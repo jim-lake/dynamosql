@@ -12,13 +12,11 @@ const {
 } = require('@aws-sdk/client-dynamodb');
 
 const { init: AdminInit, ...AdminOther } = require('./dynamodb_admin');
+const { pql, convertError } = require('./dynamodb_helper');
 
 const BATCH_LIMIT = 5;
 const QUERY_LIMIT = 5;
 
-exports.escapeIdentifier = escapeIdentifier;
-exports.escapeString = escapeString;
-exports.escapeValue = escapeValue;
 exports.init = init;
 exports.pql = pql;
 exports.queryQL = queryQL;
@@ -41,57 +39,6 @@ function init(params) {
   g_client = new DynamoDBClient(params);
   AdminInit(g_client);
 }
-function escapeIdentifier(string) {
-  return '"' + string + '"';
-}
-function escapeString(string) {
-  let ret = '';
-  for (let i = 0; i < string.length; i++) {
-    const c = string.charCodeAt(i);
-    if (c < 32) {
-      ret += '\\x' + c.toString(16);
-    } else if (c === 39) {
-      ret += "''";
-    } else {
-      ret += string[i];
-    }
-  }
-  return ret;
-}
-function escapeValue(value) {
-  let s;
-  if (value === null) {
-    s = 'NULL';
-  } else if (Array.isArray(value)) {
-    s = '[ ';
-    s += value.map(escapeValue).join(', ');
-    s += ' ]';
-  } else if (typeof value === 'object') {
-    s = '{ ';
-    s += Object.keys(value)
-      .map((key) => `'${key}': ${escapeValue(value[key])}`)
-      .join(', ');
-    s += ' }';
-  } else if (typeof value === 'number') {
-    s = String(value);
-  } else if (value !== undefined) {
-    s = "'" + escapeString(String(value)) + "'";
-  } else {
-    s = 'MISSING';
-  }
-  return s;
-}
-function pql(strings, ...values) {
-  let s = '';
-  for (let i = 0; i < strings.length; i++) {
-    s += strings[i];
-    if (i < values.length) {
-      s += escapeValue(values[i]);
-    }
-  }
-  s = s.replace(/\s+/g, ' ').trim();
-  return s;
-}
 
 function queryQL(list, done) {
   if (!Array.isArray(list)) {
@@ -103,8 +50,8 @@ function queryQL(list, done) {
       list.length,
       QUERY_LIMIT,
       (i, done) => {
-        const sql = list[i];
-        _queryQL(sql, (err, result) => {
+        const item = list[i];
+        _queryQL(item, (err, result) => {
           result_list[i] = result;
           err_list[i] = err;
           done(err);
@@ -114,29 +61,32 @@ function queryQL(list, done) {
     );
   }
 }
-function _queryQL(sql, done) {
+function _queryQL(params, done) {
+  const sql = params?.sql ? params.sql : params;
   const input = {
     Statement: sql,
-    ReturnValuesOnConditionCheckFailure: 'ALL_OLD',
+    ReturnValuesOnConditionCheckFailure: params?.return ?? 'NONE',
   };
   const command = new ExecuteStatementCommand(input);
   _pagedSend(command, done);
 }
-function batchQL(list, done) {
+function batchQL(params, done) {
+  const list = Array.isArray(params) ? params : params.list;
   const input = {
     Statements: list.map((Statement) => ({
       Statement,
-      ReturnValuesOnConditionCheckFailure: 'ALL_OLD',
+      ReturnValuesOnConditionCheckFailure: params?.return ?? 'NONE',
     })),
   };
   const command = new BatchExecuteStatementCommand(input);
   _pagedSend(command, done);
 }
-function transactionQL(list, done) {
+function transactionQL(params, done) {
+  const list = Array.isArray(params) ? params : params.list;
   const input = {
     TransactStatements: list.map((Statement) => ({
       Statement,
-      ReturnValuesOnConditionCheckFailure: 'ALL_OLD',
+      ReturnValuesOnConditionCheckFailure: params?.return ?? 'NONE',
     })),
   };
   const command = new ExecuteTransactionCommand(input);
@@ -185,7 +135,7 @@ function batchWrite(list, done) {
           if (err.Item) {
             results.push(err.Item);
           }
-          done(_convertError(err));
+          done(convertError(err));
         }
       );
     },
@@ -227,7 +177,7 @@ function _pagedSend(command, done) {
           if (err.Item) {
             results.push(err.Item);
           }
-          done(_convertError(err));
+          done(convertError(err));
         }
       );
     },
@@ -248,7 +198,7 @@ function _errorReturn(err, done) {
   if (err.Item) {
     ret = [err.Item];
   }
-  done(_convertError(err), ret);
+  done(convertError(err), ret);
 }
 function _inputUpdate(opts) {
   const sets = [];
@@ -314,7 +264,7 @@ function _convertSuccess(result) {
         if (!err) {
           err = [];
         }
-        err[i] = _convertError(response.Error);
+        err[i] = convertError(response.Error);
       }
       ret[i] = _convertResult(response);
     });
@@ -329,15 +279,6 @@ function _convertResult(result) {
     ret = result.Items;
   } else if (result?.Item) {
     ret = [result?.Item];
-  }
-  return ret;
-}
-function _convertError(err) {
-  let ret = err;
-  if (err.name === 'ConditionalCheckFailedException' && err.Item) {
-    ret = 'cond_fail';
-  } else if (err.Code === 'ConditionalCheckFailed') {
-    ret = 'cond_fail';
   }
   return ret;
 }

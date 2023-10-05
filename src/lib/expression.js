@@ -68,7 +68,7 @@ function getValue(expr, session, row_map, index) {
 function _decodeCell(cell) {
   let type;
   let value;
-  if (!cell) {
+  if (!cell || cell.NULL) {
     type = 'null';
     value = null;
   } else if (cell.S) {

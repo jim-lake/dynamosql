@@ -200,7 +200,6 @@ exports.TYPES_MAP = {
   254: 'STRING',
   255: 'GEOMETRY',
 };
-//console.log(Object.keys(exports.TYPES).map(key => `${exports.TYPES[key]}: "${key}"`).join(",\n"));
 
 exports.CHARSETS = {
   BIG5_CHINESE_CI: 1,

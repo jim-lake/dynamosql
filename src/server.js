@@ -16,11 +16,11 @@ server.on('connection', _onConnection);
 
 asyncSeries([(done) => Session.init({}, done)], (err) => {
   if (err) {
-    logger.debug('mysql init failed:', err);
+    logger.debug('dynamosql init failed:', err);
     process.exit(-1);
   } else {
     server.listen(PORT);
-    logger.info('mysql server listening:', PORT);
+    logger.info('dynamosql server listening:', PORT);
   }
 });
 
@@ -53,7 +53,7 @@ function _onConnection(conn) {
     logger.trace('init_db:', database);
     session.setCurrentDatabase(database, (err) => {
       if (err) {
-        conn.writeError(_errorConvert(err));
+        conn.writeError(_errorToMysql(err));
       } else {
         conn.writeOk();
       }
@@ -92,7 +92,7 @@ function _query(sql, session, conn) {
     }
     if (err) {
       logger.trace('err:', err);
-      const { code, message } = _errorConvert(err);
+      const { code, message } = _errorToMysql(err);
       conn.writeError({ code, message });
     } else if (count === 1) {
       logger.trace('single result:', results, schemas);
@@ -131,7 +131,7 @@ function _trim(s) {
   }
   return ret;
 }
-function _errorConvert(err) {
+function _errorToMysql(err) {
   let ret;
   if (err === 'unsupported') {
     ret = { code: 1002, message: 'Unsupported' };
@@ -139,8 +139,21 @@ function _errorConvert(err) {
     ret = { code: 1064, message: 'Parse error' };
   } else if (err === 'no_current_database') {
     ret = { code: 1046, message: 'No database selected' };
+  } else if (err === 'table_not_found') {
+    ret = { code: 1051, message: 'Table not found' };
+  } else if (err === 'table_exists') {
+    ret = { code: 1050, message: 'Table already exists' };
+  } else if (err === 'dup') {
+    ret = { code: 1062, message: 'Duplication entry' };
+  } else if (typeof err.Message === 'string') {
+    ret = { code: 1002, message: err.Message };
+  } else if (typeof err === 'string') {
+    ret = { code: 1002, message: err };
   } else {
-    ret = { code: err.code ?? 1002, message: err.message ?? String(err) };
+    ret = {
+      code: typeof err.code === 'number' ? err.code : 1002,
+      message: err.message ? String(err.message) : 'Unknown error',
+    };
   }
   return ret;
 }

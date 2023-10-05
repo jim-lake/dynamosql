@@ -2,6 +2,9 @@ const asyncTimesSeries = require('async/timesSeries');
 
 const { Parser } = require('node-sql-parser/build/mysql');
 
+const CreateHandler = require('./lib/create_handler');
+const DropHandler = require('./lib/drop_handler');
+const InsertHandler = require('./lib/insert_handler');
 const SelectHandler = require('./lib/select_handler');
 const SetHandler = require('./lib/set_handler');
 const ShowHandler = require('./lib/show_handler');
@@ -27,6 +30,7 @@ class Session {
   constructor() {}
   _currentDatabase = null;
   _localVariables = {};
+  _transaction = null;
 
   setCurrentDatabase(database, done) {
     this._currentDatabase = database;
@@ -40,6 +44,12 @@ class Session {
   }
   getVariable(name) {
     return this._localVariables[name];
+  }
+  getTransaction() {
+    return this._transaction;
+  }
+  setTransaction(tx) {
+    this._transaction = tx;
   }
 
   query(sql, done) {
@@ -78,12 +88,18 @@ class Session {
   _singleQuery(sql, done) {
     let { err, ast } = this._astify(sql);
     let handler;
-    if (ast?.type === 'show') {
+    if (ast?.type === 'create') {
+      handler = CreateHandler.query;
+    } else if (ast?.type === 'drop') {
+      handler = DropHandler.query;
+    } else if (ast?.type === 'insert') {
+      handler = InsertHandler.query;
+    } else if (ast?.type === 'show') {
       handler = ShowHandler.query;
-    } else if (ast?.type === 'set') {
-      handler = SetHandler.query;
     } else if (ast?.type === 'select') {
       handler = SelectHandler.query;
+    } else if (ast?.type === 'set') {
+      handler = SetHandler.query;
     } else if (ast?.type === 'use') {
       handler = _useDatabase;
     } else if (!err) {
