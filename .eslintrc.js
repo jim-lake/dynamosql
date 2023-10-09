@@ -1,4 +1,5 @@
 module.exports = {
+  "ignorePatterns": ["src/vendor/*"],
   "env": {
     "node": true,
     "es6": true,

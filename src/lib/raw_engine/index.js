@@ -1,4 +1,5 @@
 const ddl = require('./ddl');
+const delete_opts = require('./delete');
 const logger = require('../../tools/logger');
 const {
   escapeValue,
@@ -7,6 +8,7 @@ const {
 } = require('../../tools/dynamodb_helper');
 
 Object.assign(exports, ddl);
+Object.assign(exports, delete_opts);
 
 exports.getRowList = getRowList;
 exports.insertRowList = insertRowList;
@@ -15,8 +17,9 @@ exports.commit = commit;
 exports.rollback = rollback;
 
 function getRowList(params, done) {
-  const { dynamodb, table, request_columns, request_all } = params;
+  const { dynamodb, table, request_set, request_all } = params;
 
+  const request_columns = [...request_set];
   const columns = request_all
     ? '*'
     : request_columns.map(escapeIdentifier).join(',');
@@ -28,13 +31,13 @@ function getRowList(params, done) {
       logger.error('raw_engine.getRowList err:', err, results, sql);
     } else {
       if (request_all) {
-        const column_set = new Set();
+        const response_set = new Set();
         results.forEach((result) => {
           for (let key in result) {
-            column_set.add(key);
+            response_set.add(key);
           }
         });
-        column_list = [...column_set.keys()];
+        column_list = [...response_set.keys()];
       } else {
         column_list = request_columns;
       }

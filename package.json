@@ -8,8 +8,8 @@
   "dependencies": {
     "@aws-sdk/client-dynamodb": "3.410.0",
     "async": "3.2.4",
+    "big-integer": "1.6.51",
     "mysql": "2.18.1",
-    "mysql2": "https://github.com/jim-lake/node-mysql2#f0897cd221feb9c6b3bf2b291fadaa4db0964694",
-    "node-sql-parser": "4.11.0"
+    "mysql2": "https://github.com/jim-lake/node-mysql2#f0897cd221feb9c6b3bf2b291fadaa4db0964694"
   }
 }

@@ -11,7 +11,6 @@ function query(params, done) {
 
   const database = ast.table?.[0]?.db || session.getCurrentDatabase();
 
-  logger.inspect(ast);
   if (!database) {
     done('no_current_database');
   } else {
@@ -21,12 +20,12 @@ function query(params, done) {
       database,
       engine,
       ignore_dup,
-      func: _runTransaction,
+      func: _runInsert,
     };
     TransactionManager.run(opts, done);
   }
 }
-function _runTransaction(params, done) {
+function _runInsert(params, done) {
   const { ast, session, engine, dynamodb, ignore_dup } = params;
   const table = ast.table?.[0]?.table;
 

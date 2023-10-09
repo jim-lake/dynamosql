@@ -5,6 +5,7 @@ exports.dropTable = unsupported;
 exports.startTransaction = unsupported;
 exports.commit = unsupported;
 exports.rollback = unsupported;
+exports.deleteRowList = unsupported;
 
 function unsupported(arg, done) {
   done('unsupported');

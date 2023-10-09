@@ -1,10 +1,12 @@
-const Functions = require('./functions');
-const SystemVariables = require('./system_variables');
-
-const { mapToObject } = require('../tools/dynamodb_helper');
-const logger = require('../tools/logger');
-
+// first to ignore circles
 exports.getValue = getValue;
+
+const BinaryExpression = require('./binary_expression');
+const Functions = require('./functions');
+const SystemVariables = require('../system_variables');
+
+const { mapToObject } = require('../../tools/dynamodb_helper');
+const logger = require('../../tools/logger');
 
 function getValue(expr, session, row_map, index) {
   let err = null;
@@ -16,16 +18,36 @@ function getValue(expr, session, row_map, index) {
     value = expr.value;
   } else if (expr.type === 'double_quote_string') {
     value = expr.value;
+    name = `"${value}"`;
+  } else if (expr.type === 'null') {
+    value = null;
+  } else if (expr.type === 'bool') {
+    value = expr.value ? 1 : 0;
+    name = expr.value ? 'TRUE' : 'FALSE';
   } else if (expr.type === 'function') {
     const func = Functions[expr.name.toLowerCase()];
     if (func) {
-      const result = func({ args: expr.args, session });
+      const result = func(expr.args, session, row_map, index);
       if (result.err) {
         err = result.err;
       } else {
         value = result.value;
         type = result.type;
-        name = expr.name + '()';
+        name = result.name ?? expr.name + '()';
+      }
+    } else {
+      err = 'ER_SP_DOES_NOT_EXIST';
+    }
+  } else if (expr.type === 'binary_expr') {
+    const func = BinaryExpression[expr.operator.toLowerCase()];
+    if (func) {
+      const result = func(expr.left, expr.right, session, row_map, index);
+      if (result.err) {
+        err = result.err;
+      } else {
+        value = result.value;
+        type = result.type;
+        name = result.name ?? expr.operator;
       }
     } else {
       err = 'ER_SP_DOES_NOT_EXIST';
@@ -60,7 +82,7 @@ function getValue(expr, session, row_map, index) {
     type = value === null ? 'null' : typeof value;
   }
   if (!name) {
-    name = value;
+    name = String(value);
   }
   return { err, type, value, name };
 }

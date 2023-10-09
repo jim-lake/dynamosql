@@ -1,8 +1,9 @@
 const asyncTimesSeries = require('async/timesSeries');
 
-const { Parser } = require('node-sql-parser/build/mysql');
+const { Parser } = require('./vendor/mysql_parser');
 
 const CreateHandler = require('./lib/create_handler');
+const DeleteHandler = require('./lib/delete_handler');
 const DropHandler = require('./lib/drop_handler');
 const InsertHandler = require('./lib/insert_handler');
 const SelectHandler = require('./lib/select_handler');
@@ -90,6 +91,8 @@ class Session {
     let handler;
     if (ast?.type === 'create') {
       handler = CreateHandler.query;
+    } else if (ast?.type === 'delete') {
+      handler = DeleteHandler.query;
     } else if (ast?.type === 'drop') {
       handler = DropHandler.query;
     } else if (ast?.type === 'insert') {
@@ -118,12 +121,7 @@ class Session {
     let err;
     let ast;
     try {
-      const clean_sql = sql?.trim?.()?.toLowerCase?.();
-      if (clean_sql === 'show databases') {
-        ast = { type: 'show', keyword: 'databases' };
-      } else {
-        ast = parser.astify(sql);
-      }
+      ast = parser.astify(sql);
     } catch (e) {
       logger.error('parse error:', e);
       err = 'parse';

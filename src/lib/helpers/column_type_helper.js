@@ -1,4 +1,4 @@
-const MYSQL = require('../constants/mysql');
+const MYSQL = require('../../constants/mysql');
 
 exports.convertType = convertType;
 

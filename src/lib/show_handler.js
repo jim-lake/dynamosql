@@ -1,4 +1,4 @@
-const { convertType } = require('./column_type_helper');
+const { convertType } = require('./helpers/column_type_helper');
 const Engine = require('./engine');
 
 exports.query = query;
