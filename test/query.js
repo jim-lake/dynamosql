@@ -17,6 +17,7 @@ const conn = mysql.createConnection({
   //database: config.db.database,
   debug: true,
   multipleStatements: true,
+  dateStrings: true,
 });
 conn.connect((err) => {
   if (err) {

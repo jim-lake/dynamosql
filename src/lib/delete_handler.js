@@ -1,4 +1,3 @@
-const asyncSeries = require('async/series');
 const Engine = require('./engine');
 const { resolveReferences } = require('./helpers/column_ref_helper');
 const TransactionManager = require('./transaction_manager');

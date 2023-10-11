@@ -29,6 +29,7 @@ function query(params, done) {
       table,
       request_set,
       request_all,
+      where: ast.where,
     };
     engine.getRowList(opts, (err, rows, columns) => {
       if (err) {
