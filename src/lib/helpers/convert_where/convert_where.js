@@ -4,7 +4,7 @@ const BinaryExpression = require('./binary_expression');
 const Functions = require('./functions');
 const Expression = require('../../expression');
 
-function convertWhere(expr, session, extra) {
+function convertWhere(expr, session, from_key, extra) {
   let err = null;
   let value = null;
 
@@ -19,7 +19,7 @@ function convertWhere(expr, session, extra) {
   } else if (expr.type === 'function') {
     const func = Functions[expr.name.toLowerCase()];
     if (func) {
-      const result = func(expr, session, extra);
+      const result = func(expr, session, from_key, extra);
       if (result.err) {
         err = result.err;
       } else {
@@ -31,7 +31,7 @@ function convertWhere(expr, session, extra) {
   } else if (expr.type === 'binary_expr') {
     const func = BinaryExpression[expr.operator.toLowerCase()];
     if (func) {
-      const result = func(expr, session, extra);
+      const result = func(expr, session, from_key, extra);
       if (result.err) {
         err = result.err;
       } else {
@@ -41,7 +41,11 @@ function convertWhere(expr, session, extra) {
       err = 'unsupported';
     }
   } else if (expr.type === 'column_ref') {
-    value = expr.column;
+    if (expr.from.key === from_key) {
+      value = expr.column;
+    } else {
+      err = 'unsupported';
+    }
   } else {
     const result = Expression.getValue(expr, session);
     err = result.err;

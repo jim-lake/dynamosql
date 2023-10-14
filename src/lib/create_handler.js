@@ -18,6 +18,9 @@ function query(params, done) {
           type: def.definition?.dataType,
           length: def.definition?.length,
         });
+        if (def.primary_key === 'primary key') {
+          primary_key = [{ name: def.column?.column }];
+        }
       } else if (def.constraint_type === 'primary key') {
         primary_key = def.definition?.map?.((sub) => ({
           name: sub.column,

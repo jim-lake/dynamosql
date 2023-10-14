@@ -4,9 +4,9 @@ const { escapeIdentifier } = require('../../tools/dynamodb_helper');
 exports.deleteRowList = deleteRowList;
 
 function deleteRowList(params, done) {
-  const { dynamodb, table, session, where } = params;
+  const { dynamodb, table, session, from, where } = params;
 
-  const result = convertWhere(where, session);
+  const result = convertWhere(where, session, from.key);
   if (result.err) {
     done(result.err);
   } else if (!result.value) {

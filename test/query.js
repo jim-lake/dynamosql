@@ -44,7 +44,7 @@ conn.on('handshake', (handshake) => {
 
 function _query(sql, done) {
   console.log('sql:', sql);
-  conn.query(sql, (err, results, fields) => {
+  conn.query({ sql, nestTables: true }, (err, results, fields) => {
     const result0 = results?.[0];
     const val = result0?.fieldCount ?? result0?.length;
     if (val !== undefined) {

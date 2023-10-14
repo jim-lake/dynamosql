@@ -11,7 +11,6 @@ function query(params, done) {
   const resolve_err = resolveReferences(ast, current_database);
   const database = ast.from?.[0]?.db;
 
-  logger.inspect(ast);
   if (resolve_err) {
     logger.error('resolve_err:', resolve_err);
     done(resolve_err);
@@ -20,12 +19,12 @@ function query(params, done) {
   } else if (ast?.from?.length > 1) {
     done('unsupported');
   } else {
-    logger.inspect('ast:', ast);
     const engine = Engine.getEngine(database);
     const opts = {
       ...params,
       engine,
       database,
+      from: ast.from[0],
       func: _runDelete,
     };
     TransactionManager.run(opts, done);

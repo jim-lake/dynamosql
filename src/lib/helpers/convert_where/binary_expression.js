@@ -15,18 +15,18 @@ const Expression = require('../../expression');
 const { convertWhere } = require('./convert_where');
 
 function constantFixup(func) {
-  return (expr, session, extra) => {
+  return (expr, session, from_key, extra) => {
     let result;
     result = Expression.getValue(expr, session);
     if (result.err) {
-      result = func(expr, session, extra);
+      result = func(expr, session, from_key, extra);
     }
     return result;
   };
 }
-function and(expr, session, extra) {
-  const left = convertWhere(expr.left, session, extra);
-  const right = convertWhere(expr.right, session, extra);
+function and(expr, session, from_key, extra) {
+  const left = convertWhere(expr.left, session, from_key, extra);
+  const right = convertWhere(expr.right, session, from_key, extra);
   if (left.err === 'unsupported' && extra?.default_true) {
     left.err = null;
     left.value = 1;
@@ -51,9 +51,9 @@ function and(expr, session, extra) {
   }
   return { err, value };
 }
-function or(expr, session, extra) {
-  const left = convertWhere(expr.left, session, extra);
-  const right = convertWhere(expr.right, session, extra);
+function or(expr, session, from_key, extra) {
+  const left = convertWhere(expr.left, session, from_key, extra);
+  const right = convertWhere(expr.right, session, from_key, extra);
   let err = left.err ?? right.err;
   let value;
   if (err === 'unsupported' && extra?.default_true) {
@@ -72,8 +72,8 @@ function or(expr, session, extra) {
   }
   return { err, value };
 }
-function _in(expr, session) {
-  const left = convertWhere(expr.left, session);
+function _in(expr, session, from_key, extra) {
+  const left = convertWhere(expr.left, session, from_key, extra);
   let err;
   let value;
   if (left.err) {
@@ -84,7 +84,7 @@ function _in(expr, session) {
     const count = expr.right?.value?.length;
     const list = [];
     for (let i = 0; i < count; i++) {
-      const right = convertWhere(expr.right.value[i], session);
+      const right = convertWhere(expr.right.value[i], session, from_key, extra);
       if (right.err) {
         err = right.err;
         break;
@@ -101,9 +101,9 @@ function _in(expr, session) {
   }
   return { err, value };
 }
-function equal(expr, session, extra) {
-  const left = convertWhere(expr.left, session, extra);
-  const right = convertWhere(expr.right, session, extra);
+function equal(expr, session, from_key, extra) {
+  const left = convertWhere(expr.left, session, from_key, extra);
+  const right = convertWhere(expr.right, session, from_key, extra);
 
   const err = left.err ?? right.err;
   const value = `${left.value} = ${right.value}`;

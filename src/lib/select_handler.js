@@ -2,7 +2,7 @@ const { getEngine } = require('./engine');
 const Expression = require('./expression');
 const { convertType } = require('./helpers/column_type_helper');
 const { resolveReferences } = require('./helpers/column_ref_helper');
-const logger = require('../tools/logger');
+const { formJoinMap } = require('./helpers/join');
 
 exports.query = query;
 
@@ -12,84 +12,70 @@ function query(params, done) {
   const current_database = session.getCurrentDatabase();
   const resolve_err = resolveReferences(ast, current_database);
 
-  logger.inspect(ast);
   if (resolve_err) {
     done(resolve_err);
-  } else if (ast.from?.length > 1) {
-    logger.error('unsupported:', ast.from, ast.columns, ast);
-    done('unsupported');
   } else if (ast?.from?.length) {
-    const from = ast.from[0];
-    const { table, request_set, request_all, db } = from;
+    const db = ast.from?.[0]?.db;
     const engine = getEngine(db);
     const opts = {
       session,
       dynamodb,
-      database: db,
-      table,
-      request_set,
-      request_all,
+      list: ast.from,
       where: ast.where,
     };
-    engine.getRowList(opts, (err, rows, columns) => {
+    engine.getRowList(opts, (err, source_map, column_map) => {
       if (err) {
         done(err);
       } else {
-        const row_map = { [from.key]: rows, 0: rows };
-        const column_map = { [from.key]: columns };
-        _evaluateReturn({ ...params, row_map, column_map }, done);
+        _evaluateReturn({ ...params, source_map, column_map }, done);
       }
     });
   } else {
-    const row_map = { 0: [{}] };
-    _evaluateReturn({ ...params, row_map, column_map: {} }, done);
+    const source_map = { 0: [{}] };
+    _evaluateReturn({ ...params, source_map, column_map: {} }, done);
   }
 }
 function _evaluateReturn(params, done) {
-  const { session, row_map, ast } = params;
+  const { session, source_map, ast } = params;
   const query_columns = _expandStarColumns(params);
 
-  const where = ast.where;
-  const rows = row_map['0'];
+  const { from, where } = ast;
+  let err;
+  let row_map;
+  const join_result = formJoinMap({ source_map, from, where, session });
+  if (join_result.err) {
+    err = join_result.err;
+  } else {
+    row_map = join_result.row_map;
+  }
+  const key = from?.[0]?.key || '0';
+  const rows = row_map?.[key];
   const row_count = rows?.length || 0;
   const column_count = query_columns?.length || 0;
 
-  let err;
   const output_row_list = [];
   for (let i = 0; i < row_count && !err; i++) {
-    let skip = false;
-    if (where) {
-      const result = Expression.getValue(where, session, row_map, i);
+    const output_row = [];
+    for (let j = 0; j < column_count; j++) {
+      const column = query_columns[j];
+      const result = Expression.getValue(column.expr, session, row_map, i);
       if (result.err) {
         err = result.err;
-      } else if (!result.value) {
-        skip = true;
-      }
-    }
-
-    if (!skip && !err) {
-      const output_row = [];
-      for (let j = 0; j < column_count; j++) {
-        const column = query_columns[j];
-        const result = Expression.getValue(column.expr, session, row_map, i);
-        if (result.err) {
-          err = result.err;
-          break;
-        } else {
-          output_row[j] = result.value;
-          if (result.type !== column.result_type) {
-            column.result_type = _unionType(column.result_type, result.type);
-          }
-          if (!column.result_name) {
-            column.result_name = result.name;
-          }
-          if (result.value === null) {
-            column.result_nullable = true;
-          }
+        break;
+      } else {
+        output_row[j] = result.value;
+        if (result.type !== column.result_type) {
+          column.result_type = _unionType(column.result_type, result.type);
+        }
+        if (!column.result_name) {
+          column.result_name = result.name;
+        }
+        if (result.value === null) {
+          column.result_nullable = true;
         }
       }
-      output_row_list.push(output_row);
     }
+    output_row_list.push(output_row);
   }
 
   const column_list = [];
@@ -125,7 +111,10 @@ function _expandStarColumns(params) {
           (!db && from.as === table)
         ) {
           const column_list = column_map[from.key];
-          column_list?.forEach?.((name) => {
+          if (!column_list.length) {
+            from.request_set.forEach((name) => column_list.push(name));
+          }
+          column_list.forEach((name) => {
             ret.push({
               expr: {
                 type: 'column_ref',
