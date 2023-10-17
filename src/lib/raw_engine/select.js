@@ -8,18 +8,18 @@ exports.getRowList = getRowList;
 function getRowList(params, done) {
   const { list } = params;
 
-  const row_map = {};
+  const source_map = {};
   const column_map = {};
   asyncEach(
     list,
     (from, done) => {
       _getFromTable({ ...params, from }, (err, results, column_list) => {
-        row_map[from.key] = results;
+        source_map[from.key] = results;
         column_map[from.key] = column_list;
         done(err);
       });
     },
-    (err) => done(err, row_map, column_map)
+    (err) => done(err, source_map, column_map)
   );
 }
 function _getFromTable(params, done) {
@@ -31,7 +31,7 @@ function _getFromTable(params, done) {
     : request_columns.map(escapeIdentifier).join(',');
   let sql = `SELECT ${columns} FROM ${escapeIdentifier(table)}`;
   const where_result = where
-    ? convertWhere(where, session, from.key, { default_true: true })
+    ? convertWhere(where, { session, from_key: from.key, default_true: true })
     : null;
   if (!where_result?.err && where_result?.value) {
     sql += ' WHERE ' + where_result.value;

@@ -20,7 +20,7 @@ const parser = new Parser();
 
 function init(params, done) {
   dynamodb.init(params);
-  done();
+  done?.();
 }
 
 function newSession(args) {
@@ -60,7 +60,7 @@ class Session {
       .filter((s) => s.length > 0);
     if (list.length === 1) {
       this._singleQuery(list[0], (err, result, columns) =>
-        done(err, result, columns, 1)
+        done(err ?? null, result, columns, 1)
       );
     } else {
       const query_count = list.length;
@@ -82,14 +82,17 @@ class Session {
             done();
           }
         },
-        (err) => done(err, result_list, schema_list, query_count)
+        (err) => done(err ?? null, result_list, schema_list, query_count)
       );
     }
   }
   _singleQuery(sql, done) {
     let { err, ast } = this._astify(sql);
+    let result;
     let handler;
-    if (ast?.type === 'create') {
+    if (!ast && !err) {
+      result = {};
+    } else if (ast?.type === 'create') {
       handler = CreateHandler.query;
     } else if (ast?.type === 'delete') {
       handler = DeleteHandler.query;
@@ -113,7 +116,7 @@ class Session {
     if (handler) {
       handler({ sql, ast, dynamodb, session: this }, done);
     } else {
-      done(err);
+      done(err, result);
     }
   }
 

@@ -10,7 +10,7 @@ function query(params, done) {
   const expr = ast?.expr;
   if (expr?.type === 'assign') {
     const { left } = expr;
-    const right = Expression.getValue(expr.right, session);
+    const right = Expression.getValue(expr.right, { session });
     if (right.err) {
       err = right.err;
     } else if (left?.type === 'var' && left.prefix === '@') {

@@ -3,6 +3,8 @@ const Expression = require('./expression');
 const { convertType } = require('./helpers/column_type_helper');
 const { resolveReferences } = require('./helpers/column_ref_helper');
 const { formJoinMap } = require('./helpers/join');
+const { sort } = require('./helpers/sort');
+const logger = require('../tools/logger');
 
 exports.query = query;
 
@@ -13,6 +15,7 @@ function query(params, done) {
   const resolve_err = resolveReferences(ast, current_database);
 
   if (resolve_err) {
+    logger.error('select: resolve err:', resolve_err);
     done(resolve_err);
   } else if (ast?.from?.length) {
     const db = ast.from?.[0]?.db;
@@ -31,8 +34,7 @@ function query(params, done) {
       }
     });
   } else {
-    const source_map = { 0: [{}] };
-    _evaluateReturn({ ...params, source_map, column_map: {} }, done);
+    _evaluateReturn({ ...params, source_map: null, column_map: {} }, done);
   }
 }
 function _evaluateReturn(params, done) {
@@ -41,24 +43,27 @@ function _evaluateReturn(params, done) {
 
   const { from, where } = ast;
   let err;
-  let row_map;
-  const join_result = formJoinMap({ source_map, from, where, session });
-  if (join_result.err) {
-    err = join_result.err;
+  let row_list;
+  let sleep_ms = 9;
+  if (from) {
+    const join_result = formJoinMap({ source_map, from, where, session });
+    if (join_result.err) {
+      err = join_result.err;
+    } else {
+      row_list = join_result.row_list;
+    }
   } else {
-    row_map = join_result.row_map;
+    row_list = [{ 0: {} }];
   }
-  const key = from?.[0]?.key || '0';
-  const rows = row_map?.[key];
-  const row_count = rows?.length || 0;
+  const row_count = row_list?.length || 0;
   const column_count = query_columns?.length || 0;
 
-  const output_row_list = [];
   for (let i = 0; i < row_count && !err; i++) {
     const output_row = [];
+    const row = row_list[i];
     for (let j = 0; j < column_count; j++) {
       const column = query_columns[j];
-      const result = Expression.getValue(column.expr, session, row_map, i);
+      const result = Expression.getValue(column.expr, { session, row });
       if (result.err) {
         err = result.err;
         break;
@@ -74,8 +79,11 @@ function _evaluateReturn(params, done) {
           column.result_nullable = true;
         }
       }
+      if (result.sleep_ms) {
+        sleep_ms = result.sleep_ms;
+      }
     }
-    output_row_list.push(output_row);
+    row['@@result'] = output_row;
   }
 
   const column_list = [];
@@ -91,10 +99,22 @@ function _evaluateReturn(params, done) {
       column_type.orgTable = column?.expr?.from?.table || '';
       column_type.table = column?.expr?.from?.as || column_type.orgTable;
       column_type.schema = column.expr?.from?.db || '';
+      column_type.result_type = column.result_type;
       column_list.push(column_type);
     }
   }
-  done(err, output_row_list, column_list);
+  if (ast.orderby) {
+    sort(row_list, ast.orderby, { session, column_list });
+  }
+  const output_row_list = row_list.map((row) => row['@@result']);
+
+  if (sleep_ms && !err) {
+    setTimeout(() => {
+      done(err, output_row_list, column_list);
+    }, sleep_ms);
+  } else {
+    done(err, output_row_list, column_list);
+  }
 }
 
 function _expandStarColumns(params) {

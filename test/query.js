@@ -15,7 +15,7 @@ const conn = mysql.createConnection({
   user: config.db.user,
   password: config.db.password,
   //database: config.db.database,
-  debug: true,
+  //debug: true,
   multipleStatements: true,
   dateStrings: true,
 });

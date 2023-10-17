@@ -4,16 +4,23 @@ exports.database = database;
 exports.concat = concat;
 exports.coalesce = coalesce;
 exports.ifnull = coalesce;
+exports.sleep = sleep;
 
-function database(args, session) {
-  return { value: session.getCurrentDatabase() };
+function database(expr, state) {
+  return { value: state.session.getCurrentDatabase() };
 }
-function coalesce(args, session, row_map, index) {
+function sleep(expr, state) {
+  const result = Expression.getValue(expr.args.value?.[0], state);
+  result.name = 'sleep()';
+  result.sleep_ms = parseFloat(result.value) * 1000;
+  return result;
+}
+function coalesce(expr, state) {
   let err;
   let value = null;
   let type;
-  args.value?.some?.((expr) => {
-    const result = Expression.getValue(expr, session, row_map, index);
+  expr.args.value?.some?.((sub) => {
+    const result = Expression.getValue(sub, state);
     if (result.err) {
       err = result.err;
     }
@@ -23,11 +30,11 @@ function coalesce(args, session, row_map, index) {
   });
   return { err, value, type };
 }
-function concat(args, session, row_map, index) {
+function concat(expr, state) {
   let err;
   let value = '';
-  args.value?.every?.((expr) => {
-    const result = Expression.getValue(expr, session, row_map, index);
+  expr.args.value?.every?.((sub) => {
+    const result = Expression.getValue(sub, state);
     if (!err && result.err) {
       err = result.err;
     } else if (result.value === null) {

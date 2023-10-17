@@ -8,88 +8,81 @@ const SystemVariables = require('../system_variables');
 const { mapToObject } = require('../../tools/dynamodb_helper');
 const logger = require('../../tools/logger');
 
-function getValue(expr, session, row_map, index) {
-  let err = null;
-  let type = null;
-  let value = null;
-  let name = null;
+function getValue(expr, state) {
+  const { session, row, column_list } = state;
+  let result = { err: null, type: null, value: null, name: null };
 
   if (expr.type === 'number') {
-    value = expr.value;
+    result.value = expr.value;
   } else if (expr.type === 'double_quote_string') {
-    value = expr.value;
-    name = `"${value}"`;
+    result.value = expr.value;
+    result.name = `"${result.value}"`;
   } else if (expr.type === 'null') {
-    value = null;
+    result.value = null;
   } else if (expr.type === 'bool') {
-    value = expr.value ? 1 : 0;
-    name = expr.value ? 'TRUE' : 'FALSE';
+    result.value = expr.value ? 1 : 0;
+    result.name = expr.value ? 'TRUE' : 'FALSE';
   } else if (expr.type === 'function') {
     const func = Functions[expr.name.toLowerCase()];
     if (func) {
-      const result = func(expr.args, session, row_map, index);
-      if (result.err) {
-        err = result.err;
-      } else {
-        value = result.value;
-        type = result.type;
-        name = result.name ?? expr.name + '()';
+      result = func(expr, state);
+      if (!result.name) {
+        result.name = expr.name + '()';
       }
     } else {
-      err = 'ER_SP_DOES_NOT_EXIST';
+      result.err = 'ER_SP_DOES_NOT_EXIST';
     }
   } else if (expr.type === 'binary_expr') {
     const func = BinaryExpression[expr.operator.toLowerCase()];
     if (func) {
-      const result = func(expr.left, expr.right, session, row_map, index);
-      if (result.err) {
-        err = result.err;
-      } else {
-        value = result.value;
-        type = result.type;
-        name = result.name ?? expr.operator;
+      result = func(expr, state);
+      if (!result.name) {
+        result.name = expr.operator;
       }
     } else {
-      err = 'ER_SP_DOES_NOT_EXIST';
+      result.err = 'ER_SP_DOES_NOT_EXIST';
     }
   } else if (expr.type === 'var') {
     const { prefix } = expr;
     if (prefix === '@@') {
       const func = SystemVariables[expr.name.toLowerCase()];
       if (func) {
-        value = func(session);
+        result.value = func(session);
       } else {
-        err = 'ER_UNKNOWN_SYSTEM_VARIABLE';
+        result.err = 'ER_UNKNOWN_SYSTEM_VARIABLE';
       }
     } else if (prefix === '@') {
-      value = session.getVariable(expr.name) ?? null;
+      result.value = session.getVariable(expr.name) ?? null;
     } else {
-      err = 'unsupported';
+      result.err = 'unsupported';
     }
-    name = prefix + expr.name;
+    result.name = prefix + expr.name;
   } else if (expr.type === 'column_ref') {
-    name = expr.column;
-    if (row_map) {
-      const cell = row_map?.[expr.from?.key]?.[index]?.[name];
+    result.name = expr.column;
+    if (row && expr.result_index >= 0) {
+      result.value = row['@@result']?.[expr.result_index];
+      result.type = column_list?.[expr.result_index]?.result_type;
+    } else if (row) {
+      const cell = row[expr.from?.key]?.[expr.column];
       const decode = _decodeCell(cell);
-      type = decode?.type;
-      value = decode?.value;
+      result.type = decode?.type;
+      result.value = decode?.value;
     } else {
-      err = 'no_row_map';
-      value = name;
+      result.err = 'no_row_list';
+      result.value = expr.column;
     }
   } else {
     logger.error('unsupported expr:', expr);
-    err = 'unsupported';
+    result.err = 'unsupported';
   }
 
-  if (!type) {
-    type = value === null ? 'null' : typeof value;
+  if (!result.type) {
+    result.type = result.value === null ? 'null' : typeof result.value;
   }
-  if (!name) {
-    name = String(value);
+  if (!result.name) {
+    result.name = String(result.value);
   }
-  return { err, type, value, name };
+  return result;
 }
 
 function _decodeCell(cell) {

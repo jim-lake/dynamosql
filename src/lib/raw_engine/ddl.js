@@ -14,8 +14,12 @@ function getTableList(params, done) {
   });
 }
 function createTable(params, done) {
-  const { dynamodb, ...other } = params;
-  dynamodb.createTable(other, (err) => {
+  const { dynamodb, primary_key, ...other } = params;
+  const column_list = params.column_list.filter((column) =>
+    primary_key.find((key) => key.name === column.name)
+  );
+  const opts = { ...other, primary_key, column_list };
+  dynamodb.createTable(opts, (err) => {
     if (err === 'resource_in_use') {
       err = 'table_exists';
     } else if (err) {

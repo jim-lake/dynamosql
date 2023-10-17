@@ -7,9 +7,9 @@ exports['<>'] = notEqual;
 exports['and'] = and;
 exports['or'] = or;
 
-function plus(arg_left, arg_right, session, row_map, index) {
-  const left = Expression.getValue(arg_left, session, row_map, index);
-  const right = Expression.getValue(arg_right, session, row_map, index);
+function plus(expr, state) {
+  const left = Expression.getValue(expr.left, state);
+  const right = Expression.getValue(expr.right, state);
   const err = left.err ?? right.err;
   const name = left.name + ' + ' + right.name;
   let value;
@@ -25,19 +25,19 @@ function plus(arg_left, arg_right, session, row_map, index) {
 
   return { err, value, name };
 }
-function equal(arg_left, arg_right, session, row_map, index) {
-  return _equal(arg_left, arg_right, session, row_map, index, ' = ');
+function equal(expr, state) {
+  return _equal(expr, state, ' = ');
 }
-function notEqual(arg_left, arg_right, session, row_map, index) {
-  const ret = _equal(arg_left, arg_right, session, row_map, index, ' != ');
+function notEqual(expr, state) {
+  const ret = _equal(expr, state, ' != ');
   if (ret.value !== null) {
     ret.value = ret.value ? 0 : 1;
   }
   return ret;
 }
-function _equal(arg_left, arg_right, session, row_map, index, op) {
-  const left = Expression.getValue(arg_left, session, row_map, index);
-  const right = Expression.getValue(arg_right, session, row_map, index);
+function _equal(expr, state, op) {
+  const left = Expression.getValue(expr.left, state);
+  const right = Expression.getValue(expr.right, state);
   const err = left.err ?? right.err;
   const name = left.name + op + right.name;
   let value = 0;
@@ -55,30 +55,30 @@ function _equal(arg_left, arg_right, session, row_map, index, op) {
   }
   return { err, value, name };
 }
-function and(arg_left, arg_right, session, row_map, index) {
-  const left = Expression.getValue(arg_left, session, row_map, index);
+function and(expr, state) {
+  const left = Expression.getValue(expr.left, state);
   let err = left.err;
   let name = left.name + ' AND ';
   let value = 0;
   if (!err && left.value === null) {
     value = null;
   } else if (!err && left.value) {
-    const right = Expression.getValue(arg_right, session, row_map, index);
+    const right = Expression.getValue(expr.right, state);
     err = right.err;
     value = _convertBooleanValue(right.value);
     name = left.name + ' AND ' + right.name;
   }
   return { err, value, name };
 }
-function or(arg_left, arg_right, session, row_map, index) {
-  const left = Expression.getValue(arg_left, session, row_map, index);
+function or(expr, state) {
+  const left = Expression.getValue(expr.left, state);
   let err = left.err;
   let name = left.name + ' OR ';
   let value = 1;
   if (!err && left.value === null) {
     value = null;
   } else if (!err && !left.value) {
-    const right = Expression.getValue(arg_right, session, row_map, index);
+    const right = Expression.getValue(expr.right, state);
     err = right.err;
     value = _convertBooleanValue(right.value);
     name = left.name + ' OR ' + right.name;

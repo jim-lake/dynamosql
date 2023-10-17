@@ -6,6 +6,7 @@ exports.error = error;
 exports.info = info;
 exports.trace = trace;
 exports.inspect = inspect;
+exports.always = always;
 
 const LEVEL_NONE = 0;
 const LEVEL_ERROR = 1;
@@ -52,6 +53,9 @@ function trace() {
   if (g_logLevel >= LEVEL_TRACE) {
     return _log.apply(this, arguments);
   }
+}
+function always() {
+  return _log.apply(this, arguments);
 }
 function _log() {
   const s = util.format.apply(this, arguments);
