@@ -106,7 +106,7 @@ function _evaluateReturn(params, done) {
   if (ast.orderby) {
     sort(row_list, ast.orderby, { session, column_list });
   }
-  const output_row_list = row_list.map((row) => row['@@result']);
+  const output_row_list = row_list?.map?.((row) => row['@@result']);
 
   if (sleep_ms && !err) {
     setTimeout(() => {

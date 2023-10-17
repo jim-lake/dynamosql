@@ -33,10 +33,10 @@ function _findRows(
   let output_count = 0;
   for (let i = 0; i < row_count && !err; i++) {
     const row_index = start_index + output_count;
-    const row = row_list[row_index];
     if (!row_list[row_index]) {
       row_list[row_index] = {};
     }
+    const row = row_list[row_index];
 
     row_list[row_index][key] = rows[i] ?? null;
     for (let j = 0; output_count > 0 && j < from_index; j++) {

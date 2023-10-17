@@ -36,7 +36,7 @@ function and(expr, state) {
     right.value = 1;
   }
 
-  const err = left.err ?? right.err;
+  const err = left.err || right.err;
   let value;
   if (!left.value || !right.value) {
     value = 0;
@@ -54,7 +54,7 @@ function and(expr, state) {
 function or(expr, state) {
   const left = convertWhere(expr.left, state);
   const right = convertWhere(expr.right, state);
-  let err = left.err ?? right.err;
+  let err = left.err || right.err;
   let value;
   if (err === 'unsupported' && state?.default_true) {
     value = 1;

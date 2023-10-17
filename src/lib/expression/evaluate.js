@@ -3,6 +3,7 @@ exports.getValue = getValue;
 
 const BinaryExpression = require('./binary_expression');
 const Functions = require('./functions');
+const UnaryExpression = require('./unary_expression');
 const SystemVariables = require('../system_variables');
 
 const { mapToObject } = require('../../tools/dynamodb_helper');
@@ -40,6 +41,17 @@ function getValue(expr, state) {
         result.name = expr.operator;
       }
     } else {
+      result.err = 'ER_SP_DOES_NOT_EXIST';
+    }
+  } else if (expr.type === 'unary_expr') {
+    const func = UnaryExpression[expr.operator.toLowerCase()];
+    if (func) {
+      result = func(expr, state);
+      if (!result.name) {
+        result.name = expr.operator;
+      }
+    } else {
+      logger.inspect(expr);
       result.err = 'ER_SP_DOES_NOT_EXIST';
     }
   } else if (expr.type === 'var') {

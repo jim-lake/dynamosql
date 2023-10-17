@@ -19,48 +19,6 @@ const mysql_conn = mysql.createConnection({
 Session.init();
 const ddb_session = Session.newSession();
 
-const SETUP_SQL_LIST = fs
-  .readFileSync(path.join(__dirname, 'setup.sql'), 'utf8')
-  .split(';')
-  .map((s) => s.trim())
-  .filter((s) => s.length > 0);
-/*
-before(function (done) {
-  this.timeout(10000 * SETUP_SQL_LIST.length);
-
-  async.eachSeries(
-    SETUP_SQL_LIST,
-    (sql, done) => {
-      console.log('before:', sql);
-      async.series(
-        [
-          (done) => {
-            mysql_conn.query(sql, (err) => {
-              if (err) {
-                console.log('before mysql:', sql, 'err:', err);
-              }
-              done(err);
-            });
-          },
-          (done) => {
-            ddb_session.query(sql, (err) => {
-              if (err) {
-                console.log('before ddb:', sql, 'err:', err);
-              }
-              done(err);
-            });
-          },
-        ],
-        (err) => {
-          console.log('before: done: err:', err);
-          done(err);
-        }
-      );
-    },
-    done
-  );
-});
-*/
 after(() => {
   mysql_conn.destroy();
 });
@@ -70,9 +28,6 @@ const SQL_LIST = fs
   .split(';')
   .map((s) => s.trim())
   .filter((s) => s.length > 0);
-const SQL1 = `SELECT 1 + 1 AS foo`;
-
-_runTest(SQL1);
 
 SQL_LIST.forEach((sql) => _runTest(sql));
 
