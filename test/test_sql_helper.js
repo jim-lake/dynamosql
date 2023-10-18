@@ -3,6 +3,7 @@ exports.runTests = runTests;
 const async = require('async');
 const { expect } = require('chai');
 const fs = require('node:fs');
+const path = require('node:path');
 const config = require('../config');
 const mysql = require('mysql');
 const Session = require('../src/session');
@@ -20,7 +21,7 @@ const mysql_conn = mysql.createConnection({
 Session.init();
 const ddb_session = Session.newSession();
 
-function runTests(file_path) {
+function runTests(name, file_path) {
   after(() => {
     mysql_conn.destroy();
   });
@@ -34,7 +35,7 @@ function runTests(file_path) {
   SQL_LIST.forEach((sql) => _runTest(sql));
 
   function _runTest(sql) {
-    describe('Join', function () {
+    describe(name, function () {
       it(sql, function (done) {
         const mysql_result = {};
         const ddb_result = {};

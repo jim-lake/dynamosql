@@ -17,5 +17,6 @@ INSERT INTO foo (id, other, comment) VALUES
   ("111", 111, "111 comment"),
   ("112", 222, "112 comment"),
   ("113", 333, "113 comment"),
-  ("114", null, "114 comment with null")
+  ("114", null, "114 comment with null"),
+  ("115", 222, "115 comment dup 222")
 ;

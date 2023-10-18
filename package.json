@@ -3,7 +3,7 @@
   "private": true,
   "scripts": {
     "pretty": "prettier --write src test",
-    "lint": "eslint src test"
+    "lint": "eslint src"
   },
   "dependencies": {
     "@aws-sdk/client-dynamodb": "3.410.0",

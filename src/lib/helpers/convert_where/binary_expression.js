@@ -1,10 +1,10 @@
 exports['='] = constantFixup(equal);
-exports['!='] = constantFixup(unsupported);
-exports['<>'] = constantFixup(unsupported);
-exports['>'] = constantFixup(unsupported);
-exports['>='] = constantFixup(unsupported);
-exports['<'] = constantFixup(unsupported);
-exports['<='] = constantFixup(unsupported);
+exports['!='] = constantFixup(notEqual);
+exports['<>'] = constantFixup(notEqual);
+exports['>'] = constantFixup(gt);
+exports['<'] = constantFixup(lt);
+exports['>='] = constantFixup(gte);
+exports['<='] = constantFixup(lte);
 exports['and'] = constantFixup(and);
 exports['or'] = constantFixup(or);
 exports['in'] = constantFixup(_in);
@@ -101,13 +101,31 @@ function _in(expr, state) {
   }
   return { err, value };
 }
-function equal(expr, state) {
+function _comparator(expr, state, op) {
   const left = convertWhere(expr.left, state);
   const right = convertWhere(expr.right, state);
 
   const err = left.err || right.err;
-  const value = `${left.value} = ${right.value}`;
+  const value = `${left.value} ${op} ${right.value}`;
   return { err, value };
+}
+function equal(expr, state) {
+  return _comparator(expr, state, '=');
+}
+function notEqual(expr, state) {
+  return _comparator(expr, state, '!=');
+}
+function gt(expr, state) {
+  return _comparator(expr, state, '>');
+}
+function lt(expr, state) {
+  return _comparator(expr, state, '<');
+}
+function gte(expr, state) {
+  return _comparator(expr, state, '>=');
+}
+function lte(expr, state) {
+  return _comparator(expr, state, '<=');
 }
 function unsupported() {
   return { err: 'unsupported' };

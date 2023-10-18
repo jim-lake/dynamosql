@@ -6,6 +6,8 @@ exports['!='] = notEqual;
 exports['<>'] = notEqual;
 exports['>'] = gt;
 exports['<'] = lt;
+exports['>='] = gte;
+exports['<='] = lte;
 exports['and'] = and;
 exports['or'] = or;
 
@@ -56,17 +58,11 @@ function _equal(expr, state, op) {
   }
   return { err, value, name };
 }
-function gt(expr, state) {
-  return _gt(expr.left, expr.right, state);
-}
-function lt(expr, state) {
-  return _gt(expr.right, expr.left, state);
-}
-function _gt(expr_left, expr_right, state) {
+function _gt(expr_left, expr_right, state, op, flip) {
   const left = Expression.getValue(expr_left, state);
   const right = Expression.getValue(expr_right, state);
   const err = left.err || right.err;
-  const name = left.name + ' > ' + right.name;
+  const name = flip ? right.name + op + left.name : left.name + op + right.name;
   let value = 0;
   if (!err) {
     if (left.value === null || right.value === null) {
@@ -90,6 +86,48 @@ function _gt(expr_left, expr_right, state) {
     }
   }
   return { err, value, name };
+}
+function gt(expr, state) {
+  return _gt(expr.left, expr.right, state, ' > ', false);
+}
+function lt(expr, state) {
+  return _gt(expr.right, expr.left, state, ' < ', true);
+}
+function _gte(expr_left, expr_right, state, op, flip) {
+  const left = Expression.getValue(expr_left, state);
+  const right = Expression.getValue(expr_right, state);
+  const err = left.err || right.err;
+  const name = flip ? right.name + op + left.name : left.name + op + right.name;
+  let value = 0;
+  if (!err) {
+    if (left.value === null || right.value === null) {
+      value = null;
+    } else if (left.value === right.value) {
+      value = 1;
+    } else if (
+      typeof left.value === 'number' ||
+      typeof right.value === 'number' ||
+      left.type === 'number' ||
+      right.type === 'number'
+    ) {
+      value = _convertNum(left.value) >= _convertNum(right.value) ? 1 : 0;
+    } else if (
+      typeof left.value === 'string' &&
+      typeof right.value === 'string'
+    ) {
+      value = left.value.localeCompare(right.value) >= 0 ? 1 : 0;
+    } else {
+      value =
+        String(left.value).localeCompare(String(right.value)) >= 0 ? 1 : 0;
+    }
+  }
+  return { err, value, name };
+}
+function gte(expr, state) {
+  return _gte(expr.left, expr.right, state, ' >= ', false);
+}
+function lte(expr, state) {
+  return _gte(expr.right, expr.left, state, ' <= ', true);
 }
 function and(expr, state) {
   const left = Expression.getValue(expr.left, state);
