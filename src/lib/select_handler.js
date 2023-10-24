@@ -89,8 +89,8 @@ function _evaluateReturn(params, done) {
   let output_row_list;
   const column_list = [];
   if (!err) {
-    for (let j = 0; j < column_count; j++) {
-      const column = query_columns[j];
+    for (let i = 0; i < column_count; i++) {
+      const column = query_columns[i];
       const column_type = convertType(
         column.result_type,
         column.result_nullable
@@ -103,8 +103,25 @@ function _evaluateReturn(params, done) {
       column_type.result_type = column.result_type;
       column_list.push(column_type);
     }
-    sort(row_list, ast.orderby, { session, column_list });
-    output_row_list = row_list?.map?.((row) => row['@@result']);
+    if (ast.orderby) {
+      sort(row_list, ast.orderby, { session, column_list });
+    }
+    let start = 0;
+    let end = row_list.length;
+    if (ast.limit?.seperator === 'offset') {
+      start = ast.limit.value[1].value;
+      end = Math.min(end, start + ast.limit.value[0].value);
+    } else if (ast.limit?.value?.length > 1) {
+      start = ast.limit.value[0].value;
+      end = Math.min(end, start + ast.limit.value[1].value);
+    } else if (ast.limit) {
+      end = Math.min(end, ast.limit.value[0].value);
+    }
+
+    output_row_list = [];
+    for (let i = start; i < end; i++) {
+      output_row_list[i] = row_list[i]['@@result'];
+    }
   }
 
   if (!err && sleep_ms) {

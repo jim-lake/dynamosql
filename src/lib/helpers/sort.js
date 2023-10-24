@@ -3,7 +3,6 @@ exports.sort = sort;
 const Expression = require('../expression');
 
 function sort(row_list, orderby, state) {
-  console.log(row_list);
   row_list.sort(_sort.bind(null, orderby, state));
 }
 function _sort(orderby, state, a, b) {
