@@ -1,6 +1,7 @@
 // first to ignore circles
 exports.getValue = getValue;
 
+const AggregateFunctions = require('./aggregate_functions');
 const BinaryExpression = require('./binary_expression');
 const Functions = require('./functions');
 const UnaryExpression = require('./unary_expression');
@@ -32,6 +33,17 @@ function getValue(expr, state) {
       }
     } else {
       logger.trace('expression.getValue: unknown function:', expr.name);
+      result.err = 'ER_SP_DOES_NOT_EXIST';
+    }
+  } else if (expr.type === 'aggr_func') {
+    const func = AggregateFunctions[expr.name.toLowerCase()];
+    if (func) {
+      result = func(expr, state);
+      if (!result.name) {
+        result.name = expr.name + '()';
+      }
+    } else {
+      logger.trace('expression.getValue: unknown aggregate:', expr.name);
       result.err = 'ER_SP_DOES_NOT_EXIST';
     }
   } else if (expr.type === 'binary_expr') {

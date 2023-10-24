@@ -61,18 +61,20 @@ function resolveReferences(ast, current_database) {
   });
 
   if (!err) {
-    walkColumnRefs(ast.orderby, (object) => {
-      const ret = _resolveObject(
-        object,
-        ast,
-        db_map,
-        table_map,
-        name_cache,
-        result_map
-      );
-      if (ret && !err) {
-        err = ret;
-      }
+    [ast.groupby, ast.orderby, ast.having].forEach((item) => {
+      walkColumnRefs(item, (object) => {
+        const ret = _resolveObject(
+          object,
+          ast,
+          db_map,
+          table_map,
+          name_cache,
+          result_map
+        );
+        if (ret && !err) {
+          err = ret;
+        }
+      });
     });
   }
   return err;
@@ -125,6 +127,7 @@ function _resolveObject(
     } else {
       const index = result_map?.[object.column];
       if (index >= 0) {
+        console.log(object.column, index);
         object._resultIndex = index;
       } else {
         const cached = name_cache[object.column];

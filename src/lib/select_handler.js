@@ -3,6 +3,7 @@ const Expression = require('./expression');
 const { convertType } = require('./helpers/column_type_helper');
 const { resolveReferences } = require('./helpers/column_ref_helper');
 const { formJoin } = require('./helpers/join');
+const { formGroup } = require('./helpers/group');
 const { sort } = require('./helpers/sort');
 const logger = require('../tools/logger');
 
@@ -41,19 +42,27 @@ function _evaluateReturn(params, done) {
   const { session, source_map, ast } = params;
   const query_columns = _expandStarColumns(params);
 
-  const { from, where } = ast;
+  const { from, where, groupby } = ast;
   let err;
   let row_list;
   let sleep_ms = 9;
   if (from) {
-    const join_result = formJoin({ source_map, from, where, session });
-    if (join_result.err) {
-      err = join_result.err;
+    const result = formJoin({ source_map, from, where, session });
+    if (result.err) {
+      err = result.err;
     } else {
-      row_list = join_result.row_list;
+      row_list = result.row_list;
     }
   } else {
     row_list = [{ 0: {} }];
+  }
+  if (!err && groupby) {
+    const result = formGroup({ groupby, ast, row_list, session });
+    if (result.err) {
+      err = result.err;
+    } else {
+      row_list = result.row_list;
+    }
   }
   const row_count = row_list?.length || 0;
   const column_count = query_columns?.length || 0;
