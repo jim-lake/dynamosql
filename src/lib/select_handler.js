@@ -86,6 +86,7 @@ function _evaluateReturn(params, done) {
     row['@@result'] = output_row;
   }
 
+  let output_row_list;
   const column_list = [];
   if (!err) {
     for (let j = 0; j < column_count; j++) {
@@ -102,13 +103,11 @@ function _evaluateReturn(params, done) {
       column_type.result_type = column.result_type;
       column_list.push(column_type);
     }
-  }
-  if (ast.orderby) {
     sort(row_list, ast.orderby, { session, column_list });
+    output_row_list = row_list?.map?.((row) => row['@@result']);
   }
-  const output_row_list = row_list?.map?.((row) => row['@@result']);
 
-  if (sleep_ms && !err) {
+  if (!err && sleep_ms) {
     setTimeout(() => {
       done(err, output_row_list, column_list);
     }, sleep_ms);

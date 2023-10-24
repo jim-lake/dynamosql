@@ -31,6 +31,7 @@ function getValue(expr, state) {
         result.name = expr.name + '()';
       }
     } else {
+      logger.trace('expression.getValue: unknown function:', expr.name);
       result.err = 'ER_SP_DOES_NOT_EXIST';
     }
   } else if (expr.type === 'binary_expr') {
@@ -41,6 +42,10 @@ function getValue(expr, state) {
         result.name = expr.operator;
       }
     } else {
+      logger.trace(
+        'expression.getValue: unknown binary operator:',
+        expr.operator
+      );
       result.err = 'ER_SP_DOES_NOT_EXIST';
     }
   } else if (expr.type === 'unary_expr') {
@@ -51,7 +56,10 @@ function getValue(expr, state) {
         result.name = expr.operator;
       }
     } else {
-      logger.inspect(expr);
+      logger.trace(
+        'expression.getValue: unknown unanary operator:',
+        expr.operator
+      );
       result.err = 'ER_SP_DOES_NOT_EXIST';
     }
   } else if (expr.type === 'var') {
@@ -61,6 +69,10 @@ function getValue(expr, state) {
       if (func) {
         result.value = func(session);
       } else {
+        logger.trace(
+          'expression.getValue: unknown system variable:',
+          expr.name
+        );
         result.err = 'ER_UNKNOWN_SYSTEM_VARIABLE';
       }
     } else if (prefix === '@') {
