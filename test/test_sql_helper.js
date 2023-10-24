@@ -7,21 +7,21 @@ const path = require('node:path');
 const config = require('../config');
 const mysql = require('mysql');
 const Session = require('../src/session');
-
-const mysql_conn = mysql.createConnection({
-  host: config.db.host,
-  port: config.db.port || 3306,
-  user: config.db.user,
-  password: config.db.password,
-  //database: config.db.database,
-  multipleStatements: true,
-  dateStrings: true,
-});
-
-Session.init();
-const ddb_session = Session.newSession();
+const logger = require('../src/tools/logger');
 
 function runTests(name, file_path) {
+  const mysql_conn = mysql.createConnection({
+    host: config.db.host,
+    port: config.db.port || 3306,
+    user: config.db.user,
+    password: config.db.password,
+    //database: config.db.database,
+    multipleStatements: true,
+    dateStrings: true,
+  });
+
+  Session.init();
+  const ddb_session = Session.newSession();
   after(() => {
     mysql_conn.destroy();
   });
@@ -60,6 +60,9 @@ function runTests(name, file_path) {
             },
           ],
           () => {
+            if (ddb_result.err && !mysql_result.err) {
+              console.error('unexpected ddb_result.err:', err);
+            }
             expect(ddb_result.err, 'err equality').to.equal(mysql_result.err);
             expect(ddb_result.results.length, 'results length').to.equal(
               mysql_result.results.length

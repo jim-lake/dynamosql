@@ -71,9 +71,9 @@ function getValue(expr, state) {
     result.name = prefix + expr.name;
   } else if (expr.type === 'column_ref') {
     result.name = expr.column;
-    if (row && expr.result_index >= 0) {
-      result.value = row['@@result']?.[expr.result_index];
-      result.type = column_list?.[expr.result_index]?.result_type;
+    if (row && expr._resultIndex >= 0) {
+      result.value = row['@@result']?.[expr._resultIndex];
+      result.type = column_list?.[expr._resultIndex]?.result_type;
     } else if (row) {
       const cell = row[expr.from?.key]?.[expr.column];
       const decode = _decodeCell(cell);

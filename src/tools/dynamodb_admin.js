@@ -2,12 +2,14 @@ const asyncForever = require('async/forever');
 const {
   CreateTableCommand,
   DeleteTableCommand,
+  DescribeTableCommand,
   ListTablesCommand,
 } = require('@aws-sdk/client-dynamodb');
 const { convertError } = require('./dynamodb_helper');
 
 exports.init = init;
 exports.getTableList = getTableList;
+exports.getTable = getTable;
 exports.createTable = createTable;
 exports.deleteTable = deleteTable;
 
@@ -41,6 +43,13 @@ function getTableList(done) {
       }
       done(err, results);
     }
+  );
+}
+function getTable(TableName, done) {
+  const command = new DescribeTableCommand({ TableName });
+  g_client.send(command).then(
+    (result) => done(null, result),
+    (err) => done(convertError(err))
   );
 }
 function createTable(params, done) {

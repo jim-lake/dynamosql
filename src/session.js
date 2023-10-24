@@ -10,7 +10,7 @@ const SelectHandler = require('./lib/select_handler');
 const SetHandler = require('./lib/set_handler');
 const ShowHandler = require('./lib/show_handler');
 
-const dynamodb = require('./tools/dynamodb');
+const DynamoDB = require('./lib/dynamodb');
 const logger = require('./tools/logger');
 
 exports.init = init;
@@ -18,9 +18,10 @@ exports.newSession = newSession;
 
 const parser = new Parser();
 
+let g_dynamodb;
+
 function init(params, done) {
-  dynamodb.init(params);
-  done?.();
+  g_dynamodb = DynamoDB.newDynamoDB(params, done);
 }
 
 function newSession(args) {
@@ -114,7 +115,7 @@ class Session {
     }
 
     if (handler) {
-      handler({ sql, ast, dynamodb, session: this }, done);
+      handler({ sql, ast, dynamodb: g_dynamodb, session: this }, done);
     } else {
       done(err, result);
     }

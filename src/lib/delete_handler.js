@@ -16,15 +16,12 @@ function query(params, done) {
     done(resolve_err);
   } else if (!database) {
     done('no_current_database');
-  } else if (ast?.from?.length > 1) {
-    done('unsupported');
   } else {
     const engine = Engine.getEngine(database);
     const opts = {
       ...params,
       engine,
       database,
-      from: ast.from[0],
       func: _runDelete,
     };
     TransactionManager.run(opts, done);
@@ -32,15 +29,11 @@ function query(params, done) {
 }
 function _runDelete(params, done) {
   const { ast, session, engine, dynamodb } = params;
-  const { table } = ast.from[0];
-  const { where } = ast;
 
   const opts = {
     dynamodb,
     session,
-    database: params.database,
-    table,
-    where,
+    ast,
   };
   engine.deleteRowList(opts, (err, affectedRows) => {
     done(err, { affectedRows });

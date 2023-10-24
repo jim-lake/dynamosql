@@ -1,18 +1,23 @@
 const Expression = require('./index');
+const { SQLDate, convertNum } = require('../helpers/sql_conversion');
 
 exports.database = database;
 exports.concat = concat;
 exports.coalesce = coalesce;
 exports.ifnull = coalesce;
 exports.sleep = sleep;
+exports.from_unixtime = from_unixtime;
 
 function database(expr, state) {
   return { value: state.session.getCurrentDatabase() };
 }
 function sleep(expr, state) {
   const result = Expression.getValue(expr.args.value?.[0], state);
-  result.name = 'sleep()';
-  result.sleep_ms = parseFloat(result.value) * 1000;
+  result.name = `SLEEP(${result.name})`;
+  const sleep_ms = convertNum(result.value);
+  if (sleep_ms > 0) {
+    result.sleep_ms = sleep_ms * 1000;
+  }
   return result;
 }
 function coalesce(expr, state) {
@@ -45,4 +50,14 @@ function concat(expr, state) {
     return value !== null;
   });
   return { err, value };
+}
+function from_unixtime(expr, state) {
+  const result = Expression.getValue(expr.args.value?.[0], state);
+  result.name = `FROM_UNIXTIME(${result.name})`;
+  result.type = 'datetime';
+  if (!result.err && result.value !== null) {
+    const time = convertNum(result.value);
+    result.value = time < 0 ? null : new SQLDate(time);
+  }
+  return result;
 }

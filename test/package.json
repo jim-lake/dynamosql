@@ -4,6 +4,7 @@
   "scripts": {
     "lint": "eslint .",
     "pretty": "prettier --write .",
+    "setup": "mocha setup/setup.js",
     "test": "mocha '**/*.test.js'"
   },
   "devDependencies": {

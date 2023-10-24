@@ -46,6 +46,20 @@ function convertType(type, nullable) {
       flags: 0,
       decimals: 0,
     };
+  } else if (type === 'datetime') {
+    ret = {
+      catalog: 'def',
+      table: '',
+      schema: '',
+      orgTable: '',
+      name: '',
+      orgName: '',
+      characterSet: MYSQL.CHARSETS.UTF8_GENERAL_CI,
+      columnLength: 4294967295,
+      columnType: MYSQL.TYPES.DATETIME,
+      flags: 0,
+      decimals: 0,
+    };
   } else if (type === 'string' || typeof type !== 'object') {
     ret = {
       catalog: 'def',

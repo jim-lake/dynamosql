@@ -2,7 +2,7 @@ const { getEngine } = require('./engine');
 const Expression = require('./expression');
 const { convertType } = require('./helpers/column_type_helper');
 const { resolveReferences } = require('./helpers/column_ref_helper');
-const { formJoinMap } = require('./helpers/join');
+const { formJoin } = require('./helpers/join');
 const { sort } = require('./helpers/sort');
 const logger = require('../tools/logger');
 
@@ -46,7 +46,7 @@ function _evaluateReturn(params, done) {
   let row_list;
   let sleep_ms = 9;
   if (from) {
-    const join_result = formJoinMap({ source_map, from, where, session });
+    const join_result = formJoin({ source_map, from, where, session });
     if (join_result.err) {
       err = join_result.err;
     } else {
@@ -132,7 +132,7 @@ function _expandStarColumns(params) {
         ) {
           const column_list = column_map[from.key];
           if (!column_list.length) {
-            from.request_set.forEach((name) => column_list.push(name));
+            from._requestSet.forEach((name) => column_list.push(name));
           }
           column_list.forEach((name) => {
             ret.push({

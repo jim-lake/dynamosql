@@ -24,9 +24,9 @@ function getRowList(params, done) {
 }
 function _getFromTable(params, done) {
   const { dynamodb, session, from, where } = params;
-  const { table, request_set, request_all } = params.from;
-  const request_columns = [...request_set];
-  const columns = request_all
+  const { table, _requestSet, _requestAll } = params.from;
+  const request_columns = [..._requestSet];
+  const columns = _requestAll
     ? '*'
     : request_columns.map(escapeIdentifier).join(',');
   let sql = `SELECT ${columns} FROM ${escapeIdentifier(table)}`;
@@ -41,7 +41,7 @@ function _getFromTable(params, done) {
     if (err) {
       logger.error('raw_engine.getRowList err:', err, results, sql);
     } else {
-      if (request_all) {
+      if (_requestAll) {
         const response_set = new Set();
         results.forEach((result) => {
           for (let key in result) {

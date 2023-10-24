@@ -42,9 +42,7 @@ function _runTest(sql) {
       async.series(
         [
           (done) => {
-            logger.always('mysql start:', sql);
             mysql_conn.query(sql, (err, results, columns) => {
-              logger.always('mysql done:', err);
               mysql_result.err = err;
               mysql_result.results = results;
               mysql_result.columns = columns;
@@ -52,9 +50,7 @@ function _runTest(sql) {
             });
           },
           (done) => {
-            logger.always('ddb start:', sql);
             ddb_session.query(sql, (err, results, columns) => {
-              logger.always('ddb done:', err);
               ddb_result.err = err;
               ddb_result.results = results;
               ddb_result.columns = columns;

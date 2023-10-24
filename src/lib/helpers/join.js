@@ -1,7 +1,7 @@
 const Expression = require('../expression');
-exports.formJoinMap = formJoinMap;
+exports.formJoin = formJoin;
 
-function formJoinMap(params) {
+function formJoin(params) {
   const { source_map, from, where, session } = params;
   const row_list = [];
   from.forEach((from_table) => {

@@ -14,8 +14,8 @@ function resolveReferences(ast, current_database) {
         from.db = current_database;
       }
     }
-    from.request_set = new Set();
-    from.request_all = false;
+    from._requestSet = new Set();
+    from._requestAll = false;
     from.key = from.as || `${from.db}.${from.table}`;
     if (from.as) {
       table_map[from.as] = from;
@@ -29,18 +29,30 @@ function resolveReferences(ast, current_database) {
       db_map[from.db][from.table] = from;
     }
   });
+  ast.table?.forEach?.((object) => {
+    const from = object.db
+      ? db_map[object.db]?.[object.table]
+      : table_map[object.table];
+    if (!from) {
+      err = 'table_not_found';
+    } else {
+      object.from = from;
+    }
+  });
 
   const name_cache = {};
-  [ast.from, ast.columns, ast.where].forEach((item) => {
-    walkColumnRefs(item, (object) => {
-      const ret = _resolveObject(object, ast, db_map, table_map, name_cache);
-      if (ret && !err) {
-        err = ret;
-      }
+  if (!err) {
+    [ast.from, ast.columns, ast.where].forEach((item) => {
+      walkColumnRefs(item, (object) => {
+        const ret = _resolveObject(object, ast, db_map, table_map, name_cache);
+        if (ret && !err) {
+          err = ret;
+        }
+      });
     });
-  });
+  }
   const result_map = {};
-  ast.columns.forEach((column, i) => {
+  ast.columns?.forEach?.((column, i) => {
     if (column.as) {
       result_map[column.as] = i;
     } else if (column.expr?.type === 'column_ref') {
@@ -78,7 +90,7 @@ function _resolveObject(
     if (object.db) {
       const from = db_map[object.db]?.[object.table];
       if (from) {
-        from.request_all = true;
+        from._requestAll = true;
       } else {
         err = 'table_not_found';
       }
@@ -89,7 +101,7 @@ function _resolveObject(
           from.as === object.table ||
           (!from.as && from.table === object.table)
         ) {
-          from.request_all = true;
+          from._requestAll = true;
           found = true;
         }
       });
@@ -98,7 +110,7 @@ function _resolveObject(
       }
     } else {
       ast.from?.forEach?.((from) => {
-        from.request_all = true;
+        from._requestAll = true;
       });
     }
   } else {
@@ -111,9 +123,9 @@ function _resolveObject(
       from = table_map[object.table];
       add_cache = true;
     } else {
-      const result_index = result_map?.[object.column];
-      if (result_index >= 0) {
-        object.result_index = result_index;
+      const index = result_map?.[object.column];
+      if (index >= 0) {
+        object._resultIndex = index;
       } else {
         const cached = name_cache[object.column];
         from = cached ?? ast.from?.[0];
@@ -121,11 +133,11 @@ function _resolveObject(
     }
     if (from) {
       object.from = from;
-      from.request_set.add(object.column);
+      from._requestSet.add(object.column);
       if (add_cache) {
         name_cache[object.column] = from;
       }
-    } else if (object.result_index === undefined) {
+    } else if (object._resultIndex === undefined) {
       err = 'table_not_found';
     }
   }
