@@ -12,9 +12,11 @@ const logger = require('../../tools/logger');
 
 function getValue(expr, state) {
   const { session, row, column_list } = state;
-  let result = { err: null, type: null, value: null, name: null };
+  let result = { err: null, value: undefined, name: undefined };
 
-  if (expr.type === 'number') {
+  if (!expr) {
+    // no expression results in undefined
+  } else if (expr.type === 'number') {
     result.value = expr.value;
   } else if (expr.type === 'double_quote_string') {
     result.value = expr.value;
@@ -115,7 +117,7 @@ function getValue(expr, state) {
   if (!result.type) {
     result.type = result.value === null ? 'null' : typeof result.value;
   }
-  if (!result.name) {
+  if (result.name === undefined && result.value !== undefined) {
     result.name = String(result.value);
   }
   return result;

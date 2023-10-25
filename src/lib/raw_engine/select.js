@@ -26,9 +26,10 @@ function _getFromTable(params, done) {
   const { dynamodb, session, from, where } = params;
   const { table, _requestSet, _requestAll } = params.from;
   const request_columns = [..._requestSet];
-  const columns = _requestAll
-    ? '*'
-    : request_columns.map(escapeIdentifier).join(',');
+  const columns =
+    _requestAll || request_columns.length === 0
+      ? '*'
+      : request_columns.map(escapeIdentifier).join(',');
   let sql = `SELECT ${columns} FROM ${escapeIdentifier(table)}`;
   const where_result = where
     ? convertWhere(where, { session, from_key: from.key, default_true: true })

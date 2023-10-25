@@ -1,12 +1,16 @@
 const Expression = require('./index');
-const { SQLDate, convertNum } = require('../helpers/sql_conversion');
+const { convertNum, convertDate } = require('../helpers/sql_conversion');
+const { SQLDate } = require('../types/sql_date');
 
 exports.database = database;
 exports.concat = concat;
 exports.coalesce = coalesce;
 exports.ifnull = coalesce;
 exports.sleep = sleep;
+exports.now = now;
 exports.from_unixtime = from_unixtime;
+exports.date = _date;
+exports.date_format = date_format;
 
 function database(expr, state) {
   return { value: state.session.getCurrentDatabase() };
@@ -51,6 +55,16 @@ function concat(expr, state) {
   });
   return { err, value };
 }
+function now(expr, state) {
+  const result = Expression.getValue(expr.args.value?.[0], state);
+  result.name = `NOW(${result.name ?? ''})`;
+  if (!result.err && result.type) {
+    const time = parseFloat((Date.now() / 1000).toFixed(result.value || 0));
+    result.value = new SQLDate(time);
+    result.type = 'datetime';
+  }
+  return result;
+}
 function from_unixtime(expr, state) {
   const result = Expression.getValue(expr.args.value?.[0], state);
   result.name = `FROM_UNIXTIME(${result.name})`;
@@ -60,4 +74,27 @@ function from_unixtime(expr, state) {
     result.value = time < 0 ? null : new SQLDate(time);
   }
   return result;
+}
+function _date(expr, state) {
+  const result = Expression.getValue(expr.args.value?.[0], state);
+  result.name = `DATE(${result.name})`;
+  result.type = 'date';
+  if (!result.err && result.value !== null) {
+    result.value = convertDate(result.value);
+    result.value?.setType?.('date');
+  }
+  return result;
+}
+function date_format(expr, state) {
+  const date_arg = Expression.getValue(expr.args.value?.[0], state);
+  const format = Expression.getValue(expr.args.value?.[1], state);
+  let err = date_arg.err || format.err;
+  let value;
+  const name = `DATE_FORMAT(${date_arg.name}, ${format.name})`;
+  if (!err && (date_arg.value === null || format.value === null)) {
+    value = null;
+  } else if (!err) {
+    value = convertDate(date_arg.value)?.dateFormat?.(format.value) || null;
+  }
+  return { err, name, value, type: 'string' };
 }

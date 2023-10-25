@@ -12,6 +12,8 @@ function formGroup(params) {
     const group = groupby[i];
     if (group._resultIndex !== undefined) {
       groupby[i] = ast.columns[group._resultIndex]?.expr;
+    } else if (group.type === 'number') {
+      groupby[i] = ast.columns[group.value - 1]?.expr;
     }
   }
 
@@ -28,7 +30,6 @@ function formGroup(params) {
       let obj = group_map;
       for (let i = 0; i < count; i++) {
         const key = key_list[i];
-        console.log(obj, count, i, key);
         if (i + 1 === count && !obj[key]) {
           obj[key] = [];
         } else if (!obj[key]) {

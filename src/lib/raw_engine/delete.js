@@ -12,8 +12,6 @@ function deleteRowList(params, done) {
   const { session } = params;
   const { from, where } = params.ast;
 
-  logger.inspect(params.ast);
-
   const result = convertWhere(where, { session, from_key: from?.[0]?.key });
   if (result.err) {
     done(result.err);

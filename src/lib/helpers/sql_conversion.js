@@ -1,5 +1,8 @@
+const { SQLDate } = require('../types/sql_date');
+
 exports.convertBooleanValue = convertBooleanValue;
 exports.convertNum = convertNum;
+exports.convertDate = convertDate;
 
 function convertNum(value) {
   let ret = value;
@@ -24,34 +27,12 @@ function convertBooleanValue(value) {
   }
   return ret;
 }
-class SQLDate {
-  constructor(time) {
-    this._time = time;
-    this._isMsTime = Math.floor(this._time) !== this._time;
+function convertDate(value) {
+  let ret;
+  if (value instanceof SQLDate) {
+    ret = value;
+  } else {
+    ret = null;
   }
-  _date = null;
-  _makeDate() {
-    if (!this._date) {
-      this._date = new Date(this._time * 1000);
-    }
-  }
-  getTime() {
-    return this._time;
-  }
-  toString() {
-    let ret;
-    this._makeDate();
-    if (isNaN(this._date)) {
-      ret = null;
-    } else {
-      ret = this._date.toISOString().replace('T', ' ');
-      if (this._isMsTime) {
-        ret = ret.replace('Z', '');
-      } else {
-        ret = ret.replace(/\..*$/, '');
-      }
-    }
-    return ret;
-  }
+  return ret;
 }
-exports.SQLDate = SQLDate;

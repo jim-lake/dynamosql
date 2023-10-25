@@ -127,7 +127,6 @@ function _resolveObject(
     } else {
       const index = result_map?.[object.column];
       if (index >= 0) {
-        console.log(object.column, index);
         object._resultIndex = index;
       } else {
         const cached = name_cache[object.column];

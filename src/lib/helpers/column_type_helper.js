@@ -55,9 +55,23 @@ function convertType(type, nullable) {
       name: '',
       orgName: '',
       characterSet: MYSQL.CHARSETS.UTF8_GENERAL_CI,
-      columnLength: 4294967295,
+      columnLength: 19,
       columnType: MYSQL.TYPES.DATETIME,
-      flags: 0,
+      flags: MYSQL.FIELD_FLAGS.BINARY | MYSQL.FIELD_FLAGS.NOT_NULL,
+      decimals: 0,
+    };
+  } else if (type === 'date') {
+    ret = {
+      catalog: 'def',
+      table: '',
+      schema: '',
+      orgTable: '',
+      name: '',
+      orgName: '',
+      characterSet: MYSQL.CHARSETS.UTF8_GENERAL_CI,
+      columnLength: 10,
+      columnType: MYSQL.TYPES.DATE,
+      flags: MYSQL.FIELD_FLAGS.BINARY | MYSQL.FIELD_FLAGS.NOT_NULL,
       decimals: 0,
     };
   } else if (type === 'string' || typeof type !== 'object') {
