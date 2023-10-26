@@ -66,7 +66,7 @@ function concat(expr, state) {
 }
 function now(expr, state) {
   const result = Expression.getValue(expr.args?.value?.[0], state);
-  result.name = `NOW(${result.name ?? ''})`;
+  result.name = expr.args ? `NOW(${result.name ?? ''})` : 'CURRENT_TIMESTAMP';
   if (!result.err && result.type) {
     const decimals = result.value || 0;
     if (decimals > 6) {
@@ -79,7 +79,7 @@ function now(expr, state) {
 }
 function curtime(expr, state) {
   const result = Expression.getValue(expr.args?.value?.[0], state);
-  result.name = `CURTIME(${result.name ?? ''})`;
+  result.name = expr.args ? `CURTIME(${result.name ?? ''})` : 'CURRENT_TIME';
   if (!result.err && result.type) {
     const decimals = result.value || 0;
     if (decimals > 6) {
@@ -91,9 +91,10 @@ function curtime(expr, state) {
   }
   return result;
 }
-function curdate() {
+function curdate(expr) {
   const value = newSQLDateTime(Date.now() / 1000, 'date');
-  return { value, type: 'date' };
+  const name = expr.args ? 'CURDATE()' : 'CURRENT_DATE';
+  return { value, name, type: 'date' };
 }
 function from_unixtime(expr, state) {
   const result = Expression.getValue(expr.args.value?.[0], state);

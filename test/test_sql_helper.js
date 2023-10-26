@@ -77,6 +77,7 @@ function runTests(name, file_path) {
                 const name = column.name;
                 let left = String(result[j]);
                 let right = String(mysql_result.results[i][name]);
+                expect(left.length, `results[${i}].${name} length equal`).to.equal(right.length);
                 if (name === 'ignore_seconds') {
                   left = left.replace(SECONDS_REGEX, '');
                   right = right.replace(SECONDS_REGEX, '');
