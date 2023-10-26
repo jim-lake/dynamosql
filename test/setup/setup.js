@@ -5,7 +5,6 @@ const path = require('node:path');
 const config = require('../../config');
 const mysql = require('mysql');
 const Session = require('../../src/session');
-const logger = require('../../src/tools/logger');
 
 const mysql_conn = mysql.createConnection({
   host: config.db.host,

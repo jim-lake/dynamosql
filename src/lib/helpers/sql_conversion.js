@@ -12,7 +12,9 @@ const DAY = 24 * HOUR;
 
 function convertNum(value) {
   let ret = value;
-  if (value === '') {
+  if (value === null) {
+    ret = null;
+  } else if (value === '') {
     ret = 0;
   } else if (typeof value === 'string') {
     ret = parseFloat(value);
@@ -35,7 +37,9 @@ function convertBooleanValue(value) {
 }
 function convertDateTime(value, type, decimals) {
   let ret;
-  if (value instanceof SQLDateTime) {
+  if (value === null) {
+    ret = null;
+  } else if (value instanceof SQLDateTime) {
     ret = value;
   } else if (typeof value === 'string') {
     const time = Date.parse(value);
@@ -50,6 +54,7 @@ function convertDateTime(value, type, decimals) {
   return ret;
 }
 const TIME_REGEX = /^[0-9]*:[0-9]*/;
+const NUM_REGEX = /^[0-9.]*$/;
 function convertTime(value, decimals) {
   let ret;
   if (value instanceof SQLTime) {
@@ -63,6 +68,9 @@ function convertTime(value, decimals) {
       const seconds = parseFloat(parts[2] || '0');
       const time = hours * HOUR + minutes * MINUTE + seconds;
       ret = newSQLTime(time, decimals);
+    } else if (NUM_REGEX.test(value)) {
+      const num = convertNum(value);
+      ret = convertTime(num, decimals);
     } else {
       const datetime = convertDateTime(value + ' UTC', 'datetime', decimals);
       if (datetime) {

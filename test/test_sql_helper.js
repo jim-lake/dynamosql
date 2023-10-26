@@ -3,15 +3,13 @@ exports.runTests = runTests;
 const async = require('async');
 const { expect } = require('chai');
 const fs = require('node:fs');
-const path = require('node:path');
 const config = require('../config');
 const mysql = require('mysql');
 const Session = require('../src/session');
-const logger = require('../src/tools/logger');
 
 const SECONDS_REGEX = /:[0-9]{2}(\.[0-9]*)?$/g;
 
-function runTests(name, file_path) {
+function runTests(test_name, file_path) {
   const mysql_conn = mysql.createConnection({
     host: config.db.host,
     port: config.db.port || 3306,
@@ -37,7 +35,7 @@ function runTests(name, file_path) {
   SQL_LIST.forEach((sql) => _runTest(sql));
 
   function _runTest(sql) {
-    describe(name, function () {
+    describe(test_name, function () {
       it(sql, function (done) {
         const mysql_result = {};
         const ddb_result = {};
@@ -77,8 +75,11 @@ function runTests(name, file_path) {
                 const name = column.name;
                 let left = String(result[j]);
                 let right = String(mysql_result.results[i][name]);
-                expect(left.length, `results[${i}].${name} length equal`).to.equal(right.length);
                 if (name === 'ignore_seconds') {
+                  expect(
+                    left.length,
+                    `results[${i}].${name} length equal`
+                  ).to.equal(right.length);
                   left = left.replace(SECONDS_REGEX, '');
                   right = right.replace(SECONDS_REGEX, '');
                 }
