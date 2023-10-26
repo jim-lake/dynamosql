@@ -1,8 +1,14 @@
-const { SQLDate } = require('../types/sql_date');
+const { newSQLDateTime, SQLDateTime } = require('../types/sql_datetime');
+const { newSQLTime, SQLTime } = require('../types/sql_time');
 
 exports.convertBooleanValue = convertBooleanValue;
 exports.convertNum = convertNum;
-exports.convertDate = convertDate;
+exports.convertDateTime = convertDateTime;
+exports.convertTime = convertTime;
+
+const MINUTE = 60;
+const HOUR = 60 * MINUTE;
+const DAY = 24 * HOUR;
 
 function convertNum(value) {
   let ret = value;
@@ -27,12 +33,53 @@ function convertBooleanValue(value) {
   }
   return ret;
 }
-function convertDate(value) {
+function convertDateTime(value, type, decimals) {
   let ret;
-  if (value instanceof SQLDate) {
+  if (value instanceof SQLDateTime) {
     ret = value;
-  } else {
-    ret = null;
+  } else if (typeof value === 'string') {
+    const time = Date.parse(value);
+    if (isNaN(time)) {
+      ret = null;
+    } else {
+      ret = newSQLDateTime(time / 1000, type, decimals);
+    }
+  } else if (typeof value === 'number') {
+    ret = newSQLDateTime(value, type, decimals);
+  }
+  return ret;
+}
+const TIME_REGEX = /^[0-9]*:[0-9]*/;
+function convertTime(value, decimals) {
+  let ret;
+  if (value instanceof SQLTime) {
+    ret = value;
+  } else if (typeof value === 'string') {
+    value = value.trim();
+    if (TIME_REGEX.test(value)) {
+      const parts = value.split(':');
+      const hours = Math.floor(parseFloat(parts[0] || '0'));
+      const minutes = Math.floor(parseFloat(parts[1] || '0'));
+      const seconds = parseFloat(parts[2] || '0');
+      const time = hours * HOUR + minutes * MINUTE + seconds;
+      ret = newSQLTime(time, decimals);
+    } else {
+      const datetime = convertDateTime(value + ' UTC', 'datetime', decimals);
+      if (datetime) {
+        const time = datetime.getTime();
+        ret = newSQLTime(time % DAY, decimals);
+      } else {
+        const num = convertNum(value);
+        ret = convertTime(num, decimals);
+      }
+    }
+  } else if (typeof value === 'number') {
+    const hours = Math.floor(value / 10000);
+    value -= hours * 10000;
+    const minutes = Math.floor(value / 100);
+    value -= minutes * 100;
+    const time = hours * HOUR + minutes * MINUTE + value;
+    ret = newSQLTime(time, decimals);
   }
   return ret;
 }

@@ -11,4 +11,6 @@ describe('Expression', function () {
     'unary_expression.sql',
     path.join(__dirname, 'unary_expression.sql')
   );
+
+  runTests('date.sql', path.join(__dirname, 'date.sql'));
 });

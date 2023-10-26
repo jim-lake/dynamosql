@@ -17,6 +17,7 @@ exports['>='] = gte;
 exports['<='] = lte;
 exports['and'] = and;
 exports['or'] = or;
+exports['xor'] = xor;
 
 function _numBothSides(expr, state, op) {
   const left = Expression.getValue(expr.left, state);
@@ -214,6 +215,23 @@ function or(expr, state) {
         value = result;
       }
       name = left.name + ' OR ' + right.name;
+    }
+  }
+  return { err, value, name };
+}
+function xor(expr, state) {
+  const left = Expression.getValue(expr.left, state);
+  const right = Expression.getValue(expr.right, state);
+  const err = left.err || right.err;
+  const name = left.name + ' XOR ' + right.name;
+  let value = 1;
+  if (!err) {
+    const right_bool = convertBooleanValue(right.value);
+    const left_bool = convertBooleanValue(left.value);
+    if (right_bool === null || left_bool === null) {
+      value = null;
+    } else {
+      value = right_bool ^ left_bool;
     }
   }
   return { err, value, name };

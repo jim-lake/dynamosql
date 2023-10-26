@@ -1,6 +1,7 @@
 const Expression = require('./index');
-const { convertNum, convertDate } = require('../helpers/sql_conversion');
-const { SQLDate } = require('../types/sql_date');
+const { convertNum, convertDateTime } = require('../helpers/sql_conversion');
+const { newSQLDateTime } = require('../types/sql_datetime');
+const { newSQLTime } = require('../types/sql_time');
 
 exports.database = database;
 exports.concat = concat;
@@ -8,9 +9,17 @@ exports.coalesce = coalesce;
 exports.ifnull = coalesce;
 exports.sleep = sleep;
 exports.now = now;
+exports.current_timestamp = now;
 exports.from_unixtime = from_unixtime;
 exports.date = _date;
 exports.date_format = date_format;
+exports.datediff = datediff;
+exports.curdate = curdate;
+exports.current_date = curdate;
+exports.curtime = curtime;
+exports.current_time = curtime;
+
+const DAY = 24 * 60 * 60;
 
 function database(expr, state) {
   return { value: state.session.getCurrentDatabase() };
@@ -56,14 +65,35 @@ function concat(expr, state) {
   return { err, value };
 }
 function now(expr, state) {
-  const result = Expression.getValue(expr.args.value?.[0], state);
+  const result = Expression.getValue(expr.args?.value?.[0], state);
   result.name = `NOW(${result.name ?? ''})`;
   if (!result.err && result.type) {
-    const time = parseFloat((Date.now() / 1000).toFixed(result.value || 0));
-    result.value = new SQLDate(time);
+    const decimals = result.value || 0;
+    if (decimals > 6) {
+      result.err = 'ER_TOO_BIG_PRECISION';
+    }
+    result.value = newSQLDateTime(Date.now() / 1000, 'datetime', decimals);
     result.type = 'datetime';
   }
   return result;
+}
+function curtime(expr, state) {
+  const result = Expression.getValue(expr.args?.value?.[0], state);
+  result.name = `CURTIME(${result.name ?? ''})`;
+  if (!result.err && result.type) {
+    const decimals = result.value || 0;
+    if (decimals > 6) {
+      result.err = 'ER_TOO_BIG_PRECISION';
+    }
+    const time = (Date.now() / 1000) % DAY;
+    result.value = newSQLTime(time, decimals);
+    result.type = 'time';
+  }
+  return result;
+}
+function curdate() {
+  const value = newSQLDateTime(Date.now() / 1000, 'date');
+  return { value, type: 'date' };
 }
 function from_unixtime(expr, state) {
   const result = Expression.getValue(expr.args.value?.[0], state);
@@ -71,7 +101,7 @@ function from_unixtime(expr, state) {
   result.type = 'datetime';
   if (!result.err && result.value !== null) {
     const time = convertNum(result.value);
-    result.value = time < 0 ? null : new SQLDate(time);
+    result.value = time < 0 ? null : newSQLDateTime(time);
   }
   return result;
 }
@@ -80,21 +110,37 @@ function _date(expr, state) {
   result.name = `DATE(${result.name})`;
   result.type = 'date';
   if (!result.err && result.value !== null) {
-    result.value = convertDate(result.value);
+    result.value = convertDateTime(result.value);
     result.value?.setType?.('date');
   }
   return result;
 }
 function date_format(expr, state) {
-  const date_arg = Expression.getValue(expr.args.value?.[0], state);
+  const date = Expression.getValue(expr.args.value?.[0], state);
   const format = Expression.getValue(expr.args.value?.[1], state);
-  let err = date_arg.err || format.err;
+  let err = date.err || format.err;
   let value;
-  const name = `DATE_FORMAT(${date_arg.name}, ${format.name})`;
-  if (!err && (date_arg.value === null || format.value === null)) {
+  const name = `DATE_FORMAT(${date.name}, ${format.name})`;
+  if (!err && (date.value === null || format.value === null)) {
     value = null;
   } else if (!err) {
-    value = convertDate(date_arg.value)?.dateFormat?.(format.value) || null;
+    value =
+      convertDateTime(date.value)?.dateFormat?.(String(format.value)) || null;
   }
   return { err, name, value, type: 'string' };
+}
+function datediff(expr, state) {
+  const expr1 = Expression.getValue(expr.args.value?.[0], state);
+  const expr2 = Expression.getValue(expr.args.value?.[1], state);
+  let err = expr1.err || expr2.err;
+  let value;
+  const name = `DATEDIFF(${expr1.name}, ${expr2.name})`;
+  if (!err && (expr1.value === null || expr2.value === null)) {
+    value = null;
+  } else if (!err) {
+    value =
+      convertDateTime(expr1.value)?.diff?.(convertDateTime(expr2.value)) ||
+      null;
+  }
+  return { err, name, value, type: 'int' };
 }

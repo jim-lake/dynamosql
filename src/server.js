@@ -144,7 +144,9 @@ function _errorToMysql(err) {
   } else if (err === 'table_exists') {
     ret = { code: 1050, message: 'Table already exists' };
   } else if (err === 'dup') {
-    ret = { code: 1062, message: 'Duplication entry' };
+    ret = { code: 1062, message: 'Duplicate entry' };
+  } else if (err === 'ER_TOO_BIG_PRECISION') {
+    ret = { code: 1426, message: 'Too-big precision' };
   } else if (typeof err.Message === 'string') {
     ret = { code: 1002, message: err.Message };
   } else if (typeof err === 'string') {

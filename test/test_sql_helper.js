@@ -9,6 +9,8 @@ const mysql = require('mysql');
 const Session = require('../src/session');
 const logger = require('../src/tools/logger');
 
+const SECONDS_REGEX = /:[0-9]{2}(\.[0-9]*)?$/g;
+
 function runTests(name, file_path) {
   const mysql_conn = mysql.createConnection({
     host: config.db.host,
@@ -40,7 +42,7 @@ function runTests(name, file_path) {
         const mysql_result = {};
         const ddb_result = {};
 
-        async.series(
+        async.parallel(
           [
             (done) => {
               mysql_conn.query(sql, (err, results, columns) => {
@@ -61,19 +63,25 @@ function runTests(name, file_path) {
           ],
           () => {
             if (ddb_result.err && !mysql_result.err) {
-              console.error('unexpected ddb_result.err:', err);
+              console.error('unexpected ddb_result.err:', ddb_result.err);
             }
-            expect(ddb_result.err, 'err equality').to.equal(mysql_result.err);
-            expect(ddb_result.results.length, 'results length').to.equal(
-              mysql_result.results.length
+            if (ddb_result.err && ddb_result.err !== mysql_result.err.code) {
+              expect(ddb_result.err, 'err equality').to.equal(mysql_result.err);
+            }
+            expect(ddb_result?.results?.length, 'results length').to.equal(
+              mysql_result?.results?.length
             );
 
-            ddb_result.results.forEach((result, i) => {
+            ddb_result?.results?.forEach?.((result, i) => {
               ddb_result.columns.forEach((column, j) => {
-                expect(
-                  String(result[j]),
-                  `results[${i}].${column.name} equal`
-                ).to.equal(String(mysql_result.results[i][column.name]));
+                const name = column.name;
+                let left = String(result[j]);
+                let right = String(mysql_result.results[i][name]);
+                if (name === 'ignore_seconds') {
+                  left = left.replace(SECONDS_REGEX, '');
+                  right = right.replace(SECONDS_REGEX, '');
+                }
+                expect(left, `results[${i}].${name} equal`).to.equal(right);
               });
             });
             done();

@@ -4,7 +4,7 @@ DROP TABLE IF EXISTS foo;
 -- DROP TABLE IF EXISTS bar;
 -- DROP TABLE IF EXISTS other;
 -- DROP TABLE IF EXISTS otherother;
-SELECT SLEEP(3);
+SELECT SLEEP(5);
 CREATE TABLE foo (id varchar(256) primary key, other int, comment varchar(256));
 -- CREATE TABLE bar (id varchar(256) primary key, otherother varchar(256), comment varchar(256));
 -- CREATE TABLE other (other int primary key, otherstring varchar(256));

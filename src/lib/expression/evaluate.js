@@ -3,6 +3,7 @@ exports.getValue = getValue;
 
 const AggregateFunctions = require('./aggregate_functions');
 const BinaryExpression = require('./binary_expression');
+const Cast = require('./cast');
 const Functions = require('./functions');
 const UnaryExpression = require('./unary_expression');
 const SystemVariables = require('../system_variables');
@@ -73,6 +74,20 @@ function getValue(expr, state) {
       logger.trace(
         'expression.getValue: unknown unanary operator:',
         expr.operator
+      );
+      result.err = 'ER_SP_DOES_NOT_EXIST';
+    }
+  } else if (expr.type === 'cast') {
+    const func = Cast[expr.target.dataType.toLowerCase()];
+    if (func) {
+      result = func(expr, state);
+      if (!result.name) {
+        result.name = `CAST(? AS ${expr.target.dataType})`;
+      }
+    } else {
+      logger.trace(
+        'expression.getValue: unknown cast type:',
+        expr.target.dataType
       );
       result.err = 'ER_SP_DOES_NOT_EXIST';
     }

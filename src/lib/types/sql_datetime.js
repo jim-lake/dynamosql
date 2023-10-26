@@ -1,19 +1,20 @@
-class SQLDate {
-  constructor(time) {
+class SQLDateTime {
+  constructor(time, type, decimals) {
     this._time = time;
-    this._isMsTime = Math.floor(this._time) !== this._time;
+    this._type = type;
+    this._decimals = decimals || 0;
+    if (type === 'date') {
+      this._time -= this._time % (24 * 60 * 60);
+    } else if (this._decimals === 0) {
+      this._time = Math.trunc(this._time);
+    } else {
+      this._time = parseFloat(this._time.toFixed(this._decimals));
+    }
   }
   _date = null;
-  _isMsTime = false;
-  _isDate = false;
   _makeDate() {
     if (!this._date) {
       this._date = new Date(this._time * 1000);
-    }
-  }
-  setType(type) {
-    if (type === 'date') {
-      this._isDate = true;
     }
   }
   getTime() {
@@ -23,15 +24,20 @@ class SQLDate {
     let ret;
     this._makeDate();
     if (isNaN(this._date)) {
-      ret = null;
+      ret = '';
     } else {
       ret = this._date.toISOString().replace('T', ' ');
-      if (this._isDate) {
+      if (this._type === 'date') {
         ret = ret.slice(0, 10);
-      } else if (this._isMsTime) {
-        ret = ret.replace('Z', '');
       } else {
-        ret = ret.replace(/\..*$/, '');
+        ret = ret.replace('Z', '');
+        if (this._decimals === 0) {
+          ret = ret.slice(0, 19);
+        } else if (this._decimals > 3) {
+          ret = ret.padEnd(this._decimals + 20, '0');
+        } else {
+          ret = ret.slice(0, 20 + this._decimals);
+        }
       }
     }
     return ret;
@@ -40,14 +46,24 @@ class SQLDate {
     let ret;
     this._makeDate();
     if (isNaN(this._date)) {
-      ret = null;
+      ret = '';
     } else {
       ret = _dateFormat(this._date, format);
     }
     return ret;
   }
 }
-exports.SQLDate = SQLDate;
+function newSQLDateTime(time, type, decimals) {
+  let ret;
+  if (isNaN(time)) {
+    ret = null;
+  } else {
+    ret = new SQLDateTime(time, type, decimals);
+  }
+  return ret;
+}
+exports.newSQLDateTime = newSQLDateTime;
+exports.SQLDateTime = SQLDateTime;
 
 const FORMAT_LONG_NUMBER = new Intl.DateTimeFormat('en-US', {
   weekday: 'long',
