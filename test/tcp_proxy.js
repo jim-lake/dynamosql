@@ -1,5 +1,5 @@
 const net = require('node:net');
-const PacketParser = require('../node_modules/mysql2/lib/packet_parser.js');
+const PacketParser = require('../server/node_modules/mysql2/lib/packet_parser.js');
 const MYSQL = require('../src/constants/mysql');
 
 const PORT = process.env.PORT ? parseInt(process.env.PORT) : 3306;

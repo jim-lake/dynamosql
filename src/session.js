@@ -98,11 +98,10 @@ class Session {
     if (this._isReleased) {
       done('released');
     } else {
-      const list = opts.sql
-        .split(';')
-        .map((s) => s.trim())
-        .filter((s) => s.length > 0);
-      if (list.length === 0) {
+      const { err: parse_err, list } = _astify(opts.sql);
+      if (parse_err) {
+        done(parse_err);
+      } else if (list.length === 0) {
         done();
       } else if (list.length === 1) {
         this._singleQuery(list[0], (err, result, columns) =>
@@ -115,9 +114,9 @@ class Session {
         asyncTimesSeries(
           query_count,
           (n, done) => {
-            const sql = list[n];
-            if (sql) {
-              this._singleQuery(sql, (err, result, columns) => {
+            const ast = list[n];
+            if (ast) {
+              this._singleQuery(ast, (err, result, columns) => {
                 if (!err) {
                   result_list[n] = result;
                   schema_list[n] = columns;
@@ -135,13 +134,11 @@ class Session {
       }
     }
   }
-  _singleQuery(sql, done) {
-    let { err, ast } = this._astify(sql);
+  _singleQuery(ast, done) {
+    let err;
     let result;
     let handler;
-    if (!ast && !err) {
-      result = {};
-    } else if (ast?.type === 'create') {
+    if (ast?.type === 'create') {
       handler = CreateHandler.query;
     } else if (ast?.type === 'delete') {
       handler = DeleteHandler.query;
@@ -163,24 +160,28 @@ class Session {
     }
 
     if (handler) {
-      handler({ sql, ast, dynamodb: g_dynamodb, session: this }, done);
+      handler({ ast, dynamodb: g_dynamodb, session: this }, done);
     } else {
       done(err, result);
     }
   }
-  _astify(sql) {
-    let err;
-    let ast;
-    try {
-      ast = parser.astify(sql);
-    } catch (e) {
-      logger.error('parse error:', e);
-      err = 'parse';
-    }
-    return { err, ast };
-  }
 }
-
+function _astify(sql) {
+  let err;
+  let list = [];
+  try {
+    const result = parser.astify(sql);
+    if (Array.isArray(result)) {
+      list = result;
+    } else {
+      list = [result];
+    }
+  } catch (e) {
+    logger.error('parse error:', e);
+    err = 'parse';
+  }
+  return { err, list };
+}
 function _useDatabase(params, done) {
   params.session.setCurrentDatabase(params.ast.db, (err) => {
     done(err, {});
