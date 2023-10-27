@@ -1,5 +1,5 @@
-const { newSQLDateTime, SQLDateTime } = require('../types/sql_datetime');
-const { newSQLTime, SQLTime } = require('../types/sql_time');
+const { createSQLDateTime, SQLDateTime } = require('../types/sql_datetime');
+const { createSQLTime, SQLTime } = require('../types/sql_time');
 
 exports.convertBooleanValue = convertBooleanValue;
 exports.convertNum = convertNum;
@@ -46,10 +46,10 @@ function convertDateTime(value, type, decimals) {
     if (isNaN(time)) {
       ret = null;
     } else {
-      ret = newSQLDateTime(time / 1000, type, decimals);
+      ret = createSQLDateTime(time / 1000, type, decimals);
     }
   } else if (typeof value === 'number') {
-    ret = newSQLDateTime(value, type, decimals);
+    ret = createSQLDateTime(value, type, decimals);
   }
   return ret;
 }
@@ -67,7 +67,7 @@ function convertTime(value, decimals) {
       const minutes = Math.floor(parseFloat(parts[1] || '0'));
       const seconds = parseFloat(parts[2] || '0');
       const time = hours * HOUR + minutes * MINUTE + seconds;
-      ret = newSQLTime(time, decimals);
+      ret = createSQLTime(time, decimals);
     } else if (NUM_REGEX.test(value)) {
       const num = convertNum(value);
       ret = convertTime(num, decimals);
@@ -75,7 +75,7 @@ function convertTime(value, decimals) {
       const datetime = convertDateTime(value + ' UTC', 'datetime', decimals);
       if (datetime) {
         const time = datetime.getTime();
-        ret = newSQLTime(time % DAY, decimals);
+        ret = createSQLTime(time % DAY, decimals);
       } else {
         const num = convertNum(value);
         ret = convertTime(num, decimals);
@@ -87,7 +87,7 @@ function convertTime(value, decimals) {
     const minutes = Math.floor(value / 100);
     value -= minutes * 100;
     const time = hours * HOUR + minutes * MINUTE + value;
-    ret = newSQLTime(time, decimals);
+    ret = createSQLTime(time, decimals);
   }
   return ret;
 }

@@ -1,82 +1,81 @@
-const asyncSeries = require('async/series');
 const mysql = require('mysql2');
 const MYSQL = require('../src/constants/mysql');
+const { createPool, logger } = require('../src');
 const { DEPRECATE_EOF } = MYSQL.CLIENT_FLAGS;
 const { SERVER_MORE_RESULTS_EXISTS } = MYSQL.SERVER_STATUS;
-const logger = require('./tools/logger');
 
-const Session = require('./session');
+exports.createServer = createServer;
 
-const PORT = process.env.PORT ? parseInt(process.env.PORT) : 3306;
-const server = mysql.createServer();
+function createServer(args) {
+  return new Server(args);
+}
 
-let g_connectionId = 1;
-
-server.on('connection', _onConnection);
-
-asyncSeries([(done) => Session.init({}, done)], (err) => {
-  if (err) {
-    logger.debug('dynamosql init failed:', err);
-    process.exit(-1);
-  } else {
-    server.listen(PORT);
-    logger.info('dynamosql server listening:', PORT);
+class Server {
+  constructor(args) {
+    this._pool = createPool(args);
+    this._server = mysql.createServer();
+    this._server.on('connection', this._onConnection);
   }
-});
-
-function _onConnection(conn) {
-  logger.trace('server: new connection');
-
-  const session = Session.newSession();
-
-  function authenticate(params, done) {
-    const flags = params?.clientHelloReply?.clientFlags;
-    conn.DEPRECATE_EOF = Boolean(flags & DEPRECATE_EOF);
-    if (params.database) {
-      session.setCurrentDatabase(params.database);
-    }
-    conn.current_database = params.database;
-    done(null, null, { serverStatus: 0x2 });
+  _server;
+  _connectionId = 1;
+  listen(port, done) {
+    this._server.listen(port);
+    done?.();
   }
+  _onConnection = (conn) => {
+    logger.trace('server: new connection');
+    let session;
 
-  conn.serverHandshake({
-    protocolVersion: 10,
-    serverVersion: '8.0.0-dynamosql',
-    connectionId: g_connectionId++,
-    statusFlags: 2,
-    characterSet: 255,
-    capabilityFlags: 0x0fff31f | DEPRECATE_EOF,
-    authCallback: authenticate,
-  });
-  //conn.on('packet', (...arg) => console.log('packet:', ...arg));
-  conn.on('init_db', (database) => {
-    logger.trace('init_db:', database);
-    session.setCurrentDatabase(database, (err) => {
-      if (err) {
-        conn.writeError(_errorToMysql(err));
-      } else {
-        conn.writeOk();
+    function authCallback(params, done) {
+      const flags = params?.clientHelloReply?.clientFlags;
+      conn.DEPRECATE_EOF = Boolean(flags & DEPRECATE_EOF);
+      if (params.database) {
+        session.setCurrentDatabase(params.database);
       }
+      conn.current_database = params.database;
+      done(null, null, { serverStatus: 0x2 });
+    }
+    this._pool.getConnection((err, new_session) => {
+      session = new_session;
+      conn.serverHandshake({
+        protocolVersion: 10,
+        serverVersion: '8.0.0-dynamosql',
+        connectionId: this._connectionId++,
+        statusFlags: 2,
+        characterSet: 255,
+        capabilityFlags: 0x0fff31f | DEPRECATE_EOF,
+        authCallback,
+      });
     });
-  });
 
-  conn.on('field_list', (table, fields, ...other) => {
-    logger.trace('server: field_list:', table, fields, ...other);
-    conn.writeEof(undefined, undefined, true);
-  });
-  conn.on('query', (sql) => _query(sql, session, conn));
-  conn.on('stmt_prepare', (sql) => _query(sql, session, conn));
-  conn.on('stmt_execute', (_ignore1, _ignore2, _ignore3, _ignore4, sql) =>
-    _query(sql, session, conn)
-  );
-
-  conn.on('error', (err) => {
-    logger.error('server: error:', err);
-  });
-  conn.on('end', () => {
-    logger.trace('server: end');
-    conn.close();
-  });
+    //conn.on('packet', (...arg) => console.log('packet:', ...arg));
+    conn.on('init_db', (database) => {
+      logger.trace('init_db:', database);
+      session.setCurrentDatabase(database, (err) => {
+        if (err) {
+          conn.writeError(_errorToMysql(err));
+        } else {
+          conn.writeOk();
+        }
+      });
+    });
+    conn.on('field_list', (table, fields, ...other) => {
+      logger.trace('server: field_list:', table, fields, ...other);
+      conn.writeEof(undefined, undefined, true);
+    });
+    conn.on('query', (sql) => _query(sql, session, conn));
+    conn.on('stmt_prepare', (sql) => _query(sql, session, conn));
+    conn.on('stmt_execute', (_ignore1, _ignore2, _ignore3, _ignore4, sql) =>
+      _query(sql, session, conn)
+    );
+    conn.on('error', (err) => {
+      logger.error('server: error:', err);
+    });
+    conn.on('end', () => {
+      logger.trace('server: end');
+      conn.close();
+    });
+  };
 }
 
 function _query(sql, session, conn) {
@@ -116,7 +115,6 @@ function _writeResult(conn, result, schema, more_results) {
     conn.writeOk(result, more_results);
   }
 }
-
 function _maybeEof(conn) {
   if (!conn.DEPRECATE_EOF) {
     conn.writeEof();

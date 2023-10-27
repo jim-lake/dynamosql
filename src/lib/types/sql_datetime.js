@@ -53,7 +53,7 @@ class SQLDateTime {
     return ret;
   }
 }
-function newSQLDateTime(time, type, decimals) {
+function createSQLDateTime(time, type, decimals) {
   let ret;
   if (isNaN(time)) {
     ret = null;
@@ -62,7 +62,7 @@ function newSQLDateTime(time, type, decimals) {
   }
   return ret;
 }
-exports.newSQLDateTime = newSQLDateTime;
+exports.createSQLDateTime = createSQLDateTime;
 exports.SQLDateTime = SQLDateTime;
 
 const FORMAT_LONG_NUMBER = new Intl.DateTimeFormat('en-US', {

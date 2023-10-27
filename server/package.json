@@ -1,0 +1,11 @@
+{
+  "name": "dynamosql-server",
+  "private": true,
+  "scripts": {
+    "pretty": "prettier --write .",
+    "lint": "eslint ."
+  },
+  "dependencies": {
+    "mysql2": "https://github.com/jim-lake/node-mysql2#f0897cd221feb9c6b3bf2b291fadaa4db0964694"
+  }
+}

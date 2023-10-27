@@ -1,4 +1,5 @@
 const asyncTimesSeries = require('async/timesSeries');
+const SqlString = require('sqlstring');
 
 const { Parser } = require('./vendor/mysql_parser');
 
@@ -14,25 +15,44 @@ const DynamoDB = require('./lib/dynamodb');
 const logger = require('./tools/logger');
 
 exports.init = init;
-exports.newSession = newSession;
+exports.createSession = createSession;
 
 const parser = new Parser();
 
 let g_dynamodb;
-
-function init(params, done) {
-  g_dynamodb = DynamoDB.newDynamoDB(params, done);
+function init(args) {
+  g_dynamodb = DynamoDB.createDynamoDB(args);
 }
-
-function newSession(args) {
+function createSession(args) {
+  if (args) {
+    g_dynamodb = DynamoDB.createDynamoDB(args);
+  }
   return new Session(args);
 }
 
 class Session {
-  constructor() {}
+  constructor(args) {
+    if (args?.database) {
+      this.setCurrentDatabase(args.database);
+    }
+    if (args?.multipleStatements) {
+      this._multipleStatements = true;
+    }
+  }
   _currentDatabase = null;
   _localVariables = {};
   _transaction = null;
+  _isReleased = false;
+  _multipleStatements = false;
+  escape = SqlString.escpape;
+  escapeId = SqlString.escapeId;
+  release(done) {
+    this._isReleased = true;
+    done?.();
+  }
+  destroy() {
+    this._isReleased = true;
+  }
 
   setCurrentDatabase(database, done) {
     this._currentDatabase = database;
@@ -54,37 +74,65 @@ class Session {
     this._transaction = tx;
   }
 
-  query(sql, done) {
-    const list = sql
-      .split(';')
-      .map((s) => s.trim())
-      .filter((s) => s.length > 0);
-    if (list.length === 1) {
-      this._singleQuery(list[0], (err, result, columns) =>
-        done(err ?? null, result, columns, 1)
-      );
+  query(params, values, done) {
+    const opts = typeof params === 'object' ? params : {};
+    if (typeof params === 'string') {
+      opts.sql = params;
+    }
+    if (typeof values === 'function') {
+      done = values;
+    } else if (values !== undefined) {
+      opts.values = values;
+    }
+
+    if (!opts.sql) {
+      done('bad_arguments');
     } else {
-      const query_count = list.length;
-      const result_list = [];
-      const schema_list = [];
-      asyncTimesSeries(
-        query_count,
-        (n, done) => {
-          const single_sql = list[n];
-          if (single_sql) {
-            this._singleQuery(single_sql, (err, result, columns) => {
-              if (!err) {
-                result_list[n] = result;
-                schema_list[n] = columns;
-              }
-              done(err);
-            });
-          } else {
-            done();
-          }
-        },
-        (err) => done(err ?? null, result_list, schema_list, query_count)
-      );
+      if (opts.values !== undefined) {
+        opts.sql = SqlString.format(opts.sql, opts.values);
+      }
+      this._query(opts, done);
+    }
+  }
+  _query(opts, done) {
+    if (this._isReleased) {
+      done('released');
+    } else {
+      const list = opts.sql
+        .split(';')
+        .map((s) => s.trim())
+        .filter((s) => s.length > 0);
+      if (list.length === 0) {
+        done();
+      } else if (list.length === 1) {
+        this._singleQuery(list[0], (err, result, columns) =>
+          done(err ?? null, result, columns, 1)
+        );
+      } else if (this._multipleStatements) {
+        const query_count = list.length;
+        const result_list = [];
+        const schema_list = [];
+        asyncTimesSeries(
+          query_count,
+          (n, done) => {
+            const sql = list[n];
+            if (sql) {
+              this._singleQuery(sql, (err, result, columns) => {
+                if (!err) {
+                  result_list[n] = result;
+                  schema_list[n] = columns;
+                }
+                done(err);
+              });
+            } else {
+              done();
+            }
+          },
+          (err) => done(err ?? null, result_list, schema_list, query_count)
+        );
+      } else {
+        done('multiple_statements_disabled');
+      }
     }
   }
   _singleQuery(sql, done) {
@@ -120,7 +168,6 @@ class Session {
       done(err, result);
     }
   }
-
   _astify(sql) {
     let err;
     let ast;

@@ -2,9 +2,9 @@ const dynamodb = require('../../tools/dynamodb');
 
 const MetadataCache = require('./metadata_cache');
 
-exports.newDynamoDB = newDynamoDB;
+exports.createDynamoDB = createDynamoDB;
 
-function newDynamoDB(params, done) {
+function createDynamoDB(params, done) {
   dynamodb.init(params);
 
   const self = Object.assign({}, dynamodb, MetadataCache);

@@ -17,7 +17,7 @@ const mysql_conn = mysql.createConnection({
 });
 
 Session.init();
-const ddb_session = Session.newSession();
+const ddb_session = Session.createSession();
 
 after(() => {
   mysql_conn.destroy();

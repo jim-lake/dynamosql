@@ -1,4 +1,4 @@
-exports.newSQLTime = newSQLTime;
+exports.createSQLTime = createSQLTime;
 
 class SQLTime {
   constructor(time, decimals) {
@@ -27,7 +27,7 @@ class SQLTime {
   }
 }
 exports.SQLTime = SQLTime;
-function newSQLTime(time, decimals) {
+function createSQLTime(time, decimals) {
   let ret;
   if (isNaN(time)) {
     ret = null;

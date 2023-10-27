@@ -1,7 +1,7 @@
 const Expression = require('./index');
 const { convertNum, convertDateTime } = require('../helpers/sql_conversion');
-const { newSQLDateTime } = require('../types/sql_datetime');
-const { newSQLTime } = require('../types/sql_time');
+const { createSQLDateTime } = require('../types/sql_datetime');
+const { createSQLTime } = require('../types/sql_time');
 
 exports.database = database;
 exports.concat = concat;
@@ -72,7 +72,7 @@ function now(expr, state) {
     if (decimals > 6) {
       result.err = 'ER_TOO_BIG_PRECISION';
     }
-    result.value = newSQLDateTime(Date.now() / 1000, 'datetime', decimals);
+    result.value = createSQLDateTime(Date.now() / 1000, 'datetime', decimals);
     result.type = 'datetime';
   }
   return result;
@@ -86,13 +86,13 @@ function curtime(expr, state) {
       result.err = 'ER_TOO_BIG_PRECISION';
     }
     const time = (Date.now() / 1000) % DAY;
-    result.value = newSQLTime(time, decimals);
+    result.value = createSQLTime(time, decimals);
     result.type = 'time';
   }
   return result;
 }
 function curdate(expr) {
-  const value = newSQLDateTime(Date.now() / 1000, 'date');
+  const value = createSQLDateTime(Date.now() / 1000, 'date');
   const name = expr.args ? 'CURDATE()' : 'CURRENT_DATE';
   return { value, name, type: 'date' };
 }
@@ -102,7 +102,9 @@ function from_unixtime(expr, state) {
   result.type = 'datetime';
   if (!result.err && result.value !== null) {
     const time = convertNum(result.value);
-    result.value = time < 0 ? null : newSQLDateTime(time);
+    const decimals = Math.min(6, String(time).split('.')?.[1]?.length || 0);
+    result.value =
+      time < 0 ? null : createSQLDateTime(time, 'datetime', decimals);
   }
   return result;
 }

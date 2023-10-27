@@ -1,14 +1,35 @@
 {
   "name": "dynamosql",
   "private": true,
+  "version": "0.0.1",
+  "description": "MySQL compatible query engine with DynamoDB storage engine",
+  "main": "src/index.js",
+  "files": [
+    "src/**/*"
+  ],
   "scripts": {
-    "pretty": "prettier --write src test",
-    "lint": "eslint src"
+    "pretty": "prettier --write src server test examples",
+    "lint": "eslint src server examples"
   },
+  "repository": {
+    "type": "git",
+    "url": "git+ssh://git@github.com/jim-lake/dynamosql.git"
+  },
+  "keywords": [
+    "dynamosql",
+    "dynamodb",
+    "mysql"
+  ],
+  "author": "github.com/jim-lake",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/jim-lake/dynamosql/issues"
+  },
+  "homepage": "https://github.com/jim-lake/dynamosql#readme",
   "dependencies": {
     "@aws-sdk/client-dynamodb": "3.410.0",
     "async": "3.2.4",
     "big-integer": "1.6.51",
-    "mysql2": "https://github.com/jim-lake/node-mysql2#f0897cd221feb9c6b3bf2b291fadaa4db0964694"
+    "sqlstring": "2.3.3"
   }
 }
