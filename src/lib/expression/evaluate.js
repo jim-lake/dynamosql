@@ -36,7 +36,7 @@ function getValue(expr, state) {
       }
     } else {
       logger.trace('expression.getValue: unknown function:', expr.name);
-      result.err = 'ER_SP_DOES_NOT_EXIST';
+      result.err = { err: 'ER_SP_DOES_NOT_EXIST', args: [expr.name] };
     }
   } else if (expr.type === 'aggr_func') {
     const func = AggregateFunctions[expr.name.toLowerCase()];
@@ -47,7 +47,7 @@ function getValue(expr, state) {
       }
     } else {
       logger.trace('expression.getValue: unknown aggregate:', expr.name);
-      result.err = 'ER_SP_DOES_NOT_EXIST';
+      result.err = { err: 'ER_SP_DOES_NOT_EXIST', args: [expr.name] };
     }
   } else if (expr.type === 'binary_expr') {
     const func = BinaryExpression[expr.operator.toLowerCase()];
@@ -61,7 +61,7 @@ function getValue(expr, state) {
         'expression.getValue: unknown binary operator:',
         expr.operator
       );
-      result.err = 'ER_SP_DOES_NOT_EXIST';
+      result.err = { err: 'ER_SP_DOES_NOT_EXIST', args: [expr.operator] };
     }
   } else if (expr.type === 'unary_expr') {
     const func = UnaryExpression[expr.operator.toLowerCase()];
@@ -75,7 +75,7 @@ function getValue(expr, state) {
         'expression.getValue: unknown unanary operator:',
         expr.operator
       );
-      result.err = 'ER_SP_DOES_NOT_EXIST';
+      result.err = { err: 'ER_SP_DOES_NOT_EXIST', args: [expr.operator] };
     }
   } else if (expr.type === 'cast') {
     const func = Cast[expr.target.dataType.toLowerCase()];
@@ -89,7 +89,10 @@ function getValue(expr, state) {
         'expression.getValue: unknown cast type:',
         expr.target.dataType
       );
-      result.err = 'ER_SP_DOES_NOT_EXIST';
+      result.err = {
+        err: 'ER_SP_DOES_NOT_EXIST',
+        args: [expr.target.dataType],
+      };
     }
   } else if (expr.type === 'var') {
     const { prefix } = expr;
@@ -102,7 +105,7 @@ function getValue(expr, state) {
           'expression.getValue: unknown system variable:',
           expr.name
         );
-        result.err = 'ER_UNKNOWN_SYSTEM_VARIABLE';
+        result.err = { err: 'ER_UNKNOWN_SYSTEM_VARIABLE', args: [expr.name] };
       }
     } else if (prefix === '@') {
       result.value = session.getVariable(expr.name) ?? null;

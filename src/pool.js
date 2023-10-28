@@ -7,7 +7,7 @@ function createPool(args) {
   if (args) {
     Session.init(args);
   }
-  return new Pool(args);
+  return new Pool(args || {});
 }
 class Pool {
   constructor(args) {
@@ -16,10 +16,21 @@ class Pool {
   _args;
   escape = SqlString.escape;
   escapeId = SqlString.escapeId;
+  end(done) {
+    done?.();
+  }
   getConnection(done) {
     done(null, Session.createSession(this._args));
   }
-  end(done) {
-    done?.();
+  query(opts, values, done) {
+    if (typeof values === 'function') {
+      done = values;
+      values = undefined;
+    }
+    const session = Session.createSession(this._args);
+    session.query(opts, values, (...result) => {
+      session.release();
+      done(...result);
+    });
   }
 }

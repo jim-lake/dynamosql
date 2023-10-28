@@ -13,6 +13,7 @@ const ShowHandler = require('./lib/show_handler');
 
 const DynamoDB = require('./lib/dynamodb');
 const logger = require('./tools/logger');
+const { SQLError } = require('./error');
 
 exports.init = init;
 exports.createSession = createSession;
@@ -38,20 +39,37 @@ class Session {
     if (args?.multipleStatements) {
       this._multipleStatements = true;
     }
+    if (args?.typeCast === false) {
+      this._typeCast = false;
+    }
+    if (args?.dateStrings) {
+      this._dateStrings = true;
+    }
+    if (args?.resultObjects === false) {
+      this._resultObjects = false;
+    }
   }
   _currentDatabase = null;
   _localVariables = {};
   _transaction = null;
   _isReleased = false;
   _multipleStatements = false;
+
+  _typeCast = true;
+  _dateStrings = false;
+  _resultObjects = true;
+
   escape = SqlString.escpape;
   escapeId = SqlString.escapeId;
+  end(done) {
+    this.release(done);
+  }
   release(done) {
     this._isReleased = true;
     done?.();
   }
   destroy() {
-    this._isReleased = true;
+    this.release();
   }
 
   setCurrentDatabase(database, done) {
@@ -86,7 +104,7 @@ class Session {
     }
 
     if (!opts.sql) {
-      done('bad_arguments');
+      done(new SQLError('ER_EMPTY_QUERY'));
     } else {
       if (opts.values !== undefined) {
         opts.sql = SqlString.format(opts.sql, opts.values);
@@ -100,13 +118,16 @@ class Session {
     } else {
       const { err: parse_err, list } = _astify(opts.sql);
       if (parse_err) {
-        done(parse_err);
+        done(new SQLError(parse_err, opts.sql));
       } else if (list.length === 0) {
-        done();
+        done(new SQLError('ER_EMPTY_QUERY', opts.sql));
       } else if (list.length === 1) {
-        this._singleQuery(list[0], (err, result, columns) =>
-          done(err ?? null, result, columns, 1)
-        );
+        this._singleQuery(list[0], (err, result, columns) => {
+          if (!err) {
+            this._transformResult(result, columns, opts);
+          }
+          done(err ? new SQLError(err, opts.sql) : null, result, columns, 1);
+        });
       } else if (this._multipleStatements) {
         const query_count = list.length;
         const result_list = [];
@@ -118,6 +139,7 @@ class Session {
             if (ast) {
               this._singleQuery(ast, (err, result, columns) => {
                 if (!err) {
+                  this._transformResult(result, columns, opts);
                   result_list[n] = result;
                   schema_list[n] = columns;
                 }
@@ -127,10 +149,16 @@ class Session {
               done();
             }
           },
-          (err) => done(err ?? null, result_list, schema_list, query_count)
+          (err) => {
+            if (err) {
+              err = new SQLError(err, opts.sql);
+              err.index = result_list.length;
+            }
+            done(err, result_list, schema_list, query_count);
+          }
         );
       } else {
-        done('multiple_statements_disabled');
+        done(new SQLError('multiple_statements_disabled', opts.sql));
       }
     }
   }
@@ -156,7 +184,10 @@ class Session {
       handler = _useDatabase;
     } else if (!err) {
       logger.error('unsupported statement type:', ast);
-      err = 'unsupported';
+      err = {
+        err: 'unsupported_type',
+        args: [ast.type],
+      };
     }
 
     if (handler) {
@@ -164,6 +195,31 @@ class Session {
     } else {
       done(err, result);
     }
+  }
+  _transformResult(list, columns, opts) {
+    if (this._resultObjects && Array.isArray(list)) {
+      list.forEach((result, i) => {
+        const obj = {};
+        columns.forEach((column, j) => {
+          let dest = obj;
+          if (opts.nestTables) {
+            if (!obj[column.table]) {
+              obj[column.table] = {};
+            }
+            dest = obj[column.table];
+          }
+          dest[column.name] = this._convertCell(result[j], column.columnType);
+        });
+        list[i] = obj;
+      });
+    }
+  }
+  _convertCell(value, type) {
+    let ret = value;
+    if (this._typeCast) {
+      // type cast here
+    }
+    return ret;
   }
 }
 function _astify(sql) {
@@ -178,7 +234,8 @@ function _astify(sql) {
     }
   } catch (e) {
     logger.error('parse error:', e);
-    err = 'parse';
+    const start = e?.location?.start;
+    err = { err: 'parse', args: [start?.line, start?.column] };
   }
   return { err, list };
 }

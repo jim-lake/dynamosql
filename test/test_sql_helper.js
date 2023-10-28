@@ -21,7 +21,7 @@ function runTests(test_name, file_path) {
   });
 
   Session.init();
-  const ddb_session = Session.createSession();
+  const ddb_session = Session.createSession({ resultObjects: false });
   after(() => {
     mysql_conn.destroy();
   });

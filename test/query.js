@@ -59,7 +59,6 @@ function _query(sql, done) {
       fields?.forEach?.((field, i) => {
         console.log('field:', i, _convertField(field));
       });
-      console.log('results:', err, results);
     }
     if (err) {
       console.log('err:', err);

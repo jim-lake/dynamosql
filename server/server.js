@@ -7,11 +7,12 @@ const { SERVER_MORE_RESULTS_EXISTS } = MYSQL.SERVER_STATUS;
 exports.createServer = createServer;
 
 function createServer(args) {
-  return new Server(args);
+  return new Server(args || {});
 }
 
 class Server {
   constructor(args) {
+    args.resultObjects = false;
     this._pool = createPool(args);
     this._server = mysql.createServer();
     this._server.on('connection', this._onConnection);
@@ -130,8 +131,14 @@ function _trim(s) {
   return ret;
 }
 function _errorToMysql(err) {
+  console.log('_errorToMysql:', err, err.errno, err.sqlMessage);
   let ret;
-  if (err === 'unsupported') {
+  if (typeof err.errno === 'number') {
+    ret = {
+      code: err.errno,
+      message: err.sqlMessage || err.message || 'Unknown error',
+    };
+  } else if (err === 'unsupported') {
     ret = { code: 1002, message: 'Unsupported' };
   } else if (err === 'parse') {
     ret = { code: 1064, message: 'Parse error' };

@@ -34,7 +34,10 @@ function resolveReferences(ast, current_database) {
       ? db_map[object.db]?.[object.table]
       : table_map[object.table];
     if (!from) {
-      err = 'table_not_found';
+      err = {
+        err: 'table_not_found',
+        args: [object.table],
+      };
     } else {
       object.from = from;
     }
@@ -94,7 +97,10 @@ function _resolveObject(
       if (from) {
         from._requestAll = true;
       } else {
-        err = 'table_not_found';
+        err = {
+          err: 'table_not_found',
+          args: [object.table],
+        };
       }
     } else if (object.table) {
       let found = false;
@@ -108,7 +114,10 @@ function _resolveObject(
         }
       });
       if (!found) {
-        err = 'table_not_found';
+        err = {
+          err: 'table_not_found',
+          args: [object.table],
+        };
       }
     } else {
       ast.from?.forEach?.((from) => {
@@ -140,7 +149,22 @@ function _resolveObject(
         name_cache[object.column] = from;
       }
     } else if (object._resultIndex === undefined) {
-      err = 'table_not_found';
+      if (object.db && !db_map[object.db]) {
+        err = {
+          err: 'db_not_found',
+          args: [object.db],
+        };
+      } else if (object.table) {
+        err = {
+          err: 'table_not_found',
+          args: [object.table],
+        };
+      } else {
+        err = {
+          err: 'column_not_found',
+          args: [object.column],
+        };
+      }
     }
   }
   return err;
