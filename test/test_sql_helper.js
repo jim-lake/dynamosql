@@ -63,7 +63,7 @@ function runTests(test_name, file_path) {
             if (ddb_result.err && !mysql_result.err) {
               console.error('unexpected ddb_result.err:', ddb_result.err);
             }
-            if (ddb_result.err && ddb_result.err !== mysql_result.err.code) {
+            if (ddb_result.err && ddb_result.err.code !== mysql_result.err?.code) {
               expect(ddb_result.err, 'err equality').to.equal(mysql_result.err);
             }
             expect(ddb_result?.results?.length, 'results length').to.equal(
