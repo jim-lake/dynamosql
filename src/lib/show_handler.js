@@ -3,7 +3,7 @@ const Engine = require('./engine');
 
 exports.query = query;
 
-const DATABASES = [['information_schema'], ['_dynamodb']];
+const DATABASES = [['_dynamodb']];
 
 function query(params, done) {
   const { ast, session, dynamodb } = params;
