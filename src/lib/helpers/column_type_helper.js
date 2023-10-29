@@ -98,7 +98,10 @@ function convertType(type, nullable) {
       characterSet: MYSQL.CHARSETS.BINARY,
       columnLength: 255,
       columnType: MYSQL.TYPES.VAR_STRING,
-      flags: MYSQL.FIELD_FLAGS.NOT_NULL | MYSQL.FIELD_FLAGS.BINARY | MYSQL.FIELD_FLAGS.UNSIGNED,
+      flags:
+        MYSQL.FIELD_FLAGS.NOT_NULL |
+        MYSQL.FIELD_FLAGS.BINARY |
+        MYSQL.FIELD_FLAGS.UNSIGNED,
       decimals: 0,
     };
   } else if (type === 'string' || typeof type !== 'object') {

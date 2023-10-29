@@ -12,15 +12,18 @@ const Session = require('../src/session');
 const SECONDS_REGEX = /:[0-9]{2}(\.[0-9]*)?$/g;
 
 function runTests(test_name, file_path, extra) {
-  const mysql_opts = Object.assign({
-    host: config.db.host,
-    port: config.db.port || 3306,
-    user: config.db.user,
-    password: config.db.password,
-    //database: config.db.database,
-    multipleStatements: true,
-    dateStrings: true,
-  }, extra?.mysql);
+  const mysql_opts = Object.assign(
+    {
+      host: config.db.host,
+      port: config.db.port || 3306,
+      user: config.db.user,
+      password: config.db.password,
+      //database: config.db.database,
+      multipleStatements: true,
+      dateStrings: true,
+    },
+    extra?.mysql
+  );
   const mysql_conn = mysql.createConnection(mysql_opts);
 
   const session_opts = Object.assign({ resultObjects: false }, extra?.session);
@@ -103,20 +106,24 @@ function runTests(test_name, file_path, extra) {
 }
 function _checkEqual(name, i, left, right) {
   if (name === 'ignore_seconds') {
-    expect(
-      left.length,
-      `results[${i}].${name} length equal`
-    ).to.equal(right.length);
+    expect(left.length, `results[${i}].${name} length equal`).to.equal(
+      right.length
+    );
     left = String(left).replace(SECONDS_REGEX, '');
     right = String(right).replace(SECONDS_REGEX, '');
   }
   if (left instanceof Date) {
-    assert(right instanceof Date, "both are dates");
-    expect(left.getTime(),`results[${i}].${name} typeof equal`).to.equal(right.getTime());
+    assert(right instanceof Date, 'both are dates');
+    expect(left.getTime(), `results[${i}].${name} typeof equal`).to.equal(
+      right.getTime()
+    );
   } else if (Buffer.isBuffer(left)) {
-    assert(Buffer.isBuffer(right), "both are buffers");
-    assert(Buffer.compare(left, right) === 0, `results[${i}].${name} buffers not equal`);
+    assert(Buffer.isBuffer(right), 'both are buffers');
+    assert(
+      Buffer.compare(left, right) === 0,
+      `results[${i}].${name} buffers not equal`
+    );
   } else {
-    expect(left,`results[${i}].${name} equal`).to.equal(right);
+    expect(left, `results[${i}].${name} equal`).to.equal(right);
   }
 }
