@@ -19,7 +19,7 @@ class Pool {
   end(done) {
     done?.();
   }
-  getConnection(done) {
+  getSession(done) {
     done(null, Session.createSession(this._args));
   }
   query(opts, values, done) {

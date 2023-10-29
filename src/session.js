@@ -61,12 +61,12 @@ class Session {
 
   escape = SqlString.escpape;
   escapeId = SqlString.escapeId;
-  end(done) {
-    this.release(done);
-  }
   release(done) {
     this._isReleased = true;
     done?.();
+  }
+  end(done) {
+    this.release(done);
   }
   destroy() {
     this.release();
