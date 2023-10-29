@@ -70,7 +70,7 @@ See above.
 
 When creating a session, the following options are available.
 
-* `database`: Name of the database to use for this connection (Optional).
+* `database`: Name of the database to use for this session (Optional).
 * `region`: The AWS region to connect to DynamoDB.
   If not provided, will use the defaults of the AWS SDK (v3) which
   may fail. (Optional)
@@ -88,7 +88,7 @@ When creating a session, the following options are available.
 * `multipleStatements`: Allow multiple mysql statements per query. Be careful
   with this, it could increase the scope of SQL injection attacks. (Default: `false`)
 
-## Pooling connections
+## Pooling sessions
 
 You can use pooling to set session options once and then all sessions will use
 those options.
@@ -119,11 +119,11 @@ const dynamosql = require('dynamosql');
 const pool = dynamosql.createPool(...);
 
 pool.getSession(function(err, session) {
-  if (err) throw err; // not connected!
+  if (err) throw err; // bad pool options
 
-  // Use the connection
+  // Use the session
   session.query('SELECT something FROM sometable', function (error, results, fields) {
-    // When done with the connection, release it.
+    // When done with the session, release it.
     session.release();
 
     // Handle error after the release.
@@ -160,7 +160,7 @@ The second form `.query(sqlString, values, callback)` comes when using
 placeholder values (see [escaping query values](#escaping-query-values)):
 
 ```js
-connection.query('SELECT * FROM `books` WHERE `author` = ?', ['David'], function (error, results, fields) {
+session.query('SELECT * FROM `books` WHERE `author` = ?', ['David'], function (error, results, fields) {
   // error will be an Error if one occurred during the query
   // results will contain the results of the query
   // fields will contain information about the returned results fields (if any)
@@ -168,12 +168,11 @@ connection.query('SELECT * FROM `books` WHERE `author` = ?', ['David'], function
 ```
 
 The third form `.query(options, callback)` comes when using various advanced
-options on the query, like [escaping query values](#escaping-query-values),
-[joins with overlapping column names](#joins-with-overlapping-column-names),
-[timeouts](#timeouts), and [type casting](#type-casting).
+options on the query, like [escaping query values](#escaping-query-values) and
+[type casting](#type-casting).
 
 ```js
-connection.query({
+session.query({
   sql: 'SELECT * FROM `books` WHERE `author` = ?',
   timeout: 40000, // 40s
   values: ['David']
@@ -189,7 +188,7 @@ placeholder values are passed as an argument and not in the options object.
 The `values` argument will override the `values` in the option object.
 
 ```js
-connection.query({
+session.query({
     sql: 'SELECT * FROM `books` WHERE `author` = ?',
     timeout: 40000, // 40s
   },
