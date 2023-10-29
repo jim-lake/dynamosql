@@ -36,7 +36,7 @@ class Server {
       conn.current_database = params.database;
       done(null, null, { serverStatus: 0x2 });
     }
-    this._pool.getConnection((err, new_session) => {
+    this._pool.getSession((err, new_session) => {
       session = new_session;
       conn.serverHandshake({
         protocolVersion: 10,

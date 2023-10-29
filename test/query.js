@@ -1,3 +1,5 @@
+process.env.TZ = 'UTC';
+
 const async = require('async');
 const mysql = require('mysql');
 const config = require('../config');
@@ -59,6 +61,7 @@ function _query(sql, done) {
       fields?.forEach?.((field, i) => {
         console.log('field:', i, _convertField(field));
       });
+      console.log('  results:', results);
     }
     if (err) {
       console.log('err:', err);

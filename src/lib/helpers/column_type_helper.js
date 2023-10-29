@@ -87,6 +87,20 @@ function convertType(type, nullable) {
       flags: MYSQL.FIELD_FLAGS.BINARY | MYSQL.FIELD_FLAGS.NOT_NULL,
       decimals: 0,
     };
+  } else if (type === 'buffer') {
+    ret = {
+      catalog: 'def',
+      table: '',
+      schema: '',
+      orgTable: '',
+      name: '',
+      orgName: '',
+      characterSet: MYSQL.CHARSETS.BINARY,
+      columnLength: 255,
+      columnType: MYSQL.TYPES.VAR_STRING,
+      flags: MYSQL.FIELD_FLAGS.NOT_NULL | MYSQL.FIELD_FLAGS.BINARY | MYSQL.FIELD_FLAGS.UNSIGNED,
+      decimals: 0,
+    };
   } else if (type === 'string' || typeof type !== 'object') {
     ret = {
       catalog: 'def',

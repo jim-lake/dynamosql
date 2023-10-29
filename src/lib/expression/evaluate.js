@@ -15,19 +15,24 @@ function getValue(expr, state) {
   const { session, row, column_list } = state;
   let result = { err: null, value: undefined, name: undefined };
 
+  const type = expr?.type;
   if (!expr) {
     // no expression results in undefined
-  } else if (expr.type === 'number') {
+  } else if (type === 'number') {
     result.value = expr.value;
-  } else if (expr.type === 'double_quote_string') {
+  } else if (type === 'double_quote_string') {
     result.value = expr.value;
     result.name = `"${result.value}"`;
-  } else if (expr.type === 'null') {
+  } else if (type === 'null') {
     result.value = null;
-  } else if (expr.type === 'bool') {
+  } else if (type === 'bool') {
     result.value = expr.value ? 1 : 0;
     result.name = expr.value ? 'TRUE' : 'FALSE';
-  } else if (expr.type === 'function') {
+  } else if (type === 'hex_string' || type === 'full_hex_string') {
+    result.value = Buffer.from(expr.value, 'hex');
+    result.name = 'x' + expr.value.slice(0, 10);
+    result.type = 'buffer';
+  } else if (type === 'function') {
     const func = Functions[expr.name.toLowerCase()];
     if (func) {
       result = func(expr, state);
@@ -38,7 +43,7 @@ function getValue(expr, state) {
       logger.trace('expression.getValue: unknown function:', expr.name);
       result.err = { err: 'ER_SP_DOES_NOT_EXIST', args: [expr.name] };
     }
-  } else if (expr.type === 'aggr_func') {
+  } else if (type === 'aggr_func') {
     const func = AggregateFunctions[expr.name.toLowerCase()];
     if (func) {
       result = func(expr, state);
@@ -49,7 +54,7 @@ function getValue(expr, state) {
       logger.trace('expression.getValue: unknown aggregate:', expr.name);
       result.err = { err: 'ER_SP_DOES_NOT_EXIST', args: [expr.name] };
     }
-  } else if (expr.type === 'binary_expr') {
+  } else if (type === 'binary_expr') {
     const func = BinaryExpression[expr.operator.toLowerCase()];
     if (func) {
       result = func(expr, state);
@@ -63,7 +68,7 @@ function getValue(expr, state) {
       );
       result.err = { err: 'ER_SP_DOES_NOT_EXIST', args: [expr.operator] };
     }
-  } else if (expr.type === 'unary_expr') {
+  } else if (type === 'unary_expr') {
     const func = UnaryExpression[expr.operator.toLowerCase()];
     if (func) {
       result = func(expr, state);
@@ -77,7 +82,7 @@ function getValue(expr, state) {
       );
       result.err = { err: 'ER_SP_DOES_NOT_EXIST', args: [expr.operator] };
     }
-  } else if (expr.type === 'cast') {
+  } else if (type === 'cast') {
     const func = Cast[expr.target.dataType.toLowerCase()];
     if (func) {
       result = func(expr, state);
@@ -94,7 +99,7 @@ function getValue(expr, state) {
         args: [expr.target.dataType],
       };
     }
-  } else if (expr.type === 'var') {
+  } else if (type === 'var') {
     const { prefix } = expr;
     if (prefix === '@@') {
       const func = SystemVariables[expr.name.toLowerCase()];
@@ -113,7 +118,7 @@ function getValue(expr, state) {
       result.err = 'unsupported';
     }
     result.name = prefix + expr.name;
-  } else if (expr.type === 'column_ref') {
+  } else if (type === 'column_ref') {
     result.name = expr.column;
     if (row && expr._resultIndex >= 0) {
       result.value = row['@@result']?.[expr._resultIndex];

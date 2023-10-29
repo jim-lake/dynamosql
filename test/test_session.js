@@ -1,3 +1,5 @@
+process.env.TZ = 'UTC';
+
 const path = require('node:path');
 const config = tryRequire('../config');
 const dynamosql = require('../src');
@@ -11,6 +13,8 @@ console.log('sql:', sql);
 
 const opts = {
   multipleStatements: true,
+  dateStrings: true,
+  resultObjects: false,
 };
 if (config.region) {
   opts.region = config.region;

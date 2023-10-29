@@ -52,6 +52,10 @@ class SQLDateTime {
     }
     return ret;
   }
+  toDate() {
+    this._makeDate();
+    return this._date;
+  }
 }
 function createSQLDateTime(time, type, decimals) {
   let ret;

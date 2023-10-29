@@ -109,7 +109,6 @@ function _evaluateReturn(params, done) {
       column_type.orgTable = column?.expr?.from?.table || '';
       column_type.table = column?.expr?.from?.as || column_type.orgTable;
       column_type.schema = column.expr?.from?.db || '';
-      column_type.result_type = column.result_type;
       column_list.push(column_type);
     }
     if (ast.orderby) {

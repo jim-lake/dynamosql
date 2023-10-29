@@ -1,7 +1,9 @@
+process.env.TZ = 'UTC';
+
 exports.runTests = runTests;
 
 const async = require('async');
-const { expect } = require('chai');
+const { assert, expect } = require('chai');
 const fs = require('node:fs');
 const config = require('../config');
 const mysql = require('mysql');
@@ -9,8 +11,8 @@ const Session = require('../src/session');
 
 const SECONDS_REGEX = /:[0-9]{2}(\.[0-9]*)?$/g;
 
-function runTests(test_name, file_path) {
-  const mysql_conn = mysql.createConnection({
+function runTests(test_name, file_path, extra) {
+  const mysql_opts = Object.assign({
     host: config.db.host,
     port: config.db.port || 3306,
     user: config.db.user,
@@ -18,12 +20,14 @@ function runTests(test_name, file_path) {
     //database: config.db.database,
     multipleStatements: true,
     dateStrings: true,
-  });
+  }, extra?.mysql);
+  const mysql_conn = mysql.createConnection(mysql_opts);
 
-  Session.init();
-  const ddb_session = Session.createSession({ resultObjects: false });
+  const session_opts = Object.assign({ resultObjects: false }, extra?.session);
+  const ddb_session = Session.createSession(session_opts);
   after(() => {
     mysql_conn.destroy();
+    ddb_session.destroy();
   });
 
   const SQL_LIST = fs
@@ -74,25 +78,45 @@ function runTests(test_name, file_path) {
             );
 
             ddb_result?.results?.forEach?.((result, i) => {
-              ddb_result.columns.forEach((column, j) => {
-                const name = column.name;
-                let left = String(result[j]);
-                let right = String(mysql_result.results[i][name]);
-                if (name === 'ignore_seconds') {
-                  expect(
-                    left.length,
-                    `results[${i}].${name} length equal`
-                  ).to.equal(right.length);
-                  left = left.replace(SECONDS_REGEX, '');
-                  right = right.replace(SECONDS_REGEX, '');
-                }
-                expect(left, `results[${i}].${name} equal`).to.equal(right);
-              });
+              if (Array.isArray(result)) {
+                ddb_result.columns.forEach((column, j) => {
+                  const name = column.name;
+                  const left = String(result[j]);
+                  const right = String(mysql_result.results[i][name]);
+                  _checkEqual(name, i, left, right);
+                });
+              } else {
+                ddb_result.columns.forEach((column, j) => {
+                  const name = column.name;
+                  const left = result[name];
+                  const right = mysql_result.results[i][name];
+                  _checkEqual(name, i, left, right);
+                });
+              }
             });
             done();
           }
         );
       });
     });
+  }
+}
+function _checkEqual(name, i, left, right) {
+  if (name === 'ignore_seconds') {
+    expect(
+      left.length,
+      `results[${i}].${name} length equal`
+    ).to.equal(right.length);
+    left = String(left).replace(SECONDS_REGEX, '');
+    right = String(right).replace(SECONDS_REGEX, '');
+  }
+  if (left instanceof Date) {
+    assert(right instanceof Date, "both are dates");
+    expect(left.getTime(),`results[${i}].${name} typeof equal`).to.equal(right.getTime());
+  } else if (Buffer.isBuffer(left)) {
+    assert(Buffer.isBuffer(right), "both are buffers");
+    assert(Buffer.compare(left, right) === 0, `results[${i}].${name} buffers not equal`);
+  } else {
+    expect(left,`results[${i}].${name} equal`).to.equal(right);
   }
 }

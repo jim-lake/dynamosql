@@ -1,3 +1,5 @@
+process.env.TZ = 'UTC';
+
 const net = require('node:net');
 const PacketParser = require('../server/node_modules/mysql2/lib/packet_parser.js');
 const MYSQL = require('../src/constants/mysql');

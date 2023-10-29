@@ -11,6 +11,7 @@ const SelectHandler = require('./lib/select_handler');
 const SetHandler = require('./lib/set_handler');
 const ShowHandler = require('./lib/show_handler');
 
+const { typeCast } = require('./lib/helpers/type_cast_helper');
 const DynamoDB = require('./lib/dynamodb');
 const logger = require('./tools/logger');
 const { SQLError } = require('./error');
@@ -39,16 +40,17 @@ class Session {
     if (args?.multipleStatements) {
       this._multipleStatements = true;
     }
+    if (args?.resultObjects === false) {
+      this._resultObjects = false;
+    }
     if (args?.typeCast === false) {
       this._typeCast = false;
     }
     if (args?.dateStrings) {
-      this._dateStrings = true;
-    }
-    if (args?.resultObjects === false) {
-      this._resultObjects = false;
+      this._typeCastOptions.dateStrings = true;
     }
   }
+  _typeCastOptions = {};
   _currentDatabase = null;
   _localVariables = {};
   _transaction = null;
@@ -208,18 +210,16 @@ class Session {
             }
             dest = obj[column.table];
           }
-          dest[column.name] = this._convertCell(result[j], column.columnType);
+          dest[column.name] = this._convertCell(result[j], column);
         });
         list[i] = obj;
       });
     }
   }
-  _convertCell(value, type) {
-    let ret = value;
-    if (this._typeCast) {
-      // type cast here
-    }
-    return ret;
+  _convertCell(value, column) {
+    return this._typeCast
+      ? typeCast(value, column, this._typeCastOptions)
+      : value;
   }
 }
 function _astify(sql) {

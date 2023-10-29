@@ -1,3 +1,5 @@
+process.env.TZ = 'UTC';
+
 const async = require('async');
 const mysql = require('mysql');
 const config = require('../config');
