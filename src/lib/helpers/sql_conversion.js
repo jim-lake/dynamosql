@@ -5,6 +5,7 @@ exports.convertBooleanValue = convertBooleanValue;
 exports.convertNum = convertNum;
 exports.convertDateTime = convertDateTime;
 exports.convertTime = convertTime;
+exports.getDecimals = getDecimals;
 
 const MINUTE = 60;
 const HOUR = 60 * MINUTE;
@@ -88,6 +89,18 @@ function convertTime(value, decimals) {
     value -= minutes * 100;
     const time = hours * HOUR + minutes * MINUTE + value;
     ret = createSQLTime(time, decimals);
+  }
+  return ret;
+}
+function getDecimals(value, max) {
+  let ret = 0;
+  if (typeof value === 'number') {
+    ret = String(value).split('.')?.[1]?.length || 0;
+  } else if (typeof value === 'string') {
+    ret = value.split('.')?.[1]?.length || 0;
+  }
+  if (max !== undefined) {
+    ret = Math.min(max, ret);
   }
   return ret;
 }

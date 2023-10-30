@@ -10,6 +10,10 @@ class SQLDateTime {
     } else {
       this._time = parseFloat(this._time.toFixed(this._decimals));
     }
+    this._fractionText =
+      this._decimals > 0
+        ? this._time.toFixed(this._decimals).slice(-this._decimals)
+        : '';
   }
   _date = null;
   _makeDate() {
@@ -17,8 +21,14 @@ class SQLDateTime {
       this._date = new Date(this._time * 1000);
     }
   }
+  getType() {
+    return this._type;
+  }
   getTime() {
     return this._time;
+  }
+  getDecimals() {
+    return this._decimals;
   }
   toString() {
     let ret;
@@ -30,13 +40,9 @@ class SQLDateTime {
       if (this._type === 'date') {
         ret = ret.slice(0, 10);
       } else {
-        ret = ret.replace('Z', '');
-        if (this._decimals === 0) {
-          ret = ret.slice(0, 19);
-        } else if (this._decimals > 3) {
-          ret = ret.padEnd(this._decimals + 20, '0');
-        } else {
-          ret = ret.slice(0, 20 + this._decimals);
+        ret = ret.replace(/\..*/, '');
+        if (this._decimals > 0) {
+          ret = ret + '.' + this._fractionText;
         }
       }
     }

@@ -1,9 +1,11 @@
 const { convertDateTime, convertTime } = require('../helpers/sql_conversion');
+const { createSQLInterval } = require('../types/sql_interval');
 const Expression = require('./evaluate');
 
 exports.datetime = datetime;
 exports.date = date;
 exports.time = time;
+exports.interval = interval;
 
 function datetime(expr, state) {
   const result = Expression.getValue(expr.expr, state);
@@ -37,6 +39,15 @@ function time(expr, state) {
       result.err = 'ER_TOO_BIG_PRECISION';
     }
     result.value = convertTime(result.value, decimals);
+  }
+  return result;
+}
+function interval(expr, state) {
+  const result = Expression.getValue(expr.expr, state);
+  result.name = `INTERVAL ${result.name} ${expr.unit}`;
+  result.type = 'interval';
+  if (!result.err && result.value !== null) {
+    result.value = createSQLInterval(result.value, expr.unit);
   }
   return result;
 }

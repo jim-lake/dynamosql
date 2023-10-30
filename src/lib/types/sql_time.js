@@ -5,8 +5,14 @@ class SQLTime {
     this._time = time;
     this._decimals = decimals || 0;
   }
+  getType() {
+    return 'time';
+  }
   getTime() {
     return this._time;
+  }
+  getDecimals() {
+    return this._decimals;
   }
   toString() {
     let ret;

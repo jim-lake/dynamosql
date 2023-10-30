@@ -32,6 +32,8 @@ function getValue(expr, state) {
     result.value = Buffer.from(expr.value, 'hex');
     result.name = 'x' + expr.value.slice(0, 10);
     result.type = 'buffer';
+  } else if (type === 'interval') {
+    result = Cast.interval(expr, state);
   } else if (type === 'function') {
     const func = Functions[expr.name.toLowerCase()];
     if (func) {

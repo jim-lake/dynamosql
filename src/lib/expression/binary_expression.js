@@ -1,6 +1,7 @@
 const {
   convertNum,
   convertBooleanValue,
+  convertDateTime,
 } = require('../helpers/sql_conversion');
 const Expression = require('./index');
 
@@ -19,45 +20,90 @@ exports['and'] = and;
 exports['or'] = or;
 exports['xor'] = xor;
 
-function _numBothSides(expr, state, op) {
+function _isDateOrTime(type) {
+  return type === 'date' || type === 'datetime' || type === 'time';
+}
+
+function _numBothSides(expr, state, op, allow_interval) {
   const left = Expression.getValue(expr.left, state);
   const right = Expression.getValue(expr.right, state);
-  const err = left.err || right.err;
+  let err = left.err || right.err;
   const name = left.name + op + right.name;
   let value;
   let left_num;
   let right_num;
+  let interval;
+  let datetime;
   if (!err) {
     if (left.value === null || right.value === null) {
       value = null;
+    } else if (allow_interval && left.type === 'interval') {
+      interval = left.value;
+      if (_isDateOrTime(right.type)) {
+        datetime = right.value;
+      } else if (typeof right.value === 'string') {
+        datetime = convertDateTime(left.value);
+        if (datetime === null) {
+          value = null;
+        }
+      } else {
+        value = null;
+      }
+    } else if (allow_interval && right.type === 'interval') {
+      interval = right.value;
+      if (_isDateOrTime(left.type)) {
+        datetime = left.value;
+      } else if (typeof left.value === 'string') {
+        datetime = convertDateTime(left.value);
+        if (datetime === null) {
+          value = null;
+        }
+      } else {
+        value = null;
+      }
+    } else if (right.type === 'interval' || left.type === 'interval') {
+      err = 'bad_interval_usage';
     } else {
       left_num = convertNum(left.value);
       right_num = convertNum(right.value);
+      if (left_num === null || right_num === null) {
+        value = null;
+      }
     }
   }
-  return { err, name, value, left_num, right_num };
+  return { err, name, value, left_num, right_num, interval, datetime };
 }
 function plus(expr, state) {
-  let { err, name, value, left_num, right_num } = _numBothSides(
-    expr,
-    state,
-    ' + '
-  );
+  let { err, name, value, left_num, right_num, interval, datetime } =
+    _numBothSides(expr, state, ' + ', true);
+  let type;
   if (!err && value !== null) {
-    value = left_num + right_num;
+    if (datetime) {
+      const result = interval.add(datetime);
+      value = result.value;
+      type = result.type;
+    } else {
+      value = left_num + right_num;
+      type = 'number';
+    }
   }
-  return { err, value, name };
+  return { err, value, type, name };
 }
 function minus(expr, state) {
-  let { err, name, value, left_num, right_num } = _numBothSides(
-    expr,
-    state,
-    ' - '
-  );
+  let { err, name, value, left_num, right_num, interval, datetime } =
+    _numBothSides(expr, state, ' - ', true);
+  let type;
   if (!err && value !== null) {
-    value = left_num - right_num;
+    if (datetime) {
+      const result = interval.sub(datetime);
+      value = result.value;
+      type = result.type;
+    } else {
+      value = left_num - right_num;
+      type = 'number';
+    }
   }
-  return { err, value, name };
+  return { err, value, type, name };
 }
 function mul(expr, state) {
   let { err, name, value, left_num, right_num } = _numBothSides(

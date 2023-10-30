@@ -54,6 +54,10 @@ const ERROR_MAP = {
     code: 'ER_TABLE_EXISTS_ERROR',
     sqlMessage: 'Table already exists.',
   },
+  bad_interval_usage: {
+    code: 'ER_PARSE_ERROR',
+    sqlMessage: 'You have an error in your SQL syntax.  Check near "INTERVAL".',
+  },
 };
 class SQLError extends Error {
   constructor(err, sql) {

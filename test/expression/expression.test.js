@@ -13,4 +13,5 @@ describe('Expression', function () {
   );
 
   runTests('date.sql', path.join(__dirname, 'date.sql'));
+  runTests('interval.sql', path.join(__dirname, 'interval.sql'));
 });
