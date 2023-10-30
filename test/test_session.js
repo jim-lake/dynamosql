@@ -14,7 +14,7 @@ console.log('sql:', sql);
 const opts = {
   multipleStatements: true,
   dateStrings: true,
-  resultObjects: false,
+  resultObjects: true,
 };
 if (config.region) {
   opts.region = config.region;
@@ -31,7 +31,7 @@ if (!session) {
   console.error('failed to init session');
   process.exit(-2);
 }
-session.query(sql, (err, results, fields) => {
+session.query({ sql, nestTables: true }, (err, results, fields) => {
   if (err) {
     console.log('err:', err);
   }

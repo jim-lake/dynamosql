@@ -140,13 +140,12 @@ function _evaluateReturn(params, done) {
     done(err, output_row_list, column_list);
   }
 }
-
 function _expandStarColumns(params) {
   const { ast, column_map } = params;
   const ret = [];
   ast?.columns?.forEach?.((column) => {
     if (column?.expr?.type === 'column_ref' && column.expr.column === '*') {
-      const { db, table } = column;
+      const { db, table } = column.expr;
       ast.from.forEach((from) => {
         if (
           (!db && !table) ||

@@ -47,10 +47,15 @@ function runTests(test_name, file_path, extra) {
         const mysql_result = {};
         const ddb_result = {};
 
+        const opts = { sql };
+        if (extra?.nestTables) {
+          opts.nestTables = true;
+        }
+
         async.parallel(
           [
             (done) => {
-              mysql_conn.query(sql, (err, results, columns) => {
+              mysql_conn.query(opts, (err, results, columns) => {
                 mysql_result.err = err;
                 mysql_result.results = results;
                 mysql_result.columns = columns;
@@ -58,7 +63,7 @@ function runTests(test_name, file_path, extra) {
               });
             },
             (done) => {
-              ddb_session.query(sql, (err, results, columns) => {
+              ddb_session.query(opts, (err, results, columns) => {
                 ddb_result.err = err;
                 ddb_result.results = results;
                 ddb_result.columns = columns;
@@ -90,9 +95,13 @@ function runTests(test_name, file_path, extra) {
                 });
               } else {
                 ddb_result.columns.forEach((column, j) => {
-                  const name = column.name;
-                  const left = result[name];
-                  const right = mysql_result.results[i][name];
+                  const { table, name } = column;
+                  const left = opts.nestTables
+                    ? result[table]?.[name]
+                    : result[name];
+                  const right = opts.nestTables
+                    ? mysql_result.results[i]?.[table]?.[name]
+                    : mysql_result.results[i][name];
                   _checkEqual(name, i, left, right);
                 });
               }

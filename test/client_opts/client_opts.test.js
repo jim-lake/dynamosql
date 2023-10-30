@@ -21,4 +21,15 @@ describe('Client Opts', function () {
       dateStrings: true,
     },
   });
+
+  runTests('nest_tables.sql', path.join(__dirname, 'nest_tables.sql'), {
+    mysql: {
+      dateStrings: true,
+    },
+    session: {
+      resultObjects: true,
+      dateStrings: true,
+    },
+    nestTables: true,
+  });
 });

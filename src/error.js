@@ -50,6 +50,10 @@ const ERROR_MAP = {
     code: 'ER_TOO_BIG_PRECISION',
     sqlMessage: 'Too-big precision specified. Maximum is 6.',
   },
+  table_exists: {
+    code: 'ER_TABLE_EXISTS_ERROR',
+    sqlMessage: 'Table already exists.',
+  },
 };
 class SQLError extends Error {
   constructor(err, sql) {
