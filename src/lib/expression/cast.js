@@ -16,7 +16,7 @@ function datetime(expr, state) {
     if (decimals > 6) {
       result.err = 'ER_TOO_BIG_PRECISION';
     }
-    result.value = convertDateTime(result.value + ' UTC', 'datetime', decimals);
+    result.value = convertDateTime(result.value, 'datetime', decimals);
   }
   return result;
 }
@@ -25,7 +25,7 @@ function date(expr, state) {
   result.name = `CAST(${result.name} AS DATE)`;
   result.type = 'date';
   if (!result.err && result.value !== null) {
-    result.value = convertDateTime(result.value + ' UTC', 'date');
+    result.value = convertDateTime(result.value, 'date');
   }
   return result;
 }

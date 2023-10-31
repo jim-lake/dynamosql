@@ -172,8 +172,14 @@ function _addMonth(old_time, number) {
   const new_months = date.getUTCFullYear() * 12 + date.getUTCMonth() + number;
   const year = Math.floor(new_months / 12);
   const month = new_months - year * 12;
+  let day = date.getUTCDate();
   date.setUTCFullYear(year);
   date.setUTCMonth(month);
+  while (date.getUTCMonth() > month) {
+    date.setUTCMonth(0);
+    date.setUTCDate(day--);
+    date.setUTCMonth(month);
+  }
   const delta = date.getTime() - start_time;
   return old_time + delta / 1000;
 }

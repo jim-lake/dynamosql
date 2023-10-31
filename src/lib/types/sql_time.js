@@ -20,6 +20,10 @@ class SQLTime {
       ret = '';
     } else {
       let seconds = this._time;
+      const neg = seconds < 0 ? '-' : '';
+      if (neg) {
+        seconds = -seconds;
+      }
       const hours = Math.floor(seconds / 60 / 60);
       seconds -= hours * 60 * 60;
       const minutes = Math.floor(seconds / 60);
@@ -27,7 +31,7 @@ class SQLTime {
 
       const ret_secs =
         (seconds < 10 ? '0' : '') + seconds.toFixed(this._decimals);
-      ret = `${_pad(hours)}:${_pad(minutes)}:${ret_secs}`;
+      ret = `${neg}${_pad(hours)}:${_pad(minutes)}:${ret_secs}`;
     }
     return ret;
   }

@@ -6,19 +6,17 @@ class SQLDateTime {
     if (type === 'date') {
       this._time -= this._time % (24 * 60 * 60);
     } else if (this._decimals === 0) {
-      this._time = Math.trunc(this._time);
+      this._time = Math.floor(this._time);
     } else {
       this._time = parseFloat(this._time.toFixed(this._decimals));
     }
     this._fractionText =
-      this._decimals > 0
-        ? this._time.toFixed(this._decimals).slice(-this._decimals)
-        : '';
+      this._decimals > 0 ? _getDecimal(this._time, this._decimals) : '';
   }
   _date = null;
   _makeDate() {
     if (!this._date) {
-      this._date = new Date(this._time * 1000);
+      this._date = new Date(Math.floor(this._time * 1000));
     }
   }
   getType() {
@@ -66,6 +64,10 @@ class SQLDateTime {
 function createSQLDateTime(time, type, decimals) {
   let ret;
   if (isNaN(time)) {
+    ret = null;
+  } else if (time >= 253402300800) {
+    ret = null;
+  } else if (time <= -62167219201) {
     ret = null;
   } else {
     ret = new SQLDateTime(time, type, decimals);
@@ -262,4 +264,10 @@ function _nthNumber(number) {
     }
   }
   return ret;
+}
+function _getDecimal(time, decimals) {
+  if (time < 0) {
+    time -= Math.floor(time);
+  }
+  return time.toFixed(decimals).slice(-decimals);
 }
