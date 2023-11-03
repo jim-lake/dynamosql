@@ -22,6 +22,8 @@ function convertNum(value) {
     if (isNaN(ret)) {
       ret = 0;
     }
+  } else if (value?.toNumber) {
+    ret = value.toNumber();
   }
   return ret;
 }
@@ -41,13 +43,13 @@ const DATE_RS = `^([0-9]{1,4})${SEP}([0-2]?[0-9])${SEP}([0-3]?[0-9])`;
 const DEC_RS = `(\\.[0-9]{1,6})?`;
 const DIGIT_RS = `(${SEP}([0-5]?[0-9]))?`;
 const DT_RS = `${DATE_RS}(\\s+|T)([0-2]?[0-9])${DIGIT_RS}${DIGIT_RS}${DEC_RS}`;
-const DATE_REGEX = new RegExp(DATE_RS);
-const DATETIME_REGEX = new RegExp(DT_RS);
 const DATE4_RS = `^([0-9]{4})([0-1][0-9])([0-3][0-9])`;
 const DATETIME4_RS = `${DATE4_RS}([0-2][0-9])([0-5][0-9])(([0-5][0-9])${DEC_RS})?`;
 const DATE2_RS = `^([0-9]{2})([0-1][0-9])([0-3][0-9])`;
 const DATETIME2_RS = `${DATE2_RS}([0-2][0-9])([0-5][0-9])(([0-5][0-9])${DEC_RS})?`;
 
+const DATE_REGEX = new RegExp(DATE_RS + '$');
+const DATETIME_REGEX = new RegExp(DT_RS);
 const DATE4_REGEX = new RegExp(DATE4_RS);
 const DATETIME4_REGEX = new RegExp(DATETIME4_RS);
 const DATE2_REGEX = new RegExp(DATE2_RS);
@@ -58,23 +60,25 @@ function convertDateTime(value, type, decimals) {
   if (value === null) {
     ret = null;
   } else if (value instanceof SQLDateTime) {
-    ret = value;
+    ret = createSQLDateTime(value, type, decimals);
+  } else if (value instanceof SQLTime) {
+    ret = value.toSQLDateTime(decimals);
   } else if (typeof value === 'string') {
     let time = _stringToDateTime(value);
     if (time === undefined) {
       time = _stringToDate(value);
+      if (!type) {
+        type = 'date';
+      }
     }
 
     if (time === undefined) {
-      const num = parseFloat(value);
-      if (!isNaN(num)) {
-        time = _numToDateTime(value);
-      }
+      time = _numToDateTime(value);
     }
     if (time === undefined) {
       ret = null;
     } else {
-      ret = createSQLDateTime(time, type, decimals);
+      ret = createSQLDateTime(time, type ?? 'datetime', decimals);
     }
   } else if (typeof value === 'number') {
     const time = _numToDateTime(value);
@@ -96,9 +100,9 @@ function convertTime(value, decimals) {
   } else if (typeof value === 'string') {
     let time = _stringToTime(value);
     if (time === undefined) {
-      time = _stringToDateTime(value);
-      if (time !== undefined) {
-        time %= 24 * 60 * 60;
+      const result = _stringToDateTime(value);
+      if (result !== undefined) {
+        time = (result.time % DAY) + (result.fraction || 0);
       }
     }
     if (time === undefined) {
@@ -173,10 +177,7 @@ function _stringToDateTime(value) {
     const min = match[7] || '0';
     const sec = match[9] || '0';
     const fraction = parseFloat('0' + match[10]);
-    ret = _partsToTime(year, month, day, hour, min, sec);
-    if (ret !== undefined) {
-      ret += fraction;
-    }
+    ret = _partsToTime(year, month, day, hour, min, sec, fraction);
   }
   return ret;
 }
@@ -192,10 +193,7 @@ function _numToDateTime(number) {
     const min = match[5];
     const sec = match[7] || '0';
     const fraction = parseFloat('0' + match[8]);
-    ret = _partsToTime(year, month, day, hour, min, sec);
-    if (ret !== undefined) {
-      ret += fraction;
-    }
+    ret = _partsToTime(year, month, day, hour, min, sec, fraction);
   }
   if (ret === undefined) {
     match = s.match(DATETIME2_REGEX);
@@ -207,10 +205,7 @@ function _numToDateTime(number) {
       const min = match[5];
       const sec = match[7] || '0';
       const fraction = parseFloat('0' + match[8]);
-      ret = _partsToTime(year, month, day, hour, min, sec);
-      if (ret !== undefined) {
-        ret += fraction;
-      }
+      ret = _partsToTime(year, month, day, hour, min, sec, fraction);
     }
   }
   if (ret === undefined) {
@@ -259,20 +254,28 @@ function _pad4(num) {
   return String(num).padStart(4, '0');
 }
 function _fix2year(num) {
-  if (typeof num === 'string') {
-    num = parseInt(num);
+  let ret = num;
+  if (num?.length <= 2) {
+    ret = parseInt(num);
+    if (num >= 0 && num <= 69) {
+      ret += 2000;
+    } else if (num >= 70 && num <= 99) {
+      ret += 1900;
+    }
   }
-  if (num >= 10 && num <= 69) {
-    num += 2000;
-  } else if (num >= 70 && num <= 99) {
-    num += 1900;
-  }
-  return num;
+  return ret;
 }
-function _partsToTime(year, month, day, hour, min, sec) {
+function _partsToTime(year, month, day, hour, min, sec, fraction) {
   const iso = `${_pad4(year)}-${_pad2(month)}-${_pad2(day)}T${_pad2(
     hour
   )}:${_pad2(min)}:${_pad2(sec)}Z`;
   const time = Date.parse(iso);
-  return isNaN(time) ? undefined : time / 1000;
+  let ret;
+  if (!isNaN(time)) {
+    ret = {
+      time: time / 1000,
+      fraction,
+    };
+  }
+  return ret;
 }

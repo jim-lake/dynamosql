@@ -1,4 +1,9 @@
 exports.createSQLTime = createSQLTime;
+const { createDateTime } = require('./sql_datetime');
+
+const MINUTE = 60;
+const HOUR = MINUTE * 60;
+const DAY = 24 * HOUR;
 
 class SQLTime {
   constructor(time, decimals) {
@@ -10,6 +15,9 @@ class SQLTime {
   }
   getTime() {
     return this._time;
+  }
+  getFraction() {
+    return 0;
   }
   getDecimals() {
     return this._decimals;
@@ -24,16 +32,29 @@ class SQLTime {
       if (neg) {
         seconds = -seconds;
       }
-      const hours = Math.floor(seconds / 60 / 60);
-      seconds -= hours * 60 * 60;
-      const minutes = Math.floor(seconds / 60);
-      seconds -= minutes * 60;
+      const hours = Math.floor(seconds / HOUR);
+      seconds -= hours * HOUR;
+      const minutes = Math.floor(seconds / MINUTE);
+      seconds -= minutes * MINUTE;
 
       const ret_secs =
         (seconds < 10 ? '0' : '') + seconds.toFixed(this._decimals);
       ret = `${neg}${_pad(hours)}:${_pad(minutes)}:${ret_secs}`;
     }
     return ret;
+  }
+  toSQLDateTime(decimals) {
+    const now = Date.now() / 1000;
+    const time = now - (now % DAY) + this._time;
+    return createDateTime(time, 'datetime', decimals ?? this._decimals);
+  }
+  toNumber() {
+    let seconds = this._time;
+    const hours = Math.floor(seconds / HOUR);
+    seconds -= hours * HOUR;
+    const minutes = Math.floor(seconds / MINUTE);
+    seconds -= minutes * MINUTE;
+    return hours * 10000 + minutes * 100 + seconds;
   }
 }
 exports.SQLTime = SQLTime;

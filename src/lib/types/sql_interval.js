@@ -76,6 +76,7 @@ class SQLInterval {
   }
   _add(datetime, mult) {
     let old_time = datetime.getTime?.();
+    let fraction = datetime.getFraction?.();
     const old_type = datetime?.getType?.();
     let type;
     if (old_type === 'datetime') {
@@ -99,10 +100,18 @@ class SQLInterval {
         const now = Date.now() / 1000;
         old_time += now - (now % (24 * 60 * 60));
       }
-      const time = this._isMonth
-        ? _addMonth(old_time, number)
-        : old_time + number;
-      value = createSQLDateTime(time, type, decimals);
+      let time;
+      if (this._isMonth) {
+        time = _addMonth(old_time, number);
+      } else {
+        const add_time = Math.floor(number);
+        time = old_time + add_time;
+        fraction += number - add_time;
+        const overflow = Math.floor(fraction);
+        time += overflow;
+        fraction -= overflow;
+      }
+      value = createSQLDateTime({ time, fraction }, type, decimals);
     }
     return { type, value };
   }
@@ -175,7 +184,7 @@ function _addMonth(old_time, number) {
   let day = date.getUTCDate();
   date.setUTCFullYear(year);
   date.setUTCMonth(month);
-  while (date.getUTCMonth() > month) {
+  while (date.getUTCMonth() !== month) {
     date.setUTCMonth(0);
     date.setUTCDate(day--);
     date.setUTCMonth(month);

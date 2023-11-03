@@ -1,19 +1,38 @@
+exports.createSQLDateTime = createSQLDateTime;
+
+const YEAR_MULT = 10000;
+const MONTH_MULT = 100;
+const DAY_MULT = 1;
+const HOUR_MULT = 10000;
+const MINUTE_MULT = 100;
+const DATE_TIME_MULT = 10000;
+
 class SQLDateTime {
-  constructor(time, type, decimals) {
-    this._time = time;
-    this._type = type;
-    this._decimals = decimals || 0;
+  constructor(time_arg, type, decimals) {
+    this._time = Math.floor(time_arg?.time ?? time_arg);
+    if (time_arg?.fraction !== undefined) {
+      this._fraction = time_arg.fraction;
+    } else if (typeof time_arg === 'number') {
+      this._fraction = parseFloat(
+        '0.' + (String(time_arg).split('.')[1] || '').slice(0, 6).padEnd(6, '0')
+      );
+    } else {
+      this._fraction = 0;
+    }
+    this._type = type || 'datetime';
+    this._decimals = decimals ?? (this._fraction ? 6 : 0);
     if (type === 'date') {
       this._time -= this._time % (24 * 60 * 60);
-    } else if (this._decimals === 0) {
-      this._time = Math.floor(this._time);
-    } else {
-      this._time = parseFloat(this._time.toFixed(this._decimals));
+    } else if (this._decimals > 0) {
+      this._fraction = parseFloat(this._fraction.toFixed(this._decimals));
+      const fd = this.time < 0 ? 1 - this._fraction : this._fraction;
+      this._fractionText =
+        '.' + fd.toFixed(this._decimals).slice(-this._decimals);
     }
-    this._fractionText =
-      this._decimals > 0 ? _getDecimal(this._time, this._decimals) : '';
   }
   _date = null;
+  _fraction = 0;
+  _fractionText = '';
   _makeDate() {
     if (!this._date) {
       this._date = new Date(Math.floor(this._time * 1000));
@@ -24,6 +43,9 @@ class SQLDateTime {
   }
   getTime() {
     return this._time;
+  }
+  getFraction() {
+    return this._fraction;
   }
   getDecimals() {
     return this._decimals;
@@ -40,7 +62,7 @@ class SQLDateTime {
       } else {
         ret = ret.replace(/\..*/, '');
         if (this._decimals > 0) {
-          ret = ret + '.' + this._fractionText;
+          ret = ret + this._fractionText;
         }
       }
     }
@@ -60,22 +82,51 @@ class SQLDateTime {
     this._makeDate();
     return this._date;
   }
+  toNumber() {
+    let ret = 0;
+    this._makeDate();
+    ret += this._date.getUTCFullYear() * YEAR_MULT;
+    ret += (this._date.getUTCMonth() + 1) * MONTH_MULT;
+    ret += this._date.getUTCDate() * DAY_MULT;
+    if (this._type === 'datetime') {
+      ret = ret * DATE_TIME_MULT;
+      ret += this._date.getUTCHours() * HOUR_MULT;
+      ret += this._date.getUTCMinutes() * MINUTE_MULT;
+      ret += this._date.getUTCSeconds();
+      if (this._decimals > 0) {
+        ret += this._fraction;
+      }
+    }
+    return ret;
+  }
 }
-function createSQLDateTime(time, type, decimals) {
+exports.SQLDateTime = SQLDateTime;
+function createSQLDateTime(arg, type, decimals) {
   let ret;
-  if (isNaN(time)) {
-    ret = null;
-  } else if (time >= 253402300800) {
-    ret = null;
-  } else if (time <= -62167219201) {
-    ret = null;
+  if (arg instanceof SQLDateTime) {
+    if (arg._type === type && arg._decimals === decimals) {
+      ret = arg;
+    } else {
+      const opts = {
+        time: arg._time,
+        fraction: arg._fraction,
+      };
+      ret = new SQLDateTime(opts, type ?? arg._type, decimals ?? arg._decimals);
+    }
   } else {
-    ret = new SQLDateTime(time, type, decimals);
+    const time = arg?.time ?? arg;
+    if (isNaN(time)) {
+      ret = null;
+    } else if (time >= 253402300800) {
+      ret = null;
+    } else if (time <= -62167219201) {
+      ret = null;
+    } else {
+      ret = new SQLDateTime(arg, type, decimals);
+    }
   }
   return ret;
 }
-exports.createSQLDateTime = createSQLDateTime;
-exports.SQLDateTime = SQLDateTime;
 
 const FORMAT_LONG_NUMBER = new Intl.DateTimeFormat('en-US', {
   weekday: 'long',
@@ -264,10 +315,4 @@ function _nthNumber(number) {
     }
   }
   return ret;
-}
-function _getDecimal(time, decimals) {
-  if (time < 0) {
-    time -= Math.floor(time);
-  }
-  return time.toFixed(decimals).slice(-decimals);
 }
