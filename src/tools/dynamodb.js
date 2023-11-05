@@ -23,6 +23,7 @@ exports.queryQL = queryQL;
 exports.batchQL = batchQL;
 exports.transactionQL = transactionQL;
 exports.deleteItems = deleteItems;
+exports.updateItems = updateItems;
 Object.assign(exports, AdminOther);
 
 let g_client;
@@ -118,6 +119,49 @@ function deleteItems(params, done) {
           })
           .join(' AND ');
         sql_list.push(prefix + cond);
+      }
+      transactionQL(sql_list, (err, result) => {
+        for (let i = start; i < end; i++) {
+          result_list[i] = result?.[i - start];
+          err_list[i] = err?.[i - start];
+        }
+        done(err);
+      });
+    },
+    (err) => done(err ? err_list : null, result_list)
+  );
+}
+function updateItems(params, done) {
+  const BATCH_LIMIT = 100;
+  const { table, key_list, list } = params;
+  const batch_count = Math.ceil(list.length / BATCH_LIMIT);
+  const prefix = `UPDATE ${escapeIdentifier(table)} SET `;
+  const err_list = [];
+  const result_list = [];
+  asyncTimesLimit(
+    batch_count,
+    QUERY_LIMIT,
+    (batch_index, done) => {
+      const sql_list = [];
+      const start = BATCH_LIMIT * batch_index;
+      const end = Math.min(start + BATCH_LIMIT, list.length);
+      for (let i = start; i < end; i++) {
+        const item = list[i];
+        const sets = item.set_list
+          .map((object) => {
+            const { column, value } = object;
+            return `${escapeIdentifier(column)} = ${value}`;
+          })
+          .join(', ');
+        const cond =
+          ' WHERE ' +
+          key_list
+            .map((key, j) => {
+              const value = item.key[j];
+              return `${escapeIdentifier(key)} = ${_convertValueToPQL(value)}`;
+            })
+            .join(' AND ');
+        sql_list.push(prefix + sets + cond);
       }
       transactionQL(sql_list, (err, result) => {
         for (let i = start; i < end; i++) {

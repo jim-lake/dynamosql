@@ -34,9 +34,16 @@ function escapeString(string) {
   }
   return ret;
 }
-function escapeValue(value) {
+function escapeNumber(value) {
+  return String(value).replace(/[^0-9.]/g, '');
+}
+function escapeValue(value, type) {
   let s;
-  if (value === null) {
+  if (type === 'string') {
+    s = "'" + escapeString(String(value)) + "'";
+  } else if (type === 'number') {
+    s = escapeNumber(value);
+  } else if (value === null) {
     s = 'NULL';
   } else if (Array.isArray(value)) {
     s = '[ ';

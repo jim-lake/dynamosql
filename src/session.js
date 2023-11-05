@@ -10,6 +10,7 @@ const InsertHandler = require('./lib/insert_handler');
 const SelectHandler = require('./lib/select_handler');
 const SetHandler = require('./lib/set_handler');
 const ShowHandler = require('./lib/show_handler');
+const UpdateHandler = require('./lib/update_handler');
 
 const { typeCast } = require('./lib/helpers/type_cast_helper');
 const DynamoDB = require('./lib/dynamodb');
@@ -182,6 +183,8 @@ class Session {
       handler = SelectHandler.query;
     } else if (ast?.type === 'set') {
       handler = SetHandler.query;
+    } else if (ast?.type === 'update') {
+      handler = UpdateHandler.query;
     } else if (ast?.type === 'use') {
       handler = _useDatabase;
     } else if (!err) {

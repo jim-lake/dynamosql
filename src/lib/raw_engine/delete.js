@@ -32,14 +32,14 @@ RETURNING ALL OLD *`;
     if (err?.name === 'ValidationException') {
       _selectDelete(params, done);
     } else {
-      done(err, results?.length);
+      done(err, { affectedRows: results?.length });
     }
   });
 }
 function _selectDelete(params, done) {
   const { dynamodb, session, ast } = params;
 
-  let affected_rows = 0;
+  let affectedRows = 0;
   asyncSeries(
     [
       (done) =>
@@ -121,7 +121,7 @@ function _selectDelete(params, done) {
                     data
                   );
                 } else {
-                  affected_rows += list.length;
+                  affectedRows += list.length;
                 }
                 done(err);
               });
@@ -132,7 +132,7 @@ function _selectDelete(params, done) {
           done
         ),
     ],
-    (err) => done(err, affected_rows)
+    (err) => done(err, { affectedRows })
   );
 }
 function _addCollection(collection, values) {

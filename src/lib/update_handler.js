@@ -8,6 +8,9 @@ exports.query = query;
 function query(params, done) {
   const { ast, session } = params;
   const current_database = session.getCurrentDatabase();
+
+  ast.from = ast.table;
+  delete ast.table;
   const resolve_err = resolveReferences(ast, current_database);
   const database = ast.from?.[0]?.db;
 
@@ -22,12 +25,12 @@ function query(params, done) {
       ...params,
       engine,
       database,
-      func: _runDelete,
+      func: _runUpdate,
     };
     TransactionManager.run(opts, done);
   }
 }
-function _runDelete(params, done) {
+function _runUpdate(params, done) {
   const { ast, session, engine, dynamodb } = params;
 
   const opts = {
@@ -35,7 +38,7 @@ function _runDelete(params, done) {
     session,
     ast,
   };
-  engine.deleteRowList(opts, (err, result) => {
+  engine.updateRowList(opts, (err, result) => {
     done(err, result);
   });
 }

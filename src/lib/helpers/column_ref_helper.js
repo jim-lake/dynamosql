@@ -45,7 +45,7 @@ function resolveReferences(ast, current_database) {
 
   const name_cache = {};
   if (!err) {
-    [ast.from, ast.columns, ast.where].forEach((item) => {
+    [ast.from, ast.columns, ast.where, ast.set].forEach((item) => {
       walkColumnRefs(item, (object) => {
         const ret = _resolveObject(object, ast, db_map, table_map, name_cache);
         if (ret && !err) {
@@ -54,6 +54,15 @@ function resolveReferences(ast, current_database) {
       });
     });
   }
+  if (!err) {
+    ast.set?.forEach?.((object) => {
+      const ret = _resolveObject(object, ast, db_map, table_map, name_cache);
+      if (ret && !err) {
+        err = ret;
+      }
+    });
+  }
+
   const result_map = {};
   ast.columns?.forEach?.((column, i) => {
     if (column.as) {
