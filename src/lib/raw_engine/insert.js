@@ -22,7 +22,7 @@ function insertRowList(params, done) {
           if (item_err?.Code === 'DuplicateItem') {
             // ignore
           } else if (!err && item_err) {
-            err = convertError(item_err);
+            err = convertError(item_err, { table });
           }
         });
       }
@@ -36,10 +36,23 @@ function insertRowList(params, done) {
       ) {
         for (let i = 0; i < err.CancellationReasons.length; i++) {
           if (err.CancellationReasons[i].Code === 'DuplicateItem') {
-            err = 'dup';
+            err = {
+              err: 'dup_table_insert',
+              args: [table, list[i]],
+            };
+            break;
+          } else if (err.CancellationReasons[i].Code !== 'None') {
+            err = {
+              err: convertError(err.CancellationReasons[i]),
+            };
+            if (err.err === 'table_not_found') {
+              err.args = [table];
+            }
             break;
           }
         }
+      } else if (err) {
+        err = convertError(err);
       }
       done(err, err ? 0 : list.length);
     });

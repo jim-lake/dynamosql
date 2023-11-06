@@ -1,10 +1,19 @@
 const { isNativeError } = require('node:util').types;
 const { CODE_ERRNO } = require('./constants/mysql');
+const { jsonStringify } = require('./tools/util');
 
 const DEFAULT_ERRNO = 1002;
 const DEFAULT_CODE = 'ER_NO';
 
 const ERROR_MAP = {
+  dup_table_insert: {
+    code: 'ER_DUP_ENTRY',
+    sqlMessage: errStr`Duplicate entry for table '${0}' and item '${1}'`,
+  },
+  dup: {
+    code: 'ER_DUP_ENTRY',
+    sqlMessage: 'Duplicate entry',
+  },
   parse: {
     code: 'ER_PARSE_ERROR',
     sqlMessage: errStr`You have an error in your SQL syntax; check your syntax near column ${1} at line ${0}`,
@@ -93,8 +102,19 @@ function errStr(strings, ...index_list) {
     let s = '';
     for (let i = 0; i < strings.length; i++) {
       s += strings[i];
-      s += arg_list?.[index_list?.[i]] || '';
+      s += _stringify(arg_list?.[index_list?.[i]]);
     }
     return s;
   };
+}
+function _stringify(arg) {
+  let ret = arg || '';
+  if (
+    arg &&
+    typeof arg === 'object' &&
+    arg.toString === Object.prototype.toString
+  ) {
+    ret = jsonStringify(arg);
+  }
+  return ret;
 }

@@ -1,4 +1,13 @@
 exports.hex = hex;
+exports.jsonStringify = jsonStringify;
+
+function jsonStringify(...args) {
+  try {
+    return JSON.stringify(...args);
+  } catch {
+    return '';
+  }
+}
 
 function hex(s) {
   let ret = '';

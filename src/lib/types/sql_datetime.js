@@ -20,14 +20,24 @@ class SQLDateTime {
       this._fraction = 0;
     }
     this._type = type || 'datetime';
-    this._decimals = decimals ?? (this._fraction ? 6 : 0);
     if (type === 'date') {
+      this._decimals = 0;
       this._time -= this._time % (24 * 60 * 60);
-    } else if (this._decimals > 0) {
+      this._fraction = 0;
+    } else {
+      this._decimals = decimals ?? (this._fraction ? 6 : 0);
       this._fraction = parseFloat(this._fraction.toFixed(this._decimals));
-      const fd = this.time < 0 ? 1 - this._fraction : this._fraction;
-      this._fractionText =
-        '.' + fd.toFixed(this._decimals).slice(-this._decimals);
+      let fd = 0;
+      if (this._fraction >= 1.0) {
+        this._fraction = 0;
+        this._time += this._time < 0 ? -1 : 1;
+      } else {
+        fd = this._fraction;
+      }
+      if (this._decimals > 0) {
+        this._fractionText =
+          '.' + fd.toFixed(this._decimals).slice(-this._decimals);
+      }
     }
   }
   _date = null;

@@ -33,14 +33,15 @@ function runTests(test_name, file_path, extra) {
     ddb_session.destroy();
   });
 
-  const SQL_LIST = fs
-    .readFileSync(file_path, 'utf8')
+  const data = fs.readFileSync(file_path, 'utf8');
+  const sql_list = data
+    .replace(/\-\-.*/g, '\n')
     .split(';')
     .map((s) => s.trim())
-    .filter((s) => s.length > 0 && !s.startsWith('--'));
+    .filter((s) => s.length > 0);
 
   describe(test_name, function () {
-    SQL_LIST.forEach((sql) => _runTest(sql));
+    sql_list.forEach((sql) => _runTest(sql));
   });
   function _runTest(sql) {
     it(sql, function (done) {

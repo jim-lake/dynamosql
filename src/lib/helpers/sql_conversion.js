@@ -38,7 +38,7 @@ function convertBooleanValue(value) {
   }
   return ret;
 }
-const SEP = `[-^\\][!@#$%&*()_+={}\\|<>,.:;"']+`;
+const SEP = `[-^\\][!@#$%&*()_+={}\\|/\\\\<>,.:;"']+`;
 const DATE_RS = `^([0-9]{1,4})${SEP}([0-2]?[0-9])${SEP}([0-3]?[0-9])`;
 const DEC_RS = `(\\.[0-9]{1,6})?`;
 const DIGIT_RS = `(${SEP}([0-5]?[0-9]))?`;
