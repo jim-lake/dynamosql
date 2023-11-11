@@ -314,13 +314,13 @@ function _is(expr, state, op) {
   let right_name;
   if (expr.right.value === null) {
     right = null;
-    right_name = "NULL";
+    right_name = 'NULL';
   } else if (expr.right.value === true) {
     right = true;
-    right_name = "TRUE";
+    right_name = 'TRUE';
   } else if (expr.right.value === false) {
     right = false;
-    right_name = "FALSE";
+    right_name = 'FALSE';
   } else if (!result.err) {
     result.err = {
       err: 'syntax_err',

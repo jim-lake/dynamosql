@@ -143,11 +143,11 @@ function _is(expr, state, op) {
   let err = left.err;
   if (!err) {
     if (expr.right.value === null) {
-      right = "NULL";
+      right = 'NULL';
     } else if (expr.right.value === true) {
-      right = "TRUE";
+      right = 'TRUE';
     } else if (expr.right.value === false) {
-      right = "FALSE";
+      right = 'FALSE';
     } else {
       err = 'syntax_err';
     }
@@ -158,14 +158,14 @@ function _is(expr, state, op) {
 function not(expr, state) {
   const result = convertWhere(expr.expr, state);
   if (!result.err) {
-    result.value = "NOT " + result.value;
+    result.value = 'NOT ' + result.value;
   }
   return result;
 }
 function minus(expr, state) {
   const result = convertWhere(expr.expr, state);
   if (!result.err) {
-    result.value = "-" + result.value;
+    result.value = '-' + result.value;
   }
   return result;
 }

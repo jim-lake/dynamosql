@@ -5,7 +5,7 @@ const { createSQLTime } = require('../types/sql_time');
 
 exports.database = database;
 exports.sleep = sleep;
-exports.length = length;
+exports.length = _length;
 exports.concat = concat;
 exports.left = left;
 exports.coalesce = coalesce;
@@ -35,7 +35,7 @@ function sleep(expr, state) {
   }
   return result;
 }
-function length(expr, state) {
+function _length(expr, state) {
   const result = Expression.getValue(expr.args.value?.[0], state);
   result.name = `LENGTH(${result.name})`;
   result.type = 'number';

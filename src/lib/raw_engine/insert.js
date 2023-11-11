@@ -28,7 +28,7 @@ function insertRowList(params, done) {
       } else {
         affectedRows = list.length;
       }
-      done(err, err ? undefined : { affectedRows } );
+      done(err, err ? undefined : { affectedRows });
     });
   } else {
     dynamodb.transactionQL(sql_list, (err) => {

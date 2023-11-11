@@ -1,0 +1,16 @@
+SELECT 2 + 3 * 4 AS foo;
+SELECT 4 * 2 + 3 AS foo;
+SELECT !0 + 1 AS foo;
+SELECT !1 * 3 AS foo;
+SELECT !4 - 1 AS foo;
+SELECT -!0 * 9 AS foo;
+SELECT 1 + 2 < 3 AS foo;
+SELECT 2 * 7 < 11 AS foo;
+SELECT -2 - -3 + !0 AS foo;
+SELECT 1 OR 0 AND 1 AS foo;
+SELECT NOT 1 AND 1 OR 0 AS foo;
+SELECT NOT 1 - 1 AND 1 OR 0 AS foo;
+SELECT 1 -+-+!1 AS foo;
+SELECT !+"foo" AS foo;
+SELECT -!+"foo" AS foo;
+SELECT -!-"foo" AS foo;
