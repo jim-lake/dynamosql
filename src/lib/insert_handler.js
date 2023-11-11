@@ -30,7 +30,7 @@ function _runInsert(params, done) {
   const table = ast.table?.[0]?.table;
 
   let list;
-  let affectedRows;
+  let result;
   asyncSeries(
     [
       (done) => {
@@ -65,12 +65,12 @@ function _runInsert(params, done) {
           list,
           ignore_dup,
         };
-        engine.insertRowList(opts, (err, count) => {
-          affectedRows = count;
+        engine.insertRowList(opts, (err, insert_result) => {
+          result = insert_result;
           done(err);
         });
       },
     ],
-    (err) => done(err, { affectedRows })
+    (err) => done(err, result)
   );
 }

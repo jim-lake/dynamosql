@@ -15,18 +15,20 @@ function insertRowList(params, done) {
   if (ignore_dup) {
     dynamodb.batchQL(sql_list, (err_list) => {
       let err;
-      let affected_rows = 0;
+      let affectedRows = list.length;
       if (err_list?.length > 0) {
-        affected_rows = list.length - err_list.length;
         err_list.forEach((item_err) => {
           if (item_err?.Code === 'DuplicateItem') {
-            // ignore
+            affectedRows--;
           } else if (!err && item_err) {
+            affectedRows--;
             err = convertError(item_err, { table });
           }
         });
+      } else {
+        affectedRows = list.length;
       }
-      done(err, affected_rows);
+      done(err, err ? undefined : { affectedRows } );
     });
   } else {
     dynamodb.transactionQL(sql_list, (err) => {
@@ -54,7 +56,7 @@ function insertRowList(params, done) {
       } else if (err) {
         err = convertError(err);
       }
-      done(err, err ? 0 : list.length);
+      done(err, err ? undefined : { affectedRows: list.length });
     });
   }
 }

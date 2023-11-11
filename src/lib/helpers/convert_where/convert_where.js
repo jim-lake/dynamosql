@@ -1,23 +1,24 @@
 exports.convertWhere = convertWhere;
 
-const BinaryExpression = require('./binary_expression');
+const ConvertExpression = require('./convert_expression');
 const Functions = require('./functions');
 const Expression = require('../../expression');
 
 function convertWhere(expr, state) {
+  const { type } = expr;
   const { from_key } = state;
   let err = null;
   let value = null;
 
-  if (expr.type === 'number') {
+  if (type === 'number') {
     value = expr.value;
-  } else if (expr.type === 'double_quote_string') {
+  } else if (type === 'double_quote_string') {
     value = `'${expr.value}'`;
-  } else if (expr.type === 'null') {
+  } else if (type === 'null') {
     value = null;
-  } else if (expr.type === 'bool') {
+  } else if (type === 'bool') {
     value = expr.value;
-  } else if (expr.type === 'function') {
+  } else if (type === 'function') {
     const func = Functions[expr.name.toLowerCase()];
     if (func) {
       const result = func(expr, state);
@@ -29,8 +30,8 @@ function convertWhere(expr, state) {
     } else {
       err = 'unsupported';
     }
-  } else if (expr.type === 'binary_expr') {
-    const func = BinaryExpression[expr.operator.toLowerCase()];
+  } else if (type === 'binary_expr' || type === 'unary_expr') {
+    const func = ConvertExpression[expr.operator.toLowerCase()];
     if (func) {
       const result = func(expr, state);
       if (result.err) {
@@ -41,7 +42,7 @@ function convertWhere(expr, state) {
     } else {
       err = 'unsupported';
     }
-  } else if (expr.type === 'column_ref') {
+  } else if (type === 'column_ref') {
     if (expr.from?.key === from_key) {
       value = expr.column;
     } else {

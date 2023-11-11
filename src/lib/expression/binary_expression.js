@@ -19,6 +19,8 @@ exports['<='] = lte;
 exports['and'] = and;
 exports['or'] = or;
 exports['xor'] = xor;
+exports['is'] = is;
+exports['is not'] = isNot;
 
 function _isDateOrTimeLike(type) {
   return type === 'date' || type === 'datetime' || type === 'time';
@@ -297,6 +299,47 @@ function xor(expr, state) {
     }
   }
   return { err, value, name };
+}
+function is(expr, state) {
+  return _is(expr, state, 'IS');
+}
+function isNot(expr, state) {
+  const result = _is(expr, state, 'IS NOT');
+  result.value = result.value ? 0 : 1;
+  return result;
+}
+function _is(expr, state, op) {
+  const result = Expression.getValue(expr.left, state);
+  let right;
+  let right_name;
+  if (expr.right.value === null) {
+    right = null;
+    right_name = "NULL";
+  } else if (expr.right.value === true) {
+    right = true;
+    right_name = "TRUE";
+  } else if (expr.right.value === false) {
+    right = false;
+    right_name = "FALSE";
+  } else if (!result.err) {
+    result.err = {
+      err: 'syntax_err',
+      args: [op],
+    };
+  }
+  result.name = `${result.name} ${op} ${right_name}`;
+  if (!result.err) {
+    if (right === null) {
+      result.value = right === result.value ? 1 : 0;
+    } else if (right && result.value) {
+      result.value = 1;
+    } else if (!right && !result.value) {
+      result.value = 1;
+    } else {
+      result.value = 0;
+    }
+  }
+  return result;
 }
 function _unionDateTime(type1, type2) {
   let ret;

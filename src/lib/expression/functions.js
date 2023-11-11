@@ -4,10 +4,12 @@ const { createSQLDateTime } = require('../types/sql_datetime');
 const { createSQLTime } = require('../types/sql_time');
 
 exports.database = database;
+exports.sleep = sleep;
+exports.length = length;
 exports.concat = concat;
+exports.left = left;
 exports.coalesce = coalesce;
 exports.ifnull = coalesce;
-exports.sleep = sleep;
 exports.now = now;
 exports.current_timestamp = now;
 exports.from_unixtime = from_unixtime;
@@ -30,6 +32,15 @@ function sleep(expr, state) {
   const sleep_ms = convertNum(result.value);
   if (sleep_ms > 0) {
     result.sleep_ms = sleep_ms * 1000;
+  }
+  return result;
+}
+function length(expr, state) {
+  const result = Expression.getValue(expr.args.value?.[0], state);
+  result.name = `LENGTH(${result.name})`;
+  result.type = 'number';
+  if (!result.err && result.value !== null) {
+    result.value = String(result.value).length;
   }
   return result;
 }
@@ -63,6 +74,20 @@ function concat(expr, state) {
     return value !== null;
   });
   return { err, value };
+}
+function left(expr, state) {
+  const result = Expression.getValue(expr.args?.value?.[0], state);
+  const len_result = Expression.getValue(expr.args?.value?.[1], state);
+  result.name = `LEFT(${result.name ?? ''}, ${len_result.name ?? ''})`;
+  result.err = result.err || len_result.err;
+  result.type = 'string';
+  if (!result.err && (result.value === null || len_result.value === null)) {
+    result.value = null;
+  } else if (!result.err) {
+    const length = convertNum(len_result.value);
+    result.value = String(result.value).substring(0, length);
+  }
+  return result;
 }
 function now(expr, state) {
   const result = Expression.getValue(expr.args?.value?.[0], state);

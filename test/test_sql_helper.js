@@ -73,41 +73,62 @@ function runTests(test_name, file_path, extra) {
           },
         ],
         () => {
-          if (ddb_result.err && !mysql_result.err) {
-            console.error('unexpected ddb_result.err:', ddb_result.err);
-          }
-          if (
-            ddb_result.err &&
-            ddb_result.err.code !== mysql_result.err?.code
-          ) {
-            expect(ddb_result.err, 'err equality').to.equal(mysql_result.err);
-          }
-          expect(ddb_result?.results?.length, 'results length').to.equal(
-            mysql_result?.results?.length
-          );
+          try {
+            if (ddb_result.err && !mysql_result.err) {
+              console.error('unexpected ddb_result.err:', ddb_result.err);
+            }
+            if (
+              ddb_result.err &&
+              ddb_result.err.code !== mysql_result.err?.code
+            ) {
+              expect(ddb_result.err, 'err equality').to.equal(mysql_result.err);
+            }
+            expect(ddb_result.results?.length, 'results length').to.equal(
+              mysql_result.results?.length
+            );
+            expect(
+              Array.isArray(ddb_result.results),
+              'results both arrays or both not arrays'
+            ).to.equal(Array.isArray(mysql_result.results));
 
-          ddb_result?.results?.forEach?.((result, i) => {
-            if (Array.isArray(result)) {
-              ddb_result.columns.forEach((column, j) => {
-                const name = column.name;
-                const left = String(result[j]);
-                const right = String(mysql_result.results[i][name]);
-                _checkEqual(name, i, left, right);
+            if (Array.isArray(ddb_result.results)) {
+              ddb_result.results?.forEach?.((result, i) => {
+                if (Array.isArray(result)) {
+                  ddb_result.columns.forEach((column, j) => {
+                    const name = column.name;
+                    const left = String(result[j]);
+                    const right = String(mysql_result.results[i][name]);
+                    _checkEqual(name, i, left, right);
+                  });
+                } else {
+                  ddb_result.columns.forEach((column, j) => {
+                    const { table, name } = column;
+                    const left = opts.nestTables
+                      ? result[table]?.[name]
+                      : result[name];
+                    const right = opts.nestTables
+                      ? mysql_result.results[i]?.[table]?.[name]
+                      : mysql_result.results[i][name];
+                    _checkEqual(name, i, left, right);
+                  });
+                }
               });
             } else {
-              ddb_result.columns.forEach((column, j) => {
-                const { table, name } = column;
-                const left = opts.nestTables
-                  ? result[table]?.[name]
-                  : result[name];
-                const right = opts.nestTables
-                  ? mysql_result.results[i]?.[table]?.[name]
-                  : mysql_result.results[i][name];
-                _checkEqual(name, i, left, right);
-              });
+              expect(
+                ddb_result.results?.affectedRows,
+                'affectedRows equal'
+              ).to.equal(mysql_result.results?.affectedRows);
+              if (extra?.checkChanged) {
+                expect(
+                  ddb_result.results?.changedRows,
+                  'changedRows equal'
+                ).to.equal(mysql_result.results?.changedRows);
+              }
             }
-          });
-          done();
+            done();
+          } catch (e) {
+            done(e);
+          }
         }
       );
     });

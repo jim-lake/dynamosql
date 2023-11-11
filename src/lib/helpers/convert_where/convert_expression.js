@@ -8,8 +8,12 @@ exports['<='] = constantFixup(lte);
 exports['and'] = constantFixup(and);
 exports['or'] = constantFixup(or);
 exports['in'] = constantFixup(_in);
-exports['is'] = constantFixup(unsupported);
+exports['is'] = constantFixup(is);
+exports['is not'] = constantFixup(isNot);
 exports['between'] = constantFixup(unsupported);
+exports['not'] = constantFixup(not);
+exports['!'] = constantFixup(not);
+exports['-'] = constantFixup(minus);
 
 const Expression = require('../../expression');
 const { convertWhere } = require('./convert_where');
@@ -126,6 +130,44 @@ function gte(expr, state) {
 }
 function lte(expr, state) {
   return _comparator(expr, state, '<=');
+}
+function is(expr, state) {
+  return _is(expr, state, 'IS');
+}
+function isNot(expr, state) {
+  return _is(expr, state, 'IS NOT');
+}
+function _is(expr, state, op) {
+  const left = convertWhere(expr.left, state);
+  let right;
+  let err = left.err;
+  if (!err) {
+    if (expr.right.value === null) {
+      right = "NULL";
+    } else if (expr.right.value === true) {
+      right = "TRUE";
+    } else if (expr.right.value === false) {
+      right = "FALSE";
+    } else {
+      err = 'syntax_err';
+    }
+  }
+  const value = `${left.value} ${op} ${right}`;
+  return { err, value };
+}
+function not(expr, state) {
+  const result = convertWhere(expr.expr, state);
+  if (!result.err) {
+    result.value = "NOT " + result.value;
+  }
+  return result;
+}
+function minus(expr, state) {
+  const result = convertWhere(expr.expr, state);
+  if (!result.err) {
+    result.value = "-" + result.value;
+  }
+  return result;
 }
 function unsupported() {
   return { err: 'unsupported' };

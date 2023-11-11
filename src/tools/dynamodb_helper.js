@@ -64,7 +64,7 @@ function escapeValue(value, type) {
   }
   return s;
 }
-function convertError(err, args) {
+function convertError(err) {
   let ret = err;
   if (err.name === 'ConditionalCheckFailedException' && err.Item) {
     ret = 'cond_fail';

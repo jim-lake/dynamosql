@@ -18,6 +18,10 @@ const ERROR_MAP = {
     code: 'ER_PARSE_ERROR',
     sqlMessage: errStr`You have an error in your SQL syntax; check your syntax near column ${1} at line ${0}`,
   },
+  syntax_err: {
+    code: 'ER_PARSE_ERROR',
+    sqlMessage: errStr`You have an error in your SQL syntax; check your syntax near ${0}`,
+  },
   ER_EMPTY_QUERY: {
     code: 'ER_EMPTY_QUERY',
     sqlMessage: 'Query was empty',
