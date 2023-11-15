@@ -8,7 +8,6 @@ exports.query = query;
 
 function query(params, done) {
   const { ast, session } = params;
-  const ignore_dup = ast.prefix === 'ignore into';
 
   const database = ast.table?.[0]?.db || session.getCurrentDatabase();
 
@@ -20,14 +19,13 @@ function query(params, done) {
       ...params,
       database,
       engine,
-      ignore_dup,
-      func: _runInsert,
+      func: _runReplace,
     };
     TransactionManager.run(opts, done);
   }
 }
-function _runInsert(params, done) {
-  const { ast, session, engine, dynamodb, ignore_dup } = params;
+function _runReplace(params, done) {
+  const { ast, session, engine, dynamodb } = params;
   const table = ast.table?.[0]?.table;
 
   let list;
@@ -71,13 +69,11 @@ function _runInsert(params, done) {
         const opts = {
           dynamodb,
           session,
-          database: params.database,
           table,
           list,
-          ignore_dup,
         };
-        engine.insertRowList(opts, (err, insert_result) => {
-          result = insert_result;
+        engine.replaceRowList(opts, (err, replace_result) => {
+          result = replace_result;
           done(err);
         });
       },

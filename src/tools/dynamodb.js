@@ -5,6 +5,7 @@ const {
   BatchExecuteStatementCommand,
   ExecuteStatementCommand,
   ExecuteTransactionCommand,
+  TransactWriteItemsCommand,
 } = require('@aws-sdk/client-dynamodb');
 
 const { init: AdminInit, ...AdminOther } = require('./dynamodb_admin');
@@ -13,6 +14,7 @@ const {
   convertError,
   escapeIdentifier,
   escapeString,
+  nativeToValue,
 } = require('./dynamodb_helper');
 
 const QUERY_LIMIT = 5;
@@ -24,6 +26,7 @@ exports.batchQL = batchQL;
 exports.transactionQL = transactionQL;
 exports.deleteItems = deleteItems;
 exports.updateItems = updateItems;
+exports.putItems = putItems;
 Object.assign(exports, AdminOther);
 
 let g_client;
@@ -172,6 +175,53 @@ function updateItems(params, done) {
       });
     },
     (err) => done(err ? err_list : null, result_list)
+  );
+}
+function putItems(params, done) {
+  const BATCH_LIMIT = 100;
+  const { table, list } = params;
+  const batch_count = Math.ceil(list.length / BATCH_LIMIT);
+  const err_list = [];
+  asyncTimesLimit(
+    batch_count,
+    QUERY_LIMIT,
+    (batch_index, done) => {
+      const start = BATCH_LIMIT * batch_index;
+      const end = start + BATCH_LIMIT;
+      const item_list = list.slice(start, end);
+      const input = {
+        TransactItems: item_list.map((item) => ({
+          Put: {
+            TableName: table,
+            Item: nativeToValue(item).M,
+          },
+        })),
+      };
+      const command = new TransactWriteItemsCommand(input);
+      g_client.send(command).then(
+        () => done(),
+        (err) => {
+          if (
+            err?.name === 'TransactionCanceledException' &&
+            err.CancellationReasons?.length > 0
+          ) {
+            err.CancellationReasons.forEach((cancel_err, i) => {
+              err_list[start + i] = {
+                err: convertError(cancel_err),
+                parent: cancel_err,
+              };
+            });
+          } else {
+            err_list[start] = {
+              err: convertError(err),
+              parent: err,
+            };
+          }
+          done(err || 'unknown');
+        }
+      );
+    },
+    (err) => done(err ? err_list : null)
   );
 }
 function _pagedSend(command, done) {

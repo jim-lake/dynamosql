@@ -7,6 +7,7 @@ const CreateHandler = require('./lib/create_handler');
 const DeleteHandler = require('./lib/delete_handler');
 const DropHandler = require('./lib/drop_handler');
 const InsertHandler = require('./lib/insert_handler');
+const ReplaceHandler = require('./lib/replace_handler');
 const SelectHandler = require('./lib/select_handler');
 const SetHandler = require('./lib/set_handler');
 const ShowHandler = require('./lib/show_handler');
@@ -177,6 +178,8 @@ class Session {
       handler = DropHandler.query;
     } else if (ast?.type === 'insert') {
       handler = InsertHandler.query;
+    } else if (ast?.type === 'replace') {
+      handler = ReplaceHandler.query;
     } else if (ast?.type === 'show') {
       handler = ShowHandler.query;
     } else if (ast?.type === 'select') {

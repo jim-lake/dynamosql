@@ -3,7 +3,12 @@ exports.sort = sort;
 const Expression = require('../expression');
 
 function sort(row_list, orderby, state) {
-  row_list.sort(_sort.bind(null, orderby, state));
+  try {
+    row_list.sort(_sort.bind(null, orderby, state));
+  } catch (e) {
+    return e;
+  }
+  return null;
 }
 function _sort(orderby, state, a, b) {
   const order_length = orderby.length;
@@ -24,6 +29,10 @@ function _sort(orderby, state, a, b) {
     } else {
       const a_value = Expression.getValue(expr, { ...state, row: a });
       const b_value = Expression.getValue(expr, { ...state, row: b });
+      const err = a_value.err || b_value.err;
+      if (err) {
+        throw err;
+      }
       const result = func(a_value.value, b_value.value, a_value.type);
       if (result !== 0) {
         return result;

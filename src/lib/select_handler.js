@@ -112,8 +112,10 @@ function _evaluateReturn(params, done) {
       column_list.push(column_type);
     }
     if (ast.orderby) {
-      sort(row_list, ast.orderby, { session, column_list });
+      err = sort(row_list, ast.orderby, { session, column_list });
     }
+  }
+  if (!err) {
     let start = 0;
     let end = row_list.length;
     if (ast.limit?.seperator === 'offset') {
@@ -137,7 +139,7 @@ function _evaluateReturn(params, done) {
       done(err, output_row_list, column_list);
     }, sleep_ms);
   } else {
-    done(err, output_row_list, column_list);
+    done(err, err ? undefined : output_row_list, err ? undefined : column_list);
   }
 }
 function _expandStarColumns(params) {

@@ -1,4 +1,8 @@
-const { convertDateTime, convertTime } = require('../helpers/sql_conversion');
+const {
+  convertDateTime,
+  convertTime,
+  convertNum,
+} = require('../helpers/sql_conversion');
 const { createSQLInterval } = require('../types/sql_interval');
 const Expression = require('./evaluate');
 
@@ -6,6 +10,7 @@ exports.datetime = datetime;
 exports.date = date;
 exports.time = time;
 exports.interval = interval;
+exports.signed = signed;
 
 function datetime(expr, state) {
   const result = Expression.getValue(expr.expr, state);
@@ -48,6 +53,15 @@ function interval(expr, state) {
   result.type = 'interval';
   if (!result.err && result.value !== null) {
     result.value = createSQLInterval(result.value, expr.unit);
+  }
+  return result;
+}
+function signed(expr, state) {
+  const result = Expression.getValue(expr.expr, state);
+  result.name = `CAST(${result.name} AS SIGNED)`;
+  result.type = 'bigint';
+  if (!result.err && result.value !== null) {
+    result.value = Math.trunc(convertNum(result.value));
   }
   return result;
 }

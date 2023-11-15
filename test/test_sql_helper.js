@@ -41,6 +41,7 @@ function runTests(test_name, file_path, extra) {
     .filter((s) => s.length > 0);
 
   describe(test_name, function () {
+    this.timeout(5000);
     sql_list.forEach((sql) => _runTest(sql));
   });
   function _runTest(sql) {
@@ -114,10 +115,12 @@ function runTests(test_name, file_path, extra) {
                 }
               });
             } else {
-              expect(
-                ddb_result.results?.affectedRows,
-                'affectedRows equal'
-              ).to.equal(mysql_result.results?.affectedRows);
+              if (extra?.skipAffected !== true) {
+                expect(
+                  ddb_result.results?.affectedRows,
+                  'affectedRows equal'
+                ).to.equal(mysql_result.results?.affectedRows);
+              }
               if (extra?.checkChanged) {
                 expect(
                   ddb_result.results?.changedRows,

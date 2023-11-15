@@ -5,6 +5,7 @@ exports.escapeValue = escapeValue;
 exports.convertError = convertError;
 exports.mapToObject = mapToObject;
 exports.valueToNative = valueToNative;
+exports.nativeToValue = nativeToValue;
 
 function pql(strings, ...values) {
   let s = '';
@@ -77,6 +78,8 @@ function convertError(err) {
     ret = 'table_not_found';
   } else if (err.name === 'ResourceInUseException') {
     ret = 'resource_in_use';
+  } else if (err.name === 'ValidationError') {
+    ret = 'validation';
   }
   return ret;
 }
@@ -89,15 +92,36 @@ function mapToObject(obj) {
   return ret;
 }
 function valueToNative(value) {
+  let ret = value;
+  if (value) {
+    if (value.N) {
+      ret = parseFloat(value.N);
+    } else if (value.L?.map) {
+      ret = value.L.map(valueToNative);
+    } else if (value.M) {
+      ret = mapToObject(value.M);
+    } else {
+      ret = value.S ?? value.B ?? value.BOOL ?? value;
+    }
+  }
+  return ret;
+}
+function nativeToValue(obj) {
   let ret;
-  if (value.N) {
-    ret = parseFloat(value.N);
-  } else if (value.L?.map) {
-    ret = value.L.map(valueToNative);
-  } else if (value.M) {
-    ret = mapToObject(value.M);
+  if (obj === null) {
+    ret = { NULL: true };
+  } else if (typeof obj === 'object') {
+    const M = {};
+    for (let key in obj) {
+      M[key] = nativeToValue(obj[key]);
+    }
+    ret = { M };
+  } else if (typeof obj === 'number') {
+    ret = { N: String(obj) };
+  } else if (typeof obj === 'boolean') {
+    ret = { BOOL: obj };
   } else {
-    ret = value.S ?? value.B ?? value.BOOL ?? value;
+    ret = { S: String(obj) };
   }
   return ret;
 }

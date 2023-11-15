@@ -7,6 +7,7 @@ exports.commit = unsupported;
 exports.rollback = unsupported;
 exports.deleteRowList = unsupported;
 exports.updateRowList = unsupported;
+exports.replaceRowList = unsupported;
 
 function unsupported(arg, done) {
   done('unsupported');

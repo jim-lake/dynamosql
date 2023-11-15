@@ -18,6 +18,20 @@ function convertType(type, nullable) {
       flags: MYSQL.FIELD_FLAGS.BINARY | MYSQL.FIELD_FLAGS.NOT_NULL,
       decimals: 31,
     };
+  } else if (type === 'bigint') {
+    ret = {
+      catalog: 'def',
+      table: '',
+      schema: '',
+      orgTable: '',
+      name: '',
+      orgName: '',
+      characterSet: MYSQL.CHARSETS.BINARY,
+      columnLength: 66,
+      columnType: MYSQL.TYPES.BIGINT,
+      flags: MYSQL.FIELD_FLAGS.BINARY | MYSQL.FIELD_FLAGS.NOT_NULL,
+      decimals: 0,
+    };
   } else if (type === 'null') {
     ret = {
       catalog: 'def',

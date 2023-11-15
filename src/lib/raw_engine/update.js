@@ -61,22 +61,24 @@ RETURNING MODIFIED OLD *
     dynamodb.queryQL(sql, (err, results) => {
       if (err?.name === 'ValidationException') {
         _selectUpdate(params, done);
-      } else if (err?.name === 'ConditionalCheckFailedException') {
-        done(null, { affectedRows: 0, changedRows: 0 });
-      } else if (err) {
-        logger.error('update._singleUpdate: err:', err);
       } else {
-        let changedRows = 0;
-        if (!err) {
+        let result;
+        if (err?.name === 'ConditionalCheckFailedException') {
+          err = null;
+          result = { affectedRows: 0, changedRows: 0 };
+        } else if (err) {
+          logger.error('update._singleUpdate: err:', err);
+        } else {
+          result = { affectedRows: 1, changedRows: 0 };
           set.forEach((object, i) => {
             const { column } = object;
             const value = value_list[i];
-            if (value !== escapeValue(valueToNative(results[0]?.[column]))) {
-              changedRows = 1;
+            if (value !== escapeValue(valueToNative(results?.[0]?.[column]))) {
+              result.changedRows = 1;
             }
           });
         }
-        done(err, { affectedRows: 1, changedRows });
+        done(err, result);
       }
     });
   }
