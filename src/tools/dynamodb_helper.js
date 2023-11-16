@@ -78,8 +78,14 @@ function convertError(err) {
     ret = 'table_not_found';
   } else if (err.name === 'ResourceInUseException') {
     ret = 'resource_in_use';
-  } else if (err.name === 'ValidationError') {
-    ret = 'validation';
+  } else if (err.Code === 'ValidationError' || err.name === 'ValidationError') {
+    if (err.Message?.match?.(/expected: [^\s]* actual: NULL/)) {
+      ret = 'ER_BAD_NULL_ERROR';
+    } else if (err.Message?.match?.(/expected: [^\s]* actual:/)) {
+      ret = 'ER_TRUNCATED_WRONG_VALUE_FOR_FIELD';
+    } else {
+      ret = 'validation';
+    }
   }
   return ret;
 }

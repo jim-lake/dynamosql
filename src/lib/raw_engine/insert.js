@@ -46,6 +46,7 @@ function insertRowList(params, done) {
           } else if (err.CancellationReasons[i].Code !== 'None') {
             err = {
               err: convertError(err.CancellationReasons[i]),
+              message: err.CancellationReasons[i].Message,
             };
             if (err.err === 'table_not_found') {
               err.args = [table];

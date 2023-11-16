@@ -130,7 +130,7 @@ function _evaluateReturn(params, done) {
 
     output_row_list = [];
     for (let i = start; i < end; i++) {
-      output_row_list[i] = row_list[i]['@@result'];
+      output_row_list.push(row_list[i]['@@result']);
     }
   }
 

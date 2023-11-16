@@ -71,6 +71,16 @@ const ERROR_MAP = {
     code: 'ER_PARSE_ERROR',
     sqlMessage: 'You have an error in your SQL syntax.  Check near "INTERVAL".',
   },
+  ER_WRONG_VALUE_COUNT_ON_ROW: {
+    code: 'ER_WRONG_VALUE_COUNT_ON_ROW',
+    sqlMessage: errStr`Column count doesn't match value count at row ${0}`,
+  },
+  ER_BAD_NULL_ERROR: {
+    code: 'ER_BAD_NULL_ERROR',
+  },
+  ER_TRUNCATED_WRONG_VALUE_FOR_FIELD: {
+    code: 'ER_TRUNCATED_WRONG_VALUE_FOR_FIELD',
+  },
 };
 class SQLError extends Error {
   constructor(err, sql) {
@@ -84,7 +94,7 @@ class SQLError extends Error {
     }
     const message =
       err.message || sqlMessage || (typeof err === 'string' ? err : undefined);
-    if (isNativeError(err)) {
+    if (isNativeError(err) || code === DEFAULT_CODE) {
       super(message, { cause: err });
     } else {
       super(message);

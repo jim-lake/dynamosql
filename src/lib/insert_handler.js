@@ -2,6 +2,7 @@ const asyncSeries = require('async/series');
 const Engine = require('./engine');
 const Expression = require('./expression');
 const TransactionManager = require('./transaction_manager');
+const SelectHandler = require('./select_handler');
 const logger = require('../tools/logger');
 
 exports.query = query;
@@ -11,9 +12,13 @@ function query(params, done) {
   const ignore_dup = ast.prefix === 'ignore into';
 
   const database = ast.table?.[0]?.db || session.getCurrentDatabase();
-
   if (!database) {
-    done('no_current_database');
+    err = 'no_current_database';
+  } else {
+    err = _checkAst(ast);
+  }
+  if (err) {
+    done(err);
   } else {
     const engine = Engine.getEngine(database);
     const opts = {
@@ -35,8 +40,8 @@ function _runInsert(params, done) {
   asyncSeries(
     [
       (done) => {
-        let err;
         if (ast.set?.length > 0) {
+          let err;
           const obj = {};
           ast.set.forEach((item) => {
             const expr_result = Expression.getValue(item.value, { session });
@@ -46,42 +51,84 @@ function _runInsert(params, done) {
             obj[item.column] = expr_result.value;
           });
           list = [obj];
-        } else if (ast.columns?.length > 0) {
-          list = [];
-          ast.values?.forEach?.((row) => {
-            const obj = {};
-            ast.columns.forEach((name, i) => {
-              const expr_result = Expression.getValue(row.value[i], {
-                session,
+          done(err);
+        } else if (ast.columns?.length > 0 && ast.values.type === 'select') {
+          const opts = { ast: ast.values, session, dynamodb };
+          SelectHandler.query(opts, (err, row_list) => {
+            if (err) {
+              logger.error('insert select err:', err);
+            } else {
+              list = row_list.map(row => {
+                const obj = {};
+                ast.columns.forEach((name, i) => {
+                  obj[name] = row[i];
+                });
+                return obj;
               });
-              if (!err && expr_result.err) {
-                err = expr_result.err;
-              }
-              obj[name] = expr_result.value;
-            });
-            list.push(obj);
+            }
+            done(err);
           });
+        } else if (ast.columns?.length > 0) {
+          let err;
+          list = [];
+          ast.values?.forEach?.((row, i) => {
+            const obj = {};
+            if (row.value.length === ast.columns.length) {
+              ast.columns.forEach((name, j) => {
+                const expr_result = Expression.getValue(row.value[j], {
+                  session,
+                });
+                if (!err && expr_result.err) {
+                  err = expr_result.err;
+                }
+                obj[name] = expr_result.value;
+              });
+              list.push(obj);
+            } else {
+              err = {
+                err: 'ER_WRONG_VALUE_COUNT_ON_ROW',
+                args: [i],
+              };
+            }
+          });
+          done(err);
         } else {
           logger.error('unsupported insert without column names');
-          err = 'unsupported';
+          done('unsupported');
         }
-        done(err);
       },
       (done) => {
-        const opts = {
-          dynamodb,
-          session,
-          database: params.database,
-          table,
-          list,
-          ignore_dup,
-        };
-        engine.insertRowList(opts, (err, insert_result) => {
-          result = insert_result;
-          done(err);
-        });
+        if (list.length > 0) {
+          const opts = {
+            dynamodb,
+            session,
+            database: params.database,
+            table,
+            list,
+            ignore_dup,
+          };
+          engine.insertRowList(opts, (err, insert_result) => {
+            result = insert_result;
+            done(err);
+          });
+        } else {
+          result = { affectedRows: 0 };
+          done(null);
+        }
       },
     ],
     (err) => done(err, result)
   );
+}
+function _checkAst(ast) {
+  let err;
+  if (ast.values?.type === 'select') {
+    if (ast.columns?.length !== ast.values.columns?.length) {
+      err = {
+        err: 'ER_WRONG_VALUE_COUNT_ON_ROW',
+        args: [1],
+      };
+    }
+  }
+  return err;
 }
