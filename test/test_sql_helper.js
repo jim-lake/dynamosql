@@ -41,7 +41,7 @@ function runTests(test_name, file_path, extra) {
     .filter((s) => s.length > 0);
 
   describe(test_name, function () {
-    this.timeout(5000);
+    this.timeout(extra?.timeout || 5000);
     sql_list.forEach((sql) => _runTest(sql));
   });
   function _runTest(sql) {
@@ -75,12 +75,14 @@ function runTests(test_name, file_path, extra) {
         ],
         () => {
           try {
-
             if (ddb_result.err && !mysql_result.err) {
               console.error('unexpected ddb_result.err:', ddb_result.err);
               expect(ddb_result.err, 'err equality').to.equal(mysql_result.err);
-            } else if (!mysql_result.err && ddb_result.err) {
-              console.error('unexpected mysql_result.err:', ddb_result.err);
+            } else if (!ddb_result.err && mysql_result.err) {
+              console.error(
+                'unexpected ddb_result success, mysql err:',
+                mysql_result.err
+              );
               expect(ddb_result.err, 'err equality').to.equal(mysql_result.err);
             } else if (
               ddb_result.err &&

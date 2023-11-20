@@ -22,6 +22,11 @@ function query(params, done) {
       engine.dropTable(opts, (err) => {
         if (err === 'table_not_found' && ast.prefix === 'if exists') {
           err = null;
+        } else if (err === 'table_not_found') {
+          err = {
+            err: 'ER_BAD_TABLE_ERROR',
+            args: [table],
+          };
         }
         done(err, {});
       });

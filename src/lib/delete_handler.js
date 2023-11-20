@@ -29,13 +29,10 @@ function query(params, done) {
 }
 function _runDelete(params, done) {
   const { ast, session, engine, dynamodb } = params;
-
   const opts = {
     dynamodb,
     session,
     ast,
   };
-  engine.deleteRowList(opts, (err, result) => {
-    done(err, result);
-  });
+  engine.deleteRowList(opts, done);
 }

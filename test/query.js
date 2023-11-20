@@ -53,21 +53,35 @@ function _query(sql, done) {
       for (let i = 0; i < results.length; i++) {
         console.log('result set:', i);
         fields?.[i]?.forEach?.((field, j) => {
-          console.log('  field:', j, _convertField(field));
+          console.log(' field:', j, _convertField(field));
         });
-        console.log('  results:', results?.[i]);
+        _printResults(results[i]);
       }
     } else {
       fields?.forEach?.((field, i) => {
-        console.log('field:', i, _convertField(field));
+        console.log(' field:', i, _convertField(field));
       });
-      console.log('  results:', results);
+      _printResults(results);
     }
     if (err) {
       console.log('err:', err);
     }
     done();
   });
+}
+function _printResults(results) {
+  if (Array.isArray(results)) {
+    console.log('results: [');
+    for (let i = 0; i < results.length; i++) {
+      console.log('   ', i + ':');
+      for (let key in results[i]) {
+        console.log('     ', key + ':', results[i][key]);
+      }
+    }
+    console.log(']');
+  } else {
+    console.log('results:', results);
+  }
 }
 
 function _convertField(field) {

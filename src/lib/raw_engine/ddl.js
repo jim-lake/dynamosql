@@ -1,3 +1,4 @@
+const asyncForever = require('async/forever');
 const logger = require('../../tools/logger');
 
 exports.getTableList = getTableList;
@@ -14,18 +15,20 @@ function getTableList(params, done) {
   });
 }
 function createTable(params, done) {
-  const { dynamodb, primary_key, ...other } = params;
+  const { dynamodb, table, primary_key, ...other } = params;
   const column_list = params.column_list.filter((column) =>
     primary_key.find((key) => key.name === column.name)
   );
-  const opts = { ...other, primary_key, column_list };
+  const opts = { ...other, table, primary_key, column_list };
   dynamodb.createTable(opts, (err) => {
     if (err === 'resource_in_use') {
-      err = 'table_exists';
+      done('table_exists');
     } else if (err) {
       logger.error('raw_engine.createTable: err:', err);
+      done(err);
+    } else {
+      _waitForTable({ dynamodb, table }, done);
     }
-    done(err);
   });
 }
 function dropTable(params, done) {
@@ -33,7 +36,43 @@ function dropTable(params, done) {
   dynamodb.deleteTable(table, (err) => {
     if (err) {
       logger.error('raw_engine.dropTable: err:', err);
+      done(err);
+    } else {
+      _waitForTable({ dynamodb, table }, (wait_err) => {
+        if (wait_err === 'table_not_found') {
+          done();
+        } else {
+          done(wait_err);
+        }
+      });
     }
-    done(err);
   });
+}
+function _waitForTable(params, done) {
+  const { dynamodb, table } = params;
+  const LOOP_MS = 100;
+  let return_err;
+  asyncForever(
+    (done) => {
+      dynamodb.getTable(table, (err, result) => {
+        if (
+          !err &&
+          (result?.Table?.TableStatus === 'CREATING' ||
+            result?.Table?.TableStatus === 'DELETING')
+        ) {
+          err = null;
+        } else if (!err) {
+          err = 'stop';
+        } else {
+          return_err = err;
+        }
+        if (err) {
+          done(err);
+        } else {
+          setTimeout(() => done(), LOOP_MS);
+        }
+      });
+    },
+    () => done(return_err)
+  );
 }

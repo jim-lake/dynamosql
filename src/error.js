@@ -14,6 +14,10 @@ const ERROR_MAP = {
     code: 'ER_DUP_ENTRY',
     sqlMessage: 'Duplicate entry',
   },
+  dup_primary_key_entry: {
+    code: 'ER_DUP_ENTRY',
+    sqlMessage: errStr`Duplicate entry for value '${1}' for '${0}'`,
+  },
   parse: {
     code: 'ER_PARSE_ERROR',
     sqlMessage: errStr`You have an error in your SQL syntax; check your syntax near column ${1} at line ${0}`,
@@ -55,6 +59,10 @@ const ERROR_MAP = {
     code: 'ER_BAD_FIELD_ERROR',
     sqlMessage: errStr`Unknown column '${0}'`,
   },
+  ER_BAD_TABLE_ERROR: {
+    code: 'ER_BAD_TABLE_ERROR',
+    sqlMessage: errStr`Unknown  table '${0}'`,
+  },
   ER_SP_DOES_NOT_EXIST: {
     code: 'ER_SP_DOES_NOT_EXIST',
     sqlMessage: errStr`FUNCTION ${0} does not exist`,
@@ -94,7 +102,9 @@ class SQLError extends Error {
     }
     const message =
       err.message || sqlMessage || (typeof err === 'string' ? err : undefined);
-    if (isNativeError(err) || code === DEFAULT_CODE) {
+    if (err.cause) {
+      super(message, { cause: err.cause });
+    } else if (isNativeError(err) || code === DEFAULT_CODE) {
       super(message, { cause: err });
     } else {
       super(message);
@@ -123,8 +133,11 @@ function errStr(strings, ...index_list) {
 }
 function _stringify(arg) {
   let ret = arg || '';
-  if (
-    arg &&
+  if (arg === null) {
+    ret = 'NULL';
+  } else if (Array.isArray(arg)) {
+    ret = arg.map(_stringify).join(',');
+  } else if (
     typeof arg === 'object' &&
     arg.toString === Object.prototype.toString
   ) {

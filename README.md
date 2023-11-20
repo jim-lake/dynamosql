@@ -43,6 +43,9 @@ Your DynamoDB tables show up in the `_dynamodb` database.
   * limit
 * insert
 * delete
+* update
+* replace
+* insert select
 * create table
 * delete table
 
@@ -310,8 +313,6 @@ a few projects.  Features are added as required.
 
 ## Roadmap
 
-* update statement
-* replace statement
 * insert on conflict
 * temporary tables (useful for subqueries)
 * cross engine queries (temp & raw)

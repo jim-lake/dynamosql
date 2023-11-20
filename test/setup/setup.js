@@ -29,42 +29,42 @@ const SQL_LIST = fs
   .map((s) => s.trim())
   .filter((s) => s.length > 0);
 
-SQL_LIST.forEach((sql) => _runTest(sql));
+describe('setup.sql', function () {
+  this.timeout(15000);
+  SQL_LIST.forEach((sql) => _runTest(sql));
+});
 
 function _runTest(sql) {
-  describe('setup step', function () {
-    this.timeout(15000);
-    it(sql, function (done) {
-      const mysql_result = {};
-      const ddb_result = {};
+  it(sql, function (done) {
+    const mysql_result = {};
+    const ddb_result = {};
 
-      async.series(
-        [
-          (done) => {
-            mysql_conn.query(sql, (err, results, columns) => {
-              mysql_result.err = err;
-              mysql_result.results = results;
-              mysql_result.columns = columns;
-              done();
-            });
-          },
-          (done) => {
-            ddb_session.query(sql, (err, results, columns) => {
-              ddb_result.err = err;
-              ddb_result.results = results;
-              ddb_result.columns = columns;
-              done();
-            });
-          },
-        ],
-        () => {
-          expect(ddb_result.err, 'err equality').to.equal(mysql_result.err);
-          expect(ddb_result.results.length, 'results length').to.equal(
-            mysql_result.results.length
-          );
-          done();
-        }
-      );
-    });
+    async.series(
+      [
+        (done) => {
+          mysql_conn.query(sql, (err, results, columns) => {
+            mysql_result.err = err;
+            mysql_result.results = results;
+            mysql_result.columns = columns;
+            done();
+          });
+        },
+        (done) => {
+          ddb_session.query(sql, (err, results, columns) => {
+            ddb_result.err = err;
+            ddb_result.results = results;
+            ddb_result.columns = columns;
+            done();
+          });
+        },
+      ],
+      () => {
+        expect(ddb_result.err, 'err equality').to.equal(mysql_result.err);
+        expect(ddb_result.results.length, 'results length').to.equal(
+          mysql_result.results.length
+        );
+        done();
+      }
+    );
   });
 }

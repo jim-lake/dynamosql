@@ -3,20 +3,28 @@ const Engine = require('./engine');
 const Expression = require('./expression');
 const TransactionManager = require('./transaction_manager');
 const SelectHandler = require('./select_handler');
+const { typeCast } = require('./helpers/type_cast_helper');
 const logger = require('../tools/logger');
 
 exports.query = query;
 
 function query(params, done) {
   const { ast, session } = params;
-  const ignore_dup = ast.prefix === 'ignore into';
+  const duplicate_mode =
+    ast.type === 'replace'
+      ? 'replace'
+      : ast.prefix === 'ignore into'
+      ? 'ignore'
+      : null;
 
   const database = ast.table?.[0]?.db || session.getCurrentDatabase();
+  let err;
   if (!database) {
     err = 'no_current_database';
   } else {
     err = _checkAst(ast);
   }
+
   if (err) {
     done(err);
   } else {
@@ -25,14 +33,14 @@ function query(params, done) {
       ...params,
       database,
       engine,
-      ignore_dup,
+      duplicate_mode,
       func: _runInsert,
     };
     TransactionManager.run(opts, done);
   }
 }
 function _runInsert(params, done) {
-  const { ast, session, engine, dynamodb, ignore_dup } = params;
+  const { ast, session, engine, dynamodb, duplicate_mode } = params;
   const table = ast.table?.[0]?.table;
 
   let list;
@@ -54,14 +62,16 @@ function _runInsert(params, done) {
           done(err);
         } else if (ast.columns?.length > 0 && ast.values.type === 'select') {
           const opts = { ast: ast.values, session, dynamodb };
-          SelectHandler.query(opts, (err, row_list) => {
+          SelectHandler.query(opts, (err, row_list, columns) => {
             if (err) {
               logger.error('insert select err:', err);
             } else {
-              list = row_list.map(row => {
+              list = row_list.map((row) => {
                 const obj = {};
                 ast.columns.forEach((name, i) => {
-                  obj[name] = row[i];
+                  obj[name] = typeCast(row[i], columns[i], {
+                    dateStrings: true,
+                  });
                 });
                 return obj;
               });
@@ -105,7 +115,7 @@ function _runInsert(params, done) {
             database: params.database,
             table,
             list,
-            ignore_dup,
+            duplicate_mode,
           };
           engine.insertRowList(opts, (err, insert_result) => {
             result = insert_result;

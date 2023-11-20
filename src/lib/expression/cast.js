@@ -11,6 +11,7 @@ exports.date = date;
 exports.time = time;
 exports.interval = interval;
 exports.signed = signed;
+exports.char = char;
 
 function datetime(expr, state) {
   const result = Expression.getValue(expr.expr, state);
@@ -62,6 +63,15 @@ function signed(expr, state) {
   result.type = 'bigint';
   if (!result.err && result.value !== null) {
     result.value = Math.trunc(convertNum(result.value));
+  }
+  return result;
+}
+function char(expr, state) {
+  const result = Expression.getValue(expr.expr, state);
+  result.name = `CAST(${result.name} AS CHAR)`;
+  if (!result.err && result.value !== null && result.type !== 'string') {
+    result.type = 'string';
+    result.value = String(result.value);
   }
   return result;
 }

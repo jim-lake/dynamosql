@@ -5,13 +5,11 @@ DROP TABLE IF EXISTS bar;
 DROP TABLE IF EXISTS other;
 DROP TABLE IF EXISTS otherother;
 DROP TABLE IF EXISTS `empty`;
-SELECT SLEEP(5);
 CREATE TABLE foo (id varchar(256) primary key, other int, comment varchar(256));
 CREATE TABLE bar (id varchar(256) primary key, other varchar(256), otherother varchar(256));
 CREATE TABLE other (other int primary key, otherother varchar(256), comment varchar(256));
 CREATE TABLE otherother (otherother varchar(256) primary key, comment varchar(256));
 CREATE TABLE `empty` (id varchar(256) primary key);
-SELECT SLEEP(3);
 
 INSERT INTO foo (id, other, comment) VALUES
   ("4", 4, "4 comment"),
