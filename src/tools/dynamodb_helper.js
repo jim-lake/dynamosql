@@ -75,7 +75,7 @@ function convertError(err) {
     err.name === 'ResourceNotFoundException' ||
     err.Code === 'ResourceNotFound'
   ) {
-    ret = 'table_not_found';
+    ret = 'resource_not_found';
   } else if (err.name === 'ResourceInUseException') {
     ret = 'resource_in_use';
   } else if (err.Code === 'ValidationError' || err.name === 'ValidationError') {

@@ -44,6 +44,14 @@ INSERT IGNORE INTO _dynamodb.foo (id, other, comment)
 ;
 SELECT id, other, comment FROM _dynamodb.foo ORDER BY id;
 
+DELETE FROM _dynamodb.foo WHERE id = "comment";
+INSERT IGNORE INTO _dynamodb.foo (id, other, comment)
+  SELECT "comment" AS comment, CAST(otherother AS SIGNED) AS other, CAST(other AS CHAR) AS id
+  FROM _dynamodb.bar
+  ORDER BY id DESC
+;
+SELECT id, other, comment FROM _dynamodb.foo ORDER BY id;
+
 -- Reset
 DELETE FROM _dynamodb.foo WHERE id = "comment";
 DELETE FROM _dynamodb.foo WHERE id = "333";

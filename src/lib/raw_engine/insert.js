@@ -26,8 +26,8 @@ function _insertIgnoreReplease(params, done) {
       (done) => {
         if (list.length > 1) {
           dynamodb.getTableCached(table, (err, result) => {
-            if (err === 'table_not_found') {
-              err = { err, args: [table] };
+            if (err === 'resource_not_found') {
+              err = { err: 'table_not_found', args: [table] };
             } else if (!err) {
               const key_list = result.Table.KeySchema.map(
                 (k) => k.AttributeName
@@ -123,7 +123,8 @@ function _insertNoIgnore(params, done) {
             err: convertError(err.CancellationReasons[i]),
             message: err.CancellationReasons[i].Message,
           };
-          if (err.err === 'table_not_found') {
+          if (err.err === 'resource_not_found') {
+            err.err = 'table_not_found';
             err.args = [table];
           }
           break;

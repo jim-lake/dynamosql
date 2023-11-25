@@ -1,6 +1,9 @@
 exports.getTableList = unsupported;
 exports.getRowList = unsupported;
 exports.createTable = unsupported;
+exports.createIndex = unsupported;
+exports.deleteIndex = unsupported;
+exports.addColumn = unsupported;
 exports.dropTable = unsupported;
 exports.startTransaction = unsupported;
 exports.commit = unsupported;

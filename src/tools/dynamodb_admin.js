@@ -4,6 +4,7 @@ const {
   DeleteTableCommand,
   DescribeTableCommand,
   ListTablesCommand,
+  UpdateTableCommand,
 } = require('@aws-sdk/client-dynamodb');
 const { convertError } = require('./dynamodb_helper');
 
@@ -12,6 +13,8 @@ exports.getTableList = getTableList;
 exports.getTable = getTable;
 exports.createTable = createTable;
 exports.deleteTable = deleteTable;
+exports.createIndex = createIndex;
+exports.deleteIndex = deleteIndex;
 
 let g_client;
 
@@ -85,6 +88,55 @@ function createTable(params, done) {
 }
 function deleteTable(TableName, done) {
   const command = new DeleteTableCommand({ TableName });
+  g_client.send(command).then(
+    () => done(),
+    (err) => done(convertError(err))
+  );
+}
+function createIndex(params, done) {
+  const { table, index_name, key_list, projection_type } = params;
+  const AttributeDefinitions = key_list.map((item) => ({
+    AttributeName: item.name,
+    AttributeType: _dynamoType(item.type),
+  }));
+  const KeySchema = [
+    {
+      AttributeName: key_list?.[0]?.name,
+      KeyType: 'HASH',
+    },
+  ];
+  if (key_list?.[1]) {
+    KeySchema.push({
+      AttributeName: key_list[1].name,
+      KeyType: 'RANGE',
+    });
+  }
+  const input = {
+    TableName: table,
+    AttributeDefinitions,
+    GlobalSecondaryIndexUpdates: [
+      {
+        Create: {
+          IndexName: index_name,
+          KeySchema,
+          Projection: { ProjectionType: projection_type || 'KEYS_ONLY' },
+        },
+      },
+    ],
+  };
+  const command = new UpdateTableCommand(input);
+  g_client.send(command).then(
+    () => done(),
+    (err) => done(convertError(err))
+  );
+}
+function deleteIndex(params, done) {
+  const { table, index_name } = params;
+  const input = {
+    TableName: table,
+    GlobalSecondaryIndexUpdates: [{ Delete: { IndexName: index_name } }],
+  };
+  const command = new UpdateTableCommand(input);
   g_client.send(command).then(
     () => done(),
     (err) => done(convertError(err))

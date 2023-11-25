@@ -20,9 +20,9 @@ function query(params, done) {
         table,
       };
       engine.dropTable(opts, (err) => {
-        if (err === 'table_not_found' && ast.prefix === 'if exists') {
+        if (err === 'resource_not_found' && ast.prefix === 'if exists') {
           err = null;
-        } else if (err === 'table_not_found') {
+        } else if (err === 'resource_not_found') {
           err = {
             err: 'ER_BAD_TABLE_ERROR',
             args: [table],

@@ -89,6 +89,18 @@ const ERROR_MAP = {
   ER_TRUNCATED_WRONG_VALUE_FOR_FIELD: {
     code: 'ER_TRUNCATED_WRONG_VALUE_FOR_FIELD',
   },
+  ER_KEY_COLUMN_DOES_NOT_EXITS: {
+    code: 'ER_KEY_COLUMN_DOES_NOT_EXITS',
+    sqlMessage: errStr`Key column '${0}' doesn't exist in table`,
+  },
+  ER_DUP_KEYNAME: {
+    code: 'ER_DUP_KEYNAME',
+    sqlMessage: errStr`Duplicate key name '${0}'`,
+  },
+  ER_CANT_DROP_FIELD_OR_KEY: {
+    code: 'ER_CANT_DROP_FIELD_OR_KEY',
+    sqlMessage: errStr`Can't DROP '${0}'; check that column/key exists`,
+  },
 };
 class SQLError extends Error {
   constructor(err, sql) {

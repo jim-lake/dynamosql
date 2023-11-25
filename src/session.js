@@ -3,6 +3,7 @@ const SqlString = require('sqlstring');
 
 const { Parser } = require('./vendor/mysql_parser');
 
+const AlterHandler = require('./lib/alter_handler');
 const CreateHandler = require('./lib/create_handler');
 const DeleteHandler = require('./lib/delete_handler');
 const DropHandler = require('./lib/drop_handler');
@@ -167,38 +168,51 @@ class Session {
   }
   _singleQuery(ast, done) {
     let err;
-    let result;
     let handler;
-    if (ast?.type === 'create') {
-      handler = CreateHandler.query;
-    } else if (ast?.type === 'delete') {
-      handler = DeleteHandler.query;
-    } else if (ast?.type === 'drop') {
-      handler = DropHandler.query;
-    } else if (ast?.type === 'insert' || ast?.type === 'replace') {
-      handler = InsertHandler.query;
-    } else if (ast?.type === 'show') {
-      handler = ShowHandler.query;
-    } else if (ast?.type === 'select') {
-      handler = SelectHandler.query;
-    } else if (ast?.type === 'set') {
-      handler = SetHandler.query;
-    } else if (ast?.type === 'update') {
-      handler = UpdateHandler.query;
-    } else if (ast?.type === 'use') {
-      handler = _useDatabase;
-    } else if (!err) {
-      logger.error('unsupported statement type:', ast);
-      err = {
-        err: 'unsupported_type',
-        args: [ast.type],
-      };
+    switch (ast?.type) {
+      case 'alter':
+        handler = AlterHandler.query;
+        break;
+      case 'create':
+        handler = CreateHandler.query;
+        break;
+      case 'delete':
+        handler = DeleteHandler.query;
+        break;
+      case 'drop':
+        handler = DropHandler.query;
+        break;
+      case 'insert':
+      case 'replace':
+        handler = InsertHandler.query;
+        break;
+      case 'show':
+        handler = ShowHandler.query;
+        break;
+      case 'select':
+        handler = SelectHandler.query;
+        break;
+      case 'set':
+        handler = SetHandler.query;
+        break;
+      case 'update':
+        handler = UpdateHandler.query;
+        break;
+      case 'use':
+        handler = _useDatabase;
+        break;
+      default:
+        logger.error('unsupported statement type:', ast);
+        err = {
+          err: 'unsupported_type',
+          args: [ast?.type],
+        };
     }
 
     if (handler) {
       handler({ ast, dynamodb: g_dynamodb, session: this }, done);
     } else {
-      done(err, result);
+      done(err || 'unsupported_type');
     }
   }
   _transformResult(list, columns, opts) {

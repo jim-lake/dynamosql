@@ -26,7 +26,7 @@ exports.LEVEL_TRACE = LEVEL_TRACE;
 let g_remoteLogFunc = null;
 let g_logLevel = LEVEL_NONE;
 if (process.env.LOG) {
-  const level = LEVEL_MAP[process.env.LOG];
+  const level = LEVEL_MAP[process.env.LOG.toUpperCase()];
   if (level !== undefined) {
     g_logLevel = level;
     trace('log level:', level);

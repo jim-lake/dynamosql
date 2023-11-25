@@ -4,6 +4,9 @@ const logger = require('../../tools/logger');
 exports.getTableList = getTableList;
 exports.createTable = createTable;
 exports.dropTable = dropTable;
+exports.addColumn = addColumn;
+exports.createIndex = createIndex;
+exports.deleteIndex = deleteIndex;
 
 function getTableList(params, done) {
   const { dynamodb } = params;
@@ -39,7 +42,7 @@ function dropTable(params, done) {
       done(err);
     } else {
       _waitForTable({ dynamodb, table }, (wait_err) => {
-        if (wait_err === 'table_not_found') {
+        if (wait_err === 'resource_not_found') {
           done();
         } else {
           done(wait_err);
@@ -48,19 +51,61 @@ function dropTable(params, done) {
     }
   });
 }
+function addColumn(params, done) {
+  done();
+}
+function createIndex(params, done) {
+  const { dynamodb, table, index_name, key_list } = params;
+  const opts = { table, index_name, key_list };
+  dynamodb.createIndex(opts, (err) => {
+    if (
+      err === 'resource_in_use' ||
+      err?.message?.indexOf?.('already exists') >= 0
+    ) {
+      done('index_exists');
+    } else if (err) {
+      logger.error('raw_engine.createIndex: err:', err);
+      done(err);
+    } else {
+      _waitForTable({ dynamodb, table, index_name }, done);
+    }
+  });
+}
+function deleteIndex(params, done) {
+  const { dynamodb, table, index_name } = params;
+  dynamodb.deleteIndex({ table, index_name }, (err) => {
+    if (err === 'resource_not_found') {
+      done('index_not_found');
+    } else if (err) {
+      logger.error('raw_engine.deleteIndex: err:', err);
+      done(err);
+    } else {
+      _waitForTable({ dynamodb, table, index_name }, done);
+    }
+  });
+}
 function _waitForTable(params, done) {
-  const { dynamodb, table } = params;
-  const LOOP_MS = 100;
+  const { dynamodb, table, index_name } = params;
+  const LOOP_MS = 500;
   let return_err;
   asyncForever(
     (done) => {
       dynamodb.getTable(table, (err, result) => {
+        const status = result?.Table?.TableStatus;
         if (
           !err &&
-          (result?.Table?.TableStatus === 'CREATING' ||
-            result?.Table?.TableStatus === 'DELETING')
+          (status === 'CREATING' ||
+            status === 'UPDATING' ||
+            status === 'DELETING')
         ) {
           err = null;
+        } else if (!err && index_name) {
+          const index = result?.Table?.GlobalSecondaryIndexes?.find?.(
+            (item) => item.IndexName === index_name
+          );
+          if (!index || index.IndexStatus === 'ACTIVE') {
+            err = 'stop';
+          }
         } else if (!err) {
           err = 'stop';
         } else {
