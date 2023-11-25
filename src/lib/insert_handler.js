@@ -127,7 +127,12 @@ function _runInsert(params, done) {
         }
       },
     ],
-    (err) => done(err, result)
+    (err) => {
+      if (err === 'resource_not_found' || err?.err === 'resource_not_found') {
+        err = { err: 'table_not_found', args: err?.args || [table] };
+      }
+      done(err, result);
+    }
   );
 }
 function _checkAst(ast) {

@@ -123,10 +123,6 @@ function _insertNoIgnore(params, done) {
             err: convertError(err.CancellationReasons[i]),
             message: err.CancellationReasons[i].Message,
           };
-          if (err.err === 'resource_not_found') {
-            err.err = 'table_not_found';
-            err.args = [table];
-          }
           break;
         }
       }
