@@ -1,6 +1,6 @@
 const asyncSeries = require('async/series');
-const Engine = require('./engine');
 const Expression = require('./expression');
+const SchemaManager = require('./schema_manager');
 const TransactionManager = require('./transaction_manager');
 const SelectHandler = require('./select_handler');
 const { typeCast } = require('./helpers/type_cast_helper');
@@ -18,6 +18,7 @@ function query(params, done) {
       : null;
 
   const database = ast.table?.[0]?.db || session.getCurrentDatabase();
+  const table = ast.table?.[0]?.table;
   let err;
   if (!database) {
     err = 'no_current_database';
@@ -28,7 +29,7 @@ function query(params, done) {
   if (err) {
     done(err);
   } else {
-    const engine = Engine.getEngine(database);
+    const engine = SchemaManager.getEngine(database, table);
     const opts = {
       ...params,
       database,

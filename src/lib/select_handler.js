@@ -1,5 +1,5 @@
-const { getEngine } = require('./engine');
 const Expression = require('./expression');
+const SchemaManager = require('./schema_manager');
 const { convertType } = require('./helpers/column_type_helper');
 const { resolveReferences } = require('./helpers/column_ref_helper');
 const { formJoin } = require('./helpers/join');
@@ -20,7 +20,8 @@ function query(params, done) {
     done(resolve_err);
   } else if (ast?.from?.length) {
     const db = ast.from?.[0]?.db;
-    const engine = getEngine(db);
+    const table = ast.from?.[0]?.table;
+    const engine = SchemaManager.getEngine(db, table);
     const opts = {
       session,
       dynamodb,

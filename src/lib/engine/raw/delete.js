@@ -1,10 +1,10 @@
 const asyncSeries = require('async/series');
 const asyncEach = require('async/each');
 const { getRowList } = require('./select');
-const { convertWhere } = require('../helpers/convert_where');
-const { formJoin } = require('../helpers/join');
-const { escapeIdentifier } = require('../../tools/dynamodb_helper');
-const logger = require('../../tools/logger');
+const { convertWhere } = require('../../helpers/convert_where');
+const { formJoin } = require('../../helpers/join');
+const { escapeIdentifier } = require('../../../tools/dynamodb_helper');
+const logger = require('../../../tools/logger');
 
 exports.deleteRowList = deleteRowList;
 

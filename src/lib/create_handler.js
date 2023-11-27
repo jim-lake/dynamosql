@@ -1,7 +1,6 @@
 const asyncSeries = require('async/series');
-const Engine = require('./engine');
 const SelectHandler = require('./select_handler');
-const TransactionManager = require('./transaction_manager');
+const SchemaManager = require('./schema_manager');
 const { typeCast } = require('./helpers/type_cast_helper');
 const { trackFirstSeen } = require('../tools/util');
 const logger = require('../tools/logger');
@@ -16,38 +15,26 @@ function query(params, done) {
     _createDatabase(params, done);
   } else if (!database) {
     done('no_current_database');
+  } else if (ast.keyword === 'table') {
+    _createTable(params, done);
   } else {
-    const engine = Engine.getEngine(database);
-    const opts = {
-      ...params,
-      engine,
-      database,
-      func: _runCreate,
-    };
-    TransactionManager.run(opts, done);
+    logger.error('unsupported create:', ast.keyword);
+    done('unsupported');
   }
 }
 function _createDatabase(params, done) {
   const { ast } = params;
-  if (ast.if_not_exists) {
-    done(null, {});
-  } else {
-    done('unsupported');
-  }
-}
-
-function _runCreate(params, done) {
-  const { ast } = params;
-
-  if (ast.keyword === 'table') {
-    _createTable(params, done);
-  } else {
-    logger.error('unsupported:', ast);
-    done('unsupported');
-  }
+  SchemaManager.createDatabase(ast.database, (err) => {
+    if (err === 'database_exists' && ast.if_not_exists) {
+      err = null;
+    } else if (err && err !== 'database_exists') {
+      logger.error('createDatabase: err:', err);
+    }
+    done(err);
+  });
 }
 function _createTable(params, done) {
-  const { ast, engine, session, dynamodb } = params;
+  const { ast, session, dynamodb } = params;
   const database = ast.table?.[0]?.db || session.getCurrentDatabase();
   const table = ast.table?.[0]?.table;
   const duplicate_mode = ast.ignore_replace;
@@ -106,17 +93,24 @@ function _createTable(params, done) {
         }
       },
       (done) => {
+        const options = Object.fromEntries(
+          ast.table_options?.map?.((item) => [item.keyword, item.value]) || []
+        );
         const opts = {
           dynamodb,
+          session,
           database,
           table,
           column_list,
           primary_key,
+          is_temp: Boolean(ast.temporary),
+          table_engine: options['engine'],
         };
-        engine.createTable(opts, done);
+        SchemaManager.createTable(opts, done);
       },
       (done) => {
         if (list?.length > 0) {
+          const engine = SchemaManager.getEngine(database, table);
           const opts = {
             dynamodb,
             session,

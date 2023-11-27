@@ -1,7 +1,7 @@
 const asyncEach = require('async/each');
-const logger = require('../../tools/logger');
-const { convertWhere } = require('../helpers/convert_where');
-const { escapeIdentifier } = require('../../tools/dynamodb_helper');
+const logger = require('../../../tools/logger');
+const { convertWhere } = require('../../helpers/convert_where');
+const { escapeIdentifier } = require('../../../tools/dynamodb_helper');
 
 exports.getRowList = getRowList;
 

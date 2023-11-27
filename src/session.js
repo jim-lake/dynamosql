@@ -58,6 +58,7 @@ class Session {
   _transaction = null;
   _isReleased = false;
   _multipleStatements = false;
+  _tempTableMap = {};
 
   _typeCast = true;
   _dateStrings = false;
@@ -95,6 +96,12 @@ class Session {
   setTransaction(tx) {
     this._transaction = tx;
   }
+  getTempTableList() {
+    return Object.entries(this._tempTableMap);
+  }
+  dropTempTable(databaase_table) {
+    delete this._tempTableMap[databaase_table];
+  }
 
   query(params, values, done) {
     const opts = typeof params === 'object' ? params : {};
@@ -130,7 +137,7 @@ class Session {
           if (!err) {
             this._transformResult(result, columns, opts);
           }
-          done(err ? new SQLError(err, opts.sql) : null, result, columns, 1);
+          done(err ? new SQLError(err, opts.sql) : null, result ?? {}, columns, 1);
         });
       } else if (this._multipleStatements) {
         const query_count = list.length;
@@ -144,7 +151,7 @@ class Session {
               this._singleQuery(ast, (err, result, columns) => {
                 if (!err) {
                   this._transformResult(result, columns, opts);
-                  result_list[n] = result;
+                  result_list[n] = result ?? {};
                   schema_list[n] = columns;
                 }
                 done(err);

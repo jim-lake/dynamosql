@@ -1,4 +1,4 @@
-const Engine = require('./engine');
+const SchemaManager = require('./schema_manager');
 const logger = require('../tools/logger');
 
 exports.query = query;
@@ -6,20 +6,22 @@ exports.query = query;
 function query(params, done) {
   const { ast, session, dynamodb } = params;
 
-  if (ast.keyword === 'table') {
+  if (ast.keyword === 'database') {
+    SchemaManager.dropDatabase({ ...params, database: ast.name }, done);
+  } else if (ast.keyword === 'table') {
     const database = ast.name?.[0]?.db || session.getCurrentDatabase();
     const table = ast.name?.[0]?.table;
 
     if (!database) {
       done('no_current_database');
     } else {
-      const engine = Engine.getEngine(database);
       const opts = {
         dynamodb,
+        session,
         database,
         table,
       };
-      engine.dropTable(opts, (err) => {
+      SchemaManager.dropTable(opts, (err) => {
         if (err === 'resource_not_found' && ast.prefix === 'if exists') {
           err = null;
         } else if (err === 'resource_not_found') {

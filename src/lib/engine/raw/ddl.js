@@ -1,5 +1,5 @@
 const asyncForever = require('async/forever');
-const logger = require('../../tools/logger');
+const logger = require('../../../tools/logger');
 
 exports.getTableList = getTableList;
 exports.createTable = createTable;

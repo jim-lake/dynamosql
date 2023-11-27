@@ -3,8 +3,8 @@ const {
   escapeValue,
   escapeIdentifier,
   convertError,
-} = require('../../tools/dynamodb_helper');
-const { trackFirstSeen } = require('../../tools/util');
+} = require('../../../tools/dynamodb_helper');
+const { trackFirstSeen } = require('../../../tools/util');
 
 exports.insertRowList = insertRowList;
 

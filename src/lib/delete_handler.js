@@ -1,6 +1,6 @@
-const Engine = require('./engine');
-const { resolveReferences } = require('./helpers/column_ref_helper');
+const SchemaManager = require('./schema_manager');
 const TransactionManager = require('./transaction_manager');
+const { resolveReferences } = require('./helpers/column_ref_helper');
 const logger = require('../tools/logger');
 
 exports.query = query;
@@ -10,6 +10,7 @@ function query(params, done) {
   const current_database = session.getCurrentDatabase();
   const resolve_err = resolveReferences(ast, current_database);
   const database = ast.from?.[0]?.db;
+  const table = ast.from?.[0]?.table;
 
   if (resolve_err) {
     logger.error('resolve_err:', resolve_err);
@@ -17,7 +18,7 @@ function query(params, done) {
   } else if (!database) {
     done('no_current_database');
   } else {
-    const engine = Engine.getEngine(database);
+    const engine = SchemaManager.getEngine(database, table);
     const opts = {
       ...params,
       engine,

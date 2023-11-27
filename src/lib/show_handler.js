@@ -1,9 +1,7 @@
+const SchemaManager = require('./schema_manager');
 const { convertType } = require('./helpers/column_type_helper');
-const Engine = require('./engine');
 
 exports.query = query;
-
-const DATABASES = [['_dynamodb']];
 
 function query(params, done) {
   const { ast, session, dynamodb } = params;
@@ -15,11 +13,12 @@ function query(params, done) {
       name: 'Database',
       orgName: 'Database',
     });
-    done(null, DATABASES, [column]);
+    const list = SchemaManager.getDatabaseList();
+    const rows = list?.map?.((item) => [item]);
+    done(null, rows, [column]);
   } else if (ast.keyword === 'tables') {
     const database = session.getCurrentDatabase();
     if (database) {
-      const engine = Engine.getEngine(database);
       const name = 'Tables_in_' + database;
       const column = Object.assign(convertType('string'), {
         table: 'TABLES',
@@ -27,8 +26,8 @@ function query(params, done) {
         name,
         orgName: name,
       });
-      engine.getTableList({ dynamodb, database }, (err, tables) => {
-        const rows = tables?.map?.((table) => [table]);
+      SchemaManager.getTableList({ dynamodb, database }, (err, list) => {
+        const rows = list?.map?.((item) => [item]);
         done(err, rows, [column]);
       });
     } else {

@@ -1,4 +1,4 @@
-const { convertError } = require('../../tools/dynamodb_helper');
+const { convertError } = require('../../../tools/dynamodb_helper');
 
 exports.replaceRowList = replaceRowList;
 

@@ -1,6 +1,6 @@
 const asyncSeries = require('async/series');
 const asyncEachSeries = require('async/eachSeries');
-const Engine = require('./engine');
+const SchemaManager = require('./schema_manager');
 const TransactionManager = require('./transaction_manager');
 
 exports.query = query;
@@ -8,7 +8,8 @@ exports.query = query;
 function query(params, done) {
   const { ast, dynamodb, session } = params;
   const database = ast.table?.[0]?.db || session.getCurrentDatabase();
-  const engine = Engine.getEngine(database);
+  const table = ast.table?.[0]?.table;
+  const engine = SchemaManager.getEngine(database, table);
 
   if (ast.table && database) {
     const opts = {

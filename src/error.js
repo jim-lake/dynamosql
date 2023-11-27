@@ -43,6 +43,14 @@ const ERROR_MAP = {
     code: DEFAULT_ERRNO,
     sqlMessage: errStr`Unsupported query type: ${0}`,
   },
+  database_no_drop_builtin: {
+    code: 'ER_DBACCESS_DENIED_ERROR',
+    sqlMessage: "Can't drop a built in database",
+  },
+  database_exists: {
+    code: 'ER_DB_CREATE_EXISTS',
+    sqlMessage: 'Database exists',
+  },
   no_current_database: {
     code: 'ER_NO_DB_ERROR',
     sqlMessage: 'No database selected',
@@ -100,6 +108,10 @@ const ERROR_MAP = {
   ER_CANT_DROP_FIELD_OR_KEY: {
     code: 'ER_CANT_DROP_FIELD_OR_KEY',
     sqlMessage: errStr`Can't DROP '${0}'; check that column/key exists`,
+  },
+  ER_UNKNOWN_STORAGE_ENGINE: {
+    code: 'ER_UNKNOWN_STORAGE_ENGINE',
+    sqlMessage: errStr`Unknown storage engine '${0}'`,
   },
 };
 class SQLError extends Error {
