@@ -137,7 +137,12 @@ class Session {
           if (!err) {
             this._transformResult(result, columns, opts);
           }
-          done(err ? new SQLError(err, opts.sql) : null, result ?? {}, columns, 1);
+          done(
+            err ? new SQLError(err, opts.sql) : null,
+            result ?? {},
+            columns,
+            1
+          );
         });
       } else if (this._multipleStatements) {
         const query_count = list.length;

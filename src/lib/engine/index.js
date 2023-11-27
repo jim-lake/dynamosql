@@ -5,15 +5,16 @@ exports.getDatabaseError = getDatabaseError;
 exports.getTableError = getTableError;
 
 const KEYS = [
-  'getTableList',
-  'createTable',
-  'createIndex',
-  'deleteIndex',
-  'addColumn',
-  'dropTable',
   'startTransaction',
   'commit',
   'rollback',
+  'getTableList',
+  'createTable',
+  'dropTable',
+  'createIndex',
+  'deleteIndex',
+  'addColumn',
+  'getRowList',
   'deleteRowList',
   'updateRowList',
   'replaceRowList',

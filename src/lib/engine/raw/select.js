@@ -39,7 +39,9 @@ function _getFromTable(params, done) {
   }
   dynamodb.queryQL(sql, (err, results) => {
     let column_list;
-    if (err) {
+    if (err === 'resource_not_found') {
+      done({ err: 'table_not_found', args: [table] });
+    } else if (err) {
       logger.error('raw_engine.getRowList err:', err, results, sql);
     } else {
       if (_requestAll) {
