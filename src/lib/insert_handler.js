@@ -29,7 +29,7 @@ function query(params, done) {
   if (err) {
     done(err);
   } else {
-    const engine = SchemaManager.getEngine(database, table);
+    const engine = SchemaManager.getEngine(database, table, session);
     const opts = {
       ...params,
       database,
@@ -63,16 +63,14 @@ function _runInsert(params, done) {
           done(err);
         } else if (ast.columns?.length > 0 && ast.values.type === 'select') {
           const opts = { ast: ast.values, session, dynamodb };
-          SelectHandler.query(opts, (err, row_list, columns) => {
+          SelectHandler.internalQuery(opts, (err, row_list) => {
             if (err) {
               logger.error('insert select err:', err);
             } else {
               list = row_list.map((row) => {
                 const obj = {};
                 ast.columns.forEach((name, i) => {
-                  obj[name] = typeCast(row[i], columns[i], {
-                    dateStrings: true,
-                  });
+                  obj[name] = row[i];
                 });
                 return obj;
               });

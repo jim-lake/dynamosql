@@ -9,7 +9,7 @@ function query(params, done) {
   const { ast, dynamodb, session } = params;
   const database = ast.table?.[0]?.db || session.getCurrentDatabase();
   const table = ast.table?.[0]?.table;
-  const engine = SchemaManager.getEngine(database, table);
+  const engine = SchemaManager.getEngine(database, table, session);
 
   if (ast.table && database) {
     const opts = {

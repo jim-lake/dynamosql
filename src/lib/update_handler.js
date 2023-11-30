@@ -21,7 +21,7 @@ function query(params, done) {
   } else if (!database) {
     done('no_current_database');
   } else {
-    const engine = SchemaManager.getEngine(database, table);
+    const engine = SchemaManager.getEngine(database, table, session);
     const opts = {
       ...params,
       engine,

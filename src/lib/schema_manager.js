@@ -13,24 +13,26 @@ exports.dropTable = dropTable;
 const BUILT_IN = ['_dynamodb'];
 const g_schemaMap = {};
 
-function getEngine(database, table) {
+function getEngine(database, table, session) {
   let ret;
+  const schema = g_schemaMap[database];
   if (database === '_dynamodb') {
     ret = Engine.getEngineByName('raw');
+  } else if (!schema) {
+    ret = Engine.getDatabaseError(database);
+  } else if (session.getTempTable(database, table)) {
+    ret = Engine.getEngineByName('memory');
+  } else if (schema[table]) {
+    ret = Engine.getEngineByName(schema[table].table_engine);
   } else {
-    const table_engine = g_schemaMap[database]?.[table]?.table_engine;
-    if (table_engine) {
-      ret = Engine.getEngineByName(table_engine);
-    } else if (g_schemaMap[database]) {
-      ret = Engine.getTableError(table);
-    } else {
-      ret = Engine.getDatabaseError(database);
-    }
+    ret = Engine.getTableError(table);
   }
   return ret;
 }
-function _findTable(database, table) {
-  return g_schemaMap[database]?.[table];
+function _findTable(database, table, session) {
+  return (
+    session.getTempTable(database, table) || g_schemaMap[database]?.[table]
+  );
 }
 function getDatabaseList() {
   return [...BUILT_IN, ...Object.keys(g_schemaMap)];
@@ -55,15 +57,16 @@ function createDatabase(database, done) {
   }
 }
 function dropDatabase(params, done) {
-  const { database } = params;
+  const { session, database } = params;
   if (BUILT_IN.includes(database)) {
     done('database_no_drop_builtin');
   } else if (database in g_schemaMap) {
+    session.dropTempTable(database);
     const table_list = Object.keys(g_schemaMap[database]);
     asyncEach(
       table_list,
       (table, done) => {
-        const engine = getEngine(database, table);
+        const engine = getEngine(database, table, session);
         engine.dropTable({ ...params, table }, (err) => {
           if (err) {
             logger.error('dropDatabase: table:', table, 'drop err:', err);
@@ -85,22 +88,25 @@ function dropDatabase(params, done) {
   }
 }
 function createTable(params, done) {
-  const { database, table, is_temp } = params;
-  if (database === '_dynamodb') {
+  const { session, database, table, is_temp } = params;
+  const table_engine = is_temp
+    ? 'memory'
+    : params.table_engine?.toLowerCase?.() ?? 'raw';
+
+  if (database === '_dynamodb' && table_engine !== 'raw') {
+    done('access_denied');
+  } else if (database === '_dynamodb') {
     const engine = Engine.getEngineByName('raw');
     engine.createTable(params, done);
-  } else if (_findTable(database, table)) {
+  } else if (_findTable(database, table, session)) {
     done({ err: 'table_exists', args: [table] });
   } else if (!(database in g_schemaMap)) {
     done({ err: 'db_not_found', args: [database] });
   } else {
-    const table_engine = is_temp
-      ? 'memory'
-      : params.table_engine?.toLowerCase?.() ?? 'raw';
     const engine = Engine.getEngineByName(table_engine);
     if (engine) {
       engine.createTable(params, (err) => {
-        if (!err) {
+        if (!err && !is_temp) {
           g_schemaMap[database][table] = { table_engine };
         }
         done(err);
@@ -111,12 +117,12 @@ function createTable(params, done) {
   }
 }
 function dropTable(params, done) {
-  const { database, table } = params;
+  const { session, database, table } = params;
   if (database === '_dynamodb') {
-    const engine = getEngine(database, table);
+    const engine = Engine.getEngineByName('raw');
     engine.dropTable(params, done);
-  } else if (_findTable(database, table)) {
-    const engine = Engine.getEngine(database, table);
+  } else if (_findTable(database, table, session)) {
+    const engine = getEngine(database, table, session);
     engine.dropTable(params, (err) => {
       if (err) {
         logger.error(

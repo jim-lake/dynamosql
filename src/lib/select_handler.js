@@ -8,8 +8,19 @@ const { sort } = require('./helpers/sort');
 const logger = require('../tools/logger');
 
 exports.query = query;
+exports.internalQuery = internalQuery;
 
 function query(params, done) {
+  internalQuery(params, (err, output_row_list, column_list) => {
+    output_row_list?.forEach?.(row => {
+      for (let key in row) {
+        row[key] = row[key].value;
+      }
+    });
+    done(err, output_row_list, column_list);
+  });
+}
+function internalQuery(params, done) {
   const { ast, session, dynamodb } = params;
 
   const current_database = session.getCurrentDatabase();
@@ -21,7 +32,7 @@ function query(params, done) {
   } else if (ast?.from?.length) {
     const db = ast.from?.[0]?.db;
     const table = ast.from?.[0]?.table;
-    const engine = SchemaManager.getEngine(db, table);
+    const engine = SchemaManager.getEngine(db, table, session);
     const opts = {
       session,
       dynamodb,
@@ -78,7 +89,7 @@ function _evaluateReturn(params, done) {
         err = result.err;
         break;
       } else {
-        output_row[j] = result.value;
+        output_row[j] = result;
         if (result.type !== column.result_type) {
           column.result_type = _unionType(column.result_type, result.type);
         }

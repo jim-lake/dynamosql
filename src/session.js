@@ -21,19 +21,14 @@ const { SQLError } = require('./error');
 exports.init = init;
 exports.createSession = createSession;
 
-const parser = new Parser();
+const DEFAULT_RESULT = { affectedRows: 0 };
 
+const parser = new Parser();
 let g_dynamodb;
+
 function init(args) {
   g_dynamodb = DynamoDB.createDynamoDB(args);
 }
-function createSession(args) {
-  if (args) {
-    g_dynamodb = DynamoDB.createDynamoDB(args);
-  }
-  return new Session(args);
-}
-
 class Session {
   constructor(args) {
     if (args?.database) {
@@ -99,8 +94,26 @@ class Session {
   getTempTableList() {
     return Object.entries(this._tempTableMap);
   }
-  dropTempTable(databaase_table) {
-    delete this._tempTableMap[databaase_table];
+  getTempTable(database, table) {
+    const key = database + '.' + table;
+    return this._tempTableMap[key];
+  }
+  saveTempTable(database, table, contents) {
+    const key = database + '.' + table;
+    this._tempTableMap[key] = contents;
+  }
+  dropTempTable(database, table) {
+    const prefix = database + '.';
+    if (table) {
+      const key = prefix + table;
+      delete this._tempTableMap[key];
+    } else {
+      Object.keys(this._tempTableMap).forEach((key) => {
+        if (key.startsWith(prefix)) {
+          delete this._tempTableMap[key];
+        }
+      });
+    }
   }
 
   query(params, values, done) {
@@ -139,7 +152,7 @@ class Session {
           }
           done(
             err ? new SQLError(err, opts.sql) : null,
-            result ?? {},
+            result ?? DEFAULT_RESULT,
             columns,
             1
           );
@@ -156,7 +169,7 @@ class Session {
               this._singleQuery(ast, (err, result, columns) => {
                 if (!err) {
                   this._transformResult(result, columns, opts);
-                  result_list[n] = result ?? {};
+                  result_list[n] = result ?? DEFAULT_RESULT;
                   schema_list[n] = columns;
                 }
                 done(err);
@@ -251,6 +264,12 @@ class Session {
       : value;
   }
 }
+function createSession(args) {
+  if (args) {
+    g_dynamodb = DynamoDB.createDynamoDB(args);
+  }
+  return new Session(args);
+}
 function _astify(sql) {
   let err;
   let list = [];
@@ -269,7 +288,5 @@ function _astify(sql) {
   return { err, list };
 }
 function _useDatabase(params, done) {
-  params.session.setCurrentDatabase(params.ast.db, (err) => {
-    done(err, {});
-  });
+  params.session.setCurrentDatabase(params.ast.db, done);
 }

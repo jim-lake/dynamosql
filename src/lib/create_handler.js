@@ -25,12 +25,15 @@ function query(params, done) {
 function _createDatabase(params, done) {
   const { ast } = params;
   SchemaManager.createDatabase(ast.database, (err) => {
+    let result;
     if (err === 'database_exists' && ast.if_not_exists) {
       err = null;
     } else if (err && err !== 'database_exists') {
       logger.error('createDatabase: err:', err);
+    } else if (!err) {
+      result = { affectedRows: 1 };
     }
-    done(err);
+    done(err, result);
   });
 }
 function _createTable(params, done) {
@@ -58,21 +61,19 @@ function _createTable(params, done) {
     }
   });
   let list;
-  let result = {};
+  let result;
   asyncSeries(
     [
       (done) => {
         if (ast.as && ast.query_expr) {
           const opts = { ast: ast.query_expr, session, dynamodb };
-          SelectHandler.query(opts, (err, row_list, columns) => {
+          SelectHandler.internalQuery(opts, (err, row_list, columns) => {
             if (!err) {
               const track = new Map();
               list = row_list.map((row) => {
                 const obj = {};
                 columns.forEach((column, i) => {
-                  obj[column.name] = typeCast(row[i], column, {
-                    dateStrings: true,
-                  });
+                  obj[column.name] = row[i];
                 });
                 if (!err && !duplicate_mode) {
                   const keys = primary_key.map(({ name }) => obj[name]);
@@ -110,7 +111,7 @@ function _createTable(params, done) {
       },
       (done) => {
         if (list?.length > 0) {
-          const engine = SchemaManager.getEngine(database, table);
+          const engine = SchemaManager.getEngine(database, table, session);
           const opts = {
             dynamodb,
             session,

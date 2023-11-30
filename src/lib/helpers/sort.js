@@ -19,8 +19,8 @@ function _sort(orderby, state, a, b) {
     if (expr?.type === 'number') {
       const index = expr.value - 1;
       const result = func(
-        a['@@result']?.[index],
-        b['@@result']?.[index],
+        a['@@result']?.[index]?.value,
+        b['@@result']?.[index]?.value,
         state.column_list[index]
       );
       if (result !== 0) {

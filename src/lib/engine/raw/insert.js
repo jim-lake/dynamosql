@@ -12,12 +12,12 @@ function insertRowList(params, done) {
   if (params.list.length === 0) {
     done(null, { affectedRows: 0 });
   } else if (params.duplicate_mode) {
-    _insertIgnoreReplease(params, done);
+    _insertIgnoreReplace(params, done);
   } else {
     _insertNoIgnore(params, done);
   }
 }
-function _insertIgnoreReplease(params, done) {
+function _insertIgnoreReplace(params, done) {
   const { dynamodb, duplicate_mode, table } = params;
   let list = params.list;
   let affectedRows;

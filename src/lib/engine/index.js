@@ -1,11 +1,11 @@
 const RawEngine = require('./raw');
+const MemoryEngine = require('./memory');
 
 exports.getEngineByName = getEngineByName;
 exports.getDatabaseError = getDatabaseError;
 exports.getTableError = getTableError;
 
 const KEYS = [
-  'startTransaction',
   'commit',
   'rollback',
   'getTableList',
@@ -26,6 +26,9 @@ function getEngineByName(name) {
   switch (name) {
     case 'raw':
       ret = RawEngine;
+      break;
+    case 'memory':
+      ret = MemoryEngine;
       break;
     default:
       ret = NullEngine;

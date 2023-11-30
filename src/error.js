@@ -113,6 +113,10 @@ const ERROR_MAP = {
     code: 'ER_UNKNOWN_STORAGE_ENGINE',
     sqlMessage: errStr`Unknown storage engine '${0}'`,
   },
+  access_denied: {
+    code: 'ER_DBACCESS_DENIED_ERROR',
+    sqlMessage: 'Access denied',
+  },
 };
 class SQLError extends Error {
   constructor(err, sql) {

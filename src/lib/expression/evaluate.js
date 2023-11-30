@@ -123,8 +123,9 @@ function getValue(expr, state) {
   } else if (type === 'column_ref') {
     result.name = expr.column;
     if (row && expr._resultIndex >= 0) {
-      result.value = row['@@result']?.[expr._resultIndex];
-      result.type = column_list?.[expr._resultIndex]?.result_type;
+      const output_result = row['@@result']?.[expr._resultIndex];
+      result.value = output_result?.value;
+      result.type = output_result?.type;
     } else if (row) {
       const cell = row[expr.from?.key]?.[expr.column];
       const decode = _decodeCell(cell);
@@ -154,6 +155,9 @@ function _decodeCell(cell) {
   if (!cell || cell.NULL) {
     type = 'null';
     value = null;
+  } else if (cell.value) {
+    type = cell.type ?? typeof cell.value;
+    value = cell.value;
   } else if (cell.S) {
     type = 'string';
     value = cell.S;
@@ -167,7 +171,11 @@ function _decodeCell(cell) {
     type = 'json';
     value = mapToObject(cell.M);
   } else {
-    logger.error('invalid cell:', cell);
+    type = typeof cell;
+    value = cell;
+    if (type === 'object') {
+      type = 'json';
+    }
   }
   return { type, value };
 }

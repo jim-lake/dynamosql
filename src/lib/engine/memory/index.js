@@ -1,21 +1,22 @@
 const ddl = require('./ddl');
-const delete_opts = require('./delete');
 const insert = require('./insert');
-const replace = require('./replace');
 const select = require('./select');
-const update = require('./update');
+
+const Storage = require('./storage');
 
 Object.assign(exports, ddl);
-Object.assign(exports, delete_opts);
 Object.assign(exports, insert);
-Object.assign(exports, replace);
 Object.assign(exports, select);
-Object.assign(exports, update);
 
 exports.commit = commit;
 exports.rollback = rollback;
 
 function commit(params, done) {
+  const { data, session } = params;
+  for (let key in data) {
+    const { database, table, row_list } = data[key];
+    Storage.saveRowList(database, table, session, row_list);
+  }
   done();
 }
 function rollback(params, done) {
