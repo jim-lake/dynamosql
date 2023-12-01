@@ -1,7 +1,6 @@
 const asyncSeries = require('async/series');
 const SelectHandler = require('./select_handler');
 const SchemaManager = require('./schema_manager');
-const { typeCast } = require('./helpers/type_cast_helper');
 const { trackFirstSeen } = require('../tools/util');
 const logger = require('../tools/logger');
 
@@ -76,7 +75,7 @@ function _createTable(params, done) {
                   obj[column.name] = row[i];
                 });
                 if (!err && !duplicate_mode) {
-                  const keys = primary_key.map(({ name }) => obj[name]);
+                  const keys = primary_key.map(({ name }) => obj[name].value);
                   if (!trackFirstSeen(track, keys)) {
                     err = {
                       err: 'dup_primary_key_entry',

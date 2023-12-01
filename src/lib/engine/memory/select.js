@@ -1,5 +1,4 @@
 const Storage = require('./storage');
-const logger = require('../../../tools/logger');
 
 exports.getRowList = getRowList;
 
@@ -26,6 +25,6 @@ function _getFromTable(params) {
   return {
     err: data ? null : 'table_not_found',
     row_list: data?.row_list,
-    column_list: data?.column_list?.map?.(column => column.name) || [],
+    column_list: data?.column_list?.map?.((column) => column.name) || [],
   };
 }

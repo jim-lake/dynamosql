@@ -39,7 +39,7 @@ function _insertIgnoreReplace(params, done) {
               list = list.filter((row) =>
                 trackFirstSeen(
                   track,
-                  key_list.map((key) => row[key])
+                  key_list.map((key) => row[key].value)
                 )
               );
               if (duplicate_mode === 'replace') {
@@ -57,7 +57,7 @@ function _insertIgnoreReplace(params, done) {
           affectedRows = list.length;
           const sql_list = list.map(
             (item) =>
-              `INSERT INTO ${escapeIdentifier(table)} VALUE ${escapeValue(
+              `INSERT INTO ${escapeIdentifier(table)} VALUE ${_escapeItem(
                 item
               )}`
           );
@@ -84,6 +84,7 @@ function _insertIgnoreReplace(params, done) {
             done(err);
           });
         } else {
+          list.forEach(_fixupItem);
           const opts = {
             table,
             list,
@@ -104,7 +105,7 @@ function _insertNoIgnore(params, done) {
   const { dynamodb, table, list } = params;
   const sql_list = list.map(
     (item) =>
-      `INSERT INTO ${escapeIdentifier(table)} VALUE ${escapeValue(item)}`
+      `INSERT INTO ${escapeIdentifier(table)} VALUE ${_escapeItem(item)}`
   );
   dynamodb.transactionQL(sql_list, (err) => {
     if (
@@ -115,7 +116,7 @@ function _insertNoIgnore(params, done) {
         if (err.CancellationReasons[i].Code === 'DuplicateItem') {
           err = {
             err: 'dup_table_insert',
-            args: [table, list[i]],
+            args: [table, _fixupItem(list[i])],
           };
           break;
         } else if (err.CancellationReasons[i].Code !== 'None') {
@@ -137,4 +138,18 @@ function _insertNoIgnore(params, done) {
     }
     done(err, err ? undefined : { affectedRows: list.length });
   });
+}
+function _fixupItem(item) {
+  for (let key in item) {
+    item[key] = item[key].value;
+  }
+  return item;
+}
+function _escapeItem(item) {
+  let s = '{ ';
+  s += Object.keys(item)
+    .map((key) => `'${key}': ${escapeValue(item[key].value)}`)
+    .join(', ');
+  s += ' }';
+  return s;
 }

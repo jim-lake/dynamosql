@@ -17,7 +17,6 @@ const KEYS = [
   'getRowList',
   'deleteRowList',
   'updateRowList',
-  'replaceRowList',
 ];
 const NullEngine = _makeErrorEngine('unsupported');
 

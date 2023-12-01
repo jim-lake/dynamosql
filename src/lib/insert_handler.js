@@ -3,7 +3,6 @@ const Expression = require('./expression');
 const SchemaManager = require('./schema_manager');
 const TransactionManager = require('./transaction_manager');
 const SelectHandler = require('./select_handler');
-const { typeCast } = require('./helpers/type_cast_helper');
 const logger = require('../tools/logger');
 
 exports.query = query;
@@ -57,7 +56,7 @@ function _runInsert(params, done) {
             if (!err && expr_result.err) {
               err = expr_result.err;
             }
-            obj[item.column] = expr_result.value;
+            obj[item.column] = expr_result;
           });
           list = [obj];
           done(err);
@@ -90,7 +89,7 @@ function _runInsert(params, done) {
                 if (!err && expr_result.err) {
                   err = expr_result.err;
                 }
-                obj[name] = expr_result.value;
+                obj[name] = expr_result;
               });
               list.push(obj);
             } else {

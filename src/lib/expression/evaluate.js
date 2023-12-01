@@ -12,7 +12,7 @@ const { mapToObject } = require('../../tools/dynamodb_helper');
 const logger = require('../../tools/logger');
 
 function getValue(expr, state) {
-  const { session, row, column_list } = state;
+  const { session, row } = state;
   let result = { err: null, value: undefined, name: undefined };
 
   const type = expr?.type;

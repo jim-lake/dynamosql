@@ -12,7 +12,7 @@ exports.internalQuery = internalQuery;
 
 function query(params, done) {
   internalQuery(params, (err, output_row_list, column_list) => {
-    output_row_list?.forEach?.(row => {
+    output_row_list?.forEach?.((row) => {
       for (let key in row) {
         row[key] = row[key].value;
       }

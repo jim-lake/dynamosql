@@ -152,8 +152,8 @@ class Session {
           }
           done(
             err ? new SQLError(err, opts.sql) : null,
-            result ?? DEFAULT_RESULT,
-            columns,
+            err ? undefined : result ?? DEFAULT_RESULT,
+            err ? undefined : columns,
             1
           );
         });
