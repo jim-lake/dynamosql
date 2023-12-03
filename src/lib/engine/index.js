@@ -14,9 +14,10 @@ const KEYS = [
   'createIndex',
   'deleteIndex',
   'addColumn',
-  'getRowList',
   'getTableInfo',
-  'deleteRowList',
+  'getRowList',
+  'singleDelete',
+  'multipleDelete',
   'singleUpdate',
   'multipleUpdate',
 ];

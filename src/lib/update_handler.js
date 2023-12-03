@@ -2,9 +2,10 @@ const asyncSeries = require('async/series');
 const asyncEach = require('async/each');
 const Expression = require('./expression');
 const SchemaManager = require('./schema_manager');
-const SelectHandler = require('./select_handler');
 const TransactionManager = require('./transaction_manager');
+const { makeEngineGroups } = require('./helpers/engine_groups');
 const { resolveReferences } = require('./helpers/column_ref_helper');
+const { runSelect } = require('./helpers/select_modify');
 const logger = require('../tools/logger');
 
 exports.query = query;
@@ -62,143 +63,73 @@ function _multipleUpdate(params, done) {
   asyncSeries(
     [
       (done) =>
-        asyncEach(
-          ast.from,
-          (object, done) => {
-            const { db, table } = object;
-            const engine = SchemaManager.getEngine(db, table, session);
-            const opts = { dynamodb, session, database: db, table };
-            engine.getTableInfo(opts, (err, result) => {
-              if (err) {
-                logger.error(
-                  '_selectUpdate: getTable: err:',
-                  err,
-                  table,
-                  result
-                );
-              } else if (result?.primary_key?.length > 0) {
-                object._keyList = result.primary_key.map((key) => key.name);
-                object._keyList.forEach((key) => object._requestSet.add(key));
-              } else {
-                err = 'bad_schema';
-              }
-              done(err);
-            });
-          },
-          done
-        ),
-      (done) => {
-        const opts = {
-          dynamodb,
-          session,
-          ast,
-          skip_resolve: true,
-        };
-        SelectHandler.internalQuery(
-          opts,
-          (err, _ignore, _ignore2, row_list) => {
-            if (!err) {
-              ast.from.forEach((object) => {
-                const from_key = object.key;
-                const key_list = object._keyList;
-                const collection = new Map();
-                row_list.forEach((row) => {
-                  const keys = key_list.map((key) => row[from_key]?.[key]);
-                  const set_list = ast.set
-                    .filter((set_item) => set_item.from.key === from_key)
-                    .map((set_item) => {
-                      const expr_result = Expression.getValue(set_item.value, {
-                        session,
-                        row,
-                      });
-                      if (!err && expr_result.err) {
-                        err = expr_result.err;
-                      }
-                      return {
-                        column: set_item.column,
-                        value: expr_result,
-                      };
+        runSelect(params, (err, result_list) => {
+          if (!err) {
+            ast.from.forEach((object) => {
+              const from_key = object.key;
+              const list = result_list.find(
+                (result) => result.key === from_key
+              )?.list;
+              object._updateList = [];
+              list?.forEach?.(({ key, row }) => {
+                const set_list = ast.set
+                  .filter((set_item) => set_item.from.key === from_key)
+                  .map((set_item) => {
+                    const expr_result = Expression.getValue(set_item.value, {
+                      session,
+                      row,
                     });
-                  if (set_list.length > 0) {
-                    _addCollection(collection, keys, set_list);
-                  }
-                });
-                object._updateList = [];
-                collection.forEach((value0, key0) => {
-                  if (key_list.length > 1) {
-                    value0.forEach((value1, key1) => {
-                      object._updateList.push({
-                        key: [key0, key1],
-                        set_list: value1,
-                      });
-                    });
-                  } else {
-                    object._updateList.push({ key: [key0], set_list: value0 });
-                  }
-                });
+                    if (!err && expr_result.err) {
+                      err = expr_result.err;
+                    }
+                    return {
+                      column: set_item.column,
+                      value: expr_result,
+                    };
+                  });
+                if (set_list.length > 0) {
+                  object._updateList.push({ key, set_list });
+                }
               });
-            }
-            done(err);
-          }
-        );
-      },
-      (done) => {
-        const groups = [];
-        ast.from.forEach((object) => {
-          if (object._updateList.length > 0) {
-            const engine = SchemaManager.getEngine(
-              object.db,
-              object.table,
-              session
-            );
-            let found = groups.find((group) => group.engine === engine);
-            const update = {
-              database: object.db,
-              table: object.table,
-              key_list: object._keyList,
-              update_list: object._updateList,
-            };
-            if (found) {
-              found.list.push(update);
-            } else {
-              groups.push({ engine, list: [update] });
-            }
-          }
-        });
-
-        asyncEach(
-          groups,
-          (group, done) => {
-            const { engine, list } = group;
-            const opts = {
-              dynamodb,
-              session,
-              list,
-            };
-            engine.multipleUpdate(opts, (err, result) => {
-              if (!err) {
-                affectedRows += result.affectedRows;
-                changedRows += result.changedRows;
-              }
-              done(err);
             });
-          },
-          done
-        );
+          }
+          done(err);
+        }),
+      (done) => {
+        const from_list = ast.from
+          .map((obj) => ({
+            database: obj.db,
+            table: obj.table,
+            key_list: obj._keyList,
+            update_list: obj._updateList,
+          }))
+          .filter((obj) => obj.update_list.length > 0);
+        if (from_list.length > 0) {
+          const groups = makeEngineGroups(session, from_list);
+          asyncEach(
+            groups,
+            (group, done) => {
+              const { engine, list } = group;
+              const opts = {
+                dynamodb,
+                session,
+                list,
+              };
+              engine.multipleUpdate(opts, (err, result) => {
+                if (!err) {
+                  affectedRows += result.affectedRows;
+                  changedRows += result.changedRows;
+                }
+                done(err);
+              });
+            },
+            done
+          );
+        } else {
+          done();
+        }
       },
     ],
     (err) => done(err, { affectedRows, changedRows })
   );
-}
-function _addCollection(collection, keys, value) {
-  if (keys.length > 1) {
-    let sub_map = collection.get(keys[0]);
-    if (!sub_map) {
-      sub_map = new Map();
-      collection.set(keys[0], sub_map);
-    }
-    sub_map.set(keys[1], value);
-  } else {
-    collection.set(keys[0], value);
-  }
 }
