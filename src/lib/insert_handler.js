@@ -121,7 +121,7 @@ function _runInsert(params, done) {
           });
         } else {
           result = { affectedRows: 0 };
-          done(null);
+          done();
         }
       },
     ],

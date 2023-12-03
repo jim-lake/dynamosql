@@ -30,7 +30,7 @@ function _createDatabase(params, done) {
     } else if (err && err !== 'database_exists') {
       logger.error('createDatabase: err:', err);
     } else if (!err) {
-      result = { affectedRows: 1 };
+      result = { affectedRows: 1, changedRows: 0 };
     }
     done(err, result);
   });

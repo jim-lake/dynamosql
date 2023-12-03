@@ -15,8 +15,10 @@ const KEYS = [
   'deleteIndex',
   'addColumn',
   'getRowList',
+  'getTableInfo',
   'deleteRowList',
-  'updateRowList',
+  'singleUpdate',
+  'multipleUpdate',
 ];
 const NullEngine = _makeErrorEngine('unsupported');
 

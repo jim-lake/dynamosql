@@ -14,6 +14,7 @@ const {
   convertError,
   escapeIdentifier,
   escapeString,
+  escapeValue,
   nativeToValue,
 } = require('./dynamodb_helper');
 
@@ -153,7 +154,7 @@ function updateItems(params, done) {
         const sets = item.set_list
           .map((object) => {
             const { column, value } = object;
-            return `${escapeIdentifier(column)} = ${value}`;
+            return `${escapeIdentifier(column)} = ${escapeValue(value)}`;
           })
           .join(', ');
         const cond =
@@ -263,7 +264,9 @@ function _pagedSend(command, done) {
 }
 function _convertValueToPQL(value) {
   let ret;
-  if (value.S !== undefined) {
+  if (!value) {
+    ret = 'NULL';
+  } else if (value.S !== undefined) {
     ret = "'" + escapeString(value.S) + "'";
   } else if (value.N !== undefined) {
     ret = value.N;

@@ -1,5 +1,6 @@
 const Storage = require('./storage');
 
+exports.getTableInfo = getTableInfo;
 exports.getTableList = getTableList;
 exports.createTable = createTable;
 exports.dropTable = dropTable;
@@ -7,23 +8,43 @@ exports.addColumn = addColumn;
 exports.createIndex = createIndex;
 exports.deleteIndex = deleteIndex;
 
+function getTableInfo(params, done) {
+  const { session, database, table } = params;
+  const data = Storage.getTable(database, table, session);
+  if (data) {
+    const result = {
+      table,
+      primary_key: data.primary_key,
+      column_list: data.column_list,
+      is_open: false,
+    };
+    done(null, result);
+  } else {
+    done({ err: 'table_not_found', args: [table] });
+  }
+}
 function getTableList(params, done) {
   done(null, []);
 }
 function createTable(params, done) {
   const { session, database, table, primary_key, column_list, is_temp } =
     params;
-  const data = {
-    column_list,
-    primary_key,
-    row_list: [],
-  };
-  if (is_temp) {
-    session.saveTempTable(database, table, data);
+  if (primary_key.length === 0) {
+    done({ err: 'unsupported', message: 'primary key is required' });
   } else {
-    Storage.saveTable(database, table, data);
+    const data = {
+      column_list,
+      primary_key,
+      row_list: [],
+      primary_map: new Map(),
+    };
+    if (is_temp) {
+      session.saveTempTable(database, table, data);
+    } else {
+      Storage.saveTable(database, table, data);
+    }
+    done();
   }
-  done();
 }
 function dropTable(params, done) {
   const { session, database, table } = params;

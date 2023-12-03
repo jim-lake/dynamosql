@@ -12,19 +12,24 @@ exports.internalQuery = internalQuery;
 
 function query(params, done) {
   internalQuery(params, (err, output_row_list, column_list) => {
-    output_row_list?.forEach?.((row) => {
-      for (let key in row) {
-        row[key] = row[key].value;
-      }
-    });
+    if (!err) {
+      output_row_list?.forEach?.((row) => {
+        for (let key in row) {
+          row[key] = row[key].value;
+        }
+      });
+    }
     done(err, output_row_list, column_list);
   });
 }
 function internalQuery(params, done) {
   const { ast, session, dynamodb } = params;
 
+  let resolve_err;
   const current_database = session.getCurrentDatabase();
-  const resolve_err = resolveReferences(ast, current_database);
+  if (!params.skip_resolve) {
+    resolve_err = resolveReferences(ast, current_database);
+  }
 
   if (resolve_err) {
     logger.error('select: resolve err:', resolve_err);
@@ -140,18 +145,16 @@ function _evaluateReturn(params, done) {
       end = Math.min(end, ast.limit.value[0].value);
     }
 
-    output_row_list = [];
-    for (let i = start; i < end; i++) {
-      output_row_list.push(row_list[i]['@@result']);
-    }
+    row_list = row_list.slice(start, end);
+    output_row_list = row_list.map((row) => row['@@result']);
   }
 
   if (!err && sleep_ms) {
     setTimeout(() => {
-      done(err, output_row_list, column_list);
+      done(err, output_row_list, column_list, row_list);
     }, sleep_ms);
   } else {
-    done(err, err ? undefined : output_row_list, err ? undefined : column_list);
+    done(err, output_row_list, column_list, row_list);
   }
 }
 function _expandStarColumns(params) {

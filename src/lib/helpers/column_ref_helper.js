@@ -14,8 +14,10 @@ function resolveReferences(ast, current_database) {
         from.db = current_database;
       }
     }
-    from._requestSet = new Set();
-    from._requestAll = false;
+    if (!from._requestSet) {
+      from._requestSet = new Set();
+    }
+    from._requestAll = from._requestAll || false;
     from.key = from.as || `${from.db}.${from.table}`;
     if (from.as) {
       table_map[from.as] = from;

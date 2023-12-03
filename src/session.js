@@ -21,7 +21,7 @@ const { SQLError } = require('./error');
 exports.init = init;
 exports.createSession = createSession;
 
-const DEFAULT_RESULT = { affectedRows: 0 };
+const DEFAULT_RESULT = { affectedRows: 0, changedRows: 0 };
 
 const parser = new Parser();
 let g_dynamodb;

@@ -1,6 +1,7 @@
 const asyncForever = require('async/forever');
 const logger = require('../../../tools/logger');
 
+exports.getTableInfo = getTableInfo;
 exports.getTableList = getTableList;
 exports.createTable = createTable;
 exports.dropTable = dropTable;
@@ -8,6 +9,40 @@ exports.addColumn = addColumn;
 exports.createIndex = createIndex;
 exports.deleteIndex = deleteIndex;
 
+const TYPE_MAP = {
+  S: 'string',
+  N: 'number',
+  B: 'buffer',
+};
+function getTableInfo(params, done) {
+  const { dynamodb, table } = params;
+  dynamodb.getTable(table, (err, data) => {
+    let result;
+    if (err) {
+      logger.error('getTableInfo: err:', err, table, data);
+    } else if (!data || !data.Table) {
+      err = 'bad_data';
+    } else {
+      const column_list = data.Table.AttributeDefinitions.map((def) => ({
+        name: def.AttributeName,
+        type: TYPE_MAP[def.AttributeType],
+      }));
+      const primary_key = data.Table.KeySchema.map((key) => {
+        const type = column_list.find(
+          (col) => col.name === key.AttributeName
+        ).type;
+        return { name: key.AttributeName, type };
+      });
+      result = {
+        table,
+        primary_key,
+        column_list,
+        is_open: true,
+      };
+    }
+    done(err, result);
+  });
+}
 function getTableList(params, done) {
   const { dynamodb } = params;
   dynamodb.getTableList((err, results) => {
