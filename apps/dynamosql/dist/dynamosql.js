@@ -1,9 +1,43 @@
 'use strict';
 
-var require$$0$2 = require('sqlstring');
+var SqlString = require('sqlstring');
 var require$$0 = require('big-integer');
 var require$$0$1 = require('node:util');
 var require$$1 = require('@aws-sdk/client-dynamodb');
+
+function _interopNamespaceDefault(e) {
+	var n = Object.create(null);
+	if (e) {
+		Object.keys(e).forEach(function (k) {
+			if (k !== 'default') {
+				var d = Object.getOwnPropertyDescriptor(e, k);
+				Object.defineProperty(n, k, d.get ? d : {
+					enumerable: true,
+					get: function () { return e[k]; }
+				});
+			}
+		});
+	}
+	n.default = e;
+	return Object.freeze(n);
+}
+
+function _mergeNamespaces(n, m) {
+	m.forEach(function (e) {
+		e && typeof e !== 'string' && !Array.isArray(e) && Object.keys(e).forEach(function (k) {
+			if (k !== 'default' && !(k in n)) {
+				var d = Object.getOwnPropertyDescriptor(e, k);
+				Object.defineProperty(n, k, d.get ? d : {
+					enumerable: true,
+					get: function () { return e[k]; }
+				});
+			}
+		});
+	});
+	return Object.freeze(n);
+}
+
+var SqlString__namespace = /*#__PURE__*/_interopNamespaceDefault(SqlString);
 
 var commonjsGlobal = typeof globalThis !== 'undefined' ? globalThis : typeof window !== 'undefined' ? window : typeof global !== 'undefined' ? global : typeof self !== 'undefined' ? self : {};
 
@@ -11,9 +45,34 @@ function getDefaultExportFromCjs (x) {
 	return x && x.__esModule && Object.prototype.hasOwnProperty.call(x, 'default') ? x['default'] : x;
 }
 
-var src = {};
-
-var pool = {};
+function getAugmentedNamespace(n) {
+  if (Object.prototype.hasOwnProperty.call(n, '__esModule')) return n;
+  var f = n.default;
+	if (typeof f == "function") {
+		var a = function a () {
+			var isInstance = false;
+      try {
+        isInstance = this instanceof a;
+      } catch {}
+			if (isInstance) {
+        return Reflect.construct(f, arguments, this.constructor);
+			}
+			return f.apply(this, arguments);
+		};
+		a.prototype = f.prototype;
+  } else a = {};
+  Object.defineProperty(a, '__esModule', {value: true});
+	Object.keys(n).forEach(function (k) {
+		var d = Object.getOwnPropertyDescriptor(n, k);
+		Object.defineProperty(a, k, d.get ? d : {
+			enumerable: true,
+			get: function () {
+				return n[k];
+			}
+		});
+	});
+	return a;
+}
 
 var session = {};
 
@@ -19863,22 +19922,22 @@ function requireForever () {
 	return forever.exports;
 }
 
-var logger = {};
+var logger$2 = {};
 
 var hasRequiredLogger;
 
 function requireLogger () {
-	if (hasRequiredLogger) return logger;
+	if (hasRequiredLogger) return logger$2;
 	hasRequiredLogger = 1;
 	const util = require$$0$1;
 
-	logger.setLogLevel = setLogLevel;
-	logger.setRemoteLog = setRemoteLog;
-	logger.error = error;
-	logger.info = info;
-	logger.trace = trace;
-	logger.inspect = inspect;
-	logger.always = always;
+	logger$2.setLogLevel = setLogLevel;
+	logger$2.setRemoteLog = setRemoteLog;
+	logger$2.error = error;
+	logger$2.info = info;
+	logger$2.trace = trace;
+	logger$2.inspect = inspect;
+	logger$2.always = always;
 
 	const LEVEL_NONE = 0;
 	const LEVEL_ERROR = 1;
@@ -19890,10 +19949,10 @@ function requireLogger () {
 	  INFO: LEVEL_INFO,
 	  TRACE: LEVEL_TRACE,
 	};
-	logger.LEVEL_NONE = LEVEL_NONE;
-	logger.LEVEL_ERROR = LEVEL_ERROR;
-	logger.LEVEL_INFO = LEVEL_INFO;
-	logger.LEVEL_TRACE = LEVEL_TRACE;
+	logger$2.LEVEL_NONE = LEVEL_NONE;
+	logger$2.LEVEL_ERROR = LEVEL_ERROR;
+	logger$2.LEVEL_INFO = LEVEL_INFO;
+	logger$2.LEVEL_TRACE = LEVEL_TRACE;
 
 	let g_remoteLogFunc = null;
 	let g_logLevel = LEVEL_NONE;
@@ -19951,7 +20010,7 @@ function requireLogger () {
 	  }
 	  console.log(s);
 	}
-	return logger;
+	return logger$2;
 }
 
 var hasRequiredDdl$1;
@@ -27891,190 +27950,185 @@ function requireDynamodb () {
 	return dynamodb$1;
 }
 
-var error = {};
+var mysqlExports = requireMysql();
 
-var hasRequiredError;
+var utilExports = requireUtil();
 
-function requireError () {
-	if (hasRequiredError) return error;
-	hasRequiredError = 1;
-	const { isNativeError } = require$$0$1.types;
-	const { CODE_ERRNO } = requireMysql();
-	const { jsonStringify } = requireUtil();
-
-	const DEFAULT_ERRNO = 1002;
-	const DEFAULT_CODE = 'ER_NO';
-
-	const ERROR_MAP = {
-	  dup_table_insert: {
-	    code: 'ER_DUP_ENTRY',
-	    sqlMessage: errStr`Duplicate entry for table '${0}' and item '${1}'`,
-	  },
-	  dup: {
-	    code: 'ER_DUP_ENTRY',
-	    sqlMessage: 'Duplicate entry',
-	  },
-	  dup_primary_key_entry: {
-	    code: 'ER_DUP_ENTRY',
-	    sqlMessage: errStr`Duplicate entry for value '${1}' for '${0}'`,
-	  },
-	  parse: {
-	    code: 'ER_PARSE_ERROR',
-	    sqlMessage: errStr`You have an error in your SQL syntax; check your syntax near column ${1} at line ${0}`,
-	  },
-	  syntax_err: {
-	    code: 'ER_PARSE_ERROR',
-	    sqlMessage: errStr`You have an error in your SQL syntax; check your syntax near ${0}`,
-	  },
-	  ER_EMPTY_QUERY: {
-	    code: 'ER_EMPTY_QUERY',
-	    sqlMessage: 'Query was empty',
-	  },
-	  multiple_statements_disabled: {
-	    code: 'ER_PARSE_ERROR',
-	    sqlMessage:
-	      'Multiple statements are disabled.  See the "multipleStatements" session option.',
-	  },
-	  unsupported: {
-	    code: DEFAULT_ERRNO,
-	    sqlMessage: 'Unsupport sql feature.',
-	  },
-	  unsupported_type: {
-	    code: DEFAULT_ERRNO,
-	    sqlMessage: errStr`Unsupported query type: ${0}`,
-	  },
-	  database_no_drop_builtin: {
-	    code: 'ER_DBACCESS_DENIED_ERROR',
-	    sqlMessage: "Can't drop a built in database",
-	  },
-	  database_exists: {
-	    code: 'ER_DB_CREATE_EXISTS',
-	    sqlMessage: 'Database exists',
-	  },
-	  no_current_database: {
-	    code: 'ER_NO_DB_ERROR',
-	    sqlMessage: 'No database selected',
-	  },
-	  db_not_found: {
-	    code: 'ER_BAD_DB_ERROR',
-	    sqlMessage: errStr`Unknown database '${0}'`,
-	  },
-	  table_not_found: {
-	    code: 'ER_NO_SUCH_TABLE',
-	    sqlMessage: errStr`Table '${0}' doesn't exist`,
-	  },
-	  column_not_found: {
-	    code: 'ER_BAD_FIELD_ERROR',
-	    sqlMessage: errStr`Unknown column '${0}'`,
-	  },
-	  ER_BAD_TABLE_ERROR: {
-	    code: 'ER_BAD_TABLE_ERROR',
-	    sqlMessage: errStr`Unknown  table '${0}'`,
-	  },
-	  ER_SP_DOES_NOT_EXIST: {
-	    code: 'ER_SP_DOES_NOT_EXIST',
-	    sqlMessage: errStr`FUNCTION ${0} does not exist`,
-	  },
-	  ER_TOO_BIG_PRECISION: {
-	    code: 'ER_TOO_BIG_PRECISION',
-	    sqlMessage: 'Too-big precision specified. Maximum is 6.',
-	  },
-	  table_exists: {
-	    code: 'ER_TABLE_EXISTS_ERROR',
-	    sqlMessage: 'Table already exists.',
-	  },
-	  bad_interval_usage: {
-	    code: 'ER_PARSE_ERROR',
-	    sqlMessage: 'You have an error in your SQL syntax.  Check near "INTERVAL".',
-	  },
-	  ER_WRONG_VALUE_COUNT_ON_ROW: {
-	    code: 'ER_WRONG_VALUE_COUNT_ON_ROW',
-	    sqlMessage: errStr`Column count doesn't match value count at row ${0}`,
-	  },
-	  ER_BAD_NULL_ERROR: {
-	    code: 'ER_BAD_NULL_ERROR',
-	  },
-	  ER_TRUNCATED_WRONG_VALUE_FOR_FIELD: {
-	    code: 'ER_TRUNCATED_WRONG_VALUE_FOR_FIELD',
-	  },
-	  ER_KEY_COLUMN_DOES_NOT_EXITS: {
-	    code: 'ER_KEY_COLUMN_DOES_NOT_EXITS',
-	    sqlMessage: errStr`Key column '${0}' doesn't exist in table`,
-	  },
-	  ER_DUP_KEYNAME: {
-	    code: 'ER_DUP_KEYNAME',
-	    sqlMessage: errStr`Duplicate key name '${0}'`,
-	  },
-	  ER_CANT_DROP_FIELD_OR_KEY: {
-	    code: 'ER_CANT_DROP_FIELD_OR_KEY',
-	    sqlMessage: errStr`Can't DROP '${0}'; check that column/key exists`,
-	  },
-	  ER_UNKNOWN_STORAGE_ENGINE: {
-	    code: 'ER_UNKNOWN_STORAGE_ENGINE',
-	    sqlMessage: errStr`Unknown storage engine '${0}'`,
-	  },
-	  access_denied: {
-	    code: 'ER_DBACCESS_DENIED_ERROR',
-	    sqlMessage: 'Access denied',
-	  },
-	};
-	class SQLError extends Error {
-	  constructor(err, sql) {
-	    const sql_err = ERROR_MAP[err] || ERROR_MAP[err.err];
-	    const code = err.code || sql_err?.code || DEFAULT_CODE;
-	    const errno =
-	      err.errno || sql_err?.errno || CODE_ERRNO[code] || DEFAULT_ERRNO;
-	    let sqlMessage = err.sqlMessage || sql_err?.sqlMessage;
-	    if (typeof sqlMessage === 'function') {
-	      sqlMessage = sqlMessage(err.args);
-	    }
-	    const message =
-	      err.message || sqlMessage || (typeof err === 'string' ? err : undefined);
-	    if (err.cause) {
-	      super(message, { cause: err.cause });
-	    } else if (isNativeError(err) || code === DEFAULT_CODE) {
-	      super(message, { cause: err });
-	    } else {
-	      super(message);
-	    }
-	    this.code = code;
-	    this.errno = errno;
-	    if (sqlMessage) {
-	      this.sqlMessage = sqlMessage;
-	    }
-	    if (sql) {
-	      this.sql = sql;
-	    }
-	  }
-	}
-	error.SQLError = SQLError;
-
-	function errStr(strings, ...index_list) {
-	  return function (arg_list) {
-	    let s = '';
-	    for (let i = 0; i < strings.length; i++) {
-	      s += strings[i];
-	      s += _stringify(arg_list?.[index_list?.[i]]);
-	    }
-	    return s;
-	  };
-	}
-	function _stringify(arg) {
-	  let ret = arg || '';
-	  if (arg === null) {
-	    ret = 'NULL';
-	  } else if (Array.isArray(arg)) {
-	    ret = arg.map(_stringify).join(',');
-	  } else if (
-	    typeof arg === 'object' &&
-	    arg.toString === Object.prototype.toString
-	  ) {
-	    ret = jsonStringify(arg);
-	  }
-	  return ret;
-	}
-	return error;
+const { isNativeError } = require$$0$1.types;
+const DEFAULT_ERRNO = 1002;
+const DEFAULT_CODE = 'ER_NO';
+const ERROR_MAP = {
+    dup_table_insert: {
+        code: 'ER_DUP_ENTRY',
+        sqlMessage: errStr `Duplicate entry for table '${0}' and item '${1}'`,
+    },
+    dup: {
+        code: 'ER_DUP_ENTRY',
+        sqlMessage: 'Duplicate entry',
+    },
+    dup_primary_key_entry: {
+        code: 'ER_DUP_ENTRY',
+        sqlMessage: errStr `Duplicate entry for value '${1}' for '${0}'`,
+    },
+    parse: {
+        code: 'ER_PARSE_ERROR',
+        sqlMessage: errStr `You have an error in your SQL syntax; check your syntax near column ${1} at line ${0}`,
+    },
+    syntax_err: {
+        code: 'ER_PARSE_ERROR',
+        sqlMessage: errStr `You have an error in your SQL syntax; check your syntax near ${0}`,
+    },
+    ER_EMPTY_QUERY: {
+        code: 'ER_EMPTY_QUERY',
+        sqlMessage: 'Query was empty',
+    },
+    multiple_statements_disabled: {
+        code: 'ER_PARSE_ERROR',
+        sqlMessage: 'Multiple statements are disabled.  See the "multipleStatements" session option.',
+    },
+    unsupported: {
+        code: 'ER_NO',
+        sqlMessage: 'Unsupport sql feature.',
+    },
+    unsupported_type: {
+        code: 'ER_NO',
+        sqlMessage: errStr `Unsupported query type: ${0}`,
+    },
+    database_no_drop_builtin: {
+        code: 'ER_DBACCESS_DENIED_ERROR',
+        sqlMessage: "Can't drop a built in database",
+    },
+    database_exists: {
+        code: 'ER_DB_CREATE_EXISTS',
+        sqlMessage: 'Database exists',
+    },
+    no_current_database: {
+        code: 'ER_NO_DB_ERROR',
+        sqlMessage: 'No database selected',
+    },
+    db_not_found: {
+        code: 'ER_BAD_DB_ERROR',
+        sqlMessage: errStr `Unknown database '${0}'`,
+    },
+    table_not_found: {
+        code: 'ER_NO_SUCH_TABLE',
+        sqlMessage: errStr `Table '${0}' doesn't exist`,
+    },
+    column_not_found: {
+        code: 'ER_BAD_FIELD_ERROR',
+        sqlMessage: errStr `Unknown column '${0}'`,
+    },
+    ER_BAD_TABLE_ERROR: {
+        code: 'ER_BAD_TABLE_ERROR',
+        sqlMessage: errStr `Unknown  table '${0}'`,
+    },
+    ER_SP_DOES_NOT_EXIST: {
+        code: 'ER_SP_DOES_NOT_EXIST',
+        sqlMessage: errStr `FUNCTION ${0} does not exist`,
+    },
+    ER_TOO_BIG_PRECISION: {
+        code: 'ER_TOO_BIG_PRECISION',
+        sqlMessage: 'Too-big precision specified. Maximum is 6.',
+    },
+    table_exists: {
+        code: 'ER_TABLE_EXISTS_ERROR',
+        sqlMessage: 'Table already exists.',
+    },
+    bad_interval_usage: {
+        code: 'ER_PARSE_ERROR',
+        sqlMessage: 'You have an error in your SQL syntax.  Check near "INTERVAL".',
+    },
+    ER_WRONG_VALUE_COUNT_ON_ROW: {
+        code: 'ER_WRONG_VALUE_COUNT_ON_ROW',
+        sqlMessage: errStr `Column count doesn't match value count at row ${0}`,
+    },
+    ER_BAD_NULL_ERROR: {
+        code: 'ER_BAD_NULL_ERROR',
+    },
+    ER_TRUNCATED_WRONG_VALUE_FOR_FIELD: {
+        code: 'ER_TRUNCATED_WRONG_VALUE_FOR_FIELD',
+    },
+    ER_KEY_COLUMN_DOES_NOT_EXITS: {
+        code: 'ER_KEY_COLUMN_DOES_NOT_EXITS',
+        sqlMessage: errStr `Key column '${0}' doesn't exist in table`,
+    },
+    ER_DUP_KEYNAME: {
+        code: 'ER_DUP_KEYNAME',
+        sqlMessage: errStr `Duplicate key name '${0}'`,
+    },
+    ER_CANT_DROP_FIELD_OR_KEY: {
+        code: 'ER_CANT_DROP_FIELD_OR_KEY',
+        sqlMessage: errStr `Can't DROP '${0}'; check that column/key exists`,
+    },
+    ER_UNKNOWN_STORAGE_ENGINE: {
+        code: 'ER_UNKNOWN_STORAGE_ENGINE',
+        sqlMessage: errStr `Unknown storage engine '${0}'`,
+    },
+    access_denied: {
+        code: 'ER_DBACCESS_DENIED_ERROR',
+        sqlMessage: 'Access denied',
+    },
+};
+class SQLError extends Error {
+    constructor(err, sql) {
+        const sql_err = ERROR_MAP[err] || ERROR_MAP[err.err];
+        const code = err.code || sql_err?.code || DEFAULT_CODE;
+        const errno = err.errno || sql_err?.errno || mysqlExports.CODE_ERRNO[code] || DEFAULT_ERRNO;
+        let sqlMessage = err.sqlMessage || sql_err?.sqlMessage;
+        if (typeof sqlMessage === 'function') {
+            sqlMessage = sqlMessage(err.args);
+        }
+        const message = err.message || sqlMessage || (typeof err === 'string' ? err : undefined);
+        if (err.cause) {
+            super(message, { cause: err.cause });
+        }
+        else if (isNativeError(err) || code === DEFAULT_CODE) {
+            super(message, { cause: err });
+        }
+        else {
+            super(message);
+        }
+        this.code = code;
+        this.errno = errno;
+        if (sqlMessage) {
+            this.sqlMessage = sqlMessage;
+        }
+        if (sql) {
+            this.sql = sql;
+        }
+    }
 }
+function errStr(strings, ...index_list) {
+    return function (arg_list) {
+        let s = '';
+        for (let i = 0; i < strings.length; i++) {
+            s += strings[i];
+            s += _stringify(arg_list?.[index_list?.[i]]);
+        }
+        return s;
+    };
+}
+function _stringify(arg) {
+    let ret = arg || '';
+    if (arg === null) {
+        ret = 'NULL';
+    }
+    else if (Array.isArray(arg)) {
+        ret = arg.map(_stringify).join(',');
+    }
+    else if (typeof arg === 'object' &&
+        arg.toString === Object.prototype.toString) {
+        ret = utilExports.jsonStringify(arg);
+    }
+    return ret;
+}
+
+var error = /*#__PURE__*/Object.freeze({
+	__proto__: null,
+	SQLError: SQLError
+});
+
+var require$$15 = /*@__PURE__*/getAugmentedNamespace(error);
 
 var hasRequiredSession;
 
@@ -28082,7 +28136,7 @@ function requireSession () {
 	if (hasRequiredSession) return session;
 	hasRequiredSession = 1;
 	const asyncTimesSeries = requireTimesSeries();
-	const SqlString = require$$0$2;
+	const SqlString$1 = SqlString;
 
 	const { Parser } = requireMysql_parser();
 
@@ -28099,7 +28153,7 @@ function requireSession () {
 	const { typeCast } = requireType_cast_helper();
 	const DynamoDB = requireDynamodb();
 	const logger = requireLogger();
-	const { SQLError } = requireError();
+	const { SQLError } = require$$15;
 
 	session.init = init;
 	session.createSession = createSession;
@@ -28142,8 +28196,8 @@ function requireSession () {
 	  _dateStrings = false;
 	  _resultObjects = true;
 
-	  escape = SqlString.escpape;
-	  escapeId = SqlString.escapeId;
+	  escape = SqlString$1.escpape;
+	  escapeId = SqlString$1.escapeId;
 	  release(done) {
 	    this._isReleased = true;
 	    done?.();
@@ -28214,7 +28268,7 @@ function requireSession () {
 	      done(new SQLError('ER_EMPTY_QUERY'));
 	    } else {
 	      if (opts.values !== undefined) {
-	        opts.sql = SqlString.format(opts.sql, opts.values);
+	        opts.sql = SqlString$1.format(opts.sql, opts.values);
 	      }
 	      this._query(opts, done);
 	    }
@@ -28376,70 +28430,55 @@ function requireSession () {
 	return session;
 }
 
-var hasRequiredPool;
+var sessionExports = requireSession();
 
-function requirePool () {
-	if (hasRequiredPool) return pool;
-	hasRequiredPool = 1;
-	const SqlString = require$$0$2;
-	const Session = requireSession();
-
-	pool.createPool = createPool;
-
-	function createPool(args) {
-	  if (args) {
-	    Session.init(args);
-	  }
-	  return new Pool(args || {});
-	}
-	class Pool {
-	  constructor(args) {
-	    this._args = args;
-	  }
-	  _args;
-	  escape = SqlString.escape;
-	  escapeId = SqlString.escapeId;
-	  end(done) {
-	    done?.();
-	  }
-	  getSession(done) {
-	    done(null, Session.createSession(this._args));
-	  }
-	  query(opts, values, done) {
-	    if (typeof values === 'function') {
-	      done = values;
-	      values = undefined;
-	    }
-	    const session = Session.createSession(this._args);
-	    session.query(opts, values, (...result) => {
-	      session.release();
-	      done(...result);
-	    });
-	  }
-	}
-	return pool;
+function createPool$1(args) {
+    if (args) {
+        sessionExports.init(args);
+    }
+    return new Pool(args || {});
+}
+class Pool {
+    constructor(args) {
+        this.escape = SqlString__namespace.escape;
+        this.escapeId = SqlString__namespace.escapeId;
+        this._args = args;
+    }
+    end(done) {
+        done?.();
+    }
+    getSession(done) {
+        done(null, sessionExports.createSession(this._args));
+    }
+    query(opts, values, done) {
+        if (typeof values === 'function') {
+            done = values;
+            values = undefined;
+        }
+        const session = sessionExports.createSession(this._args);
+        session.query(opts, values, (...result) => {
+            session.release();
+            done(...result);
+        });
+    }
 }
 
-var hasRequiredSrc;
+var loggerExports = requireLogger();
+var logger = /*@__PURE__*/getDefaultExportFromCjs(loggerExports);
 
-function requireSrc () {
-	if (hasRequiredSrc) return src;
-	hasRequiredSrc = 1;
-	const SqlString = require$$0$2;
-	const Pool = requirePool();
-	const Session = requireSession();
-	const logger = requireLogger();
+var logger$1 = /*#__PURE__*/_mergeNamespaces({
+	__proto__: null,
+	default: logger
+}, [loggerExports]);
 
-	src.createPool = Pool.createPool;
-	src.createSession = Session.createSession;
-	src.logger = logger;
-	src.escape = SqlString.escape;
-	src.escapeId = SqlString.escapeId;
-	return src;
-}
+const createPool = createPool$1;
+const createSession = sessionExports.createSession;
+const escape = SqlString__namespace.escape;
+const escapeId = SqlString__namespace.escapeId;
 
-var srcExports = requireSrc();
-var index = /*@__PURE__*/getDefaultExportFromCjs(srcExports);
-
-module.exports = index;
+exports.createPool = createPool;
+exports.createSession = createSession;
+exports.escape = escape;
+exports.escapeId = escapeId;
+exports.logger = logger$1;
 //# sourceMappingURL=dynamosql.js.map

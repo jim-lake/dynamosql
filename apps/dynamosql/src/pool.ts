@@ -1,9 +1,7 @@
-const SqlString = require('sqlstring');
-const Session = require('./session');
+import * as SqlString from 'sqlstring';
+import * as Session from './session';
 
-exports.createPool = createPool;
-
-interface PoolOptions {
+export interface PoolOptions {
   database?: string;
   region?: string;
   accessKeyId?: string;
@@ -17,7 +15,7 @@ interface PoolOptions {
 type QueryCallback = (error: Error | null, results?: any, fields?: any) => void;
 type QueryOptions = string | { sql: string; timeout?: number; values?: any[] };
 
-function createPool(args?: PoolOptions) {
+export function createPool(args?: PoolOptions) {
   if (args) {
     Session.init(args);
   }
@@ -41,7 +39,11 @@ class Pool {
     done(null, Session.createSession(this._args));
   }
 
-  query(opts: QueryOptions, values?: any[] | QueryCallback, done?: QueryCallback) {
+  query(
+    opts: QueryOptions,
+    values?: any[] | QueryCallback,
+    done?: QueryCallback
+  ) {
     if (typeof values === 'function') {
       done = values;
       values = undefined;

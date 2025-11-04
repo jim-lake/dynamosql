@@ -1,7 +1,8 @@
-const { isNativeError } = require('node:util').types;
-const { CODE_ERRNO } = require('./constants/mysql');
-const { jsonStringify } = require('./tools/util');
+import { types } from 'node:util';
+import { CODE_ERRNO } from './constants/mysql';
+import { jsonStringify } from './tools/util';
 
+const { isNativeError } = types;
 const DEFAULT_ERRNO = 1002;
 const DEFAULT_CODE = 'ER_NO';
 
@@ -54,11 +55,11 @@ const ERROR_MAP: Record<string, ErrorMapEntry> = {
       'Multiple statements are disabled.  See the "multipleStatements" session option.',
   },
   unsupported: {
-    code: DEFAULT_ERRNO,
+    code: 'ER_NO',
     sqlMessage: 'Unsupport sql feature.',
   },
   unsupported_type: {
-    code: DEFAULT_ERRNO,
+    code: 'ER_NO',
     sqlMessage: errStr`Unsupported query type: ${0}`,
   },
   database_no_drop_builtin: {
@@ -137,23 +138,29 @@ const ERROR_MAP: Record<string, ErrorMapEntry> = {
   },
 };
 
-class SQLError extends Error {
+export class SQLError extends Error {
   code: string;
   errno: number;
   sqlMessage?: string;
   sql?: string;
 
   constructor(err: string | ErrorInput, sql?: string) {
-    const sql_err = ERROR_MAP[err as string] || ERROR_MAP[(err as ErrorInput).err!];
+    const sql_err =
+      ERROR_MAP[err as string] || ERROR_MAP[(err as ErrorInput).err!];
     const code = (err as ErrorInput).code || sql_err?.code || DEFAULT_CODE;
     const errno =
-      (err as ErrorInput).errno || sql_err?.errno || CODE_ERRNO[code] || DEFAULT_ERRNO;
+      (err as ErrorInput).errno ||
+      sql_err?.errno ||
+      CODE_ERRNO[code] ||
+      DEFAULT_ERRNO;
     let sqlMessage = (err as ErrorInput).sqlMessage || sql_err?.sqlMessage;
     if (typeof sqlMessage === 'function') {
       sqlMessage = sqlMessage((err as ErrorInput).args);
     }
     const message =
-      (err as ErrorInput).message || sqlMessage || (typeof err === 'string' ? err : undefined);
+      (err as ErrorInput).message ||
+      sqlMessage ||
+      (typeof err === 'string' ? err : undefined);
     if ((err as ErrorInput).cause) {
       super(message, { cause: (err as ErrorInput).cause });
     } else if (isNativeError(err) || code === DEFAULT_CODE) {
@@ -172,9 +179,10 @@ class SQLError extends Error {
   }
 }
 
-exports.SQLError = SQLError;
-
-function errStr(strings: TemplateStringsArray, ...index_list: number[]): ErrorTemplate {
+function errStr(
+  strings: TemplateStringsArray,
+  ...index_list: number[]
+): ErrorTemplate {
   return function (arg_list?: any[]) {
     let s = '';
     for (let i = 0; i < strings.length; i++) {

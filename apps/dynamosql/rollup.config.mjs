@@ -12,7 +12,11 @@ export default [
       sourcemap: true,
       sourcemapExcludeSources: (source) => source.includes('src/vendor/'),
     },
-    plugins: [resolve(), commonjs(), typescript()],
+    plugins: [
+      resolve(),
+      commonjs(),
+      typescript({ declaration: false, declarationMap: false }),
+    ],
     external: [
       '@aws-sdk/client-dynamodb',
       'async',
