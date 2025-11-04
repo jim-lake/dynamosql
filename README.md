@@ -19,7 +19,7 @@ syntax with a DynamoDB storage engine.
 ```js
 const dynamosql = require('dynamosql');
 const session = dynamosql.createSession();
-session.query("SELECT * FROM _dynamodb.table", (err, results) => {
+session.query('SELECT * FROM _dynamodb.table', (err, results) => {
   if (err) {
     console.error(err);
   } else {
@@ -33,21 +33,21 @@ Your DynamoDB tables show up in the `_dynamodb` database.
 
 ## Working Feaures
 
-* show databases
-* show tables
-* select
-  * simple expressions
-  * joins
-  * group by
-  * order by
-  * limit
-* insert
-* delete
-* update
-* replace
-* insert select
-* create table
-* delete table
+- show databases
+- show tables
+- select
+  - simple expressions
+  - joins
+  - group by
+  - order by
+  - limit
+- insert
+- delete
+- update
+- replace
+- insert select
+- create table
+- delete table
 
 ## Why?
 
@@ -59,7 +59,7 @@ SQL statements makes programs bigger and more error prone.
 ## Why MySQL?
 
 Having a target implementation allows test cases to compare the
-results of this engine with results against MySQL.  This removes
+results of this engine with results against MySQL. This removes
 the necessity of developing a specification and all the possible
 bikeshedding involved.
 
@@ -73,22 +73,22 @@ See above.
 
 When creating a session, the following options are available.
 
-* `database`: Name of the database to use for this session (Optional).
-* `region`: The AWS region to connect to DynamoDB.
+- `database`: Name of the database to use for this session (Optional).
+- `region`: The AWS region to connect to DynamoDB.
   If not provided, will use the defaults of the AWS SDK (v3) which
   may fail. (Optional)
-* `accessKeyId`: Access key for the credential object handed to the
+- `accessKeyId`: Access key for the credential object handed to the
   AWS SDK (v3). If not provided, will use the default crdential chain of
   the AWS SDK (v3). (Optional)
-* `secretAccessKey`: Secret key for the credentials. (Optional)
-* `resultObjects`: Determines if rows should be converted to a
+- `secretAccessKey`: Secret key for the credentials. (Optional)
+- `resultObjects`: Determines if rows should be converted to a
   javascript object. (Default: `true`)
-* `typeCast`: Determines if column values should be converted to native
+- `typeCast`: Determines if column values should be converted to native
   JavaScript types. (Default: `true`)
-* `dateStrings`: Force date types (TIMESTAMP, DATETIME, DATE) to be returned
+- `dateStrings`: Force date types (TIMESTAMP, DATETIME, DATE) to be returned
   as strings rather than inflated into JavaScript Date objects.
   Can be `true`/`false`. (Default: `false`)
-* `multipleStatements`: Allow multiple mysql statements per query. Be careful
+- `multipleStatements`: Allow multiple mysql statements per query. Be careful
   with this, it could increase the scope of SQL injection attacks. (Default: `false`)
 
 ## Pooling sessions
@@ -146,28 +146,35 @@ Pools accept the same options as sessions.
 ## Performing queries
 
 The most basic way to perform a query is to call the `.query()` method on an object
-(like a `Session`, `Pool`).  This is compatible with node-mysql.
+(like a `Session`, `Pool`). This is compatible with node-mysql.
 
 The simplest form of `.query()` is `.query(sqlString, callback)`, where a SQL string
 is the first argument and the second is a callback:
 
 ```js
-session.query('SELECT * FROM `books` WHERE `author` = "David"', function (error, results, fields) {
-  // error will be an Error if one occurred during the query
-  // results will contain the results of the query
-  // fields will contain information about the returned results fields (if any)
-});
+session.query(
+  'SELECT * FROM `books` WHERE `author` = "David"',
+  function (error, results, fields) {
+    // error will be an Error if one occurred during the query
+    // results will contain the results of the query
+    // fields will contain information about the returned results fields (if any)
+  }
+);
 ```
 
 The second form `.query(sqlString, values, callback)` comes when using
 placeholder values (see [escaping query values](#escaping-query-values)):
 
 ```js
-session.query('SELECT * FROM `books` WHERE `author` = ?', ['David'], function (error, results, fields) {
-  // error will be an Error if one occurred during the query
-  // results will contain the results of the query
-  // fields will contain information about the returned results fields (if any)
-});
+session.query(
+  'SELECT * FROM `books` WHERE `author` = ?',
+  ['David'],
+  function (error, results, fields) {
+    // error will be an Error if one occurred during the query
+    // results will contain the results of the query
+    // fields will contain information about the returned results fields (if any)
+  }
+);
 ```
 
 The third form `.query(options, callback)` comes when using various advanced
@@ -175,15 +182,18 @@ options on the query, like [escaping query values](#escaping-query-values) and
 [type casting](#type-casting).
 
 ```js
-session.query({
-  sql: 'SELECT * FROM `books` WHERE `author` = ?',
-  timeout: 40000, // 40s
-  values: ['David']
-}, function (error, results, fields) {
-  // error will be an Error if one occurred during the query
-  // results will contain the results of the query
-  // fields will contain information about the returned results fields (if any)
-});
+session.query(
+  {
+    sql: 'SELECT * FROM `books` WHERE `author` = ?',
+    timeout: 40000, // 40s
+    values: ['David'],
+  },
+  function (error, results, fields) {
+    // error will be an Error if one occurred during the query
+    // results will contain the results of the query
+    // fields will contain information about the returned results fields (if any)
+  }
+);
 ```
 
 Note that a combination of the second and third forms can be used where the
@@ -191,7 +201,8 @@ placeholder values are passed as an argument and not in the options object.
 The `values` argument will override the `values` in the option object.
 
 ```js
-session.query({
+session.query(
+  {
     sql: 'SELECT * FROM `books` WHERE `author` = ?',
     timeout: 40000, // 40s
   },
@@ -206,11 +217,10 @@ session.query({
 
 ## Escaping query values
 
-Escaping is performed by the sqlstring library.  https://github.com/mysqljs/sqlstring
+Escaping is performed by the sqlstring library. https://github.com/mysqljs/sqlstring
 
 `escape` and `escapeId` are available on the `Pool` and `Session` objects and
 on the module directly.
-
 
 ## Errors
 
@@ -220,19 +230,19 @@ review carefully in order to write solid applications.
 Most errors created by this module are instances of the JavaScript [Error][]
 object. Additionally they typically come with two extra properties:
 
-* `err.code`: String, contains the MySQL server error symbol if the error is
+- `err.code`: String, contains the MySQL server error symbol if the error is
   a [MySQL server error][] (e.g. `'ER_ACCESS_DENIED_ERROR'`), a Node.js error
   code if it is a Node.js error (e.g. `'ECONNREFUSED'`), or an internal error
   code (e.g. `'PROTOCOL_CONNECTION_LOST'`).
   Should be consistent with the behavior of MySQL.
-* `err.errno`: Number, contains the MySQL server error number. Is directly
+- `err.errno`: Number, contains the MySQL server error number. Is directly
   mapped from the err.code in all cases.
-* `err.sql`: String, contains the full SQL of the failed query. This can be
+- `err.sql`: String, contains the full SQL of the failed query. This can be
   useful when using a higher level interface like an ORM that is generating
   the queries.
-* `err.sqlMessage`: String, contains the message string that provides a
+- `err.sqlMessage`: String, contains the message string that provides a
   textual description of the error. Not exactly consistent with the MySQL
-  server messages, but largely equivalent.  Exact textual contents should
+  server messages, but largely equivalent. Exact textual contents should
   not be considered a stable API.
 
 ## Type casting
@@ -244,57 +254,57 @@ The following mappings exist:
 
 ### Number
 
-* DynamoDB Number
-* DynamoDB Boolean
-* TINYINT
-* SMALLINT
-* INT
-* MEDIUMINT
-* YEAR
-* FLOAT
-* DOUBLE
-* BIGINT
-* BOOL
+- DynamoDB Number
+- DynamoDB Boolean
+- TINYINT
+- SMALLINT
+- INT
+- MEDIUMINT
+- YEAR
+- FLOAT
+- DOUBLE
+- BIGINT
+- BOOL
 
 ### Date
 
-* TIMESTAMP
-* DATE
-* DATETIME
+- TIMESTAMP
+- DATE
+- DATETIME
 
 ### Buffer
 
-* DynamoDB Binary
-* TINYBLOB
-* MEDIUMBLOB
-* LONGBLOB
-* BLOB
-* BINARY
-* VARBINARY
-* BIT (last byte will be filled with 0 bits as necessary)
+- DynamoDB Binary
+- TINYBLOB
+- MEDIUMBLOB
+- LONGBLOB
+- BLOB
+- BINARY
+- VARBINARY
+- BIT (last byte will be filled with 0 bits as necessary)
 
 ### String
 
-* DynamoDB String
-* DynamoDB NULL
-* DynamoDB multiple types
-* CHAR
-* VARCHAR
-* TINYTEXT
-* MEDIUMTEXT
-* LONGTEXT
-* TEXT
-* ENUM
-* SET
-* DECIMAL (may exceed float precision)
-* TIME (could be mapped to Date, but what date would be set?)
+- DynamoDB String
+- DynamoDB NULL
+- DynamoDB multiple types
+- CHAR
+- VARCHAR
+- TINYTEXT
+- MEDIUMTEXT
+- LONGTEXT
+- TEXT
+- ENUM
+- SET
+- DECIMAL (may exceed float precision)
+- TIME (could be mapped to Date, but what date would be set?)
 
 ### Object
 
-* DynamoDB LIST
-* DynamoDB MAP
-* DynamoDB Sets
-* JSON
+- DynamoDB LIST
+- DynamoDB MAP
+- DynamoDB Sets
+- JSON
 
 ## MySQL Server
 
@@ -309,18 +319,18 @@ for development, testing, and automation.
 # Development
 
 This library is under active development but is being used in anger on
-a few projects.  Features are added as required.
+a few projects. Features are added as required.
 
 ## Roadmap
 
-* insert on conflict
-* temporary tables (useful for subqueries)
-* cross engine queries (temp & raw)
-* subqueries
-* more ddl statements (create index)
-* expression canonicalizer
-* information_schema
-* mvcc columnar storage engine
+- insert on conflict
+- temporary tables (useful for subqueries)
+- cross engine queries (temp & raw)
+- subqueries
+- more ddl statements (create index)
+- expression canonicalizer
+- information_schema
+- mvcc columnar storage engine
 
 ## Contributing
 
@@ -330,9 +340,10 @@ accepted using GitHub pull requests.
 ## Running tests
 
 Pull the repository and run npm install from the root and from the test
-subdirectory.  `setup` makes tables for the test run, then test runs over them.
+subdirectory. `setup` makes tables for the test run, then test runs over them.
 
 Then run
+
 ```sh
 cd test ; npm run setup ; npm run test
 ```

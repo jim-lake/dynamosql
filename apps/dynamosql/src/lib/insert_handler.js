@@ -13,8 +13,8 @@ function query(params, done) {
     ast.type === 'replace'
       ? 'replace'
       : ast.prefix === 'ignore into'
-      ? 'ignore'
-      : null;
+        ? 'ignore'
+        : null;
 
   const database = ast.table?.[0]?.db || session.getCurrentDatabase();
   const table = ast.table?.[0]?.table;

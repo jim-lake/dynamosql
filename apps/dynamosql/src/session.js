@@ -152,7 +152,7 @@ class Session {
           }
           done(
             err ? new SQLError(err, opts.sql) : null,
-            err ? undefined : result ?? DEFAULT_RESULT,
+            err ? undefined : (result ?? DEFAULT_RESULT),
             err ? undefined : columns,
             1
           );

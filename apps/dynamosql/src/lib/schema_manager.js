@@ -91,7 +91,7 @@ function createTable(params, done) {
   const { session, database, table, is_temp } = params;
   const table_engine = is_temp
     ? 'memory'
-    : params.table_engine?.toLowerCase?.() ?? 'raw';
+    : (params.table_engine?.toLowerCase?.() ?? 'raw');
 
   if (database === '_dynamodb' && table_engine !== 'raw') {
     done('access_denied');
