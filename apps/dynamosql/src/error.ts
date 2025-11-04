@@ -5,7 +5,25 @@ const { jsonStringify } = require('./tools/util');
 const DEFAULT_ERRNO = 1002;
 const DEFAULT_CODE = 'ER_NO';
 
-const ERROR_MAP = {
+type ErrorTemplate = (args?: any[]) => string;
+
+interface ErrorMapEntry {
+  code: string;
+  sqlMessage?: string | ErrorTemplate;
+  errno?: number;
+}
+
+interface ErrorInput {
+  err?: string;
+  code?: string;
+  errno?: number;
+  sqlMessage?: string;
+  message?: string;
+  args?: any[];
+  cause?: Error;
+}
+
+const ERROR_MAP: Record<string, ErrorMapEntry> = {
   dup_table_insert: {
     code: 'ER_DUP_ENTRY',
     sqlMessage: errStr`Duplicate entry for table '${0}' and item '${1}'`,
@@ -118,20 +136,26 @@ const ERROR_MAP = {
     sqlMessage: 'Access denied',
   },
 };
+
 class SQLError extends Error {
-  constructor(err, sql) {
-    const sql_err = ERROR_MAP[err] || ERROR_MAP[err.err];
-    const code = err.code || sql_err?.code || DEFAULT_CODE;
+  code: string;
+  errno: number;
+  sqlMessage?: string;
+  sql?: string;
+
+  constructor(err: string | ErrorInput, sql?: string) {
+    const sql_err = ERROR_MAP[err as string] || ERROR_MAP[(err as ErrorInput).err!];
+    const code = (err as ErrorInput).code || sql_err?.code || DEFAULT_CODE;
     const errno =
-      err.errno || sql_err?.errno || CODE_ERRNO[code] || DEFAULT_ERRNO;
-    let sqlMessage = err.sqlMessage || sql_err?.sqlMessage;
+      (err as ErrorInput).errno || sql_err?.errno || CODE_ERRNO[code] || DEFAULT_ERRNO;
+    let sqlMessage = (err as ErrorInput).sqlMessage || sql_err?.sqlMessage;
     if (typeof sqlMessage === 'function') {
-      sqlMessage = sqlMessage(err.args);
+      sqlMessage = sqlMessage((err as ErrorInput).args);
     }
     const message =
-      err.message || sqlMessage || (typeof err === 'string' ? err : undefined);
-    if (err.cause) {
-      super(message, { cause: err.cause });
+      (err as ErrorInput).message || sqlMessage || (typeof err === 'string' ? err : undefined);
+    if ((err as ErrorInput).cause) {
+      super(message, { cause: (err as ErrorInput).cause });
     } else if (isNativeError(err) || code === DEFAULT_CODE) {
       super(message, { cause: err });
     } else {
@@ -140,17 +164,18 @@ class SQLError extends Error {
     this.code = code;
     this.errno = errno;
     if (sqlMessage) {
-      this.sqlMessage = sqlMessage;
+      this.sqlMessage = sqlMessage as string;
     }
     if (sql) {
       this.sql = sql;
     }
   }
 }
+
 exports.SQLError = SQLError;
 
-function errStr(strings, ...index_list) {
-  return function (arg_list) {
+function errStr(strings: TemplateStringsArray, ...index_list: number[]): ErrorTemplate {
+  return function (arg_list?: any[]) {
     let s = '';
     for (let i = 0; i < strings.length; i++) {
       s += strings[i];
@@ -159,7 +184,8 @@ function errStr(strings, ...index_list) {
     return s;
   };
 }
-function _stringify(arg) {
+
+function _stringify(arg: any): string {
   let ret = arg || '';
   if (arg === null) {
     ret = 'NULL';

@@ -1,17 +1,18 @@
 import resolve from '@rollup/plugin-node-resolve';
 import commonjs from '@rollup/plugin-commonjs';
+import typescript from '@rollup/plugin-typescript';
 import dts from 'rollup-plugin-dts';
 
 export default [
   {
-    input: 'src/index.js',
+    input: 'src/index.ts',
     output: {
       file: 'dist/dynamosql.js',
       format: 'cjs',
       sourcemap: true,
       sourcemapExcludeSources: (source) => source.includes('src/vendor/'),
     },
-    plugins: [resolve(), commonjs()],
+    plugins: [resolve(), commonjs(), typescript()],
     external: [
       '@aws-sdk/client-dynamodb',
       'async',
@@ -20,7 +21,7 @@ export default [
     ],
   },
   {
-    input: 'src/index.js',
+    input: 'src/index.ts',
     output: { file: 'dist/dynamosql.d.ts', format: 'es' },
     plugins: [dts()],
   },
