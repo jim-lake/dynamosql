@@ -2,7 +2,7 @@ const async = require('async');
 const { expect } = require('chai');
 const fs = require('node:fs');
 const path = require('node:path');
-const config = require('../../config');
+const config = require('../../../../config');
 const mysql = require('mysql');
 const Session = require('../../src/session');
 

@@ -1,5 +1,5 @@
-const { createServer } = require('../server/server');
-const { logger } = require('../src');
+const { createServer } = require('../src/server');
+const { logger } = require('@dynamosql/dynamosql');
 
 const PORT = process.env.PORT ? parseInt(process.env.PORT) : 3306;
 

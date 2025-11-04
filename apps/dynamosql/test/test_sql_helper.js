@@ -5,7 +5,7 @@ exports.runTests = runTests;
 const async = require('async');
 const { assert, expect } = require('chai');
 const fs = require('node:fs');
-const config = require('../config');
+const config = require('../../../config');
 const mysql = require('mysql');
 const Session = require('../src/session');
 

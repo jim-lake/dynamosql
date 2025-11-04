@@ -1,5 +1,5 @@
 const mysql = require('mysql2');
-const config = require('../config');
+const config = require('../../../config');
 
 const PORT = process.env.PORT ? parseInt(process.env.PORT) : 3306;
 const server = mysql.createServer();

@@ -1,0 +1,19 @@
+{
+  "name": "@dynamosql/server",
+  "version": "0.0.1",
+  "description": "MySQL compatible server with DynamoDB storage engine",
+  "main": "src/server.js",
+  "scripts": {
+    "pretty": "prettier --write src test examples",
+    "lint": "eslint src examples",
+    "test": "mocha 'test/**/*.test.js'"
+  },
+  "dependencies": {
+    "@dynamosql/dynamosql": "*",
+    "mysql2": "https://github.com/jim-lake/node-mysql2#5061b52535d5902c96d877c58039ac728074507a"
+  },
+  "devDependencies": {
+    "chai": "4.3.10",
+    "mocha": "10.2.0"
+  }
+}

@@ -1,6 +1,6 @@
 const path = require('node:path');
-const config = tryRequire('../config');
-const dynamosql = require('../src');
+const config = tryRequire('../../../config');
+const dynamosql = require('..');
 
 const sql = process.argv.slice(2).join(' ');
 if (!sql) {

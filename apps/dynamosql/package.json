@@ -1,0 +1,26 @@
+{
+  "name": "@dynamosql/dynamosql",
+  "version": "0.0.1",
+  "description": "MySQL compatible query engine with DynamoDB storage engine",
+  "main": "src/index.js",
+  "files": [
+    "src/**/*"
+  ],
+  "scripts": {
+    "pretty": "prettier --write src test examples",
+    "lint": "eslint src examples",
+    "test:setup": "mocha test/setup/setup.js",
+    "test": "mocha 'test/**/*.test.js'"
+  },
+  "dependencies": {
+    "@aws-sdk/client-dynamodb": "3.410.0",
+    "async": "3.2.4",
+    "big-integer": "1.6.51",
+    "sqlstring": "2.3.3"
+  },
+  "devDependencies": {
+    "chai": "4.3.10",
+    "mocha": "10.2.0",
+    "mysql": "2.18.1"
+  }
+}
