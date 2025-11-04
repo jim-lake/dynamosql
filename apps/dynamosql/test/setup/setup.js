@@ -16,7 +16,7 @@ const mysql_conn = mysql.createConnection({
   dateStrings: true,
 });
 
-Session.init();
+Session.init({ region: process.env.AWS_REGION ?? 'us-west-2' });
 const ddb_session = Session.createSession();
 
 after(() => {

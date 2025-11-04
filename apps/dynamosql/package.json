@@ -13,7 +13,7 @@
     "test": "mocha 'test/**/*.test.js'"
   },
   "dependencies": {
-    "@aws-sdk/client-dynamodb": "3.410.0",
+    "@aws-sdk/client-dynamodb": "^3.922.0",
     "async": "3.2.4",
     "big-integer": "1.6.51",
     "sqlstring": "2.3.3"
