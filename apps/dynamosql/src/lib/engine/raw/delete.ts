@@ -1,7 +1,7 @@
 import asyncEach from 'async/each';
 import { convertWhere } from '../../helpers/convert_where';
 import { escapeIdentifier } from '../../../tools/dynamodb_helper';
-import * as logger from '../../../tools/logger';
+import { logger } from '@dynamosql/shared';
 
 export function singleDelete(
   params: any,

@@ -1,5 +1,5 @@
 import * as Expression from './expression';
-import * as logger from '../tools/logger';
+import { logger } from '@dynamosql/shared';
 
 export function query(params: any, done: any) {
   const { ast, session } = params;

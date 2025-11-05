@@ -4,7 +4,8 @@
   "version": "0.0.1",
   "description": "MySQL compatible query engine with DynamoDB storage engine",
   "workspaces": [
-    "apps/*"
+    "apps/*",
+    "packages/*"
   ],
   "scripts": {
     "pretty": "prettier -u --write \"**/*\" --log-level warn",

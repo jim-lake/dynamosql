@@ -1,6 +1,6 @@
 import asyncEach from 'async/each';
 import * as Engine from './engine';
-import * as logger from '../tools/logger';
+import { logger } from '@dynamosql/shared';
 
 const BUILT_IN = ['_dynamodb'];
 const g_schemaMap: any = {};

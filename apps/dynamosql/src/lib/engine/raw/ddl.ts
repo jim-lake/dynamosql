@@ -1,5 +1,5 @@
 import asyncForever from 'async/forever';
-import * as logger from '../../../tools/logger';
+import { logger } from '@dynamosql/shared';
 
 const TYPE_MAP: Record<string, string> = {
   S: 'string',

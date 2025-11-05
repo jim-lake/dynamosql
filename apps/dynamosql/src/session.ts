@@ -12,7 +12,7 @@ import * as ShowHandler from './lib/show_handler';
 import * as UpdateHandler from './lib/update_handler';
 import { typeCast } from './lib/helpers/type_cast_helper';
 import * as DynamoDB from './lib/dynamodb';
-import * as logger from './tools/logger';
+import { logger } from '@dynamosql/shared';
 import { SQLError } from './error';
 
 const DEFAULT_RESULT = { affectedRows: 0, changedRows: 0 };

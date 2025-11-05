@@ -19,6 +19,7 @@ export default [
     ],
     external: [
       '@aws-sdk/client-dynamodb',
+      '@dynamosql/shared',
       'async',
       'big-integer',
       'sqlstring',

@@ -5,7 +5,7 @@ import * as Functions from './functions';
 import * as UnaryExpression from './unary_expression';
 import * as SystemVariables from '../system_variables';
 import { mapToObject } from '../../tools/dynamodb_helper';
-import * as logger from '../../tools/logger';
+import { logger } from '@dynamosql/shared';
 
 export function getValue(expr: any, state: any): any {
   const { session, row } = state;

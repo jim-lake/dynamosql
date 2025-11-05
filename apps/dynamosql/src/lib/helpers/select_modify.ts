@@ -2,7 +2,7 @@ import asyncEach from 'async/each';
 import asyncSeries from 'async/series';
 import * as SchemaManager from '../schema_manager';
 import * as SelectHandler from '../select_handler';
-import * as logger from '../../tools/logger';
+import { logger } from '@dynamosql/shared';
 
 export function runSelect(
   params: any,

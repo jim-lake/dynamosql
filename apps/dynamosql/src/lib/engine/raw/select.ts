@@ -1,5 +1,5 @@
 import asyncEach from 'async/each';
-import * as logger from '../../../tools/logger';
+import { logger } from '@dynamosql/shared';
 import { convertWhere } from '../../helpers/convert_where';
 import { escapeIdentifier } from '../../../tools/dynamodb_helper';
 

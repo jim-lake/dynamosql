@@ -3,7 +3,7 @@ import * as Expression from './expression';
 import * as SchemaManager from './schema_manager';
 import * as TransactionManager from './transaction_manager';
 import * as SelectHandler from './select_handler';
-import * as logger from '../tools/logger';
+import { logger } from '@dynamosql/shared';
 
 export function query(params: any, done: any) {
   const { ast, session } = params;

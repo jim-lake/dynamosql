@@ -2,8 +2,9 @@
 
 var SqlString = require('sqlstring');
 var require$$0 = require('big-integer');
-var util = require('node:util');
+var shared = require('@dynamosql/shared');
 var clientDynamodb = require('@aws-sdk/client-dynamodb');
+var node_util = require('node:util');
 
 function _interopNamespaceDefault(e) {
 	var n = Object.create(null);
@@ -23,7 +24,6 @@ function _interopNamespaceDefault(e) {
 }
 
 var SqlString__namespace = /*#__PURE__*/_interopNamespaceDefault(SqlString);
-var util__namespace = /*#__PURE__*/_interopNamespaceDefault(util);
 
 var commonjsGlobal = typeof globalThis !== 'undefined' ? globalThis : typeof window !== 'undefined' ? window : typeof global !== 'undefined' ? global : typeof self !== 'undefined' ? self : {};
 
@@ -19884,87 +19884,6 @@ function requireForever () {
 var foreverExports = requireForever();
 var asyncForever = /*@__PURE__*/getDefaultExportFromCjs(foreverExports);
 
-const LEVEL_NONE = 0;
-const LEVEL_ERROR = 1;
-const LEVEL_INFO = 2;
-const LEVEL_TRACE = 3;
-const LEVEL_MAP = {
-    NONE: LEVEL_NONE,
-    ERROR: LEVEL_ERROR,
-    INFO: LEVEL_INFO,
-    TRACE: LEVEL_TRACE,
-};
-let g_remoteLogFunc = null;
-let g_logLevel = LEVEL_NONE;
-if (process.env.LOG) {
-    const level = LEVEL_MAP[process.env.LOG.toUpperCase()];
-    if (level !== undefined) {
-        g_logLevel = level;
-        trace('log level:', level);
-    }
-}
-function setRemoteLog(func) {
-    g_remoteLogFunc = func;
-}
-function setLogLevel(level) {
-    g_logLevel = level;
-}
-function error(...args) {
-    if (g_logLevel >= LEVEL_ERROR) {
-        return _log(...args);
-    }
-}
-function info(...args) {
-    if (g_logLevel >= LEVEL_INFO) {
-        return _log(...args);
-    }
-}
-function trace(...args) {
-    if (g_logLevel >= LEVEL_TRACE) {
-        return _log(...args);
-    }
-}
-function always(...args) {
-    return _log(...args);
-}
-function _log(...args) {
-    const s = util__namespace.format(...args);
-    console.log('[' + new Date().toUTCString() + '] ' + s);
-    g_remoteLogFunc?.(s);
-    return s;
-}
-function inspect(...args) {
-    let s = '';
-    for (let index in args) {
-        const a = args[index];
-        if (Number(index) > 0) {
-            s += ' ';
-        }
-        if (typeof a == 'object') {
-            s += util__namespace.inspect(a, { depth: 99 });
-        }
-        else {
-            s += a;
-        }
-    }
-    console.log(s);
-}
-
-var logger = /*#__PURE__*/Object.freeze({
-	__proto__: null,
-	LEVEL_ERROR: LEVEL_ERROR,
-	LEVEL_INFO: LEVEL_INFO,
-	LEVEL_NONE: LEVEL_NONE,
-	LEVEL_TRACE: LEVEL_TRACE,
-	always: always,
-	error: error,
-	info: info,
-	inspect: inspect,
-	setLogLevel: setLogLevel,
-	setRemoteLog: setRemoteLog,
-	trace: trace
-});
-
 const TYPE_MAP = {
     S: 'string',
     N: 'number',
@@ -19975,7 +19894,7 @@ function getTableInfo$1(params, done) {
     dynamodb.getTable(table, (err, data) => {
         let result;
         if (err) {
-            error('getTableInfo: err:', err, table, data);
+            shared.logger.error('getTableInfo: err:', err, table, data);
         }
         else if (!data || !data.Table) {
             err = 'bad_data';
@@ -20003,7 +19922,7 @@ function getTableList$4(params, done) {
     const { dynamodb } = params;
     dynamodb.getTableList((err, results) => {
         if (err) {
-            error('raw_engine.getTableList: err:', err);
+            shared.logger.error('raw_engine.getTableList: err:', err);
         }
         done(err, results);
     });
@@ -20017,7 +19936,7 @@ function createTable$5(params, done) {
             done('table_exists');
         }
         else if (err) {
-            error('raw_engine.createTable: err:', err);
+            shared.logger.error('raw_engine.createTable: err:', err);
             done(err);
         }
         else {
@@ -20029,7 +19948,7 @@ function dropTable$2(params, done) {
     const { dynamodb, table } = params;
     dynamodb.deleteTable(table, (err) => {
         if (err) {
-            error('raw_engine.dropTable: err:', err);
+            shared.logger.error('raw_engine.dropTable: err:', err);
             done(err);
         }
         else {
@@ -20056,7 +19975,7 @@ function createIndex$3(params, done) {
             done('index_exists');
         }
         else if (err) {
-            error('raw_engine.createIndex: err:', err);
+            shared.logger.error('raw_engine.createIndex: err:', err);
             done(err);
         }
         else {
@@ -20071,7 +19990,7 @@ function deleteIndex$3(params, done) {
             done('index_not_found');
         }
         else if (err) {
-            error('raw_engine.deleteIndex: err:', err);
+            shared.logger.error('raw_engine.deleteIndex: err:', err);
             done(err);
         }
         else {
@@ -20935,15 +20854,21 @@ function div(expr, state) {
     return { err, value, name };
 }
 function _convertCompare(left, right) {
-    if (left.value !== null && right.value !== null && left.value !== right.value) {
-        if ((_isDateLike(left.type) || _isDateLike(right.type)) && left.type !== right.type) {
+    if (left.value !== null &&
+        right.value !== null &&
+        left.value !== right.value) {
+        if ((_isDateLike(left.type) || _isDateLike(right.type)) &&
+            left.type !== right.type) {
             const union = _unionDateTime(left.type, right.type);
             if (union === 'date' || union === 'datetime') {
                 left.value = convertDateTime(left.value, union, 6) ?? left.value;
                 right.value = convertDateTime(right.value, union, 6) ?? right.value;
             }
         }
-        if (typeof left.value === 'number' || typeof right.value === 'number' || left.type === 'number' || right.type === 'number') {
+        if (typeof left.value === 'number' ||
+            typeof right.value === 'number' ||
+            left.type === 'number' ||
+            right.type === 'number') {
             left.value = convertNum(left.value);
             right.value = convertNum(right.value);
         }
@@ -21545,7 +21470,8 @@ function from_unixtime(expr, state) {
     if (!result.err && result.value !== null) {
         const time = convertNum(result.value);
         const decimals = Math.min(6, String(time).split('.')?.[1]?.length || 0);
-        result.value = time < 0 ? null : createSQLDateTime(time, 'datetime', decimals);
+        result.value =
+            time < 0 ? null : createSQLDateTime(time, 'datetime', decimals);
     }
     return result;
 }
@@ -21569,7 +21495,8 @@ function date_format(expr, state) {
         value = null;
     }
     else if (!err) {
-        value = convertDateTime(date.value)?.dateFormat?.(String(format.value)) || null;
+        value =
+            convertDateTime(date.value)?.dateFormat?.(String(format.value)) || null;
     }
     return { err, name, value, type: 'string' };
 }
@@ -21583,7 +21510,9 @@ function datediff(expr, state) {
         value = null;
     }
     else if (!err) {
-        value = convertDateTime(expr1.value)?.diff?.(convertDateTime(expr2.value)) || null;
+        value =
+            convertDateTime(expr1.value)?.diff?.(convertDateTime(expr2.value)) ||
+                null;
     }
     return { err, name, value, type: 'int' };
 }
@@ -21853,7 +21782,7 @@ function getValue(expr, state) {
             }
         }
         else {
-            trace('expression.getValue: unknown function:', expr.name);
+            shared.logger.trace('expression.getValue: unknown function:', expr.name);
             result.err = { err: 'ER_SP_DOES_NOT_EXIST', args: [expr.name] };
         }
     }
@@ -21866,7 +21795,7 @@ function getValue(expr, state) {
             }
         }
         else {
-            trace('expression.getValue: unknown aggregate:', expr.name);
+            shared.logger.trace('expression.getValue: unknown aggregate:', expr.name);
             result.err = { err: 'ER_SP_DOES_NOT_EXIST', args: [expr.name] };
         }
     }
@@ -21879,7 +21808,7 @@ function getValue(expr, state) {
             }
         }
         else {
-            trace('expression.getValue: unknown binary operator:', expr.operator);
+            shared.logger.trace('expression.getValue: unknown binary operator:', expr.operator);
             result.err = { err: 'ER_SP_DOES_NOT_EXIST', args: [expr.operator] };
         }
     }
@@ -21892,7 +21821,7 @@ function getValue(expr, state) {
             }
         }
         else {
-            trace('expression.getValue: unknown unanary operator:', expr.operator);
+            shared.logger.trace('expression.getValue: unknown unanary operator:', expr.operator);
             result.err = { err: 'ER_SP_DOES_NOT_EXIST', args: [expr.operator] };
         }
     }
@@ -21905,8 +21834,11 @@ function getValue(expr, state) {
             }
         }
         else {
-            trace('expression.getValue: unknown cast type:', expr.target.dataType);
-            result.err = { err: 'ER_SP_DOES_NOT_EXIST', args: [expr.target.dataType] };
+            shared.logger.trace('expression.getValue: unknown cast type:', expr.target.dataType);
+            result.err = {
+                err: 'ER_SP_DOES_NOT_EXIST',
+                args: [expr.target.dataType],
+            };
         }
     }
     else if (type === 'var') {
@@ -21917,7 +21849,7 @@ function getValue(expr, state) {
                 result.value = func(session);
             }
             else {
-                trace('expression.getValue: unknown system variable:', expr.name);
+                shared.logger.trace('expression.getValue: unknown system variable:', expr.name);
                 result.err = { err: 'ER_UNKNOWN_SYSTEM_VARIABLE', args: [expr.name] };
             }
         }
@@ -21948,7 +21880,7 @@ function getValue(expr, state) {
         }
     }
     else {
-        error('unsupported expr:', expr);
+        shared.logger.error('unsupported expr:', expr);
         result.err = 'unsupported';
     }
     if (!result.type) {
@@ -22306,7 +22238,7 @@ RETURNING ALL OLD *
                 affectedRows = 0;
             }
             else if (err) {
-                error('singleDelete: query err:', err);
+                shared.logger.error('singleDelete: query err:', err);
             }
             done(err, { affectedRows });
         });
@@ -22319,7 +22251,7 @@ function multipleDelete$1(params, done) {
         const { table, key_list, delete_list } = object;
         dynamodb.deleteItems({ table, key_list, list: delete_list }, (err, data) => {
             if (err) {
-                error('multipleDelete: deleteItems: err:', err, table, data);
+                shared.logger.error('multipleDelete: deleteItems: err:', err, table, data);
             }
             else {
                 affectedRows += delete_list.length;
@@ -22533,7 +22465,7 @@ function _getFromTable$1(params, done) {
             done({ err: 'table_not_found', args: [table] });
         }
         else if (err) {
-            error('raw_engine.getRowList err:', err, results, sql);
+            shared.logger.error('raw_engine.getRowList err:', err, results, sql);
         }
         else {
             if (_requestAll) {
@@ -22599,7 +22531,7 @@ RETURNING MODIFIED OLD *
                 result = { affectedRows: 0, changedRows: 0 };
             }
             else if (err) {
-                error('singleUpdate: err:', err);
+                shared.logger.error('singleUpdate: err:', err);
             }
             else {
                 result = { affectedRows: 1, changedRows: 0 };
@@ -22624,7 +22556,7 @@ function multipleUpdate$1(params, done) {
         update_list.forEach((item) => item.set_list.forEach((set) => (set.value = set.value.value)));
         dynamodb.updateItems({ table, key_list, list: update_list }, (err, data) => {
             if (err) {
-                error('multipleUpdate: updateItems: err:', err, 'table:', table, data);
+                shared.logger.error('multipleUpdate: updateItems: err:', err, 'table:', table, data);
             }
             else {
                 affectedRows += list.length;
@@ -22785,7 +22717,7 @@ function multipleDelete(params, done) {
                     affectedRows++;
                 }
                 else {
-                    info('memory.delete: failed to find key:', key_list, 'for table:', table);
+                    shared.logger.info('memory.delete: failed to find key:', key_list, 'for table:', table);
                 }
             });
             if (!err) {
@@ -22930,7 +22862,7 @@ function multipleUpdate(params, done) {
                     }
                 }
                 else {
-                    error('memory.update: failed to find key:', key_list, 'for table:', table);
+                    shared.logger.error('memory.update: failed to find key:', key_list, 'for table:', table);
                 }
             });
             if (!err) {
@@ -23093,7 +23025,7 @@ function dropDatabase(params, done) {
             const engine = getEngine(database, table, session);
             engine.dropTable({ ...params, table }, (err) => {
                 if (err) {
-                    error('dropDatabase: table:', table, 'drop err:', err);
+                    shared.logger.error('dropDatabase: table:', table, 'drop err:', err);
                 }
                 else {
                     delete g_schemaMap[database][table];
@@ -23154,7 +23086,7 @@ function dropTable(params, done) {
         const engine = getEngine(database, table, session);
         engine.dropTable(params, (err) => {
             if (err) {
-                error('SchemaManager.dropTable: drop error but deleting table anyway: err:', err, database, table);
+                shared.logger.error('SchemaManager.dropTable: drop error but deleting table anyway: err:', err, database, table);
             }
             delete g_schemaMap[database][table];
             done(err);
@@ -25201,7 +25133,7 @@ function internalQuery(params, done) {
         resolve_err = resolveReferences(ast, current_database);
     }
     if (resolve_err) {
-        error('select: resolve err:', resolve_err);
+        shared.logger.error('select: resolve err:', resolve_err);
         done(resolve_err);
     }
     else if (ast?.from?.length) {
@@ -25389,7 +25321,7 @@ function query$6(params, done) {
         _createTable(params, done);
     }
     else {
-        error('unsupported create:', ast.keyword);
+        shared.logger.error('unsupported create:', ast.keyword);
         done('unsupported');
     }
 }
@@ -25401,7 +25333,7 @@ function _createDatabase(params, done) {
             err = null;
         }
         else if (err && err !== 'database_exists') {
-            error('createDatabase: err:', err);
+            shared.logger.error('createDatabase: err:', err);
         }
         else if (!err) {
             result = { affectedRows: 1, changedRows: 0 };
@@ -25468,7 +25400,8 @@ function _createTable(params, done) {
             }
         },
         (done) => {
-            const options = Object.fromEntries(ast.table_options?.map?.((item) => [item.keyword, item.value]) || []);
+            const options = Object.fromEntries(ast.table_options?.map?.((item) => [item.keyword, item.value]) ||
+                []);
             const opts = {
                 dynamodb,
                 session,
@@ -25535,7 +25468,7 @@ function runSelect(params, done) {
             const opts = { dynamodb, session, database: db, table };
             engine.getTableInfo(opts, (err, result) => {
                 if (err) {
-                    error('SelectModify: getTable: err:', err, table, result);
+                    shared.logger.error('SelectModify: getTable: err:', err, table, result);
                 }
                 else if (result?.primary_key?.length > 0) {
                     object._keyList = result.primary_key.map((key) => key.name);
@@ -25611,7 +25544,7 @@ function query$5(params, done) {
     const resolve_err = resolveReferences(ast, current_database);
     const database = ast.from?.[0]?.db;
     if (resolve_err) {
-        error('resolve_err:', resolve_err);
+        shared.logger.error('resolve_err:', resolve_err);
         done(resolve_err);
     }
     else if (!database) {
@@ -25730,7 +25663,7 @@ function query$4(params, done) {
         }
     }
     else {
-        error('unsupported:', ast);
+        shared.logger.error('unsupported:', ast);
         done('unsupported');
     }
 }
@@ -25790,7 +25723,7 @@ function _runInsert(params, done) {
                 const opts = { ast: ast.values, session, dynamodb };
                 internalQuery(opts, (err, row_list) => {
                     if (err) {
-                        error('insert select err:', err);
+                        shared.logger.error('insert select err:', err);
                     }
                     else {
                         list = row_list.map((row) => {
@@ -25831,7 +25764,7 @@ function _runInsert(params, done) {
                 done(err);
             }
             else {
-                error('unsupported insert without column names');
+                shared.logger.error('unsupported insert without column names');
                 done('unsupported');
             }
         },
@@ -25889,7 +25822,7 @@ function query$2(params, done) {
             session.setVariable(left.name, right.value);
         }
         else {
-            error('set_handler.query: unsupported left:', left);
+            shared.logger.error('set_handler.query: unsupported left:', left);
             err = 'unsupported';
         }
     }
@@ -25941,7 +25874,7 @@ function query(params, done) {
     const resolve_err = resolveReferences(ast, current_database);
     const database = ast.from?.[0]?.db;
     if (resolve_err) {
-        error('resolve_err:', resolve_err);
+        shared.logger.error('resolve_err:', resolve_err);
         done(resolve_err);
     }
     else if (!database) {
@@ -26295,12 +26228,6 @@ function _dynamoType(type) {
 }
 
 const QUERY_LIMIT = 5;
-const getTableList = getTableList$1;
-const getTable$1 = getTable$2;
-const createTable$1 = createTable$2;
-const deleteTable$1 = deleteTable$2;
-const createIndex = createIndex$1;
-const deleteIndex = deleteIndex$1;
 let g_client;
 function init$1(params) {
     if (!params) {
@@ -26312,6 +26239,12 @@ function init$1(params) {
     g_client = new clientDynamodb.DynamoDBClient(params);
     init$2(g_client);
 }
+const getTableList = getTableList$1;
+const getTable$1 = getTable$2;
+const createTable$1 = createTable$2;
+const deleteTable$1 = deleteTable$2;
+const createIndex = createIndex$1;
+const deleteIndex = deleteIndex$1;
 function queryQL(list, done) {
     if (!Array.isArray(list)) {
         _queryQL(list, done);
@@ -26620,7 +26553,7 @@ function createDynamoDB(params, done) {
     return self;
 }
 
-const { isNativeError } = util.types;
+const { isNativeError } = node_util.types;
 const DEFAULT_ERRNO = 1002;
 const DEFAULT_CODE = 'ER_NO';
 const ERROR_MAP = {
@@ -26993,7 +26926,7 @@ class Session {
                 handler = _useDatabase;
                 break;
             default:
-                error('unsupported statement type:', ast);
+                shared.logger.error('unsupported statement type:', ast);
                 err = {
                     err: 'unsupported_type',
                     args: [ast?.type],
@@ -27049,7 +26982,7 @@ function _astify(sql) {
         }
     }
     catch (e) {
-        error('parse error:', e);
+        shared.logger.error('parse error:', e);
         const start = e?.location?.start;
         err = { err: 'parse', args: [start?.line, start?.column] };
     }
@@ -27099,5 +27032,4 @@ exports.createPool = createPool;
 exports.createSession = createSession;
 exports.escape = escape;
 exports.escapeId = escapeId;
-exports.logger = logger;
 //# sourceMappingURL=dynamosql.js.map

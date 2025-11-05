@@ -5,7 +5,7 @@ import { resolveReferences } from './helpers/column_ref_helper';
 import { formJoin } from './helpers/join';
 import { formGroup } from './helpers/group';
 import { sort } from './helpers/sort';
-import * as logger from '../tools/logger';
+import { logger } from '@dynamosql/shared';
 
 export function query(params: any, done: any) {
   internalQuery(params, (err: any, output_row_list: any, column_list: any) => {

@@ -5,7 +5,7 @@ import {
   escapeValue,
   valueToNative,
 } from '../../../tools/dynamodb_helper';
-import * as logger from '../../../tools/logger';
+import { logger } from '@dynamosql/shared';
 
 export function singleUpdate(
   params: any,

@@ -1,6 +1,7 @@
 const mysql = require('mysql2');
 const MYSQL = require('@dynamosql/dynamosql/src/constants/mysql');
-const { createPool, logger } = require('@dynamosql/dynamosql');
+const { createPool } = require('@dynamosql/dynamosql');
+const { logger } = require('@dynamosql/shared');
 const { DEPRECATE_EOF } = MYSQL.CLIENT_FLAGS;
 const { SERVER_MORE_RESULTS_EXISTS } = MYSQL.SERVER_STATUS;
 

@@ -6,7 +6,7 @@ import * as TransactionManager from './transaction_manager';
 import { makeEngineGroups } from './helpers/engine_groups';
 import { resolveReferences } from './helpers/column_ref_helper';
 import { runSelect } from './helpers/select_modify';
-import * as logger from '../tools/logger';
+import { logger } from '@dynamosql/shared';
 
 export function query(params: any, done: any) {
   const { ast, session } = params;

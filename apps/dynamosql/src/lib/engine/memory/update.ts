@@ -1,5 +1,5 @@
 import * as Storage from './storage';
-import * as logger from '../../../tools/logger';
+import { logger } from '@dynamosql/shared';
 
 export function singleUpdate(
   params: any,

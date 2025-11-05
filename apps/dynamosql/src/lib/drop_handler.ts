@@ -1,5 +1,5 @@
 import * as SchemaManager from './schema_manager';
-import * as logger from '../tools/logger';
+import { logger } from '@dynamosql/shared';
 
 export function query(params: any, done: any) {
   const { ast, session, dynamodb } = params;
