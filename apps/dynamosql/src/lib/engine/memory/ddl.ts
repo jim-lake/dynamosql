@@ -1,5 +1,13 @@
 import * as Storage from './storage';
-import type { TableInfoParams, TableInfo, TableListParams, CreateTableParams, DropTableParams, IndexParams, AddColumnParams } from '../index';
+import type {
+  TableInfoParams,
+  TableInfo,
+  TableListParams,
+  CreateTableParams,
+  DropTableParams,
+  IndexParams,
+  AddColumnParams,
+} from '../index';
 
 export function getTableInfo(
   params: TableInfoParams,
@@ -27,7 +35,10 @@ export function getTableList(
   done(null, []);
 }
 
-export function createTable(params: CreateTableParams, done: (err?: any) => void): void {
+export function createTable(
+  params: CreateTableParams,
+  done: (err?: any) => void
+): void {
   const { session, database, table, primary_key, column_list, is_temp } =
     params;
   if (primary_key.length === 0) {
@@ -48,7 +59,10 @@ export function createTable(params: CreateTableParams, done: (err?: any) => void
   }
 }
 
-export function dropTable(params: DropTableParams, done: (err?: any) => void): void {
+export function dropTable(
+  params: DropTableParams,
+  done: (err?: any) => void
+): void {
   const { session, database, table } = params;
   if (session.getTempTable(database, table)) {
     session.deleteTempTable(database, table);
@@ -58,14 +72,23 @@ export function dropTable(params: DropTableParams, done: (err?: any) => void): v
   done();
 }
 
-export function addColumn(params: AddColumnParams, done: (err?: any) => void): void {
+export function addColumn(
+  params: AddColumnParams,
+  done: (err?: any) => void
+): void {
   done();
 }
 
-export function createIndex(params: IndexParams, done: (err?: any) => void): void {
+export function createIndex(
+  params: IndexParams,
+  done: (err?: any) => void
+): void {
   done();
 }
 
-export function deleteIndex(params: IndexParams, done: (err?: any) => void): void {
+export function deleteIndex(
+  params: IndexParams,
+  done: (err?: any) => void
+): void {
   done();
 }

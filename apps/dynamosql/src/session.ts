@@ -14,6 +14,7 @@ import { typeCast } from './lib/helpers/type_cast_helper';
 import * as DynamoDB from './lib/dynamodb';
 import { logger } from '@dynamosql/shared';
 import { SQLError } from './error';
+import type { Session as ISession } from './lib/types/session';
 
 const DEFAULT_RESULT = { affectedRows: 0, changedRows: 0 };
 
@@ -24,7 +25,7 @@ export function init(args: any) {
   g_dynamodb = DynamoDB.createDynamoDB(args);
 }
 
-class Session {
+class Session implements ISession {
   _typeCastOptions: any = {};
   _currentDatabase: string | null = null;
   _localVariables: any = {};
@@ -107,6 +108,10 @@ class Session {
   saveTempTable(database: string, table: string, contents: any) {
     const key = database + '.' + table;
     this._tempTableMap[key] = contents;
+  }
+
+  deleteTempTable(database: string, table: string) {
+    this.dropTempTable(database, table);
   }
 
   dropTempTable(database: string, table?: string) {

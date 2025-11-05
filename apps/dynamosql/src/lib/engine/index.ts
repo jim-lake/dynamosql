@@ -1,5 +1,6 @@
 import * as RawEngine from './raw';
 import * as MemoryEngine from './memory';
+import type { Session } from '../types/session';
 
 export interface ColumnDef {
   name: string;
@@ -19,7 +20,7 @@ export interface MutationResult {
 }
 
 export interface CommitParams {
-  session: any;
+  session: Session;
   data: Record<string, any>;
 }
 
@@ -30,7 +31,7 @@ export interface TableListParams {
 export interface TableInfoParams {
   dynamodb: any;
   table: string;
-  session?: any;
+  session?: Session;
   database?: string;
 }
 
@@ -39,7 +40,7 @@ export interface CreateTableParams {
   table: string;
   primary_key: ColumnDef[];
   column_list: ColumnDef[];
-  session?: any;
+  session?: Session;
   database?: string;
   is_temp?: boolean;
 }
@@ -47,7 +48,7 @@ export interface CreateTableParams {
 export interface DropTableParams {
   dynamodb: any;
   table: string;
-  session?: any;
+  session?: Session;
   database?: string;
 }
 
@@ -66,21 +67,21 @@ export interface AddColumnParams {
 
 export interface RowListParams {
   dynamodb: any;
-  session: any;
+  session: Session;
   list: any[];
   where?: any;
 }
 
 export interface DeleteParams {
   dynamodb: any;
-  session: any;
+  session: Session;
   ast: any;
   list?: any[];
 }
 
 export interface UpdateParams {
   dynamodb: any;
-  session: any;
+  session: Session;
   ast: any;
   list?: any[];
 }
@@ -90,7 +91,7 @@ export interface InsertParams {
   table: string;
   list: any[];
   duplicate_mode?: 'ignore' | 'replace';
-  session?: any;
+  session?: Session;
   database?: string;
 }
 

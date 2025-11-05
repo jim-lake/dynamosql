@@ -1,6 +1,14 @@
 import asyncForever from 'async/forever';
 import { logger } from '@dynamosql/shared';
-import type { TableInfoParams, TableInfo, TableListParams, CreateTableParams, DropTableParams, IndexParams, AddColumnParams } from '../index';
+import type {
+  TableInfoParams,
+  TableInfo,
+  TableListParams,
+  CreateTableParams,
+  DropTableParams,
+  IndexParams,
+  AddColumnParams,
+} from '../index';
 
 const TYPE_MAP: Record<string, string> = {
   S: 'string',
@@ -54,7 +62,10 @@ export function getTableList(
   });
 }
 
-export function createTable(params: CreateTableParams, done: (err?: any) => void): void {
+export function createTable(
+  params: CreateTableParams,
+  done: (err?: any) => void
+): void {
   const { dynamodb, table, primary_key, ...other } = params;
   const column_list = params.column_list.filter((column: any) =>
     primary_key.find((key: any) => key.name === column.name)
@@ -72,7 +83,10 @@ export function createTable(params: CreateTableParams, done: (err?: any) => void
   });
 }
 
-export function dropTable(params: DropTableParams, done: (err?: any) => void): void {
+export function dropTable(
+  params: DropTableParams,
+  done: (err?: any) => void
+): void {
   const { dynamodb, table } = params;
   dynamodb.deleteTable(table, (err: any) => {
     if (err) {
@@ -90,11 +104,17 @@ export function dropTable(params: DropTableParams, done: (err?: any) => void): v
   });
 }
 
-export function addColumn(params: AddColumnParams, done: (err?: any) => void): void {
+export function addColumn(
+  params: AddColumnParams,
+  done: (err?: any) => void
+): void {
   done();
 }
 
-export function createIndex(params: IndexParams, done: (err?: any) => void): void {
+export function createIndex(
+  params: IndexParams,
+  done: (err?: any) => void
+): void {
   const { dynamodb, table, index_name, key_list } = params;
   const opts = { table, index_name, key_list };
   dynamodb.createIndex(opts, (err: any) => {
@@ -112,7 +132,10 @@ export function createIndex(params: IndexParams, done: (err?: any) => void): voi
   });
 }
 
-export function deleteIndex(params: IndexParams, done: (err?: any) => void): void {
+export function deleteIndex(
+  params: IndexParams,
+  done: (err?: any) => void
+): void {
   const { dynamodb, table, index_name } = params;
   dynamodb.deleteIndex({ table, index_name }, (err: any) => {
     if (err === 'resource_not_found') {

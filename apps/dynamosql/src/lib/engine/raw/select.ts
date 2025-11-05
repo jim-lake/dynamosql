@@ -6,7 +6,11 @@ import type { RowListParams } from '../index';
 
 export function getRowList(
   params: RowListParams,
-  done: (err?: any, source_map?: Record<string, any[]>, column_map?: Record<string, string[]>) => void
+  done: (
+    err?: any,
+    source_map?: Record<string, any[]>,
+    column_map?: Record<string, string[]>
+  ) => void
 ): void {
   const { list } = params;
 
