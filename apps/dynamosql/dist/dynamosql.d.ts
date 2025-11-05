@@ -25,95 +25,82 @@ declare class Pool {
     query(opts: QueryOptions, values?: any[] | QueryCallback, done?: QueryCallback): void;
 }
 
-const util = require('node:util');
+declare class Session {
+    _typeCastOptions: any;
+    _currentDatabase: string | null;
+    _localVariables: any;
+    _transaction: any;
+    _isReleased: boolean;
+    _multipleStatements: boolean;
+    _tempTableMap: any;
+    _typeCast: boolean;
+    _dateStrings: boolean;
+    _resultObjects: boolean;
+    escape: any;
+    escapeId: any;
+    constructor(args?: any);
+    release(done?: () => void): void;
+    end(done?: () => void): void;
+    destroy(): void;
+    setCurrentDatabase(database: string, done?: () => void): void;
+    getCurrentDatabase(): string;
+    setVariable(name: string, value: any): void;
+    getVariable(name: string): any;
+    getTransaction(): any;
+    setTransaction(tx: any): void;
+    getTempTableList(): [string, unknown][];
+    getTempTable(database: string, table: string): any;
+    saveTempTable(database: string, table: string, contents: any): void;
+    dropTempTable(database: string, table?: string): void;
+    query(params: any, values?: any, done?: any): void;
+    _query(opts: any, done: any): void;
+    _singleQuery(ast: any, done: any): void;
+    _transformResult(list: any, columns: any, opts: any): void;
+    _convertCell(value: any, column: any): any;
+}
+declare function createSession$1(args?: any): Session;
 
-exports.setLogLevel = setLogLevel;
-exports.setRemoteLog = setRemoteLog;
-exports.error = error;
-exports.info = info;
-exports.trace = trace;
-exports.inspect = inspect;
-exports.always = always;
+declare const LEVEL_NONE = 0;
+declare const LEVEL_ERROR = 1;
+declare const LEVEL_INFO = 2;
+declare const LEVEL_TRACE = 3;
+declare function setRemoteLog(func: any): void;
+declare function setLogLevel(level: number): void;
+declare function error(...args: any[]): any;
+declare function info(...args: any[]): any;
+declare function trace(...args: any[]): any;
+declare function always(...args: any[]): any;
+declare function inspect(...args: any[]): void;
 
-const LEVEL_NONE = 0;
-const LEVEL_ERROR = 1;
-const LEVEL_INFO = 2;
-const LEVEL_TRACE = 3;
-const LEVEL_MAP = {
-  NONE: LEVEL_NONE,
-  ERROR: LEVEL_ERROR,
-  INFO: LEVEL_INFO,
-  TRACE: LEVEL_TRACE,
-};
-exports.LEVEL_NONE = LEVEL_NONE;
-exports.LEVEL_ERROR = LEVEL_ERROR;
-exports.LEVEL_INFO = LEVEL_INFO;
-exports.LEVEL_TRACE = LEVEL_TRACE;
-
-let g_remoteLogFunc = null;
-let g_logLevel = LEVEL_NONE;
-if (process.env.LOG) {
-  const level = LEVEL_MAP[process.env.LOG.toUpperCase()];
-  if (level !== undefined) {
-    g_logLevel = level;
-    trace('log level:', level);
-  }
-}
-
-function setRemoteLog(func) {
-  g_remoteLogFunc = func;
-}
-function setLogLevel(level) {
-  g_logLevel = level;
-}
-function error() {
-  if (g_logLevel >= LEVEL_ERROR) {
-    return _log.apply(this, arguments);
-  }
-}
-function info() {
-  if (g_logLevel >= LEVEL_INFO) {
-    return _log.apply(this, arguments);
-  }
-}
-function trace() {
-  if (g_logLevel >= LEVEL_TRACE) {
-    return _log.apply(this, arguments);
-  }
-}
-function always() {
-  return _log.apply(this, arguments);
-}
-function _log() {
-  const s = util.format.apply(this, arguments);
-  console.log('[' + new Date().toUTCString() + '] ' + s);
-  g_remoteLogFunc?.(s);
-  return s;
-}
-function inspect() {
-  let s = '';
-  for (let index in arguments) {
-    const a = arguments[index];
-    if (index > 0) {
-      s += ' ';
-    }
-
-    if (typeof a == 'object') {
-      s += util.inspect(a, { depth: 99 });
-    } else {
-      s += a;
-    }
-  }
-  console.log(s);
-}
-
+declare const logger_LEVEL_ERROR: typeof LEVEL_ERROR;
+declare const logger_LEVEL_INFO: typeof LEVEL_INFO;
+declare const logger_LEVEL_NONE: typeof LEVEL_NONE;
+declare const logger_LEVEL_TRACE: typeof LEVEL_TRACE;
+declare const logger_always: typeof always;
+declare const logger_error: typeof error;
+declare const logger_info: typeof info;
+declare const logger_inspect: typeof inspect;
+declare const logger_setLogLevel: typeof setLogLevel;
+declare const logger_setRemoteLog: typeof setRemoteLog;
+declare const logger_trace: typeof trace;
 declare namespace logger {
   export {
+    logger_LEVEL_ERROR as LEVEL_ERROR,
+    logger_LEVEL_INFO as LEVEL_INFO,
+    logger_LEVEL_NONE as LEVEL_NONE,
+    logger_LEVEL_TRACE as LEVEL_TRACE,
+    logger_always as always,
+    logger_error as error,
+    logger_info as info,
+    logger_inspect as inspect,
+    logger_setLogLevel as setLogLevel,
+    logger_setRemoteLog as setRemoteLog,
+    logger_trace as trace,
   };
 }
 
 declare const createPool: typeof createPool$1;
-declare const createSession: any;
+declare const createSession: typeof createSession$1;
 
 declare const escape: any;
 declare const escapeId: any;

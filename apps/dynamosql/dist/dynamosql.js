@@ -2,8 +2,8 @@
 
 var SqlString = require('sqlstring');
 var require$$0 = require('big-integer');
-var require$$0$1 = require('node:util');
-var require$$1 = require('@aws-sdk/client-dynamodb');
+var util = require('node:util');
+var clientDynamodb = require('@aws-sdk/client-dynamodb');
 
 function _interopNamespaceDefault(e) {
 	var n = Object.create(null);
@@ -22,59 +22,14 @@ function _interopNamespaceDefault(e) {
 	return Object.freeze(n);
 }
 
-function _mergeNamespaces(n, m) {
-	m.forEach(function (e) {
-		e && typeof e !== 'string' && !Array.isArray(e) && Object.keys(e).forEach(function (k) {
-			if (k !== 'default' && !(k in n)) {
-				var d = Object.getOwnPropertyDescriptor(e, k);
-				Object.defineProperty(n, k, d.get ? d : {
-					enumerable: true,
-					get: function () { return e[k]; }
-				});
-			}
-		});
-	});
-	return Object.freeze(n);
-}
-
 var SqlString__namespace = /*#__PURE__*/_interopNamespaceDefault(SqlString);
+var util__namespace = /*#__PURE__*/_interopNamespaceDefault(util);
 
 var commonjsGlobal = typeof globalThis !== 'undefined' ? globalThis : typeof window !== 'undefined' ? window : typeof global !== 'undefined' ? global : typeof self !== 'undefined' ? self : {};
 
 function getDefaultExportFromCjs (x) {
 	return x && x.__esModule && Object.prototype.hasOwnProperty.call(x, 'default') ? x['default'] : x;
 }
-
-function getAugmentedNamespace(n) {
-  if (Object.prototype.hasOwnProperty.call(n, '__esModule')) return n;
-  var f = n.default;
-	if (typeof f == "function") {
-		var a = function a () {
-			var isInstance = false;
-      try {
-        isInstance = this instanceof a;
-      } catch {}
-			if (isInstance) {
-        return Reflect.construct(f, arguments, this.constructor);
-			}
-			return f.apply(this, arguments);
-		};
-		a.prototype = f.prototype;
-  } else a = {};
-  Object.defineProperty(a, '__esModule', {value: true});
-	Object.keys(n).forEach(function (k) {
-		var d = Object.getOwnPropertyDescriptor(n, k);
-		Object.defineProperty(a, k, d.get ? d : {
-			enumerable: true,
-			get: function () {
-				return n[k];
-			}
-		});
-	});
-	return a;
-}
-
-var session = {};
 
 var timesSeries = {exports: {}};
 
@@ -945,6 +900,9 @@ function requireTimesSeries () {
 	} (timesSeries, timesSeries.exports));
 	return timesSeries.exports;
 }
+
+var timesSeriesExports = requireTimesSeries();
+var asyncTimesSeries = /*@__PURE__*/getDefaultExportFromCjs(timesSeriesExports);
 
 var mysql_parser = {};
 
@@ -18932,7 +18890,7 @@ function requireMysql_parser () {
 	return mysql_parser;
 }
 
-var alter_handler = {};
+var mysql_parserExports = requireMysql_parser();
 
 var series = {exports: {}};
 
@@ -19284,6 +19242,9 @@ function requireSeries () {
 	return series.exports;
 }
 
+var seriesExports = requireSeries();
+var asyncSeries = /*@__PURE__*/getDefaultExportFromCjs(seriesExports);
+
 var eachSeries = {exports: {}};
 
 var eachLimit = {exports: {}};
@@ -19421,7 +19382,8 @@ function requireEachSeries () {
 	return eachSeries.exports;
 }
 
-var schema_manager = {};
+var eachSeriesExports = requireEachSeries();
+var asyncEachSeries = /*@__PURE__*/getDefaultExportFromCjs(eachSeriesExports);
 
 var each = {exports: {}};
 
@@ -19759,11 +19721,8 @@ function requireEach () {
 	return each.exports;
 }
 
-var engine = {};
-
-var raw = {};
-
-var ddl$1 = {};
+var eachExports = requireEach();
+var asyncEach = /*@__PURE__*/getDefaultExportFromCjs(eachExports);
 
 var forever = {exports: {}};
 
@@ -19922,8039 +19881,6746 @@ function requireForever () {
 	return forever.exports;
 }
 
-var logger$2 = {};
+var foreverExports = requireForever();
+var asyncForever = /*@__PURE__*/getDefaultExportFromCjs(foreverExports);
 
-var hasRequiredLogger;
-
-function requireLogger () {
-	if (hasRequiredLogger) return logger$2;
-	hasRequiredLogger = 1;
-	const util = require$$0$1;
-
-	logger$2.setLogLevel = setLogLevel;
-	logger$2.setRemoteLog = setRemoteLog;
-	logger$2.error = error;
-	logger$2.info = info;
-	logger$2.trace = trace;
-	logger$2.inspect = inspect;
-	logger$2.always = always;
-
-	const LEVEL_NONE = 0;
-	const LEVEL_ERROR = 1;
-	const LEVEL_INFO = 2;
-	const LEVEL_TRACE = 3;
-	const LEVEL_MAP = {
-	  NONE: LEVEL_NONE,
-	  ERROR: LEVEL_ERROR,
-	  INFO: LEVEL_INFO,
-	  TRACE: LEVEL_TRACE,
-	};
-	logger$2.LEVEL_NONE = LEVEL_NONE;
-	logger$2.LEVEL_ERROR = LEVEL_ERROR;
-	logger$2.LEVEL_INFO = LEVEL_INFO;
-	logger$2.LEVEL_TRACE = LEVEL_TRACE;
-
-	let g_remoteLogFunc = null;
-	let g_logLevel = LEVEL_NONE;
-	if (process.env.LOG) {
-	  const level = LEVEL_MAP[process.env.LOG.toUpperCase()];
-	  if (level !== undefined) {
-	    g_logLevel = level;
-	    trace('log level:', level);
-	  }
-	}
-
-	function setRemoteLog(func) {
-	  g_remoteLogFunc = func;
-	}
-	function setLogLevel(level) {
-	  g_logLevel = level;
-	}
-	function error() {
-	  if (g_logLevel >= LEVEL_ERROR) {
-	    return _log.apply(this, arguments);
-	  }
-	}
-	function info() {
-	  if (g_logLevel >= LEVEL_INFO) {
-	    return _log.apply(this, arguments);
-	  }
-	}
-	function trace() {
-	  if (g_logLevel >= LEVEL_TRACE) {
-	    return _log.apply(this, arguments);
-	  }
-	}
-	function always() {
-	  return _log.apply(this, arguments);
-	}
-	function _log() {
-	  const s = util.format.apply(this, arguments);
-	  console.log('[' + new Date().toUTCString() + '] ' + s);
-	  g_remoteLogFunc?.(s);
-	  return s;
-	}
-	function inspect() {
-	  let s = '';
-	  for (let index in arguments) {
-	    const a = arguments[index];
-	    if (index > 0) {
-	      s += ' ';
-	    }
-
-	    if (typeof a == 'object') {
-	      s += util.inspect(a, { depth: 99 });
-	    } else {
-	      s += a;
-	    }
-	  }
-	  console.log(s);
-	}
-	return logger$2;
+const LEVEL_NONE = 0;
+const LEVEL_ERROR = 1;
+const LEVEL_INFO = 2;
+const LEVEL_TRACE = 3;
+const LEVEL_MAP = {
+    NONE: LEVEL_NONE,
+    ERROR: LEVEL_ERROR,
+    INFO: LEVEL_INFO,
+    TRACE: LEVEL_TRACE,
+};
+let g_remoteLogFunc = null;
+let g_logLevel = LEVEL_NONE;
+if (process.env.LOG) {
+    const level = LEVEL_MAP[process.env.LOG.toUpperCase()];
+    if (level !== undefined) {
+        g_logLevel = level;
+        trace('log level:', level);
+    }
+}
+function setRemoteLog(func) {
+    g_remoteLogFunc = func;
+}
+function setLogLevel(level) {
+    g_logLevel = level;
+}
+function error(...args) {
+    if (g_logLevel >= LEVEL_ERROR) {
+        return _log(...args);
+    }
+}
+function info(...args) {
+    if (g_logLevel >= LEVEL_INFO) {
+        return _log(...args);
+    }
+}
+function trace(...args) {
+    if (g_logLevel >= LEVEL_TRACE) {
+        return _log(...args);
+    }
+}
+function always(...args) {
+    return _log(...args);
+}
+function _log(...args) {
+    const s = util__namespace.format(...args);
+    console.log('[' + new Date().toUTCString() + '] ' + s);
+    g_remoteLogFunc?.(s);
+    return s;
+}
+function inspect(...args) {
+    let s = '';
+    for (let index in args) {
+        const a = args[index];
+        if (Number(index) > 0) {
+            s += ' ';
+        }
+        if (typeof a == 'object') {
+            s += util__namespace.inspect(a, { depth: 99 });
+        }
+        else {
+            s += a;
+        }
+    }
+    console.log(s);
 }
 
-var hasRequiredDdl$1;
+var logger = /*#__PURE__*/Object.freeze({
+	__proto__: null,
+	LEVEL_ERROR: LEVEL_ERROR,
+	LEVEL_INFO: LEVEL_INFO,
+	LEVEL_NONE: LEVEL_NONE,
+	LEVEL_TRACE: LEVEL_TRACE,
+	always: always,
+	error: error,
+	info: info,
+	inspect: inspect,
+	setLogLevel: setLogLevel,
+	setRemoteLog: setRemoteLog,
+	trace: trace
+});
 
-function requireDdl$1 () {
-	if (hasRequiredDdl$1) return ddl$1;
-	hasRequiredDdl$1 = 1;
-	const asyncForever = requireForever();
-	const logger = requireLogger();
-
-	ddl$1.getTableInfo = getTableInfo;
-	ddl$1.getTableList = getTableList;
-	ddl$1.createTable = createTable;
-	ddl$1.dropTable = dropTable;
-	ddl$1.addColumn = addColumn;
-	ddl$1.createIndex = createIndex;
-	ddl$1.deleteIndex = deleteIndex;
-
-	const TYPE_MAP = {
-	  S: 'string',
-	  N: 'number',
-	  B: 'buffer',
-	};
-	function getTableInfo(params, done) {
-	  const { dynamodb, table } = params;
-	  dynamodb.getTable(table, (err, data) => {
-	    let result;
-	    if (err) {
-	      logger.error('getTableInfo: err:', err, table, data);
-	    } else if (!data || !data.Table) {
-	      err = 'bad_data';
-	    } else {
-	      const column_list = data.Table.AttributeDefinitions.map((def) => ({
-	        name: def.AttributeName,
-	        type: TYPE_MAP[def.AttributeType],
-	      }));
-	      const primary_key = data.Table.KeySchema.map((key) => {
-	        const type = column_list.find(
-	          (col) => col.name === key.AttributeName
-	        ).type;
-	        return { name: key.AttributeName, type };
-	      });
-	      result = {
-	        table,
-	        primary_key,
-	        column_list,
-	        is_open: true,
-	      };
-	    }
-	    done(err, result);
-	  });
-	}
-	function getTableList(params, done) {
-	  const { dynamodb } = params;
-	  dynamodb.getTableList((err, results) => {
-	    if (err) {
-	      logger.error('raw_engine.getTableList: err:', err);
-	    }
-	    done(err, results);
-	  });
-	}
-	function createTable(params, done) {
-	  const { dynamodb, table, primary_key, ...other } = params;
-	  const column_list = params.column_list.filter((column) =>
-	    primary_key.find((key) => key.name === column.name)
-	  );
-	  const opts = { ...other, table, primary_key, column_list };
-	  dynamodb.createTable(opts, (err) => {
-	    if (err === 'resource_in_use') {
-	      done('table_exists');
-	    } else if (err) {
-	      logger.error('raw_engine.createTable: err:', err);
-	      done(err);
-	    } else {
-	      _waitForTable({ dynamodb, table }, done);
-	    }
-	  });
-	}
-	function dropTable(params, done) {
-	  const { dynamodb, table } = params;
-	  dynamodb.deleteTable(table, (err) => {
-	    if (err) {
-	      logger.error('raw_engine.dropTable: err:', err);
-	      done(err);
-	    } else {
-	      _waitForTable({ dynamodb, table }, (wait_err) => {
-	        if (wait_err === 'resource_not_found') {
-	          done();
-	        } else {
-	          done(wait_err);
-	        }
-	      });
-	    }
-	  });
-	}
-	function addColumn(params, done) {
-	  done();
-	}
-	function createIndex(params, done) {
-	  const { dynamodb, table, index_name, key_list } = params;
-	  const opts = { table, index_name, key_list };
-	  dynamodb.createIndex(opts, (err) => {
-	    if (
-	      err === 'resource_in_use' ||
-	      err?.message?.indexOf?.('already exists') >= 0
-	    ) {
-	      done('index_exists');
-	    } else if (err) {
-	      logger.error('raw_engine.createIndex: err:', err);
-	      done(err);
-	    } else {
-	      _waitForTable({ dynamodb, table, index_name }, done);
-	    }
-	  });
-	}
-	function deleteIndex(params, done) {
-	  const { dynamodb, table, index_name } = params;
-	  dynamodb.deleteIndex({ table, index_name }, (err) => {
-	    if (err === 'resource_not_found') {
-	      done('index_not_found');
-	    } else if (err) {
-	      logger.error('raw_engine.deleteIndex: err:', err);
-	      done(err);
-	    } else {
-	      _waitForTable({ dynamodb, table, index_name }, done);
-	    }
-	  });
-	}
-	function _waitForTable(params, done) {
-	  const { dynamodb, table, index_name } = params;
-	  const LOOP_MS = 500;
-	  let return_err;
-	  asyncForever(
-	    (done) => {
-	      dynamodb.getTable(table, (err, result) => {
-	        const status = result?.Table?.TableStatus;
-	        if (
-	          !err &&
-	          (status === 'CREATING' ||
-	            status === 'UPDATING' ||
-	            status === 'DELETING')
-	        ) {
-	          err = null;
-	        } else if (!err && index_name) {
-	          const index = result?.Table?.GlobalSecondaryIndexes?.find?.(
-	            (item) => item.IndexName === index_name
-	          );
-	          if (!index || index.IndexStatus === 'ACTIVE') {
-	            err = 'stop';
-	          }
-	        } else if (!err) {
-	          err = 'stop';
-	        } else {
-	          return_err = err;
-	        }
-	        if (err) {
-	          done(err);
-	        } else {
-	          setTimeout(() => done(), LOOP_MS);
-	        }
-	      });
-	    },
-	    () => done(return_err)
-	  );
-	}
-	return ddl$1;
+const TYPE_MAP = {
+    S: 'string',
+    N: 'number',
+    B: 'buffer',
+};
+function getTableInfo$1(params, done) {
+    const { dynamodb, table } = params;
+    dynamodb.getTable(table, (err, data) => {
+        let result;
+        if (err) {
+            error('getTableInfo: err:', err, table, data);
+        }
+        else if (!data || !data.Table) {
+            err = 'bad_data';
+        }
+        else {
+            const column_list = data.Table.AttributeDefinitions.map((def) => ({
+                name: def.AttributeName,
+                type: TYPE_MAP[def.AttributeType],
+            }));
+            const primary_key = data.Table.KeySchema.map((key) => {
+                const type = column_list.find((col) => col.name === key.AttributeName).type;
+                return { name: key.AttributeName, type };
+            });
+            result = {
+                table,
+                primary_key,
+                column_list,
+                is_open: true,
+            };
+        }
+        done(err, result);
+    });
+}
+function getTableList$4(params, done) {
+    const { dynamodb } = params;
+    dynamodb.getTableList((err, results) => {
+        if (err) {
+            error('raw_engine.getTableList: err:', err);
+        }
+        done(err, results);
+    });
+}
+function createTable$5(params, done) {
+    const { dynamodb, table, primary_key, ...other } = params;
+    const column_list = params.column_list.filter((column) => primary_key.find((key) => key.name === column.name));
+    const opts = { ...other, table, primary_key, column_list };
+    dynamodb.createTable(opts, (err) => {
+        if (err === 'resource_in_use') {
+            done('table_exists');
+        }
+        else if (err) {
+            error('raw_engine.createTable: err:', err);
+            done(err);
+        }
+        else {
+            _waitForTable({ dynamodb, table }, done);
+        }
+    });
+}
+function dropTable$2(params, done) {
+    const { dynamodb, table } = params;
+    dynamodb.deleteTable(table, (err) => {
+        if (err) {
+            error('raw_engine.dropTable: err:', err);
+            done(err);
+        }
+        else {
+            _waitForTable({ dynamodb, table }, (wait_err) => {
+                if (wait_err === 'resource_not_found') {
+                    done();
+                }
+                else {
+                    done(wait_err);
+                }
+            });
+        }
+    });
+}
+function addColumn$1(params, done) {
+    done();
+}
+function createIndex$3(params, done) {
+    const { dynamodb, table, index_name, key_list } = params;
+    const opts = { table, index_name, key_list };
+    dynamodb.createIndex(opts, (err) => {
+        if (err === 'resource_in_use' ||
+            err?.message?.indexOf?.('already exists') >= 0) {
+            done('index_exists');
+        }
+        else if (err) {
+            error('raw_engine.createIndex: err:', err);
+            done(err);
+        }
+        else {
+            _waitForTable({ dynamodb, table, index_name }, done);
+        }
+    });
+}
+function deleteIndex$3(params, done) {
+    const { dynamodb, table, index_name } = params;
+    dynamodb.deleteIndex({ table, index_name }, (err) => {
+        if (err === 'resource_not_found') {
+            done('index_not_found');
+        }
+        else if (err) {
+            error('raw_engine.deleteIndex: err:', err);
+            done(err);
+        }
+        else {
+            _waitForTable({ dynamodb, table, index_name }, done);
+        }
+    });
+}
+function _waitForTable(params, done) {
+    const { dynamodb, table, index_name } = params;
+    const LOOP_MS = 500;
+    let return_err;
+    asyncForever((done) => {
+        dynamodb.getTable(table, (err, result) => {
+            const status = result?.Table?.TableStatus;
+            if (!err &&
+                (status === 'CREATING' ||
+                    status === 'UPDATING' ||
+                    status === 'DELETING')) {
+                err = null;
+            }
+            else if (!err && index_name) {
+                const index = result?.Table?.GlobalSecondaryIndexes?.find?.((item) => item.IndexName === index_name);
+                if (!index || index.IndexStatus === 'ACTIVE') {
+                    err = 'stop';
+                }
+            }
+            else if (!err) {
+                err = 'stop';
+            }
+            else {
+                return_err = err;
+            }
+            if (err) {
+                done(err);
+            }
+            else {
+                setTimeout(() => done(), LOOP_MS);
+            }
+        });
+    }, () => done(return_err));
 }
 
-var _delete$1 = {};
-
-var convert_where$1 = {};
-
-var convert_where = {};
-
-var convert_expression = {};
-
-var expression = {};
-
-var evaluate = {};
-
-var aggregate_functions = {};
-
-var sql_conversion = {};
-
-var sql_datetime = {};
-
-var hasRequiredSql_datetime;
-
-function requireSql_datetime () {
-	if (hasRequiredSql_datetime) return sql_datetime;
-	hasRequiredSql_datetime = 1;
-	sql_datetime.createSQLDateTime = createSQLDateTime;
-
-	const YEAR_MULT = 10000;
-	const MONTH_MULT = 100;
-	const DAY_MULT = 1;
-	const HOUR_MULT = 10000;
-	const MINUTE_MULT = 100;
-	const DATE_TIME_MULT = 10000;
-
-	class SQLDateTime {
-	  constructor(time_arg, type, decimals) {
-	    this._time = Math.floor(time_arg?.time ?? time_arg);
-	    if (time_arg?.fraction !== undefined) {
-	      this._fraction = time_arg.fraction;
-	    } else if (typeof time_arg === 'number') {
-	      this._fraction = parseFloat(
-	        '0.' + (String(time_arg).split('.')[1] || '').slice(0, 6).padEnd(6, '0')
-	      );
-	    } else {
-	      this._fraction = 0;
-	    }
-	    this._type = type || 'datetime';
-	    if (type === 'date') {
-	      this._decimals = 0;
-	      this._time -= this._time % (24 * 60 * 60);
-	      this._fraction = 0;
-	    } else {
-	      this._decimals = decimals ?? (this._fraction ? 6 : 0);
-	      this._fraction = parseFloat(this._fraction.toFixed(this._decimals));
-	      let fd = 0;
-	      if (this._fraction >= 1.0) {
-	        this._fraction = 0;
-	        this._time += this._time < 0 ? -1 : 1;
-	      } else {
-	        fd = this._fraction;
-	      }
-	      if (this._decimals > 0) {
-	        this._fractionText =
-	          '.' + fd.toFixed(this._decimals).slice(-this._decimals);
-	      }
-	    }
-	  }
-	  _date = null;
-	  _fraction = 0;
-	  _fractionText = '';
-	  _makeDate() {
-	    if (!this._date) {
-	      this._date = new Date(Math.floor(this._time * 1000));
-	    }
-	  }
-	  getType() {
-	    return this._type;
-	  }
-	  getTime() {
-	    return this._time;
-	  }
-	  getFraction() {
-	    return this._fraction;
-	  }
-	  getDecimals() {
-	    return this._decimals;
-	  }
-	  toString() {
-	    let ret;
-	    this._makeDate();
-	    if (isNaN(this._date)) {
-	      ret = '';
-	    } else {
-	      ret = this._date.toISOString().replace('T', ' ');
-	      if (this._type === 'date') {
-	        ret = ret.slice(0, 10);
-	      } else {
-	        ret = ret.replace(/\..*/, '');
-	        if (this._decimals > 0) {
-	          ret = ret + this._fractionText;
-	        }
-	      }
-	    }
-	    return ret;
-	  }
-	  dateFormat(format) {
-	    let ret;
-	    this._makeDate();
-	    if (isNaN(this._date)) {
-	      ret = '';
-	    } else {
-	      ret = _dateFormat(this._date, format);
-	    }
-	    return ret;
-	  }
-	  toDate() {
-	    this._makeDate();
-	    return this._date;
-	  }
-	  toNumber() {
-	    let ret = 0;
-	    this._makeDate();
-	    ret += this._date.getUTCFullYear() * YEAR_MULT;
-	    ret += (this._date.getUTCMonth() + 1) * MONTH_MULT;
-	    ret += this._date.getUTCDate() * DAY_MULT;
-	    if (this._type === 'datetime') {
-	      ret = ret * DATE_TIME_MULT;
-	      ret += this._date.getUTCHours() * HOUR_MULT;
-	      ret += this._date.getUTCMinutes() * MINUTE_MULT;
-	      ret += this._date.getUTCSeconds();
-	      if (this._decimals > 0) {
-	        ret += this._fraction;
-	      }
-	    }
-	    return ret;
-	  }
-	}
-	sql_datetime.SQLDateTime = SQLDateTime;
-	function createSQLDateTime(arg, type, decimals) {
-	  let ret;
-	  if (arg instanceof SQLDateTime) {
-	    if (arg._type === type && arg._decimals === decimals) {
-	      ret = arg;
-	    } else {
-	      const opts = {
-	        time: arg._time,
-	        fraction: arg._fraction,
-	      };
-	      ret = new SQLDateTime(opts, type ?? arg._type, decimals ?? arg._decimals);
-	    }
-	  } else {
-	    const time = arg?.time ?? arg;
-	    if (isNaN(time)) {
-	      ret = null;
-	    } else if (time >= 253402300800) {
-	      ret = null;
-	    } else if (time <= -62167219201) {
-	      ret = null;
-	    } else {
-	      ret = new SQLDateTime(arg, type, decimals);
-	    }
-	  }
-	  return ret;
-	}
-
-	const FORMAT_LONG_NUMBER = new Intl.DateTimeFormat('en-US', {
-	  weekday: 'long',
-	  year: 'numeric',
-	  month: '2-digit',
-	  day: '2-digit',
-	  hour: '2-digit',
-	  minute: '2-digit',
-	  second: '2-digit',
-	  fractionalSecondDigits: 3,
-	  hour12: false,
-	});
-	const FORMAT_SHORT_NUMBER = new Intl.DateTimeFormat('en-US', {
-	  weekday: 'short',
-	  year: '2-digit',
-	  month: 'numeric',
-	  day: 'numeric',
-	  hour: 'numeric',
-	  minute: 'numeric',
-	  second: 'numeric',
-	  fractionalSecondDigits: 3,
-	  hour12: false,
-	});
-	const FORMAT_LONG_NUMBER_12H = new Intl.DateTimeFormat('en-US', {
-	  hour: '2-digit',
-	  minute: '2-digit',
-	  second: '2-digit',
-	  fractionalSecondDigits: 3,
-	  hour12: true,
-	});
-	const FORMAT_SHORT_NUMBER_12H = new Intl.DateTimeFormat('en-US', {
-	  hour: 'numeric',
-	  minute: 'numeric',
-	  second: 'numeric',
-	  fractionalSecondDigits: 3,
-	  hour12: true,
-	});
-	const FORMAT_LONG_TEXT = new Intl.DateTimeFormat('en-US', {
-	  weekday: 'long',
-	  month: 'long',
-	});
-	const FORMAT_SHORT_TEXT = new Intl.DateTimeFormat('en-US', {
-	  weekday: 'short',
-	  month: 'short',
-	});
-
-	function _dateFormat(date, format) {
-	  const format_map = new Map();
-	  function _getPart(formatter, type) {
-	    let cached = format_map.get(formatter);
-	    if (!cached) {
-	      cached = formatter.formatToParts(date);
-	      format_map.set(formatter, cached);
-	    }
-	    const found = cached.find((part) => part.type === type);
-	    return found?.value || '';
-	  }
-	  function _time(formatter) {
-	    return (
-	      _getPart(formatter, 'hour') +
-	      ':' +
-	      _getPart(formatter, 'minute') +
-	      ':' +
-	      _getPart(formatter, 'second')
-	    );
-	  }
-	  return format.replace(/%(.)/g, (_ignore, part) => {
-	    let ret = part;
-	    let day;
-	    switch (part) {
-	      case '%':
-	        ret = '%';
-	        break;
-	      case 'a':
-	        ret = _getPart(FORMAT_SHORT_NUMBER, 'weekday');
-	        break;
-	      case 'b':
-	        ret = _getPart(FORMAT_SHORT_TEXT, 'month');
-	        break;
-	      case 'c':
-	        ret = _getPart(FORMAT_SHORT_NUMBER, 'month');
-	        break;
-	      case 'D':
-	        day = date.getDate();
-	        ret = day + _nthNumber(day);
-	        break;
-	      case 'd':
-	        ret = _getPart(FORMAT_LONG_NUMBER, 'day');
-	        break;
-	      case 'e':
-	        ret = _getPart(FORMAT_SHORT_NUMBER, 'day');
-	        break;
-	      case 'f':
-	        ret = _getPart(FORMAT_LONG_NUMBER, 'fractionalSecond');
-	        break;
-	      case 'H':
-	        ret = _getPart(FORMAT_LONG_NUMBER, 'hour');
-	        break;
-	      case 'h':
-	      case 'I':
-	        ret = _getPart(FORMAT_LONG_NUMBER_12H, 'hour');
-	        break;
-	      case 'i':
-	        ret = _getPart(FORMAT_LONG_NUMBER, 'minutes');
-	        break;
-	      case 'j':
-	        //ret = _getPart(, 'dayOfYear');
-	        break;
-	      case 'k':
-	        ret = _getPart(FORMAT_SHORT_NUMBER, 'hour');
-	        break;
-	      case 'l':
-	        ret = _getPart(FORMAT_SHORT_NUMBER_12H, 'hour');
-	        break;
-	      case 'M':
-	        ret = _getPart(FORMAT_LONG_TEXT, 'month');
-	        break;
-	      case 'm':
-	        ret = _getPart(FORMAT_LONG_NUMBER, 'month');
-	        break;
-	      case 'p':
-	        ret = _getPart(FORMAT_SHORT_NUMBER_12H, 'dayPeriod');
-	        break;
-	      case 'r':
-	        ret =
-	          _time(FORMAT_LONG_NUMBER_12H) +
-	          _getPart(FORMAT_LONG_NUMBER_12H, 'dayPeriod');
-	        break;
-	      case 'S':
-	        ret = _getPart(FORMAT_LONG_NUMBER, 'seconds');
-	        break;
-	      case 's':
-	        ret = _getPart(FORMAT_LONG_NUMBER, 'seconds');
-	        break;
-	      case 'T':
-	        ret = _time(FORMAT_LONG_NUMBER);
-	        break;
-	      case 'U':
-	        //ret = _getPart(, 'week');
-	        break;
-	      case 'u':
-	        //ret = _getPart(, 'week');
-	        break;
-	      case 'V':
-	        //ret = _getPart(, 'week');
-	        break;
-	      case 'v':
-	        //ret = _getPart(, 'week');
-	        break;
-	      case 'W':
-	        ret = _getPart(FORMAT_LONG_NUMBER, 'weekday');
-	        break;
-	      case 'w':
-	        ret = String(date.getDay());
-	        break;
-	      case 'X':
-	        ret = _getPart(FORMAT_LONG_NUMBER, 'year');
-	        break;
-	      case 'x':
-	        ret = _getPart(FORMAT_LONG_NUMBER, 'year');
-	        break;
-	      case 'Y':
-	        ret = _getPart(FORMAT_LONG_NUMBER, 'year');
-	        break;
-	      case 'y':
-	        ret = _getPart(FORMAT_SHORT_NUMBER, 'year');
-	        break;
-	    }
-	    return ret;
-	  });
-	}
-	function _nthNumber(number) {
-	  let ret = '';
-	  if (number > 3 && number < 21) {
-	    ret = 'th';
-	  } else {
-	    const temp = number % 10;
-	    if (temp === 1) {
-	      ret = 'st';
-	    } else if (temp === 2) {
-	      ret = 'nd';
-	    } else if (temp === 3) {
-	      ret = 'rd';
-	    } else {
-	      ret = 'th';
-	    }
-	  }
-	  return ret;
-	}
-	return sql_datetime;
+const YEAR_MULT = 10000;
+const MONTH_MULT = 100;
+const DAY_MULT = 1;
+const HOUR_MULT = 10000;
+const MINUTE_MULT = 100;
+const DATE_TIME_MULT = 10000;
+class SQLDateTime {
+    constructor(time_arg, type, decimals) {
+        this._fraction = 0;
+        this._fractionText = '';
+        this._date = null;
+        this._time = Math.floor(time_arg?.time ?? time_arg);
+        if (time_arg?.fraction !== undefined) {
+            this._fraction = time_arg.fraction;
+        }
+        else if (typeof time_arg === 'number') {
+            this._fraction = parseFloat('0.' + (String(time_arg).split('.')[1] || '').slice(0, 6).padEnd(6, '0'));
+        }
+        else {
+            this._fraction = 0;
+        }
+        this._type = type || 'datetime';
+        if (type === 'date') {
+            this._decimals = 0;
+            this._time -= this._time % (24 * 60 * 60);
+            this._fraction = 0;
+        }
+        else {
+            this._decimals = decimals ?? (this._fraction ? 6 : 0);
+            this._fraction = parseFloat(this._fraction.toFixed(this._decimals));
+            let fd = 0;
+            if (this._fraction >= 1.0) {
+                this._fraction = 0;
+                this._time += this._time < 0 ? -1 : 1;
+            }
+            else {
+                fd = this._fraction;
+            }
+            if (this._decimals > 0) {
+                this._fractionText =
+                    '.' + fd.toFixed(this._decimals).slice(-this._decimals);
+            }
+        }
+    }
+    _makeDate() {
+        if (!this._date) {
+            this._date = new Date(Math.floor(this._time * 1000));
+        }
+    }
+    getType() {
+        return this._type;
+    }
+    getTime() {
+        return this._time;
+    }
+    getFraction() {
+        return this._fraction;
+    }
+    getDecimals() {
+        return this._decimals;
+    }
+    toString() {
+        let ret;
+        this._makeDate();
+        if (isNaN(this._date)) {
+            ret = '';
+        }
+        else {
+            ret = this._date.toISOString().replace('T', ' ');
+            if (this._type === 'date') {
+                ret = ret.slice(0, 10);
+            }
+            else {
+                ret = ret.replace(/\..*/, '');
+                if (this._decimals > 0) {
+                    ret = ret + this._fractionText;
+                }
+            }
+        }
+        return ret;
+    }
+    dateFormat(format) {
+        let ret;
+        this._makeDate();
+        if (isNaN(this._date)) {
+            ret = '';
+        }
+        else {
+            ret = _dateFormat(this._date, format);
+        }
+        return ret;
+    }
+    toDate() {
+        this._makeDate();
+        return this._date;
+    }
+    toNumber() {
+        let ret = 0;
+        this._makeDate();
+        ret += this._date.getUTCFullYear() * YEAR_MULT;
+        ret += (this._date.getUTCMonth() + 1) * MONTH_MULT;
+        ret += this._date.getUTCDate() * DAY_MULT;
+        if (this._type === 'datetime') {
+            ret = ret * DATE_TIME_MULT;
+            ret += this._date.getUTCHours() * HOUR_MULT;
+            ret += this._date.getUTCMinutes() * MINUTE_MULT;
+            ret += this._date.getUTCSeconds();
+            if (this._decimals > 0) {
+                ret += this._fraction;
+            }
+        }
+        return ret;
+    }
+}
+function createSQLDateTime(arg, type, decimals) {
+    let ret;
+    if (arg instanceof SQLDateTime) {
+        if (arg._type === type && arg._decimals === decimals) {
+            ret = arg;
+        }
+        else {
+            const opts = {
+                time: arg._time,
+                fraction: arg._fraction,
+            };
+            ret = new SQLDateTime(opts, type ?? arg._type, decimals ?? arg._decimals);
+        }
+    }
+    else {
+        const time = arg?.time ?? arg;
+        if (isNaN(time)) {
+            ret = null;
+        }
+        else if (time >= 253402300800) {
+            ret = null;
+        }
+        else if (time <= -62167219201) {
+            ret = null;
+        }
+        else {
+            ret = new SQLDateTime(arg, type, decimals);
+        }
+    }
+    return ret;
+}
+function createDateTime(arg, type, decimals) {
+    return createSQLDateTime(arg, type, decimals);
+}
+const FORMAT_LONG_NUMBER = new Intl.DateTimeFormat('en-US', {
+    weekday: 'long',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    fractionalSecondDigits: 3,
+    hour12: false,
+});
+const FORMAT_SHORT_NUMBER = new Intl.DateTimeFormat('en-US', {
+    weekday: 'short',
+    year: '2-digit',
+    month: 'numeric',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: 'numeric',
+    second: 'numeric',
+    fractionalSecondDigits: 3,
+    hour12: false,
+});
+const FORMAT_LONG_NUMBER_12H = new Intl.DateTimeFormat('en-US', {
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    fractionalSecondDigits: 3,
+    hour12: true,
+});
+const FORMAT_SHORT_NUMBER_12H = new Intl.DateTimeFormat('en-US', {
+    hour: 'numeric',
+    minute: 'numeric',
+    second: 'numeric',
+    fractionalSecondDigits: 3,
+    hour12: true,
+});
+const FORMAT_LONG_TEXT = new Intl.DateTimeFormat('en-US', {
+    weekday: 'long',
+    month: 'long',
+});
+const FORMAT_SHORT_TEXT = new Intl.DateTimeFormat('en-US', {
+    weekday: 'short',
+    month: 'short',
+});
+function _dateFormat(date, format) {
+    const format_map = new Map();
+    function _getPart(formatter, type) {
+        let cached = format_map.get(formatter);
+        if (!cached) {
+            cached = formatter.formatToParts(date);
+            format_map.set(formatter, cached);
+        }
+        const found = cached.find((part) => part.type === type);
+        return found?.value || '';
+    }
+    function _time(formatter) {
+        return (_getPart(formatter, 'hour') +
+            ':' +
+            _getPart(formatter, 'minute') +
+            ':' +
+            _getPart(formatter, 'second'));
+    }
+    return format.replace(/%(.)/g, (_ignore, part) => {
+        let ret = part;
+        let day;
+        switch (part) {
+            case '%':
+                ret = '%';
+                break;
+            case 'a':
+                ret = _getPart(FORMAT_SHORT_NUMBER, 'weekday');
+                break;
+            case 'b':
+                ret = _getPart(FORMAT_SHORT_TEXT, 'month');
+                break;
+            case 'c':
+                ret = _getPart(FORMAT_SHORT_NUMBER, 'month');
+                break;
+            case 'D':
+                day = date.getDate();
+                ret = day + _nthNumber(day);
+                break;
+            case 'd':
+                ret = _getPart(FORMAT_LONG_NUMBER, 'day');
+                break;
+            case 'e':
+                ret = _getPart(FORMAT_SHORT_NUMBER, 'day');
+                break;
+            case 'f':
+                ret = _getPart(FORMAT_LONG_NUMBER, 'fractionalSecond');
+                break;
+            case 'H':
+                ret = _getPart(FORMAT_LONG_NUMBER, 'hour');
+                break;
+            case 'h':
+            case 'I':
+                ret = _getPart(FORMAT_LONG_NUMBER_12H, 'hour');
+                break;
+            case 'i':
+                ret = _getPart(FORMAT_LONG_NUMBER, 'minutes');
+                break;
+            case 'j':
+                //ret = _getPart(, 'dayOfYear');
+                break;
+            case 'k':
+                ret = _getPart(FORMAT_SHORT_NUMBER, 'hour');
+                break;
+            case 'l':
+                ret = _getPart(FORMAT_SHORT_NUMBER_12H, 'hour');
+                break;
+            case 'M':
+                ret = _getPart(FORMAT_LONG_TEXT, 'month');
+                break;
+            case 'm':
+                ret = _getPart(FORMAT_LONG_NUMBER, 'month');
+                break;
+            case 'p':
+                ret = _getPart(FORMAT_SHORT_NUMBER_12H, 'dayPeriod');
+                break;
+            case 'r':
+                ret =
+                    _time(FORMAT_LONG_NUMBER_12H) +
+                        _getPart(FORMAT_LONG_NUMBER_12H, 'dayPeriod');
+                break;
+            case 'S':
+                ret = _getPart(FORMAT_LONG_NUMBER, 'seconds');
+                break;
+            case 's':
+                ret = _getPart(FORMAT_LONG_NUMBER, 'seconds');
+                break;
+            case 'T':
+                ret = _time(FORMAT_LONG_NUMBER);
+                break;
+            case 'U':
+                //ret = _getPart(, 'week');
+                break;
+            case 'u':
+                //ret = _getPart(, 'week');
+                break;
+            case 'V':
+                //ret = _getPart(, 'week');
+                break;
+            case 'v':
+                //ret = _getPart(, 'week');
+                break;
+            case 'W':
+                ret = _getPart(FORMAT_LONG_NUMBER, 'weekday');
+                break;
+            case 'w':
+                ret = String(date.getDay());
+                break;
+            case 'X':
+                ret = _getPart(FORMAT_LONG_NUMBER, 'year');
+                break;
+            case 'x':
+                ret = _getPart(FORMAT_LONG_NUMBER, 'year');
+                break;
+            case 'Y':
+                ret = _getPart(FORMAT_LONG_NUMBER, 'year');
+                break;
+            case 'y':
+                ret = _getPart(FORMAT_SHORT_NUMBER, 'year');
+                break;
+        }
+        return ret;
+    });
+}
+function _nthNumber(number) {
+    let ret = '';
+    if (number > 3 && number < 21) {
+        ret = 'th';
+    }
+    else {
+        const temp = number % 10;
+        if (temp === 1) {
+            ret = 'st';
+        }
+        else if (temp === 2) {
+            ret = 'nd';
+        }
+        else if (temp === 3) {
+            ret = 'rd';
+        }
+        else {
+            ret = 'th';
+        }
+    }
+    return ret;
 }
 
-var sql_time = {};
-
-var hasRequiredSql_time;
-
-function requireSql_time () {
-	if (hasRequiredSql_time) return sql_time;
-	hasRequiredSql_time = 1;
-	sql_time.createSQLTime = createSQLTime;
-	const { createDateTime } = requireSql_datetime();
-
-	const MINUTE = 60;
-	const HOUR = MINUTE * 60;
-	const DAY = 24 * HOUR;
-
-	class SQLTime {
-	  constructor(time, decimals) {
-	    this._time = time;
-	    this._decimals = decimals || 0;
-	  }
-	  getType() {
-	    return 'time';
-	  }
-	  getTime() {
-	    return this._time;
-	  }
-	  getFraction() {
-	    return 0;
-	  }
-	  getDecimals() {
-	    return this._decimals;
-	  }
-	  toString() {
-	    let ret;
-	    if (isNaN(this._time)) {
-	      ret = '';
-	    } else {
-	      let seconds = this._time;
-	      const neg = seconds < 0 ? '-' : '';
-	      if (neg) {
-	        seconds = -seconds;
-	      }
-	      const hours = Math.floor(seconds / HOUR);
-	      seconds -= hours * HOUR;
-	      const minutes = Math.floor(seconds / MINUTE);
-	      seconds -= minutes * MINUTE;
-
-	      const ret_secs =
-	        (seconds < 10 ? '0' : '') + seconds.toFixed(this._decimals);
-	      ret = `${neg}${_pad(hours)}:${_pad(minutes)}:${ret_secs}`;
-	    }
-	    return ret;
-	  }
-	  toSQLDateTime(decimals) {
-	    const now = Date.now() / 1000;
-	    const time = now - (now % DAY) + this._time;
-	    return createDateTime(time, 'datetime', decimals ?? this._decimals);
-	  }
-	  toNumber() {
-	    let seconds = this._time;
-	    const hours = Math.floor(seconds / HOUR);
-	    seconds -= hours * HOUR;
-	    const minutes = Math.floor(seconds / MINUTE);
-	    seconds -= minutes * MINUTE;
-	    return hours * 10000 + minutes * 100 + seconds;
-	  }
-	}
-	sql_time.SQLTime = SQLTime;
-	function createSQLTime(time, decimals) {
-	  let ret;
-	  if (isNaN(time)) {
-	    ret = null;
-	  } else {
-	    ret = new SQLTime(time, decimals);
-	  }
-	  return ret;
-	}
-	function _pad(num) {
-	  return (num < 10 ? '0' : '') + num;
-	}
-	return sql_time;
+const MINUTE$1 = 60;
+const HOUR$1 = MINUTE$1 * 60;
+const DAY$2 = 24 * HOUR$1;
+class SQLTime {
+    constructor(time, decimals) {
+        this._time = time;
+        this._decimals = decimals || 0;
+    }
+    getType() {
+        return 'time';
+    }
+    getTime() {
+        return this._time;
+    }
+    getFraction() {
+        return 0;
+    }
+    getDecimals() {
+        return this._decimals;
+    }
+    toString() {
+        let ret;
+        if (isNaN(this._time)) {
+            ret = '';
+        }
+        else {
+            let seconds = this._time;
+            const neg = seconds < 0 ? '-' : '';
+            if (neg) {
+                seconds = -seconds;
+            }
+            const hours = Math.floor(seconds / HOUR$1);
+            seconds -= hours * HOUR$1;
+            const minutes = Math.floor(seconds / MINUTE$1);
+            seconds -= minutes * MINUTE$1;
+            const ret_secs = (seconds < 10 ? '0' : '') + seconds.toFixed(this._decimals);
+            ret = `${neg}${_pad(hours)}:${_pad(minutes)}:${ret_secs}`;
+        }
+        return ret;
+    }
+    toSQLDateTime(decimals) {
+        const now = Date.now() / 1000;
+        const time = now - (now % DAY$2) + this._time;
+        return createDateTime(time, 'datetime', decimals ?? this._decimals);
+    }
+    toNumber() {
+        let seconds = this._time;
+        const hours = Math.floor(seconds / HOUR$1);
+        seconds -= hours * HOUR$1;
+        const minutes = Math.floor(seconds / MINUTE$1);
+        seconds -= minutes * MINUTE$1;
+        return hours * 10000 + minutes * 100 + seconds;
+    }
+}
+function createSQLTime(time, decimals) {
+    let ret;
+    if (isNaN(time)) {
+        ret = null;
+    }
+    else {
+        ret = new SQLTime(time, decimals);
+    }
+    return ret;
+}
+function _pad(num) {
+    return (num < 10 ? '0' : '') + num;
 }
 
-var hasRequiredSql_conversion;
-
-function requireSql_conversion () {
-	if (hasRequiredSql_conversion) return sql_conversion;
-	hasRequiredSql_conversion = 1;
-	const { createSQLDateTime, SQLDateTime } = requireSql_datetime();
-	const { createSQLTime, SQLTime } = requireSql_time();
-
-	sql_conversion.convertBooleanValue = convertBooleanValue;
-	sql_conversion.convertNum = convertNum;
-	sql_conversion.convertDateTime = convertDateTime;
-	sql_conversion.convertTime = convertTime;
-	sql_conversion.getDecimals = getDecimals;
-
-	const MINUTE = 60;
-	const HOUR = 60 * MINUTE;
-	const DAY = 24 * HOUR;
-
-	function convertNum(value) {
-	  let ret = value;
-	  if (value === null) {
-	    ret = null;
-	  } else if (value === '') {
-	    ret = 0;
-	  } else if (typeof value === 'string') {
-	    ret = parseFloat(value);
-	    if (isNaN(ret)) {
-	      ret = 0;
-	    }
-	  } else if (value?.toNumber) {
-	    ret = value.toNumber();
-	  }
-	  return ret;
-	}
-	function convertBooleanValue(value) {
-	  let ret;
-	  if (value === null) {
-	    ret = null;
-	  } else if (typeof value === 'number') {
-	    ret = value ? 1 : 0;
-	  } else {
-	    ret = convertNum(value) ? 1 : 0;
-	  }
-	  return ret;
-	}
-	const SEP = `[-^\\][!@#$%&*()_+={}\\|/\\\\<>,.:;"']+`;
-	const DATE_RS = `^([0-9]{1,4})${SEP}([0-2]?[0-9])${SEP}([0-3]?[0-9])`;
-	const DEC_RS = `(\\.[0-9]{1,6})?`;
-	const DIGIT_RS = `(${SEP}([0-5]?[0-9]))?`;
-	const DT_RS = `${DATE_RS}(\\s+|T)([0-2]?[0-9])${DIGIT_RS}${DIGIT_RS}${DEC_RS}`;
-	const DATE4_RS = `^([0-9]{4})([0-1][0-9])([0-3][0-9])`;
-	const DATETIME4_RS = `${DATE4_RS}([0-2][0-9])([0-5][0-9])(([0-5][0-9])${DEC_RS})?`;
-	const DATE2_RS = `^([0-9]{2})([0-1][0-9])([0-3][0-9])`;
-	const DATETIME2_RS = `${DATE2_RS}([0-2][0-9])([0-5][0-9])(([0-5][0-9])${DEC_RS})?`;
-
-	const DATE_REGEX = new RegExp(DATE_RS + '$');
-	const DATETIME_REGEX = new RegExp(DT_RS);
-	const DATE4_REGEX = new RegExp(DATE4_RS);
-	const DATETIME4_REGEX = new RegExp(DATETIME4_RS);
-	const DATE2_REGEX = new RegExp(DATE2_RS);
-	const DATETIME2_REGEX = new RegExp(DATETIME2_RS);
-
-	function convertDateTime(value, type, decimals) {
-	  let ret;
-	  if (value === null) {
-	    ret = null;
-	  } else if (value instanceof SQLDateTime) {
-	    ret = createSQLDateTime(value, type, decimals);
-	  } else if (value instanceof SQLTime) {
-	    ret = value.toSQLDateTime(decimals);
-	  } else if (typeof value === 'string') {
-	    let time = _stringToDateTime(value);
-	    if (time === undefined) {
-	      time = _stringToDate(value);
-	      if (!type) {
-	        type = 'date';
-	      }
-	    }
-
-	    if (time === undefined) {
-	      time = _numToDateTime(value);
-	    }
-	    if (time === undefined) {
-	      ret = null;
-	    } else {
-	      ret = createSQLDateTime(time, type ?? 'datetime', decimals);
-	    }
-	  } else if (typeof value === 'number') {
-	    const time = _numToDateTime(value);
-	    if (time === undefined) {
-	      ret = null;
-	    } else {
-	      ret = createSQLDateTime(time, type, decimals);
-	    }
-	  }
-	  return ret;
-	}
-	const DAY_TIME_REGEX =
-	  /^(-)?([0-9]+)\s+([0-9]*)(:([0-9]{1,2}))?(:([0-9]{1,2}))?(\.[0-9]+)?/;
-	const TIME_REGEX = /^(-)?([0-9]*):([0-9]{1,2})(:([0-9]{1,2}))?(\.[0-9]+)?/;
-	function convertTime(value, decimals) {
-	  let ret;
-	  if (value instanceof SQLTime) {
-	    ret = value;
-	  } else if (typeof value === 'string') {
-	    let time = _stringToTime(value);
-	    if (time === undefined) {
-	      const result = _stringToDateTime(value);
-	      if (result !== undefined) {
-	        time = (result.time % DAY) + (result.fraction || 0);
-	      }
-	    }
-	    if (time === undefined) {
-	      const num = parseFloat(value);
-	      if (!isNaN(num)) {
-	        time = _numToTime(num);
-	      }
-	    }
-
-	    if (time === undefined) {
-	      ret = null;
-	    } else {
-	      ret = createSQLTime(time, decimals);
-	    }
-	  } else if (typeof value === 'number') {
-	    const time = _numToTime(value);
-	    ret = createSQLTime(time, decimals);
-	  }
-	  return ret;
-	}
-	function _stringToTime(value) {
-	  let ret;
-	  value = value.trim();
-	  let match = value.match(DAY_TIME_REGEX);
-	  if (match) {
-	    const negative = match[1];
-	    const days = parseInt(match[2]);
-	    const hours = parseInt(match[3]);
-	    const mins = parseInt(match[5] || '0');
-	    const secs = parseInt(match[7] || '0');
-	    const fraction = parseFloat('0' + match[8]);
-	    ret = days * DAY + hours * HOUR + mins * MINUTE + secs + fraction;
-	    if (negative) {
-	      ret = -ret;
-	    }
-	  }
-	  if (ret === undefined) {
-	    match = value.match(TIME_REGEX);
-	    if (match) {
-	      const negative = match[1];
-	      const hours = parseInt(match[2]);
-	      const mins = parseInt(match[3] || '0');
-	      const secs = parseInt(match[5] || '0');
-	      const fraction = parseFloat('0' + match[6]);
-	      ret = hours * HOUR + mins * MINUTE + secs + fraction;
-	      if (negative) {
-	        ret = -ret;
-	      }
-	    }
-	  }
-	  return ret;
-	}
-	function _stringToDate(value) {
-	  let ret;
-	  const match = value.trim().match(DATE_REGEX);
-	  if (match) {
-	    const year = _fix2year(match[1]);
-	    const month = match[2];
-	    const day = match[3];
-	    ret = _partsToTime(year, month, day, 0, 0, 0);
-	  }
-	  return ret;
-	}
-	function _stringToDateTime(value) {
-	  let ret;
-	  const match = value.trim().match(DATETIME_REGEX);
-	  if (match) {
-	    const year = _fix2year(match[1]);
-	    const month = match[2];
-	    const day = match[3];
-	    const hour = match[5];
-	    const min = match[7] || '0';
-	    const sec = match[9] || '0';
-	    const fraction = parseFloat('0' + match[10]);
-	    ret = _partsToTime(year, month, day, hour, min, sec, fraction);
-	  }
-	  return ret;
-	}
-	function _numToDateTime(number) {
-	  let ret;
-	  const s = String(number);
-	  let match = s.match(DATETIME4_REGEX);
-	  if (match) {
-	    const year = match[1];
-	    const month = match[2];
-	    const day = match[3];
-	    const hour = match[4];
-	    const min = match[5];
-	    const sec = match[7] || '0';
-	    const fraction = parseFloat('0' + match[8]);
-	    ret = _partsToTime(year, month, day, hour, min, sec, fraction);
-	  }
-	  if (ret === undefined) {
-	    match = s.match(DATETIME2_REGEX);
-	    if (match) {
-	      const year = _fix2year(match[1]);
-	      const month = match[2];
-	      const day = match[3];
-	      const hour = match[4];
-	      const min = match[5];
-	      const sec = match[7] || '0';
-	      const fraction = parseFloat('0' + match[8]);
-	      ret = _partsToTime(year, month, day, hour, min, sec, fraction);
-	    }
-	  }
-	  if (ret === undefined) {
-	    match = s.match(DATE4_REGEX);
-	    if (match) {
-	      const year = match[1];
-	      const month = match[2];
-	      const day = match[3];
-	      ret = _partsToTime(year, month, day, 0, 0, 0);
-	    }
-	  }
-	  if (ret === undefined) {
-	    match = s.match(DATE2_REGEX);
-	    if (match) {
-	      const year = _fix2year(match[1]);
-	      const month = match[2];
-	      const day = match[3];
-	      ret = _partsToTime(year, month, day, 0, 0, 0);
-	    }
-	  }
-	  return ret;
-	}
-	function _numToTime(number) {
-	  const hours = Math.floor(number / 10000);
-	  number -= hours * 10000;
-	  const minutes = Math.floor(number / 100);
-	  number -= minutes * 100;
-	  return hours * HOUR + minutes * MINUTE + number;
-	}
-	function getDecimals(value, max) {
-	  let ret = 0;
-	  if (typeof value === 'number') {
-	    ret = String(value).split('.')?.[1]?.length || 0;
-	  } else if (typeof value === 'string') {
-	    ret = value.split('.')?.[1]?.length || 0;
-	  }
-	  if (max !== undefined) {
-	    ret = Math.min(max, ret);
-	  }
-	  return ret;
-	}
-	function _pad2(num) {
-	  return String(num).padStart(2, '0');
-	}
-	function _pad4(num) {
-	  return String(num).padStart(4, '0');
-	}
-	function _fix2year(num) {
-	  let ret = num;
-	  if (num?.length <= 2) {
-	    ret = parseInt(num);
-	    if (num >= 0 && num <= 69) {
-	      ret += 2000;
-	    } else if (num >= 70 && num <= 99) {
-	      ret += 1900;
-	    }
-	  }
-	  return ret;
-	}
-	function _partsToTime(year, month, day, hour, min, sec, fraction) {
-	  const iso = `${_pad4(year)}-${_pad2(month)}-${_pad2(day)}T${_pad2(
-	    hour
-	  )}:${_pad2(min)}:${_pad2(sec)}Z`;
-	  const time = Date.parse(iso);
-	  let ret;
-	  if (!isNaN(time)) {
-	    ret = {
-	      time: time / 1000,
-	      fraction,
-	    };
-	  }
-	  return ret;
-	}
-	return sql_conversion;
+const MINUTE = 60;
+const HOUR = 60 * MINUTE;
+const DAY$1 = 24 * HOUR;
+function convertNum(value) {
+    let ret = value;
+    if (value === null) {
+        ret = null;
+    }
+    else if (value === '') {
+        ret = 0;
+    }
+    else if (typeof value === 'string') {
+        ret = parseFloat(value);
+        if (isNaN(ret)) {
+            ret = 0;
+        }
+    }
+    else if (value?.toNumber) {
+        ret = value.toNumber();
+    }
+    return ret;
+}
+function convertBooleanValue(value) {
+    let ret;
+    if (value === null) {
+        ret = null;
+    }
+    else if (typeof value === 'number') {
+        ret = value ? 1 : 0;
+    }
+    else {
+        ret = convertNum(value) ? 1 : 0;
+    }
+    return ret;
+}
+const SEP = `[-^\\][!@#$%&*()_+={}\\|/\\\\<>,.:;"']+`;
+const DATE_RS = `^([0-9]{1,4})${SEP}([0-2]?[0-9])${SEP}([0-3]?[0-9])`;
+const DEC_RS = `(\\.[0-9]{1,6})?`;
+const DIGIT_RS = `(${SEP}([0-5]?[0-9]))?`;
+const DT_RS = `${DATE_RS}(\\s+|T)([0-2]?[0-9])${DIGIT_RS}${DIGIT_RS}${DEC_RS}`;
+const DATE4_RS = `^([0-9]{4})([0-1][0-9])([0-3][0-9])`;
+const DATETIME4_RS = `${DATE4_RS}([0-2][0-9])([0-5][0-9])(([0-5][0-9])${DEC_RS})?`;
+const DATE2_RS = `^([0-9]{2})([0-1][0-9])([0-3][0-9])`;
+const DATETIME2_RS = `${DATE2_RS}([0-2][0-9])([0-5][0-9])(([0-5][0-9])${DEC_RS})?`;
+const DATE_REGEX = new RegExp(DATE_RS + '$');
+const DATETIME_REGEX = new RegExp(DT_RS);
+const DATE4_REGEX = new RegExp(DATE4_RS);
+const DATETIME4_REGEX = new RegExp(DATETIME4_RS);
+const DATE2_REGEX = new RegExp(DATE2_RS);
+const DATETIME2_REGEX = new RegExp(DATETIME2_RS);
+function convertDateTime(value, type, decimals) {
+    let ret;
+    if (value === null) {
+        ret = null;
+    }
+    else if (value instanceof SQLDateTime) {
+        ret = createSQLDateTime(value, type, decimals);
+    }
+    else if (value instanceof SQLTime) {
+        ret = value.toSQLDateTime(decimals);
+    }
+    else if (typeof value === 'string') {
+        let time = _stringToDateTime(value);
+        if (time === undefined) {
+            time = _stringToDate(value);
+            if (!type) {
+                type = 'date';
+            }
+        }
+        if (time === undefined) {
+            time = _numToDateTime(value);
+        }
+        if (time === undefined) {
+            ret = null;
+        }
+        else {
+            ret = createSQLDateTime(time, type ?? 'datetime', decimals);
+        }
+    }
+    else if (typeof value === 'number') {
+        const time = _numToDateTime(value);
+        if (time === undefined) {
+            ret = null;
+        }
+        else {
+            ret = createSQLDateTime(time, type, decimals);
+        }
+    }
+    return ret;
+}
+const DAY_TIME_REGEX = /^(-)?([0-9]+)\s+([0-9]*)(:([0-9]{1,2}))?(:([0-9]{1,2}))?(\.[0-9]+)?/;
+const TIME_REGEX = /^(-)?([0-9]*):([0-9]{1,2})(:([0-9]{1,2}))?(\.[0-9]+)?/;
+function convertTime(value, decimals) {
+    let ret;
+    if (value instanceof SQLTime) {
+        ret = value;
+    }
+    else if (typeof value === 'string') {
+        let time = _stringToTime(value);
+        if (time === undefined) {
+            const result = _stringToDateTime(value);
+            if (result !== undefined) {
+                time = (result.time % DAY$1) + (result.fraction || 0);
+            }
+        }
+        if (time === undefined) {
+            const num = parseFloat(value);
+            if (!isNaN(num)) {
+                time = _numToTime(num);
+            }
+        }
+        if (time === undefined) {
+            ret = null;
+        }
+        else {
+            ret = createSQLTime(time, decimals);
+        }
+    }
+    else if (typeof value === 'number') {
+        const time = _numToTime(value);
+        ret = createSQLTime(time, decimals);
+    }
+    return ret;
+}
+function _stringToTime(value) {
+    let ret;
+    value = value.trim();
+    let match = value.match(DAY_TIME_REGEX);
+    if (match) {
+        const negative = match[1];
+        const days = parseInt(match[2]);
+        const hours = parseInt(match[3]);
+        const mins = parseInt(match[5] || '0');
+        const secs = parseInt(match[7] || '0');
+        const fraction = parseFloat('0' + match[8]);
+        ret = days * DAY$1 + hours * HOUR + mins * MINUTE + secs + fraction;
+        if (negative) {
+            ret = -ret;
+        }
+    }
+    if (ret === undefined) {
+        match = value.match(TIME_REGEX);
+        if (match) {
+            const negative = match[1];
+            const hours = parseInt(match[2]);
+            const mins = parseInt(match[3] || '0');
+            const secs = parseInt(match[5] || '0');
+            const fraction = parseFloat('0' + match[6]);
+            ret = hours * HOUR + mins * MINUTE + secs + fraction;
+            if (negative) {
+                ret = -ret;
+            }
+        }
+    }
+    return ret;
+}
+function _stringToDate(value) {
+    let ret;
+    const match = value.trim().match(DATE_REGEX);
+    if (match) {
+        const year = _fix2year(match[1]);
+        const month = match[2];
+        const day = match[3];
+        ret = _partsToTime(year, month, day, 0, 0, 0);
+    }
+    return ret;
+}
+function _stringToDateTime(value) {
+    let ret;
+    const match = value.trim().match(DATETIME_REGEX);
+    if (match) {
+        const year = _fix2year(match[1]);
+        const month = match[2];
+        const day = match[3];
+        const hour = match[5];
+        const min = match[7] || '0';
+        const sec = match[9] || '0';
+        const fraction = parseFloat('0' + match[10]);
+        ret = _partsToTime(year, month, day, hour, min, sec, fraction);
+    }
+    return ret;
+}
+function _numToDateTime(number) {
+    let ret;
+    const s = String(number);
+    let match = s.match(DATETIME4_REGEX);
+    if (match) {
+        const year = match[1];
+        const month = match[2];
+        const day = match[3];
+        const hour = match[4];
+        const min = match[5];
+        const sec = match[7] || '0';
+        const fraction = parseFloat('0' + match[8]);
+        ret = _partsToTime(year, month, day, hour, min, sec, fraction);
+    }
+    if (ret === undefined) {
+        match = s.match(DATETIME2_REGEX);
+        if (match) {
+            const year = _fix2year(match[1]);
+            const month = match[2];
+            const day = match[3];
+            const hour = match[4];
+            const min = match[5];
+            const sec = match[7] || '0';
+            const fraction = parseFloat('0' + match[8]);
+            ret = _partsToTime(year, month, day, hour, min, sec, fraction);
+        }
+    }
+    if (ret === undefined) {
+        match = s.match(DATE4_REGEX);
+        if (match) {
+            const year = match[1];
+            const month = match[2];
+            const day = match[3];
+            ret = _partsToTime(year, month, day, 0, 0, 0);
+        }
+    }
+    if (ret === undefined) {
+        match = s.match(DATE2_REGEX);
+        if (match) {
+            const year = _fix2year(match[1]);
+            const month = match[2];
+            const day = match[3];
+            ret = _partsToTime(year, month, day, 0, 0, 0);
+        }
+    }
+    return ret;
+}
+function _numToTime(number) {
+    const hours = Math.floor(number / 10000);
+    number -= hours * 10000;
+    const minutes = Math.floor(number / 100);
+    number -= minutes * 100;
+    return hours * HOUR + minutes * MINUTE + number;
+}
+function getDecimals(value, max) {
+    let ret = 0;
+    if (typeof value === 'number') {
+        ret = String(value).split('.')?.[1]?.length || 0;
+    }
+    else if (typeof value === 'string') {
+        ret = value.split('.')?.[1]?.length || 0;
+    }
+    {
+        ret = Math.min(max, ret);
+    }
+    return ret;
+}
+function _pad2(num) {
+    return String(num).padStart(2, '0');
+}
+function _pad4(num) {
+    return String(num).padStart(4, '0');
+}
+function _fix2year(num) {
+    let ret = num;
+    if (num?.length <= 2) {
+        ret = parseInt(num);
+        if (num >= 0 && num <= 69) {
+            ret += 2000;
+        }
+        else if (num >= 70 && num <= 99) {
+            ret += 1900;
+        }
+    }
+    return ret;
+}
+function _partsToTime(year, month, day, hour, min, sec, fraction) {
+    const iso = `${_pad4(year)}-${_pad2(month)}-${_pad2(day)}T${_pad2(hour)}:${_pad2(min)}:${_pad2(sec)}Z`;
+    const time = Date.parse(iso);
+    let ret;
+    if (!isNaN(time)) {
+        ret = {
+            time: time / 1000,
+            fraction,
+        };
+    }
+    return ret;
 }
 
-var hasRequiredAggregate_functions;
-
-function requireAggregate_functions () {
-	if (hasRequiredAggregate_functions) return aggregate_functions;
-	hasRequiredAggregate_functions = 1;
-	const Expression = requireExpression();
-	const { convertNum } = requireSql_conversion();
-
-	aggregate_functions.sum = sum;
-
-	function sum(expr, state) {
-	  const { row, ...other } = state;
-	  const group = row?.['@@group'] || [{}];
-	  let err;
-	  let value = 0;
-	  let name = 'SUM(';
-	  group.forEach((group_row, i) => {
-	    other.row = group_row;
-	    const result = Expression.getValue(expr.args?.expr, other);
-	    if (i === 0) {
-	      name += result.name;
-	    }
-
-	    if (!err && result.err) {
-	      err = result.err;
-	    } else if (result.value === null) {
-	      value = null;
-	    } else if (value !== null) {
-	      value += convertNum(result.value);
-	    }
-	  });
-	  name += ')';
-	  return { err, value, type: 'number', name };
-	}
-	return aggregate_functions;
+function sum(expr, state) {
+    const { row, ...other } = state;
+    const group = row?.['@@group'] || [{}];
+    let err;
+    let value = 0;
+    let name = 'SUM(';
+    group.forEach((group_row, i) => {
+        other.row = group_row;
+        const result = getValue(expr.args?.expr, other);
+        if (i === 0) {
+            name += result.name;
+        }
+        if (!err && result.err) {
+            err = result.err;
+        }
+        else if (result.value === null) {
+            value = null;
+        }
+        else if (value !== null) {
+            value += convertNum(result.value);
+        }
+    });
+    name += ')';
+    return { err, value, type: 'number', name };
 }
 
-var binary_expression = {};
+var AggregateFunctions = /*#__PURE__*/Object.freeze({
+	__proto__: null,
+	sum: sum
+});
 
-var hasRequiredBinary_expression;
-
-function requireBinary_expression () {
-	if (hasRequiredBinary_expression) return binary_expression;
-	hasRequiredBinary_expression = 1;
-	(function (exports) {
-		const {
-		  convertNum,
-		  convertBooleanValue,
-		  convertDateTime,
-		} = requireSql_conversion();
-		const Expression = requireExpression();
-
-		exports['+'] = plus;
-		exports['-'] = minus;
-		exports['*'] = mul;
-		exports['/'] = div;
-		exports['='] = equal;
-		exports['!='] = notEqual;
-		exports['<>'] = notEqual;
-		exports['>'] = gt;
-		exports['<'] = lt;
-		exports['>='] = gte;
-		exports['<='] = lte;
-		exports['and'] = and;
-		exports['or'] = or;
-		exports['xor'] = xor;
-		exports['is'] = is;
-		exports['is not'] = isNot;
-
-		function _isDateOrTimeLike(type) {
-		  return type === 'date' || type === 'datetime' || type === 'time';
-		}
-		function _isDateLike(type) {
-		  return type === 'date' || type === 'datetime';
-		}
-
-		function _numBothSides(expr, state, op, allow_interval) {
-		  const left = Expression.getValue(expr.left, state);
-		  const right = Expression.getValue(expr.right, state);
-		  let err = left.err || right.err;
-		  const name = left.name + op + right.name;
-		  let value;
-		  let left_num;
-		  let right_num;
-		  let interval;
-		  let datetime;
-		  if (!err) {
-		    if (left.value === null || right.value === null) {
-		      value = null;
-		    } else if (allow_interval && left.type === 'interval') {
-		      interval = left.value;
-		      if (_isDateOrTimeLike(right.type)) {
-		        datetime = right.value;
-		      } else if (typeof right.value === 'string') {
-		        datetime = convertDateTime(left.value);
-		        if (!datetime) {
-		          value = null;
-		        }
-		      } else {
-		        value = null;
-		      }
-		    } else if (allow_interval && right.type === 'interval') {
-		      interval = right.value;
-		      if (_isDateOrTimeLike(left.type)) {
-		        datetime = left.value;
-		      } else if (typeof left.value === 'string') {
-		        datetime = convertDateTime(left.value);
-		        if (!datetime) {
-		          value = null;
-		        }
-		      } else {
-		        value = null;
-		      }
-		    } else if (right.type === 'interval' || left.type === 'interval') {
-		      err = 'bad_interval_usage';
-		    } else {
-		      left_num = convertNum(left.value);
-		      right_num = convertNum(right.value);
-		      if (left_num === null || right_num === null) {
-		        value = null;
-		      }
-		    }
-		  }
-		  return { err, name, value, left_num, right_num, interval, datetime };
-		}
-		function plus(expr, state) {
-		  let { err, name, value, left_num, right_num, interval, datetime } =
-		    _numBothSides(expr, state, ' + ', true);
-		  let type;
-		  if (!err && value !== null) {
-		    if (datetime) {
-		      const result = interval.add(datetime);
-		      value = result.value;
-		      type = result.type;
-		    } else {
-		      value = left_num + right_num;
-		      type = 'number';
-		    }
-		  }
-		  return { err, value, type, name };
-		}
-		function minus(expr, state) {
-		  let { err, name, value, left_num, right_num, interval, datetime } =
-		    _numBothSides(expr, state, ' - ', true);
-		  let type;
-		  if (!err && value !== null) {
-		    if (datetime) {
-		      const result = interval.sub(datetime);
-		      value = result.value;
-		      type = result.type;
-		    } else {
-		      value = left_num - right_num;
-		      type = 'number';
-		    }
-		  }
-		  return { err, value, type, name };
-		}
-		function mul(expr, state) {
-		  let { err, name, value, left_num, right_num } = _numBothSides(
-		    expr,
-		    state,
-		    ' * '
-		  );
-		  if (!err && value !== null) {
-		    value = left_num * right_num;
-		  }
-		  return { err, value, name };
-		}
-		function div(expr, state) {
-		  let { err, name, value, left_num, right_num } = _numBothSides(
-		    expr,
-		    state,
-		    ' / '
-		  );
-		  if (!err && value !== null) {
-		    value = left_num / right_num;
-		  }
-		  return { err, value, name };
-		}
-		function equal(expr, state) {
-		  return _equal(expr, state, ' = ');
-		}
-		function notEqual(expr, state) {
-		  const ret = _equal(expr, state, ' != ');
-		  if (ret.value !== null) {
-		    ret.value = ret.value ? 0 : 1;
-		  }
-		  return ret;
-		}
-		function _convertCompare(left, right) {
-		  if (
-		    left.value !== null &&
-		    right.value !== null &&
-		    left.value !== right.value
-		  ) {
-		    if (
-		      (_isDateLike(left.type) || _isDateLike(right.type)) &&
-		      left.type !== right.type
-		    ) {
-		      const union = _unionDateTime(left.type, right.type);
-		      if (union === 'date' || union === 'datetime') {
-		        left.value = convertDateTime(left.value, union, 6) ?? left.value;
-		        right.value = convertDateTime(right.value, union, 6) ?? right.value;
-		      }
-		    }
-		    if (
-		      typeof left.value === 'number' ||
-		      typeof right.value === 'number' ||
-		      left.type === 'number' ||
-		      right.type === 'number'
-		    ) {
-		      left.value = convertNum(left.value);
-		      right.value = convertNum(right.value);
-		    } else {
-		      if (typeof left.value !== 'string') {
-		        left.value = String(left.value);
-		      }
-		      if (typeof right.value !== 'string') {
-		        right.value = String(right.value);
-		      }
-		    }
-		  }
-		}
-		function _equal(expr, state, op) {
-		  const left = Expression.getValue(expr.left, state);
-		  const right = Expression.getValue(expr.right, state);
-		  const err = left.err || right.err;
-		  const name = left.name + op + right.name;
-		  let value = 0;
-		  if (!err) {
-		    _convertCompare(left, right);
-		    if (left.value === null || right.value === null) {
-		      value = null;
-		    } else if (left.value === right.value) {
-		      value = 1;
-		    } else if (typeof left.value === 'string') {
-		      value = left.value.localeCompare(right.value) === 0 ? 1 : 0;
-		    }
-		  }
-		  return { err, value, name };
-		}
-		function _gt(expr_left, expr_right, state, op, flip) {
-		  const left = Expression.getValue(expr_left, state);
-		  const right = Expression.getValue(expr_right, state);
-		  const err = left.err || right.err;
-		  const name = flip ? right.name + op + left.name : left.name + op + right.name;
-		  let value = 0;
-		  if (!err) {
-		    _convertCompare(left, right);
-		    if (left.value === null || right.value === null) {
-		      value = null;
-		    } else if (left.value === right.value) {
-		      value = 0;
-		    } else if (typeof left.value === 'number') {
-		      value = left.value > right.value ? 1 : 0;
-		    } else {
-		      value = left.value.localeCompare(right.value) > 0 ? 1 : 0;
-		    }
-		  }
-		  return { err, value, name };
-		}
-		function gt(expr, state) {
-		  return _gt(expr.left, expr.right, state, ' > ', false);
-		}
-		function lt(expr, state) {
-		  return _gt(expr.right, expr.left, state, ' < ', true);
-		}
-		function _gte(expr_left, expr_right, state, op, flip) {
-		  const left = Expression.getValue(expr_left, state);
-		  const right = Expression.getValue(expr_right, state);
-		  const err = left.err || right.err;
-		  const name = flip ? right.name + op + left.name : left.name + op + right.name;
-		  let value = 0;
-		  if (!err) {
-		    _convertCompare(left, right);
-		    if (left.value === null || right.value === null) {
-		      value = null;
-		    } else if (left.value === right.value) {
-		      value = 1;
-		    } else if (typeof left.value === 'number') {
-		      value = convertNum(left.value) >= convertNum(right.value) ? 1 : 0;
-		    } else {
-		      value = left.value.localeCompare(right.value) >= 0 ? 1 : 0;
-		    }
-		  }
-		  return { err, value, name };
-		}
-		function gte(expr, state) {
-		  return _gte(expr.left, expr.right, state, ' >= ', false);
-		}
-		function lte(expr, state) {
-		  return _gte(expr.right, expr.left, state, ' <= ', true);
-		}
-		function and(expr, state) {
-		  const left = Expression.getValue(expr.left, state);
-		  let err = left.err;
-		  let name = left.name + ' AND ';
-		  let value = 0;
-		  if (!err) {
-		    value = convertBooleanValue(left.value);
-		    if (value !== 0) {
-		      const right = Expression.getValue(expr.right, state);
-		      err = right.err;
-		      value = convertBooleanValue(right.value) && value;
-		      name = left.name + ' AND ' + right.name;
-		    }
-		  }
-		  return { err, value, name };
-		}
-		function or(expr, state) {
-		  const left = Expression.getValue(expr.left, state);
-		  let err = left.err;
-		  let name = left.name + ' OR ';
-		  let value = 1;
-		  if (!err) {
-		    value = convertBooleanValue(left.value);
-		    if (!value) {
-		      const right = Expression.getValue(expr.right, state);
-		      err = right.err;
-		      const result = convertBooleanValue(right.value);
-		      if (result) {
-		        value = 1;
-		      } else if (value !== null) {
-		        value = result;
-		      }
-		      name = left.name + ' OR ' + right.name;
-		    }
-		  }
-		  return { err, value, name };
-		}
-		function xor(expr, state) {
-		  const left = Expression.getValue(expr.left, state);
-		  const right = Expression.getValue(expr.right, state);
-		  const err = left.err || right.err;
-		  const name = left.name + ' XOR ' + right.name;
-		  let value = 1;
-		  if (!err) {
-		    const right_bool = convertBooleanValue(right.value);
-		    const left_bool = convertBooleanValue(left.value);
-		    if (right_bool === null || left_bool === null) {
-		      value = null;
-		    } else {
-		      value = right_bool ^ left_bool;
-		    }
-		  }
-		  return { err, value, name };
-		}
-		function is(expr, state) {
-		  return _is(expr, state, 'IS');
-		}
-		function isNot(expr, state) {
-		  const result = _is(expr, state, 'IS NOT');
-		  result.value = result.value ? 0 : 1;
-		  return result;
-		}
-		function _is(expr, state, op) {
-		  const result = Expression.getValue(expr.left, state);
-		  let right;
-		  let right_name;
-		  if (expr.right.value === null) {
-		    right = null;
-		    right_name = 'NULL';
-		  } else if (expr.right.value === true) {
-		    right = true;
-		    right_name = 'TRUE';
-		  } else if (expr.right.value === false) {
-		    right = false;
-		    right_name = 'FALSE';
-		  } else if (!result.err) {
-		    result.err = {
-		      err: 'syntax_err',
-		      args: [op],
-		    };
-		  }
-		  result.name = `${result.name} ${op} ${right_name}`;
-		  if (!result.err) {
-		    if (right === null) {
-		      result.value = right === result.value ? 1 : 0;
-		    } else if (right && result.value) {
-		      result.value = 1;
-		    } else if (!right && !result.value) {
-		      result.value = 1;
-		    } else {
-		      result.value = 0;
-		    }
-		  }
-		  return result;
-		}
-		function _unionDateTime(type1, type2) {
-		  let ret;
-		  if (type1 === 'string') {
-		    ret = 'datetime';
-		  } else if (type2 === 'string') {
-		    ret = 'datetime';
-		  } else if (type1 === 'time' || type2 === 'time') {
-		    ret = 'datetime';
-		  } else if (_isDateLike(type1) && _isDateLike(type2)) {
-		    ret = 'datetime';
-		  }
-		  return ret;
-		} 
-	} (binary_expression));
-	return binary_expression;
+function _isDateOrTimeLike(type) {
+    return type === 'date' || type === 'datetime' || type === 'time';
+}
+function _isDateLike(type) {
+    return type === 'date' || type === 'datetime';
+}
+function _numBothSides(expr, state, op, allow_interval) {
+    const left = getValue(expr.left, state);
+    const right = getValue(expr.right, state);
+    let err = left.err || right.err;
+    const name = left.name + op + right.name;
+    let value;
+    let left_num;
+    let right_num;
+    let interval;
+    let datetime;
+    if (!err) {
+        if (left.value === null || right.value === null) {
+            value = null;
+        }
+        else if (allow_interval && left.type === 'interval') {
+            interval = left.value;
+            if (_isDateOrTimeLike(right.type)) {
+                datetime = right.value;
+            }
+            else if (typeof right.value === 'string') {
+                datetime = convertDateTime(left.value);
+                if (!datetime) {
+                    value = null;
+                }
+            }
+            else {
+                value = null;
+            }
+        }
+        else if (allow_interval && right.type === 'interval') {
+            interval = right.value;
+            if (_isDateOrTimeLike(left.type)) {
+                datetime = left.value;
+            }
+            else if (typeof left.value === 'string') {
+                datetime = convertDateTime(left.value);
+                if (!datetime) {
+                    value = null;
+                }
+            }
+            else {
+                value = null;
+            }
+        }
+        else if (right.type === 'interval' || left.type === 'interval') {
+            err = 'bad_interval_usage';
+        }
+        else {
+            left_num = convertNum(left.value);
+            right_num = convertNum(right.value);
+            if (left_num === null || right_num === null) {
+                value = null;
+            }
+        }
+    }
+    return { err, name, value, left_num, right_num, interval, datetime };
+}
+function plus$1(expr, state) {
+    let { err, name, value, left_num, right_num, interval, datetime } = _numBothSides(expr, state, ' + ', true);
+    let type;
+    if (!err && value !== null) {
+        if (datetime) {
+            const result = interval.add(datetime);
+            value = result.value;
+            type = result.type;
+        }
+        else {
+            value = left_num + right_num;
+            type = 'number';
+        }
+    }
+    return { err, value, type, name };
+}
+function minus$2(expr, state) {
+    let { err, name, value, left_num, right_num, interval, datetime } = _numBothSides(expr, state, ' - ', true);
+    let type;
+    if (!err && value !== null) {
+        if (datetime) {
+            const result = interval.sub(datetime);
+            value = result.value;
+            type = result.type;
+        }
+        else {
+            value = left_num - right_num;
+            type = 'number';
+        }
+    }
+    return { err, value, type, name };
+}
+function div(expr, state) {
+    let { err, name, value, left_num, right_num } = _numBothSides(expr, state, ' / ');
+    if (!err && value !== null) {
+        value = left_num / right_num;
+    }
+    return { err, value, name };
+}
+function _convertCompare(left, right) {
+    if (left.value !== null && right.value !== null && left.value !== right.value) {
+        if ((_isDateLike(left.type) || _isDateLike(right.type)) && left.type !== right.type) {
+            const union = _unionDateTime(left.type, right.type);
+            if (union === 'date' || union === 'datetime') {
+                left.value = convertDateTime(left.value, union, 6) ?? left.value;
+                right.value = convertDateTime(right.value, union, 6) ?? right.value;
+            }
+        }
+        if (typeof left.value === 'number' || typeof right.value === 'number' || left.type === 'number' || right.type === 'number') {
+            left.value = convertNum(left.value);
+            right.value = convertNum(right.value);
+        }
+        else {
+            if (typeof left.value !== 'string') {
+                left.value = String(left.value);
+            }
+            if (typeof right.value !== 'string') {
+                right.value = String(right.value);
+            }
+        }
+    }
+}
+function _equal$1(expr, state, op) {
+    const left = getValue(expr.left, state);
+    const right = getValue(expr.right, state);
+    const err = left.err || right.err;
+    const name = left.name + op + right.name;
+    let value = 0;
+    if (!err) {
+        _convertCompare(left, right);
+        if (left.value === null || right.value === null) {
+            value = null;
+        }
+        else if (left.value === right.value) {
+            value = 1;
+        }
+        else if (typeof left.value === 'string') {
+            value = left.value.localeCompare(right.value) === 0 ? 1 : 0;
+        }
+    }
+    return { err, value, name };
+}
+function equal$1(expr, state) {
+    return _equal$1(expr, state, ' = ');
+}
+function notEqual$1(expr, state) {
+    const ret = _equal$1(expr, state, ' != ');
+    if (ret.value !== null) {
+        ret.value = ret.value ? 0 : 1;
+    }
+    return ret;
+}
+function _gt$1(expr_left, expr_right, state, op, flip) {
+    const left = getValue(expr_left, state);
+    const right = getValue(expr_right, state);
+    const err = left.err || right.err;
+    const name = flip ? right.name + op + left.name : left.name + op + right.name;
+    let value = 0;
+    if (!err) {
+        _convertCompare(left, right);
+        if (left.value === null || right.value === null) {
+            value = null;
+        }
+        else if (left.value === right.value) {
+            value = 0;
+        }
+        else if (typeof left.value === 'number') {
+            value = left.value > right.value ? 1 : 0;
+        }
+        else {
+            value = left.value.localeCompare(right.value) > 0 ? 1 : 0;
+        }
+    }
+    return { err, value, name };
+}
+function gt$1(expr, state) {
+    return _gt$1(expr.left, expr.right, state, ' > ', false);
+}
+function lt$1(expr, state) {
+    return _gt$1(expr.right, expr.left, state, ' < ', true);
+}
+function _gte$1(expr_left, expr_right, state, op, flip) {
+    const left = getValue(expr_left, state);
+    const right = getValue(expr_right, state);
+    const err = left.err || right.err;
+    const name = flip ? right.name + op + left.name : left.name + op + right.name;
+    let value = 0;
+    if (!err) {
+        _convertCompare(left, right);
+        if (left.value === null || right.value === null) {
+            value = null;
+        }
+        else if (left.value === right.value) {
+            value = 1;
+        }
+        else if (typeof left.value === 'number') {
+            value = convertNum(left.value) >= convertNum(right.value) ? 1 : 0;
+        }
+        else {
+            value = left.value.localeCompare(right.value) >= 0 ? 1 : 0;
+        }
+    }
+    return { err, value, name };
+}
+function gte$1(expr, state) {
+    return _gte$1(expr.left, expr.right, state, ' >= ', false);
+}
+function lte$1(expr, state) {
+    return _gte$1(expr.right, expr.left, state, ' <= ', true);
+}
+function and$1(expr, state) {
+    const left = getValue(expr.left, state);
+    let err = left.err;
+    let name = left.name + ' AND ';
+    let value = 0;
+    if (!err) {
+        value = convertBooleanValue(left.value);
+        if (value !== 0) {
+            const right = getValue(expr.right, state);
+            err = right.err;
+            value = convertBooleanValue(right.value) && value;
+            name = left.name + ' AND ' + right.name;
+        }
+    }
+    return { err, value, name };
+}
+function or$1(expr, state) {
+    const left = getValue(expr.left, state);
+    let err = left.err;
+    let name = left.name + ' OR ';
+    let value = 1;
+    if (!err) {
+        value = convertBooleanValue(left.value);
+        if (!value) {
+            const right = getValue(expr.right, state);
+            err = right.err;
+            const result = convertBooleanValue(right.value);
+            if (result) {
+                value = 1;
+            }
+            else if (value !== null) {
+                value = result;
+            }
+            name = left.name + ' OR ' + right.name;
+        }
+    }
+    return { err, value, name };
+}
+function xor(expr, state) {
+    const left = getValue(expr.left, state);
+    const right = getValue(expr.right, state);
+    const err = left.err || right.err;
+    const name = left.name + ' XOR ' + right.name;
+    let value = 1;
+    if (!err) {
+        const right_bool = convertBooleanValue(right.value);
+        const left_bool = convertBooleanValue(left.value);
+        if (right_bool === null || left_bool === null) {
+            value = null;
+        }
+        else {
+            value = right_bool ^ left_bool;
+        }
+    }
+    return { err, value, name };
+}
+function is$1(expr, state) {
+    return _is$1(expr, state, 'IS');
+}
+function isNot$1(expr, state) {
+    const result = _is$1(expr, state, 'IS NOT');
+    result.value = result.value ? 0 : 1;
+    return result;
+}
+function _is$1(expr, state, op) {
+    const result = getValue(expr.left, state);
+    let right;
+    let right_name;
+    if (expr.right.value === null) {
+        right = null;
+        right_name = 'NULL';
+    }
+    else if (expr.right.value === true) {
+        right = true;
+        right_name = 'TRUE';
+    }
+    else if (expr.right.value === false) {
+        right = false;
+        right_name = 'FALSE';
+    }
+    else if (!result.err) {
+        result.err = { err: 'syntax_err', args: [op] };
+    }
+    result.name = `${result.name} ${op} ${right_name}`;
+    if (!result.err) {
+        if (right === null) {
+            result.value = right === result.value ? 1 : 0;
+        }
+        else if (right && result.value) {
+            result.value = 1;
+        }
+        else if (!right && !result.value) {
+            result.value = 1;
+        }
+        else {
+            result.value = 0;
+        }
+    }
+    return result;
+}
+function _unionDateTime(type1, type2) {
+    let ret;
+    if (type1 === 'string') {
+        ret = 'datetime';
+    }
+    else if (type2 === 'string') {
+        ret = 'datetime';
+    }
+    else if (type1 === 'time' || type2 === 'time') {
+        ret = 'datetime';
+    }
+    else if (_isDateLike(type1) && _isDateLike(type2)) {
+        ret = 'datetime';
+    }
+    return ret;
 }
 
-var cast = {};
+var BinaryExpression = /*#__PURE__*/Object.freeze({
+	__proto__: null,
+	"!=": notEqual$1,
+	"+": plus$1,
+	"-": minus$2,
+	"/": div,
+	"<": lt$1,
+	"<=": lte$1,
+	"<>": notEqual$1,
+	"=": equal$1,
+	">": gt$1,
+	">=": gte$1,
+	and: and$1,
+	is: is$1,
+	"is not": isNot$1,
+	or: or$1,
+	xor: xor
+});
 
-var sql_interval = {};
-
-var hasRequiredSql_interval;
-
-function requireSql_interval () {
-	if (hasRequiredSql_interval) return sql_interval;
-	hasRequiredSql_interval = 1;
-	sql_interval.createSQLInterval = createSQLInterval;
-	const { createSQLDateTime } = requireSql_datetime();
-	const { createSQLTime } = requireSql_time();
-	const { getDecimals, convertNum } = requireSql_conversion();
-
-	const SINGLE_TIME = {
-	  microsecond: 0.000001,
-	  second: 1,
-	  minute: 60,
-	  hour: 60 * 60,
-	  day: 24 * 60 * 60,
-	  week: 7 * 24 * 60 * 60,
-	};
-	const DOUBLE_TIME = {
-	  second_microsecond: [1, 0.000001],
-	  minute_microsecond: [60, 0.000001],
-	  minute_second: [60, 1],
-	  hour_microsecond: [60 * 60, 0.000001],
-	  hour_second: [60 * 60, 1],
-	  hour_minute: [60 * 60, 60],
-	  day_microsecond: [24 * 60 * 60, 0.000001],
-	  day_second: [24 * 60 * 60, 1],
-	  day_minute: [24 * 60 * 60, 60],
-	  day_hour: [24 * 60 * 60, 60 * 60],
-	};
-	const MONTH = {
-	  month: 1,
-	  quarter: 3,
-	  year: 12,
-	  year_month: [12, 1],
-	};
-	const FORCE_DATE = {
-	  day: true,
-	  week: true,
-	  month: true,
-	  quarter: true,
-	  year: true,
-	  day_microsecond: true,
-	  day_second: true,
-	  day_minute: true,
-	  day_hour: true,
-	  year_month: true,
-	};
-	const DECIMALS = {
-	  microsecond: 6,
-	  second_microsecond: 6,
-	  minute_microsecond: 6,
-	  hour_microsecond: 6,
-	  day_microsecond: 6,
-	};
-
-	class SQLInterval {
-	  constructor(number, decimals, is_month, force_date) {
-	    this._isMonth = is_month;
-	    this._forceDate = force_date;
-	    this._decimals = decimals || 0;
-	    if (this._decimals > 0) {
-	      this._number = parseFloat(
-	        number.toFixed(this._decimals + 1).slice(0, -1)
-	      );
-	    } else {
-	      this._number = Math.trunc(number);
-	    }
-	  }
-	  getNumber() {
-	    return this._number;
-	  }
-	  isMonth() {
-	    return this._isMonth;
-	  }
-	  forceDate() {
-	    return this._forceDate;
-	  }
-	  toString() {
-	    return null;
-	  }
-	  _add(datetime, mult) {
-	    let old_time = datetime.getTime?.();
-	    let fraction = datetime.getFraction?.();
-	    const old_type = datetime?.getType?.();
-	    let type;
-	    if (old_type === 'datetime') {
-	      type = 'datetime';
-	    } else if (old_type === 'date' && !this._forceDate) {
-	      type = 'datetime';
-	    } else if (old_type === 'date') {
-	      type = 'date';
-	    } else if (old_type === 'time' && this._forceDate) {
-	      type = 'datetime';
-	    } else if (old_type === 'time') {
-	      type = 'time';
-	    }
-	    const decimals = Math.max(datetime.getDecimals?.(), this._decimals);
-	    const number = this._number * mult;
-	    let value = null;
-	    if (type === 'time') {
-	      value = createSQLTime(old_time + number, decimals);
-	    } else {
-	      if (old_type === 'time') {
-	        const now = Date.now() / 1000;
-	        old_time += now - (now % (24 * 60 * 60));
-	      }
-	      let time;
-	      if (this._isMonth) {
-	        time = _addMonth(old_time, number);
-	      } else {
-	        const add_time = Math.floor(number);
-	        time = old_time + add_time;
-	        fraction += number - add_time;
-	        const overflow = Math.floor(fraction);
-	        time += overflow;
-	        fraction -= overflow;
-	      }
-	      value = createSQLDateTime({ time, fraction }, type, decimals);
-	    }
-	    return { type, value };
-	  }
-	  add(datetime) {
-	    return this._add(datetime, 1);
-	  }
-	  sub(datetime) {
-	    return this._add(datetime, -1);
-	  }
-	}
-	sql_interval.SQLInterval = SQLInterval;
-	function createSQLInterval(value, unit_name) {
-	  let is_month = false;
-	  let unit;
-	  if (unit_name in MONTH) {
-	    is_month = true;
-	    unit = MONTH[unit_name];
-	  } else {
-	    unit = SINGLE_TIME[unit_name] ?? DOUBLE_TIME[unit_name];
-	  }
-	  let ret = null;
-	  const number = unit ? _convertNumber(value, unit, unit_name) : null;
-	  if (number !== null) {
-	    const force_date = unit_name in FORCE_DATE;
-	    let decimals = DECIMALS[unit_name] || 0;
-	    if (!decimals && unit_name.endsWith('second')) {
-	      decimals = getDecimals(value, 6);
-	      if (typeof value === 'string' && decimals) {
-	        decimals = 6;
-	      }
-	    }
-	    ret = new SQLInterval(number, decimals, is_month, force_date);
-	  }
-	  return ret;
-	}
-	function _convertNumber(value, unit, unit_name) {
-	  let ret = null;
-	  if (Array.isArray(unit)) {
-	    if (typeof value === 'number') {
-	      ret = value * unit[1];
-	    } else {
-	      const match = String(value).match(/\d+/g);
-	      if (match.length === 2) {
-	        ret = parseInt(match[0]) * unit[0] + parseInt(match[1]) * unit[2];
-	      } else if (match.length === 1) {
-	        ret = parseInt(match[0]) * unit[1];
-	      } else if (match.length === 0) {
-	        ret = 0;
-	      } else {
-	        ret = null;
-	      }
-	    }
-	  } else {
-	    ret = convertNum(value);
-	    if (ret !== null) {
-	      if (unit_name !== 'second') {
-	        ret = Math.trunc(ret);
-	      }
-	      ret *= unit;
-	    }
-	  }
-	  return ret;
-	}
-	function _addMonth(old_time, number) {
-	  const date = new Date(old_time * 1000);
-	  const start_time = date.getTime();
-	  const new_months = date.getUTCFullYear() * 12 + date.getUTCMonth() + number;
-	  const year = Math.floor(new_months / 12);
-	  const month = new_months - year * 12;
-	  let day = date.getUTCDate();
-	  date.setUTCFullYear(year);
-	  date.setUTCMonth(month);
-	  while (date.getUTCMonth() !== month) {
-	    date.setUTCMonth(0);
-	    date.setUTCDate(day--);
-	    date.setUTCMonth(month);
-	  }
-	  const delta = date.getTime() - start_time;
-	  return old_time + delta / 1000;
-	}
-	return sql_interval;
+const SINGLE_TIME = {
+    microsecond: 0.000001,
+    second: 1,
+    minute: 60,
+    hour: 60 * 60,
+    day: 24 * 60 * 60,
+    week: 7 * 24 * 60 * 60,
+};
+const DOUBLE_TIME = {
+    second_microsecond: [1, 0.000001],
+    minute_microsecond: [60, 0.000001],
+    minute_second: [60, 1],
+    hour_microsecond: [60 * 60, 0.000001],
+    hour_second: [60 * 60, 1],
+    hour_minute: [60 * 60, 60],
+    day_microsecond: [24 * 60 * 60, 0.000001],
+    day_second: [24 * 60 * 60, 1],
+    day_minute: [24 * 60 * 60, 60],
+    day_hour: [24 * 60 * 60, 60 * 60],
+};
+const MONTH = {
+    month: 1,
+    quarter: 3,
+    year: 12,
+    year_month: [12, 1],
+};
+const FORCE_DATE = {
+    day: true,
+    week: true,
+    month: true,
+    quarter: true,
+    year: true,
+    day_microsecond: true,
+    day_second: true,
+    day_minute: true,
+    day_hour: true,
+    year_month: true,
+};
+const DECIMALS = {
+    microsecond: 6,
+    second_microsecond: 6,
+    minute_microsecond: 6,
+    hour_microsecond: 6,
+    day_microsecond: 6,
+};
+class SQLInterval {
+    constructor(number, decimals, is_month, force_date) {
+        this._isMonth = is_month;
+        this._forceDate = force_date;
+        this._decimals = decimals || 0;
+        if (this._decimals > 0) {
+            this._number = parseFloat(number.toFixed(this._decimals + 1).slice(0, -1));
+        }
+        else {
+            this._number = Math.trunc(number);
+        }
+    }
+    getNumber() {
+        return this._number;
+    }
+    isMonth() {
+        return this._isMonth;
+    }
+    forceDate() {
+        return this._forceDate;
+    }
+    toString() {
+        return null;
+    }
+    _add(datetime, mult) {
+        let old_time = datetime.getTime?.();
+        let fraction = datetime.getFraction?.();
+        const old_type = datetime?.getType?.();
+        let type;
+        if (old_type === 'datetime') {
+            type = 'datetime';
+        }
+        else if (old_type === 'date' && !this._forceDate) {
+            type = 'datetime';
+        }
+        else if (old_type === 'date') {
+            type = 'date';
+        }
+        else if (old_type === 'time' && this._forceDate) {
+            type = 'datetime';
+        }
+        else if (old_type === 'time') {
+            type = 'time';
+        }
+        const decimals = Math.max(datetime.getDecimals?.(), this._decimals);
+        const number = this._number * mult;
+        let value = null;
+        if (type === 'time') {
+            value = createSQLTime(old_time + number, decimals);
+        }
+        else {
+            if (old_type === 'time') {
+                const now = Date.now() / 1000;
+                old_time += now - (now % (24 * 60 * 60));
+            }
+            let time;
+            if (this._isMonth) {
+                time = _addMonth(old_time, number);
+            }
+            else {
+                const add_time = Math.floor(number);
+                time = old_time + add_time;
+                fraction += number - add_time;
+                const overflow = Math.floor(fraction);
+                time += overflow;
+                fraction -= overflow;
+            }
+            value = createSQLDateTime({ time, fraction }, type, decimals);
+        }
+        return { type, value };
+    }
+    add(datetime) {
+        return this._add(datetime, 1);
+    }
+    sub(datetime) {
+        return this._add(datetime, -1);
+    }
+}
+function createSQLInterval(value, unit_name) {
+    let is_month = false;
+    let unit;
+    if (unit_name in MONTH) {
+        is_month = true;
+        unit = MONTH[unit_name];
+    }
+    else {
+        unit = SINGLE_TIME[unit_name] ?? DOUBLE_TIME[unit_name];
+    }
+    let ret = null;
+    const number = unit ? _convertNumber(value, unit, unit_name) : null;
+    if (number !== null) {
+        const force_date = unit_name in FORCE_DATE;
+        let decimals = DECIMALS[unit_name] || 0;
+        if (!decimals && unit_name.endsWith('second')) {
+            decimals = getDecimals(value, 6);
+            if (typeof value === 'string' && decimals) {
+                decimals = 6;
+            }
+        }
+        ret = new SQLInterval(number, decimals, is_month, force_date);
+    }
+    return ret;
+}
+function _convertNumber(value, unit, unit_name) {
+    let ret = null;
+    if (Array.isArray(unit)) {
+        if (typeof value === 'number') {
+            ret = value * unit[1];
+        }
+        else {
+            const match = String(value).match(/\d+/g);
+            if (match && match.length === 2) {
+                ret = parseInt(match[0]) * unit[0] + parseInt(match[1]) * unit[2];
+            }
+            else if (match && match.length === 1) {
+                ret = parseInt(match[0]) * unit[1];
+            }
+            else if (match && match.length === 0) {
+                ret = 0;
+            }
+            else {
+                ret = null;
+            }
+        }
+    }
+    else {
+        ret = convertNum(value);
+        if (ret !== null) {
+            if (unit_name !== 'second') {
+                ret = Math.trunc(ret);
+            }
+            ret *= unit;
+        }
+    }
+    return ret;
+}
+function _addMonth(old_time, number) {
+    const date = new Date(old_time * 1000);
+    const start_time = date.getTime();
+    const new_months = date.getUTCFullYear() * 12 + date.getUTCMonth() + number;
+    const year = Math.floor(new_months / 12);
+    const month = new_months - year * 12;
+    let day = date.getUTCDate();
+    date.setUTCFullYear(year);
+    date.setUTCMonth(month);
+    while (date.getUTCMonth() !== month) {
+        date.setUTCMonth(0);
+        date.setUTCDate(day--);
+        date.setUTCMonth(month);
+    }
+    const delta = date.getTime() - start_time;
+    return old_time + delta / 1000;
 }
 
-var hasRequiredCast;
-
-function requireCast () {
-	if (hasRequiredCast) return cast;
-	hasRequiredCast = 1;
-	const {
-	  convertDateTime,
-	  convertTime,
-	  convertNum,
-	} = requireSql_conversion();
-	const { createSQLInterval } = requireSql_interval();
-	const Expression = requireEvaluate();
-
-	cast.datetime = datetime;
-	cast.date = date;
-	cast.time = time;
-	cast.interval = interval;
-	cast.signed = signed;
-	cast.char = char;
-
-	function datetime(expr, state) {
-	  const result = Expression.getValue(expr.expr, state);
-	  result.name = `CAST(${result.name} AS DATETIME)`;
-	  result.type = 'datetime';
-	  if (!result.err && result.value !== null) {
-	    const decimals = expr.target.length || 0;
-	    if (decimals > 6) {
-	      result.err = 'ER_TOO_BIG_PRECISION';
-	    }
-	    result.value = convertDateTime(result.value, 'datetime', decimals);
-	  }
-	  return result;
-	}
-	function date(expr, state) {
-	  const result = Expression.getValue(expr.expr, state);
-	  result.name = `CAST(${result.name} AS DATE)`;
-	  result.type = 'date';
-	  if (!result.err && result.value !== null) {
-	    result.value = convertDateTime(result.value, 'date');
-	  }
-	  return result;
-	}
-	function time(expr, state) {
-	  const result = Expression.getValue(expr.expr, state);
-	  result.name = `CAST(${result.name} AS TIME)`;
-	  result.type = 'time';
-	  if (!result.err && result.value !== null) {
-	    const decimals = expr.target.length || 0;
-	    if (decimals > 6) {
-	      result.err = 'ER_TOO_BIG_PRECISION';
-	    }
-	    result.value = convertTime(result.value, decimals);
-	  }
-	  return result;
-	}
-	function interval(expr, state) {
-	  const result = Expression.getValue(expr.expr, state);
-	  result.name = `INTERVAL ${result.name} ${expr.unit}`;
-	  result.type = 'interval';
-	  if (!result.err && result.value !== null) {
-	    result.value = createSQLInterval(result.value, expr.unit);
-	  }
-	  return result;
-	}
-	function signed(expr, state) {
-	  const result = Expression.getValue(expr.expr, state);
-	  result.name = `CAST(${result.name} AS SIGNED)`;
-	  result.type = 'bigint';
-	  if (!result.err && result.value !== null) {
-	    result.value = Math.trunc(convertNum(result.value));
-	  }
-	  return result;
-	}
-	function char(expr, state) {
-	  const result = Expression.getValue(expr.expr, state);
-	  result.name = `CAST(${result.name} AS CHAR)`;
-	  if (!result.err && result.value !== null && result.type !== 'string') {
-	    result.type = 'string';
-	    result.value = String(result.value);
-	  }
-	  return result;
-	}
-	return cast;
+function datetime(expr, state) {
+    const result = getValue(expr.expr, state);
+    result.name = `CAST(${result.name} AS DATETIME)`;
+    result.type = 'datetime';
+    if (!result.err && result.value !== null) {
+        const decimals = expr.target.length || 0;
+        if (decimals > 6) {
+            result.err = 'ER_TOO_BIG_PRECISION';
+        }
+        result.value = convertDateTime(result.value, 'datetime', decimals);
+    }
+    return result;
+}
+function date$1(expr, state) {
+    const result = getValue(expr.expr, state);
+    result.name = `CAST(${result.name} AS DATE)`;
+    result.type = 'date';
+    if (!result.err && result.value !== null) {
+        result.value = convertDateTime(result.value, 'date');
+    }
+    return result;
+}
+function time(expr, state) {
+    const result = getValue(expr.expr, state);
+    result.name = `CAST(${result.name} AS TIME)`;
+    result.type = 'time';
+    if (!result.err && result.value !== null) {
+        const decimals = expr.target.length || 0;
+        if (decimals > 6) {
+            result.err = 'ER_TOO_BIG_PRECISION';
+        }
+        result.value = convertTime(result.value, decimals);
+    }
+    return result;
+}
+function interval(expr, state) {
+    const result = getValue(expr.expr, state);
+    result.name = `INTERVAL ${result.name} ${expr.unit}`;
+    result.type = 'interval';
+    if (!result.err && result.value !== null) {
+        result.value = createSQLInterval(result.value, expr.unit);
+    }
+    return result;
+}
+function signed(expr, state) {
+    const result = getValue(expr.expr, state);
+    result.name = `CAST(${result.name} AS SIGNED)`;
+    result.type = 'bigint';
+    if (!result.err && result.value !== null) {
+        result.value = Math.trunc(convertNum(result.value));
+    }
+    return result;
+}
+function char(expr, state) {
+    const result = getValue(expr.expr, state);
+    result.name = `CAST(${result.name} AS CHAR)`;
+    if (!result.err && result.value !== null && result.type !== 'string') {
+        result.type = 'string';
+        result.value = String(result.value);
+    }
+    return result;
 }
 
-var functions$1 = {};
+var Cast = /*#__PURE__*/Object.freeze({
+	__proto__: null,
+	char: char,
+	date: date$1,
+	datetime: datetime,
+	interval: interval,
+	signed: signed,
+	time: time
+});
 
-var hasRequiredFunctions$1;
+const DAY = 24 * 60 * 60;
+function database(expr, state) {
+    return { value: state.session.getCurrentDatabase() };
+}
+function sleep(expr, state) {
+    const result = getValue(expr.args.value?.[0], state);
+    result.name = `SLEEP(${result.name})`;
+    const sleep_ms = convertNum(result.value);
+    if (sleep_ms > 0) {
+        result.sleep_ms = sleep_ms * 1000;
+    }
+    return result;
+}
+function length(expr, state) {
+    const result = getValue(expr.args.value?.[0], state);
+    result.name = `LENGTH(${result.name})`;
+    result.type = 'number';
+    if (!result.err && result.value !== null) {
+        result.value = String(result.value).length;
+    }
+    return result;
+}
+function concat(expr, state) {
+    let err;
+    let value = '';
+    expr.args.value?.every?.((sub) => {
+        const result = getValue(sub, state);
+        if (!err && result.err) {
+            err = result.err;
+        }
+        else if (result.value === null) {
+            value = null;
+        }
+        else {
+            value += String(result.value);
+        }
+        return value !== null;
+    });
+    return { err, value };
+}
+function left(expr, state) {
+    const result = getValue(expr.args?.value?.[0], state);
+    const len_result = getValue(expr.args?.value?.[1], state);
+    result.name = `LEFT(${result.name ?? ''}, ${len_result.name ?? ''})`;
+    result.err = result.err || len_result.err;
+    result.type = 'string';
+    if (!result.err && (result.value === null || len_result.value === null)) {
+        result.value = null;
+    }
+    else if (!result.err) {
+        const length = convertNum(len_result.value);
+        result.value = String(result.value).substring(0, length);
+    }
+    return result;
+}
+function coalesce(expr, state) {
+    let err;
+    let value = null;
+    let type;
+    expr.args.value?.some?.((sub) => {
+        const result = getValue(sub, state);
+        if (result.err) {
+            err = result.err;
+        }
+        value = result.value;
+        type = result.type;
+        return !err && value !== null;
+    });
+    return { err, value, type };
+}
+const ifnull = coalesce;
+function now(expr, state) {
+    const result = getValue(expr.args?.value?.[0], state);
+    result.name = expr.args ? `NOW(${result.name ?? ''})` : 'CURRENT_TIMESTAMP';
+    if (!result.err && result.type) {
+        const decimals = result.value || 0;
+        if (decimals > 6) {
+            result.err = 'ER_TOO_BIG_PRECISION';
+        }
+        result.value = createSQLDateTime(Date.now() / 1000, 'datetime', decimals);
+        result.type = 'datetime';
+    }
+    return result;
+}
+const current_timestamp = now;
+function from_unixtime(expr, state) {
+    const result = getValue(expr.args.value?.[0], state);
+    result.name = `FROM_UNIXTIME(${result.name})`;
+    result.type = 'datetime';
+    if (!result.err && result.value !== null) {
+        const time = convertNum(result.value);
+        const decimals = Math.min(6, String(time).split('.')?.[1]?.length || 0);
+        result.value = time < 0 ? null : createSQLDateTime(time, 'datetime', decimals);
+    }
+    return result;
+}
+function date(expr, state) {
+    const result = getValue(expr.args.value?.[0], state);
+    result.name = `DATE(${result.name})`;
+    result.type = 'date';
+    if (!result.err && result.value !== null) {
+        result.value = convertDateTime(result.value);
+        result.value?.setType?.('date');
+    }
+    return result;
+}
+function date_format(expr, state) {
+    const date = getValue(expr.args.value?.[0], state);
+    const format = getValue(expr.args.value?.[1], state);
+    let err = date.err || format.err;
+    let value;
+    const name = `DATE_FORMAT(${date.name}, ${format.name})`;
+    if (!err && (date.value === null || format.value === null)) {
+        value = null;
+    }
+    else if (!err) {
+        value = convertDateTime(date.value)?.dateFormat?.(String(format.value)) || null;
+    }
+    return { err, name, value, type: 'string' };
+}
+function datediff(expr, state) {
+    const expr1 = getValue(expr.args.value?.[0], state);
+    const expr2 = getValue(expr.args.value?.[1], state);
+    let err = expr1.err || expr2.err;
+    let value;
+    const name = `DATEDIFF(${expr1.name}, ${expr2.name})`;
+    if (!err && (expr1.value === null || expr2.value === null)) {
+        value = null;
+    }
+    else if (!err) {
+        value = convertDateTime(expr1.value)?.diff?.(convertDateTime(expr2.value)) || null;
+    }
+    return { err, name, value, type: 'int' };
+}
+function curdate(expr) {
+    const value = createSQLDateTime(Date.now() / 1000, 'date');
+    const name = expr.args ? 'CURDATE()' : 'CURRENT_DATE';
+    return { value, name, type: 'date' };
+}
+const current_date = curdate;
+function curtime(expr, state) {
+    const result = getValue(expr.args?.value?.[0], state);
+    result.name = expr.args ? `CURTIME(${result.name ?? ''})` : 'CURRENT_TIME';
+    if (!result.err && result.type) {
+        const decimals = result.value || 0;
+        if (decimals > 6) {
+            result.err = 'ER_TOO_BIG_PRECISION';
+        }
+        const time = (Date.now() / 1000) % DAY;
+        result.value = createSQLTime(time, decimals);
+        result.type = 'time';
+    }
+    return result;
+}
+const current_time = curtime;
 
-function requireFunctions$1 () {
-	if (hasRequiredFunctions$1) return functions$1;
-	hasRequiredFunctions$1 = 1;
-	const Expression = requireExpression();
-	const { convertNum, convertDateTime } = requireSql_conversion();
-	const { createSQLDateTime } = requireSql_datetime();
-	const { createSQLTime } = requireSql_time();
+var Functions$1 = /*#__PURE__*/Object.freeze({
+	__proto__: null,
+	coalesce: coalesce,
+	concat: concat,
+	curdate: curdate,
+	current_date: current_date,
+	current_time: current_time,
+	current_timestamp: current_timestamp,
+	curtime: curtime,
+	database: database,
+	date: date,
+	date_format: date_format,
+	datediff: datediff,
+	from_unixtime: from_unixtime,
+	ifnull: ifnull,
+	left: left,
+	length: length,
+	now: now,
+	sleep: sleep
+});
 
-	functions$1.database = database;
-	functions$1.sleep = sleep;
-	functions$1.length = _length;
-	functions$1.concat = concat;
-	functions$1.left = left;
-	functions$1.coalesce = coalesce;
-	functions$1.ifnull = coalesce;
-	functions$1.now = now;
-	functions$1.current_timestamp = now;
-	functions$1.from_unixtime = from_unixtime;
-	functions$1.date = _date;
-	functions$1.date_format = date_format;
-	functions$1.datediff = datediff;
-	functions$1.curdate = curdate;
-	functions$1.current_date = curdate;
-	functions$1.curtime = curtime;
-	functions$1.current_time = curtime;
-
-	const DAY = 24 * 60 * 60;
-
-	function database(expr, state) {
-	  return { value: state.session.getCurrentDatabase() };
-	}
-	function sleep(expr, state) {
-	  const result = Expression.getValue(expr.args.value?.[0], state);
-	  result.name = `SLEEP(${result.name})`;
-	  const sleep_ms = convertNum(result.value);
-	  if (sleep_ms > 0) {
-	    result.sleep_ms = sleep_ms * 1000;
-	  }
-	  return result;
-	}
-	function _length(expr, state) {
-	  const result = Expression.getValue(expr.args.value?.[0], state);
-	  result.name = `LENGTH(${result.name})`;
-	  result.type = 'number';
-	  if (!result.err && result.value !== null) {
-	    result.value = String(result.value).length;
-	  }
-	  return result;
-	}
-	function coalesce(expr, state) {
-	  let err;
-	  let value = null;
-	  let type;
-	  expr.args.value?.some?.((sub) => {
-	    const result = Expression.getValue(sub, state);
-	    if (result.err) {
-	      err = result.err;
-	    }
-	    value = result.value;
-	    type = result.type;
-	    return !err && value !== null;
-	  });
-	  return { err, value, type };
-	}
-	function concat(expr, state) {
-	  let err;
-	  let value = '';
-	  expr.args.value?.every?.((sub) => {
-	    const result = Expression.getValue(sub, state);
-	    if (!err && result.err) {
-	      err = result.err;
-	    } else if (result.value === null) {
-	      value = null;
-	    } else {
-	      value += String(result.value);
-	    }
-	    return value !== null;
-	  });
-	  return { err, value };
-	}
-	function left(expr, state) {
-	  const result = Expression.getValue(expr.args?.value?.[0], state);
-	  const len_result = Expression.getValue(expr.args?.value?.[1], state);
-	  result.name = `LEFT(${result.name ?? ''}, ${len_result.name ?? ''})`;
-	  result.err = result.err || len_result.err;
-	  result.type = 'string';
-	  if (!result.err && (result.value === null || len_result.value === null)) {
-	    result.value = null;
-	  } else if (!result.err) {
-	    const length = convertNum(len_result.value);
-	    result.value = String(result.value).substring(0, length);
-	  }
-	  return result;
-	}
-	function now(expr, state) {
-	  const result = Expression.getValue(expr.args?.value?.[0], state);
-	  result.name = expr.args ? `NOW(${result.name ?? ''})` : 'CURRENT_TIMESTAMP';
-	  if (!result.err && result.type) {
-	    const decimals = result.value || 0;
-	    if (decimals > 6) {
-	      result.err = 'ER_TOO_BIG_PRECISION';
-	    }
-	    result.value = createSQLDateTime(Date.now() / 1000, 'datetime', decimals);
-	    result.type = 'datetime';
-	  }
-	  return result;
-	}
-	function curtime(expr, state) {
-	  const result = Expression.getValue(expr.args?.value?.[0], state);
-	  result.name = expr.args ? `CURTIME(${result.name ?? ''})` : 'CURRENT_TIME';
-	  if (!result.err && result.type) {
-	    const decimals = result.value || 0;
-	    if (decimals > 6) {
-	      result.err = 'ER_TOO_BIG_PRECISION';
-	    }
-	    const time = (Date.now() / 1000) % DAY;
-	    result.value = createSQLTime(time, decimals);
-	    result.type = 'time';
-	  }
-	  return result;
-	}
-	function curdate(expr) {
-	  const value = createSQLDateTime(Date.now() / 1000, 'date');
-	  const name = expr.args ? 'CURDATE()' : 'CURRENT_DATE';
-	  return { value, name, type: 'date' };
-	}
-	function from_unixtime(expr, state) {
-	  const result = Expression.getValue(expr.args.value?.[0], state);
-	  result.name = `FROM_UNIXTIME(${result.name})`;
-	  result.type = 'datetime';
-	  if (!result.err && result.value !== null) {
-	    const time = convertNum(result.value);
-	    const decimals = Math.min(6, String(time).split('.')?.[1]?.length || 0);
-	    result.value =
-	      time < 0 ? null : createSQLDateTime(time, 'datetime', decimals);
-	  }
-	  return result;
-	}
-	function _date(expr, state) {
-	  const result = Expression.getValue(expr.args.value?.[0], state);
-	  result.name = `DATE(${result.name})`;
-	  result.type = 'date';
-	  if (!result.err && result.value !== null) {
-	    result.value = convertDateTime(result.value);
-	    result.value?.setType?.('date');
-	  }
-	  return result;
-	}
-	function date_format(expr, state) {
-	  const date = Expression.getValue(expr.args.value?.[0], state);
-	  const format = Expression.getValue(expr.args.value?.[1], state);
-	  let err = date.err || format.err;
-	  let value;
-	  const name = `DATE_FORMAT(${date.name}, ${format.name})`;
-	  if (!err && (date.value === null || format.value === null)) {
-	    value = null;
-	  } else if (!err) {
-	    value =
-	      convertDateTime(date.value)?.dateFormat?.(String(format.value)) || null;
-	  }
-	  return { err, name, value, type: 'string' };
-	}
-	function datediff(expr, state) {
-	  const expr1 = Expression.getValue(expr.args.value?.[0], state);
-	  const expr2 = Expression.getValue(expr.args.value?.[1], state);
-	  let err = expr1.err || expr2.err;
-	  let value;
-	  const name = `DATEDIFF(${expr1.name}, ${expr2.name})`;
-	  if (!err && (expr1.value === null || expr2.value === null)) {
-	    value = null;
-	  } else if (!err) {
-	    value =
-	      convertDateTime(expr1.value)?.diff?.(convertDateTime(expr2.value)) ||
-	      null;
-	  }
-	  return { err, name, value, type: 'int' };
-	}
-	return functions$1;
+function plus(expr, state) {
+    return getValue(expr.expr, state);
+}
+function not$1(expr, state) {
+    const result = getValue(expr.expr, state);
+    result.name = 'NOT ' + result.name;
+    result.type = 'number';
+    if (!result.err && result.value !== null) {
+        result.value = convertNum(result.value) ? 0 : 1;
+    }
+    return result;
+}
+function minus$1(expr, state) {
+    const result = getValue(expr.expr, state);
+    result.name = '-' + result.name;
+    result.type = 'number';
+    if (!result.err && result.value !== null) {
+        result.value = -convertNum(result.value);
+    }
+    return result;
 }
 
-var unary_expression = {};
+var UnaryExpression = /*#__PURE__*/Object.freeze({
+	__proto__: null,
+	"!": not$1,
+	"+": plus,
+	"-": minus$1,
+	not: not$1
+});
 
-var hasRequiredUnary_expression;
-
-function requireUnary_expression () {
-	if (hasRequiredUnary_expression) return unary_expression;
-	hasRequiredUnary_expression = 1;
-	(function (exports) {
-		const Expression = requireExpression();
-		const { convertNum } = requireSql_conversion();
-
-		exports['+'] = plus;
-		exports['!'] = not;
-		exports['not'] = not;
-		exports['-'] = minus;
-
-		function plus(expr, state) {
-		  return Expression.getValue(expr.expr, state);
-		}
-		function not(expr, state) {
-		  const result = Expression.getValue(expr.expr, state);
-		  result.name = 'NOT ' + result.name;
-		  result.type = 'number';
-		  if (!result.err && result.value !== null) {
-		    result.value = convertNum(result.value) ? 0 : 1;
-		  }
-		  return result;
-		}
-		function minus(expr, state) {
-		  const result = Expression.getValue(expr.expr, state);
-		  result.name = '-' + result.name;
-		  result.type = 'number';
-		  if (!result.err && result.value !== null) {
-		    result.value = -convertNum(result.value);
-		  }
-		  return result;
-		} 
-	} (unary_expression));
-	return unary_expression;
+function version_comment() {
+    return 'dynamosql source version';
 }
 
-var system_variables = {};
+var SystemVariables = /*#__PURE__*/Object.freeze({
+	__proto__: null,
+	version_comment: version_comment
+});
 
-var hasRequiredSystem_variables;
-
-function requireSystem_variables () {
-	if (hasRequiredSystem_variables) return system_variables;
-	hasRequiredSystem_variables = 1;
-	system_variables.version_comment = version_comment;
-
-	function version_comment() {
-	  return 'dynamosql source version';
-	}
-	return system_variables;
+function pql(strings, ...values) {
+    let s = '';
+    for (let i = 0; i < strings.length; i++) {
+        s += strings[i];
+        if (i < values.length) {
+            s += escapeValue(values[i]);
+        }
+    }
+    s = s.replace(/\s+/g, ' ').trim();
+    return s;
+}
+function escapeIdentifier(string) {
+    return '"' + string.replace('"', '""') + '"';
+}
+function escapeString(string) {
+    let ret = '';
+    for (let i = 0; i < string.length; i++) {
+        const c = string.charCodeAt(i);
+        if (c < 32) {
+            ret += '\\x' + c.toString(16);
+        }
+        else if (c === 39) {
+            ret += "''";
+        }
+        else {
+            ret += string[i];
+        }
+    }
+    return ret;
+}
+function escapeNumber(value) {
+    return String(value).replace(/[^0-9.]/g, '');
+}
+function escapeValue(value, type) {
+    let s;
+    if (type === 'string') {
+        s = "'" + escapeString(String(value)) + "'";
+    }
+    else if (type === 'number') {
+        s = escapeNumber(value);
+    }
+    else if (value === null) {
+        s = 'NULL';
+    }
+    else if (Array.isArray(value)) {
+        s = '[ ';
+        s += value.map(escapeValue).join(', ');
+        s += ' ]';
+    }
+    else if (typeof value === 'object') {
+        s = '{ ';
+        s += Object.keys(value)
+            .map((key) => `'${key}': ${escapeValue(value[key])}`)
+            .join(', ');
+        s += ' }';
+    }
+    else if (typeof value === 'number') {
+        s = String(value);
+    }
+    else if (value !== undefined) {
+        s = "'" + escapeString(String(value)) + "'";
+    }
+    else {
+        s = 'undefined';
+    }
+    return s;
+}
+function convertError(err) {
+    let ret = err;
+    if (err.name === 'ConditionalCheckFailedException' && err.Item) {
+        ret = 'cond_fail';
+    }
+    else if (err.Code === 'ConditionalCheckFailed') {
+        ret = 'cond_fail';
+    }
+    else if (err.name === 'ResourceNotFoundException' ||
+        err.Code === 'ResourceNotFound') {
+        ret = 'resource_not_found';
+    }
+    else if (err.name === 'ResourceInUseException') {
+        ret = 'resource_in_use';
+    }
+    else if (err.Code === 'ValidationError' || err.name === 'ValidationError') {
+        if (err.Message?.match?.(/expected: [^\s]* actual: NULL/)) {
+            ret = 'ER_BAD_NULL_ERROR';
+        }
+        else if (err.Message?.match?.(/expected: [^\s]* actual:/)) {
+            ret = 'ER_TRUNCATED_WRONG_VALUE_FOR_FIELD';
+        }
+        else {
+            ret = 'validation';
+        }
+    }
+    return ret;
+}
+function mapToObject(obj) {
+    const ret = {};
+    ret.toString = toString;
+    Object.keys(obj).forEach((key) => {
+        ret[key] = valueToNative(obj[key]);
+    });
+    return ret;
+}
+function valueToNative(value) {
+    let ret = value;
+    if (value) {
+        if (value.N) {
+            ret = parseFloat(value.N);
+        }
+        else if (value.L?.map) {
+            ret = value.L.map(valueToNative);
+        }
+        else if (value.M) {
+            ret = mapToObject(value.M);
+        }
+        else {
+            ret = value.S ?? value.B ?? value.BOOL ?? value;
+        }
+    }
+    return ret;
+}
+function nativeToValue(obj) {
+    let ret;
+    if (obj === null) {
+        ret = { NULL: true };
+    }
+    else if (typeof obj === 'object') {
+        const M = {};
+        for (let key in obj) {
+            M[key] = nativeToValue(obj[key]);
+        }
+        ret = { M };
+    }
+    else if (typeof obj === 'number') {
+        ret = { N: String(obj) };
+    }
+    else if (typeof obj === 'boolean') {
+        ret = { BOOL: obj };
+    }
+    else {
+        ret = { S: String(obj) };
+    }
+    return ret;
+}
+function toString() {
+    return JSON.stringify(this);
 }
 
-var dynamodb_helper = {};
-
-var hasRequiredDynamodb_helper;
-
-function requireDynamodb_helper () {
-	if (hasRequiredDynamodb_helper) return dynamodb_helper;
-	hasRequiredDynamodb_helper = 1;
-	dynamodb_helper.pql = pql;
-	dynamodb_helper.escapeIdentifier = escapeIdentifier;
-	dynamodb_helper.escapeString = escapeString;
-	dynamodb_helper.escapeValue = escapeValue;
-	dynamodb_helper.convertError = convertError;
-	dynamodb_helper.mapToObject = mapToObject;
-	dynamodb_helper.valueToNative = valueToNative;
-	dynamodb_helper.nativeToValue = nativeToValue;
-
-	function pql(strings, ...values) {
-	  let s = '';
-	  for (let i = 0; i < strings.length; i++) {
-	    s += strings[i];
-	    if (i < values.length) {
-	      s += escapeValue(values[i]);
-	    }
-	  }
-	  s = s.replace(/\s+/g, ' ').trim();
-	  return s;
-	}
-	function escapeIdentifier(string) {
-	  return '"' + string.replace('"', '""') + '"';
-	}
-	function escapeString(string) {
-	  let ret = '';
-	  for (let i = 0; i < string.length; i++) {
-	    const c = string.charCodeAt(i);
-	    if (c < 32) {
-	      ret += '\\x' + c.toString(16);
-	    } else if (c === 39) {
-	      ret += "''";
-	    } else {
-	      ret += string[i];
-	    }
-	  }
-	  return ret;
-	}
-	function escapeNumber(value) {
-	  return String(value).replace(/[^0-9.]/g, '');
-	}
-	function escapeValue(value, type) {
-	  let s;
-	  if (type === 'string') {
-	    s = "'" + escapeString(String(value)) + "'";
-	  } else if (type === 'number') {
-	    s = escapeNumber(value);
-	  } else if (value === null) {
-	    s = 'NULL';
-	  } else if (Array.isArray(value)) {
-	    s = '[ ';
-	    s += value.map(escapeValue).join(', ');
-	    s += ' ]';
-	  } else if (typeof value === 'object') {
-	    s = '{ ';
-	    s += Object.keys(value)
-	      .map((key) => `'${key}': ${escapeValue(value[key])}`)
-	      .join(', ');
-	    s += ' }';
-	  } else if (typeof value === 'number') {
-	    s = String(value);
-	  } else if (value !== undefined) {
-	    s = "'" + escapeString(String(value)) + "'";
-	  } else {
-	    s = 'undefined';
-	  }
-	  return s;
-	}
-	function convertError(err) {
-	  let ret = err;
-	  if (err.name === 'ConditionalCheckFailedException' && err.Item) {
-	    ret = 'cond_fail';
-	  } else if (err.Code === 'ConditionalCheckFailed') {
-	    ret = 'cond_fail';
-	  } else if (
-	    err.name === 'ResourceNotFoundException' ||
-	    err.Code === 'ResourceNotFound'
-	  ) {
-	    ret = 'resource_not_found';
-	  } else if (err.name === 'ResourceInUseException') {
-	    ret = 'resource_in_use';
-	  } else if (err.Code === 'ValidationError' || err.name === 'ValidationError') {
-	    if (err.Message?.match?.(/expected: [^\s]* actual: NULL/)) {
-	      ret = 'ER_BAD_NULL_ERROR';
-	    } else if (err.Message?.match?.(/expected: [^\s]* actual:/)) {
-	      ret = 'ER_TRUNCATED_WRONG_VALUE_FOR_FIELD';
-	    } else {
-	      ret = 'validation';
-	    }
-	  }
-	  return ret;
-	}
-	function mapToObject(obj) {
-	  const ret = {};
-	  ret.toString = toString;
-	  Object.keys(obj).forEach((key) => {
-	    ret[key] = valueToNative(obj[key]);
-	  });
-	  return ret;
-	}
-	function valueToNative(value) {
-	  let ret = value;
-	  if (value) {
-	    if (value.N) {
-	      ret = parseFloat(value.N);
-	    } else if (value.L?.map) {
-	      ret = value.L.map(valueToNative);
-	    } else if (value.M) {
-	      ret = mapToObject(value.M);
-	    } else {
-	      ret = value.S ?? value.B ?? value.BOOL ?? value;
-	    }
-	  }
-	  return ret;
-	}
-	function nativeToValue(obj) {
-	  let ret;
-	  if (obj === null) {
-	    ret = { NULL: true };
-	  } else if (typeof obj === 'object') {
-	    const M = {};
-	    for (let key in obj) {
-	      M[key] = nativeToValue(obj[key]);
-	    }
-	    ret = { M };
-	  } else if (typeof obj === 'number') {
-	    ret = { N: String(obj) };
-	  } else if (typeof obj === 'boolean') {
-	    ret = { BOOL: obj };
-	  } else {
-	    ret = { S: String(obj) };
-	  }
-	  return ret;
-	}
-	function toString() {
-	  return JSON.stringify(this);
-	}
-	return dynamodb_helper;
+function getValue(expr, state) {
+    const { session, row } = state;
+    let result = { err: null, value: undefined, name: undefined };
+    const type = expr?.type;
+    if (!expr) ;
+    else if (type === 'number') {
+        result.value = expr.value;
+    }
+    else if (type === 'double_quote_string') {
+        result.value = expr.value;
+        result.name = `"${result.value}"`;
+    }
+    else if (type === 'null') {
+        result.value = null;
+    }
+    else if (type === 'bool') {
+        result.value = expr.value ? 1 : 0;
+        result.name = expr.value ? 'TRUE' : 'FALSE';
+    }
+    else if (type === 'hex_string' || type === 'full_hex_string') {
+        result.value = Buffer.from(expr.value, 'hex');
+        result.name = 'x' + expr.value.slice(0, 10);
+        result.type = 'buffer';
+    }
+    else if (type === 'interval') {
+        result = interval(expr, state);
+    }
+    else if (type === 'function') {
+        const func = Functions$1[expr.name.toLowerCase()];
+        if (func) {
+            result = func(expr, state);
+            if (!result.name) {
+                result.name = expr.name + '()';
+            }
+        }
+        else {
+            trace('expression.getValue: unknown function:', expr.name);
+            result.err = { err: 'ER_SP_DOES_NOT_EXIST', args: [expr.name] };
+        }
+    }
+    else if (type === 'aggr_func') {
+        const func = AggregateFunctions[expr.name.toLowerCase()];
+        if (func) {
+            result = func(expr, state);
+            if (!result.name) {
+                result.name = expr.name + '()';
+            }
+        }
+        else {
+            trace('expression.getValue: unknown aggregate:', expr.name);
+            result.err = { err: 'ER_SP_DOES_NOT_EXIST', args: [expr.name] };
+        }
+    }
+    else if (type === 'binary_expr') {
+        const func = BinaryExpression[expr.operator.toLowerCase()];
+        if (func) {
+            result = func(expr, state);
+            if (!result.name) {
+                result.name = expr.operator;
+            }
+        }
+        else {
+            trace('expression.getValue: unknown binary operator:', expr.operator);
+            result.err = { err: 'ER_SP_DOES_NOT_EXIST', args: [expr.operator] };
+        }
+    }
+    else if (type === 'unary_expr') {
+        const func = UnaryExpression[expr.operator.toLowerCase()];
+        if (func) {
+            result = func(expr, state);
+            if (!result.name) {
+                result.name = expr.operator;
+            }
+        }
+        else {
+            trace('expression.getValue: unknown unanary operator:', expr.operator);
+            result.err = { err: 'ER_SP_DOES_NOT_EXIST', args: [expr.operator] };
+        }
+    }
+    else if (type === 'cast') {
+        const func = Cast[expr.target.dataType.toLowerCase()];
+        if (func) {
+            result = func(expr, state);
+            if (!result.name) {
+                result.name = `CAST(? AS ${expr.target.dataType})`;
+            }
+        }
+        else {
+            trace('expression.getValue: unknown cast type:', expr.target.dataType);
+            result.err = { err: 'ER_SP_DOES_NOT_EXIST', args: [expr.target.dataType] };
+        }
+    }
+    else if (type === 'var') {
+        const { prefix } = expr;
+        if (prefix === '@@') {
+            const func = SystemVariables[expr.name.toLowerCase()];
+            if (func) {
+                result.value = func(session);
+            }
+            else {
+                trace('expression.getValue: unknown system variable:', expr.name);
+                result.err = { err: 'ER_UNKNOWN_SYSTEM_VARIABLE', args: [expr.name] };
+            }
+        }
+        else if (prefix === '@') {
+            result.value = session.getVariable(expr.name) ?? null;
+        }
+        else {
+            result.err = 'unsupported';
+        }
+        result.name = prefix + expr.name;
+    }
+    else if (type === 'column_ref') {
+        result.name = expr.column;
+        if (row && expr._resultIndex >= 0) {
+            const output_result = row['@@result']?.[expr._resultIndex];
+            result.value = output_result?.value;
+            result.type = output_result?.type;
+        }
+        else if (row) {
+            const cell = row[expr.from?.key]?.[expr.column];
+            const decode = _decodeCell(cell);
+            result.type = decode?.type;
+            result.value = decode?.value;
+        }
+        else {
+            result.err = 'no_row_list';
+            result.value = expr.column;
+        }
+    }
+    else {
+        error('unsupported expr:', expr);
+        result.err = 'unsupported';
+    }
+    if (!result.type) {
+        result.type = result.value === null ? 'null' : typeof result.value;
+    }
+    if (result.name === undefined && result.value !== undefined) {
+        result.name = String(result.value);
+    }
+    return result;
+}
+function _decodeCell(cell) {
+    let type;
+    let value;
+    if (!cell || cell.NULL) {
+        type = 'null';
+        value = null;
+    }
+    else if (cell.value) {
+        type = cell.type ?? typeof cell.value;
+        value = cell.value;
+    }
+    else if (cell.S) {
+        type = 'string';
+        value = cell.S;
+    }
+    else if (cell.N) {
+        type = 'number';
+        value = cell.N;
+    }
+    else if (cell.BOOL) {
+        type = 'boolean';
+        value = cell.BOOL;
+    }
+    else if (cell.M) {
+        type = 'json';
+        value = mapToObject(cell.M);
+    }
+    else {
+        type = typeof cell;
+        value = cell;
+        if (type === 'object') {
+            type = 'json';
+        }
+    }
+    return { type, value };
 }
 
-var hasRequiredEvaluate;
+function constantFixup(func) {
+    return (expr, state) => {
+        let result;
+        result = getValue(expr, state);
+        if (result.err) {
+            result = func(expr, state);
+        }
+        return result;
+    };
+}
+function and(expr, state) {
+    const left = convertWhere(expr.left, state);
+    const right = convertWhere(expr.right, state);
+    if (left.err === 'unsupported' && state?.default_true) {
+        left.err = null;
+        left.value = 1;
+    }
+    if (right.err === 'unsupported' && state?.default_true) {
+        right.err = null;
+        right.value = 1;
+    }
+    const err = left.err || right.err;
+    let value;
+    if (!left.value || !right.value) {
+        value = 0;
+    }
+    else if (left.value === 1 && right.value === 1) {
+        value = 1;
+    }
+    else if (right.value === 1) {
+        value = left.value;
+    }
+    else if (left.value === 1) {
+        value = right.value;
+    }
+    else {
+        value = `(${left.value}) AND (${right.value})`;
+    }
+    return { err, value };
+}
+function or(expr, state) {
+    const left = convertWhere(expr.left, state);
+    const right = convertWhere(expr.right, state);
+    let err = left.err || right.err;
+    let value;
+    if (err === 'unsupported' && state?.default_true) {
+        value = 1;
+        err = null;
+    }
+    else if (!left.value && !right.value) {
+        value = 0;
+    }
+    else if (left.value === 1 || right.value === 1) {
+        value = 1;
+    }
+    else if (!right.value) {
+        value = left.value;
+    }
+    else if (!left.value) {
+        value = right.value;
+    }
+    else {
+        value = `(${left.value}) OR (${right.value})`;
+    }
+    return { err, value };
+}
+function _in(expr, state) {
+    const left = convertWhere(expr.left, state);
+    let err;
+    let value;
+    if (left.err) {
+        err = left.err;
+    }
+    else if (left.value === null) {
+        value = null;
+    }
+    else {
+        const count = expr.right?.value?.length;
+        const list = [];
+        for (let i = 0; i < count; i++) {
+            const right = convertWhere(expr.right.value[i], state);
+            if (right.err) {
+                err = right.err;
+                break;
+            }
+            else if (right.value === null) {
+                value = null;
+                break;
+            }
+            else {
+                list.push(right.value);
+            }
+        }
+        if (value === undefined) {
+            value = `${left.value} IN (${list.join(',')})`;
+        }
+    }
+    return { err, value };
+}
+function _comparator(expr, state, op) {
+    const left = convertWhere(expr.left, state);
+    const right = convertWhere(expr.right, state);
+    const err = left.err || right.err;
+    const value = `${left.value} ${op} ${right.value}`;
+    return { err, value };
+}
+function equal(expr, state) {
+    return _comparator(expr, state, '=');
+}
+function notEqual(expr, state) {
+    return _comparator(expr, state, '!=');
+}
+function gt(expr, state) {
+    return _comparator(expr, state, '>');
+}
+function lt(expr, state) {
+    return _comparator(expr, state, '<');
+}
+function gte(expr, state) {
+    return _comparator(expr, state, '>=');
+}
+function lte(expr, state) {
+    return _comparator(expr, state, '<=');
+}
+function is(expr, state) {
+    return _is(expr, state, 'IS');
+}
+function isNot(expr, state) {
+    return _is(expr, state, 'IS NOT');
+}
+function _is(expr, state, op) {
+    const left = convertWhere(expr.left, state);
+    let right;
+    let err = left.err;
+    if (!err) {
+        if (expr.right.value === null) {
+            right = 'NULL';
+        }
+        else if (expr.right.value === true) {
+            right = 'TRUE';
+        }
+        else if (expr.right.value === false) {
+            right = 'FALSE';
+        }
+        else {
+            err = 'syntax_err';
+        }
+    }
+    const value = `${left.value} ${op} ${right}`;
+    return { err, value };
+}
+function not(expr, state) {
+    const result = convertWhere(expr.expr, state);
+    if (!result.err) {
+        result.value = 'NOT ' + result.value;
+    }
+    return result;
+}
+function minus(expr, state) {
+    const result = convertWhere(expr.expr, state);
+    if (!result.err) {
+        result.value = '-' + result.value;
+    }
+    return result;
+}
+function unsupported() {
+    return { err: 'unsupported' };
+}
+const _equal = constantFixup(equal);
+const _notEqual = constantFixup(notEqual);
+const _gt = constantFixup(gt);
+const _lt = constantFixup(lt);
+const _gte = constantFixup(gte);
+const _lte = constantFixup(lte);
+const _and = constantFixup(and);
+const _or = constantFixup(or);
+const _inOp = constantFixup(_in);
+const _isOp = constantFixup(is);
+const _isNotOp = constantFixup(isNot);
+const _between = constantFixup(unsupported);
+const _not = constantFixup(not);
+const _minus = constantFixup(minus);
 
-function requireEvaluate () {
-	if (hasRequiredEvaluate) return evaluate;
-	hasRequiredEvaluate = 1;
-	// first to ignore circles
-	evaluate.getValue = getValue;
+var ConvertExpression = /*#__PURE__*/Object.freeze({
+	__proto__: null,
+	"!": _not,
+	"!=": _notEqual,
+	"-": _minus,
+	"<": _lt,
+	"<=": _lte,
+	"<>": _notEqual,
+	"=": _equal,
+	">": _gt,
+	">=": _gte,
+	and: _and,
+	between: _between,
+	in: _inOp,
+	is: _isOp,
+	"is not": _isNotOp,
+	not: _not,
+	or: _or
+});
 
-	const AggregateFunctions = requireAggregate_functions();
-	const BinaryExpression = requireBinary_expression();
-	const Cast = requireCast();
-	const Functions = requireFunctions$1();
-	const UnaryExpression = requireUnary_expression();
-	const SystemVariables = requireSystem_variables();
-
-	const { mapToObject } = requireDynamodb_helper();
-	const logger = requireLogger();
-
-	function getValue(expr, state) {
-	  const { session, row } = state;
-	  let result = { err: null, value: undefined, name: undefined };
-
-	  const type = expr?.type;
-	  if (!expr) ; else if (type === 'number') {
-	    result.value = expr.value;
-	  } else if (type === 'double_quote_string') {
-	    result.value = expr.value;
-	    result.name = `"${result.value}"`;
-	  } else if (type === 'null') {
-	    result.value = null;
-	  } else if (type === 'bool') {
-	    result.value = expr.value ? 1 : 0;
-	    result.name = expr.value ? 'TRUE' : 'FALSE';
-	  } else if (type === 'hex_string' || type === 'full_hex_string') {
-	    result.value = Buffer.from(expr.value, 'hex');
-	    result.name = 'x' + expr.value.slice(0, 10);
-	    result.type = 'buffer';
-	  } else if (type === 'interval') {
-	    result = Cast.interval(expr, state);
-	  } else if (type === 'function') {
-	    const func = Functions[expr.name.toLowerCase()];
-	    if (func) {
-	      result = func(expr, state);
-	      if (!result.name) {
-	        result.name = expr.name + '()';
-	      }
-	    } else {
-	      logger.trace('expression.getValue: unknown function:', expr.name);
-	      result.err = { err: 'ER_SP_DOES_NOT_EXIST', args: [expr.name] };
-	    }
-	  } else if (type === 'aggr_func') {
-	    const func = AggregateFunctions[expr.name.toLowerCase()];
-	    if (func) {
-	      result = func(expr, state);
-	      if (!result.name) {
-	        result.name = expr.name + '()';
-	      }
-	    } else {
-	      logger.trace('expression.getValue: unknown aggregate:', expr.name);
-	      result.err = { err: 'ER_SP_DOES_NOT_EXIST', args: [expr.name] };
-	    }
-	  } else if (type === 'binary_expr') {
-	    const func = BinaryExpression[expr.operator.toLowerCase()];
-	    if (func) {
-	      result = func(expr, state);
-	      if (!result.name) {
-	        result.name = expr.operator;
-	      }
-	    } else {
-	      logger.trace(
-	        'expression.getValue: unknown binary operator:',
-	        expr.operator
-	      );
-	      result.err = { err: 'ER_SP_DOES_NOT_EXIST', args: [expr.operator] };
-	    }
-	  } else if (type === 'unary_expr') {
-	    const func = UnaryExpression[expr.operator.toLowerCase()];
-	    if (func) {
-	      result = func(expr, state);
-	      if (!result.name) {
-	        result.name = expr.operator;
-	      }
-	    } else {
-	      logger.trace(
-	        'expression.getValue: unknown unanary operator:',
-	        expr.operator
-	      );
-	      result.err = { err: 'ER_SP_DOES_NOT_EXIST', args: [expr.operator] };
-	    }
-	  } else if (type === 'cast') {
-	    const func = Cast[expr.target.dataType.toLowerCase()];
-	    if (func) {
-	      result = func(expr, state);
-	      if (!result.name) {
-	        result.name = `CAST(? AS ${expr.target.dataType})`;
-	      }
-	    } else {
-	      logger.trace(
-	        'expression.getValue: unknown cast type:',
-	        expr.target.dataType
-	      );
-	      result.err = {
-	        err: 'ER_SP_DOES_NOT_EXIST',
-	        args: [expr.target.dataType],
-	      };
-	    }
-	  } else if (type === 'var') {
-	    const { prefix } = expr;
-	    if (prefix === '@@') {
-	      const func = SystemVariables[expr.name.toLowerCase()];
-	      if (func) {
-	        result.value = func(session);
-	      } else {
-	        logger.trace(
-	          'expression.getValue: unknown system variable:',
-	          expr.name
-	        );
-	        result.err = { err: 'ER_UNKNOWN_SYSTEM_VARIABLE', args: [expr.name] };
-	      }
-	    } else if (prefix === '@') {
-	      result.value = session.getVariable(expr.name) ?? null;
-	    } else {
-	      result.err = 'unsupported';
-	    }
-	    result.name = prefix + expr.name;
-	  } else if (type === 'column_ref') {
-	    result.name = expr.column;
-	    if (row && expr._resultIndex >= 0) {
-	      const output_result = row['@@result']?.[expr._resultIndex];
-	      result.value = output_result?.value;
-	      result.type = output_result?.type;
-	    } else if (row) {
-	      const cell = row[expr.from?.key]?.[expr.column];
-	      const decode = _decodeCell(cell);
-	      result.type = decode?.type;
-	      result.value = decode?.value;
-	    } else {
-	      result.err = 'no_row_list';
-	      result.value = expr.column;
-	    }
-	  } else {
-	    logger.error('unsupported expr:', expr);
-	    result.err = 'unsupported';
-	  }
-
-	  if (!result.type) {
-	    result.type = result.value === null ? 'null' : typeof result.value;
-	  }
-	  if (result.name === undefined && result.value !== undefined) {
-	    result.name = String(result.value);
-	  }
-	  return result;
-	}
-
-	function _decodeCell(cell) {
-	  let type;
-	  let value;
-	  if (!cell || cell.NULL) {
-	    type = 'null';
-	    value = null;
-	  } else if (cell.value) {
-	    type = cell.type ?? typeof cell.value;
-	    value = cell.value;
-	  } else if (cell.S) {
-	    type = 'string';
-	    value = cell.S;
-	  } else if (cell.N) {
-	    type = 'number';
-	    value = cell.N;
-	  } else if (cell.BOOL) {
-	    type = 'boolean';
-	    value = cell.BOOL;
-	  } else if (cell.M) {
-	    type = 'json';
-	    value = mapToObject(cell.M);
-	  } else {
-	    type = typeof cell;
-	    value = cell;
-	    if (type === 'object') {
-	      type = 'json';
-	    }
-	  }
-	  return { type, value };
-	}
-	return evaluate;
+function foo() {
+    return { err: 'unsupported' };
 }
 
-var hasRequiredExpression;
+var Functions = /*#__PURE__*/Object.freeze({
+	__proto__: null,
+	foo: foo
+});
 
-function requireExpression () {
-	if (hasRequiredExpression) return expression;
-	hasRequiredExpression = 1;
-	expression.getValue = requireEvaluate().getValue;
-	return expression;
+function convertWhere(expr, state) {
+    const { from_key } = state;
+    let err = null;
+    let value = null;
+    if (expr) {
+        const { type } = expr;
+        if (type === 'number') {
+            value = expr.value;
+        }
+        else if (type === 'double_quote_string') {
+            value = `'${expr.value}'`;
+        }
+        else if (type === 'null') {
+            value = null;
+        }
+        else if (type === 'bool') {
+            value = expr.value;
+        }
+        else if (type === 'function') {
+            const func = Functions[expr.name.toLowerCase()];
+            if (func) {
+                const result = func(expr, state);
+                if (result.err) {
+                    err = result.err;
+                }
+                else {
+                    value = result.value;
+                }
+            }
+            else {
+                err = 'unsupported';
+            }
+        }
+        else if (type === 'binary_expr' || type === 'unary_expr') {
+            const func = ConvertExpression[expr.operator.toLowerCase()];
+            if (func) {
+                const result = func(expr, state);
+                if (result.err) {
+                    err = result.err;
+                }
+                else {
+                    value = result.value;
+                }
+            }
+            else {
+                err = 'unsupported';
+            }
+        }
+        else if (type === 'column_ref') {
+            if (expr.from?.key === from_key) {
+                value = expr.column;
+            }
+            else {
+                err = 'unsupported';
+            }
+        }
+        else {
+            const result = getValue(expr, state);
+            err = result.err;
+            value = result.value;
+        }
+    }
+    return { err, value };
 }
 
-var hasRequiredConvert_expression;
-
-function requireConvert_expression () {
-	if (hasRequiredConvert_expression) return convert_expression;
-	hasRequiredConvert_expression = 1;
-	(function (exports) {
-		exports['='] = constantFixup(equal);
-		exports['!='] = constantFixup(notEqual);
-		exports['<>'] = constantFixup(notEqual);
-		exports['>'] = constantFixup(gt);
-		exports['<'] = constantFixup(lt);
-		exports['>='] = constantFixup(gte);
-		exports['<='] = constantFixup(lte);
-		exports['and'] = constantFixup(and);
-		exports['or'] = constantFixup(or);
-		exports['in'] = constantFixup(_in);
-		exports['is'] = constantFixup(is);
-		exports['is not'] = constantFixup(isNot);
-		exports['between'] = constantFixup(unsupported);
-		exports['not'] = constantFixup(not);
-		exports['!'] = constantFixup(not);
-		exports['-'] = constantFixup(minus);
-
-		const Expression = requireExpression();
-		const { convertWhere } = requireConvert_where$1();
-
-		function constantFixup(func) {
-		  return (expr, state) => {
-		    let result;
-		    result = Expression.getValue(expr, state);
-		    if (result.err) {
-		      result = func(expr, state);
-		    }
-		    return result;
-		  };
-		}
-		function and(expr, state) {
-		  const left = convertWhere(expr.left, state);
-		  const right = convertWhere(expr.right, state);
-		  if (left.err === 'unsupported' && state?.default_true) {
-		    left.err = null;
-		    left.value = 1;
-		  }
-		  if (right.err === 'unsupported' && state?.default_true) {
-		    right.err = null;
-		    right.value = 1;
-		  }
-
-		  const err = left.err || right.err;
-		  let value;
-		  if (!left.value || !right.value) {
-		    value = 0;
-		  } else if (left.value === 1 && right.value === 1) {
-		    value = 1;
-		  } else if (right.value === 1) {
-		    value = left.value;
-		  } else if (left.value === 1) {
-		    value = right.value;
-		  } else {
-		    value = `(${left.value}) AND (${right.value})`;
-		  }
-		  return { err, value };
-		}
-		function or(expr, state) {
-		  const left = convertWhere(expr.left, state);
-		  const right = convertWhere(expr.right, state);
-		  let err = left.err || right.err;
-		  let value;
-		  if (err === 'unsupported' && state?.default_true) {
-		    value = 1;
-		    err = null;
-		  } else if (!left.value && !right.value) {
-		    value = 0;
-		  } else if (left.value === 1 || right.value === 1) {
-		    value = 1;
-		  } else if (!right.value) {
-		    value = left.value;
-		  } else if (!left.value) {
-		    value = right.value;
-		  } else {
-		    value = `(${left.value}) OR (${right.value})`;
-		  }
-		  return { err, value };
-		}
-		function _in(expr, state) {
-		  const left = convertWhere(expr.left, state);
-		  let err;
-		  let value;
-		  if (left.err) {
-		    err = left.err;
-		  } else if (left.value === null) {
-		    value = null;
-		  } else {
-		    const count = expr.right?.value?.length;
-		    const list = [];
-		    for (let i = 0; i < count; i++) {
-		      const right = convertWhere(expr.right.value[i], state);
-		      if (right.err) {
-		        err = right.err;
-		        break;
-		      } else if (right.value === null) {
-		        value = null;
-		        break;
-		      } else {
-		        list.push(right.value);
-		      }
-		    }
-		    if (value === undefined) {
-		      value = `${left.value} IN (${list.join(',')})`;
-		    }
-		  }
-		  return { err, value };
-		}
-		function _comparator(expr, state, op) {
-		  const left = convertWhere(expr.left, state);
-		  const right = convertWhere(expr.right, state);
-
-		  const err = left.err || right.err;
-		  const value = `${left.value} ${op} ${right.value}`;
-		  return { err, value };
-		}
-		function equal(expr, state) {
-		  return _comparator(expr, state, '=');
-		}
-		function notEqual(expr, state) {
-		  return _comparator(expr, state, '!=');
-		}
-		function gt(expr, state) {
-		  return _comparator(expr, state, '>');
-		}
-		function lt(expr, state) {
-		  return _comparator(expr, state, '<');
-		}
-		function gte(expr, state) {
-		  return _comparator(expr, state, '>=');
-		}
-		function lte(expr, state) {
-		  return _comparator(expr, state, '<=');
-		}
-		function is(expr, state) {
-		  return _is(expr, state, 'IS');
-		}
-		function isNot(expr, state) {
-		  return _is(expr, state, 'IS NOT');
-		}
-		function _is(expr, state, op) {
-		  const left = convertWhere(expr.left, state);
-		  let right;
-		  let err = left.err;
-		  if (!err) {
-		    if (expr.right.value === null) {
-		      right = 'NULL';
-		    } else if (expr.right.value === true) {
-		      right = 'TRUE';
-		    } else if (expr.right.value === false) {
-		      right = 'FALSE';
-		    } else {
-		      err = 'syntax_err';
-		    }
-		  }
-		  const value = `${left.value} ${op} ${right}`;
-		  return { err, value };
-		}
-		function not(expr, state) {
-		  const result = convertWhere(expr.expr, state);
-		  if (!result.err) {
-		    result.value = 'NOT ' + result.value;
-		  }
-		  return result;
-		}
-		function minus(expr, state) {
-		  const result = convertWhere(expr.expr, state);
-		  if (!result.err) {
-		    result.value = '-' + result.value;
-		  }
-		  return result;
-		}
-		function unsupported() {
-		  return { err: 'unsupported' };
-		} 
-	} (convert_expression));
-	return convert_expression;
-}
-
-var functions = {};
-
-var hasRequiredFunctions;
-
-function requireFunctions () {
-	if (hasRequiredFunctions) return functions;
-	hasRequiredFunctions = 1;
-	functions.foo = unsupported;
-
-	function unsupported() {
-	  return { err: 'unsupported' };
-	}
-	return functions;
-}
-
-var hasRequiredConvert_where$1;
-
-function requireConvert_where$1 () {
-	if (hasRequiredConvert_where$1) return convert_where;
-	hasRequiredConvert_where$1 = 1;
-	convert_where.convertWhere = convertWhere;
-
-	const ConvertExpression = requireConvert_expression();
-	const Functions = requireFunctions();
-	const Expression = requireExpression();
-
-	function convertWhere(expr, state) {
-	  const { from_key } = state;
-	  let err = null;
-	  let value = null;
-
-	  if (expr) {
-	    const { type } = expr;
-	    if (type === 'number') {
-	      value = expr.value;
-	    } else if (type === 'double_quote_string') {
-	      value = `'${expr.value}'`;
-	    } else if (type === 'null') {
-	      value = null;
-	    } else if (type === 'bool') {
-	      value = expr.value;
-	    } else if (type === 'function') {
-	      const func = Functions[expr.name.toLowerCase()];
-	      if (func) {
-	        const result = func(expr, state);
-	        if (result.err) {
-	          err = result.err;
-	        } else {
-	          value = result.value;
-	        }
-	      } else {
-	        err = 'unsupported';
-	      }
-	    } else if (type === 'binary_expr' || type === 'unary_expr') {
-	      const func = ConvertExpression[expr.operator.toLowerCase()];
-	      if (func) {
-	        const result = func(expr, state);
-	        if (result.err) {
-	          err = result.err;
-	        } else {
-	          value = result.value;
-	        }
-	      } else {
-	        err = 'unsupported';
-	      }
-	    } else if (type === 'column_ref') {
-	      if (expr.from?.key === from_key) {
-	        value = expr.column;
-	      } else {
-	        err = 'unsupported';
-	      }
-	    } else {
-	      const result = Expression.getValue(expr, state);
-	      err = result.err;
-	      value = result.value;
-	    }
-	  }
-	  return { err, value };
-	}
-	return convert_where;
-}
-
-var hasRequiredConvert_where;
-
-function requireConvert_where () {
-	if (hasRequiredConvert_where) return convert_where$1;
-	hasRequiredConvert_where = 1;
-	convert_where$1.convertWhere = requireConvert_where$1().convertWhere;
-	return convert_where$1;
-}
-
-var hasRequired_delete$1;
-
-function require_delete$1 () {
-	if (hasRequired_delete$1) return _delete$1;
-	hasRequired_delete$1 = 1;
-	const asyncEach = requireEach();
-	const { convertWhere } = requireConvert_where();
-	const { escapeIdentifier } = requireDynamodb_helper();
-	const logger = requireLogger();
-
-	_delete$1.singleDelete = singleDelete;
-	_delete$1.multipleDelete = multipleDelete;
-
-	function singleDelete(params, done) {
-	  const { dynamodb, session } = params;
-	  const { from, where } = params.ast;
-
-	  let no_single = false;
-	  const result = convertWhere(where, { session, from_key: from?.[0]?.key });
-	  if (result.err) {
-	    no_single = true;
-	  } else if (from.length > 1) {
-	    no_single = true;
-	  } else if (!result.value) {
-	    no_single = true;
-	  }
-
-	  if (no_single) {
-	    done('no_single');
-	  } else {
-	    const sql = `
+function singleDelete$1(params, done) {
+    const { dynamodb, session } = params;
+    const { from, where } = params.ast;
+    let no_single = false;
+    const result = convertWhere(where, { session, from_key: from?.[0]?.key });
+    if (result.err) {
+        no_single = true;
+    }
+    else if (from.length > 1) {
+        no_single = true;
+    }
+    else if (!result.value) {
+        no_single = true;
+    }
+    if (no_single) {
+        done('no_single');
+    }
+    else {
+        const sql = `
 DELETE FROM ${escapeIdentifier(from[0].table)}
 WHERE ${result.value}
 RETURNING ALL OLD *
 `;
-	    dynamodb.queryQL(sql, (err, results) => {
-	      let affectedRows = results?.length;
-	      if (err?.name === 'ValidationException') {
-	        err = 'no_single';
-	      } else if (err?.name === 'ConditionalCheckFailedException') {
-	        err = null;
-	        affectedRows = 0;
-	      } else if (err) {
-	        logger.error('singleDelete: query err:', err);
-	      }
-	      done(err, { affectedRows });
-	    });
-	  }
-	}
-	function multipleDelete(params, done) {
-	  const { dynamodb, list } = params;
-
-	  let affectedRows = 0;
-	  asyncEach(
-	    list,
-	    (object, done) => {
-	      const { table, key_list, delete_list } = object;
-	      dynamodb.deleteItems(
-	        { table, key_list, list: delete_list },
-	        (err, data) => {
-	          if (err) {
-	            logger.error('multipleDelete: deleteItems: err:', err, table, data);
-	          } else {
-	            affectedRows += delete_list.length;
-	          }
-	          done(err);
-	        }
-	      );
-	    },
-	    (err) => done(err, { affectedRows })
-	  );
-	}
-	return _delete$1;
+        dynamodb.queryQL(sql, (err, results) => {
+            let affectedRows = results?.length;
+            if (err?.name === 'ValidationException') {
+                err = 'no_single';
+            }
+            else if (err?.name === 'ConditionalCheckFailedException') {
+                err = null;
+                affectedRows = 0;
+            }
+            else if (err) {
+                error('singleDelete: query err:', err);
+            }
+            done(err, { affectedRows });
+        });
+    }
+}
+function multipleDelete$1(params, done) {
+    const { dynamodb, list } = params;
+    let affectedRows = 0;
+    asyncEach(list, (object, done) => {
+        const { table, key_list, delete_list } = object;
+        dynamodb.deleteItems({ table, key_list, list: delete_list }, (err, data) => {
+            if (err) {
+                error('multipleDelete: deleteItems: err:', err, table, data);
+            }
+            else {
+                affectedRows += delete_list.length;
+            }
+            done(err);
+        });
+    }, (err) => done(err, { affectedRows }));
 }
 
-var insert$1 = {};
-
-var util = {};
-
-var hasRequiredUtil;
-
-function requireUtil () {
-	if (hasRequiredUtil) return util;
-	hasRequiredUtil = 1;
-	util.hex = hex;
-	util.jsonStringify = jsonStringify;
-	util.trackFirstSeen = trackFirstSeen;
-
-	function jsonStringify(...args) {
-	  try {
-	    return JSON.stringify(...args);
-	  } catch {
-	    return '';
-	  }
-	}
-
-	function hex(s) {
-	  let ret = '';
-	  for (let i = 0; i < s.length; i++) {
-	    ret += s.charCodeAt(i).toString(16).padStart(4, '0');
-	    ret += ' ';
-	  }
-	  return ret;
-	}
-	function trackFirstSeen(map, keys) {
-	  let ret = true;
-	  if (keys.length > 1) {
-	    let sub = map.get(keys[0]);
-	    if (sub) {
-	      if (sub.has(keys[1])) {
-	        ret = false;
-	      } else {
-	        sub.set(keys[1], true);
-	      }
-	    } else {
-	      sub = new Map();
-	      sub.set(keys[1], true);
-	      map.set(keys[0], sub);
-	    }
-	  } else if (map.has(keys[0])) {
-	    ret = false;
-	  } else {
-	    map.set(keys[0], true);
-	  }
-	  return ret;
-	}
-	return util;
+function jsonStringify(...args) {
+    try {
+        return JSON.stringify(...args);
+    }
+    catch {
+        return '';
+    }
+}
+function trackFirstSeen(map, keys) {
+    let ret = true;
+    if (keys.length > 1) {
+        let sub = map.get(keys[0]);
+        if (sub) {
+            if (sub.has(keys[1])) {
+                ret = false;
+            }
+            else {
+                sub.set(keys[1], true);
+            }
+        }
+        else {
+            sub = new Map();
+            sub.set(keys[1], true);
+            map.set(keys[0], sub);
+        }
+    }
+    else if (map.has(keys[0])) {
+        ret = false;
+    }
+    else {
+        map.set(keys[0], true);
+    }
+    return ret;
 }
 
-var hasRequiredInsert$1;
-
-function requireInsert$1 () {
-	if (hasRequiredInsert$1) return insert$1;
-	hasRequiredInsert$1 = 1;
-	const asyncSeries = requireSeries();
-	const {
-	  escapeValue,
-	  escapeIdentifier,
-	  convertError,
-	} = requireDynamodb_helper();
-	const { trackFirstSeen } = requireUtil();
-
-	insert$1.insertRowList = insertRowList;
-
-	function insertRowList(params, done) {
-	  if (params.list.length === 0) {
-	    done(null, { affectedRows: 0 });
-	  } else if (params.duplicate_mode) {
-	    _insertIgnoreReplace(params, done);
-	  } else {
-	    _insertNoIgnore(params, done);
-	  }
-	}
-	function _insertIgnoreReplace(params, done) {
-	  const { dynamodb, duplicate_mode, table } = params;
-	  let list = params.list;
-	  let affectedRows;
-	  asyncSeries(
-	    [
-	      (done) => {
-	        if (list.length > 1) {
-	          dynamodb.getTableCached(table, (err, result) => {
-	            if (err === 'resource_not_found') {
-	              err = { err: 'table_not_found', args: [table] };
-	            } else if (!err) {
-	              const key_list = result.Table.KeySchema.map(
-	                (k) => k.AttributeName
-	              );
-	              const track = new Map();
-	              if (duplicate_mode === 'replace') {
-	                list.reverse();
-	              }
-	              list = list.filter((row) =>
-	                trackFirstSeen(
-	                  track,
-	                  key_list.map((key) => row[key].value)
-	                )
-	              );
-	              if (duplicate_mode === 'replace') {
-	                list.reverse();
-	              }
-	            }
-	            done(err);
-	          });
-	        } else {
-	          done();
-	        }
-	      },
-	      (done) => {
-	        if (duplicate_mode === 'ignore') {
-	          affectedRows = list.length;
-	          const sql_list = list.map(
-	            (item) =>
-	              `INSERT INTO ${escapeIdentifier(table)} VALUE ${_escapeItem(
-	                item
-	              )}`
-	          );
-	          dynamodb.batchQL(sql_list, (err_list) => {
-	            let err;
-	            if (err_list?.length > 0) {
-	              err_list.forEach((item_err) => {
-	                if (item_err?.Code === 'DuplicateItem') {
-	                  affectedRows--;
-	                } else if (!err && item_err) {
-	                  affectedRows--;
-	                  err = convertError(item_err, { table });
-	                }
-	              });
-	            } else if (err_list?.name === 'ValidationException') {
-	              err = {
-	                err: 'dup_table_insert',
-	                sqlMessage: err_list.message,
-	                cause: err_list,
-	              };
-	            } else if (err_list) {
-	              err = err_list;
-	            }
-	            done(err);
-	          });
-	        } else {
-	          list.forEach(_fixupItem);
-	          const opts = {
-	            table,
-	            list,
-	          };
-	          dynamodb.putItems(opts, (err) => {
-	            if (err) {
-	              err = convertError(err);
-	            }
-	            done(err, err ? undefined : { affectedRows: list.length });
-	          });
-	        }
-	      },
-	    ],
-	    (err) => done(err, err ? undefined : { affectedRows })
-	  );
-	}
-	function _insertNoIgnore(params, done) {
-	  const { dynamodb, table, list } = params;
-	  const sql_list = list.map(
-	    (item) =>
-	      `INSERT INTO ${escapeIdentifier(table)} VALUE ${_escapeItem(item)}`
-	  );
-	  dynamodb.transactionQL(sql_list, (err) => {
-	    if (
-	      err?.name === 'TransactionCanceledException' &&
-	      err.CancellationReasons
-	    ) {
-	      for (let i = 0; i < err.CancellationReasons.length; i++) {
-	        if (err.CancellationReasons[i].Code === 'DuplicateItem') {
-	          err = {
-	            err: 'dup_table_insert',
-	            args: [table, _fixupItem(list[i])],
-	          };
-	          break;
-	        } else if (err.CancellationReasons[i].Code !== 'None') {
-	          err = {
-	            err: convertError(err.CancellationReasons[i]),
-	            message: err.CancellationReasons[i].Message,
-	          };
-	          break;
-	        }
-	      }
-	    } else if (err?.name === 'ValidationException') {
-	      err = {
-	        err: 'dup_table_insert',
-	        sqlMessage: err.message,
-	        cause: err,
-	      };
-	    } else if (err) {
-	      err = convertError(err);
-	    }
-	    done(err, err ? undefined : { affectedRows: list.length });
-	  });
-	}
-	function _fixupItem(item) {
-	  for (let key in item) {
-	    item[key] = item[key].value;
-	  }
-	  return item;
-	}
-	function _escapeItem(item) {
-	  let s = '{ ';
-	  s += Object.keys(item)
-	    .map((key) => `'${key}': ${escapeValue(item[key].value)}`)
-	    .join(', ');
-	  s += ' }';
-	  return s;
-	}
-	return insert$1;
+function insertRowList$1(params, done) {
+    if (params.list.length === 0) {
+        done(null, { affectedRows: 0 });
+    }
+    else if (params.duplicate_mode) {
+        _insertIgnoreReplace(params, done);
+    }
+    else {
+        _insertNoIgnore(params, done);
+    }
+}
+function _insertIgnoreReplace(params, done) {
+    const { dynamodb, duplicate_mode, table } = params;
+    let list = params.list;
+    let affectedRows;
+    asyncSeries([
+        (done) => {
+            if (list.length > 1) {
+                dynamodb.getTableCached(table, (err, result) => {
+                    if (err === 'resource_not_found') {
+                        err = { err: 'table_not_found', args: [table] };
+                    }
+                    else if (!err) {
+                        const key_list = result.Table.KeySchema.map((k) => k.AttributeName);
+                        const track = new Map();
+                        if (duplicate_mode === 'replace') {
+                            list.reverse();
+                        }
+                        list = list.filter((row) => trackFirstSeen(track, key_list.map((key) => row[key].value)));
+                        if (duplicate_mode === 'replace') {
+                            list.reverse();
+                        }
+                    }
+                    done(err);
+                });
+            }
+            else {
+                done();
+            }
+        },
+        (done) => {
+            if (duplicate_mode === 'ignore') {
+                affectedRows = list.length;
+                const sql_list = list.map((item) => `INSERT INTO ${escapeIdentifier(table)} VALUE ${_escapeItem(item)}`);
+                dynamodb.batchQL(sql_list, (err_list) => {
+                    let err;
+                    if (err_list?.length > 0) {
+                        err_list.forEach((item_err) => {
+                            if (item_err?.Code === 'DuplicateItem') {
+                                affectedRows--;
+                            }
+                            else if (!err && item_err) {
+                                affectedRows--;
+                                err = convertError(item_err);
+                            }
+                        });
+                    }
+                    else if (err_list?.name === 'ValidationException') {
+                        err = {
+                            err: 'dup_table_insert',
+                            sqlMessage: err_list.message,
+                            cause: err_list,
+                        };
+                    }
+                    else if (err_list) {
+                        err = err_list;
+                    }
+                    done(err);
+                });
+            }
+            else {
+                list.forEach(_fixupItem);
+                const opts = {
+                    table,
+                    list,
+                };
+                dynamodb.putItems(opts, (err) => {
+                    if (err) {
+                        err = convertError(err);
+                    }
+                    done(err, err ? undefined : { affectedRows: list.length });
+                });
+            }
+        },
+    ], (err) => done(err, err ? undefined : { affectedRows }));
+}
+function _insertNoIgnore(params, done) {
+    const { dynamodb, table, list } = params;
+    const sql_list = list.map((item) => `INSERT INTO ${escapeIdentifier(table)} VALUE ${_escapeItem(item)}`);
+    dynamodb.transactionQL(sql_list, (err) => {
+        if (err?.name === 'TransactionCanceledException' &&
+            err.CancellationReasons) {
+            for (let i = 0; i < err.CancellationReasons.length; i++) {
+                if (err.CancellationReasons[i].Code === 'DuplicateItem') {
+                    err = {
+                        err: 'dup_table_insert',
+                        args: [table, _fixupItem(list[i])],
+                    };
+                    break;
+                }
+                else if (err.CancellationReasons[i].Code !== 'None') {
+                    err = {
+                        err: convertError(err.CancellationReasons[i]),
+                        message: err.CancellationReasons[i].Message,
+                    };
+                    break;
+                }
+            }
+        }
+        else if (err?.name === 'ValidationException') {
+            err = {
+                err: 'dup_table_insert',
+                sqlMessage: err.message,
+                cause: err,
+            };
+        }
+        else if (err) {
+            err = convertError(err);
+        }
+        done(err, err ? undefined : { affectedRows: list.length });
+    });
+}
+function _fixupItem(item) {
+    for (let key in item) {
+        item[key] = item[key].value;
+    }
+    return item;
+}
+function _escapeItem(item) {
+    let s = '{ ';
+    s += Object.keys(item)
+        .map((key) => `'${key}': ${escapeValue(item[key].value)}`)
+        .join(', ');
+    s += ' }';
+    return s;
 }
 
-var select$1 = {};
-
-var hasRequiredSelect$1;
-
-function requireSelect$1 () {
-	if (hasRequiredSelect$1) return select$1;
-	hasRequiredSelect$1 = 1;
-	const asyncEach = requireEach();
-	const logger = requireLogger();
-	const { convertWhere } = requireConvert_where();
-	const { escapeIdentifier } = requireDynamodb_helper();
-
-	select$1.getRowList = getRowList;
-
-	function getRowList(params, done) {
-	  const { list } = params;
-
-	  const source_map = {};
-	  const column_map = {};
-	  asyncEach(
-	    list,
-	    (from, done) => {
-	      _getFromTable({ ...params, from }, (err, results, column_list) => {
-	        source_map[from.key] = results;
-	        column_map[from.key] = column_list;
-	        done(err);
-	      });
-	    },
-	    (err) => done(err, source_map, column_map)
-	  );
-	}
-	function _getFromTable(params, done) {
-	  const { dynamodb, session, from, where } = params;
-	  const { table, _requestSet, _requestAll } = params.from;
-	  const request_columns = [..._requestSet];
-	  const columns =
-	    _requestAll || request_columns.length === 0
-	      ? '*'
-	      : request_columns.map(escapeIdentifier).join(',');
-	  let sql = `SELECT ${columns} FROM ${escapeIdentifier(table)}`;
-	  const where_result = where
-	    ? convertWhere(where, { session, from_key: from.key, default_true: true })
-	    : null;
-	  if (!where_result?.err && where_result?.value) {
-	    sql += ' WHERE ' + where_result.value;
-	  }
-	  dynamodb.queryQL(sql, (err, results) => {
-	    let column_list;
-	    if (err === 'resource_not_found') {
-	      done({ err: 'table_not_found', args: [table] });
-	    } else if (err) {
-	      logger.error('raw_engine.getRowList err:', err, results, sql);
-	    } else {
-	      if (_requestAll) {
-	        const response_set = new Set();
-	        results.forEach((result) => {
-	          for (let key in result) {
-	            response_set.add(key);
-	          }
-	        });
-	        column_list = [...response_set.keys()];
-	      } else {
-	        column_list = request_columns;
-	      }
-	    }
-	    done(err, results, column_list);
-	  });
-	}
-	return select$1;
+function getRowList$1(params, done) {
+    const { list } = params;
+    const source_map = {};
+    const column_map = {};
+    asyncEach(list, (from, done) => {
+        _getFromTable$1({ ...params, from }, (err, results, column_list) => {
+            source_map[from.key] = results;
+            column_map[from.key] = column_list;
+            done(err);
+        });
+    }, (err) => done(err, source_map, column_map));
+}
+function _getFromTable$1(params, done) {
+    const { dynamodb, session, from, where } = params;
+    const { table, _requestSet, _requestAll } = params.from;
+    const request_columns = [..._requestSet];
+    const columns = _requestAll || request_columns.length === 0
+        ? '*'
+        : request_columns.map(escapeIdentifier).join(',');
+    let sql = `SELECT ${columns} FROM ${escapeIdentifier(table)}`;
+    const where_result = where
+        ? convertWhere(where, { session, from_key: from.key, default_true: true })
+        : null;
+    if (!where_result?.err && where_result?.value) {
+        sql += ' WHERE ' + where_result.value;
+    }
+    dynamodb.queryQL(sql, (err, results) => {
+        let column_list;
+        if (err === 'resource_not_found') {
+            done({ err: 'table_not_found', args: [table] });
+        }
+        else if (err) {
+            error('raw_engine.getRowList err:', err, results, sql);
+        }
+        else {
+            if (_requestAll) {
+                const response_set = new Set();
+                results.forEach((result) => {
+                    for (let key in result) {
+                        response_set.add(key);
+                    }
+                });
+                column_list = [...response_set.keys()];
+            }
+            else {
+                column_list = request_columns;
+            }
+        }
+        done(err, results, column_list);
+    });
 }
 
-var update$1 = {};
-
-var hasRequiredUpdate$1;
-
-function requireUpdate$1 () {
-	if (hasRequiredUpdate$1) return update$1;
-	hasRequiredUpdate$1 = 1;
-	const asyncEach = requireEach();
-	const { convertWhere } = requireConvert_where();
-	const {
-	  escapeIdentifier,
-	  escapeValue,
-	  valueToNative,
-	} = requireDynamodb_helper();
-	const logger = requireLogger();
-
-	update$1.singleUpdate = singleUpdate;
-	update$1.multipleUpdate = multipleUpdate;
-
-	function singleUpdate(params, done) {
-	  const { dynamodb, session } = params;
-	  const { set, from, where } = params.ast;
-
-	  const where_result = convertWhere(where, {
-	    session,
-	    from_key: from?.[0]?.key,
-	  });
-	  let no_single = where_result.err;
-	  if (from.length > 1 || !where_result.value) {
-	    no_single = true;
-	  }
-	  const value_list = set.map((object) => {
-	    const { value } = object;
-	    let ret;
-	    const result = convertWhere(value, { session, from_key: from?.[0]?.key });
-	    if (result.err) {
-	      no_single = true;
-	    } else {
-	      ret = result.value;
-	    }
-	    return ret;
-	  });
-
-	  if (no_single) {
-	    done('no_single');
-	  } else {
-	    const sets = set
-	      .map(
-	        (object, i) => escapeIdentifier(object.column) + ' = ' + value_list[i]
-	      )
-	      .join(', ');
-
-	    const sql = `
+function singleUpdate$1(params, done) {
+    const { dynamodb, session } = params;
+    const { set, from, where } = params.ast;
+    const where_result = convertWhere(where, {
+        session,
+        from_key: from?.[0]?.key,
+    });
+    let no_single = where_result.err;
+    if (from.length > 1 || !where_result.value) {
+        no_single = true;
+    }
+    const value_list = set.map((object) => {
+        const { value } = object;
+        let ret;
+        const result = convertWhere(value, { session, from_key: from?.[0]?.key });
+        if (result.err) {
+            no_single = true;
+        }
+        else {
+            ret = result.value;
+        }
+        return ret;
+    });
+    if (no_single) {
+        done('no_single');
+    }
+    else {
+        const sets = set
+            .map((object, i) => escapeIdentifier(object.column) + ' = ' + value_list[i])
+            .join(', ');
+        const sql = `
 UPDATE ${escapeIdentifier(from[0].table)}
 SET ${sets}
 WHERE ${where_result.value}
 RETURNING MODIFIED OLD *
 `;
-	    dynamodb.queryQL(sql, (err, results) => {
-	      let result;
-	      if (err?.name === 'ValidationException') {
-	        err = 'no_single';
-	      } else if (err?.name === 'ConditionalCheckFailedException') {
-	        err = null;
-	        result = { affectedRows: 0, changedRows: 0 };
-	      } else if (err) {
-	        logger.error('singleUpdate: err:', err);
-	      } else {
-	        result = { affectedRows: 1, changedRows: 0 };
-	        set.forEach((object, i) => {
-	          const { column } = object;
-	          const value = value_list[i];
-	          if (value !== escapeValue(valueToNative(results?.[0]?.[column]))) {
-	            result.changedRows = 1;
-	          }
-	        });
-	      }
-	      done(err, result);
-	    });
-	  }
-	}
-	function multipleUpdate(params, done) {
-	  const { dynamodb, list } = params;
-
-	  let affectedRows = 0;
-	  let changedRows = 0;
-	  asyncEach(
-	    list,
-	    (object, done) => {
-	      const { table, key_list, update_list } = object;
-	      update_list.forEach((item) =>
-	        item.set_list.forEach((set) => (set.value = set.value.value))
-	      );
-	      dynamodb.updateItems(
-	        { table, key_list, list: update_list },
-	        (err, data) => {
-	          if (err) {
-	            logger.error(
-	              'multipleUpdate: updateItems: err:',
-	              err,
-	              'table:',
-	              table,
-	              data
-	            );
-	          } else {
-	            affectedRows += list.length;
-	            changedRows += list.length;
-	          }
-	          done(err);
-	        }
-	      );
-	    },
-	    (err) => done(err, { affectedRows, changedRows })
-	  );
-	}
-	return update$1;
+        dynamodb.queryQL(sql, (err, results) => {
+            let result;
+            if (err?.name === 'ValidationException') {
+                err = 'no_single';
+            }
+            else if (err?.name === 'ConditionalCheckFailedException') {
+                err = null;
+                result = { affectedRows: 0, changedRows: 0 };
+            }
+            else if (err) {
+                error('singleUpdate: err:', err);
+            }
+            else {
+                result = { affectedRows: 1, changedRows: 0 };
+                set.forEach((object, i) => {
+                    const { column } = object;
+                    const value = value_list[i];
+                    if (value !== escapeValue(valueToNative(results?.[0]?.[column]))) {
+                        result.changedRows = 1;
+                    }
+                });
+            }
+            done(err, result);
+        });
+    }
+}
+function multipleUpdate$1(params, done) {
+    const { dynamodb, list } = params;
+    let affectedRows = 0;
+    let changedRows = 0;
+    asyncEach(list, (object, done) => {
+        const { table, key_list, update_list } = object;
+        update_list.forEach((item) => item.set_list.forEach((set) => (set.value = set.value.value)));
+        dynamodb.updateItems({ table, key_list, list: update_list }, (err, data) => {
+            if (err) {
+                error('multipleUpdate: updateItems: err:', err, 'table:', table, data);
+            }
+            else {
+                affectedRows += list.length;
+                changedRows += list.length;
+            }
+            done(err);
+        });
+    }, (err) => done(err, { affectedRows, changedRows }));
 }
 
-var hasRequiredRaw;
-
-function requireRaw () {
-	if (hasRequiredRaw) return raw;
-	hasRequiredRaw = 1;
-	(function (exports) {
-		const ddl = requireDdl$1();
-		const delete_opts = require_delete$1();
-		const insert = requireInsert$1();
-		const select = requireSelect$1();
-		const update = requireUpdate$1();
-
-		Object.assign(exports, ddl);
-		Object.assign(exports, delete_opts);
-		Object.assign(exports, insert);
-		Object.assign(exports, select);
-		Object.assign(exports, update);
-
-		exports.commit = commit;
-		exports.rollback = rollback;
-
-		function commit(params, done) {
-		  done();
-		}
-		function rollback(params, done) {
-		  done();
-		} 
-	} (raw));
-	return raw;
+function commit$2(params, done) {
+    done();
+}
+function rollback$2(params, done) {
+    done();
 }
 
-var memory = {};
+var RawEngine = /*#__PURE__*/Object.freeze({
+	__proto__: null,
+	addColumn: addColumn$1,
+	commit: commit$2,
+	createIndex: createIndex$3,
+	createTable: createTable$5,
+	deleteIndex: deleteIndex$3,
+	dropTable: dropTable$2,
+	getRowList: getRowList$1,
+	getTableInfo: getTableInfo$1,
+	getTableList: getTableList$4,
+	insertRowList: insertRowList$1,
+	multipleDelete: multipleDelete$1,
+	multipleUpdate: multipleUpdate$1,
+	rollback: rollback$2,
+	singleDelete: singleDelete$1,
+	singleUpdate: singleUpdate$1
+});
 
-var ddl = {};
-
-var storage = {};
-
-var hasRequiredStorage;
-
-function requireStorage () {
-	if (hasRequiredStorage) return storage;
-	hasRequiredStorage = 1;
-	storage.getTable = getTable;
-	storage.saveTable = saveTable;
-	storage.deleteTable = deleteTable;
-	storage.updateTableData = updateTableData;
-	storage.txSaveData = txSaveData;
-	storage.txGetData = txGetData;
-
-	const g_tableMap = {};
-
-	function getTable(database, table, session) {
-	  const key = database + '.' + table;
-	  let data = session.getTempTable(database, table) || g_tableMap[key];
-	  const updates = txGetData(database, table, session)?.data;
-	  if (data && updates) {
-	    data = Object.assign({}, data, updates);
-	  }
-	  return data;
-	}
-	function updateTableData(database, table, session, updates) {
-	  const key = database + '.' + table;
-	  const data = session.getTempTable(database, table) || g_tableMap[key];
-	  Object.assign(data, updates);
-	}
-	function txSaveData(database, table, session, data) {
-	  const tx = session.getTransaction();
-	  const key = database + '.' + table;
-	  const existing = tx.getData('memory') || {};
-	  existing[key] = { database, table, data };
-	  tx.setData('memory', existing);
-	}
-	function txGetData(database, table, session) {
-	  const key = database + '.' + table;
-	  const tx = session.getTransaction();
-	  return tx?.getData?.('memory')?.[key];
-	}
-	function saveTable(database, table, data) {
-	  const key = database + '.' + table;
-	  g_tableMap[key] = data;
-	}
-	function deleteTable(database, table) {
-	  const key = database + '.' + table;
-	  delete g_tableMap[key];
-	}
-	return storage;
+const g_tableMap = {};
+function getTable$3(database, table, session) {
+    const key = database + '.' + table;
+    let data = session.getTempTable(database, table) || g_tableMap[key];
+    const updates = txGetData(database, table, session)?.data;
+    if (data && updates) {
+        data = Object.assign({}, data, updates);
+    }
+    return data;
+}
+function updateTableData(database, table, session, updates) {
+    const key = database + '.' + table;
+    const data = session.getTempTable(database, table) || g_tableMap[key];
+    Object.assign(data, updates);
+}
+function txSaveData(database, table, session, data) {
+    const tx = session.getTransaction();
+    const key = database + '.' + table;
+    const existing = tx.getData('memory') || {};
+    existing[key] = { database, table, data };
+    tx.setData('memory', existing);
+}
+function txGetData(database, table, session) {
+    const key = database + '.' + table;
+    const tx = session.getTransaction();
+    return tx?.getData?.('memory')?.[key];
+}
+function saveTable(database, table, data) {
+    const key = database + '.' + table;
+    g_tableMap[key] = data;
+}
+function deleteTable$3(database, table) {
+    const key = database + '.' + table;
+    delete g_tableMap[key];
 }
 
-var hasRequiredDdl;
-
-function requireDdl () {
-	if (hasRequiredDdl) return ddl;
-	hasRequiredDdl = 1;
-	const Storage = requireStorage();
-
-	ddl.getTableInfo = getTableInfo;
-	ddl.getTableList = getTableList;
-	ddl.createTable = createTable;
-	ddl.dropTable = dropTable;
-	ddl.addColumn = addColumn;
-	ddl.createIndex = createIndex;
-	ddl.deleteIndex = deleteIndex;
-
-	function getTableInfo(params, done) {
-	  const { session, database, table } = params;
-	  const data = Storage.getTable(database, table, session);
-	  if (data) {
-	    const result = {
-	      table,
-	      primary_key: data.primary_key,
-	      column_list: data.column_list,
-	      is_open: false,
-	    };
-	    done(null, result);
-	  } else {
-	    done({ err: 'table_not_found', args: [table] });
-	  }
-	}
-	function getTableList(params, done) {
-	  done(null, []);
-	}
-	function createTable(params, done) {
-	  const { session, database, table, primary_key, column_list, is_temp } =
-	    params;
-	  if (primary_key.length === 0) {
-	    done({ err: 'unsupported', message: 'primary key is required' });
-	  } else {
-	    const data = {
-	      column_list,
-	      primary_key,
-	      row_list: [],
-	      primary_map: new Map(),
-	    };
-	    if (is_temp) {
-	      session.saveTempTable(database, table, data);
-	    } else {
-	      Storage.saveTable(database, table, data);
-	    }
-	    done();
-	  }
-	}
-	function dropTable(params, done) {
-	  const { session, database, table } = params;
-	  if (session.getTempTable(database, table)) {
-	    session.deleteTempTable(database, table);
-	  } else {
-	    Storage.deleteTable(database, table);
-	  }
-	  done();
-	}
-	function addColumn(params, done) {
-	  done();
-	}
-	function createIndex(params, done) {
-	  done();
-	}
-	function deleteIndex(params, done) {
-	  done();
-	}
-	return ddl;
+function getTableInfo(params, done) {
+    const { session, database, table } = params;
+    const data = getTable$3(database, table, session);
+    if (data) {
+        const result = {
+            table,
+            primary_key: data.primary_key,
+            column_list: data.column_list,
+            is_open: false,
+        };
+        done(null, result);
+    }
+    else {
+        done({ err: 'table_not_found', args: [table] });
+    }
+}
+function getTableList$3(params, done) {
+    done(null, []);
+}
+function createTable$4(params, done) {
+    const { session, database, table, primary_key, column_list, is_temp } = params;
+    if (primary_key.length === 0) {
+        done({ err: 'unsupported', message: 'primary key is required' });
+    }
+    else {
+        const data = {
+            column_list,
+            primary_key,
+            row_list: [],
+            primary_map: new Map(),
+        };
+        if (is_temp) {
+            session.saveTempTable(database, table, data);
+        }
+        else {
+            saveTable(database, table, data);
+        }
+        done();
+    }
+}
+function dropTable$1(params, done) {
+    const { session, database, table } = params;
+    if (session.getTempTable(database, table)) {
+        session.deleteTempTable(database, table);
+    }
+    else {
+        deleteTable$3(database, table);
+    }
+    done();
+}
+function addColumn(params, done) {
+    done();
+}
+function createIndex$2(params, done) {
+    done();
+}
+function deleteIndex$2(params, done) {
+    done();
 }
 
-var _delete = {};
-
-var hasRequired_delete;
-
-function require_delete () {
-	if (hasRequired_delete) return _delete;
-	hasRequired_delete = 1;
-	const Storage = requireStorage();
-	const logger = requireLogger();
-
-	_delete.singleDelete = singleDelete;
-	_delete.multipleDelete = multipleDelete;
-
-	function singleDelete(params, done) {
-	  done('no_single');
-	}
-	function multipleDelete(params, done) {
-	  const { session, list } = params;
-
-	  let err;
-	  let affectedRows = 0;
-	  list.some((changes) => {
-	    const { database, table, delete_list } = changes;
-	    const data = Storage.getTable(database, table, session);
-	    if (data) {
-	      const row_list = data.row_list.slice();
-	      const primary_map = new Map(data.primary_map);
-	      delete_list.forEach((object) => {
-	        const key_list = object.map((key) => key.value);
-	        const delete_key = JSON.stringify(key_list);
-	        const index = primary_map.get(delete_key);
-	        if (index >= 0) {
-	          primary_map.delete(delete_key);
-	          row_list.splice(index, 1);
-	          primary_map.forEach((value, key) => {
-	            if (value > index) {
-	              primary_map.set(key, value - 1);
-	            }
-	          });
-	          affectedRows++;
-	        } else {
-	          logger.info(
-	            'memory.delete: failed to find key:',
-	            key_list,
-	            'for table:',
-	            table
-	          );
-	        }
-	      });
-	      if (!err) {
-	        Storage.txSaveData(database, table, session, { row_list, primary_map });
-	      }
-	    } else {
-	      err = 'table_not_found';
-	    }
-	    return err;
-	  });
-	  done(err, { affectedRows });
-	}
-	return _delete;
+function singleDelete(params, done) {
+    done('no_single');
+}
+function multipleDelete(params, done) {
+    const { session, list } = params;
+    let err;
+    let affectedRows = 0;
+    list.some((changes) => {
+        const { database, table, delete_list } = changes;
+        const data = getTable$3(database, table, session);
+        if (data) {
+            const row_list = data.row_list.slice();
+            const primary_map = new Map(data.primary_map);
+            delete_list.forEach((object) => {
+                const key_list = object.map((key) => key.value);
+                const delete_key = JSON.stringify(key_list);
+                const index = primary_map.get(delete_key);
+                if (index >= 0) {
+                    primary_map.delete(delete_key);
+                    row_list.splice(index, 1);
+                    primary_map.forEach((value, key) => {
+                        if (value > index) {
+                            primary_map.set(key, value - 1);
+                        }
+                    });
+                    affectedRows++;
+                }
+                else {
+                    info('memory.delete: failed to find key:', key_list, 'for table:', table);
+                }
+            });
+            if (!err) {
+                txSaveData(database, table, session, { row_list, primary_map });
+            }
+        }
+        else {
+            err = 'table_not_found';
+        }
+        return err;
+    });
+    done(err, { affectedRows });
 }
 
-var insert = {};
-
-var hasRequiredInsert;
-
-function requireInsert () {
-	if (hasRequiredInsert) return insert;
-	hasRequiredInsert = 1;
-	const Storage = requireStorage();
-
-	insert.insertRowList = insertRowList;
-
-	function insertRowList(params, done) {
-	  const { session, database, table, list, duplicate_mode } = params;
-	  const data = Storage.getTable(database, table, session);
-	  if (list.length === 0) {
-	    done(null, { affectedRows: 0 });
-	  } else if (data) {
-	    const { primary_key } = data;
-	    const row_list = data.row_list.slice();
-	    const primary_map = new Map(data.primary_map);
-	    let err;
-	    let affectedRows = 0;
-	    list.some((row) => {
-	      _transformRow(row);
-	      const key_values = primary_key.map((key) => row[key.name].value);
-	      const key = JSON.stringify(key_values);
-	      const index = primary_map.get(key);
-	      if (index === undefined) {
-	        primary_map.set(key, row_list.push(row) - 1);
-	        affectedRows++;
-	      } else if (duplicate_mode === 'replace') {
-	        if (!_rowEqual(row_list[index], row)) {
-	          affectedRows++;
-	        }
-	        row_list[index] = row;
-	        affectedRows++;
-	      } else if (!duplicate_mode) {
-	        err = { err: 'dup_primary_key_entry', args: [primary_key, key_values] };
-	      }
-	      return err;
-	    });
-	    if (!err) {
-	      Storage.txSaveData(database, table, session, { row_list, primary_map });
-	    }
-	    done(err, { affectedRows, changedRows: 0 });
-	  } else {
-	    done('table_not_found');
-	  }
-	}
-	function _transformRow(row) {
-	  for (let key in row) {
-	    row[key] = { type: row[key].type, value: row[key].value };
-	  }
-	}
-	function _rowEqual(a, b) {
-	  const keys_a = Object.keys(a);
-	  return keys_a.every((key) => {
-	    return a[key].value === b[key].value;
-	  });
-	}
-	return insert;
+function insertRowList(params, done) {
+    const { session, database, table, list, duplicate_mode } = params;
+    const data = getTable$3(database, table, session);
+    if (list.length === 0) {
+        done(null, { affectedRows: 0 });
+    }
+    else if (data) {
+        const { primary_key } = data;
+        const row_list = data.row_list.slice();
+        const primary_map = new Map(data.primary_map);
+        let err;
+        let affectedRows = 0;
+        list.some((row) => {
+            _transformRow(row);
+            const key_values = primary_key.map((key) => row[key.name].value);
+            const key = JSON.stringify(key_values);
+            const index = primary_map.get(key);
+            if (index === undefined) {
+                primary_map.set(key, row_list.push(row) - 1);
+                affectedRows++;
+            }
+            else if (duplicate_mode === 'replace') {
+                if (!_rowEqual(row_list[index], row)) {
+                    affectedRows++;
+                }
+                row_list[index] = row;
+                affectedRows++;
+            }
+            else if (!duplicate_mode) {
+                err = { err: 'dup_primary_key_entry', args: [primary_key, key_values] };
+            }
+            return err;
+        });
+        if (!err) {
+            txSaveData(database, table, session, { row_list, primary_map });
+        }
+        done(err, { affectedRows, changedRows: 0 });
+    }
+    else {
+        done('table_not_found');
+    }
+}
+function _transformRow(row) {
+    for (let key in row) {
+        row[key] = { type: row[key].type, value: row[key].value };
+    }
+}
+function _rowEqual(a, b) {
+    const keys_a = Object.keys(a);
+    return keys_a.every((key) => {
+        return a[key].value === b[key].value;
+    });
 }
 
-var select = {};
-
-var hasRequiredSelect;
-
-function requireSelect () {
-	if (hasRequiredSelect) return select;
-	hasRequiredSelect = 1;
-	const Storage = requireStorage();
-
-	select.getRowList = getRowList;
-
-	function getRowList(params, done) {
-	  const { list } = params;
-
-	  let err;
-	  const source_map = {};
-	  const column_map = {};
-	  list.forEach((from) => {
-	    const result = _getFromTable({ ...params, from });
-	    if (!err && result.err) {
-	      err = result.err;
-	    }
-	    source_map[from.key] = result.row_list;
-	    column_map[from.key] = result.column_list;
-	  });
-	  done(err, source_map, column_map);
-	}
-	function _getFromTable(params) {
-	  const { session } = params;
-	  const { db, table } = params.from;
-	  const data = Storage.getTable(db, table, session);
-	  return {
-	    err: data ? null : 'table_not_found',
-	    row_list: data?.row_list,
-	    column_list: data?.column_list?.map?.((column) => column.name) || [],
-	  };
-	}
-	return select;
+function getRowList(params, done) {
+    const { list } = params;
+    let err;
+    const source_map = {};
+    const column_map = {};
+    list.forEach((from) => {
+        const result = _getFromTable({ ...params, from });
+        if (!err && result.err) {
+            err = result.err;
+        }
+        source_map[from.key] = result.row_list;
+        column_map[from.key] = result.column_list;
+    });
+    done(err, source_map, column_map);
+}
+function _getFromTable(params) {
+    const { session } = params;
+    const { db, table } = params.from;
+    const data = getTable$3(db, table, session);
+    return {
+        err: data ? null : 'table_not_found',
+        row_list: data?.row_list,
+        column_list: data?.column_list?.map?.((column) => column.name) || [],
+    };
 }
 
-var update = {};
-
-var hasRequiredUpdate;
-
-function requireUpdate () {
-	if (hasRequiredUpdate) return update;
-	hasRequiredUpdate = 1;
-	const Storage = requireStorage();
-	const logger = requireLogger();
-
-	update.singleUpdate = singleUpdate;
-	update.multipleUpdate = multipleUpdate;
-
-	function singleUpdate(params, done) {
-	  done('no_single');
-	}
-	function multipleUpdate(params, done) {
-	  const { session, list } = params;
-
-	  let err;
-	  let affectedRows = 0;
-	  let changedRows = 0;
-	  list.some((changes) => {
-	    const { database, table, update_list } = changes;
-	    const data = Storage.getTable(database, table, session);
-	    if (data) {
-	      const row_list = data.row_list.slice();
-	      const primary_map = new Map(data.primary_map);
-	      update_list.forEach((update) => {
-	        const { set_list } = update;
-	        const key_list = update.key.map((key) => key.value);
-	        const update_key = JSON.stringify(key_list);
-	        const index = primary_map.get(update_key);
-	        if (index >= 0) {
-	          const old_row = row_list[index];
-	          const new_row = Object.assign({}, old_row);
-	          let changed = false;
-	          set_list.forEach((set) => {
-	            new_row[set.column] = _transformCell(set.value);
-	            // TODO: better equality tester
-	            if (old_row[set.column].value !== new_row[set.column].value) {
-	              changed = true;
-	            }
-	          });
-	          const new_key = _makePrimaryKey(data.primary_key, new_row);
-	          if (new_key !== update_key && primary_map.has(new_key)) {
-	            err = {
-	              err: 'dup_primary_key_entry',
-	              args: [data.primary_key, new_key],
-	            };
-	          } else if (new_key !== update_key) {
-	            primary_map.delete(update_key);
-	            primary_map.set(new_key, index);
-	          }
-	          if (!err) {
-	            row_list[index] = new_row;
-	            affectedRows++;
-	            if (changed) {
-	              changedRows++;
-	            }
-	          }
-	        } else {
-	          logger.error(
-	            'memory.update: failed to find key:',
-	            key_list,
-	            'for table:',
-	            table
-	          );
-	        }
-	      });
-	      if (!err) {
-	        Storage.txSaveData(database, table, session, { row_list, primary_map });
-	      }
-	    } else {
-	      err = 'table_not_found';
-	    }
-	    return err;
-	  });
-	  done(err, { affectedRows, changedRows });
-	}
-	function _transformCell(cell) {
-	  return { value: cell.value, type: cell.type };
-	}
-	function _makePrimaryKey(primary_key, row) {
-	  const key_values = primary_key.map((key) => row[key.name].value);
-	  return JSON.stringify(key_values);
-	}
-	return update;
+function singleUpdate(params, done) {
+    done('no_single');
+}
+function multipleUpdate(params, done) {
+    const { session, list } = params;
+    let err;
+    let affectedRows = 0;
+    let changedRows = 0;
+    list.some((changes) => {
+        const { database, table, update_list } = changes;
+        const data = getTable$3(database, table, session);
+        if (data) {
+            const row_list = data.row_list.slice();
+            const primary_map = new Map(data.primary_map);
+            update_list.forEach((update) => {
+                const { set_list } = update;
+                const key_list = update.key.map((key) => key.value);
+                const update_key = JSON.stringify(key_list);
+                const index = primary_map.get(update_key);
+                if (index >= 0) {
+                    const old_row = row_list[index];
+                    const new_row = Object.assign({}, old_row);
+                    let changed = false;
+                    set_list.forEach((set) => {
+                        new_row[set.column] = _transformCell(set.value);
+                        // TODO: better equality tester
+                        if (old_row[set.column].value !== new_row[set.column].value) {
+                            changed = true;
+                        }
+                    });
+                    const new_key = _makePrimaryKey(data.primary_key, new_row);
+                    if (new_key !== update_key && primary_map.has(new_key)) {
+                        err = {
+                            err: 'dup_primary_key_entry',
+                            args: [data.primary_key, new_key],
+                        };
+                    }
+                    else if (new_key !== update_key) {
+                        primary_map.delete(update_key);
+                        primary_map.set(new_key, index);
+                    }
+                    if (!err) {
+                        row_list[index] = new_row;
+                        affectedRows++;
+                        if (changed) {
+                            changedRows++;
+                        }
+                    }
+                }
+                else {
+                    error('memory.update: failed to find key:', key_list, 'for table:', table);
+                }
+            });
+            if (!err) {
+                txSaveData(database, table, session, { row_list, primary_map });
+            }
+        }
+        else {
+            err = 'table_not_found';
+        }
+        return err;
+    });
+    done(err, { affectedRows, changedRows });
+}
+function _transformCell(cell) {
+    return { value: cell.value, type: cell.type };
+}
+function _makePrimaryKey(primary_key, row) {
+    const key_values = primary_key.map((key) => row[key.name].value);
+    return JSON.stringify(key_values);
 }
 
-var hasRequiredMemory;
-
-function requireMemory () {
-	if (hasRequiredMemory) return memory;
-	hasRequiredMemory = 1;
-	(function (exports) {
-		const ddl = requireDdl();
-		const delete_opts = require_delete();
-		const insert = requireInsert();
-		const select = requireSelect();
-		const update = requireUpdate();
-
-		const Storage = requireStorage();
-
-		Object.assign(exports, ddl);
-		Object.assign(exports, delete_opts);
-		Object.assign(exports, insert);
-		Object.assign(exports, select);
-		Object.assign(exports, update);
-
-		exports.commit = commit;
-		exports.rollback = rollback;
-
-		function commit(params, done) {
-		  const { session, data } = params;
-		  for (let key in data) {
-		    const { database, table, data: tx_data } = data[key];
-		    Storage.updateTableData(database, table, session, tx_data);
-		  }
-		  done();
-		}
-		function rollback(params, done) {
-		  done();
-		} 
-	} (memory));
-	return memory;
+function commit$1(params, done) {
+    const { session, data } = params;
+    for (let key in data) {
+        const { database, table, data: tx_data } = data[key];
+        updateTableData(database, table, session, tx_data);
+    }
+    done();
+}
+function rollback$1(params, done) {
+    done();
 }
 
-var hasRequiredEngine;
+var MemoryEngine = /*#__PURE__*/Object.freeze({
+	__proto__: null,
+	addColumn: addColumn,
+	commit: commit$1,
+	createIndex: createIndex$2,
+	createTable: createTable$4,
+	deleteIndex: deleteIndex$2,
+	dropTable: dropTable$1,
+	getRowList: getRowList,
+	getTableInfo: getTableInfo,
+	getTableList: getTableList$3,
+	insertRowList: insertRowList,
+	multipleDelete: multipleDelete,
+	multipleUpdate: multipleUpdate,
+	rollback: rollback$1,
+	singleDelete: singleDelete,
+	singleUpdate: singleUpdate
+});
 
-function requireEngine () {
-	if (hasRequiredEngine) return engine;
-	hasRequiredEngine = 1;
-	const RawEngine = requireRaw();
-	const MemoryEngine = requireMemory();
-
-	engine.getEngineByName = getEngineByName;
-	engine.getDatabaseError = getDatabaseError;
-	engine.getTableError = getTableError;
-
-	const KEYS = [
-	  'commit',
-	  'rollback',
-	  'getTableList',
-	  'createTable',
-	  'dropTable',
-	  'createIndex',
-	  'deleteIndex',
-	  'addColumn',
-	  'getTableInfo',
-	  'getRowList',
-	  'singleDelete',
-	  'multipleDelete',
-	  'singleUpdate',
-	  'multipleUpdate',
-	];
-	const NullEngine = _makeErrorEngine('unsupported');
-
-	function getEngineByName(name) {
-	  let ret;
-	  switch (name) {
-	    case 'raw':
-	      ret = RawEngine;
-	      break;
-	    case 'memory':
-	      ret = MemoryEngine;
-	      break;
-	    default:
-	      ret = NullEngine;
-	      break;
-	  }
-	  return ret;
-	}
-	function getDatabaseError(database) {
-	  return _makeErrorEngine({ err: 'db_not_found', args: [database] });
-	}
-	function getTableError(table) {
-	  return _makeErrorEngine({ err: 'table_not_found', args: [table] });
-	}
-
-	function _makeErrorEngine(error) {
-	  return Object.fromEntries(
-	    KEYS.map((key) => [key, _makeErrorCallback(error)])
-	  );
-	}
-	function _makeErrorCallback(error) {
-	  return function (arg, done) {
-	    done(error);
-	  };
-	}
-	return engine;
+const KEYS = [
+    'commit',
+    'rollback',
+    'getTableList',
+    'createTable',
+    'dropTable',
+    'createIndex',
+    'deleteIndex',
+    'addColumn',
+    'getTableInfo',
+    'getRowList',
+    'singleDelete',
+    'multipleDelete',
+    'singleUpdate',
+    'multipleUpdate',
+    'insertRowList',
+];
+const NullEngine = _makeErrorEngine('unsupported');
+function getEngineByName(name) {
+    let ret;
+    switch (name) {
+        case 'raw':
+            ret = RawEngine;
+            break;
+        case 'memory':
+            ret = MemoryEngine;
+            break;
+        default:
+            ret = NullEngine;
+            break;
+    }
+    return ret;
+}
+function getDatabaseError(database) {
+    return _makeErrorEngine({ err: 'db_not_found', args: [database] });
+}
+function getTableError(table) {
+    return _makeErrorEngine({ err: 'table_not_found', args: [table] });
+}
+function _makeErrorEngine(error) {
+    return Object.fromEntries(KEYS.map((key) => [key, _makeErrorCallback(error)]));
+}
+function _makeErrorCallback(error) {
+    return function (arg, done) {
+        done(error);
+    };
 }
 
-var hasRequiredSchema_manager;
-
-function requireSchema_manager () {
-	if (hasRequiredSchema_manager) return schema_manager;
-	hasRequiredSchema_manager = 1;
-	const asyncEach = requireEach();
-	const Engine = requireEngine();
-	const logger = requireLogger();
-
-	schema_manager.getEngine = getEngine;
-	schema_manager.getDatabaseList = getDatabaseList;
-	schema_manager.getTableList = getTableList;
-	schema_manager.createDatabase = createDatabase;
-	schema_manager.dropDatabase = dropDatabase;
-	schema_manager.createTable = createTable;
-	schema_manager.dropTable = dropTable;
-
-	const BUILT_IN = ['_dynamodb'];
-	const g_schemaMap = {};
-
-	function getEngine(database, table, session) {
-	  let ret;
-	  const schema = g_schemaMap[database];
-	  if (database === '_dynamodb') {
-	    ret = Engine.getEngineByName('raw');
-	  } else if (!schema) {
-	    ret = Engine.getDatabaseError(database);
-	  } else if (session.getTempTable(database, table)) {
-	    ret = Engine.getEngineByName('memory');
-	  } else if (schema[table]) {
-	    ret = Engine.getEngineByName(schema[table].table_engine);
-	  } else {
-	    ret = Engine.getTableError(table);
-	  }
-	  return ret;
-	}
-	function _findTable(database, table, session) {
-	  return (
-	    session.getTempTable(database, table) || g_schemaMap[database]?.[table]
-	  );
-	}
-	function getDatabaseList() {
-	  return [...BUILT_IN, ...Object.keys(g_schemaMap)];
-	}
-	function getTableList(params, done) {
-	  const { dynamodb, database } = params;
-	  if (database === '_dynamodb') {
-	    const engine = Engine.getEngineByName('raw');
-	    engine.getTableList({ dynamodb }, done);
-	  } else if (database in g_schemaMap) {
-	    done(null, []);
-	  } else {
-	    done({ err: 'db_not_found', args: [database] });
-	  }
-	}
-	function createDatabase(database, done) {
-	  if (BUILT_IN.includes(database) || database in g_schemaMap) {
-	    done('database_exists');
-	  } else {
-	    g_schemaMap[database] = {};
-	    done();
-	  }
-	}
-	function dropDatabase(params, done) {
-	  const { session, database } = params;
-	  if (BUILT_IN.includes(database)) {
-	    done('database_no_drop_builtin');
-	  } else if (database in g_schemaMap) {
-	    session.dropTempTable(database);
-	    const table_list = Object.keys(g_schemaMap[database]);
-	    asyncEach(
-	      table_list,
-	      (table, done) => {
-	        const engine = getEngine(database, table, session);
-	        engine.dropTable({ ...params, table }, (err) => {
-	          if (err) {
-	            logger.error('dropDatabase: table:', table, 'drop err:', err);
-	          } else {
-	            delete g_schemaMap[database][table];
-	          }
-	          done(err);
-	        });
-	      },
-	      (err) => {
-	        if (!err) {
-	          delete g_schemaMap[database];
-	        }
-	        done(err);
-	      }
-	    );
-	  } else {
-	    done({ err: 'db_not_found', args: [database] });
-	  }
-	}
-	function createTable(params, done) {
-	  const { session, database, table, is_temp } = params;
-	  const table_engine = is_temp
-	    ? 'memory'
-	    : (params.table_engine?.toLowerCase?.() ?? 'raw');
-
-	  if (database === '_dynamodb' && table_engine !== 'raw') {
-	    done('access_denied');
-	  } else if (database === '_dynamodb') {
-	    const engine = Engine.getEngineByName('raw');
-	    engine.createTable(params, done);
-	  } else if (_findTable(database, table, session)) {
-	    done({ err: 'table_exists', args: [table] });
-	  } else if (!(database in g_schemaMap)) {
-	    done({ err: 'db_not_found', args: [database] });
-	  } else {
-	    const engine = Engine.getEngineByName(table_engine);
-	    if (engine) {
-	      engine.createTable(params, (err) => {
-	        if (!err && !is_temp) {
-	          g_schemaMap[database][table] = { table_engine };
-	        }
-	        done(err);
-	      });
-	    } else {
-	      done({ err: 'ER_UNKNOWN_STORAGE_ENGINE', args: [table_engine] });
-	    }
-	  }
-	}
-	function dropTable(params, done) {
-	  const { session, database, table } = params;
-	  if (database === '_dynamodb') {
-	    const engine = Engine.getEngineByName('raw');
-	    engine.dropTable(params, done);
-	  } else if (_findTable(database, table, session)) {
-	    const engine = getEngine(database, table, session);
-	    engine.dropTable(params, (err) => {
-	      if (err) {
-	        logger.error(
-	          'SchemaManager.dropTable: drop error but deleting table anyway: err:',
-	          err,
-	          database,
-	          table
-	        );
-	      }
-	      delete g_schemaMap[database][table];
-	      done(err);
-	    });
-	  } else {
-	    done('resource_not_found');
-	  }
-	}
-	return schema_manager;
+const BUILT_IN = ['_dynamodb'];
+const g_schemaMap = {};
+function getEngine(database, table, session) {
+    let ret;
+    const schema = g_schemaMap[database];
+    if (database === '_dynamodb') {
+        ret = getEngineByName('raw');
+    }
+    else if (!schema) {
+        ret = getDatabaseError(database);
+    }
+    else if (session.getTempTable(database, table)) {
+        ret = getEngineByName('memory');
+    }
+    else if (schema[table]) {
+        ret = getEngineByName(schema[table].table_engine);
+    }
+    else {
+        ret = getTableError(table);
+    }
+    return ret;
+}
+function _findTable(database, table, session) {
+    return (session.getTempTable(database, table) || g_schemaMap[database]?.[table]);
+}
+function getDatabaseList() {
+    return [...BUILT_IN, ...Object.keys(g_schemaMap)];
+}
+function getTableList$2(params, done) {
+    const { dynamodb, database } = params;
+    if (database === '_dynamodb') {
+        const engine = getEngineByName('raw');
+        engine.getTableList({ dynamodb }, done);
+    }
+    else if (database in g_schemaMap) {
+        done(null, []);
+    }
+    else {
+        done({ err: 'db_not_found', args: [database] });
+    }
+}
+function createDatabase(database, done) {
+    if (BUILT_IN.includes(database) || database in g_schemaMap) {
+        done('database_exists');
+    }
+    else {
+        g_schemaMap[database] = {};
+        done();
+    }
+}
+function dropDatabase(params, done) {
+    const { session, database } = params;
+    if (BUILT_IN.includes(database)) {
+        done('database_no_drop_builtin');
+    }
+    else if (database in g_schemaMap) {
+        session.dropTempTable(database);
+        const table_list = Object.keys(g_schemaMap[database]);
+        asyncEach(table_list, (table, done) => {
+            const engine = getEngine(database, table, session);
+            engine.dropTable({ ...params, table }, (err) => {
+                if (err) {
+                    error('dropDatabase: table:', table, 'drop err:', err);
+                }
+                else {
+                    delete g_schemaMap[database][table];
+                }
+                done(err);
+            });
+        }, (err) => {
+            if (!err) {
+                delete g_schemaMap[database];
+            }
+            done(err);
+        });
+    }
+    else {
+        done({ err: 'db_not_found', args: [database] });
+    }
+}
+function createTable$3(params, done) {
+    const { session, database, table, is_temp } = params;
+    const table_engine = is_temp
+        ? 'memory'
+        : (params.table_engine?.toLowerCase?.() ?? 'raw');
+    if (database === '_dynamodb' && table_engine !== 'raw') {
+        done('access_denied');
+    }
+    else if (database === '_dynamodb') {
+        const engine = getEngineByName('raw');
+        engine.createTable(params, done);
+    }
+    else if (_findTable(database, table, session)) {
+        done({ err: 'table_exists', args: [table] });
+    }
+    else if (!(database in g_schemaMap)) {
+        done({ err: 'db_not_found', args: [database] });
+    }
+    else {
+        const engine = getEngineByName(table_engine);
+        if (engine) {
+            engine.createTable(params, (err) => {
+                if (!err && !is_temp) {
+                    g_schemaMap[database][table] = { table_engine };
+                }
+                done(err);
+            });
+        }
+        else {
+            done({ err: 'ER_UNKNOWN_STORAGE_ENGINE', args: [table_engine] });
+        }
+    }
+}
+function dropTable(params, done) {
+    const { session, database, table } = params;
+    if (database === '_dynamodb') {
+        const engine = getEngineByName('raw');
+        engine.dropTable(params, done);
+    }
+    else if (_findTable(database, table, session)) {
+        const engine = getEngine(database, table, session);
+        engine.dropTable(params, (err) => {
+            if (err) {
+                error('SchemaManager.dropTable: drop error but deleting table anyway: err:', err, database, table);
+            }
+            delete g_schemaMap[database][table];
+            done(err);
+        });
+    }
+    else {
+        done('resource_not_found');
+    }
 }
 
-var transaction_manager = {};
-
-var hasRequiredTransaction_manager;
-
-function requireTransaction_manager () {
-	if (hasRequiredTransaction_manager) return transaction_manager;
-	hasRequiredTransaction_manager = 1;
-	const asyncEach = requireEach();
-	const asyncSeries = requireSeries();
-
-	const Engine = requireEngine();
-
-	transaction_manager.run = run;
-	transaction_manager.startTransaction = startTransaction;
-	transaction_manager.commit = commit;
-	transaction_manager.rollback = rollback;
-
-	class Transaction {
-	  constructor(auto_commit) {
-	    this._isAutoCommit = Boolean(auto_commit);
-	  }
-	  _dataMap = new Map();
-	  isAutoCommit() {
-	    return this._isAutoCommit;
-	  }
-	  getEngineNameList() {
-	    return this._dataMap.keys();
-	  }
-	  getData(name) {
-	    return this._dataMap.get(name);
-	  }
-	  setData(name, data) {
-	    this._dataMap.set(name, data);
-	  }
-	}
-
-	function run(params, done) {
-	  const { dynamodb, session, func } = params;
-	  let tx;
-	  let func_err;
-	  let result_list = [];
-	  asyncSeries(
-	    [
-	      (done) => startTransaction({ session, auto_commit: true }, done),
-	      (done) => {
-	        tx = session.getTransaction();
-	        params.transaction = tx;
-	        func(params, (err, ...results) => {
-	          func_err = err;
-	          result_list = results;
-	          done();
-	        });
-	      },
-	      (done) => {
-	        if (tx.isAutoCommit()) {
-	          if (func_err) {
-	            rollback({ dynamodb, session }, done);
-	          } else {
-	            commit({ dynamodb, session }, done);
-	          }
-	        } else {
-	          done();
-	        }
-	      },
-	    ],
-	    (err) => done(func_err || err, ...result_list)
-	  );
-	}
-	function startTransaction(params, done) {
-	  const { session, auto_commit } = params;
-	  const existing = session.getTransaction();
-	  if (!existing) {
-	    const tx = new Transaction(auto_commit);
-	    session.setTransaction(tx);
-	  }
-	  done();
-	}
-	function commit(params, done) {
-	  _txEach(
-	    params,
-	    ({ engine, ...other }, done) => engine.commit(other, done),
-	    done
-	  );
-	}
-	function rollback(params, done) {
-	  _txEach(
-	    params,
-	    ({ engine, ...other }, done) => engine.rollback(other, done),
-	    done
-	  );
-	}
-	function _txEach(params, callback, done) {
-	  const { dynamodb, session } = params;
-	  const transaction = session.getTransaction();
-	  if (transaction) {
-	    const list = transaction.getEngineNameList();
-	    asyncEach(
-	      list,
-	      (name, done) => {
-	        const engine = Engine.getEngineByName(name);
-	        const data = transaction.getData(name);
-	        callback({ engine, dynamodb, session, transaction, data }, done);
-	      },
-	      (err) => {
-	        session.setTransaction(null);
-	        done(err);
-	      }
-	    );
-	  } else {
-	    done();
-	  }
-	}
-	return transaction_manager;
+class Transaction {
+    constructor(auto_commit) {
+        this._dataMap = new Map();
+        this._isAutoCommit = Boolean(auto_commit);
+    }
+    isAutoCommit() {
+        return this._isAutoCommit;
+    }
+    getEngineNameList() {
+        return this._dataMap.keys();
+    }
+    getData(name) {
+        return this._dataMap.get(name);
+    }
+    setData(name, data) {
+        this._dataMap.set(name, data);
+    }
+}
+function run(params, done) {
+    const { dynamodb, session, func } = params;
+    let tx;
+    let func_err;
+    let result_list = [];
+    asyncSeries([
+        (done) => startTransaction({ session, auto_commit: true }, done),
+        (done) => {
+            tx = session.getTransaction();
+            params.transaction = tx;
+            func(params, (err, ...results) => {
+                func_err = err;
+                result_list = results;
+                done();
+            });
+        },
+        (done) => {
+            if (tx.isAutoCommit()) {
+                if (func_err) {
+                    rollback({ dynamodb, session }, done);
+                }
+                else {
+                    commit({ dynamodb, session }, done);
+                }
+            }
+            else {
+                done();
+            }
+        },
+    ], (err) => done(func_err || err, ...result_list));
+}
+function startTransaction(params, done) {
+    const { session, auto_commit } = params;
+    const existing = session.getTransaction();
+    if (!existing) {
+        const tx = new Transaction(auto_commit);
+        session.setTransaction(tx);
+    }
+    done();
+}
+function commit(params, done) {
+    _txEach(params, ({ engine, ...other }, done) => engine.commit(other, done), done);
+}
+function rollback(params, done) {
+    _txEach(params, ({ engine, ...other }, done) => engine.rollback(other, done), done);
+}
+function _txEach(params, callback, done) {
+    const { dynamodb, session } = params;
+    const transaction = session.getTransaction();
+    if (transaction) {
+        const list = transaction.getEngineNameList();
+        asyncEach(list, (name, done) => {
+            const engine = getEngineByName(name);
+            const data = transaction.getData(name);
+            callback({ engine, dynamodb, session, transaction, data }, done);
+        }, (err) => {
+            session.setTransaction(null);
+            done(err);
+        });
+    }
+    else {
+        done();
+    }
 }
 
-var hasRequiredAlter_handler;
-
-function requireAlter_handler () {
-	if (hasRequiredAlter_handler) return alter_handler;
-	hasRequiredAlter_handler = 1;
-	const asyncSeries = requireSeries();
-	const asyncEachSeries = requireEachSeries();
-	const SchemaManager = requireSchema_manager();
-	const TransactionManager = requireTransaction_manager();
-
-	alter_handler.query = query;
-
-	function query(params, done) {
-	  const { ast, dynamodb, session } = params;
-	  const database = ast.table?.[0]?.db || session.getCurrentDatabase();
-	  const table = ast.table?.[0]?.table;
-	  const engine = SchemaManager.getEngine(database, table, session);
-
-	  if (ast.table && database) {
-	    const opts = {
-	      dynamodb,
-	      ast,
-	      engine,
-	      session,
-	      func: _runAlterTable,
-	    };
-	    TransactionManager.run(opts, done);
-	  } else if (ast.table) {
-	    done('no_current_database');
-	  } else {
-	    done('unsupported');
-	  }
-	}
-	function _runAlterTable(params, done) {
-	  const { ast, dynamodb, engine, session } = params;
-	  const table = ast.table?.[0]?.table;
-	  const column_list = [];
-	  asyncSeries(
-	    [
-	      (done) =>
-	        asyncEachSeries(
-	          ast.expr,
-	          (def, done) => {
-	            if (def.resource === 'column' && def.action === 'add') {
-	              const column_name = def.column?.column;
-	              const type = def.definition?.dataType;
-	              const length = def.definition?.length;
-	              column_list.push({
-	                name: column_name,
-	                type,
-	                length,
-	              });
-	              const opts = {
-	                dynamodb,
-	                session,
-	                table,
-	                column_name,
-	                type,
-	                length,
-	              };
-	              engine.addColumn(opts, done);
-	            } else {
-	              done();
-	            }
-	          },
-	          done
-	        ),
-	      (done) =>
-	        asyncEachSeries(
-	          ast.expr,
-	          (def, done) => {
-	            if (def.resource === 'index' && def.action === 'add') {
-	              let key_err;
-	              const key_list =
-	                def.definition?.map?.((sub) => {
-	                  const column_def = column_list.find(
-	                    (col) => col.name === sub.column
-	                  );
-	                  if (!column_def) {
-	                    key_err = {
-	                      err: 'ER_KEY_COLUMN_DOES_NOT_EXITS',
-	                      args: [sub.column],
-	                    };
-	                  }
-	                  return {
-	                    name: sub.column,
-	                    order_by: sub.order_by,
-	                    type: column_def?.type,
-	                  };
-	                }) || [];
-	              if (key_err) {
-	                done(key_err);
-	              } else {
-	                const opts = {
-	                  dynamodb,
-	                  session,
-	                  table,
-	                  index_name: def.index,
-	                  key_list,
-	                };
-	                engine.createIndex(opts, (err) => {
-	                  if (err === 'index_exists') {
-	                    err = {
-	                      err: 'ER_DUP_KEYNAME',
-	                      args: [def.index],
-	                    };
-	                  }
-	                  done(err);
-	                });
-	              }
-	            } else if (def.resource === 'index' && def.action === 'drop') {
-	              const opts = {
-	                dynamodb,
-	                session,
-	                table,
-	                index_name: def.index,
-	              };
-	              engine.deleteIndex(opts, (err) => {
-	                if (err === 'index_not_found') {
-	                  err = {
-	                    err: 'ER_CANT_DROP_FIELD_OR_KEY',
-	                    args: [def.index],
-	                  };
-	                }
-	                done(err);
-	              });
-	            } else {
-	              done();
-	            }
-	          },
-	          done
-	        ),
-	    ],
-	    (err) => done(err, err ? undefined : {})
-	  );
-	}
-	return alter_handler;
+function query$8(params, done) {
+    const { ast, dynamodb, session } = params;
+    const database = ast.table?.[0]?.db || session.getCurrentDatabase();
+    const table = ast.table?.[0]?.table;
+    const engine = getEngine(database, table, session);
+    if (ast.table && database) {
+        const opts = {
+            dynamodb,
+            ast,
+            engine,
+            session,
+            func: _runAlterTable,
+        };
+        run(opts, done);
+    }
+    else if (ast.table) {
+        done('no_current_database');
+    }
+    else {
+        done('unsupported');
+    }
+}
+function _runAlterTable(params, done) {
+    const { ast, dynamodb, engine, session } = params;
+    const table = ast.table?.[0]?.table;
+    const column_list = [];
+    asyncSeries([
+        (done) => asyncEachSeries(ast.expr, (def, done) => {
+            if (def.resource === 'column' && def.action === 'add') {
+                const column_name = def.column?.column;
+                const type = def.definition?.dataType;
+                const length = def.definition?.length;
+                column_list.push({
+                    name: column_name,
+                    type,
+                    length,
+                });
+                const opts = {
+                    dynamodb,
+                    session,
+                    table,
+                    column_name,
+                    type,
+                    length,
+                };
+                engine.addColumn(opts, done);
+            }
+            else {
+                done();
+            }
+        }, done),
+        (done) => asyncEachSeries(ast.expr, (def, done) => {
+            if (def.resource === 'index' && def.action === 'add') {
+                let key_err;
+                const key_list = def.definition?.map?.((sub) => {
+                    const column_def = column_list.find((col) => col.name === sub.column);
+                    if (!column_def) {
+                        key_err = {
+                            err: 'ER_KEY_COLUMN_DOES_NOT_EXITS',
+                            args: [sub.column],
+                        };
+                    }
+                    return {
+                        name: sub.column,
+                        order_by: sub.order_by,
+                        type: column_def?.type,
+                    };
+                }) || [];
+                if (key_err) {
+                    done(key_err);
+                }
+                else {
+                    const opts = {
+                        dynamodb,
+                        session,
+                        table,
+                        index_name: def.index,
+                        key_list,
+                    };
+                    engine.createIndex(opts, (err) => {
+                        if (err === 'index_exists') {
+                            err = {
+                                err: 'ER_DUP_KEYNAME',
+                                args: [def.index],
+                            };
+                        }
+                        done(err);
+                    });
+                }
+            }
+            else if (def.resource === 'index' && def.action === 'drop') {
+                const opts = {
+                    dynamodb,
+                    session,
+                    table,
+                    index_name: def.index,
+                };
+                engine.deleteIndex(opts, (err) => {
+                    if (err === 'index_not_found') {
+                        err = {
+                            err: 'ER_CANT_DROP_FIELD_OR_KEY',
+                            args: [def.index],
+                        };
+                    }
+                    done(err);
+                });
+            }
+            else {
+                done();
+            }
+        }, done),
+    ], (err) => done(err, err ? undefined : {}));
 }
 
-var create_handler = {};
+const FIELD_FLAGS = {
+    NOT_NULL: 1,
+    UNSIGNED: 32,
+    BINARY: 128};
+const TYPES = {
+    OLDDECIMAL: 0x00,
+    TINY: 0x01,
+    TINYINT: 0x01,
+    SHORT: 0x02,
+    SMALLINT: 0x02,
+    INT: 0x03,
+    LONG: 0x03,
+    FLOAT: 0x04,
+    DOUBLE: 0x05,
+    NULL: 0x06,
+    TIMESTAMP: 0x07,
+    LONGLONG: 0x08,
+    BIGINT: 0x08,
+    INT24: 0x09,
+    MEDIUMINT: 0x09,
+    DATE: 0x0a,
+    TIME: 0x0b,
+    DATETIME: 0x0c,
+    YEAR: 0x0d,
+    NEWDATE: 0x0e,
+    VARCHAR: 0x0f,
+    BIT: 0x10,
+    JSON: 0xf5,
+    DECIMAL: 0xf6,
+    ENUM: 0xf7,
+    SET: 0xf8,
+    TINYBLOB: 0xf9,
+    MEDIUMBLOB: 0xfa,
+    LONGBLOB: 0xfb,
+    BLOB: 0xfc,
+    VAR_STRING: 0xfd,
+    STRING: 0xfe,
+    GEOMETRY: 0xff,
+};
+const CHARSETS = {
+    UTF8_GENERAL_CI: 33,
+    BINARY: 63};
+const CODE_ERRNO = {
+    EE_CANTCREATEFILE: 1,
+    EE_READ: 2,
+    EE_WRITE: 3,
+    EE_BADCLOSE: 4,
+    EE_OUTOFMEMORY: 5,
+    EE_DELETE: 6,
+    EE_LINK: 7,
+    EE_EOFERR: 9,
+    EE_CANTLOCK: 10,
+    EE_CANTUNLOCK: 11,
+    EE_DIR: 12,
+    EE_STAT: 13,
+    EE_CANT_CHSIZE: 14,
+    EE_CANT_OPEN_STREAM: 15,
+    EE_GETWD: 16,
+    EE_SETWD: 17,
+    EE_LINK_WARNING: 18,
+    EE_OPEN_WARNING: 19,
+    EE_DISK_FULL: 20,
+    EE_CANT_MKDIR: 21,
+    EE_UNKNOWN_CHARSET: 22,
+    EE_OUT_OF_FILERESOURCES: 23,
+    EE_CANT_READLINK: 24,
+    EE_CANT_SYMLINK: 25,
+    EE_REALPATH: 26,
+    EE_SYNC: 27,
+    EE_UNKNOWN_COLLATION: 28,
+    EE_FILENOTFOUND: 29,
+    EE_FILE_NOT_CLOSED: 30,
+    EE_CHANGE_OWNERSHIP: 31,
+    EE_CHANGE_PERMISSIONS: 32,
+    EE_CANT_SEEK: 33,
+    EE_CAPACITY_EXCEEDED: 34,
+    HA_ERR_KEY_NOT_FOUND: 120,
+    HA_ERR_FOUND_DUPP_KEY: 121,
+    HA_ERR_INTERNAL_ERROR: 122,
+    HA_ERR_RECORD_CHANGED: 123,
+    HA_ERR_WRONG_INDEX: 124,
+    HA_ERR_CRASHED: 126,
+    HA_ERR_WRONG_IN_RECORD: 127,
+    HA_ERR_OUT_OF_MEM: 128,
+    HA_ERR_NOT_A_TABLE: 130,
+    HA_ERR_WRONG_COMMAND: 131,
+    HA_ERR_OLD_FILE: 132,
+    HA_ERR_NO_ACTIVE_RECORD: 133,
+    HA_ERR_RECORD_DELETED: 134,
+    HA_ERR_RECORD_FILE_FULL: 135,
+    HA_ERR_INDEX_FILE_FULL: 136,
+    HA_ERR_END_OF_FILE: 137,
+    HA_ERR_UNSUPPORTED: 138,
+    HA_ERR_TOO_BIG_ROW: 139,
+    HA_WRONG_CREATE_OPTION: 140,
+    HA_ERR_FOUND_DUPP_UNIQUE: 141,
+    HA_ERR_UNKNOWN_CHARSET: 142,
+    HA_ERR_WRONG_MRG_TABLE_DEF: 143,
+    HA_ERR_CRASHED_ON_REPAIR: 144,
+    HA_ERR_CRASHED_ON_USAGE: 145,
+    HA_ERR_LOCK_WAIT_TIMEOUT: 146,
+    HA_ERR_LOCK_TABLE_FULL: 147,
+    HA_ERR_READ_ONLY_TRANSACTION: 148,
+    HA_ERR_LOCK_DEADLOCK: 149,
+    HA_ERR_CANNOT_ADD_FOREIGN: 150,
+    HA_ERR_NO_REFERENCED_ROW: 151,
+    HA_ERR_ROW_IS_REFERENCED: 152,
+    HA_ERR_NO_SAVEPOINT: 153,
+    HA_ERR_NON_UNIQUE_BLOCK_SIZE: 154,
+    HA_ERR_NO_SUCH_TABLE: 155,
+    HA_ERR_TABLE_EXIST: 156,
+    HA_ERR_NO_CONNECTION: 157,
+    HA_ERR_NULL_IN_SPATIAL: 158,
+    HA_ERR_TABLE_DEF_CHANGED: 159,
+    HA_ERR_NO_PARTITION_FOUND: 160,
+    HA_ERR_RBR_LOGGING_FAILED: 161,
+    HA_ERR_DROP_INDEX_FK: 162,
+    HA_ERR_FOREIGN_DUPLICATE_KEY: 163,
+    HA_ERR_TABLE_NEEDS_UPGRADE: 164,
+    HA_ERR_TABLE_READONLY: 165,
+    HA_ERR_AUTOINC_READ_FAILED: 166,
+    HA_ERR_AUTOINC_ERANGE: 167,
+    HA_ERR_GENERIC: 168,
+    HA_ERR_RECORD_IS_THE_SAME: 169,
+    HA_ERR_LOGGING_IMPOSSIBLE: 170,
+    HA_ERR_CORRUPT_EVENT: 171,
+    HA_ERR_NEW_FILE: 172,
+    HA_ERR_ROWS_EVENT_APPLY: 173,
+    HA_ERR_INITIALIZATION: 174,
+    HA_ERR_FILE_TOO_SHORT: 175,
+    HA_ERR_WRONG_CRC: 176,
+    HA_ERR_TOO_MANY_CONCURRENT_TRXS: 177,
+    HA_ERR_NOT_IN_LOCK_PARTITIONS: 178,
+    HA_ERR_INDEX_COL_TOO_LONG: 179,
+    HA_ERR_INDEX_CORRUPT: 180,
+    HA_ERR_UNDO_REC_TOO_BIG: 181,
+    HA_FTS_INVALID_DOCID: 182,
+    HA_ERR_TABLE_IN_FK_CHECK: 183,
+    HA_ERR_TABLESPACE_EXISTS: 184,
+    HA_ERR_TOO_MANY_FIELDS: 185,
+    HA_ERR_ROW_IN_WRONG_PARTITION: 186,
+    HA_ERR_INNODB_READ_ONLY: 187,
+    HA_ERR_FTS_EXCEED_RESULT_CACHE_LIMIT: 188,
+    HA_ERR_TEMP_FILE_WRITE_FAILURE: 189,
+    HA_ERR_INNODB_FORCED_RECOVERY: 190,
+    HA_ERR_FTS_TOO_MANY_WORDS_IN_PHRASE: 191,
+    HA_ERR_FK_DEPTH_EXCEEDED: 192,
+    HA_MISSING_CREATE_OPTION: 193,
+    HA_ERR_SE_OUT_OF_MEMORY: 194,
+    HA_ERR_TABLE_CORRUPT: 195,
+    HA_ERR_QUERY_INTERRUPTED: 196,
+    HA_ERR_TABLESPACE_MISSING: 197,
+    HA_ERR_TABLESPACE_IS_NOT_EMPTY: 198,
+    HA_ERR_WRONG_FILE_NAME: 199,
+    HA_ERR_NOT_ALLOWED_COMMAND: 200,
+    HA_ERR_COMPUTE_FAILED: 201,
+    ER_HASHCHK: 1000,
+    ER_NISAMCHK: 1001,
+    ER_NO: 1002,
+    ER_YES: 1003,
+    ER_CANT_CREATE_FILE: 1004,
+    ER_CANT_CREATE_TABLE: 1005,
+    ER_CANT_CREATE_DB: 1006,
+    ER_DB_CREATE_EXISTS: 1007,
+    ER_DB_DROP_EXISTS: 1008,
+    ER_DB_DROP_DELETE: 1009,
+    ER_DB_DROP_RMDIR: 1010,
+    ER_CANT_DELETE_FILE: 1011,
+    ER_CANT_FIND_SYSTEM_REC: 1012,
+    ER_CANT_GET_STAT: 1013,
+    ER_CANT_GET_WD: 1014,
+    ER_CANT_LOCK: 1015,
+    ER_CANT_OPEN_FILE: 1016,
+    ER_FILE_NOT_FOUND: 1017,
+    ER_CANT_READ_DIR: 1018,
+    ER_CANT_SET_WD: 1019,
+    ER_CHECKREAD: 1020,
+    ER_DISK_FULL: 1021,
+    ER_DUP_KEY: 1022,
+    ER_ERROR_ON_CLOSE: 1023,
+    ER_ERROR_ON_READ: 1024,
+    ER_ERROR_ON_RENAME: 1025,
+    ER_ERROR_ON_WRITE: 1026,
+    ER_FILE_USED: 1027,
+    ER_FILSORT_ABORT: 1028,
+    ER_FORM_NOT_FOUND: 1029,
+    ER_GET_ERRNO: 1030,
+    ER_ILLEGAL_HA: 1031,
+    ER_KEY_NOT_FOUND: 1032,
+    ER_NOT_FORM_FILE: 1033,
+    ER_NOT_KEYFILE: 1034,
+    ER_OLD_KEYFILE: 1035,
+    ER_OPEN_AS_READONLY: 1036,
+    ER_OUTOFMEMORY: 1037,
+    ER_OUT_OF_SORTMEMORY: 1038,
+    ER_UNEXPECTED_EOF: 1039,
+    ER_CON_COUNT_ERROR: 1040,
+    ER_OUT_OF_RESOURCES: 1041,
+    ER_BAD_HOST_ERROR: 1042,
+    ER_HANDSHAKE_ERROR: 1043,
+    ER_DBACCESS_DENIED_ERROR: 1044,
+    ER_ACCESS_DENIED_ERROR: 1045,
+    ER_NO_DB_ERROR: 1046,
+    ER_UNKNOWN_COM_ERROR: 1047,
+    ER_BAD_NULL_ERROR: 1048,
+    ER_BAD_DB_ERROR: 1049,
+    ER_TABLE_EXISTS_ERROR: 1050,
+    ER_BAD_TABLE_ERROR: 1051,
+    ER_NON_UNIQ_ERROR: 1052,
+    ER_SERVER_SHUTDOWN: 1053,
+    ER_BAD_FIELD_ERROR: 1054,
+    ER_WRONG_FIELD_WITH_GROUP: 1055,
+    ER_WRONG_GROUP_FIELD: 1056,
+    ER_WRONG_SUM_SELECT: 1057,
+    ER_WRONG_VALUE_COUNT: 1058,
+    ER_TOO_LONG_IDENT: 1059,
+    ER_DUP_FIELDNAME: 1060,
+    ER_DUP_KEYNAME: 1061,
+    ER_DUP_ENTRY: 1062,
+    ER_WRONG_FIELD_SPEC: 1063,
+    ER_PARSE_ERROR: 1064,
+    ER_EMPTY_QUERY: 1065,
+    ER_NONUNIQ_TABLE: 1066,
+    ER_INVALID_DEFAULT: 1067,
+    ER_MULTIPLE_PRI_KEY: 1068,
+    ER_TOO_MANY_KEYS: 1069,
+    ER_TOO_MANY_KEY_PARTS: 1070,
+    ER_TOO_LONG_KEY: 1071,
+    ER_KEY_COLUMN_DOES_NOT_EXITS: 1072,
+    ER_BLOB_USED_AS_KEY: 1073,
+    ER_TOO_BIG_FIELDLENGTH: 1074,
+    ER_WRONG_AUTO_KEY: 1075,
+    ER_READY: 1076,
+    ER_NORMAL_SHUTDOWN: 1077,
+    ER_GOT_SIGNAL: 1078,
+    ER_SHUTDOWN_COMPLETE: 1079,
+    ER_FORCING_CLOSE: 1080,
+    ER_IPSOCK_ERROR: 1081,
+    ER_NO_SUCH_INDEX: 1082,
+    ER_WRONG_FIELD_TERMINATORS: 1083,
+    ER_BLOBS_AND_NO_TERMINATED: 1084,
+    ER_TEXTFILE_NOT_READABLE: 1085,
+    ER_FILE_EXISTS_ERROR: 1086,
+    ER_LOAD_INFO: 1087,
+    ER_ALTER_INFO: 1088,
+    ER_WRONG_SUB_KEY: 1089,
+    ER_CANT_REMOVE_ALL_FIELDS: 1090,
+    ER_CANT_DROP_FIELD_OR_KEY: 1091,
+    ER_INSERT_INFO: 1092,
+    ER_UPDATE_TABLE_USED: 1093,
+    ER_NO_SUCH_THREAD: 1094,
+    ER_KILL_DENIED_ERROR: 1095,
+    ER_NO_TABLES_USED: 1096,
+    ER_TOO_BIG_SET: 1097,
+    ER_NO_UNIQUE_LOGFILE: 1098,
+    ER_TABLE_NOT_LOCKED_FOR_WRITE: 1099,
+    ER_TABLE_NOT_LOCKED: 1100,
+    ER_BLOB_CANT_HAVE_DEFAULT: 1101,
+    ER_WRONG_DB_NAME: 1102,
+    ER_WRONG_TABLE_NAME: 1103,
+    ER_TOO_BIG_SELECT: 1104,
+    ER_UNKNOWN_ERROR: 1105,
+    ER_UNKNOWN_PROCEDURE: 1106,
+    ER_WRONG_PARAMCOUNT_TO_PROCEDURE: 1107,
+    ER_WRONG_PARAMETERS_TO_PROCEDURE: 1108,
+    ER_UNKNOWN_TABLE: 1109,
+    ER_FIELD_SPECIFIED_TWICE: 1110,
+    ER_INVALID_GROUP_FUNC_USE: 1111,
+    ER_UNSUPPORTED_EXTENSION: 1112,
+    ER_TABLE_MUST_HAVE_COLUMNS: 1113,
+    ER_RECORD_FILE_FULL: 1114,
+    ER_UNKNOWN_CHARACTER_SET: 1115,
+    ER_TOO_MANY_TABLES: 1116,
+    ER_TOO_MANY_FIELDS: 1117,
+    ER_TOO_BIG_ROWSIZE: 1118,
+    ER_STACK_OVERRUN: 1119,
+    ER_WRONG_OUTER_JOIN: 1120,
+    ER_NULL_COLUMN_IN_INDEX: 1121,
+    ER_CANT_FIND_UDF: 1122,
+    ER_CANT_INITIALIZE_UDF: 1123,
+    ER_UDF_NO_PATHS: 1124,
+    ER_UDF_EXISTS: 1125,
+    ER_CANT_OPEN_LIBRARY: 1126,
+    ER_CANT_FIND_DL_ENTRY: 1127,
+    ER_FUNCTION_NOT_DEFINED: 1128,
+    ER_HOST_IS_BLOCKED: 1129,
+    ER_HOST_NOT_PRIVILEGED: 1130,
+    ER_PASSWORD_ANONYMOUS_USER: 1131,
+    ER_PASSWORD_NOT_ALLOWED: 1132,
+    ER_PASSWORD_NO_MATCH: 1133,
+    ER_UPDATE_INFO: 1134,
+    ER_CANT_CREATE_THREAD: 1135,
+    ER_WRONG_VALUE_COUNT_ON_ROW: 1136,
+    ER_CANT_REOPEN_TABLE: 1137,
+    ER_INVALID_USE_OF_NULL: 1138,
+    ER_REGEXP_ERROR: 1139,
+    ER_MIX_OF_GROUP_FUNC_AND_FIELDS: 1140,
+    ER_NONEXISTING_GRANT: 1141,
+    ER_TABLEACCESS_DENIED_ERROR: 1142,
+    ER_COLUMNACCESS_DENIED_ERROR: 1143,
+    ER_ILLEGAL_GRANT_FOR_TABLE: 1144,
+    ER_GRANT_WRONG_HOST_OR_USER: 1145,
+    ER_NO_SUCH_TABLE: 1146,
+    ER_NONEXISTING_TABLE_GRANT: 1147,
+    ER_NOT_ALLOWED_COMMAND: 1148,
+    ER_SYNTAX_ERROR: 1149,
+    ER_DELAYED_CANT_CHANGE_LOCK: 1150,
+    ER_TOO_MANY_DELAYED_THREADS: 1151,
+    ER_ABORTING_CONNECTION: 1152,
+    ER_NET_PACKET_TOO_LARGE: 1153,
+    ER_NET_READ_ERROR_FROM_PIPE: 1154,
+    ER_NET_FCNTL_ERROR: 1155,
+    ER_NET_PACKETS_OUT_OF_ORDER: 1156,
+    ER_NET_UNCOMPRESS_ERROR: 1157,
+    ER_NET_READ_ERROR: 1158,
+    ER_NET_READ_INTERRUPTED: 1159,
+    ER_NET_ERROR_ON_WRITE: 1160,
+    ER_NET_WRITE_INTERRUPTED: 1161,
+    ER_TOO_LONG_STRING: 1162,
+    ER_TABLE_CANT_HANDLE_BLOB: 1163,
+    ER_TABLE_CANT_HANDLE_AUTO_INCREMENT: 1164,
+    ER_DELAYED_INSERT_TABLE_LOCKED: 1165,
+    ER_WRONG_COLUMN_NAME: 1166,
+    ER_WRONG_KEY_COLUMN: 1167,
+    ER_WRONG_MRG_TABLE: 1168,
+    ER_DUP_UNIQUE: 1169,
+    ER_BLOB_KEY_WITHOUT_LENGTH: 1170,
+    ER_PRIMARY_CANT_HAVE_NULL: 1171,
+    ER_TOO_MANY_ROWS: 1172,
+    ER_REQUIRES_PRIMARY_KEY: 1173,
+    ER_NO_RAID_COMPILED: 1174,
+    ER_UPDATE_WITHOUT_KEY_IN_SAFE_MODE: 1175,
+    ER_KEY_DOES_NOT_EXITS: 1176,
+    ER_CHECK_NO_SUCH_TABLE: 1177,
+    ER_CHECK_NOT_IMPLEMENTED: 1178,
+    ER_CANT_DO_THIS_DURING_AN_TRANSACTION: 1179,
+    ER_ERROR_DURING_COMMIT: 1180,
+    ER_ERROR_DURING_ROLLBACK: 1181,
+    ER_ERROR_DURING_FLUSH_LOGS: 1182,
+    ER_ERROR_DURING_CHECKPOINT: 1183,
+    ER_NEW_ABORTING_CONNECTION: 1184,
+    ER_DUMP_NOT_IMPLEMENTED: 1185,
+    ER_FLUSH_MASTER_BINLOG_CLOSED: 1186,
+    ER_INDEX_REBUILD: 1187,
+    ER_MASTER: 1188,
+    ER_MASTER_NET_READ: 1189,
+    ER_MASTER_NET_WRITE: 1190,
+    ER_FT_MATCHING_KEY_NOT_FOUND: 1191,
+    ER_LOCK_OR_ACTIVE_TRANSACTION: 1192,
+    ER_UNKNOWN_SYSTEM_VARIABLE: 1193,
+    ER_CRASHED_ON_USAGE: 1194,
+    ER_CRASHED_ON_REPAIR: 1195,
+    ER_WARNING_NOT_COMPLETE_ROLLBACK: 1196,
+    ER_TRANS_CACHE_FULL: 1197,
+    ER_SLAVE_MUST_STOP: 1198,
+    ER_SLAVE_NOT_RUNNING: 1199,
+    ER_BAD_SLAVE: 1200,
+    ER_MASTER_INFO: 1201,
+    ER_SLAVE_THREAD: 1202,
+    ER_TOO_MANY_USER_CONNECTIONS: 1203,
+    ER_SET_CONSTANTS_ONLY: 1204,
+    ER_LOCK_WAIT_TIMEOUT: 1205,
+    ER_LOCK_TABLE_FULL: 1206,
+    ER_READ_ONLY_TRANSACTION: 1207,
+    ER_DROP_DB_WITH_READ_LOCK: 1208,
+    ER_CREATE_DB_WITH_READ_LOCK: 1209,
+    ER_WRONG_ARGUMENTS: 1210,
+    ER_NO_PERMISSION_TO_CREATE_USER: 1211,
+    ER_UNION_TABLES_IN_DIFFERENT_DIR: 1212,
+    ER_LOCK_DEADLOCK: 1213,
+    ER_TABLE_CANT_HANDLE_FT: 1214,
+    ER_CANNOT_ADD_FOREIGN: 1215,
+    ER_NO_REFERENCED_ROW: 1216,
+    ER_ROW_IS_REFERENCED: 1217,
+    ER_CONNECT_TO_MASTER: 1218,
+    ER_QUERY_ON_MASTER: 1219,
+    ER_ERROR_WHEN_EXECUTING_COMMAND: 1220,
+    ER_WRONG_USAGE: 1221,
+    ER_WRONG_NUMBER_OF_COLUMNS_IN_SELECT: 1222,
+    ER_CANT_UPDATE_WITH_READLOCK: 1223,
+    ER_MIXING_NOT_ALLOWED: 1224,
+    ER_DUP_ARGUMENT: 1225,
+    ER_USER_LIMIT_REACHED: 1226,
+    ER_SPECIFIC_ACCESS_DENIED_ERROR: 1227,
+    ER_LOCAL_VARIABLE: 1228,
+    ER_GLOBAL_VARIABLE: 1229,
+    ER_NO_DEFAULT: 1230,
+    ER_WRONG_VALUE_FOR_VAR: 1231,
+    ER_WRONG_TYPE_FOR_VAR: 1232,
+    ER_VAR_CANT_BE_READ: 1233,
+    ER_CANT_USE_OPTION_HERE: 1234,
+    ER_NOT_SUPPORTED_YET: 1235,
+    ER_MASTER_FATAL_ERROR_READING_BINLOG: 1236,
+    ER_SLAVE_IGNORED_TABLE: 1237,
+    ER_INCORRECT_GLOBAL_LOCAL_VAR: 1238,
+    ER_WRONG_FK_DEF: 1239,
+    ER_KEY_REF_DO_NOT_MATCH_TABLE_REF: 1240,
+    ER_OPERAND_COLUMNS: 1241,
+    ER_SUBQUERY_NO_1_ROW: 1242,
+    ER_UNKNOWN_STMT_HANDLER: 1243,
+    ER_CORRUPT_HELP_DB: 1244,
+    ER_CYCLIC_REFERENCE: 1245,
+    ER_AUTO_CONVERT: 1246,
+    ER_ILLEGAL_REFERENCE: 1247,
+    ER_DERIVED_MUST_HAVE_ALIAS: 1248,
+    ER_SELECT_REDUCED: 1249,
+    ER_TABLENAME_NOT_ALLOWED_HERE: 1250,
+    ER_NOT_SUPPORTED_AUTH_MODE: 1251,
+    ER_SPATIAL_CANT_HAVE_NULL: 1252,
+    ER_COLLATION_CHARSET_MISMATCH: 1253,
+    ER_SLAVE_WAS_RUNNING: 1254,
+    ER_SLAVE_WAS_NOT_RUNNING: 1255,
+    ER_TOO_BIG_FOR_UNCOMPRESS: 1256,
+    ER_ZLIB_Z_MEM_ERROR: 1257,
+    ER_ZLIB_Z_BUF_ERROR: 1258,
+    ER_ZLIB_Z_DATA_ERROR: 1259,
+    ER_CUT_VALUE_GROUP_CONCAT: 1260,
+    ER_WARN_TOO_FEW_RECORDS: 1261,
+    ER_WARN_TOO_MANY_RECORDS: 1262,
+    ER_WARN_NULL_TO_NOTNULL: 1263,
+    ER_WARN_DATA_OUT_OF_RANGE: 1264,
+    WARN_DATA_TRUNCATED: 1265,
+    ER_WARN_USING_OTHER_HANDLER: 1266,
+    ER_CANT_AGGREGATE_2COLLATIONS: 1267,
+    ER_DROP_USER: 1268,
+    ER_REVOKE_GRANTS: 1269,
+    ER_CANT_AGGREGATE_3COLLATIONS: 1270,
+    ER_CANT_AGGREGATE_NCOLLATIONS: 1271,
+    ER_VARIABLE_IS_NOT_STRUCT: 1272,
+    ER_UNKNOWN_COLLATION: 1273,
+    ER_SLAVE_IGNORED_SSL_PARAMS: 1274,
+    ER_SERVER_IS_IN_SECURE_AUTH_MODE: 1275,
+    ER_WARN_FIELD_RESOLVED: 1276,
+    ER_BAD_SLAVE_UNTIL_COND: 1277,
+    ER_MISSING_SKIP_SLAVE: 1278,
+    ER_UNTIL_COND_IGNORED: 1279,
+    ER_WRONG_NAME_FOR_INDEX: 1280,
+    ER_WRONG_NAME_FOR_CATALOG: 1281,
+    ER_WARN_QC_RESIZE: 1282,
+    ER_BAD_FT_COLUMN: 1283,
+    ER_UNKNOWN_KEY_CACHE: 1284,
+    ER_WARN_HOSTNAME_WONT_WORK: 1285,
+    ER_UNKNOWN_STORAGE_ENGINE: 1286,
+    ER_WARN_DEPRECATED_SYNTAX: 1287,
+    ER_NON_UPDATABLE_TABLE: 1288,
+    ER_FEATURE_DISABLED: 1289,
+    ER_OPTION_PREVENTS_STATEMENT: 1290,
+    ER_DUPLICATED_VALUE_IN_TYPE: 1291,
+    ER_TRUNCATED_WRONG_VALUE: 1292,
+    ER_TOO_MUCH_AUTO_TIMESTAMP_COLS: 1293,
+    ER_INVALID_ON_UPDATE: 1294,
+    ER_UNSUPPORTED_PS: 1295,
+    ER_GET_ERRMSG: 1296,
+    ER_GET_TEMPORARY_ERRMSG: 1297,
+    ER_UNKNOWN_TIME_ZONE: 1298,
+    ER_WARN_INVALID_TIMESTAMP: 1299,
+    ER_INVALID_CHARACTER_STRING: 1300,
+    ER_WARN_ALLOWED_PACKET_OVERFLOWED: 1301,
+    ER_CONFLICTING_DECLARATIONS: 1302,
+    ER_SP_NO_RECURSIVE_CREATE: 1303,
+    ER_SP_ALREADY_EXISTS: 1304,
+    ER_SP_DOES_NOT_EXIST: 1305,
+    ER_SP_DROP_FAILED: 1306,
+    ER_SP_STORE_FAILED: 1307,
+    ER_SP_LILABEL_MISMATCH: 1308,
+    ER_SP_LABEL_REDEFINE: 1309,
+    ER_SP_LABEL_MISMATCH: 1310,
+    ER_SP_UNINIT_VAR: 1311,
+    ER_SP_BADSELECT: 1312,
+    ER_SP_BADRETURN: 1313,
+    ER_SP_BADSTATEMENT: 1314,
+    ER_UPDATE_LOG_DEPRECATED_IGNORED: 1315,
+    ER_UPDATE_LOG_DEPRECATED_TRANSLATED: 1316,
+    ER_QUERY_INTERRUPTED: 1317,
+    ER_SP_WRONG_NO_OF_ARGS: 1318,
+    ER_SP_COND_MISMATCH: 1319,
+    ER_SP_NORETURN: 1320,
+    ER_SP_NORETURNEND: 1321,
+    ER_SP_BAD_CURSOR_QUERY: 1322,
+    ER_SP_BAD_CURSOR_SELECT: 1323,
+    ER_SP_CURSOR_MISMATCH: 1324,
+    ER_SP_CURSOR_ALREADY_OPEN: 1325,
+    ER_SP_CURSOR_NOT_OPEN: 1326,
+    ER_SP_UNDECLARED_VAR: 1327,
+    ER_SP_WRONG_NO_OF_FETCH_ARGS: 1328,
+    ER_SP_FETCH_NO_DATA: 1329,
+    ER_SP_DUP_PARAM: 1330,
+    ER_SP_DUP_VAR: 1331,
+    ER_SP_DUP_COND: 1332,
+    ER_SP_DUP_CURS: 1333,
+    ER_SP_CANT_ALTER: 1334,
+    ER_SP_SUBSELECT_NYI: 1335,
+    ER_STMT_NOT_ALLOWED_IN_SF_OR_TRG: 1336,
+    ER_SP_VARCOND_AFTER_CURSHNDLR: 1337,
+    ER_SP_CURSOR_AFTER_HANDLER: 1338,
+    ER_SP_CASE_NOT_FOUND: 1339,
+    ER_FPARSER_TOO_BIG_FILE: 1340,
+    ER_FPARSER_BAD_HEADER: 1341,
+    ER_FPARSER_EOF_IN_COMMENT: 1342,
+    ER_FPARSER_ERROR_IN_PARAMETER: 1343,
+    ER_FPARSER_EOF_IN_UNKNOWN_PARAMETER: 1344,
+    ER_VIEW_NO_EXPLAIN: 1345,
+    ER_FRM_UNKNOWN_TYPE: 1346,
+    ER_WRONG_OBJECT: 1347,
+    ER_NONUPDATEABLE_COLUMN: 1348,
+    ER_VIEW_SELECT_DERIVED: 1349,
+    ER_VIEW_SELECT_CLAUSE: 1350,
+    ER_VIEW_SELECT_VARIABLE: 1351,
+    ER_VIEW_SELECT_TMPTABLE: 1352,
+    ER_VIEW_WRONG_LIST: 1353,
+    ER_WARN_VIEW_MERGE: 1354,
+    ER_WARN_VIEW_WITHOUT_KEY: 1355,
+    ER_VIEW_INVALID: 1356,
+    ER_SP_NO_DROP_SP: 1357,
+    ER_SP_GOTO_IN_HNDLR: 1358,
+    ER_TRG_ALREADY_EXISTS: 1359,
+    ER_TRG_DOES_NOT_EXIST: 1360,
+    ER_TRG_ON_VIEW_OR_TEMP_TABLE: 1361,
+    ER_TRG_CANT_CHANGE_ROW: 1362,
+    ER_TRG_NO_SUCH_ROW_IN_TRG: 1363,
+    ER_NO_DEFAULT_FOR_FIELD: 1364,
+    ER_DIVISION_BY_ZERO: 1365,
+    ER_TRUNCATED_WRONG_VALUE_FOR_FIELD: 1366,
+    ER_ILLEGAL_VALUE_FOR_TYPE: 1367,
+    ER_VIEW_NONUPD_CHECK: 1368,
+    ER_VIEW_CHECK_FAILED: 1369,
+    ER_PROCACCESS_DENIED_ERROR: 1370,
+    ER_RELAY_LOG_FAIL: 1371,
+    ER_PASSWD_LENGTH: 1372,
+    ER_UNKNOWN_TARGET_BINLOG: 1373,
+    ER_IO_ERR_LOG_INDEX_READ: 1374,
+    ER_BINLOG_PURGE_PROHIBITED: 1375,
+    ER_FSEEK_FAIL: 1376,
+    ER_BINLOG_PURGE_FATAL_ERR: 1377,
+    ER_LOG_IN_USE: 1378,
+    ER_LOG_PURGE_UNKNOWN_ERR: 1379,
+    ER_RELAY_LOG_INIT: 1380,
+    ER_NO_BINARY_LOGGING: 1381,
+    ER_RESERVED_SYNTAX: 1382,
+    ER_WSAS_FAILED: 1383,
+    ER_DIFF_GROUPS_PROC: 1384,
+    ER_NO_GROUP_FOR_PROC: 1385,
+    ER_ORDER_WITH_PROC: 1386,
+    ER_LOGGING_PROHIBIT_CHANGING_OF: 1387,
+    ER_NO_FILE_MAPPING: 1388,
+    ER_WRONG_MAGIC: 1389,
+    ER_PS_MANY_PARAM: 1390,
+    ER_KEY_PART_0: 1391,
+    ER_VIEW_CHECKSUM: 1392,
+    ER_VIEW_MULTIUPDATE: 1393,
+    ER_VIEW_NO_INSERT_FIELD_LIST: 1394,
+    ER_VIEW_DELETE_MERGE_VIEW: 1395,
+    ER_CANNOT_USER: 1396,
+    ER_XAER_NOTA: 1397,
+    ER_XAER_INVAL: 1398,
+    ER_XAER_RMFAIL: 1399,
+    ER_XAER_OUTSIDE: 1400,
+    ER_XAER_RMERR: 1401,
+    ER_XA_RBROLLBACK: 1402,
+    ER_NONEXISTING_PROC_GRANT: 1403,
+    ER_PROC_AUTO_GRANT_FAIL: 1404,
+    ER_PROC_AUTO_REVOKE_FAIL: 1405,
+    ER_DATA_TOO_LONG: 1406,
+    ER_SP_BAD_SQLSTATE: 1407,
+    ER_STARTUP: 1408,
+    ER_LOAD_FROM_FIXED_SIZE_ROWS_TO_VAR: 1409,
+    ER_CANT_CREATE_USER_WITH_GRANT: 1410,
+    ER_WRONG_VALUE_FOR_TYPE: 1411,
+    ER_TABLE_DEF_CHANGED: 1412,
+    ER_SP_DUP_HANDLER: 1413,
+    ER_SP_NOT_VAR_ARG: 1414,
+    ER_SP_NO_RETSET: 1415,
+    ER_CANT_CREATE_GEOMETRY_OBJECT: 1416,
+    ER_FAILED_ROUTINE_BREAK_BINLOG: 1417,
+    ER_BINLOG_UNSAFE_ROUTINE: 1418,
+    ER_BINLOG_CREATE_ROUTINE_NEED_SUPER: 1419,
+    ER_EXEC_STMT_WITH_OPEN_CURSOR: 1420,
+    ER_STMT_HAS_NO_OPEN_CURSOR: 1421,
+    ER_COMMIT_NOT_ALLOWED_IN_SF_OR_TRG: 1422,
+    ER_NO_DEFAULT_FOR_VIEW_FIELD: 1423,
+    ER_SP_NO_RECURSION: 1424,
+    ER_TOO_BIG_SCALE: 1425,
+    ER_TOO_BIG_PRECISION: 1426,
+    ER_M_BIGGER_THAN_D: 1427,
+    ER_WRONG_LOCK_OF_SYSTEM_TABLE: 1428,
+    ER_CONNECT_TO_FOREIGN_DATA_SOURCE: 1429,
+    ER_QUERY_ON_FOREIGN_DATA_SOURCE: 1430,
+    ER_FOREIGN_DATA_SOURCE_DOESNT_EXIST: 1431,
+    ER_FOREIGN_DATA_STRING_INVALID_CANT_CREATE: 1432,
+    ER_FOREIGN_DATA_STRING_INVALID: 1433,
+    ER_CANT_CREATE_FEDERATED_TABLE: 1434,
+    ER_TRG_IN_WRONG_SCHEMA: 1435,
+    ER_STACK_OVERRUN_NEED_MORE: 1436,
+    ER_TOO_LONG_BODY: 1437,
+    ER_WARN_CANT_DROP_DEFAULT_KEYCACHE: 1438,
+    ER_TOO_BIG_DISPLAYWIDTH: 1439,
+    ER_XAER_DUPID: 1440,
+    ER_DATETIME_FUNCTION_OVERFLOW: 1441,
+    ER_CANT_UPDATE_USED_TABLE_IN_SF_OR_TRG: 1442,
+    ER_VIEW_PREVENT_UPDATE: 1443,
+    ER_PS_NO_RECURSION: 1444,
+    ER_SP_CANT_SET_AUTOCOMMIT: 1445,
+    ER_MALFORMED_DEFINER: 1446,
+    ER_VIEW_FRM_NO_USER: 1447,
+    ER_VIEW_OTHER_USER: 1448,
+    ER_NO_SUCH_USER: 1449,
+    ER_FORBID_SCHEMA_CHANGE: 1450,
+    ER_ROW_IS_REFERENCED_2: 1451,
+    ER_NO_REFERENCED_ROW_2: 1452,
+    ER_SP_BAD_VAR_SHADOW: 1453,
+    ER_TRG_NO_DEFINER: 1454,
+    ER_OLD_FILE_FORMAT: 1455,
+    ER_SP_RECURSION_LIMIT: 1456,
+    ER_SP_PROC_TABLE_CORRUPT: 1457,
+    ER_SP_WRONG_NAME: 1458,
+    ER_TABLE_NEEDS_UPGRADE: 1459,
+    ER_SP_NO_AGGREGATE: 1460,
+    ER_MAX_PREPARED_STMT_COUNT_REACHED: 1461,
+    ER_VIEW_RECURSIVE: 1462,
+    ER_NON_GROUPING_FIELD_USED: 1463,
+    ER_TABLE_CANT_HANDLE_SPKEYS: 1464,
+    ER_NO_TRIGGERS_ON_SYSTEM_SCHEMA: 1465,
+    ER_REMOVED_SPACES: 1466,
+    ER_AUTOINC_READ_FAILED: 1467,
+    ER_USERNAME: 1468,
+    ER_HOSTNAME: 1469,
+    ER_WRONG_STRING_LENGTH: 1470,
+    ER_NON_INSERTABLE_TABLE: 1471,
+    ER_ADMIN_WRONG_MRG_TABLE: 1472,
+    ER_TOO_HIGH_LEVEL_OF_NESTING_FOR_SELECT: 1473,
+    ER_NAME_BECOMES_EMPTY: 1474,
+    ER_AMBIGUOUS_FIELD_TERM: 1475,
+    ER_FOREIGN_SERVER_EXISTS: 1476,
+    ER_FOREIGN_SERVER_DOESNT_EXIST: 1477,
+    ER_ILLEGAL_HA_CREATE_OPTION: 1478,
+    ER_PARTITION_REQUIRES_VALUES_ERROR: 1479,
+    ER_PARTITION_WRONG_VALUES_ERROR: 1480,
+    ER_PARTITION_MAXVALUE_ERROR: 1481,
+    ER_PARTITION_SUBPARTITION_ERROR: 1482,
+    ER_PARTITION_SUBPART_MIX_ERROR: 1483,
+    ER_PARTITION_WRONG_NO_PART_ERROR: 1484,
+    ER_PARTITION_WRONG_NO_SUBPART_ERROR: 1485,
+    ER_WRONG_EXPR_IN_PARTITION_FUNC_ERROR: 1486,
+    ER_NO_CONST_EXPR_IN_RANGE_OR_LIST_ERROR: 1487,
+    ER_FIELD_NOT_FOUND_PART_ERROR: 1488,
+    ER_LIST_OF_FIELDS_ONLY_IN_HASH_ERROR: 1489,
+    ER_INCONSISTENT_PARTITION_INFO_ERROR: 1490,
+    ER_PARTITION_FUNC_NOT_ALLOWED_ERROR: 1491,
+    ER_PARTITIONS_MUST_BE_DEFINED_ERROR: 1492,
+    ER_RANGE_NOT_INCREASING_ERROR: 1493,
+    ER_INCONSISTENT_TYPE_OF_FUNCTIONS_ERROR: 1494,
+    ER_MULTIPLE_DEF_CONST_IN_LIST_PART_ERROR: 1495,
+    ER_PARTITION_ENTRY_ERROR: 1496,
+    ER_MIX_HANDLER_ERROR: 1497,
+    ER_PARTITION_NOT_DEFINED_ERROR: 1498,
+    ER_TOO_MANY_PARTITIONS_ERROR: 1499,
+    ER_SUBPARTITION_ERROR: 1500,
+    ER_CANT_CREATE_HANDLER_FILE: 1501,
+    ER_BLOB_FIELD_IN_PART_FUNC_ERROR: 1502,
+    ER_UNIQUE_KEY_NEED_ALL_FIELDS_IN_PF: 1503,
+    ER_NO_PARTS_ERROR: 1504,
+    ER_PARTITION_MGMT_ON_NONPARTITIONED: 1505,
+    ER_FOREIGN_KEY_ON_PARTITIONED: 1506,
+    ER_DROP_PARTITION_NON_EXISTENT: 1507,
+    ER_DROP_LAST_PARTITION: 1508,
+    ER_COALESCE_ONLY_ON_HASH_PARTITION: 1509,
+    ER_REORG_HASH_ONLY_ON_SAME_NO: 1510,
+    ER_REORG_NO_PARAM_ERROR: 1511,
+    ER_ONLY_ON_RANGE_LIST_PARTITION: 1512,
+    ER_ADD_PARTITION_SUBPART_ERROR: 1513,
+    ER_ADD_PARTITION_NO_NEW_PARTITION: 1514,
+    ER_COALESCE_PARTITION_NO_PARTITION: 1515,
+    ER_REORG_PARTITION_NOT_EXIST: 1516,
+    ER_SAME_NAME_PARTITION: 1517,
+    ER_NO_BINLOG_ERROR: 1518,
+    ER_CONSECUTIVE_REORG_PARTITIONS: 1519,
+    ER_REORG_OUTSIDE_RANGE: 1520,
+    ER_PARTITION_FUNCTION_FAILURE: 1521,
+    ER_PART_STATE_ERROR: 1522,
+    ER_LIMITED_PART_RANGE: 1523,
+    ER_PLUGIN_IS_NOT_LOADED: 1524,
+    ER_WRONG_VALUE: 1525,
+    ER_NO_PARTITION_FOR_GIVEN_VALUE: 1526,
+    ER_FILEGROUP_OPTION_ONLY_ONCE: 1527,
+    ER_CREATE_FILEGROUP_FAILED: 1528,
+    ER_DROP_FILEGROUP_FAILED: 1529,
+    ER_TABLESPACE_AUTO_EXTEND_ERROR: 1530,
+    ER_WRONG_SIZE_NUMBER: 1531,
+    ER_SIZE_OVERFLOW_ERROR: 1532,
+    ER_ALTER_FILEGROUP_FAILED: 1533,
+    ER_BINLOG_ROW_LOGGING_FAILED: 1534,
+    ER_BINLOG_ROW_WRONG_TABLE_DEF: 1535,
+    ER_BINLOG_ROW_RBR_TO_SBR: 1536,
+    ER_EVENT_ALREADY_EXISTS: 1537,
+    ER_EVENT_STORE_FAILED: 1538,
+    ER_EVENT_DOES_NOT_EXIST: 1539,
+    ER_EVENT_CANT_ALTER: 1540,
+    ER_EVENT_DROP_FAILED: 1541,
+    ER_EVENT_INTERVAL_NOT_POSITIVE_OR_TOO_BIG: 1542,
+    ER_EVENT_ENDS_BEFORE_STARTS: 1543,
+    ER_EVENT_EXEC_TIME_IN_THE_PAST: 1544,
+    ER_EVENT_OPEN_TABLE_FAILED: 1545,
+    ER_EVENT_NEITHER_M_EXPR_NOR_M_AT: 1546,
+    ER_COL_COUNT_DOESNT_MATCH_CORRUPTED: 1547,
+    ER_CANNOT_LOAD_FROM_TABLE: 1548,
+    ER_EVENT_CANNOT_DELETE: 1549,
+    ER_EVENT_COMPILE_ERROR: 1550,
+    ER_EVENT_SAME_NAME: 1551,
+    ER_EVENT_DATA_TOO_LONG: 1552,
+    ER_DROP_INDEX_FK: 1553,
+    ER_WARN_DEPRECATED_SYNTAX_WITH_VER: 1554,
+    ER_CANT_WRITE_LOCK_LOG_TABLE: 1555,
+    ER_CANT_LOCK_LOG_TABLE: 1556,
+    ER_FOREIGN_DUPLICATE_KEY: 1557,
+    ER_COL_COUNT_DOESNT_MATCH_PLEASE_UPDATE: 1558,
+    ER_TEMP_TABLE_PREVENTS_SWITCH_OUT_OF_RBR: 1559,
+    ER_STORED_FUNCTION_PREVENTS_SWITCH_BINLOG_FORMAT: 1560,
+    ER_NDB_CANT_SWITCH_BINLOG_FORMAT: 1561,
+    ER_PARTITION_NO_TEMPORARY: 1562,
+    ER_PARTITION_CONST_DOMAIN_ERROR: 1563,
+    ER_PARTITION_FUNCTION_IS_NOT_ALLOWED: 1564,
+    ER_DDL_LOG_ERROR: 1565,
+    ER_NULL_IN_VALUES_LESS_THAN: 1566,
+    ER_WRONG_PARTITION_NAME: 1567,
+    ER_CANT_CHANGE_TX_CHARACTERISTICS: 1568,
+    ER_DUP_ENTRY_AUTOINCREMENT_CASE: 1569,
+    ER_EVENT_MODIFY_QUEUE_ERROR: 1570,
+    ER_EVENT_SET_VAR_ERROR: 1571,
+    ER_PARTITION_MERGE_ERROR: 1572,
+    ER_CANT_ACTIVATE_LOG: 1573,
+    ER_RBR_NOT_AVAILABLE: 1574,
+    ER_BASE64_DECODE_ERROR: 1575,
+    ER_EVENT_RECURSION_FORBIDDEN: 1576,
+    ER_EVENTS_DB_ERROR: 1577,
+    ER_ONLY_INTEGERS_ALLOWED: 1578,
+    ER_UNSUPORTED_LOG_ENGINE: 1579,
+    ER_BAD_LOG_STATEMENT: 1580,
+    ER_CANT_RENAME_LOG_TABLE: 1581,
+    ER_WRONG_PARAMCOUNT_TO_NATIVE_FCT: 1582,
+    ER_WRONG_PARAMETERS_TO_NATIVE_FCT: 1583,
+    ER_WRONG_PARAMETERS_TO_STORED_FCT: 1584,
+    ER_NATIVE_FCT_NAME_COLLISION: 1585,
+    ER_DUP_ENTRY_WITH_KEY_NAME: 1586,
+    ER_BINLOG_PURGE_EMFILE: 1587,
+    ER_EVENT_CANNOT_CREATE_IN_THE_PAST: 1588,
+    ER_EVENT_CANNOT_ALTER_IN_THE_PAST: 1589,
+    ER_SLAVE_INCIDENT: 1590,
+    ER_NO_PARTITION_FOR_GIVEN_VALUE_SILENT: 1591,
+    ER_BINLOG_UNSAFE_STATEMENT: 1592,
+    ER_SLAVE_FATAL_ERROR: 1593,
+    ER_SLAVE_RELAY_LOG_READ_FAILURE: 1594,
+    ER_SLAVE_RELAY_LOG_WRITE_FAILURE: 1595,
+    ER_SLAVE_CREATE_EVENT_FAILURE: 1596,
+    ER_SLAVE_MASTER_COM_FAILURE: 1597,
+    ER_BINLOG_LOGGING_IMPOSSIBLE: 1598,
+    ER_VIEW_NO_CREATION_CTX: 1599,
+    ER_VIEW_INVALID_CREATION_CTX: 1600,
+    ER_SR_INVALID_CREATION_CTX: 1601,
+    ER_TRG_CORRUPTED_FILE: 1602,
+    ER_TRG_NO_CREATION_CTX: 1603,
+    ER_TRG_INVALID_CREATION_CTX: 1604,
+    ER_EVENT_INVALID_CREATION_CTX: 1605,
+    ER_TRG_CANT_OPEN_TABLE: 1606,
+    ER_CANT_CREATE_SROUTINE: 1607,
+    ER_NEVER_USED: 1608,
+    ER_NO_FORMAT_DESCRIPTION_EVENT_BEFORE_BINLOG_STATEMENT: 1609,
+    ER_SLAVE_CORRUPT_EVENT: 1610,
+    ER_LOAD_DATA_INVALID_COLUMN: 1611,
+    ER_LOG_PURGE_NO_FILE: 1612,
+    ER_XA_RBTIMEOUT: 1613,
+    ER_XA_RBDEADLOCK: 1614,
+    ER_NEED_REPREPARE: 1615,
+    ER_DELAYED_NOT_SUPPORTED: 1616,
+    WARN_NO_MASTER_INFO: 1617,
+    WARN_OPTION_IGNORED: 1618,
+    ER_PLUGIN_DELETE_BUILTIN: 1619,
+    WARN_PLUGIN_BUSY: 1620,
+    ER_VARIABLE_IS_READONLY: 1621,
+    ER_WARN_ENGINE_TRANSACTION_ROLLBACK: 1622,
+    ER_SLAVE_HEARTBEAT_FAILURE: 1623,
+    ER_SLAVE_HEARTBEAT_VALUE_OUT_OF_RANGE: 1624,
+    ER_NDB_REPLICATION_SCHEMA_ERROR: 1625,
+    ER_CONFLICT_FN_PARSE_ERROR: 1626,
+    ER_EXCEPTIONS_WRITE_ERROR: 1627,
+    ER_TOO_LONG_TABLE_COMMENT: 1628,
+    ER_TOO_LONG_FIELD_COMMENT: 1629,
+    ER_FUNC_INEXISTENT_NAME_COLLISION: 1630,
+    ER_DATABASE_NAME: 1631,
+    ER_TABLE_NAME: 1632,
+    ER_PARTITION_NAME: 1633,
+    ER_SUBPARTITION_NAME: 1634,
+    ER_TEMPORARY_NAME: 1635,
+    ER_RENAMED_NAME: 1636,
+    ER_TOO_MANY_CONCURRENT_TRXS: 1637,
+    WARN_NON_ASCII_SEPARATOR_NOT_IMPLEMENTED: 1638,
+    ER_DEBUG_SYNC_TIMEOUT: 1639,
+    ER_DEBUG_SYNC_HIT_LIMIT: 1640,
+    ER_DUP_SIGNAL_SET: 1641,
+    ER_SIGNAL_WARN: 1642,
+    ER_SIGNAL_NOT_FOUND: 1643,
+    ER_SIGNAL_EXCEPTION: 1644,
+    ER_RESIGNAL_WITHOUT_ACTIVE_HANDLER: 1645,
+    ER_SIGNAL_BAD_CONDITION_TYPE: 1646,
+    WARN_COND_ITEM_TRUNCATED: 1647,
+    ER_COND_ITEM_TOO_LONG: 1648,
+    ER_UNKNOWN_LOCALE: 1649,
+    ER_SLAVE_IGNORE_SERVER_IDS: 1650,
+    ER_QUERY_CACHE_DISABLED: 1651,
+    ER_SAME_NAME_PARTITION_FIELD: 1652,
+    ER_PARTITION_COLUMN_LIST_ERROR: 1653,
+    ER_WRONG_TYPE_COLUMN_VALUE_ERROR: 1654,
+    ER_TOO_MANY_PARTITION_FUNC_FIELDS_ERROR: 1655,
+    ER_MAXVALUE_IN_VALUES_IN: 1656,
+    ER_TOO_MANY_VALUES_ERROR: 1657,
+    ER_ROW_SINGLE_PARTITION_FIELD_ERROR: 1658,
+    ER_FIELD_TYPE_NOT_ALLOWED_AS_PARTITION_FIELD: 1659,
+    ER_PARTITION_FIELDS_TOO_LONG: 1660,
+    ER_BINLOG_ROW_ENGINE_AND_STMT_ENGINE: 1661,
+    ER_BINLOG_ROW_MODE_AND_STMT_ENGINE: 1662,
+    ER_BINLOG_UNSAFE_AND_STMT_ENGINE: 1663,
+    ER_BINLOG_ROW_INJECTION_AND_STMT_ENGINE: 1664,
+    ER_BINLOG_STMT_MODE_AND_ROW_ENGINE: 1665,
+    ER_BINLOG_ROW_INJECTION_AND_STMT_MODE: 1666,
+    ER_BINLOG_MULTIPLE_ENGINES_AND_SELF_LOGGING_ENGINE: 1667,
+    ER_BINLOG_UNSAFE_LIMIT: 1668,
+    ER_BINLOG_UNSAFE_INSERT_DELAYED: 1669,
+    ER_BINLOG_UNSAFE_SYSTEM_TABLE: 1670,
+    ER_BINLOG_UNSAFE_AUTOINC_COLUMNS: 1671,
+    ER_BINLOG_UNSAFE_UDF: 1672,
+    ER_BINLOG_UNSAFE_SYSTEM_VARIABLE: 1673,
+    ER_BINLOG_UNSAFE_SYSTEM_FUNCTION: 1674,
+    ER_BINLOG_UNSAFE_NONTRANS_AFTER_TRANS: 1675,
+    ER_MESSAGE_AND_STATEMENT: 1676,
+    ER_SLAVE_CONVERSION_FAILED: 1677,
+    ER_SLAVE_CANT_CREATE_CONVERSION: 1678,
+    ER_INSIDE_TRANSACTION_PREVENTS_SWITCH_BINLOG_FORMAT: 1679,
+    ER_PATH_LENGTH: 1680,
+    ER_WARN_DEPRECATED_SYNTAX_NO_REPLACEMENT: 1681,
+    ER_WRONG_NATIVE_TABLE_STRUCTURE: 1682,
+    ER_WRONG_PERFSCHEMA_USAGE: 1683,
+    ER_WARN_I_S_SKIPPED_TABLE: 1684,
+    ER_INSIDE_TRANSACTION_PREVENTS_SWITCH_BINLOG_DIRECT: 1685,
+    ER_STORED_FUNCTION_PREVENTS_SWITCH_BINLOG_DIRECT: 1686,
+    ER_SPATIAL_MUST_HAVE_GEOM_COL: 1687,
+    ER_TOO_LONG_INDEX_COMMENT: 1688,
+    ER_LOCK_ABORTED: 1689,
+    ER_DATA_OUT_OF_RANGE: 1690,
+    ER_WRONG_SPVAR_TYPE_IN_LIMIT: 1691,
+    ER_BINLOG_UNSAFE_MULTIPLE_ENGINES_AND_SELF_LOGGING_ENGINE: 1692,
+    ER_BINLOG_UNSAFE_MIXED_STATEMENT: 1693,
+    ER_INSIDE_TRANSACTION_PREVENTS_SWITCH_SQL_LOG_BIN: 1694,
+    ER_STORED_FUNCTION_PREVENTS_SWITCH_SQL_LOG_BIN: 1695,
+    ER_FAILED_READ_FROM_PAR_FILE: 1696,
+    ER_VALUES_IS_NOT_INT_TYPE_ERROR: 1697,
+    ER_ACCESS_DENIED_NO_PASSWORD_ERROR: 1698,
+    ER_SET_PASSWORD_AUTH_PLUGIN: 1699,
+    ER_GRANT_PLUGIN_USER_EXISTS: 1700,
+    ER_TRUNCATE_ILLEGAL_FK: 1701,
+    ER_PLUGIN_IS_PERMANENT: 1702,
+    ER_SLAVE_HEARTBEAT_VALUE_OUT_OF_RANGE_MIN: 1703,
+    ER_SLAVE_HEARTBEAT_VALUE_OUT_OF_RANGE_MAX: 1704,
+    ER_STMT_CACHE_FULL: 1705,
+    ER_MULTI_UPDATE_KEY_CONFLICT: 1706,
+    ER_TABLE_NEEDS_REBUILD: 1707,
+    WARN_OPTION_BELOW_LIMIT: 1708,
+    ER_INDEX_COLUMN_TOO_LONG: 1709,
+    ER_ERROR_IN_TRIGGER_BODY: 1710,
+    ER_ERROR_IN_UNKNOWN_TRIGGER_BODY: 1711,
+    ER_INDEX_CORRUPT: 1712,
+    ER_UNDO_RECORD_TOO_BIG: 1713,
+    ER_BINLOG_UNSAFE_INSERT_IGNORE_SELECT: 1714,
+    ER_BINLOG_UNSAFE_INSERT_SELECT_UPDATE: 1715,
+    ER_BINLOG_UNSAFE_REPLACE_SELECT: 1716,
+    ER_BINLOG_UNSAFE_CREATE_IGNORE_SELECT: 1717,
+    ER_BINLOG_UNSAFE_CREATE_REPLACE_SELECT: 1718,
+    ER_BINLOG_UNSAFE_UPDATE_IGNORE: 1719,
+    ER_PLUGIN_NO_UNINSTALL: 1720,
+    ER_PLUGIN_NO_INSTALL: 1721,
+    ER_BINLOG_UNSAFE_WRITE_AUTOINC_SELECT: 1722,
+    ER_BINLOG_UNSAFE_CREATE_SELECT_AUTOINC: 1723,
+    ER_BINLOG_UNSAFE_INSERT_TWO_KEYS: 1724,
+    ER_TABLE_IN_FK_CHECK: 1725,
+    ER_UNSUPPORTED_ENGINE: 1726,
+    ER_BINLOG_UNSAFE_AUTOINC_NOT_FIRST: 1727,
+    ER_CANNOT_LOAD_FROM_TABLE_V2: 1728,
+    ER_MASTER_DELAY_VALUE_OUT_OF_RANGE: 1729,
+    ER_ONLY_FD_AND_RBR_EVENTS_ALLOWED_IN_BINLOG_STATEMENT: 1730,
+    ER_PARTITION_EXCHANGE_DIFFERENT_OPTION: 1731,
+    ER_PARTITION_EXCHANGE_PART_TABLE: 1732,
+    ER_PARTITION_EXCHANGE_TEMP_TABLE: 1733,
+    ER_PARTITION_INSTEAD_OF_SUBPARTITION: 1734,
+    ER_UNKNOWN_PARTITION: 1735,
+    ER_TABLES_DIFFERENT_METADATA: 1736,
+    ER_ROW_DOES_NOT_MATCH_PARTITION: 1737,
+    ER_BINLOG_CACHE_SIZE_GREATER_THAN_MAX: 1738,
+    ER_WARN_INDEX_NOT_APPLICABLE: 1739,
+    ER_PARTITION_EXCHANGE_FOREIGN_KEY: 1740,
+    ER_NO_SUCH_KEY_VALUE: 1741,
+    ER_RPL_INFO_DATA_TOO_LONG: 1742,
+    ER_NETWORK_READ_EVENT_CHECKSUM_FAILURE: 1743,
+    ER_BINLOG_READ_EVENT_CHECKSUM_FAILURE: 1744,
+    ER_BINLOG_STMT_CACHE_SIZE_GREATER_THAN_MAX: 1745,
+    ER_CANT_UPDATE_TABLE_IN_CREATE_TABLE_SELECT: 1746,
+    ER_PARTITION_CLAUSE_ON_NONPARTITIONED: 1747,
+    ER_ROW_DOES_NOT_MATCH_GIVEN_PARTITION_SET: 1748,
+    ER_NO_SUCH_PARTITION: 1749,
+    ER_CHANGE_RPL_INFO_REPOSITORY_FAILURE: 1750,
+    ER_WARNING_NOT_COMPLETE_ROLLBACK_WITH_CREATED_TEMP_TABLE: 1751,
+    ER_WARNING_NOT_COMPLETE_ROLLBACK_WITH_DROPPED_TEMP_TABLE: 1752,
+    ER_MTS_FEATURE_IS_NOT_SUPPORTED: 1753,
+    ER_MTS_UPDATED_DBS_GREATER_MAX: 1754,
+    ER_MTS_CANT_PARALLEL: 1755,
+    ER_MTS_INCONSISTENT_DATA: 1756,
+    ER_FULLTEXT_NOT_SUPPORTED_WITH_PARTITIONING: 1757,
+    ER_DA_INVALID_CONDITION_NUMBER: 1758,
+    ER_INSECURE_PLAIN_TEXT: 1759,
+    ER_INSECURE_CHANGE_MASTER: 1760,
+    ER_FOREIGN_DUPLICATE_KEY_WITH_CHILD_INFO: 1761,
+    ER_FOREIGN_DUPLICATE_KEY_WITHOUT_CHILD_INFO: 1762,
+    ER_SQLTHREAD_WITH_SECURE_SLAVE: 1763,
+    ER_TABLE_HAS_NO_FT: 1764,
+    ER_VARIABLE_NOT_SETTABLE_IN_SF_OR_TRIGGER: 1765,
+    ER_VARIABLE_NOT_SETTABLE_IN_TRANSACTION: 1766,
+    ER_GTID_NEXT_IS_NOT_IN_GTID_NEXT_LIST: 1767,
+    ER_CANT_CHANGE_GTID_NEXT_IN_TRANSACTION: 1768,
+    ER_SET_STATEMENT_CANNOT_INVOKE_FUNCTION: 1769,
+    ER_GTID_NEXT_CANT_BE_AUTOMATIC_IF_GTID_NEXT_LIST_IS_NON_NULL: 1770,
+    ER_SKIPPING_LOGGED_TRANSACTION: 1771,
+    ER_MALFORMED_GTID_SET_SPECIFICATION: 1772,
+    ER_MALFORMED_GTID_SET_ENCODING: 1773,
+    ER_MALFORMED_GTID_SPECIFICATION: 1774,
+    ER_GNO_EXHAUSTED: 1775,
+    ER_BAD_SLAVE_AUTO_POSITION: 1776,
+    ER_AUTO_POSITION_REQUIRES_GTID_MODE_NOT_OFF: 1777,
+    ER_CANT_DO_IMPLICIT_COMMIT_IN_TRX_WHEN_GTID_NEXT_IS_SET: 1778,
+    ER_GTID_MODE_ON_REQUIRES_ENFORCE_GTID_CONSISTENCY_ON: 1779,
+    ER_GTID_MODE_REQUIRES_BINLOG: 1780,
+    ER_CANT_SET_GTID_NEXT_TO_GTID_WHEN_GTID_MODE_IS_OFF: 1781,
+    ER_CANT_SET_GTID_NEXT_TO_ANONYMOUS_WHEN_GTID_MODE_IS_ON: 1782,
+    ER_CANT_SET_GTID_NEXT_LIST_TO_NON_NULL_WHEN_GTID_MODE_IS_OFF: 1783,
+    ER_FOUND_GTID_EVENT_WHEN_GTID_MODE_IS_OFF: 1784,
+    ER_GTID_UNSAFE_NON_TRANSACTIONAL_TABLE: 1785,
+    ER_GTID_UNSAFE_CREATE_SELECT: 1786,
+    ER_GTID_UNSAFE_CREATE_DROP_TEMPORARY_TABLE_IN_TRANSACTION: 1787,
+    ER_GTID_MODE_CAN_ONLY_CHANGE_ONE_STEP_AT_A_TIME: 1788,
+    ER_MASTER_HAS_PURGED_REQUIRED_GTIDS: 1789,
+    ER_CANT_SET_GTID_NEXT_WHEN_OWNING_GTID: 1790,
+    ER_UNKNOWN_EXPLAIN_FORMAT: 1791,
+    ER_CANT_EXECUTE_IN_READ_ONLY_TRANSACTION: 1792,
+    ER_TOO_LONG_TABLE_PARTITION_COMMENT: 1793,
+    ER_SLAVE_CONFIGURATION: 1794,
+    ER_INNODB_FT_LIMIT: 1795,
+    ER_INNODB_NO_FT_TEMP_TABLE: 1796,
+    ER_INNODB_FT_WRONG_DOCID_COLUMN: 1797,
+    ER_INNODB_FT_WRONG_DOCID_INDEX: 1798,
+    ER_INNODB_ONLINE_LOG_TOO_BIG: 1799,
+    ER_UNKNOWN_ALTER_ALGORITHM: 1800,
+    ER_UNKNOWN_ALTER_LOCK: 1801,
+    ER_MTS_CHANGE_MASTER_CANT_RUN_WITH_GAPS: 1802,
+    ER_MTS_RECOVERY_FAILURE: 1803,
+    ER_MTS_RESET_WORKERS: 1804,
+    ER_COL_COUNT_DOESNT_MATCH_CORRUPTED_V2: 1805,
+    ER_SLAVE_SILENT_RETRY_TRANSACTION: 1806,
+    ER_DISCARD_FK_CHECKS_RUNNING: 1807,
+    ER_TABLE_SCHEMA_MISMATCH: 1808,
+    ER_TABLE_IN_SYSTEM_TABLESPACE: 1809,
+    ER_IO_READ_ERROR: 1810,
+    ER_IO_WRITE_ERROR: 1811,
+    ER_TABLESPACE_MISSING: 1812,
+    ER_TABLESPACE_EXISTS: 1813,
+    ER_TABLESPACE_DISCARDED: 1814,
+    ER_INTERNAL_ERROR: 1815,
+    ER_INNODB_IMPORT_ERROR: 1816,
+    ER_INNODB_INDEX_CORRUPT: 1817,
+    ER_INVALID_YEAR_COLUMN_LENGTH: 1818,
+    ER_NOT_VALID_PASSWORD: 1819,
+    ER_MUST_CHANGE_PASSWORD: 1820,
+    ER_FK_NO_INDEX_CHILD: 1821,
+    ER_FK_NO_INDEX_PARENT: 1822,
+    ER_FK_FAIL_ADD_SYSTEM: 1823,
+    ER_FK_CANNOT_OPEN_PARENT: 1824,
+    ER_FK_INCORRECT_OPTION: 1825,
+    ER_FK_DUP_NAME: 1826,
+    ER_PASSWORD_FORMAT: 1827,
+    ER_FK_COLUMN_CANNOT_DROP: 1828,
+    ER_FK_COLUMN_CANNOT_DROP_CHILD: 1829,
+    ER_FK_COLUMN_NOT_NULL: 1830,
+    ER_DUP_INDEX: 1831,
+    ER_FK_COLUMN_CANNOT_CHANGE: 1832,
+    ER_FK_COLUMN_CANNOT_CHANGE_CHILD: 1833,
+    ER_FK_CANNOT_DELETE_PARENT: 1834,
+    ER_MALFORMED_PACKET: 1835,
+    ER_READ_ONLY_MODE: 1836,
+    ER_GTID_NEXT_TYPE_UNDEFINED_GROUP: 1837,
+    ER_VARIABLE_NOT_SETTABLE_IN_SP: 1838,
+    ER_CANT_SET_GTID_PURGED_WHEN_GTID_MODE_IS_OFF: 1839,
+    ER_CANT_SET_GTID_PURGED_WHEN_GTID_EXECUTED_IS_NOT_EMPTY: 1840,
+    ER_CANT_SET_GTID_PURGED_WHEN_OWNED_GTIDS_IS_NOT_EMPTY: 1841,
+    ER_GTID_PURGED_WAS_CHANGED: 1842,
+    ER_GTID_EXECUTED_WAS_CHANGED: 1843,
+    ER_BINLOG_STMT_MODE_AND_NO_REPL_TABLES: 1844,
+    ER_ALTER_OPERATION_NOT_SUPPORTED: 1845,
+    ER_ALTER_OPERATION_NOT_SUPPORTED_REASON: 1846,
+    ER_ALTER_OPERATION_NOT_SUPPORTED_REASON_COPY: 1847,
+    ER_ALTER_OPERATION_NOT_SUPPORTED_REASON_PARTITION: 1848,
+    ER_ALTER_OPERATION_NOT_SUPPORTED_REASON_FK_RENAME: 1849,
+    ER_ALTER_OPERATION_NOT_SUPPORTED_REASON_COLUMN_TYPE: 1850,
+    ER_ALTER_OPERATION_NOT_SUPPORTED_REASON_FK_CHECK: 1851,
+    ER_ALTER_OPERATION_NOT_SUPPORTED_REASON_IGNORE: 1852,
+    ER_ALTER_OPERATION_NOT_SUPPORTED_REASON_NOPK: 1853,
+    ER_ALTER_OPERATION_NOT_SUPPORTED_REASON_AUTOINC: 1854,
+    ER_ALTER_OPERATION_NOT_SUPPORTED_REASON_HIDDEN_FTS: 1855,
+    ER_ALTER_OPERATION_NOT_SUPPORTED_REASON_CHANGE_FTS: 1856,
+    ER_ALTER_OPERATION_NOT_SUPPORTED_REASON_FTS: 1857,
+    ER_SQL_SLAVE_SKIP_COUNTER_NOT_SETTABLE_IN_GTID_MODE: 1858,
+    ER_DUP_UNKNOWN_IN_INDEX: 1859,
+    ER_IDENT_CAUSES_TOO_LONG_PATH: 1860,
+    ER_ALTER_OPERATION_NOT_SUPPORTED_REASON_NOT_NULL: 1861,
+    ER_MUST_CHANGE_PASSWORD_LOGIN: 1862,
+    ER_ROW_IN_WRONG_PARTITION: 1863,
+    ER_MTS_EVENT_BIGGER_PENDING_JOBS_SIZE_MAX: 1864,
+    ER_INNODB_NO_FT_USES_PARSER: 1865,
+    ER_BINLOG_LOGICAL_CORRUPTION: 1866,
+    ER_WARN_PURGE_LOG_IN_USE: 1867,
+    ER_WARN_PURGE_LOG_IS_ACTIVE: 1868,
+    ER_AUTO_INCREMENT_CONFLICT: 1869,
+    WARN_ON_BLOCKHOLE_IN_RBR: 1870,
+    ER_SLAVE_MI_INIT_REPOSITORY: 1871,
+    ER_SLAVE_RLI_INIT_REPOSITORY: 1872,
+    ER_ACCESS_DENIED_CHANGE_USER_ERROR: 1873,
+    ER_INNODB_READ_ONLY: 1874,
+    ER_STOP_SLAVE_SQL_THREAD_TIMEOUT: 1875,
+    ER_STOP_SLAVE_IO_THREAD_TIMEOUT: 1876,
+    ER_TABLE_CORRUPT: 1877,
+    ER_TEMP_FILE_WRITE_FAILURE: 1878,
+    ER_INNODB_FT_AUX_NOT_HEX_ID: 1879,
+    ER_OLD_TEMPORALS_UPGRADED: 1880,
+    ER_INNODB_FORCED_RECOVERY: 1881,
+    ER_AES_INVALID_IV: 1882,
+    ER_PLUGIN_CANNOT_BE_UNINSTALLED: 1883,
+    ER_GTID_UNSAFE_BINLOG_SPLITTABLE_STATEMENT_AND_GTID_GROUP: 1884,
+    ER_SLAVE_HAS_MORE_GTIDS_THAN_MASTER: 1885,
+    ER_MISSING_KEY: 1886,
+    WARN_NAMED_PIPE_ACCESS_EVERYONE: 1887,
+    ER_FOUND_MISSING_GTIDS: 1888,
+    ER_FILE_CORRUPT: 3000,
+    ER_ERROR_ON_MASTER: 3001,
+    ER_INCONSISTENT_ERROR: 3002,
+    ER_STORAGE_ENGINE_NOT_LOADED: 3003,
+    ER_GET_STACKED_DA_WITHOUT_ACTIVE_HANDLER: 3004,
+    ER_WARN_LEGACY_SYNTAX_CONVERTED: 3005,
+    ER_BINLOG_UNSAFE_FULLTEXT_PLUGIN: 3006,
+    ER_CANNOT_DISCARD_TEMPORARY_TABLE: 3007,
+    ER_FK_DEPTH_EXCEEDED: 3008,
+    ER_COL_COUNT_DOESNT_MATCH_PLEASE_UPDATE_V2: 3009,
+    ER_WARN_TRIGGER_DOESNT_HAVE_CREATED: 3010,
+    ER_REFERENCED_TRG_DOES_NOT_EXIST: 3011,
+    ER_EXPLAIN_NOT_SUPPORTED: 3012,
+    ER_INVALID_FIELD_SIZE: 3013,
+    ER_MISSING_HA_CREATE_OPTION: 3014,
+    ER_ENGINE_OUT_OF_MEMORY: 3015,
+    ER_PASSWORD_EXPIRE_ANONYMOUS_USER: 3016,
+    ER_SLAVE_SQL_THREAD_MUST_STOP: 3017,
+    ER_NO_FT_MATERIALIZED_SUBQUERY: 3018,
+    ER_INNODB_UNDO_LOG_FULL: 3019,
+    ER_INVALID_ARGUMENT_FOR_LOGARITHM: 3020,
+    ER_SLAVE_CHANNEL_IO_THREAD_MUST_STOP: 3021,
+    ER_WARN_OPEN_TEMP_TABLES_MUST_BE_ZERO: 3022,
+    ER_WARN_ONLY_MASTER_LOG_FILE_NO_POS: 3023,
+    ER_QUERY_TIMEOUT: 3024,
+    ER_NON_RO_SELECT_DISABLE_TIMER: 3025,
+    ER_DUP_LIST_ENTRY: 3026,
+    ER_SQL_MODE_NO_EFFECT: 3027,
+    ER_AGGREGATE_ORDER_FOR_UNION: 3028,
+    ER_AGGREGATE_ORDER_NON_AGG_QUERY: 3029,
+    ER_SLAVE_WORKER_STOPPED_PREVIOUS_THD_ERROR: 3030,
+    ER_DONT_SUPPORT_SLAVE_PRESERVE_COMMIT_ORDER: 3031,
+    ER_SERVER_OFFLINE_MODE: 3032,
+    ER_GIS_DIFFERENT_SRIDS: 3033,
+    ER_GIS_UNSUPPORTED_ARGUMENT: 3034,
+    ER_GIS_UNKNOWN_ERROR: 3035,
+    ER_GIS_UNKNOWN_EXCEPTION: 3036,
+    ER_GIS_INVALID_DATA: 3037,
+    ER_BOOST_GEOMETRY_EMPTY_INPUT_EXCEPTION: 3038,
+    ER_BOOST_GEOMETRY_CENTROID_EXCEPTION: 3039,
+    ER_BOOST_GEOMETRY_OVERLAY_INVALID_INPUT_EXCEPTION: 3040,
+    ER_BOOST_GEOMETRY_TURN_INFO_EXCEPTION: 3041,
+    ER_BOOST_GEOMETRY_SELF_INTERSECTION_POINT_EXCEPTION: 3042,
+    ER_BOOST_GEOMETRY_UNKNOWN_EXCEPTION: 3043,
+    ER_STD_BAD_ALLOC_ERROR: 3044,
+    ER_STD_DOMAIN_ERROR: 3045,
+    ER_STD_LENGTH_ERROR: 3046,
+    ER_STD_INVALID_ARGUMENT: 3047,
+    ER_STD_OUT_OF_RANGE_ERROR: 3048,
+    ER_STD_OVERFLOW_ERROR: 3049,
+    ER_STD_RANGE_ERROR: 3050,
+    ER_STD_UNDERFLOW_ERROR: 3051,
+    ER_STD_LOGIC_ERROR: 3052,
+    ER_STD_RUNTIME_ERROR: 3053,
+    ER_STD_UNKNOWN_EXCEPTION: 3054,
+    ER_GIS_DATA_WRONG_ENDIANESS: 3055,
+    ER_CHANGE_MASTER_PASSWORD_LENGTH: 3056,
+    ER_USER_LOCK_WRONG_NAME: 3057,
+    ER_USER_LOCK_DEADLOCK: 3058,
+    ER_REPLACE_INACCESSIBLE_ROWS: 3059,
+    ER_ALTER_OPERATION_NOT_SUPPORTED_REASON_GIS: 3060,
+    ER_ILLEGAL_USER_VAR: 3061,
+    ER_GTID_MODE_OFF: 3062,
+    ER_UNSUPPORTED_BY_REPLICATION_THREAD: 3063,
+    ER_INCORRECT_TYPE: 3064,
+    ER_FIELD_IN_ORDER_NOT_SELECT: 3065,
+    ER_AGGREGATE_IN_ORDER_NOT_SELECT: 3066,
+    ER_INVALID_RPL_WILD_TABLE_FILTER_PATTERN: 3067,
+    ER_NET_OK_PACKET_TOO_LARGE: 3068,
+    ER_INVALID_JSON_DATA: 3069,
+    ER_INVALID_GEOJSON_MISSING_MEMBER: 3070,
+    ER_INVALID_GEOJSON_WRONG_TYPE: 3071,
+    ER_INVALID_GEOJSON_UNSPECIFIED: 3072,
+    ER_DIMENSION_UNSUPPORTED: 3073,
+    ER_SLAVE_CHANNEL_DOES_NOT_EXIST: 3074,
+    ER_SLAVE_MULTIPLE_CHANNELS_HOST_PORT: 3075,
+    ER_SLAVE_CHANNEL_NAME_INVALID_OR_TOO_LONG: 3076,
+    ER_SLAVE_NEW_CHANNEL_WRONG_REPOSITORY: 3077,
+    ER_SLAVE_CHANNEL_DELETE: 3078,
+    ER_SLAVE_MULTIPLE_CHANNELS_CMD: 3079,
+    ER_SLAVE_MAX_CHANNELS_EXCEEDED: 3080,
+    ER_SLAVE_CHANNEL_MUST_STOP: 3081,
+    ER_SLAVE_CHANNEL_NOT_RUNNING: 3082,
+    ER_SLAVE_CHANNEL_WAS_RUNNING: 3083,
+    ER_SLAVE_CHANNEL_WAS_NOT_RUNNING: 3084,
+    ER_SLAVE_CHANNEL_SQL_THREAD_MUST_STOP: 3085,
+    ER_SLAVE_CHANNEL_SQL_SKIP_COUNTER: 3086,
+    ER_WRONG_FIELD_WITH_GROUP_V2: 3087,
+    ER_MIX_OF_GROUP_FUNC_AND_FIELDS_V2: 3088,
+    ER_WARN_DEPRECATED_SYSVAR_UPDATE: 3089,
+    ER_WARN_DEPRECATED_SQLMODE: 3090,
+    ER_CANNOT_LOG_PARTIAL_DROP_DATABASE_WITH_GTID: 3091,
+    ER_GROUP_REPLICATION_CONFIGURATION: 3092,
+    ER_GROUP_REPLICATION_RUNNING: 3093,
+    ER_GROUP_REPLICATION_APPLIER_INIT_ERROR: 3094,
+    ER_GROUP_REPLICATION_STOP_APPLIER_THREAD_TIMEOUT: 3095,
+    ER_GROUP_REPLICATION_COMMUNICATION_LAYER_SESSION_ERROR: 3096,
+    ER_GROUP_REPLICATION_COMMUNICATION_LAYER_JOIN_ERROR: 3097,
+    ER_BEFORE_DML_VALIDATION_ERROR: 3098,
+    ER_PREVENTS_VARIABLE_WITHOUT_RBR: 3099,
+    ER_RUN_HOOK_ERROR: 3100,
+    ER_TRANSACTION_ROLLBACK_DURING_COMMIT: 3101,
+    ER_GENERATED_COLUMN_FUNCTION_IS_NOT_ALLOWED: 3102,
+    ER_UNSUPPORTED_ALTER_INPLACE_ON_VIRTUAL_COLUMN: 3103,
+    ER_WRONG_FK_OPTION_FOR_GENERATED_COLUMN: 3104,
+    ER_NON_DEFAULT_VALUE_FOR_GENERATED_COLUMN: 3105,
+    ER_UNSUPPORTED_ACTION_ON_GENERATED_COLUMN: 3106,
+    ER_GENERATED_COLUMN_NON_PRIOR: 3107,
+    ER_DEPENDENT_BY_GENERATED_COLUMN: 3108,
+    ER_GENERATED_COLUMN_REF_AUTO_INC: 3109,
+    ER_FEATURE_NOT_AVAILABLE: 3110,
+    ER_CANT_SET_GTID_MODE: 3111,
+    ER_CANT_USE_AUTO_POSITION_WITH_GTID_MODE_OFF: 3112,
+    ER_CANT_REPLICATE_ANONYMOUS_WITH_AUTO_POSITION: 3113,
+    ER_CANT_REPLICATE_ANONYMOUS_WITH_GTID_MODE_ON: 3114,
+    ER_CANT_REPLICATE_GTID_WITH_GTID_MODE_OFF: 3115,
+    ER_CANT_SET_ENFORCE_GTID_CONSISTENCY_ON_WITH_ONGOING_GTID_VIOLATING_TRANSACTIONS: 3116,
+    ER_SET_ENFORCE_GTID_CONSISTENCY_WARN_WITH_ONGOING_GTID_VIOLATING_TRANSACTIONS: 3117,
+    ER_ACCOUNT_HAS_BEEN_LOCKED: 3118,
+    ER_WRONG_TABLESPACE_NAME: 3119,
+    ER_TABLESPACE_IS_NOT_EMPTY: 3120,
+    ER_WRONG_FILE_NAME: 3121,
+    ER_BOOST_GEOMETRY_INCONSISTENT_TURNS_EXCEPTION: 3122,
+    ER_WARN_OPTIMIZER_HINT_SYNTAX_ERROR: 3123,
+    ER_WARN_BAD_MAX_EXECUTION_TIME: 3124,
+    ER_WARN_UNSUPPORTED_MAX_EXECUTION_TIME: 3125,
+    ER_WARN_CONFLICTING_HINT: 3126,
+    ER_WARN_UNKNOWN_QB_NAME: 3127,
+    ER_UNRESOLVED_HINT_NAME: 3128,
+    ER_WARN_ON_MODIFYING_GTID_EXECUTED_TABLE: 3129,
+    ER_PLUGGABLE_PROTOCOL_COMMAND_NOT_SUPPORTED: 3130,
+    ER_LOCKING_SERVICE_WRONG_NAME: 3131,
+    ER_LOCKING_SERVICE_DEADLOCK: 3132,
+    ER_LOCKING_SERVICE_TIMEOUT: 3133,
+    ER_GIS_MAX_POINTS_IN_GEOMETRY_OVERFLOWED: 3134,
+    ER_SQL_MODE_MERGED: 3135,
+    ER_VTOKEN_PLUGIN_TOKEN_MISMATCH: 3136,
+    ER_VTOKEN_PLUGIN_TOKEN_NOT_FOUND: 3137,
+    ER_CANT_SET_VARIABLE_WHEN_OWNING_GTID: 3138,
+    ER_SLAVE_CHANNEL_OPERATION_NOT_ALLOWED: 3139,
+    ER_INVALID_JSON_TEXT: 3140,
+    ER_INVALID_JSON_TEXT_IN_PARAM: 3141,
+    ER_INVALID_JSON_BINARY_DATA: 3142,
+    ER_INVALID_JSON_PATH: 3143,
+    ER_INVALID_JSON_CHARSET: 3144,
+    ER_INVALID_JSON_CHARSET_IN_FUNCTION: 3145,
+    ER_INVALID_TYPE_FOR_JSON: 3146,
+    ER_INVALID_CAST_TO_JSON: 3147,
+    ER_INVALID_JSON_PATH_CHARSET: 3148,
+    ER_INVALID_JSON_PATH_WILDCARD: 3149,
+    ER_JSON_VALUE_TOO_BIG: 3150,
+    ER_JSON_KEY_TOO_BIG: 3151,
+    ER_JSON_USED_AS_KEY: 3152,
+    ER_JSON_VACUOUS_PATH: 3153,
+    ER_JSON_BAD_ONE_OR_ALL_ARG: 3154,
+    ER_NUMERIC_JSON_VALUE_OUT_OF_RANGE: 3155,
+    ER_INVALID_JSON_VALUE_FOR_CAST: 3156,
+    ER_JSON_DOCUMENT_TOO_DEEP: 3157,
+    ER_JSON_DOCUMENT_NULL_KEY: 3158,
+    ER_SECURE_TRANSPORT_REQUIRED: 3159,
+    ER_NO_SECURE_TRANSPORTS_CONFIGURED: 3160,
+    ER_DISABLED_STORAGE_ENGINE: 3161,
+    ER_USER_DOES_NOT_EXIST: 3162,
+    ER_USER_ALREADY_EXISTS: 3163,
+    ER_AUDIT_API_ABORT: 3164,
+    ER_INVALID_JSON_PATH_ARRAY_CELL: 3165,
+    ER_BUFPOOL_RESIZE_INPROGRESS: 3166,
+    ER_FEATURE_DISABLED_SEE_DOC: 3167,
+    ER_SERVER_ISNT_AVAILABLE: 3168,
+    ER_SESSION_WAS_KILLED: 3169,
+    ER_CAPACITY_EXCEEDED: 3170,
+    ER_CAPACITY_EXCEEDED_IN_RANGE_OPTIMIZER: 3171,
+    ER_TABLE_NEEDS_UPG_PART: 3172,
+    ER_CANT_WAIT_FOR_EXECUTED_GTID_SET_WHILE_OWNING_A_GTID: 3173,
+    ER_CANNOT_ADD_FOREIGN_BASE_COL_VIRTUAL: 3174,
+    ER_CANNOT_CREATE_VIRTUAL_INDEX_CONSTRAINT: 3175,
+    ER_ERROR_ON_MODIFYING_GTID_EXECUTED_TABLE: 3176,
+    ER_LOCK_REFUSED_BY_ENGINE: 3177,
+    ER_UNSUPPORTED_ALTER_ONLINE_ON_VIRTUAL_COLUMN: 3178,
+    ER_MASTER_KEY_ROTATION_NOT_SUPPORTED_BY_SE: 3179,
+    ER_MASTER_KEY_ROTATION_ERROR_BY_SE: 3180,
+    ER_MASTER_KEY_ROTATION_BINLOG_FAILED: 3181,
+    ER_MASTER_KEY_ROTATION_SE_UNAVAILABLE: 3182,
+    ER_TABLESPACE_CANNOT_ENCRYPT: 3183,
+    ER_INVALID_ENCRYPTION_OPTION: 3184,
+    ER_CANNOT_FIND_KEY_IN_KEYRING: 3185,
+    ER_CAPACITY_EXCEEDED_IN_PARSER: 3186,
+    ER_UNSUPPORTED_ALTER_ENCRYPTION_INPLACE: 3187,
+    ER_KEYRING_UDF_KEYRING_SERVICE_ERROR: 3188,
+    ER_USER_COLUMN_OLD_LENGTH: 3189,
+    ER_CANT_RESET_MASTER: 3190,
+    ER_GROUP_REPLICATION_MAX_GROUP_SIZE: 3191,
+    ER_CANNOT_ADD_FOREIGN_BASE_COL_STORED: 3192,
+    ER_TABLE_REFERENCED: 3193,
+    ER_PARTITION_ENGINE_DEPRECATED_FOR_TABLE: 3194,
+    ER_WARN_USING_GEOMFROMWKB_TO_SET_SRID_ZERO: 3195,
+    ER_WARN_USING_GEOMFROMWKB_TO_SET_SRID: 3196,
+    ER_XA_RETRY: 3197,
+    ER_KEYRING_AWS_UDF_AWS_KMS_ERROR: 3198,
+    ER_BINLOG_UNSAFE_XA: 3199,
+    ER_UDF_ERROR: 3200,
+    ER_KEYRING_MIGRATION_FAILURE: 3201,
+    ER_KEYRING_ACCESS_DENIED_ERROR: 3202,
+    ER_KEYRING_MIGRATION_STATUS: 3203,
+    ER_PLUGIN_FAILED_TO_OPEN_TABLES: 3204,
+    ER_PLUGIN_FAILED_TO_OPEN_TABLE: 3205,
+    ER_AUDIT_LOG_NO_KEYRING_PLUGIN_INSTALLED: 3206,
+    ER_AUDIT_LOG_ENCRYPTION_PASSWORD_HAS_NOT_BEEN_SET: 3207,
+    ER_AUDIT_LOG_COULD_NOT_CREATE_AES_KEY: 3208,
+    ER_AUDIT_LOG_ENCRYPTION_PASSWORD_CANNOT_BE_FETCHED: 3209,
+    ER_AUDIT_LOG_JSON_FILTERING_NOT_ENABLED: 3210,
+    ER_AUDIT_LOG_UDF_INSUFFICIENT_PRIVILEGE: 3211,
+    ER_AUDIT_LOG_SUPER_PRIVILEGE_REQUIRED: 3212,
+    ER_COULD_NOT_REINITIALIZE_AUDIT_LOG_FILTERS: 3213,
+    ER_AUDIT_LOG_UDF_INVALID_ARGUMENT_TYPE: 3214,
+    ER_AUDIT_LOG_UDF_INVALID_ARGUMENT_COUNT: 3215,
+    ER_AUDIT_LOG_HAS_NOT_BEEN_INSTALLED: 3216,
+    ER_AUDIT_LOG_UDF_READ_INVALID_MAX_ARRAY_LENGTH_ARG_TYPE: 3217,
+    ER_AUDIT_LOG_UDF_READ_INVALID_MAX_ARRAY_LENGTH_ARG_VALUE: 3218,
+    ER_AUDIT_LOG_JSON_FILTER_PARSING_ERROR: 3219,
+    ER_AUDIT_LOG_JSON_FILTER_NAME_CANNOT_BE_EMPTY: 3220,
+    ER_AUDIT_LOG_JSON_USER_NAME_CANNOT_BE_EMPTY: 3221,
+    ER_AUDIT_LOG_JSON_FILTER_DOES_NOT_EXISTS: 3222,
+    ER_AUDIT_LOG_USER_FIRST_CHARACTER_MUST_BE_ALPHANUMERIC: 3223,
+    ER_AUDIT_LOG_USER_NAME_INVALID_CHARACTER: 3224,
+    ER_AUDIT_LOG_HOST_NAME_INVALID_CHARACTER: 3225,
+    WARN_DEPRECATED_MAXDB_SQL_MODE_FOR_TIMESTAMP: 3226,
+    ER_XA_REPLICATION_FILTERS: 3227,
+    ER_CANT_OPEN_ERROR_LOG: 3228,
+    ER_GROUPING_ON_TIMESTAMP_IN_DST: 3229,
+    ER_CANT_START_SERVER_NAMED_PIPE: 3230,
+};
 
-var select_handler = {};
-
-var column_type_helper = {};
-
-var mysql = {};
-
-var hasRequiredMysql;
-
-function requireMysql () {
-	if (hasRequiredMysql) return mysql;
-	hasRequiredMysql = 1;
-	mysql.CLIENT_FLAGS = {
-	  LONG_PASSWORD: 0x00000001,
-	  FOUND_ROWS: 0x00000002,
-	  LONG_FLAG: 0x00000004,
-	  CONNECT_WITH_DB: 0x00000008,
-	  NO_SCHEMA: 0x00000010,
-	  COMPRESS: 0x00000020,
-	  ODBC: 0x00000040,
-	  LOCAL_FILES: 0x00000080,
-	  IGNORE_SPACE: 0x00000100,
-	  PROTOCOL_41: 0x00000200,
-	  INTERACTIVE: 0x00000400,
-	  SSL: 0x00000800,
-	  IGNORE_SIGPIPE: 0x00001000,
-	  TRANSACTIONS: 0x00002000,
-	  RESERVED: 0x00004000,
-	  SECURE_CONNECTION: 0x00008000,
-	  MULTI_STATEMENTS: 0x00010000,
-	  MULTI_RESULTS: 0x00020000,
-	  PS_MULTI_RESULTS: 0x00040000,
-	  PLUGIN_AUTH: 0x00080000,
-	  CONNECT_ATTRS: 0x00100000,
-	  PLUGIN_AUTH_LENENC_CLIENT_DATA: 0x00200000,
-	  CAN_HANDLE_EXPIRED_PASSWORDS: 0x00400000,
-	  SESSION_TRACK: 0x00800000,
-	  DEPRECATE_EOF: 0x01000000,
-	  SSL_VERIFY_SERVER_CERT: 0x40000000,
-	  REMEMBER_OPTIONS: 0x80000000,
-	  MULTI_FACTOR_AUTHENTICATION: 0x10000000,
-	};
-	mysql.SERVER_STATUS = {
-	  SERVER_STATUS_IN_TRANS: 1,
-	  SERVER_STATUS_AUTOCOMMIT: 2,
-	  SERVER_MORE_RESULTS_EXISTS: 8,
-	  SERVER_QUERY_NO_GOOD_INDEX_USED: 16,
-	  SERVER_QUERY_NO_INDEX_USED: 32,
-	  SERVER_STATUS_CURSOR_EXISTS: 64,
-	  SERVER_STATUS_LAST_ROW_SENT: 128,
-	  SERVER_STATUS_DB_DROPPED: 256,
-	  SERVER_STATUS_NO_BACKSLASH_ESCAPES: 512,
-	  SERVER_STATUS_METADATA_CHANGED: 1024,
-	  SERVER_QUERY_WAS_SLOW: 2048,
-	  SERVER_PS_OUT_PARAMS: 4096,
-	  SERVER_STATUS_IN_TRANS_READONLY: 0x2000,
-	  SERVER_SESSION_STATE_CHANGED: 0x4000,
-	};
-	mysql.CLIENT_COMMANDS = {
-	  SLEEP: 0x00,
-	  QUIT: 0x01,
-	  INIT_DB: 0x02,
-	  QUERY: 0x03,
-	  FIELD_LIST: 0x04,
-	  CREATE_DB: 0x05,
-	  DROP_DB: 0x06,
-	  REFRESH: 0x07,
-	  SHUTDOWN: 0x08,
-	  STATISTICS: 0x09,
-	  PROCESS_INFO: 0x0a,
-	  CONNECT: 0x0b,
-	  PROCESS_KILL: 0x0c,
-	  DEBUG: 0x0d,
-	  PING: 0x0e,
-	  TIME: 0x0f,
-	  DELAYED_INSERT: 0x10,
-	  CHANGE_USER: 0x11,
-	  BINLOG_DUMP: 0x12,
-	  TABLE_DUMP: 0x13,
-	  CONNECT_OUT: 0x14,
-	  REGISTER_SLAVE: 0x15,
-	  STMT_PREPARE: 0x16,
-	  STMT_EXECUTE: 0x17,
-	  STMT_SEND_LONG_DATA: 0x18,
-	  STMT_CLOSE: 0x19,
-	  STMT_RESET: 0x1a,
-	  SET_OPTION: 0x1b,
-	  STMT_FETCH: 0x1c,
-	  DAEMON: 0x1d,
-	  BINLOG_DUMP_GTID: 0x1e,
-	  UNKNOWN: 0xff,
-	};
-	mysql.CLIENT_COMMAND_MAP = {
-	  0: 'SLEEP',
-	  1: 'QUIT',
-	  2: 'INIT_DB',
-	  3: 'QUERY',
-	  4: 'FIELD_LIST',
-	  5: 'CREATE_DB',
-	  6: 'DROP_DB',
-	  7: 'REFRESH',
-	  8: 'SHUTDOWN',
-	  9: 'STATISTICS',
-	  10: 'PROCESS_INFO',
-	  11: 'CONNECT',
-	  12: 'PROCESS_KILL',
-	  13: 'DEBUG',
-	  14: 'PING',
-	  15: 'TIME',
-	  16: 'DELAYED_INSERT',
-	  17: 'CHANGE_USER',
-	  18: 'BINLOG_DUMP',
-	  19: 'TABLE_DUMP',
-	  20: 'CONNECT_OUT',
-	  21: 'REGISTER_SLAVE',
-	  22: 'STMT_PREPARE',
-	  23: 'STMT_EXECUTE',
-	  24: 'STMT_SEND_LONG_DATA',
-	  25: 'STMT_CLOSE',
-	  26: 'STMT_RESET',
-	  27: 'SET_OPTION',
-	  28: 'STMT_FETCH',
-	  29: 'DAEMON',
-	  30: 'BINLOG_DUMP_GTID',
-	  255: 'UNKNOWN',
-	};
-	mysql.SERVER_COMMAND_MAP = {
-	  0: 'OK',
-	  254: 'EOF',
-	  255: 'ERROR',
-	};
-
-	mysql.FIELD_FLAGS = {
-	  NOT_NULL: 1,
-	  PRI_KEY: 2,
-	  UNIQUE_KEY: 4,
-	  MULTIPLE_KEY: 8,
-	  BLOB: 16,
-	  UNSIGNED: 32,
-	  ZEROFILL: 64,
-	  BINARY: 128,
-	  ENUM: 256,
-	  AUTO_INCREMENT: 512,
-	  TIMESTAMP: 1024,
-	  SET: 2048,
-	  NO_DEFAULT_VALUE: 4096,
-	  ON_UPDATE_NOW: 8192,
-	  NUM: 32768,
-	};
-	mysql.TYPES = {
-	  OLDDECIMAL: 0x00,
-	  TINY: 0x01,
-	  TINYINT: 0x01,
-	  SHORT: 0x02,
-	  SMALLINT: 0x02,
-	  INT: 0x03,
-	  LONG: 0x03,
-	  FLOAT: 0x04,
-	  DOUBLE: 0x05,
-	  NULL: 0x06,
-	  TIMESTAMP: 0x07,
-	  LONGLONG: 0x08,
-	  BIGINT: 0x08,
-	  INT24: 0x09,
-	  MEDIUMINT: 0x09,
-	  DATE: 0x0a,
-	  TIME: 0x0b,
-	  DATETIME: 0x0c,
-	  YEAR: 0x0d,
-	  NEWDATE: 0x0e,
-	  VARCHAR: 0x0f,
-	  BIT: 0x10,
-	  JSON: 0xf5,
-	  DECIMAL: 0xf6,
-	  ENUM: 0xf7,
-	  SET: 0xf8,
-	  TINYBLOB: 0xf9,
-	  MEDIUMBLOB: 0xfa,
-	  LONGBLOB: 0xfb,
-	  BLOB: 0xfc,
-	  VAR_STRING: 0xfd,
-	  STRING: 0xfe,
-	  GEOMETRY: 0xff,
-	};
-	mysql.TYPES_MAP = {
-	  0: 'OLDDECIMAL',
-	  1: 'TINYINT',
-	  2: 'SMALLINT',
-	  3: 'INT',
-	  4: 'FLOAT',
-	  5: 'DOUBLE',
-	  6: 'NULL',
-	  7: 'TIMESTAMP',
-	  8: 'BIGINT',
-	  9: 'MEDIUMINT',
-	  10: 'DATE',
-	  11: 'TIME',
-	  12: 'DATETIME',
-	  13: 'YEAR',
-	  14: 'NEWDATE',
-	  15: 'VARCHAR',
-	  16: 'BIT',
-	  245: 'JSON',
-	  246: 'DECIMAL',
-	  247: 'ENUM',
-	  248: 'SET',
-	  249: 'TINYBLOB',
-	  250: 'MEDIUMBLOB',
-	  251: 'LONGBLOB',
-	  252: 'BLOB',
-	  253: 'VAR_STRING',
-	  254: 'STRING',
-	  255: 'GEOMETRY',
-	};
-
-	mysql.CHARSETS = {
-	  BIG5_CHINESE_CI: 1,
-	  LATIN2_CZECH_CS: 2,
-	  DEC8_SWEDISH_CI: 3,
-	  CP850_GENERAL_CI: 4,
-	  LATIN1_GERMAN1_CI: 5,
-	  HP8_ENGLISH_CI: 6,
-	  KOI8R_GENERAL_CI: 7,
-	  LATIN1_SWEDISH_CI: 8,
-	  LATIN2_GENERAL_CI: 9,
-	  SWE7_SWEDISH_CI: 10,
-	  ASCII_GENERAL_CI: 11,
-	  UJIS_JAPANESE_CI: 12,
-	  SJIS_JAPANESE_CI: 13,
-	  CP1251_BULGARIAN_CI: 14,
-	  LATIN1_DANISH_CI: 15,
-	  HEBREW_GENERAL_CI: 16,
-	  TIS620_THAI_CI: 18,
-	  EUCKR_KOREAN_CI: 19,
-	  LATIN7_ESTONIAN_CS: 20,
-	  LATIN2_HUNGARIAN_CI: 21,
-	  KOI8U_GENERAL_CI: 22,
-	  CP1251_UKRAINIAN_CI: 23,
-	  GB2312_CHINESE_CI: 24,
-	  GREEK_GENERAL_CI: 25,
-	  CP1250_GENERAL_CI: 26,
-	  LATIN2_CROATIAN_CI: 27,
-	  GBK_CHINESE_CI: 28,
-	  CP1257_LITHUANIAN_CI: 29,
-	  LATIN5_TURKISH_CI: 30,
-	  LATIN1_GERMAN2_CI: 31,
-	  ARMSCII8_GENERAL_CI: 32,
-	  UTF8_GENERAL_CI: 33,
-	  CP1250_CZECH_CS: 34,
-	  UCS2_GENERAL_CI: 35,
-	  CP866_GENERAL_CI: 36,
-	  KEYBCS2_GENERAL_CI: 37,
-	  MACCE_GENERAL_CI: 38,
-	  MACROMAN_GENERAL_CI: 39,
-	  CP852_GENERAL_CI: 40,
-	  LATIN7_GENERAL_CI: 41,
-	  LATIN7_GENERAL_CS: 42,
-	  MACCE_BIN: 43,
-	  CP1250_CROATIAN_CI: 44,
-	  UTF8MB4_GENERAL_CI: 45,
-	  UTF8MB4_BIN: 46,
-	  LATIN1_BIN: 47,
-	  LATIN1_GENERAL_CI: 48,
-	  LATIN1_GENERAL_CS: 49,
-	  CP1251_BIN: 50,
-	  CP1251_GENERAL_CI: 51,
-	  CP1251_GENERAL_CS: 52,
-	  MACROMAN_BIN: 53,
-	  UTF16_GENERAL_CI: 54,
-	  UTF16_BIN: 55,
-	  UTF16LE_GENERAL_CI: 56,
-	  CP1256_GENERAL_CI: 57,
-	  CP1257_BIN: 58,
-	  CP1257_GENERAL_CI: 59,
-	  UTF32_GENERAL_CI: 60,
-	  UTF32_BIN: 61,
-	  UTF16LE_BIN: 62,
-	  BINARY: 63,
-	  ARMSCII8_BIN: 64,
-	  ASCII_BIN: 65,
-	  CP1250_BIN: 66,
-	  CP1256_BIN: 67,
-	  CP866_BIN: 68,
-	  DEC8_BIN: 69,
-	  GREEK_BIN: 70,
-	  HEBREW_BIN: 71,
-	  HP8_BIN: 72,
-	  KEYBCS2_BIN: 73,
-	  KOI8R_BIN: 74,
-	  KOI8U_BIN: 75,
-	  UTF8_TOLOWER_CI: 76,
-	  LATIN2_BIN: 77,
-	  LATIN5_BIN: 78,
-	  LATIN7_BIN: 79,
-	  CP850_BIN: 80,
-	  CP852_BIN: 81,
-	  SWE7_BIN: 82,
-	  UTF8_BIN: 83,
-	  BIG5_BIN: 84,
-	  EUCKR_BIN: 85,
-	  GB2312_BIN: 86,
-	  GBK_BIN: 87,
-	  SJIS_BIN: 88,
-	  TIS620_BIN: 89,
-	  UCS2_BIN: 90,
-	  UJIS_BIN: 91,
-	  GEOSTD8_GENERAL_CI: 92,
-	  GEOSTD8_BIN: 93,
-	  LATIN1_SPANISH_CI: 94,
-	  CP932_JAPANESE_CI: 95,
-	  CP932_BIN: 96,
-	  EUCJPMS_JAPANESE_CI: 97,
-	  EUCJPMS_BIN: 98,
-	  CP1250_POLISH_CI: 99,
-	  UTF16_UNICODE_CI: 101,
-	  UTF16_ICELANDIC_CI: 102,
-	  UTF16_LATVIAN_CI: 103,
-	  UTF16_ROMANIAN_CI: 104,
-	  UTF16_SLOVENIAN_CI: 105,
-	  UTF16_POLISH_CI: 106,
-	  UTF16_ESTONIAN_CI: 107,
-	  UTF16_SPANISH_CI: 108,
-	  UTF16_SWEDISH_CI: 109,
-	  UTF16_TURKISH_CI: 110,
-	  UTF16_CZECH_CI: 111,
-	  UTF16_DANISH_CI: 112,
-	  UTF16_LITHUANIAN_CI: 113,
-	  UTF16_SLOVAK_CI: 114,
-	  UTF16_SPANISH2_CI: 115,
-	  UTF16_ROMAN_CI: 116,
-	  UTF16_PERSIAN_CI: 117,
-	  UTF16_ESPERANTO_CI: 118,
-	  UTF16_HUNGARIAN_CI: 119,
-	  UTF16_SINHALA_CI: 120,
-	  UTF16_GERMAN2_CI: 121,
-	  UTF16_CROATIAN_CI: 122,
-	  UTF16_UNICODE_520_CI: 123,
-	  UTF16_VIETNAMESE_CI: 124,
-	  UCS2_UNICODE_CI: 128,
-	  UCS2_ICELANDIC_CI: 129,
-	  UCS2_LATVIAN_CI: 130,
-	  UCS2_ROMANIAN_CI: 131,
-	  UCS2_SLOVENIAN_CI: 132,
-	  UCS2_POLISH_CI: 133,
-	  UCS2_ESTONIAN_CI: 134,
-	  UCS2_SPANISH_CI: 135,
-	  UCS2_SWEDISH_CI: 136,
-	  UCS2_TURKISH_CI: 137,
-	  UCS2_CZECH_CI: 138,
-	  UCS2_DANISH_CI: 139,
-	  UCS2_LITHUANIAN_CI: 140,
-	  UCS2_SLOVAK_CI: 141,
-	  UCS2_SPANISH2_CI: 142,
-	  UCS2_ROMAN_CI: 143,
-	  UCS2_PERSIAN_CI: 144,
-	  UCS2_ESPERANTO_CI: 145,
-	  UCS2_HUNGARIAN_CI: 146,
-	  UCS2_SINHALA_CI: 147,
-	  UCS2_GERMAN2_CI: 148,
-	  UCS2_CROATIAN_CI: 149,
-	  UCS2_UNICODE_520_CI: 150,
-	  UCS2_VIETNAMESE_CI: 151,
-	  UCS2_GENERAL_MYSQL500_CI: 159,
-	  UTF32_UNICODE_CI: 160,
-	  UTF32_ICELANDIC_CI: 161,
-	  UTF32_LATVIAN_CI: 162,
-	  UTF32_ROMANIAN_CI: 163,
-	  UTF32_SLOVENIAN_CI: 164,
-	  UTF32_POLISH_CI: 165,
-	  UTF32_ESTONIAN_CI: 166,
-	  UTF32_SPANISH_CI: 167,
-	  UTF32_SWEDISH_CI: 168,
-	  UTF32_TURKISH_CI: 169,
-	  UTF32_CZECH_CI: 170,
-	  UTF32_DANISH_CI: 171,
-	  UTF32_LITHUANIAN_CI: 172,
-	  UTF32_SLOVAK_CI: 173,
-	  UTF32_SPANISH2_CI: 174,
-	  UTF32_ROMAN_CI: 175,
-	  UTF32_PERSIAN_CI: 176,
-	  UTF32_ESPERANTO_CI: 177,
-	  UTF32_HUNGARIAN_CI: 178,
-	  UTF32_SINHALA_CI: 179,
-	  UTF32_GERMAN2_CI: 180,
-	  UTF32_CROATIAN_CI: 181,
-	  UTF32_UNICODE_520_CI: 182,
-	  UTF32_VIETNAMESE_CI: 183,
-	  UTF8_UNICODE_CI: 192,
-	  UTF8_ICELANDIC_CI: 193,
-	  UTF8_LATVIAN_CI: 194,
-	  UTF8_ROMANIAN_CI: 195,
-	  UTF8_SLOVENIAN_CI: 196,
-	  UTF8_POLISH_CI: 197,
-	  UTF8_ESTONIAN_CI: 198,
-	  UTF8_SPANISH_CI: 199,
-	  UTF8_SWEDISH_CI: 200,
-	  UTF8_TURKISH_CI: 201,
-	  UTF8_CZECH_CI: 202,
-	  UTF8_DANISH_CI: 203,
-	  UTF8_LITHUANIAN_CI: 204,
-	  UTF8_SLOVAK_CI: 205,
-	  UTF8_SPANISH2_CI: 206,
-	  UTF8_ROMAN_CI: 207,
-	  UTF8_PERSIAN_CI: 208,
-	  UTF8_ESPERANTO_CI: 209,
-	  UTF8_HUNGARIAN_CI: 210,
-	  UTF8_SINHALA_CI: 211,
-	  UTF8_GERMAN2_CI: 212,
-	  UTF8_CROATIAN_CI: 213,
-	  UTF8_UNICODE_520_CI: 214,
-	  UTF8_VIETNAMESE_CI: 215,
-	  UTF8_GENERAL_MYSQL500_CI: 223,
-	  UTF8MB4_UNICODE_CI: 224,
-	  UTF8MB4_ICELANDIC_CI: 225,
-	  UTF8MB4_LATVIAN_CI: 226,
-	  UTF8MB4_ROMANIAN_CI: 227,
-	  UTF8MB4_SLOVENIAN_CI: 228,
-	  UTF8MB4_POLISH_CI: 229,
-	  UTF8MB4_ESTONIAN_CI: 230,
-	  UTF8MB4_SPANISH_CI: 231,
-	  UTF8MB4_SWEDISH_CI: 232,
-	  UTF8MB4_TURKISH_CI: 233,
-	  UTF8MB4_CZECH_CI: 234,
-	  UTF8MB4_DANISH_CI: 235,
-	  UTF8MB4_LITHUANIAN_CI: 236,
-	  UTF8MB4_SLOVAK_CI: 237,
-	  UTF8MB4_SPANISH2_CI: 238,
-	  UTF8MB4_ROMAN_CI: 239,
-	  UTF8MB4_PERSIAN_CI: 240,
-	  UTF8MB4_ESPERANTO_CI: 241,
-	  UTF8MB4_HUNGARIAN_CI: 242,
-	  UTF8MB4_SINHALA_CI: 243,
-	  UTF8MB4_GERMAN2_CI: 244,
-	  UTF8MB4_CROATIAN_CI: 245,
-	  UTF8MB4_UNICODE_520_CI: 246,
-	  UTF8MB4_VIETNAMESE_CI: 247,
-	  GB18030_CHINESE_CI: 248,
-	  GB18030_BIN: 249,
-	  GB18030_UNICODE_520_CI: 250,
-	  UTF8_GENERAL50_CI: 253,
-	  UTF8MB4_0900_AI_CI: 255,
-	  UTF8MB4_DE_PB_0900_AI_CI: 256,
-	  UTF8MB4_IS_0900_AI_CI: 257,
-	  UTF8MB4_LV_0900_AI_CI: 258,
-	  UTF8MB4_RO_0900_AI_CI: 259,
-	  UTF8MB4_SL_0900_AI_CI: 260,
-	  UTF8MB4_PL_0900_AI_CI: 261,
-	  UTF8MB4_ET_0900_AI_CI: 262,
-	  UTF8MB4_ES_0900_AI_CI: 263,
-	  UTF8MB4_SV_0900_AI_CI: 264,
-	  UTF8MB4_TR_0900_AI_CI: 265,
-	  UTF8MB4_CS_0900_AI_CI: 266,
-	  UTF8MB4_DA_0900_AI_CI: 267,
-	  UTF8MB4_LT_0900_AI_CI: 268,
-	  UTF8MB4_SK_0900_AI_CI: 269,
-	  UTF8MB4_ES_TRAD_0900_AI_CI: 270,
-	  UTF8MB4_LA_0900_AI_CI: 271,
-	  UTF8MB4_EO_0900_AI_CI: 273,
-	  UTF8MB4_HU_0900_AI_CI: 274,
-	  UTF8MB4_HR_0900_AI_CI: 275,
-	  UTF8MB4_VI_0900_AI_CI: 277,
-	  UTF8MB4_0900_AS_CS: 278,
-	  UTF8MB4_DE_PB_0900_AS_CS: 279,
-	  UTF8MB4_IS_0900_AS_CS: 280,
-	  UTF8MB4_LV_0900_AS_CS: 281,
-	  UTF8MB4_RO_0900_AS_CS: 282,
-	  UTF8MB4_SL_0900_AS_CS: 283,
-	  UTF8MB4_PL_0900_AS_CS: 284,
-	  UTF8MB4_ET_0900_AS_CS: 285,
-	  UTF8MB4_ES_0900_AS_CS: 286,
-	  UTF8MB4_SV_0900_AS_CS: 287,
-	  UTF8MB4_TR_0900_AS_CS: 288,
-	  UTF8MB4_CS_0900_AS_CS: 289,
-	  UTF8MB4_DA_0900_AS_CS: 290,
-	  UTF8MB4_LT_0900_AS_CS: 291,
-	  UTF8MB4_SK_0900_AS_CS: 292,
-	  UTF8MB4_ES_TRAD_0900_AS_CS: 293,
-	  UTF8MB4_LA_0900_AS_CS: 294,
-	  UTF8MB4_EO_0900_AS_CS: 296,
-	  UTF8MB4_HU_0900_AS_CS: 297,
-	  UTF8MB4_HR_0900_AS_CS: 298,
-	  UTF8MB4_VI_0900_AS_CS: 300,
-	  UTF8MB4_JA_0900_AS_CS: 303,
-	  UTF8MB4_JA_0900_AS_CS_KS: 304,
-	  UTF8MB4_0900_AS_CI: 305,
-	  UTF8MB4_RU_0900_AI_CI: 306,
-	  UTF8MB4_RU_0900_AS_CS: 307,
-	  UTF8MB4_ZH_0900_AS_CS: 308,
-	  UTF8MB4_0900_BIN: 309,
-	};
-	mysql.CODE_ERRNO = {
-	  EE_CANTCREATEFILE: 1,
-	  EE_READ: 2,
-	  EE_WRITE: 3,
-	  EE_BADCLOSE: 4,
-	  EE_OUTOFMEMORY: 5,
-	  EE_DELETE: 6,
-	  EE_LINK: 7,
-	  EE_EOFERR: 9,
-	  EE_CANTLOCK: 10,
-	  EE_CANTUNLOCK: 11,
-	  EE_DIR: 12,
-	  EE_STAT: 13,
-	  EE_CANT_CHSIZE: 14,
-	  EE_CANT_OPEN_STREAM: 15,
-	  EE_GETWD: 16,
-	  EE_SETWD: 17,
-	  EE_LINK_WARNING: 18,
-	  EE_OPEN_WARNING: 19,
-	  EE_DISK_FULL: 20,
-	  EE_CANT_MKDIR: 21,
-	  EE_UNKNOWN_CHARSET: 22,
-	  EE_OUT_OF_FILERESOURCES: 23,
-	  EE_CANT_READLINK: 24,
-	  EE_CANT_SYMLINK: 25,
-	  EE_REALPATH: 26,
-	  EE_SYNC: 27,
-	  EE_UNKNOWN_COLLATION: 28,
-	  EE_FILENOTFOUND: 29,
-	  EE_FILE_NOT_CLOSED: 30,
-	  EE_CHANGE_OWNERSHIP: 31,
-	  EE_CHANGE_PERMISSIONS: 32,
-	  EE_CANT_SEEK: 33,
-	  EE_CAPACITY_EXCEEDED: 34,
-	  HA_ERR_KEY_NOT_FOUND: 120,
-	  HA_ERR_FOUND_DUPP_KEY: 121,
-	  HA_ERR_INTERNAL_ERROR: 122,
-	  HA_ERR_RECORD_CHANGED: 123,
-	  HA_ERR_WRONG_INDEX: 124,
-	  HA_ERR_CRASHED: 126,
-	  HA_ERR_WRONG_IN_RECORD: 127,
-	  HA_ERR_OUT_OF_MEM: 128,
-	  HA_ERR_NOT_A_TABLE: 130,
-	  HA_ERR_WRONG_COMMAND: 131,
-	  HA_ERR_OLD_FILE: 132,
-	  HA_ERR_NO_ACTIVE_RECORD: 133,
-	  HA_ERR_RECORD_DELETED: 134,
-	  HA_ERR_RECORD_FILE_FULL: 135,
-	  HA_ERR_INDEX_FILE_FULL: 136,
-	  HA_ERR_END_OF_FILE: 137,
-	  HA_ERR_UNSUPPORTED: 138,
-	  HA_ERR_TOO_BIG_ROW: 139,
-	  HA_WRONG_CREATE_OPTION: 140,
-	  HA_ERR_FOUND_DUPP_UNIQUE: 141,
-	  HA_ERR_UNKNOWN_CHARSET: 142,
-	  HA_ERR_WRONG_MRG_TABLE_DEF: 143,
-	  HA_ERR_CRASHED_ON_REPAIR: 144,
-	  HA_ERR_CRASHED_ON_USAGE: 145,
-	  HA_ERR_LOCK_WAIT_TIMEOUT: 146,
-	  HA_ERR_LOCK_TABLE_FULL: 147,
-	  HA_ERR_READ_ONLY_TRANSACTION: 148,
-	  HA_ERR_LOCK_DEADLOCK: 149,
-	  HA_ERR_CANNOT_ADD_FOREIGN: 150,
-	  HA_ERR_NO_REFERENCED_ROW: 151,
-	  HA_ERR_ROW_IS_REFERENCED: 152,
-	  HA_ERR_NO_SAVEPOINT: 153,
-	  HA_ERR_NON_UNIQUE_BLOCK_SIZE: 154,
-	  HA_ERR_NO_SUCH_TABLE: 155,
-	  HA_ERR_TABLE_EXIST: 156,
-	  HA_ERR_NO_CONNECTION: 157,
-	  HA_ERR_NULL_IN_SPATIAL: 158,
-	  HA_ERR_TABLE_DEF_CHANGED: 159,
-	  HA_ERR_NO_PARTITION_FOUND: 160,
-	  HA_ERR_RBR_LOGGING_FAILED: 161,
-	  HA_ERR_DROP_INDEX_FK: 162,
-	  HA_ERR_FOREIGN_DUPLICATE_KEY: 163,
-	  HA_ERR_TABLE_NEEDS_UPGRADE: 164,
-	  HA_ERR_TABLE_READONLY: 165,
-	  HA_ERR_AUTOINC_READ_FAILED: 166,
-	  HA_ERR_AUTOINC_ERANGE: 167,
-	  HA_ERR_GENERIC: 168,
-	  HA_ERR_RECORD_IS_THE_SAME: 169,
-	  HA_ERR_LOGGING_IMPOSSIBLE: 170,
-	  HA_ERR_CORRUPT_EVENT: 171,
-	  HA_ERR_NEW_FILE: 172,
-	  HA_ERR_ROWS_EVENT_APPLY: 173,
-	  HA_ERR_INITIALIZATION: 174,
-	  HA_ERR_FILE_TOO_SHORT: 175,
-	  HA_ERR_WRONG_CRC: 176,
-	  HA_ERR_TOO_MANY_CONCURRENT_TRXS: 177,
-	  HA_ERR_NOT_IN_LOCK_PARTITIONS: 178,
-	  HA_ERR_INDEX_COL_TOO_LONG: 179,
-	  HA_ERR_INDEX_CORRUPT: 180,
-	  HA_ERR_UNDO_REC_TOO_BIG: 181,
-	  HA_FTS_INVALID_DOCID: 182,
-	  HA_ERR_TABLE_IN_FK_CHECK: 183,
-	  HA_ERR_TABLESPACE_EXISTS: 184,
-	  HA_ERR_TOO_MANY_FIELDS: 185,
-	  HA_ERR_ROW_IN_WRONG_PARTITION: 186,
-	  HA_ERR_INNODB_READ_ONLY: 187,
-	  HA_ERR_FTS_EXCEED_RESULT_CACHE_LIMIT: 188,
-	  HA_ERR_TEMP_FILE_WRITE_FAILURE: 189,
-	  HA_ERR_INNODB_FORCED_RECOVERY: 190,
-	  HA_ERR_FTS_TOO_MANY_WORDS_IN_PHRASE: 191,
-	  HA_ERR_FK_DEPTH_EXCEEDED: 192,
-	  HA_MISSING_CREATE_OPTION: 193,
-	  HA_ERR_SE_OUT_OF_MEMORY: 194,
-	  HA_ERR_TABLE_CORRUPT: 195,
-	  HA_ERR_QUERY_INTERRUPTED: 196,
-	  HA_ERR_TABLESPACE_MISSING: 197,
-	  HA_ERR_TABLESPACE_IS_NOT_EMPTY: 198,
-	  HA_ERR_WRONG_FILE_NAME: 199,
-	  HA_ERR_NOT_ALLOWED_COMMAND: 200,
-	  HA_ERR_COMPUTE_FAILED: 201,
-	  ER_HASHCHK: 1000,
-	  ER_NISAMCHK: 1001,
-	  ER_NO: 1002,
-	  ER_YES: 1003,
-	  ER_CANT_CREATE_FILE: 1004,
-	  ER_CANT_CREATE_TABLE: 1005,
-	  ER_CANT_CREATE_DB: 1006,
-	  ER_DB_CREATE_EXISTS: 1007,
-	  ER_DB_DROP_EXISTS: 1008,
-	  ER_DB_DROP_DELETE: 1009,
-	  ER_DB_DROP_RMDIR: 1010,
-	  ER_CANT_DELETE_FILE: 1011,
-	  ER_CANT_FIND_SYSTEM_REC: 1012,
-	  ER_CANT_GET_STAT: 1013,
-	  ER_CANT_GET_WD: 1014,
-	  ER_CANT_LOCK: 1015,
-	  ER_CANT_OPEN_FILE: 1016,
-	  ER_FILE_NOT_FOUND: 1017,
-	  ER_CANT_READ_DIR: 1018,
-	  ER_CANT_SET_WD: 1019,
-	  ER_CHECKREAD: 1020,
-	  ER_DISK_FULL: 1021,
-	  ER_DUP_KEY: 1022,
-	  ER_ERROR_ON_CLOSE: 1023,
-	  ER_ERROR_ON_READ: 1024,
-	  ER_ERROR_ON_RENAME: 1025,
-	  ER_ERROR_ON_WRITE: 1026,
-	  ER_FILE_USED: 1027,
-	  ER_FILSORT_ABORT: 1028,
-	  ER_FORM_NOT_FOUND: 1029,
-	  ER_GET_ERRNO: 1030,
-	  ER_ILLEGAL_HA: 1031,
-	  ER_KEY_NOT_FOUND: 1032,
-	  ER_NOT_FORM_FILE: 1033,
-	  ER_NOT_KEYFILE: 1034,
-	  ER_OLD_KEYFILE: 1035,
-	  ER_OPEN_AS_READONLY: 1036,
-	  ER_OUTOFMEMORY: 1037,
-	  ER_OUT_OF_SORTMEMORY: 1038,
-	  ER_UNEXPECTED_EOF: 1039,
-	  ER_CON_COUNT_ERROR: 1040,
-	  ER_OUT_OF_RESOURCES: 1041,
-	  ER_BAD_HOST_ERROR: 1042,
-	  ER_HANDSHAKE_ERROR: 1043,
-	  ER_DBACCESS_DENIED_ERROR: 1044,
-	  ER_ACCESS_DENIED_ERROR: 1045,
-	  ER_NO_DB_ERROR: 1046,
-	  ER_UNKNOWN_COM_ERROR: 1047,
-	  ER_BAD_NULL_ERROR: 1048,
-	  ER_BAD_DB_ERROR: 1049,
-	  ER_TABLE_EXISTS_ERROR: 1050,
-	  ER_BAD_TABLE_ERROR: 1051,
-	  ER_NON_UNIQ_ERROR: 1052,
-	  ER_SERVER_SHUTDOWN: 1053,
-	  ER_BAD_FIELD_ERROR: 1054,
-	  ER_WRONG_FIELD_WITH_GROUP: 1055,
-	  ER_WRONG_GROUP_FIELD: 1056,
-	  ER_WRONG_SUM_SELECT: 1057,
-	  ER_WRONG_VALUE_COUNT: 1058,
-	  ER_TOO_LONG_IDENT: 1059,
-	  ER_DUP_FIELDNAME: 1060,
-	  ER_DUP_KEYNAME: 1061,
-	  ER_DUP_ENTRY: 1062,
-	  ER_WRONG_FIELD_SPEC: 1063,
-	  ER_PARSE_ERROR: 1064,
-	  ER_EMPTY_QUERY: 1065,
-	  ER_NONUNIQ_TABLE: 1066,
-	  ER_INVALID_DEFAULT: 1067,
-	  ER_MULTIPLE_PRI_KEY: 1068,
-	  ER_TOO_MANY_KEYS: 1069,
-	  ER_TOO_MANY_KEY_PARTS: 1070,
-	  ER_TOO_LONG_KEY: 1071,
-	  ER_KEY_COLUMN_DOES_NOT_EXITS: 1072,
-	  ER_BLOB_USED_AS_KEY: 1073,
-	  ER_TOO_BIG_FIELDLENGTH: 1074,
-	  ER_WRONG_AUTO_KEY: 1075,
-	  ER_READY: 1076,
-	  ER_NORMAL_SHUTDOWN: 1077,
-	  ER_GOT_SIGNAL: 1078,
-	  ER_SHUTDOWN_COMPLETE: 1079,
-	  ER_FORCING_CLOSE: 1080,
-	  ER_IPSOCK_ERROR: 1081,
-	  ER_NO_SUCH_INDEX: 1082,
-	  ER_WRONG_FIELD_TERMINATORS: 1083,
-	  ER_BLOBS_AND_NO_TERMINATED: 1084,
-	  ER_TEXTFILE_NOT_READABLE: 1085,
-	  ER_FILE_EXISTS_ERROR: 1086,
-	  ER_LOAD_INFO: 1087,
-	  ER_ALTER_INFO: 1088,
-	  ER_WRONG_SUB_KEY: 1089,
-	  ER_CANT_REMOVE_ALL_FIELDS: 1090,
-	  ER_CANT_DROP_FIELD_OR_KEY: 1091,
-	  ER_INSERT_INFO: 1092,
-	  ER_UPDATE_TABLE_USED: 1093,
-	  ER_NO_SUCH_THREAD: 1094,
-	  ER_KILL_DENIED_ERROR: 1095,
-	  ER_NO_TABLES_USED: 1096,
-	  ER_TOO_BIG_SET: 1097,
-	  ER_NO_UNIQUE_LOGFILE: 1098,
-	  ER_TABLE_NOT_LOCKED_FOR_WRITE: 1099,
-	  ER_TABLE_NOT_LOCKED: 1100,
-	  ER_BLOB_CANT_HAVE_DEFAULT: 1101,
-	  ER_WRONG_DB_NAME: 1102,
-	  ER_WRONG_TABLE_NAME: 1103,
-	  ER_TOO_BIG_SELECT: 1104,
-	  ER_UNKNOWN_ERROR: 1105,
-	  ER_UNKNOWN_PROCEDURE: 1106,
-	  ER_WRONG_PARAMCOUNT_TO_PROCEDURE: 1107,
-	  ER_WRONG_PARAMETERS_TO_PROCEDURE: 1108,
-	  ER_UNKNOWN_TABLE: 1109,
-	  ER_FIELD_SPECIFIED_TWICE: 1110,
-	  ER_INVALID_GROUP_FUNC_USE: 1111,
-	  ER_UNSUPPORTED_EXTENSION: 1112,
-	  ER_TABLE_MUST_HAVE_COLUMNS: 1113,
-	  ER_RECORD_FILE_FULL: 1114,
-	  ER_UNKNOWN_CHARACTER_SET: 1115,
-	  ER_TOO_MANY_TABLES: 1116,
-	  ER_TOO_MANY_FIELDS: 1117,
-	  ER_TOO_BIG_ROWSIZE: 1118,
-	  ER_STACK_OVERRUN: 1119,
-	  ER_WRONG_OUTER_JOIN: 1120,
-	  ER_NULL_COLUMN_IN_INDEX: 1121,
-	  ER_CANT_FIND_UDF: 1122,
-	  ER_CANT_INITIALIZE_UDF: 1123,
-	  ER_UDF_NO_PATHS: 1124,
-	  ER_UDF_EXISTS: 1125,
-	  ER_CANT_OPEN_LIBRARY: 1126,
-	  ER_CANT_FIND_DL_ENTRY: 1127,
-	  ER_FUNCTION_NOT_DEFINED: 1128,
-	  ER_HOST_IS_BLOCKED: 1129,
-	  ER_HOST_NOT_PRIVILEGED: 1130,
-	  ER_PASSWORD_ANONYMOUS_USER: 1131,
-	  ER_PASSWORD_NOT_ALLOWED: 1132,
-	  ER_PASSWORD_NO_MATCH: 1133,
-	  ER_UPDATE_INFO: 1134,
-	  ER_CANT_CREATE_THREAD: 1135,
-	  ER_WRONG_VALUE_COUNT_ON_ROW: 1136,
-	  ER_CANT_REOPEN_TABLE: 1137,
-	  ER_INVALID_USE_OF_NULL: 1138,
-	  ER_REGEXP_ERROR: 1139,
-	  ER_MIX_OF_GROUP_FUNC_AND_FIELDS: 1140,
-	  ER_NONEXISTING_GRANT: 1141,
-	  ER_TABLEACCESS_DENIED_ERROR: 1142,
-	  ER_COLUMNACCESS_DENIED_ERROR: 1143,
-	  ER_ILLEGAL_GRANT_FOR_TABLE: 1144,
-	  ER_GRANT_WRONG_HOST_OR_USER: 1145,
-	  ER_NO_SUCH_TABLE: 1146,
-	  ER_NONEXISTING_TABLE_GRANT: 1147,
-	  ER_NOT_ALLOWED_COMMAND: 1148,
-	  ER_SYNTAX_ERROR: 1149,
-	  ER_DELAYED_CANT_CHANGE_LOCK: 1150,
-	  ER_TOO_MANY_DELAYED_THREADS: 1151,
-	  ER_ABORTING_CONNECTION: 1152,
-	  ER_NET_PACKET_TOO_LARGE: 1153,
-	  ER_NET_READ_ERROR_FROM_PIPE: 1154,
-	  ER_NET_FCNTL_ERROR: 1155,
-	  ER_NET_PACKETS_OUT_OF_ORDER: 1156,
-	  ER_NET_UNCOMPRESS_ERROR: 1157,
-	  ER_NET_READ_ERROR: 1158,
-	  ER_NET_READ_INTERRUPTED: 1159,
-	  ER_NET_ERROR_ON_WRITE: 1160,
-	  ER_NET_WRITE_INTERRUPTED: 1161,
-	  ER_TOO_LONG_STRING: 1162,
-	  ER_TABLE_CANT_HANDLE_BLOB: 1163,
-	  ER_TABLE_CANT_HANDLE_AUTO_INCREMENT: 1164,
-	  ER_DELAYED_INSERT_TABLE_LOCKED: 1165,
-	  ER_WRONG_COLUMN_NAME: 1166,
-	  ER_WRONG_KEY_COLUMN: 1167,
-	  ER_WRONG_MRG_TABLE: 1168,
-	  ER_DUP_UNIQUE: 1169,
-	  ER_BLOB_KEY_WITHOUT_LENGTH: 1170,
-	  ER_PRIMARY_CANT_HAVE_NULL: 1171,
-	  ER_TOO_MANY_ROWS: 1172,
-	  ER_REQUIRES_PRIMARY_KEY: 1173,
-	  ER_NO_RAID_COMPILED: 1174,
-	  ER_UPDATE_WITHOUT_KEY_IN_SAFE_MODE: 1175,
-	  ER_KEY_DOES_NOT_EXITS: 1176,
-	  ER_CHECK_NO_SUCH_TABLE: 1177,
-	  ER_CHECK_NOT_IMPLEMENTED: 1178,
-	  ER_CANT_DO_THIS_DURING_AN_TRANSACTION: 1179,
-	  ER_ERROR_DURING_COMMIT: 1180,
-	  ER_ERROR_DURING_ROLLBACK: 1181,
-	  ER_ERROR_DURING_FLUSH_LOGS: 1182,
-	  ER_ERROR_DURING_CHECKPOINT: 1183,
-	  ER_NEW_ABORTING_CONNECTION: 1184,
-	  ER_DUMP_NOT_IMPLEMENTED: 1185,
-	  ER_FLUSH_MASTER_BINLOG_CLOSED: 1186,
-	  ER_INDEX_REBUILD: 1187,
-	  ER_MASTER: 1188,
-	  ER_MASTER_NET_READ: 1189,
-	  ER_MASTER_NET_WRITE: 1190,
-	  ER_FT_MATCHING_KEY_NOT_FOUND: 1191,
-	  ER_LOCK_OR_ACTIVE_TRANSACTION: 1192,
-	  ER_UNKNOWN_SYSTEM_VARIABLE: 1193,
-	  ER_CRASHED_ON_USAGE: 1194,
-	  ER_CRASHED_ON_REPAIR: 1195,
-	  ER_WARNING_NOT_COMPLETE_ROLLBACK: 1196,
-	  ER_TRANS_CACHE_FULL: 1197,
-	  ER_SLAVE_MUST_STOP: 1198,
-	  ER_SLAVE_NOT_RUNNING: 1199,
-	  ER_BAD_SLAVE: 1200,
-	  ER_MASTER_INFO: 1201,
-	  ER_SLAVE_THREAD: 1202,
-	  ER_TOO_MANY_USER_CONNECTIONS: 1203,
-	  ER_SET_CONSTANTS_ONLY: 1204,
-	  ER_LOCK_WAIT_TIMEOUT: 1205,
-	  ER_LOCK_TABLE_FULL: 1206,
-	  ER_READ_ONLY_TRANSACTION: 1207,
-	  ER_DROP_DB_WITH_READ_LOCK: 1208,
-	  ER_CREATE_DB_WITH_READ_LOCK: 1209,
-	  ER_WRONG_ARGUMENTS: 1210,
-	  ER_NO_PERMISSION_TO_CREATE_USER: 1211,
-	  ER_UNION_TABLES_IN_DIFFERENT_DIR: 1212,
-	  ER_LOCK_DEADLOCK: 1213,
-	  ER_TABLE_CANT_HANDLE_FT: 1214,
-	  ER_CANNOT_ADD_FOREIGN: 1215,
-	  ER_NO_REFERENCED_ROW: 1216,
-	  ER_ROW_IS_REFERENCED: 1217,
-	  ER_CONNECT_TO_MASTER: 1218,
-	  ER_QUERY_ON_MASTER: 1219,
-	  ER_ERROR_WHEN_EXECUTING_COMMAND: 1220,
-	  ER_WRONG_USAGE: 1221,
-	  ER_WRONG_NUMBER_OF_COLUMNS_IN_SELECT: 1222,
-	  ER_CANT_UPDATE_WITH_READLOCK: 1223,
-	  ER_MIXING_NOT_ALLOWED: 1224,
-	  ER_DUP_ARGUMENT: 1225,
-	  ER_USER_LIMIT_REACHED: 1226,
-	  ER_SPECIFIC_ACCESS_DENIED_ERROR: 1227,
-	  ER_LOCAL_VARIABLE: 1228,
-	  ER_GLOBAL_VARIABLE: 1229,
-	  ER_NO_DEFAULT: 1230,
-	  ER_WRONG_VALUE_FOR_VAR: 1231,
-	  ER_WRONG_TYPE_FOR_VAR: 1232,
-	  ER_VAR_CANT_BE_READ: 1233,
-	  ER_CANT_USE_OPTION_HERE: 1234,
-	  ER_NOT_SUPPORTED_YET: 1235,
-	  ER_MASTER_FATAL_ERROR_READING_BINLOG: 1236,
-	  ER_SLAVE_IGNORED_TABLE: 1237,
-	  ER_INCORRECT_GLOBAL_LOCAL_VAR: 1238,
-	  ER_WRONG_FK_DEF: 1239,
-	  ER_KEY_REF_DO_NOT_MATCH_TABLE_REF: 1240,
-	  ER_OPERAND_COLUMNS: 1241,
-	  ER_SUBQUERY_NO_1_ROW: 1242,
-	  ER_UNKNOWN_STMT_HANDLER: 1243,
-	  ER_CORRUPT_HELP_DB: 1244,
-	  ER_CYCLIC_REFERENCE: 1245,
-	  ER_AUTO_CONVERT: 1246,
-	  ER_ILLEGAL_REFERENCE: 1247,
-	  ER_DERIVED_MUST_HAVE_ALIAS: 1248,
-	  ER_SELECT_REDUCED: 1249,
-	  ER_TABLENAME_NOT_ALLOWED_HERE: 1250,
-	  ER_NOT_SUPPORTED_AUTH_MODE: 1251,
-	  ER_SPATIAL_CANT_HAVE_NULL: 1252,
-	  ER_COLLATION_CHARSET_MISMATCH: 1253,
-	  ER_SLAVE_WAS_RUNNING: 1254,
-	  ER_SLAVE_WAS_NOT_RUNNING: 1255,
-	  ER_TOO_BIG_FOR_UNCOMPRESS: 1256,
-	  ER_ZLIB_Z_MEM_ERROR: 1257,
-	  ER_ZLIB_Z_BUF_ERROR: 1258,
-	  ER_ZLIB_Z_DATA_ERROR: 1259,
-	  ER_CUT_VALUE_GROUP_CONCAT: 1260,
-	  ER_WARN_TOO_FEW_RECORDS: 1261,
-	  ER_WARN_TOO_MANY_RECORDS: 1262,
-	  ER_WARN_NULL_TO_NOTNULL: 1263,
-	  ER_WARN_DATA_OUT_OF_RANGE: 1264,
-	  WARN_DATA_TRUNCATED: 1265,
-	  ER_WARN_USING_OTHER_HANDLER: 1266,
-	  ER_CANT_AGGREGATE_2COLLATIONS: 1267,
-	  ER_DROP_USER: 1268,
-	  ER_REVOKE_GRANTS: 1269,
-	  ER_CANT_AGGREGATE_3COLLATIONS: 1270,
-	  ER_CANT_AGGREGATE_NCOLLATIONS: 1271,
-	  ER_VARIABLE_IS_NOT_STRUCT: 1272,
-	  ER_UNKNOWN_COLLATION: 1273,
-	  ER_SLAVE_IGNORED_SSL_PARAMS: 1274,
-	  ER_SERVER_IS_IN_SECURE_AUTH_MODE: 1275,
-	  ER_WARN_FIELD_RESOLVED: 1276,
-	  ER_BAD_SLAVE_UNTIL_COND: 1277,
-	  ER_MISSING_SKIP_SLAVE: 1278,
-	  ER_UNTIL_COND_IGNORED: 1279,
-	  ER_WRONG_NAME_FOR_INDEX: 1280,
-	  ER_WRONG_NAME_FOR_CATALOG: 1281,
-	  ER_WARN_QC_RESIZE: 1282,
-	  ER_BAD_FT_COLUMN: 1283,
-	  ER_UNKNOWN_KEY_CACHE: 1284,
-	  ER_WARN_HOSTNAME_WONT_WORK: 1285,
-	  ER_UNKNOWN_STORAGE_ENGINE: 1286,
-	  ER_WARN_DEPRECATED_SYNTAX: 1287,
-	  ER_NON_UPDATABLE_TABLE: 1288,
-	  ER_FEATURE_DISABLED: 1289,
-	  ER_OPTION_PREVENTS_STATEMENT: 1290,
-	  ER_DUPLICATED_VALUE_IN_TYPE: 1291,
-	  ER_TRUNCATED_WRONG_VALUE: 1292,
-	  ER_TOO_MUCH_AUTO_TIMESTAMP_COLS: 1293,
-	  ER_INVALID_ON_UPDATE: 1294,
-	  ER_UNSUPPORTED_PS: 1295,
-	  ER_GET_ERRMSG: 1296,
-	  ER_GET_TEMPORARY_ERRMSG: 1297,
-	  ER_UNKNOWN_TIME_ZONE: 1298,
-	  ER_WARN_INVALID_TIMESTAMP: 1299,
-	  ER_INVALID_CHARACTER_STRING: 1300,
-	  ER_WARN_ALLOWED_PACKET_OVERFLOWED: 1301,
-	  ER_CONFLICTING_DECLARATIONS: 1302,
-	  ER_SP_NO_RECURSIVE_CREATE: 1303,
-	  ER_SP_ALREADY_EXISTS: 1304,
-	  ER_SP_DOES_NOT_EXIST: 1305,
-	  ER_SP_DROP_FAILED: 1306,
-	  ER_SP_STORE_FAILED: 1307,
-	  ER_SP_LILABEL_MISMATCH: 1308,
-	  ER_SP_LABEL_REDEFINE: 1309,
-	  ER_SP_LABEL_MISMATCH: 1310,
-	  ER_SP_UNINIT_VAR: 1311,
-	  ER_SP_BADSELECT: 1312,
-	  ER_SP_BADRETURN: 1313,
-	  ER_SP_BADSTATEMENT: 1314,
-	  ER_UPDATE_LOG_DEPRECATED_IGNORED: 1315,
-	  ER_UPDATE_LOG_DEPRECATED_TRANSLATED: 1316,
-	  ER_QUERY_INTERRUPTED: 1317,
-	  ER_SP_WRONG_NO_OF_ARGS: 1318,
-	  ER_SP_COND_MISMATCH: 1319,
-	  ER_SP_NORETURN: 1320,
-	  ER_SP_NORETURNEND: 1321,
-	  ER_SP_BAD_CURSOR_QUERY: 1322,
-	  ER_SP_BAD_CURSOR_SELECT: 1323,
-	  ER_SP_CURSOR_MISMATCH: 1324,
-	  ER_SP_CURSOR_ALREADY_OPEN: 1325,
-	  ER_SP_CURSOR_NOT_OPEN: 1326,
-	  ER_SP_UNDECLARED_VAR: 1327,
-	  ER_SP_WRONG_NO_OF_FETCH_ARGS: 1328,
-	  ER_SP_FETCH_NO_DATA: 1329,
-	  ER_SP_DUP_PARAM: 1330,
-	  ER_SP_DUP_VAR: 1331,
-	  ER_SP_DUP_COND: 1332,
-	  ER_SP_DUP_CURS: 1333,
-	  ER_SP_CANT_ALTER: 1334,
-	  ER_SP_SUBSELECT_NYI: 1335,
-	  ER_STMT_NOT_ALLOWED_IN_SF_OR_TRG: 1336,
-	  ER_SP_VARCOND_AFTER_CURSHNDLR: 1337,
-	  ER_SP_CURSOR_AFTER_HANDLER: 1338,
-	  ER_SP_CASE_NOT_FOUND: 1339,
-	  ER_FPARSER_TOO_BIG_FILE: 1340,
-	  ER_FPARSER_BAD_HEADER: 1341,
-	  ER_FPARSER_EOF_IN_COMMENT: 1342,
-	  ER_FPARSER_ERROR_IN_PARAMETER: 1343,
-	  ER_FPARSER_EOF_IN_UNKNOWN_PARAMETER: 1344,
-	  ER_VIEW_NO_EXPLAIN: 1345,
-	  ER_FRM_UNKNOWN_TYPE: 1346,
-	  ER_WRONG_OBJECT: 1347,
-	  ER_NONUPDATEABLE_COLUMN: 1348,
-	  ER_VIEW_SELECT_DERIVED: 1349,
-	  ER_VIEW_SELECT_CLAUSE: 1350,
-	  ER_VIEW_SELECT_VARIABLE: 1351,
-	  ER_VIEW_SELECT_TMPTABLE: 1352,
-	  ER_VIEW_WRONG_LIST: 1353,
-	  ER_WARN_VIEW_MERGE: 1354,
-	  ER_WARN_VIEW_WITHOUT_KEY: 1355,
-	  ER_VIEW_INVALID: 1356,
-	  ER_SP_NO_DROP_SP: 1357,
-	  ER_SP_GOTO_IN_HNDLR: 1358,
-	  ER_TRG_ALREADY_EXISTS: 1359,
-	  ER_TRG_DOES_NOT_EXIST: 1360,
-	  ER_TRG_ON_VIEW_OR_TEMP_TABLE: 1361,
-	  ER_TRG_CANT_CHANGE_ROW: 1362,
-	  ER_TRG_NO_SUCH_ROW_IN_TRG: 1363,
-	  ER_NO_DEFAULT_FOR_FIELD: 1364,
-	  ER_DIVISION_BY_ZERO: 1365,
-	  ER_TRUNCATED_WRONG_VALUE_FOR_FIELD: 1366,
-	  ER_ILLEGAL_VALUE_FOR_TYPE: 1367,
-	  ER_VIEW_NONUPD_CHECK: 1368,
-	  ER_VIEW_CHECK_FAILED: 1369,
-	  ER_PROCACCESS_DENIED_ERROR: 1370,
-	  ER_RELAY_LOG_FAIL: 1371,
-	  ER_PASSWD_LENGTH: 1372,
-	  ER_UNKNOWN_TARGET_BINLOG: 1373,
-	  ER_IO_ERR_LOG_INDEX_READ: 1374,
-	  ER_BINLOG_PURGE_PROHIBITED: 1375,
-	  ER_FSEEK_FAIL: 1376,
-	  ER_BINLOG_PURGE_FATAL_ERR: 1377,
-	  ER_LOG_IN_USE: 1378,
-	  ER_LOG_PURGE_UNKNOWN_ERR: 1379,
-	  ER_RELAY_LOG_INIT: 1380,
-	  ER_NO_BINARY_LOGGING: 1381,
-	  ER_RESERVED_SYNTAX: 1382,
-	  ER_WSAS_FAILED: 1383,
-	  ER_DIFF_GROUPS_PROC: 1384,
-	  ER_NO_GROUP_FOR_PROC: 1385,
-	  ER_ORDER_WITH_PROC: 1386,
-	  ER_LOGGING_PROHIBIT_CHANGING_OF: 1387,
-	  ER_NO_FILE_MAPPING: 1388,
-	  ER_WRONG_MAGIC: 1389,
-	  ER_PS_MANY_PARAM: 1390,
-	  ER_KEY_PART_0: 1391,
-	  ER_VIEW_CHECKSUM: 1392,
-	  ER_VIEW_MULTIUPDATE: 1393,
-	  ER_VIEW_NO_INSERT_FIELD_LIST: 1394,
-	  ER_VIEW_DELETE_MERGE_VIEW: 1395,
-	  ER_CANNOT_USER: 1396,
-	  ER_XAER_NOTA: 1397,
-	  ER_XAER_INVAL: 1398,
-	  ER_XAER_RMFAIL: 1399,
-	  ER_XAER_OUTSIDE: 1400,
-	  ER_XAER_RMERR: 1401,
-	  ER_XA_RBROLLBACK: 1402,
-	  ER_NONEXISTING_PROC_GRANT: 1403,
-	  ER_PROC_AUTO_GRANT_FAIL: 1404,
-	  ER_PROC_AUTO_REVOKE_FAIL: 1405,
-	  ER_DATA_TOO_LONG: 1406,
-	  ER_SP_BAD_SQLSTATE: 1407,
-	  ER_STARTUP: 1408,
-	  ER_LOAD_FROM_FIXED_SIZE_ROWS_TO_VAR: 1409,
-	  ER_CANT_CREATE_USER_WITH_GRANT: 1410,
-	  ER_WRONG_VALUE_FOR_TYPE: 1411,
-	  ER_TABLE_DEF_CHANGED: 1412,
-	  ER_SP_DUP_HANDLER: 1413,
-	  ER_SP_NOT_VAR_ARG: 1414,
-	  ER_SP_NO_RETSET: 1415,
-	  ER_CANT_CREATE_GEOMETRY_OBJECT: 1416,
-	  ER_FAILED_ROUTINE_BREAK_BINLOG: 1417,
-	  ER_BINLOG_UNSAFE_ROUTINE: 1418,
-	  ER_BINLOG_CREATE_ROUTINE_NEED_SUPER: 1419,
-	  ER_EXEC_STMT_WITH_OPEN_CURSOR: 1420,
-	  ER_STMT_HAS_NO_OPEN_CURSOR: 1421,
-	  ER_COMMIT_NOT_ALLOWED_IN_SF_OR_TRG: 1422,
-	  ER_NO_DEFAULT_FOR_VIEW_FIELD: 1423,
-	  ER_SP_NO_RECURSION: 1424,
-	  ER_TOO_BIG_SCALE: 1425,
-	  ER_TOO_BIG_PRECISION: 1426,
-	  ER_M_BIGGER_THAN_D: 1427,
-	  ER_WRONG_LOCK_OF_SYSTEM_TABLE: 1428,
-	  ER_CONNECT_TO_FOREIGN_DATA_SOURCE: 1429,
-	  ER_QUERY_ON_FOREIGN_DATA_SOURCE: 1430,
-	  ER_FOREIGN_DATA_SOURCE_DOESNT_EXIST: 1431,
-	  ER_FOREIGN_DATA_STRING_INVALID_CANT_CREATE: 1432,
-	  ER_FOREIGN_DATA_STRING_INVALID: 1433,
-	  ER_CANT_CREATE_FEDERATED_TABLE: 1434,
-	  ER_TRG_IN_WRONG_SCHEMA: 1435,
-	  ER_STACK_OVERRUN_NEED_MORE: 1436,
-	  ER_TOO_LONG_BODY: 1437,
-	  ER_WARN_CANT_DROP_DEFAULT_KEYCACHE: 1438,
-	  ER_TOO_BIG_DISPLAYWIDTH: 1439,
-	  ER_XAER_DUPID: 1440,
-	  ER_DATETIME_FUNCTION_OVERFLOW: 1441,
-	  ER_CANT_UPDATE_USED_TABLE_IN_SF_OR_TRG: 1442,
-	  ER_VIEW_PREVENT_UPDATE: 1443,
-	  ER_PS_NO_RECURSION: 1444,
-	  ER_SP_CANT_SET_AUTOCOMMIT: 1445,
-	  ER_MALFORMED_DEFINER: 1446,
-	  ER_VIEW_FRM_NO_USER: 1447,
-	  ER_VIEW_OTHER_USER: 1448,
-	  ER_NO_SUCH_USER: 1449,
-	  ER_FORBID_SCHEMA_CHANGE: 1450,
-	  ER_ROW_IS_REFERENCED_2: 1451,
-	  ER_NO_REFERENCED_ROW_2: 1452,
-	  ER_SP_BAD_VAR_SHADOW: 1453,
-	  ER_TRG_NO_DEFINER: 1454,
-	  ER_OLD_FILE_FORMAT: 1455,
-	  ER_SP_RECURSION_LIMIT: 1456,
-	  ER_SP_PROC_TABLE_CORRUPT: 1457,
-	  ER_SP_WRONG_NAME: 1458,
-	  ER_TABLE_NEEDS_UPGRADE: 1459,
-	  ER_SP_NO_AGGREGATE: 1460,
-	  ER_MAX_PREPARED_STMT_COUNT_REACHED: 1461,
-	  ER_VIEW_RECURSIVE: 1462,
-	  ER_NON_GROUPING_FIELD_USED: 1463,
-	  ER_TABLE_CANT_HANDLE_SPKEYS: 1464,
-	  ER_NO_TRIGGERS_ON_SYSTEM_SCHEMA: 1465,
-	  ER_REMOVED_SPACES: 1466,
-	  ER_AUTOINC_READ_FAILED: 1467,
-	  ER_USERNAME: 1468,
-	  ER_HOSTNAME: 1469,
-	  ER_WRONG_STRING_LENGTH: 1470,
-	  ER_NON_INSERTABLE_TABLE: 1471,
-	  ER_ADMIN_WRONG_MRG_TABLE: 1472,
-	  ER_TOO_HIGH_LEVEL_OF_NESTING_FOR_SELECT: 1473,
-	  ER_NAME_BECOMES_EMPTY: 1474,
-	  ER_AMBIGUOUS_FIELD_TERM: 1475,
-	  ER_FOREIGN_SERVER_EXISTS: 1476,
-	  ER_FOREIGN_SERVER_DOESNT_EXIST: 1477,
-	  ER_ILLEGAL_HA_CREATE_OPTION: 1478,
-	  ER_PARTITION_REQUIRES_VALUES_ERROR: 1479,
-	  ER_PARTITION_WRONG_VALUES_ERROR: 1480,
-	  ER_PARTITION_MAXVALUE_ERROR: 1481,
-	  ER_PARTITION_SUBPARTITION_ERROR: 1482,
-	  ER_PARTITION_SUBPART_MIX_ERROR: 1483,
-	  ER_PARTITION_WRONG_NO_PART_ERROR: 1484,
-	  ER_PARTITION_WRONG_NO_SUBPART_ERROR: 1485,
-	  ER_WRONG_EXPR_IN_PARTITION_FUNC_ERROR: 1486,
-	  ER_NO_CONST_EXPR_IN_RANGE_OR_LIST_ERROR: 1487,
-	  ER_FIELD_NOT_FOUND_PART_ERROR: 1488,
-	  ER_LIST_OF_FIELDS_ONLY_IN_HASH_ERROR: 1489,
-	  ER_INCONSISTENT_PARTITION_INFO_ERROR: 1490,
-	  ER_PARTITION_FUNC_NOT_ALLOWED_ERROR: 1491,
-	  ER_PARTITIONS_MUST_BE_DEFINED_ERROR: 1492,
-	  ER_RANGE_NOT_INCREASING_ERROR: 1493,
-	  ER_INCONSISTENT_TYPE_OF_FUNCTIONS_ERROR: 1494,
-	  ER_MULTIPLE_DEF_CONST_IN_LIST_PART_ERROR: 1495,
-	  ER_PARTITION_ENTRY_ERROR: 1496,
-	  ER_MIX_HANDLER_ERROR: 1497,
-	  ER_PARTITION_NOT_DEFINED_ERROR: 1498,
-	  ER_TOO_MANY_PARTITIONS_ERROR: 1499,
-	  ER_SUBPARTITION_ERROR: 1500,
-	  ER_CANT_CREATE_HANDLER_FILE: 1501,
-	  ER_BLOB_FIELD_IN_PART_FUNC_ERROR: 1502,
-	  ER_UNIQUE_KEY_NEED_ALL_FIELDS_IN_PF: 1503,
-	  ER_NO_PARTS_ERROR: 1504,
-	  ER_PARTITION_MGMT_ON_NONPARTITIONED: 1505,
-	  ER_FOREIGN_KEY_ON_PARTITIONED: 1506,
-	  ER_DROP_PARTITION_NON_EXISTENT: 1507,
-	  ER_DROP_LAST_PARTITION: 1508,
-	  ER_COALESCE_ONLY_ON_HASH_PARTITION: 1509,
-	  ER_REORG_HASH_ONLY_ON_SAME_NO: 1510,
-	  ER_REORG_NO_PARAM_ERROR: 1511,
-	  ER_ONLY_ON_RANGE_LIST_PARTITION: 1512,
-	  ER_ADD_PARTITION_SUBPART_ERROR: 1513,
-	  ER_ADD_PARTITION_NO_NEW_PARTITION: 1514,
-	  ER_COALESCE_PARTITION_NO_PARTITION: 1515,
-	  ER_REORG_PARTITION_NOT_EXIST: 1516,
-	  ER_SAME_NAME_PARTITION: 1517,
-	  ER_NO_BINLOG_ERROR: 1518,
-	  ER_CONSECUTIVE_REORG_PARTITIONS: 1519,
-	  ER_REORG_OUTSIDE_RANGE: 1520,
-	  ER_PARTITION_FUNCTION_FAILURE: 1521,
-	  ER_PART_STATE_ERROR: 1522,
-	  ER_LIMITED_PART_RANGE: 1523,
-	  ER_PLUGIN_IS_NOT_LOADED: 1524,
-	  ER_WRONG_VALUE: 1525,
-	  ER_NO_PARTITION_FOR_GIVEN_VALUE: 1526,
-	  ER_FILEGROUP_OPTION_ONLY_ONCE: 1527,
-	  ER_CREATE_FILEGROUP_FAILED: 1528,
-	  ER_DROP_FILEGROUP_FAILED: 1529,
-	  ER_TABLESPACE_AUTO_EXTEND_ERROR: 1530,
-	  ER_WRONG_SIZE_NUMBER: 1531,
-	  ER_SIZE_OVERFLOW_ERROR: 1532,
-	  ER_ALTER_FILEGROUP_FAILED: 1533,
-	  ER_BINLOG_ROW_LOGGING_FAILED: 1534,
-	  ER_BINLOG_ROW_WRONG_TABLE_DEF: 1535,
-	  ER_BINLOG_ROW_RBR_TO_SBR: 1536,
-	  ER_EVENT_ALREADY_EXISTS: 1537,
-	  ER_EVENT_STORE_FAILED: 1538,
-	  ER_EVENT_DOES_NOT_EXIST: 1539,
-	  ER_EVENT_CANT_ALTER: 1540,
-	  ER_EVENT_DROP_FAILED: 1541,
-	  ER_EVENT_INTERVAL_NOT_POSITIVE_OR_TOO_BIG: 1542,
-	  ER_EVENT_ENDS_BEFORE_STARTS: 1543,
-	  ER_EVENT_EXEC_TIME_IN_THE_PAST: 1544,
-	  ER_EVENT_OPEN_TABLE_FAILED: 1545,
-	  ER_EVENT_NEITHER_M_EXPR_NOR_M_AT: 1546,
-	  ER_COL_COUNT_DOESNT_MATCH_CORRUPTED: 1547,
-	  ER_CANNOT_LOAD_FROM_TABLE: 1548,
-	  ER_EVENT_CANNOT_DELETE: 1549,
-	  ER_EVENT_COMPILE_ERROR: 1550,
-	  ER_EVENT_SAME_NAME: 1551,
-	  ER_EVENT_DATA_TOO_LONG: 1552,
-	  ER_DROP_INDEX_FK: 1553,
-	  ER_WARN_DEPRECATED_SYNTAX_WITH_VER: 1554,
-	  ER_CANT_WRITE_LOCK_LOG_TABLE: 1555,
-	  ER_CANT_LOCK_LOG_TABLE: 1556,
-	  ER_FOREIGN_DUPLICATE_KEY: 1557,
-	  ER_COL_COUNT_DOESNT_MATCH_PLEASE_UPDATE: 1558,
-	  ER_TEMP_TABLE_PREVENTS_SWITCH_OUT_OF_RBR: 1559,
-	  ER_STORED_FUNCTION_PREVENTS_SWITCH_BINLOG_FORMAT: 1560,
-	  ER_NDB_CANT_SWITCH_BINLOG_FORMAT: 1561,
-	  ER_PARTITION_NO_TEMPORARY: 1562,
-	  ER_PARTITION_CONST_DOMAIN_ERROR: 1563,
-	  ER_PARTITION_FUNCTION_IS_NOT_ALLOWED: 1564,
-	  ER_DDL_LOG_ERROR: 1565,
-	  ER_NULL_IN_VALUES_LESS_THAN: 1566,
-	  ER_WRONG_PARTITION_NAME: 1567,
-	  ER_CANT_CHANGE_TX_CHARACTERISTICS: 1568,
-	  ER_DUP_ENTRY_AUTOINCREMENT_CASE: 1569,
-	  ER_EVENT_MODIFY_QUEUE_ERROR: 1570,
-	  ER_EVENT_SET_VAR_ERROR: 1571,
-	  ER_PARTITION_MERGE_ERROR: 1572,
-	  ER_CANT_ACTIVATE_LOG: 1573,
-	  ER_RBR_NOT_AVAILABLE: 1574,
-	  ER_BASE64_DECODE_ERROR: 1575,
-	  ER_EVENT_RECURSION_FORBIDDEN: 1576,
-	  ER_EVENTS_DB_ERROR: 1577,
-	  ER_ONLY_INTEGERS_ALLOWED: 1578,
-	  ER_UNSUPORTED_LOG_ENGINE: 1579,
-	  ER_BAD_LOG_STATEMENT: 1580,
-	  ER_CANT_RENAME_LOG_TABLE: 1581,
-	  ER_WRONG_PARAMCOUNT_TO_NATIVE_FCT: 1582,
-	  ER_WRONG_PARAMETERS_TO_NATIVE_FCT: 1583,
-	  ER_WRONG_PARAMETERS_TO_STORED_FCT: 1584,
-	  ER_NATIVE_FCT_NAME_COLLISION: 1585,
-	  ER_DUP_ENTRY_WITH_KEY_NAME: 1586,
-	  ER_BINLOG_PURGE_EMFILE: 1587,
-	  ER_EVENT_CANNOT_CREATE_IN_THE_PAST: 1588,
-	  ER_EVENT_CANNOT_ALTER_IN_THE_PAST: 1589,
-	  ER_SLAVE_INCIDENT: 1590,
-	  ER_NO_PARTITION_FOR_GIVEN_VALUE_SILENT: 1591,
-	  ER_BINLOG_UNSAFE_STATEMENT: 1592,
-	  ER_SLAVE_FATAL_ERROR: 1593,
-	  ER_SLAVE_RELAY_LOG_READ_FAILURE: 1594,
-	  ER_SLAVE_RELAY_LOG_WRITE_FAILURE: 1595,
-	  ER_SLAVE_CREATE_EVENT_FAILURE: 1596,
-	  ER_SLAVE_MASTER_COM_FAILURE: 1597,
-	  ER_BINLOG_LOGGING_IMPOSSIBLE: 1598,
-	  ER_VIEW_NO_CREATION_CTX: 1599,
-	  ER_VIEW_INVALID_CREATION_CTX: 1600,
-	  ER_SR_INVALID_CREATION_CTX: 1601,
-	  ER_TRG_CORRUPTED_FILE: 1602,
-	  ER_TRG_NO_CREATION_CTX: 1603,
-	  ER_TRG_INVALID_CREATION_CTX: 1604,
-	  ER_EVENT_INVALID_CREATION_CTX: 1605,
-	  ER_TRG_CANT_OPEN_TABLE: 1606,
-	  ER_CANT_CREATE_SROUTINE: 1607,
-	  ER_NEVER_USED: 1608,
-	  ER_NO_FORMAT_DESCRIPTION_EVENT_BEFORE_BINLOG_STATEMENT: 1609,
-	  ER_SLAVE_CORRUPT_EVENT: 1610,
-	  ER_LOAD_DATA_INVALID_COLUMN: 1611,
-	  ER_LOG_PURGE_NO_FILE: 1612,
-	  ER_XA_RBTIMEOUT: 1613,
-	  ER_XA_RBDEADLOCK: 1614,
-	  ER_NEED_REPREPARE: 1615,
-	  ER_DELAYED_NOT_SUPPORTED: 1616,
-	  WARN_NO_MASTER_INFO: 1617,
-	  WARN_OPTION_IGNORED: 1618,
-	  ER_PLUGIN_DELETE_BUILTIN: 1619,
-	  WARN_PLUGIN_BUSY: 1620,
-	  ER_VARIABLE_IS_READONLY: 1621,
-	  ER_WARN_ENGINE_TRANSACTION_ROLLBACK: 1622,
-	  ER_SLAVE_HEARTBEAT_FAILURE: 1623,
-	  ER_SLAVE_HEARTBEAT_VALUE_OUT_OF_RANGE: 1624,
-	  ER_NDB_REPLICATION_SCHEMA_ERROR: 1625,
-	  ER_CONFLICT_FN_PARSE_ERROR: 1626,
-	  ER_EXCEPTIONS_WRITE_ERROR: 1627,
-	  ER_TOO_LONG_TABLE_COMMENT: 1628,
-	  ER_TOO_LONG_FIELD_COMMENT: 1629,
-	  ER_FUNC_INEXISTENT_NAME_COLLISION: 1630,
-	  ER_DATABASE_NAME: 1631,
-	  ER_TABLE_NAME: 1632,
-	  ER_PARTITION_NAME: 1633,
-	  ER_SUBPARTITION_NAME: 1634,
-	  ER_TEMPORARY_NAME: 1635,
-	  ER_RENAMED_NAME: 1636,
-	  ER_TOO_MANY_CONCURRENT_TRXS: 1637,
-	  WARN_NON_ASCII_SEPARATOR_NOT_IMPLEMENTED: 1638,
-	  ER_DEBUG_SYNC_TIMEOUT: 1639,
-	  ER_DEBUG_SYNC_HIT_LIMIT: 1640,
-	  ER_DUP_SIGNAL_SET: 1641,
-	  ER_SIGNAL_WARN: 1642,
-	  ER_SIGNAL_NOT_FOUND: 1643,
-	  ER_SIGNAL_EXCEPTION: 1644,
-	  ER_RESIGNAL_WITHOUT_ACTIVE_HANDLER: 1645,
-	  ER_SIGNAL_BAD_CONDITION_TYPE: 1646,
-	  WARN_COND_ITEM_TRUNCATED: 1647,
-	  ER_COND_ITEM_TOO_LONG: 1648,
-	  ER_UNKNOWN_LOCALE: 1649,
-	  ER_SLAVE_IGNORE_SERVER_IDS: 1650,
-	  ER_QUERY_CACHE_DISABLED: 1651,
-	  ER_SAME_NAME_PARTITION_FIELD: 1652,
-	  ER_PARTITION_COLUMN_LIST_ERROR: 1653,
-	  ER_WRONG_TYPE_COLUMN_VALUE_ERROR: 1654,
-	  ER_TOO_MANY_PARTITION_FUNC_FIELDS_ERROR: 1655,
-	  ER_MAXVALUE_IN_VALUES_IN: 1656,
-	  ER_TOO_MANY_VALUES_ERROR: 1657,
-	  ER_ROW_SINGLE_PARTITION_FIELD_ERROR: 1658,
-	  ER_FIELD_TYPE_NOT_ALLOWED_AS_PARTITION_FIELD: 1659,
-	  ER_PARTITION_FIELDS_TOO_LONG: 1660,
-	  ER_BINLOG_ROW_ENGINE_AND_STMT_ENGINE: 1661,
-	  ER_BINLOG_ROW_MODE_AND_STMT_ENGINE: 1662,
-	  ER_BINLOG_UNSAFE_AND_STMT_ENGINE: 1663,
-	  ER_BINLOG_ROW_INJECTION_AND_STMT_ENGINE: 1664,
-	  ER_BINLOG_STMT_MODE_AND_ROW_ENGINE: 1665,
-	  ER_BINLOG_ROW_INJECTION_AND_STMT_MODE: 1666,
-	  ER_BINLOG_MULTIPLE_ENGINES_AND_SELF_LOGGING_ENGINE: 1667,
-	  ER_BINLOG_UNSAFE_LIMIT: 1668,
-	  ER_BINLOG_UNSAFE_INSERT_DELAYED: 1669,
-	  ER_BINLOG_UNSAFE_SYSTEM_TABLE: 1670,
-	  ER_BINLOG_UNSAFE_AUTOINC_COLUMNS: 1671,
-	  ER_BINLOG_UNSAFE_UDF: 1672,
-	  ER_BINLOG_UNSAFE_SYSTEM_VARIABLE: 1673,
-	  ER_BINLOG_UNSAFE_SYSTEM_FUNCTION: 1674,
-	  ER_BINLOG_UNSAFE_NONTRANS_AFTER_TRANS: 1675,
-	  ER_MESSAGE_AND_STATEMENT: 1676,
-	  ER_SLAVE_CONVERSION_FAILED: 1677,
-	  ER_SLAVE_CANT_CREATE_CONVERSION: 1678,
-	  ER_INSIDE_TRANSACTION_PREVENTS_SWITCH_BINLOG_FORMAT: 1679,
-	  ER_PATH_LENGTH: 1680,
-	  ER_WARN_DEPRECATED_SYNTAX_NO_REPLACEMENT: 1681,
-	  ER_WRONG_NATIVE_TABLE_STRUCTURE: 1682,
-	  ER_WRONG_PERFSCHEMA_USAGE: 1683,
-	  ER_WARN_I_S_SKIPPED_TABLE: 1684,
-	  ER_INSIDE_TRANSACTION_PREVENTS_SWITCH_BINLOG_DIRECT: 1685,
-	  ER_STORED_FUNCTION_PREVENTS_SWITCH_BINLOG_DIRECT: 1686,
-	  ER_SPATIAL_MUST_HAVE_GEOM_COL: 1687,
-	  ER_TOO_LONG_INDEX_COMMENT: 1688,
-	  ER_LOCK_ABORTED: 1689,
-	  ER_DATA_OUT_OF_RANGE: 1690,
-	  ER_WRONG_SPVAR_TYPE_IN_LIMIT: 1691,
-	  ER_BINLOG_UNSAFE_MULTIPLE_ENGINES_AND_SELF_LOGGING_ENGINE: 1692,
-	  ER_BINLOG_UNSAFE_MIXED_STATEMENT: 1693,
-	  ER_INSIDE_TRANSACTION_PREVENTS_SWITCH_SQL_LOG_BIN: 1694,
-	  ER_STORED_FUNCTION_PREVENTS_SWITCH_SQL_LOG_BIN: 1695,
-	  ER_FAILED_READ_FROM_PAR_FILE: 1696,
-	  ER_VALUES_IS_NOT_INT_TYPE_ERROR: 1697,
-	  ER_ACCESS_DENIED_NO_PASSWORD_ERROR: 1698,
-	  ER_SET_PASSWORD_AUTH_PLUGIN: 1699,
-	  ER_GRANT_PLUGIN_USER_EXISTS: 1700,
-	  ER_TRUNCATE_ILLEGAL_FK: 1701,
-	  ER_PLUGIN_IS_PERMANENT: 1702,
-	  ER_SLAVE_HEARTBEAT_VALUE_OUT_OF_RANGE_MIN: 1703,
-	  ER_SLAVE_HEARTBEAT_VALUE_OUT_OF_RANGE_MAX: 1704,
-	  ER_STMT_CACHE_FULL: 1705,
-	  ER_MULTI_UPDATE_KEY_CONFLICT: 1706,
-	  ER_TABLE_NEEDS_REBUILD: 1707,
-	  WARN_OPTION_BELOW_LIMIT: 1708,
-	  ER_INDEX_COLUMN_TOO_LONG: 1709,
-	  ER_ERROR_IN_TRIGGER_BODY: 1710,
-	  ER_ERROR_IN_UNKNOWN_TRIGGER_BODY: 1711,
-	  ER_INDEX_CORRUPT: 1712,
-	  ER_UNDO_RECORD_TOO_BIG: 1713,
-	  ER_BINLOG_UNSAFE_INSERT_IGNORE_SELECT: 1714,
-	  ER_BINLOG_UNSAFE_INSERT_SELECT_UPDATE: 1715,
-	  ER_BINLOG_UNSAFE_REPLACE_SELECT: 1716,
-	  ER_BINLOG_UNSAFE_CREATE_IGNORE_SELECT: 1717,
-	  ER_BINLOG_UNSAFE_CREATE_REPLACE_SELECT: 1718,
-	  ER_BINLOG_UNSAFE_UPDATE_IGNORE: 1719,
-	  ER_PLUGIN_NO_UNINSTALL: 1720,
-	  ER_PLUGIN_NO_INSTALL: 1721,
-	  ER_BINLOG_UNSAFE_WRITE_AUTOINC_SELECT: 1722,
-	  ER_BINLOG_UNSAFE_CREATE_SELECT_AUTOINC: 1723,
-	  ER_BINLOG_UNSAFE_INSERT_TWO_KEYS: 1724,
-	  ER_TABLE_IN_FK_CHECK: 1725,
-	  ER_UNSUPPORTED_ENGINE: 1726,
-	  ER_BINLOG_UNSAFE_AUTOINC_NOT_FIRST: 1727,
-	  ER_CANNOT_LOAD_FROM_TABLE_V2: 1728,
-	  ER_MASTER_DELAY_VALUE_OUT_OF_RANGE: 1729,
-	  ER_ONLY_FD_AND_RBR_EVENTS_ALLOWED_IN_BINLOG_STATEMENT: 1730,
-	  ER_PARTITION_EXCHANGE_DIFFERENT_OPTION: 1731,
-	  ER_PARTITION_EXCHANGE_PART_TABLE: 1732,
-	  ER_PARTITION_EXCHANGE_TEMP_TABLE: 1733,
-	  ER_PARTITION_INSTEAD_OF_SUBPARTITION: 1734,
-	  ER_UNKNOWN_PARTITION: 1735,
-	  ER_TABLES_DIFFERENT_METADATA: 1736,
-	  ER_ROW_DOES_NOT_MATCH_PARTITION: 1737,
-	  ER_BINLOG_CACHE_SIZE_GREATER_THAN_MAX: 1738,
-	  ER_WARN_INDEX_NOT_APPLICABLE: 1739,
-	  ER_PARTITION_EXCHANGE_FOREIGN_KEY: 1740,
-	  ER_NO_SUCH_KEY_VALUE: 1741,
-	  ER_RPL_INFO_DATA_TOO_LONG: 1742,
-	  ER_NETWORK_READ_EVENT_CHECKSUM_FAILURE: 1743,
-	  ER_BINLOG_READ_EVENT_CHECKSUM_FAILURE: 1744,
-	  ER_BINLOG_STMT_CACHE_SIZE_GREATER_THAN_MAX: 1745,
-	  ER_CANT_UPDATE_TABLE_IN_CREATE_TABLE_SELECT: 1746,
-	  ER_PARTITION_CLAUSE_ON_NONPARTITIONED: 1747,
-	  ER_ROW_DOES_NOT_MATCH_GIVEN_PARTITION_SET: 1748,
-	  ER_NO_SUCH_PARTITION: 1749,
-	  ER_CHANGE_RPL_INFO_REPOSITORY_FAILURE: 1750,
-	  ER_WARNING_NOT_COMPLETE_ROLLBACK_WITH_CREATED_TEMP_TABLE: 1751,
-	  ER_WARNING_NOT_COMPLETE_ROLLBACK_WITH_DROPPED_TEMP_TABLE: 1752,
-	  ER_MTS_FEATURE_IS_NOT_SUPPORTED: 1753,
-	  ER_MTS_UPDATED_DBS_GREATER_MAX: 1754,
-	  ER_MTS_CANT_PARALLEL: 1755,
-	  ER_MTS_INCONSISTENT_DATA: 1756,
-	  ER_FULLTEXT_NOT_SUPPORTED_WITH_PARTITIONING: 1757,
-	  ER_DA_INVALID_CONDITION_NUMBER: 1758,
-	  ER_INSECURE_PLAIN_TEXT: 1759,
-	  ER_INSECURE_CHANGE_MASTER: 1760,
-	  ER_FOREIGN_DUPLICATE_KEY_WITH_CHILD_INFO: 1761,
-	  ER_FOREIGN_DUPLICATE_KEY_WITHOUT_CHILD_INFO: 1762,
-	  ER_SQLTHREAD_WITH_SECURE_SLAVE: 1763,
-	  ER_TABLE_HAS_NO_FT: 1764,
-	  ER_VARIABLE_NOT_SETTABLE_IN_SF_OR_TRIGGER: 1765,
-	  ER_VARIABLE_NOT_SETTABLE_IN_TRANSACTION: 1766,
-	  ER_GTID_NEXT_IS_NOT_IN_GTID_NEXT_LIST: 1767,
-	  ER_CANT_CHANGE_GTID_NEXT_IN_TRANSACTION: 1768,
-	  ER_SET_STATEMENT_CANNOT_INVOKE_FUNCTION: 1769,
-	  ER_GTID_NEXT_CANT_BE_AUTOMATIC_IF_GTID_NEXT_LIST_IS_NON_NULL: 1770,
-	  ER_SKIPPING_LOGGED_TRANSACTION: 1771,
-	  ER_MALFORMED_GTID_SET_SPECIFICATION: 1772,
-	  ER_MALFORMED_GTID_SET_ENCODING: 1773,
-	  ER_MALFORMED_GTID_SPECIFICATION: 1774,
-	  ER_GNO_EXHAUSTED: 1775,
-	  ER_BAD_SLAVE_AUTO_POSITION: 1776,
-	  ER_AUTO_POSITION_REQUIRES_GTID_MODE_NOT_OFF: 1777,
-	  ER_CANT_DO_IMPLICIT_COMMIT_IN_TRX_WHEN_GTID_NEXT_IS_SET: 1778,
-	  ER_GTID_MODE_ON_REQUIRES_ENFORCE_GTID_CONSISTENCY_ON: 1779,
-	  ER_GTID_MODE_REQUIRES_BINLOG: 1780,
-	  ER_CANT_SET_GTID_NEXT_TO_GTID_WHEN_GTID_MODE_IS_OFF: 1781,
-	  ER_CANT_SET_GTID_NEXT_TO_ANONYMOUS_WHEN_GTID_MODE_IS_ON: 1782,
-	  ER_CANT_SET_GTID_NEXT_LIST_TO_NON_NULL_WHEN_GTID_MODE_IS_OFF: 1783,
-	  ER_FOUND_GTID_EVENT_WHEN_GTID_MODE_IS_OFF: 1784,
-	  ER_GTID_UNSAFE_NON_TRANSACTIONAL_TABLE: 1785,
-	  ER_GTID_UNSAFE_CREATE_SELECT: 1786,
-	  ER_GTID_UNSAFE_CREATE_DROP_TEMPORARY_TABLE_IN_TRANSACTION: 1787,
-	  ER_GTID_MODE_CAN_ONLY_CHANGE_ONE_STEP_AT_A_TIME: 1788,
-	  ER_MASTER_HAS_PURGED_REQUIRED_GTIDS: 1789,
-	  ER_CANT_SET_GTID_NEXT_WHEN_OWNING_GTID: 1790,
-	  ER_UNKNOWN_EXPLAIN_FORMAT: 1791,
-	  ER_CANT_EXECUTE_IN_READ_ONLY_TRANSACTION: 1792,
-	  ER_TOO_LONG_TABLE_PARTITION_COMMENT: 1793,
-	  ER_SLAVE_CONFIGURATION: 1794,
-	  ER_INNODB_FT_LIMIT: 1795,
-	  ER_INNODB_NO_FT_TEMP_TABLE: 1796,
-	  ER_INNODB_FT_WRONG_DOCID_COLUMN: 1797,
-	  ER_INNODB_FT_WRONG_DOCID_INDEX: 1798,
-	  ER_INNODB_ONLINE_LOG_TOO_BIG: 1799,
-	  ER_UNKNOWN_ALTER_ALGORITHM: 1800,
-	  ER_UNKNOWN_ALTER_LOCK: 1801,
-	  ER_MTS_CHANGE_MASTER_CANT_RUN_WITH_GAPS: 1802,
-	  ER_MTS_RECOVERY_FAILURE: 1803,
-	  ER_MTS_RESET_WORKERS: 1804,
-	  ER_COL_COUNT_DOESNT_MATCH_CORRUPTED_V2: 1805,
-	  ER_SLAVE_SILENT_RETRY_TRANSACTION: 1806,
-	  ER_DISCARD_FK_CHECKS_RUNNING: 1807,
-	  ER_TABLE_SCHEMA_MISMATCH: 1808,
-	  ER_TABLE_IN_SYSTEM_TABLESPACE: 1809,
-	  ER_IO_READ_ERROR: 1810,
-	  ER_IO_WRITE_ERROR: 1811,
-	  ER_TABLESPACE_MISSING: 1812,
-	  ER_TABLESPACE_EXISTS: 1813,
-	  ER_TABLESPACE_DISCARDED: 1814,
-	  ER_INTERNAL_ERROR: 1815,
-	  ER_INNODB_IMPORT_ERROR: 1816,
-	  ER_INNODB_INDEX_CORRUPT: 1817,
-	  ER_INVALID_YEAR_COLUMN_LENGTH: 1818,
-	  ER_NOT_VALID_PASSWORD: 1819,
-	  ER_MUST_CHANGE_PASSWORD: 1820,
-	  ER_FK_NO_INDEX_CHILD: 1821,
-	  ER_FK_NO_INDEX_PARENT: 1822,
-	  ER_FK_FAIL_ADD_SYSTEM: 1823,
-	  ER_FK_CANNOT_OPEN_PARENT: 1824,
-	  ER_FK_INCORRECT_OPTION: 1825,
-	  ER_FK_DUP_NAME: 1826,
-	  ER_PASSWORD_FORMAT: 1827,
-	  ER_FK_COLUMN_CANNOT_DROP: 1828,
-	  ER_FK_COLUMN_CANNOT_DROP_CHILD: 1829,
-	  ER_FK_COLUMN_NOT_NULL: 1830,
-	  ER_DUP_INDEX: 1831,
-	  ER_FK_COLUMN_CANNOT_CHANGE: 1832,
-	  ER_FK_COLUMN_CANNOT_CHANGE_CHILD: 1833,
-	  ER_FK_CANNOT_DELETE_PARENT: 1834,
-	  ER_MALFORMED_PACKET: 1835,
-	  ER_READ_ONLY_MODE: 1836,
-	  ER_GTID_NEXT_TYPE_UNDEFINED_GROUP: 1837,
-	  ER_VARIABLE_NOT_SETTABLE_IN_SP: 1838,
-	  ER_CANT_SET_GTID_PURGED_WHEN_GTID_MODE_IS_OFF: 1839,
-	  ER_CANT_SET_GTID_PURGED_WHEN_GTID_EXECUTED_IS_NOT_EMPTY: 1840,
-	  ER_CANT_SET_GTID_PURGED_WHEN_OWNED_GTIDS_IS_NOT_EMPTY: 1841,
-	  ER_GTID_PURGED_WAS_CHANGED: 1842,
-	  ER_GTID_EXECUTED_WAS_CHANGED: 1843,
-	  ER_BINLOG_STMT_MODE_AND_NO_REPL_TABLES: 1844,
-	  ER_ALTER_OPERATION_NOT_SUPPORTED: 1845,
-	  ER_ALTER_OPERATION_NOT_SUPPORTED_REASON: 1846,
-	  ER_ALTER_OPERATION_NOT_SUPPORTED_REASON_COPY: 1847,
-	  ER_ALTER_OPERATION_NOT_SUPPORTED_REASON_PARTITION: 1848,
-	  ER_ALTER_OPERATION_NOT_SUPPORTED_REASON_FK_RENAME: 1849,
-	  ER_ALTER_OPERATION_NOT_SUPPORTED_REASON_COLUMN_TYPE: 1850,
-	  ER_ALTER_OPERATION_NOT_SUPPORTED_REASON_FK_CHECK: 1851,
-	  ER_ALTER_OPERATION_NOT_SUPPORTED_REASON_IGNORE: 1852,
-	  ER_ALTER_OPERATION_NOT_SUPPORTED_REASON_NOPK: 1853,
-	  ER_ALTER_OPERATION_NOT_SUPPORTED_REASON_AUTOINC: 1854,
-	  ER_ALTER_OPERATION_NOT_SUPPORTED_REASON_HIDDEN_FTS: 1855,
-	  ER_ALTER_OPERATION_NOT_SUPPORTED_REASON_CHANGE_FTS: 1856,
-	  ER_ALTER_OPERATION_NOT_SUPPORTED_REASON_FTS: 1857,
-	  ER_SQL_SLAVE_SKIP_COUNTER_NOT_SETTABLE_IN_GTID_MODE: 1858,
-	  ER_DUP_UNKNOWN_IN_INDEX: 1859,
-	  ER_IDENT_CAUSES_TOO_LONG_PATH: 1860,
-	  ER_ALTER_OPERATION_NOT_SUPPORTED_REASON_NOT_NULL: 1861,
-	  ER_MUST_CHANGE_PASSWORD_LOGIN: 1862,
-	  ER_ROW_IN_WRONG_PARTITION: 1863,
-	  ER_MTS_EVENT_BIGGER_PENDING_JOBS_SIZE_MAX: 1864,
-	  ER_INNODB_NO_FT_USES_PARSER: 1865,
-	  ER_BINLOG_LOGICAL_CORRUPTION: 1866,
-	  ER_WARN_PURGE_LOG_IN_USE: 1867,
-	  ER_WARN_PURGE_LOG_IS_ACTIVE: 1868,
-	  ER_AUTO_INCREMENT_CONFLICT: 1869,
-	  WARN_ON_BLOCKHOLE_IN_RBR: 1870,
-	  ER_SLAVE_MI_INIT_REPOSITORY: 1871,
-	  ER_SLAVE_RLI_INIT_REPOSITORY: 1872,
-	  ER_ACCESS_DENIED_CHANGE_USER_ERROR: 1873,
-	  ER_INNODB_READ_ONLY: 1874,
-	  ER_STOP_SLAVE_SQL_THREAD_TIMEOUT: 1875,
-	  ER_STOP_SLAVE_IO_THREAD_TIMEOUT: 1876,
-	  ER_TABLE_CORRUPT: 1877,
-	  ER_TEMP_FILE_WRITE_FAILURE: 1878,
-	  ER_INNODB_FT_AUX_NOT_HEX_ID: 1879,
-	  ER_OLD_TEMPORALS_UPGRADED: 1880,
-	  ER_INNODB_FORCED_RECOVERY: 1881,
-	  ER_AES_INVALID_IV: 1882,
-	  ER_PLUGIN_CANNOT_BE_UNINSTALLED: 1883,
-	  ER_GTID_UNSAFE_BINLOG_SPLITTABLE_STATEMENT_AND_GTID_GROUP: 1884,
-	  ER_SLAVE_HAS_MORE_GTIDS_THAN_MASTER: 1885,
-	  ER_MISSING_KEY: 1886,
-	  WARN_NAMED_PIPE_ACCESS_EVERYONE: 1887,
-	  ER_FOUND_MISSING_GTIDS: 1888,
-	  ER_FILE_CORRUPT: 3000,
-	  ER_ERROR_ON_MASTER: 3001,
-	  ER_INCONSISTENT_ERROR: 3002,
-	  ER_STORAGE_ENGINE_NOT_LOADED: 3003,
-	  ER_GET_STACKED_DA_WITHOUT_ACTIVE_HANDLER: 3004,
-	  ER_WARN_LEGACY_SYNTAX_CONVERTED: 3005,
-	  ER_BINLOG_UNSAFE_FULLTEXT_PLUGIN: 3006,
-	  ER_CANNOT_DISCARD_TEMPORARY_TABLE: 3007,
-	  ER_FK_DEPTH_EXCEEDED: 3008,
-	  ER_COL_COUNT_DOESNT_MATCH_PLEASE_UPDATE_V2: 3009,
-	  ER_WARN_TRIGGER_DOESNT_HAVE_CREATED: 3010,
-	  ER_REFERENCED_TRG_DOES_NOT_EXIST: 3011,
-	  ER_EXPLAIN_NOT_SUPPORTED: 3012,
-	  ER_INVALID_FIELD_SIZE: 3013,
-	  ER_MISSING_HA_CREATE_OPTION: 3014,
-	  ER_ENGINE_OUT_OF_MEMORY: 3015,
-	  ER_PASSWORD_EXPIRE_ANONYMOUS_USER: 3016,
-	  ER_SLAVE_SQL_THREAD_MUST_STOP: 3017,
-	  ER_NO_FT_MATERIALIZED_SUBQUERY: 3018,
-	  ER_INNODB_UNDO_LOG_FULL: 3019,
-	  ER_INVALID_ARGUMENT_FOR_LOGARITHM: 3020,
-	  ER_SLAVE_CHANNEL_IO_THREAD_MUST_STOP: 3021,
-	  ER_WARN_OPEN_TEMP_TABLES_MUST_BE_ZERO: 3022,
-	  ER_WARN_ONLY_MASTER_LOG_FILE_NO_POS: 3023,
-	  ER_QUERY_TIMEOUT: 3024,
-	  ER_NON_RO_SELECT_DISABLE_TIMER: 3025,
-	  ER_DUP_LIST_ENTRY: 3026,
-	  ER_SQL_MODE_NO_EFFECT: 3027,
-	  ER_AGGREGATE_ORDER_FOR_UNION: 3028,
-	  ER_AGGREGATE_ORDER_NON_AGG_QUERY: 3029,
-	  ER_SLAVE_WORKER_STOPPED_PREVIOUS_THD_ERROR: 3030,
-	  ER_DONT_SUPPORT_SLAVE_PRESERVE_COMMIT_ORDER: 3031,
-	  ER_SERVER_OFFLINE_MODE: 3032,
-	  ER_GIS_DIFFERENT_SRIDS: 3033,
-	  ER_GIS_UNSUPPORTED_ARGUMENT: 3034,
-	  ER_GIS_UNKNOWN_ERROR: 3035,
-	  ER_GIS_UNKNOWN_EXCEPTION: 3036,
-	  ER_GIS_INVALID_DATA: 3037,
-	  ER_BOOST_GEOMETRY_EMPTY_INPUT_EXCEPTION: 3038,
-	  ER_BOOST_GEOMETRY_CENTROID_EXCEPTION: 3039,
-	  ER_BOOST_GEOMETRY_OVERLAY_INVALID_INPUT_EXCEPTION: 3040,
-	  ER_BOOST_GEOMETRY_TURN_INFO_EXCEPTION: 3041,
-	  ER_BOOST_GEOMETRY_SELF_INTERSECTION_POINT_EXCEPTION: 3042,
-	  ER_BOOST_GEOMETRY_UNKNOWN_EXCEPTION: 3043,
-	  ER_STD_BAD_ALLOC_ERROR: 3044,
-	  ER_STD_DOMAIN_ERROR: 3045,
-	  ER_STD_LENGTH_ERROR: 3046,
-	  ER_STD_INVALID_ARGUMENT: 3047,
-	  ER_STD_OUT_OF_RANGE_ERROR: 3048,
-	  ER_STD_OVERFLOW_ERROR: 3049,
-	  ER_STD_RANGE_ERROR: 3050,
-	  ER_STD_UNDERFLOW_ERROR: 3051,
-	  ER_STD_LOGIC_ERROR: 3052,
-	  ER_STD_RUNTIME_ERROR: 3053,
-	  ER_STD_UNKNOWN_EXCEPTION: 3054,
-	  ER_GIS_DATA_WRONG_ENDIANESS: 3055,
-	  ER_CHANGE_MASTER_PASSWORD_LENGTH: 3056,
-	  ER_USER_LOCK_WRONG_NAME: 3057,
-	  ER_USER_LOCK_DEADLOCK: 3058,
-	  ER_REPLACE_INACCESSIBLE_ROWS: 3059,
-	  ER_ALTER_OPERATION_NOT_SUPPORTED_REASON_GIS: 3060,
-	  ER_ILLEGAL_USER_VAR: 3061,
-	  ER_GTID_MODE_OFF: 3062,
-	  ER_UNSUPPORTED_BY_REPLICATION_THREAD: 3063,
-	  ER_INCORRECT_TYPE: 3064,
-	  ER_FIELD_IN_ORDER_NOT_SELECT: 3065,
-	  ER_AGGREGATE_IN_ORDER_NOT_SELECT: 3066,
-	  ER_INVALID_RPL_WILD_TABLE_FILTER_PATTERN: 3067,
-	  ER_NET_OK_PACKET_TOO_LARGE: 3068,
-	  ER_INVALID_JSON_DATA: 3069,
-	  ER_INVALID_GEOJSON_MISSING_MEMBER: 3070,
-	  ER_INVALID_GEOJSON_WRONG_TYPE: 3071,
-	  ER_INVALID_GEOJSON_UNSPECIFIED: 3072,
-	  ER_DIMENSION_UNSUPPORTED: 3073,
-	  ER_SLAVE_CHANNEL_DOES_NOT_EXIST: 3074,
-	  ER_SLAVE_MULTIPLE_CHANNELS_HOST_PORT: 3075,
-	  ER_SLAVE_CHANNEL_NAME_INVALID_OR_TOO_LONG: 3076,
-	  ER_SLAVE_NEW_CHANNEL_WRONG_REPOSITORY: 3077,
-	  ER_SLAVE_CHANNEL_DELETE: 3078,
-	  ER_SLAVE_MULTIPLE_CHANNELS_CMD: 3079,
-	  ER_SLAVE_MAX_CHANNELS_EXCEEDED: 3080,
-	  ER_SLAVE_CHANNEL_MUST_STOP: 3081,
-	  ER_SLAVE_CHANNEL_NOT_RUNNING: 3082,
-	  ER_SLAVE_CHANNEL_WAS_RUNNING: 3083,
-	  ER_SLAVE_CHANNEL_WAS_NOT_RUNNING: 3084,
-	  ER_SLAVE_CHANNEL_SQL_THREAD_MUST_STOP: 3085,
-	  ER_SLAVE_CHANNEL_SQL_SKIP_COUNTER: 3086,
-	  ER_WRONG_FIELD_WITH_GROUP_V2: 3087,
-	  ER_MIX_OF_GROUP_FUNC_AND_FIELDS_V2: 3088,
-	  ER_WARN_DEPRECATED_SYSVAR_UPDATE: 3089,
-	  ER_WARN_DEPRECATED_SQLMODE: 3090,
-	  ER_CANNOT_LOG_PARTIAL_DROP_DATABASE_WITH_GTID: 3091,
-	  ER_GROUP_REPLICATION_CONFIGURATION: 3092,
-	  ER_GROUP_REPLICATION_RUNNING: 3093,
-	  ER_GROUP_REPLICATION_APPLIER_INIT_ERROR: 3094,
-	  ER_GROUP_REPLICATION_STOP_APPLIER_THREAD_TIMEOUT: 3095,
-	  ER_GROUP_REPLICATION_COMMUNICATION_LAYER_SESSION_ERROR: 3096,
-	  ER_GROUP_REPLICATION_COMMUNICATION_LAYER_JOIN_ERROR: 3097,
-	  ER_BEFORE_DML_VALIDATION_ERROR: 3098,
-	  ER_PREVENTS_VARIABLE_WITHOUT_RBR: 3099,
-	  ER_RUN_HOOK_ERROR: 3100,
-	  ER_TRANSACTION_ROLLBACK_DURING_COMMIT: 3101,
-	  ER_GENERATED_COLUMN_FUNCTION_IS_NOT_ALLOWED: 3102,
-	  ER_UNSUPPORTED_ALTER_INPLACE_ON_VIRTUAL_COLUMN: 3103,
-	  ER_WRONG_FK_OPTION_FOR_GENERATED_COLUMN: 3104,
-	  ER_NON_DEFAULT_VALUE_FOR_GENERATED_COLUMN: 3105,
-	  ER_UNSUPPORTED_ACTION_ON_GENERATED_COLUMN: 3106,
-	  ER_GENERATED_COLUMN_NON_PRIOR: 3107,
-	  ER_DEPENDENT_BY_GENERATED_COLUMN: 3108,
-	  ER_GENERATED_COLUMN_REF_AUTO_INC: 3109,
-	  ER_FEATURE_NOT_AVAILABLE: 3110,
-	  ER_CANT_SET_GTID_MODE: 3111,
-	  ER_CANT_USE_AUTO_POSITION_WITH_GTID_MODE_OFF: 3112,
-	  ER_CANT_REPLICATE_ANONYMOUS_WITH_AUTO_POSITION: 3113,
-	  ER_CANT_REPLICATE_ANONYMOUS_WITH_GTID_MODE_ON: 3114,
-	  ER_CANT_REPLICATE_GTID_WITH_GTID_MODE_OFF: 3115,
-	  ER_CANT_SET_ENFORCE_GTID_CONSISTENCY_ON_WITH_ONGOING_GTID_VIOLATING_TRANSACTIONS: 3116,
-	  ER_SET_ENFORCE_GTID_CONSISTENCY_WARN_WITH_ONGOING_GTID_VIOLATING_TRANSACTIONS: 3117,
-	  ER_ACCOUNT_HAS_BEEN_LOCKED: 3118,
-	  ER_WRONG_TABLESPACE_NAME: 3119,
-	  ER_TABLESPACE_IS_NOT_EMPTY: 3120,
-	  ER_WRONG_FILE_NAME: 3121,
-	  ER_BOOST_GEOMETRY_INCONSISTENT_TURNS_EXCEPTION: 3122,
-	  ER_WARN_OPTIMIZER_HINT_SYNTAX_ERROR: 3123,
-	  ER_WARN_BAD_MAX_EXECUTION_TIME: 3124,
-	  ER_WARN_UNSUPPORTED_MAX_EXECUTION_TIME: 3125,
-	  ER_WARN_CONFLICTING_HINT: 3126,
-	  ER_WARN_UNKNOWN_QB_NAME: 3127,
-	  ER_UNRESOLVED_HINT_NAME: 3128,
-	  ER_WARN_ON_MODIFYING_GTID_EXECUTED_TABLE: 3129,
-	  ER_PLUGGABLE_PROTOCOL_COMMAND_NOT_SUPPORTED: 3130,
-	  ER_LOCKING_SERVICE_WRONG_NAME: 3131,
-	  ER_LOCKING_SERVICE_DEADLOCK: 3132,
-	  ER_LOCKING_SERVICE_TIMEOUT: 3133,
-	  ER_GIS_MAX_POINTS_IN_GEOMETRY_OVERFLOWED: 3134,
-	  ER_SQL_MODE_MERGED: 3135,
-	  ER_VTOKEN_PLUGIN_TOKEN_MISMATCH: 3136,
-	  ER_VTOKEN_PLUGIN_TOKEN_NOT_FOUND: 3137,
-	  ER_CANT_SET_VARIABLE_WHEN_OWNING_GTID: 3138,
-	  ER_SLAVE_CHANNEL_OPERATION_NOT_ALLOWED: 3139,
-	  ER_INVALID_JSON_TEXT: 3140,
-	  ER_INVALID_JSON_TEXT_IN_PARAM: 3141,
-	  ER_INVALID_JSON_BINARY_DATA: 3142,
-	  ER_INVALID_JSON_PATH: 3143,
-	  ER_INVALID_JSON_CHARSET: 3144,
-	  ER_INVALID_JSON_CHARSET_IN_FUNCTION: 3145,
-	  ER_INVALID_TYPE_FOR_JSON: 3146,
-	  ER_INVALID_CAST_TO_JSON: 3147,
-	  ER_INVALID_JSON_PATH_CHARSET: 3148,
-	  ER_INVALID_JSON_PATH_WILDCARD: 3149,
-	  ER_JSON_VALUE_TOO_BIG: 3150,
-	  ER_JSON_KEY_TOO_BIG: 3151,
-	  ER_JSON_USED_AS_KEY: 3152,
-	  ER_JSON_VACUOUS_PATH: 3153,
-	  ER_JSON_BAD_ONE_OR_ALL_ARG: 3154,
-	  ER_NUMERIC_JSON_VALUE_OUT_OF_RANGE: 3155,
-	  ER_INVALID_JSON_VALUE_FOR_CAST: 3156,
-	  ER_JSON_DOCUMENT_TOO_DEEP: 3157,
-	  ER_JSON_DOCUMENT_NULL_KEY: 3158,
-	  ER_SECURE_TRANSPORT_REQUIRED: 3159,
-	  ER_NO_SECURE_TRANSPORTS_CONFIGURED: 3160,
-	  ER_DISABLED_STORAGE_ENGINE: 3161,
-	  ER_USER_DOES_NOT_EXIST: 3162,
-	  ER_USER_ALREADY_EXISTS: 3163,
-	  ER_AUDIT_API_ABORT: 3164,
-	  ER_INVALID_JSON_PATH_ARRAY_CELL: 3165,
-	  ER_BUFPOOL_RESIZE_INPROGRESS: 3166,
-	  ER_FEATURE_DISABLED_SEE_DOC: 3167,
-	  ER_SERVER_ISNT_AVAILABLE: 3168,
-	  ER_SESSION_WAS_KILLED: 3169,
-	  ER_CAPACITY_EXCEEDED: 3170,
-	  ER_CAPACITY_EXCEEDED_IN_RANGE_OPTIMIZER: 3171,
-	  ER_TABLE_NEEDS_UPG_PART: 3172,
-	  ER_CANT_WAIT_FOR_EXECUTED_GTID_SET_WHILE_OWNING_A_GTID: 3173,
-	  ER_CANNOT_ADD_FOREIGN_BASE_COL_VIRTUAL: 3174,
-	  ER_CANNOT_CREATE_VIRTUAL_INDEX_CONSTRAINT: 3175,
-	  ER_ERROR_ON_MODIFYING_GTID_EXECUTED_TABLE: 3176,
-	  ER_LOCK_REFUSED_BY_ENGINE: 3177,
-	  ER_UNSUPPORTED_ALTER_ONLINE_ON_VIRTUAL_COLUMN: 3178,
-	  ER_MASTER_KEY_ROTATION_NOT_SUPPORTED_BY_SE: 3179,
-	  ER_MASTER_KEY_ROTATION_ERROR_BY_SE: 3180,
-	  ER_MASTER_KEY_ROTATION_BINLOG_FAILED: 3181,
-	  ER_MASTER_KEY_ROTATION_SE_UNAVAILABLE: 3182,
-	  ER_TABLESPACE_CANNOT_ENCRYPT: 3183,
-	  ER_INVALID_ENCRYPTION_OPTION: 3184,
-	  ER_CANNOT_FIND_KEY_IN_KEYRING: 3185,
-	  ER_CAPACITY_EXCEEDED_IN_PARSER: 3186,
-	  ER_UNSUPPORTED_ALTER_ENCRYPTION_INPLACE: 3187,
-	  ER_KEYRING_UDF_KEYRING_SERVICE_ERROR: 3188,
-	  ER_USER_COLUMN_OLD_LENGTH: 3189,
-	  ER_CANT_RESET_MASTER: 3190,
-	  ER_GROUP_REPLICATION_MAX_GROUP_SIZE: 3191,
-	  ER_CANNOT_ADD_FOREIGN_BASE_COL_STORED: 3192,
-	  ER_TABLE_REFERENCED: 3193,
-	  ER_PARTITION_ENGINE_DEPRECATED_FOR_TABLE: 3194,
-	  ER_WARN_USING_GEOMFROMWKB_TO_SET_SRID_ZERO: 3195,
-	  ER_WARN_USING_GEOMFROMWKB_TO_SET_SRID: 3196,
-	  ER_XA_RETRY: 3197,
-	  ER_KEYRING_AWS_UDF_AWS_KMS_ERROR: 3198,
-	  ER_BINLOG_UNSAFE_XA: 3199,
-	  ER_UDF_ERROR: 3200,
-	  ER_KEYRING_MIGRATION_FAILURE: 3201,
-	  ER_KEYRING_ACCESS_DENIED_ERROR: 3202,
-	  ER_KEYRING_MIGRATION_STATUS: 3203,
-	  ER_PLUGIN_FAILED_TO_OPEN_TABLES: 3204,
-	  ER_PLUGIN_FAILED_TO_OPEN_TABLE: 3205,
-	  ER_AUDIT_LOG_NO_KEYRING_PLUGIN_INSTALLED: 3206,
-	  ER_AUDIT_LOG_ENCRYPTION_PASSWORD_HAS_NOT_BEEN_SET: 3207,
-	  ER_AUDIT_LOG_COULD_NOT_CREATE_AES_KEY: 3208,
-	  ER_AUDIT_LOG_ENCRYPTION_PASSWORD_CANNOT_BE_FETCHED: 3209,
-	  ER_AUDIT_LOG_JSON_FILTERING_NOT_ENABLED: 3210,
-	  ER_AUDIT_LOG_UDF_INSUFFICIENT_PRIVILEGE: 3211,
-	  ER_AUDIT_LOG_SUPER_PRIVILEGE_REQUIRED: 3212,
-	  ER_COULD_NOT_REINITIALIZE_AUDIT_LOG_FILTERS: 3213,
-	  ER_AUDIT_LOG_UDF_INVALID_ARGUMENT_TYPE: 3214,
-	  ER_AUDIT_LOG_UDF_INVALID_ARGUMENT_COUNT: 3215,
-	  ER_AUDIT_LOG_HAS_NOT_BEEN_INSTALLED: 3216,
-	  ER_AUDIT_LOG_UDF_READ_INVALID_MAX_ARRAY_LENGTH_ARG_TYPE: 3217,
-	  ER_AUDIT_LOG_UDF_READ_INVALID_MAX_ARRAY_LENGTH_ARG_VALUE: 3218,
-	  ER_AUDIT_LOG_JSON_FILTER_PARSING_ERROR: 3219,
-	  ER_AUDIT_LOG_JSON_FILTER_NAME_CANNOT_BE_EMPTY: 3220,
-	  ER_AUDIT_LOG_JSON_USER_NAME_CANNOT_BE_EMPTY: 3221,
-	  ER_AUDIT_LOG_JSON_FILTER_DOES_NOT_EXISTS: 3222,
-	  ER_AUDIT_LOG_USER_FIRST_CHARACTER_MUST_BE_ALPHANUMERIC: 3223,
-	  ER_AUDIT_LOG_USER_NAME_INVALID_CHARACTER: 3224,
-	  ER_AUDIT_LOG_HOST_NAME_INVALID_CHARACTER: 3225,
-	  WARN_DEPRECATED_MAXDB_SQL_MODE_FOR_TIMESTAMP: 3226,
-	  ER_XA_REPLICATION_FILTERS: 3227,
-	  ER_CANT_OPEN_ERROR_LOG: 3228,
-	  ER_GROUPING_ON_TIMESTAMP_IN_DST: 3229,
-	  ER_CANT_START_SERVER_NAMED_PIPE: 3230,
-	};
-	return mysql;
+function convertType(type, nullable) {
+    let ret = type;
+    if (type === 'number') {
+        ret = {
+            catalog: 'def',
+            table: '',
+            schema: '',
+            orgTable: '',
+            name: '',
+            orgName: '',
+            characterSet: CHARSETS.BINARY,
+            columnLength: 66,
+            columnType: TYPES.DECIMAL,
+            flags: FIELD_FLAGS.BINARY | FIELD_FLAGS.NOT_NULL,
+            decimals: 31,
+        };
+    }
+    else if (type === 'bigint') {
+        ret = {
+            catalog: 'def',
+            table: '',
+            schema: '',
+            orgTable: '',
+            name: '',
+            orgName: '',
+            characterSet: CHARSETS.BINARY,
+            columnLength: 66,
+            columnType: TYPES.BIGINT,
+            flags: FIELD_FLAGS.BINARY | FIELD_FLAGS.NOT_NULL,
+            decimals: 0,
+        };
+    }
+    else if (type === 'null') {
+        ret = {
+            catalog: 'def',
+            table: '',
+            schema: '',
+            orgTable: '',
+            name: '',
+            orgName: '',
+            characterSet: CHARSETS.BINARY,
+            columnLength: 0,
+            columnType: TYPES.NULL,
+            flags: FIELD_FLAGS.BINARY,
+            decimals: 0,
+        };
+    }
+    else if (type === 'json') {
+        ret = {
+            catalog: 'def',
+            table: '',
+            schema: '',
+            orgTable: '',
+            name: '',
+            orgName: '',
+            characterSet: CHARSETS.UTF8_GENERAL_CI,
+            columnLength: 4294967295,
+            columnType: TYPES.JSON,
+            flags: 0,
+            decimals: 0,
+        };
+    }
+    else if (type === 'datetime') {
+        ret = {
+            catalog: 'def',
+            table: '',
+            schema: '',
+            orgTable: '',
+            name: '',
+            orgName: '',
+            characterSet: CHARSETS.BINARY,
+            columnLength: 26,
+            columnType: TYPES.DATETIME,
+            flags: FIELD_FLAGS.BINARY | FIELD_FLAGS.NOT_NULL,
+            decimals: 0,
+        };
+    }
+    else if (type === 'date') {
+        ret = {
+            catalog: 'def',
+            table: '',
+            schema: '',
+            orgTable: '',
+            name: '',
+            orgName: '',
+            characterSet: CHARSETS.BINARY,
+            columnLength: 10,
+            columnType: TYPES.DATE,
+            flags: FIELD_FLAGS.BINARY | FIELD_FLAGS.NOT_NULL,
+            decimals: 0,
+        };
+    }
+    else if (type === 'time') {
+        ret = {
+            catalog: 'def',
+            table: '',
+            orgTable: '',
+            name: '',
+            orgName: '',
+            characterSet: CHARSETS.BINARY,
+            columnLength: 15,
+            columnType: TYPES.TIME,
+            flags: FIELD_FLAGS.BINARY | FIELD_FLAGS.NOT_NULL,
+            decimals: 0,
+        };
+    }
+    else if (type === 'buffer') {
+        ret = {
+            catalog: 'def',
+            table: '',
+            schema: '',
+            orgTable: '',
+            name: '',
+            orgName: '',
+            characterSet: CHARSETS.BINARY,
+            columnLength: 255,
+            columnType: TYPES.VAR_STRING,
+            flags: FIELD_FLAGS.NOT_NULL |
+                FIELD_FLAGS.BINARY |
+                FIELD_FLAGS.UNSIGNED,
+            decimals: 0,
+        };
+    }
+    else if (type === 'string' || typeof type !== 'object') {
+        ret = {
+            catalog: 'def',
+            table: '',
+            schema: '',
+            orgTable: '',
+            name: '',
+            orgName: '',
+            characterSet: CHARSETS.UTF8_GENERAL_CI,
+            columnLength: 255,
+            columnType: TYPES.VAR_STRING,
+            flags: FIELD_FLAGS.NOT_NULL,
+            decimals: 31,
+        };
+    }
+    if (ret && nullable === true) {
+        ret.flags &= -2;
+    }
+    return ret;
 }
 
-var hasRequiredColumn_type_helper;
-
-function requireColumn_type_helper () {
-	if (hasRequiredColumn_type_helper) return column_type_helper;
-	hasRequiredColumn_type_helper = 1;
-	const MYSQL = requireMysql();
-
-	column_type_helper.convertType = convertType;
-
-	function convertType(type, nullable) {
-	  let ret = type;
-	  if (type === 'number') {
-	    ret = {
-	      catalog: 'def',
-	      table: '',
-	      schema: '',
-	      orgTable: '',
-	      name: '',
-	      orgName: '',
-	      characterSet: MYSQL.CHARSETS.BINARY,
-	      columnLength: 66,
-	      columnType: MYSQL.TYPES.DECIMAL,
-	      flags: MYSQL.FIELD_FLAGS.BINARY | MYSQL.FIELD_FLAGS.NOT_NULL,
-	      decimals: 31,
-	    };
-	  } else if (type === 'bigint') {
-	    ret = {
-	      catalog: 'def',
-	      table: '',
-	      schema: '',
-	      orgTable: '',
-	      name: '',
-	      orgName: '',
-	      characterSet: MYSQL.CHARSETS.BINARY,
-	      columnLength: 66,
-	      columnType: MYSQL.TYPES.BIGINT,
-	      flags: MYSQL.FIELD_FLAGS.BINARY | MYSQL.FIELD_FLAGS.NOT_NULL,
-	      decimals: 0,
-	    };
-	  } else if (type === 'null') {
-	    ret = {
-	      catalog: 'def',
-	      table: '',
-	      schema: '',
-	      orgTable: '',
-	      name: '',
-	      orgName: '',
-	      characterSet: MYSQL.CHARSETS.BINARY,
-	      columnLength: 0,
-	      columnType: MYSQL.TYPES.NULL,
-	      flags: MYSQL.FIELD_FLAGS.BINARY,
-	      decimals: 0,
-	    };
-	  } else if (type === 'json') {
-	    ret = {
-	      catalog: 'def',
-	      table: '',
-	      schema: '',
-	      orgTable: '',
-	      name: '',
-	      orgName: '',
-	      characterSet: MYSQL.CHARSETS.UTF8_GENERAL_CI,
-	      columnLength: 4294967295,
-	      columnType: MYSQL.TYPES.JSON,
-	      flags: 0,
-	      decimals: 0,
-	    };
-	  } else if (type === 'datetime') {
-	    ret = {
-	      catalog: 'def',
-	      table: '',
-	      schema: '',
-	      orgTable: '',
-	      name: '',
-	      orgName: '',
-	      characterSet: MYSQL.CHARSETS.BINARY,
-	      columnLength: 26,
-	      columnType: MYSQL.TYPES.DATETIME,
-	      flags: MYSQL.FIELD_FLAGS.BINARY | MYSQL.FIELD_FLAGS.NOT_NULL,
-	      decimals: 0,
-	    };
-	  } else if (type === 'date') {
-	    ret = {
-	      catalog: 'def',
-	      table: '',
-	      schema: '',
-	      orgTable: '',
-	      name: '',
-	      orgName: '',
-	      characterSet: MYSQL.CHARSETS.BINARY,
-	      columnLength: 10,
-	      columnType: MYSQL.TYPES.DATE,
-	      flags: MYSQL.FIELD_FLAGS.BINARY | MYSQL.FIELD_FLAGS.NOT_NULL,
-	      decimals: 0,
-	    };
-	  } else if (type === 'time') {
-	    ret = {
-	      catalog: 'def',
-	      table: '',
-	      orgTable: '',
-	      name: '',
-	      orgName: '',
-	      characterSet: MYSQL.CHARSETS.BINARY,
-	      columnLength: 15,
-	      columnType: MYSQL.TYPES.TIME,
-	      flags: MYSQL.FIELD_FLAGS.BINARY | MYSQL.FIELD_FLAGS.NOT_NULL,
-	      decimals: 0,
-	    };
-	  } else if (type === 'buffer') {
-	    ret = {
-	      catalog: 'def',
-	      table: '',
-	      schema: '',
-	      orgTable: '',
-	      name: '',
-	      orgName: '',
-	      characterSet: MYSQL.CHARSETS.BINARY,
-	      columnLength: 255,
-	      columnType: MYSQL.TYPES.VAR_STRING,
-	      flags:
-	        MYSQL.FIELD_FLAGS.NOT_NULL |
-	        MYSQL.FIELD_FLAGS.BINARY |
-	        MYSQL.FIELD_FLAGS.UNSIGNED,
-	      decimals: 0,
-	    };
-	  } else if (type === 'string' || typeof type !== 'object') {
-	    ret = {
-	      catalog: 'def',
-	      table: '',
-	      schema: '',
-	      orgTable: '',
-	      name: '',
-	      orgName: '',
-	      characterSet: MYSQL.CHARSETS.UTF8_GENERAL_CI,
-	      columnLength: 255,
-	      columnType: MYSQL.TYPES.VAR_STRING,
-	      flags: MYSQL.FIELD_FLAGS.NOT_NULL,
-	      decimals: 31,
-	    };
-	  }
-	  if (ret && nullable === true) {
-	    ret.flags &= ~MYSQL.FIELD_FLAGS.NOT_NULL;
-	  }
-	  return ret;
-	}
-	return column_type_helper;
+function walkColumnRefs(object, cb) {
+    if (object?.type === 'column_ref') {
+        cb(object);
+    }
+    else {
+        let array;
+        if (Array.isArray(object)) {
+            array = object;
+        }
+        else if (object && typeof object === 'object') {
+            array = Object.values(object);
+        }
+        array?.forEach?.((child) => {
+            walkColumnRefs(child, cb);
+        });
+    }
 }
 
-var column_ref_helper = {};
-
-var ast_helper = {};
-
-var hasRequiredAst_helper;
-
-function requireAst_helper () {
-	if (hasRequiredAst_helper) return ast_helper;
-	hasRequiredAst_helper = 1;
-	ast_helper.walkColumnRefs = walkColumnRefs;
-
-	function walkColumnRefs(object, cb) {
-	  if (object?.type === 'column_ref') {
-	    cb(object);
-	  } else {
-	    let array;
-	    if (Array.isArray(object)) {
-	      array = object;
-	    } else if (object && typeof object === 'object') {
-	      array = Object.values(object);
-	    }
-	    array?.forEach?.((child) => {
-	      walkColumnRefs(child, cb);
-	    });
-	  }
-	}
-	return ast_helper;
+function resolveReferences(ast, current_database) {
+    let err;
+    const table_map = {};
+    const db_map = {};
+    ast.from?.forEach?.((from) => {
+        if (!from.db) {
+            if (!current_database) {
+                err = 'no_current_database';
+            }
+            else {
+                from.db = current_database;
+            }
+        }
+        if (!from._requestSet) {
+            from._requestSet = new Set();
+        }
+        from._requestAll = from._requestAll || false;
+        from.key = from.as || `${from.db}.${from.table}`;
+        if (from.as) {
+            table_map[from.as] = from;
+        }
+        else {
+            if (!table_map[from.table]) {
+                table_map[from.table] = from;
+            }
+            if (!db_map[from.db]) {
+                db_map[from.db] = {};
+            }
+            db_map[from.db][from.table] = from;
+        }
+    });
+    ast.table?.forEach?.((object) => {
+        const from = object.db
+            ? db_map[object.db]?.[object.table]
+            : table_map[object.table];
+        if (!from) {
+            err = {
+                err: 'table_not_found',
+                args: [object.table],
+            };
+        }
+        else {
+            object.from = from;
+        }
+    });
+    const name_cache = {};
+    if (!err) {
+        [ast.from, ast.columns, ast.where, ast.set].forEach((item) => {
+            walkColumnRefs(item, (object) => {
+                const ret = _resolveObject(object, ast, db_map, table_map, name_cache);
+                if (ret && !err) {
+                    err = ret;
+                }
+            });
+        });
+    }
+    if (!err) {
+        ast.set?.forEach?.((object) => {
+            const ret = _resolveObject(object, ast, db_map, table_map, name_cache);
+            if (ret && !err) {
+                err = ret;
+            }
+        });
+    }
+    const result_map = {};
+    ast.columns?.forEach?.((column, i) => {
+        if (column.as) {
+            result_map[column.as] = i;
+        }
+        else if (column.expr?.type === 'column_ref') {
+            result_map[column.expr.column] = i;
+        }
+    });
+    if (!err) {
+        [ast.groupby, ast.orderby, ast.having].forEach((item) => {
+            walkColumnRefs(item, (object) => {
+                const ret = _resolveObject(object, ast, db_map, table_map, name_cache, result_map);
+                if (ret && !err) {
+                    err = ret;
+                }
+            });
+        });
+    }
+    return err;
+}
+function _resolveObject(object, ast, db_map, table_map, name_cache, result_map) {
+    let err;
+    if (object.column === '*') {
+        if (object.db) {
+            const from = db_map[object.db]?.[object.table];
+            if (from) {
+                from._requestAll = true;
+            }
+            else {
+                err = {
+                    err: 'table_not_found',
+                    args: [object.table],
+                };
+            }
+        }
+        else if (object.table) {
+            let found = false;
+            ast.from?.forEach?.((from) => {
+                if (from.as === object.table ||
+                    (!from.as && from.table === object.table)) {
+                    from._requestAll = true;
+                    found = true;
+                }
+            });
+            if (!found) {
+                err = {
+                    err: 'table_not_found',
+                    args: [object.table],
+                };
+            }
+        }
+        else {
+            ast.from?.forEach?.((from) => {
+                from._requestAll = true;
+            });
+        }
+    }
+    else {
+        let add_cache = false;
+        let from;
+        if (object.db) {
+            from = db_map[object.db]?.[object.table];
+            add_cache = true;
+        }
+        else if (object.table) {
+            from = table_map[object.table];
+            add_cache = true;
+        }
+        else {
+            const index = result_map?.[object.column];
+            if (index >= 0) {
+                object._resultIndex = index;
+            }
+            else {
+                const cached = name_cache[object.column];
+                from = cached ?? ast.from?.[0];
+            }
+        }
+        if (from) {
+            object.from = from;
+            from._requestSet.add(object.column);
+            if (add_cache) {
+                name_cache[object.column] = from;
+            }
+        }
+        else if (object._resultIndex === undefined) {
+            if (object.db && !db_map[object.db]) {
+                err = {
+                    err: 'db_not_found',
+                    args: [object.db],
+                };
+            }
+            else if (object.table) {
+                err = {
+                    err: 'table_not_found',
+                    args: [object.table],
+                };
+            }
+            else {
+                err = {
+                    err: 'column_not_found',
+                    args: [object.column],
+                };
+            }
+        }
+    }
+    return err;
 }
 
-var hasRequiredColumn_ref_helper;
-
-function requireColumn_ref_helper () {
-	if (hasRequiredColumn_ref_helper) return column_ref_helper;
-	hasRequiredColumn_ref_helper = 1;
-	const { walkColumnRefs } = requireAst_helper();
-
-	column_ref_helper.resolveReferences = resolveReferences;
-
-	function resolveReferences(ast, current_database) {
-	  let err;
-	  const table_map = {};
-	  const db_map = {};
-	  ast.from?.forEach?.((from) => {
-	    if (!from.db) {
-	      if (!current_database) {
-	        err = 'no_current_database';
-	      } else {
-	        from.db = current_database;
-	      }
-	    }
-	    if (!from._requestSet) {
-	      from._requestSet = new Set();
-	    }
-	    from._requestAll = from._requestAll || false;
-	    from.key = from.as || `${from.db}.${from.table}`;
-	    if (from.as) {
-	      table_map[from.as] = from;
-	    } else {
-	      if (!table_map[from.table]) {
-	        table_map[from.table] = from;
-	      }
-	      if (!db_map[from.db]) {
-	        db_map[from.db] = {};
-	      }
-	      db_map[from.db][from.table] = from;
-	    }
-	  });
-	  ast.table?.forEach?.((object) => {
-	    const from = object.db
-	      ? db_map[object.db]?.[object.table]
-	      : table_map[object.table];
-	    if (!from) {
-	      err = {
-	        err: 'table_not_found',
-	        args: [object.table],
-	      };
-	    } else {
-	      object.from = from;
-	    }
-	  });
-
-	  const name_cache = {};
-	  if (!err) {
-	    [ast.from, ast.columns, ast.where, ast.set].forEach((item) => {
-	      walkColumnRefs(item, (object) => {
-	        const ret = _resolveObject(object, ast, db_map, table_map, name_cache);
-	        if (ret && !err) {
-	          err = ret;
-	        }
-	      });
-	    });
-	  }
-	  if (!err) {
-	    ast.set?.forEach?.((object) => {
-	      const ret = _resolveObject(object, ast, db_map, table_map, name_cache);
-	      if (ret && !err) {
-	        err = ret;
-	      }
-	    });
-	  }
-
-	  const result_map = {};
-	  ast.columns?.forEach?.((column, i) => {
-	    if (column.as) {
-	      result_map[column.as] = i;
-	    } else if (column.expr?.type === 'column_ref') {
-	      result_map[column.expr.column] = i;
-	    }
-	  });
-
-	  if (!err) {
-	    [ast.groupby, ast.orderby, ast.having].forEach((item) => {
-	      walkColumnRefs(item, (object) => {
-	        const ret = _resolveObject(
-	          object,
-	          ast,
-	          db_map,
-	          table_map,
-	          name_cache,
-	          result_map
-	        );
-	        if (ret && !err) {
-	          err = ret;
-	        }
-	      });
-	    });
-	  }
-	  return err;
-	}
-	function _resolveObject(
-	  object,
-	  ast,
-	  db_map,
-	  table_map,
-	  name_cache,
-	  result_map
-	) {
-	  let err;
-	  if (object.column === '*') {
-	    if (object.db) {
-	      const from = db_map[object.db]?.[object.table];
-	      if (from) {
-	        from._requestAll = true;
-	      } else {
-	        err = {
-	          err: 'table_not_found',
-	          args: [object.table],
-	        };
-	      }
-	    } else if (object.table) {
-	      let found = false;
-	      ast.from?.forEach?.((from) => {
-	        if (
-	          from.as === object.table ||
-	          (!from.as && from.table === object.table)
-	        ) {
-	          from._requestAll = true;
-	          found = true;
-	        }
-	      });
-	      if (!found) {
-	        err = {
-	          err: 'table_not_found',
-	          args: [object.table],
-	        };
-	      }
-	    } else {
-	      ast.from?.forEach?.((from) => {
-	        from._requestAll = true;
-	      });
-	    }
-	  } else {
-	    let add_cache = false;
-	    let from;
-	    if (object.db) {
-	      from = db_map[object.db]?.[object.table];
-	      add_cache = true;
-	    } else if (object.table) {
-	      from = table_map[object.table];
-	      add_cache = true;
-	    } else {
-	      const index = result_map?.[object.column];
-	      if (index >= 0) {
-	        object._resultIndex = index;
-	      } else {
-	        const cached = name_cache[object.column];
-	        from = cached ?? ast.from?.[0];
-	      }
-	    }
-	    if (from) {
-	      object.from = from;
-	      from._requestSet.add(object.column);
-	      if (add_cache) {
-	        name_cache[object.column] = from;
-	      }
-	    } else if (object._resultIndex === undefined) {
-	      if (object.db && !db_map[object.db]) {
-	        err = {
-	          err: 'db_not_found',
-	          args: [object.db],
-	        };
-	      } else if (object.table) {
-	        err = {
-	          err: 'table_not_found',
-	          args: [object.table],
-	        };
-	      } else {
-	        err = {
-	          err: 'column_not_found',
-	          args: [object.column],
-	        };
-	      }
-	    }
-	  }
-	  return err;
-	}
-	return column_ref_helper;
+function formJoin(params) {
+    const { source_map, from, where, session } = params;
+    const row_list = [];
+    from.forEach((from_table) => {
+        row_list[from_table.key] = [];
+        from_table.is_left = from_table.join?.indexOf?.('LEFT') >= 0;
+    });
+    const result = _findRows(source_map, from, where, session, row_list, 0, 0);
+    const { err, output_count } = result;
+    if (!err) {
+        row_list.length = output_count;
+    }
+    return { err, row_list };
+}
+function _findRows(source_map, list, where, session, row_list, from_index, start_index) {
+    let err;
+    const from = list[from_index];
+    const { key, on, is_left } = from;
+    const rows = source_map[key];
+    const row_count = rows?.length || (is_left ? 1 : 0);
+    let output_count = 0;
+    for (let i = 0; i < row_count && !err; i++) {
+        const row_index = start_index + output_count;
+        if (!row_list[row_index]) {
+            row_list[row_index] = {};
+        }
+        const row = row_list[row_index];
+        row_list[row_index][key] = rows[i] ?? null;
+        for (let j = 0; output_count > 0 && j < from_index; j++) {
+            const from_key = list[j].key;
+            row_list[row_index][from_key] = row_list[start_index][from_key];
+        }
+        let skip = false;
+        if (on) {
+            const result = getValue(on, { session, row });
+            if (result.err) {
+                err = result.err;
+            }
+            else if (!result.value) {
+                skip = true;
+            }
+        }
+        if (skip && is_left && output_count === 0 && i + 1 === row_count) {
+            row_list[row_index][key] = null;
+            skip = false;
+        }
+        if (!skip) {
+            const next_from = from_index + 1;
+            if (next_from < list.length) {
+                const result = _findRows(source_map, list, where, session, row_list, next_from, start_index + output_count);
+                if (result.err) {
+                    err = result.err;
+                }
+                else {
+                    output_count += result.output_count;
+                }
+            }
+            else if (where) {
+                const result = getValue(where, { session, row });
+                if (result.err) {
+                    err = result.err;
+                }
+                else if (result.value) {
+                    output_count++;
+                }
+            }
+            else {
+                output_count++;
+            }
+        }
+    }
+    return { err, output_count };
 }
 
-var join = {};
-
-var hasRequiredJoin;
-
-function requireJoin () {
-	if (hasRequiredJoin) return join;
-	hasRequiredJoin = 1;
-	const Expression = requireExpression();
-	join.formJoin = formJoin;
-
-	function formJoin(params) {
-	  const { source_map, from, where, session } = params;
-	  const row_list = [];
-	  from.forEach((from_table) => {
-	    row_list[from_table.key] = [];
-	    from_table.is_left = from_table.join?.indexOf?.('LEFT') >= 0;
-	  });
-	  const result = _findRows(source_map, from, where, session, row_list, 0, 0);
-	  const { err, output_count } = result;
-	  if (!err) {
-	    row_list.length = output_count;
-	  }
-	  return { err, row_list };
-	}
-	function _findRows(
-	  source_map,
-	  list,
-	  where,
-	  session,
-	  row_list,
-	  from_index,
-	  start_index
-	) {
-	  let err;
-	  const from = list[from_index];
-	  const { key, on, is_left } = from;
-	  const rows = source_map[key];
-	  const row_count = rows?.length || (is_left ? 1 : 0);
-
-	  let output_count = 0;
-	  for (let i = 0; i < row_count && !err; i++) {
-	    const row_index = start_index + output_count;
-	    if (!row_list[row_index]) {
-	      row_list[row_index] = {};
-	    }
-	    const row = row_list[row_index];
-
-	    row_list[row_index][key] = rows[i] ?? null;
-	    for (let j = 0; output_count > 0 && j < from_index; j++) {
-	      const from_key = list[j].key;
-	      row_list[row_index][from_key] = row_list[start_index][from_key];
-	    }
-
-	    let skip = false;
-	    if (on) {
-	      const result = Expression.getValue(on, { session, row });
-	      if (result.err) {
-	        err = result.err;
-	      } else if (!result.value) {
-	        skip = true;
-	      }
-	    }
-	    if (skip && is_left && output_count === 0 && i + 1 === row_count) {
-	      row_list[row_index][key] = null;
-	      skip = false;
-	    }
-
-	    if (!skip) {
-	      const next_from = from_index + 1;
-	      if (next_from < list.length) {
-	        const result = _findRows(
-	          source_map,
-	          list,
-	          where,
-	          session,
-	          row_list,
-	          next_from,
-	          start_index + output_count
-	        );
-	        if (result.err) {
-	          err = result.err;
-	        } else {
-	          output_count += result.output_count;
-	        }
-	      } else if (where) {
-	        const result = Expression.getValue(where, { session, row });
-	        if (result.err) {
-	          err = result.err;
-	        } else if (result.value) {
-	          output_count++;
-	        }
-	      } else {
-	        output_count++;
-	      }
-	    }
-	  }
-	  return { err, output_count };
-	}
-	return join;
+function formGroup(params) {
+    const { groupby, ast, row_list, session } = params;
+    let err;
+    const output_list = [];
+    const count = groupby.length;
+    for (let i = 0; i < count; i++) {
+        const group = groupby[i];
+        if (group._resultIndex !== undefined) {
+            groupby[i] = ast.columns[group._resultIndex]?.expr;
+        }
+        else if (group.type === 'number') {
+            groupby[i] = ast.columns[group.value - 1]?.expr;
+        }
+    }
+    const group_map = {};
+    row_list.forEach((row) => {
+        const key_list = groupby.map((group) => {
+            const result = getValue(group, { session, row });
+            if (result.err && !err) {
+                err = result.err;
+            }
+            return result.value;
+        });
+        if (!err) {
+            let obj = group_map;
+            for (let i = 0; i < count; i++) {
+                const key = key_list[i];
+                if (i + 1 === count && !obj[key]) {
+                    obj[key] = [];
+                }
+                else if (!obj[key]) {
+                    obj[key] = {};
+                }
+                obj = obj[key];
+            }
+            obj.push(row);
+        }
+    });
+    if (!err) {
+        _unroll(output_list, group_map);
+    }
+    return { err, row_list: output_list };
+}
+function _unroll(list, obj) {
+    if (Array.isArray(obj)) {
+        list.push({ ...obj[0], '@@group': obj });
+    }
+    else {
+        for (let key in obj) {
+            _unroll(list, obj[key]);
+        }
+    }
 }
 
-var group = {};
-
-var hasRequiredGroup;
-
-function requireGroup () {
-	if (hasRequiredGroup) return group;
-	hasRequiredGroup = 1;
-	const Expression = requireExpression();
-
-	group.formGroup = formGroup;
-
-	function formGroup(params) {
-	  const { groupby, ast, row_list, session } = params;
-	  let err;
-	  const output_list = [];
-
-	  const count = groupby.length;
-	  for (let i = 0; i < count; i++) {
-	    const group = groupby[i];
-	    if (group._resultIndex !== undefined) {
-	      groupby[i] = ast.columns[group._resultIndex]?.expr;
-	    } else if (group.type === 'number') {
-	      groupby[i] = ast.columns[group.value - 1]?.expr;
-	    }
-	  }
-
-	  const group_map = {};
-	  row_list.forEach((row) => {
-	    const key_list = groupby.map((group) => {
-	      const result = Expression.getValue(group, { session, row });
-	      if (result.err && !err) {
-	        err = result.err;
-	      }
-	      return result.value;
-	    });
-	    if (!err) {
-	      let obj = group_map;
-	      for (let i = 0; i < count; i++) {
-	        const key = key_list[i];
-	        if (i + 1 === count && !obj[key]) {
-	          obj[key] = [];
-	        } else if (!obj[key]) {
-	          obj[key] = {};
-	        }
-	        obj = obj[key];
-	      }
-	      obj.push(row);
-	    }
-	  });
-
-	  if (!err) {
-	    _unroll(output_list, group_map);
-	  }
-	  return { err, row_list: output_list };
-	}
-	function _unroll(list, obj) {
-	  if (Array.isArray(obj)) {
-	    list.push({ ...obj[0], '@@group': obj });
-	  } else {
-	    for (let key in obj) {
-	      _unroll(list, obj[key]);
-	    }
-	  }
-	}
-	return group;
+function sort(row_list, orderby, state) {
+    try {
+        row_list.sort(_sort.bind(null, orderby, state));
+    }
+    catch (e) {
+        return e;
+    }
+    return null;
+}
+function _sort(orderby, state, a, b) {
+    const order_length = orderby.length;
+    for (let i = 0; i < order_length; i++) {
+        const order = orderby[i];
+        const { expr } = order;
+        const func = order.type !== 'DESC' ? _asc : _desc;
+        if (expr?.type === 'number') {
+            const index = expr.value - 1;
+            const result = func(a['@@result']?.[index]?.value, b['@@result']?.[index]?.value, state.column_list[index]);
+            if (result !== 0) {
+                return result;
+            }
+        }
+        else {
+            const a_value = getValue(expr, { ...state, row: a });
+            const b_value = getValue(expr, { ...state, row: b });
+            const err = a_value.err || b_value.err;
+            if (err) {
+                throw err;
+            }
+            const result = func(a_value.value, b_value.value, a_value.type);
+            if (result !== 0) {
+                return result;
+            }
+        }
+    }
+    return 0;
+}
+function _asc(a, b, column) {
+    if (a === b) {
+        return 0;
+    }
+    else if (a === null) {
+        return -1;
+    }
+    else if (b === null) {
+        return 1;
+    }
+    else if (typeof a === 'number' && typeof b === 'number') {
+        return a - b;
+    }
+    else if (column?.columnType === 246 || column === 'number') {
+        return _convertNum(a) - _convertNum(b);
+    }
+    else if (typeof a === 'string' && typeof b === 'string') {
+        return a.localeCompare(b);
+    }
+    else {
+        return String(a).localeCompare(String(b));
+    }
+}
+function _desc(a, b, column) {
+    return _asc(b, a, column);
+}
+function _convertNum(value) {
+    let ret = value;
+    if (value === '') {
+        ret = 0;
+    }
+    else if (typeof value === 'string') {
+        ret = parseFloat(value);
+        if (isNaN(ret)) {
+            ret = 0;
+        }
+    }
+    return ret;
 }
 
-var sort = {};
-
-var hasRequiredSort;
-
-function requireSort () {
-	if (hasRequiredSort) return sort;
-	hasRequiredSort = 1;
-	sort.sort = sort$1;
-
-	const Expression = requireExpression();
-
-	function sort$1(row_list, orderby, state) {
-	  try {
-	    row_list.sort(_sort.bind(null, orderby, state));
-	  } catch (e) {
-	    return e;
-	  }
-	  return null;
-	}
-	function _sort(orderby, state, a, b) {
-	  const order_length = orderby.length;
-	  for (let i = 0; i < order_length; i++) {
-	    const order = orderby[i];
-	    const { expr } = order;
-	    const func = order.type !== 'DESC' ? _asc : _desc;
-	    if (expr?.type === 'number') {
-	      const index = expr.value - 1;
-	      const result = func(
-	        a['@@result']?.[index]?.value,
-	        b['@@result']?.[index]?.value,
-	        state.column_list[index]
-	      );
-	      if (result !== 0) {
-	        return result;
-	      }
-	    } else {
-	      const a_value = Expression.getValue(expr, { ...state, row: a });
-	      const b_value = Expression.getValue(expr, { ...state, row: b });
-	      const err = a_value.err || b_value.err;
-	      if (err) {
-	        throw err;
-	      }
-	      const result = func(a_value.value, b_value.value, a_value.type);
-	      if (result !== 0) {
-	        return result;
-	      }
-	    }
-	  }
-	  return 0;
-	}
-	function _asc(a, b, column) {
-	  if (a === b) {
-	    return 0;
-	  } else if (a === null) {
-	    return -1;
-	  } else if (b === null) {
-	    return 1;
-	  } else if (typeof a === 'number' && typeof b === 'number') {
-	    return a - b;
-	  } else if (column?.columnType === 246 || column === 'number') {
-	    return _convertNum(a) - _convertNum(b);
-	  } else if (typeof a === 'string' && typeof b === 'string') {
-	    return a.localeCompare(b);
-	  } else {
-	    return String(a).localeCompare(String(b));
-	  }
-	}
-	function _desc(a, b, column) {
-	  return _asc(b, a, column);
-	}
-	function _convertNum(value) {
-	  let ret = value;
-	  if (value === '') {
-	    ret = 0;
-	  } else if (typeof value === 'string') {
-	    ret = parseFloat(value);
-	    if (isNaN(ret)) {
-	      ret = 0;
-	    }
-	  }
-	  return ret;
-	}
-	return sort;
+function query$7(params, done) {
+    internalQuery(params, (err, output_row_list, column_list) => {
+        if (!err) {
+            output_row_list?.forEach?.((row) => {
+                for (let key in row) {
+                    row[key] = row[key].value;
+                }
+            });
+        }
+        done(err, output_row_list, column_list);
+    });
+}
+function internalQuery(params, done) {
+    const { ast, session, dynamodb } = params;
+    let resolve_err;
+    const current_database = session.getCurrentDatabase();
+    if (!params.skip_resolve) {
+        resolve_err = resolveReferences(ast, current_database);
+    }
+    if (resolve_err) {
+        error('select: resolve err:', resolve_err);
+        done(resolve_err);
+    }
+    else if (ast?.from?.length) {
+        const db = ast.from?.[0]?.db;
+        const table = ast.from?.[0]?.table;
+        const engine = getEngine(db, table, session);
+        const opts = {
+            session,
+            dynamodb,
+            list: ast.from,
+            where: ast.where,
+        };
+        engine.getRowList(opts, (err, source_map, column_map) => {
+            if (err) {
+                done(err);
+            }
+            else {
+                _evaluateReturn({ ...params, source_map, column_map }, done);
+            }
+        });
+    }
+    else {
+        _evaluateReturn({ ...params, source_map: null, column_map: {} }, done);
+    }
+}
+function _evaluateReturn(params, done) {
+    const { session, source_map, ast } = params;
+    const query_columns = _expandStarColumns(params);
+    const { from, where, groupby } = ast;
+    let err;
+    let row_list;
+    let sleep_ms = 9;
+    if (from) {
+        const result = formJoin({ source_map, from, where, session });
+        if (result.err) {
+            err = result.err;
+        }
+        else {
+            row_list = result.row_list;
+        }
+    }
+    else {
+        row_list = [{ 0: {} }];
+    }
+    if (!err && groupby) {
+        const result = formGroup({ groupby, ast, row_list, session });
+        if (result.err) {
+            err = result.err;
+        }
+        else {
+            row_list = result.row_list;
+        }
+    }
+    const row_count = row_list?.length || 0;
+    const column_count = query_columns?.length || 0;
+    for (let i = 0; i < row_count && !err; i++) {
+        const output_row = [];
+        const row = row_list[i];
+        for (let j = 0; j < column_count; j++) {
+            const column = query_columns[j];
+            const result = getValue(column.expr, { session, row });
+            if (result.err) {
+                err = result.err;
+                break;
+            }
+            else {
+                output_row[j] = result;
+                if (result.type !== column.result_type) {
+                    column.result_type = _unionType(column.result_type, result.type);
+                }
+                if (!column.result_name) {
+                    column.result_name = result.name;
+                }
+                if (result.value === null) {
+                    column.result_nullable = true;
+                }
+            }
+            if (result.sleep_ms) {
+                sleep_ms = result.sleep_ms;
+            }
+        }
+        row['@@result'] = output_row;
+    }
+    let output_row_list;
+    const column_list = [];
+    if (!err) {
+        for (let i = 0; i < column_count; i++) {
+            const column = query_columns[i];
+            const column_type = convertType(column.result_type, column.result_nullable);
+            column_type.orgName = column.result_name || '';
+            column_type.name = column.as || column_type.orgName;
+            column_type.orgTable = column?.expr?.from?.table || '';
+            column_type.table = column?.expr?.from?.as || column_type.orgTable;
+            column_type.schema = column.expr?.from?.db || '';
+            column_list.push(column_type);
+        }
+        if (ast.orderby) {
+            err = sort(row_list, ast.orderby, { session, column_list });
+        }
+    }
+    if (!err) {
+        let start = 0;
+        let end = row_list.length;
+        if (ast.limit?.seperator === 'offset') {
+            start = ast.limit.value[1].value;
+            end = Math.min(end, start + ast.limit.value[0].value);
+        }
+        else if (ast.limit?.value?.length > 1) {
+            start = ast.limit.value[0].value;
+            end = Math.min(end, start + ast.limit.value[1].value);
+        }
+        else if (ast.limit) {
+            end = Math.min(end, ast.limit.value[0].value);
+        }
+        row_list = row_list.slice(start, end);
+        output_row_list = row_list.map((row) => row['@@result']);
+    }
+    if (!err && sleep_ms) {
+        setTimeout(() => {
+            done(err, output_row_list, column_list, row_list);
+        }, sleep_ms);
+    }
+    else {
+        done(err, output_row_list, column_list, row_list);
+    }
+}
+function _expandStarColumns(params) {
+    const { ast, column_map } = params;
+    const ret = [];
+    ast?.columns?.forEach?.((column) => {
+        if (column?.expr?.type === 'column_ref' && column.expr.column === '*') {
+            const { db, table } = column.expr;
+            ast.from.forEach((from) => {
+                if ((!db && !table) ||
+                    (db && from.db === db && from.table === table && !from.as) ||
+                    (!db && from.table === table && !from.as) ||
+                    (!db && from.as === table)) {
+                    const column_list = column_map[from.key];
+                    if (!column_list.length) {
+                        from._requestSet.forEach((name) => column_list.push(name));
+                    }
+                    column_list.forEach((name) => {
+                        ret.push({
+                            expr: {
+                                type: 'column_ref',
+                                db: from.as ? null : from.db,
+                                table: from.as ? from.as : from.table,
+                                column: name,
+                                from: from,
+                            },
+                            as: null,
+                        });
+                    });
+                }
+            });
+        }
+        else {
+            ret.push(column);
+        }
+    });
+    return ret;
+}
+function _unionType(old_type, new_type) {
+    let ret = new_type;
+    if (!old_type || old_type === 'null') ;
+    else if (new_type === 'null') {
+        ret = old_type;
+    }
+    else if (new_type !== old_type) {
+        ret = 'string';
+    }
+    return ret;
 }
 
-var hasRequiredSelect_handler;
-
-function requireSelect_handler () {
-	if (hasRequiredSelect_handler) return select_handler;
-	hasRequiredSelect_handler = 1;
-	const Expression = requireExpression();
-	const SchemaManager = requireSchema_manager();
-	const { convertType } = requireColumn_type_helper();
-	const { resolveReferences } = requireColumn_ref_helper();
-	const { formJoin } = requireJoin();
-	const { formGroup } = requireGroup();
-	const { sort } = requireSort();
-	const logger = requireLogger();
-
-	select_handler.query = query;
-	select_handler.internalQuery = internalQuery;
-
-	function query(params, done) {
-	  internalQuery(params, (err, output_row_list, column_list) => {
-	    if (!err) {
-	      output_row_list?.forEach?.((row) => {
-	        for (let key in row) {
-	          row[key] = row[key].value;
-	        }
-	      });
-	    }
-	    done(err, output_row_list, column_list);
-	  });
-	}
-	function internalQuery(params, done) {
-	  const { ast, session, dynamodb } = params;
-
-	  let resolve_err;
-	  const current_database = session.getCurrentDatabase();
-	  if (!params.skip_resolve) {
-	    resolve_err = resolveReferences(ast, current_database);
-	  }
-
-	  if (resolve_err) {
-	    logger.error('select: resolve err:', resolve_err);
-	    done(resolve_err);
-	  } else if (ast?.from?.length) {
-	    const db = ast.from?.[0]?.db;
-	    const table = ast.from?.[0]?.table;
-	    const engine = SchemaManager.getEngine(db, table, session);
-	    const opts = {
-	      session,
-	      dynamodb,
-	      list: ast.from,
-	      where: ast.where,
-	    };
-	    engine.getRowList(opts, (err, source_map, column_map) => {
-	      if (err) {
-	        done(err);
-	      } else {
-	        _evaluateReturn({ ...params, source_map, column_map }, done);
-	      }
-	    });
-	  } else {
-	    _evaluateReturn({ ...params, source_map: null, column_map: {} }, done);
-	  }
-	}
-	function _evaluateReturn(params, done) {
-	  const { session, source_map, ast } = params;
-	  const query_columns = _expandStarColumns(params);
-
-	  const { from, where, groupby } = ast;
-	  let err;
-	  let row_list;
-	  let sleep_ms = 9;
-	  if (from) {
-	    const result = formJoin({ source_map, from, where, session });
-	    if (result.err) {
-	      err = result.err;
-	    } else {
-	      row_list = result.row_list;
-	    }
-	  } else {
-	    row_list = [{ 0: {} }];
-	  }
-	  if (!err && groupby) {
-	    const result = formGroup({ groupby, ast, row_list, session });
-	    if (result.err) {
-	      err = result.err;
-	    } else {
-	      row_list = result.row_list;
-	    }
-	  }
-	  const row_count = row_list?.length || 0;
-	  const column_count = query_columns?.length || 0;
-
-	  for (let i = 0; i < row_count && !err; i++) {
-	    const output_row = [];
-	    const row = row_list[i];
-	    for (let j = 0; j < column_count; j++) {
-	      const column = query_columns[j];
-	      const result = Expression.getValue(column.expr, { session, row });
-	      if (result.err) {
-	        err = result.err;
-	        break;
-	      } else {
-	        output_row[j] = result;
-	        if (result.type !== column.result_type) {
-	          column.result_type = _unionType(column.result_type, result.type);
-	        }
-	        if (!column.result_name) {
-	          column.result_name = result.name;
-	        }
-	        if (result.value === null) {
-	          column.result_nullable = true;
-	        }
-	      }
-	      if (result.sleep_ms) {
-	        sleep_ms = result.sleep_ms;
-	      }
-	    }
-	    row['@@result'] = output_row;
-	  }
-
-	  let output_row_list;
-	  const column_list = [];
-	  if (!err) {
-	    for (let i = 0; i < column_count; i++) {
-	      const column = query_columns[i];
-	      const column_type = convertType(
-	        column.result_type,
-	        column.result_nullable
-	      );
-	      column_type.orgName = column.result_name || '';
-	      column_type.name = column.as || column_type.orgName;
-	      column_type.orgTable = column?.expr?.from?.table || '';
-	      column_type.table = column?.expr?.from?.as || column_type.orgTable;
-	      column_type.schema = column.expr?.from?.db || '';
-	      column_list.push(column_type);
-	    }
-	    if (ast.orderby) {
-	      err = sort(row_list, ast.orderby, { session, column_list });
-	    }
-	  }
-	  if (!err) {
-	    let start = 0;
-	    let end = row_list.length;
-	    if (ast.limit?.seperator === 'offset') {
-	      start = ast.limit.value[1].value;
-	      end = Math.min(end, start + ast.limit.value[0].value);
-	    } else if (ast.limit?.value?.length > 1) {
-	      start = ast.limit.value[0].value;
-	      end = Math.min(end, start + ast.limit.value[1].value);
-	    } else if (ast.limit) {
-	      end = Math.min(end, ast.limit.value[0].value);
-	    }
-
-	    row_list = row_list.slice(start, end);
-	    output_row_list = row_list.map((row) => row['@@result']);
-	  }
-
-	  if (!err && sleep_ms) {
-	    setTimeout(() => {
-	      done(err, output_row_list, column_list, row_list);
-	    }, sleep_ms);
-	  } else {
-	    done(err, output_row_list, column_list, row_list);
-	  }
-	}
-	function _expandStarColumns(params) {
-	  const { ast, column_map } = params;
-	  const ret = [];
-	  ast?.columns?.forEach?.((column) => {
-	    if (column?.expr?.type === 'column_ref' && column.expr.column === '*') {
-	      const { db, table } = column.expr;
-	      ast.from.forEach((from) => {
-	        if (
-	          (!db && !table) ||
-	          (db && from.db === db && from.table === table && !from.as) ||
-	          (!db && from.table === table && !from.as) ||
-	          (!db && from.as === table)
-	        ) {
-	          const column_list = column_map[from.key];
-	          if (!column_list.length) {
-	            from._requestSet.forEach((name) => column_list.push(name));
-	          }
-	          column_list.forEach((name) => {
-	            ret.push({
-	              expr: {
-	                type: 'column_ref',
-	                db: from.as ? null : from.db,
-	                table: from.as ? from.as : from.table,
-	                column: name,
-	                from: from,
-	              },
-	              as: null,
-	            });
-	          });
-	        }
-	      });
-	    } else {
-	      ret.push(column);
-	    }
-	  });
-	  return ret;
-	}
-	function _unionType(old_type, new_type) {
-	  let ret = new_type;
-	  if (!old_type || old_type === 'null') ; else if (new_type === 'null') {
-	    ret = old_type;
-	  } else if (new_type !== old_type) {
-	    ret = 'string';
-	  }
-	  return ret;
-	}
-	return select_handler;
+function query$6(params, done) {
+    const { ast, session } = params;
+    const database = ast.table?.[0]?.db || session.getCurrentDatabase();
+    if (ast.keyword === 'database') {
+        _createDatabase(params, done);
+    }
+    else if (!database) {
+        done('no_current_database');
+    }
+    else if (ast.keyword === 'table') {
+        _createTable(params, done);
+    }
+    else {
+        error('unsupported create:', ast.keyword);
+        done('unsupported');
+    }
+}
+function _createDatabase(params, done) {
+    const { ast } = params;
+    createDatabase(ast.database, (err) => {
+        let result;
+        if (err === 'database_exists' && ast.if_not_exists) {
+            err = null;
+        }
+        else if (err && err !== 'database_exists') {
+            error('createDatabase: err:', err);
+        }
+        else if (!err) {
+            result = { affectedRows: 1, changedRows: 0 };
+        }
+        done(err, result);
+    });
+}
+function _createTable(params, done) {
+    const { ast, session, dynamodb } = params;
+    const database = ast.table?.[0]?.db || session.getCurrentDatabase();
+    const table = ast.table?.[0]?.table;
+    const duplicate_mode = ast.ignore_replace;
+    const column_list = [];
+    let primary_key = [];
+    ast.create_definitions?.forEach?.((def) => {
+        if (def.resource === 'column') {
+            column_list.push({
+                name: def.column?.column,
+                type: def.definition?.dataType,
+                length: def.definition?.length,
+            });
+            if (def.primary_key === 'primary key') {
+                primary_key.push({ name: def.column?.column });
+            }
+        }
+        else if (def.constraint_type === 'primary key') {
+            primary_key = def.definition?.map?.((sub) => ({
+                name: sub.column,
+                order_by: sub.order_by,
+            }));
+        }
+    });
+    let list;
+    let result;
+    asyncSeries([
+        (done) => {
+            if (ast.as && ast.query_expr) {
+                const opts = { ast: ast.query_expr, session, dynamodb };
+                internalQuery(opts, (err, row_list, columns) => {
+                    if (!err) {
+                        const track = new Map();
+                        list = row_list.map((row) => {
+                            const obj = {};
+                            columns.forEach((column, i) => {
+                                obj[column.name] = row[i];
+                            });
+                            if (!err && !duplicate_mode) {
+                                const keys = primary_key.map(({ name }) => obj[name].value);
+                                if (!trackFirstSeen(track, keys)) {
+                                    err = {
+                                        err: 'dup_primary_key_entry',
+                                        args: [primary_key.map((key) => key.name), keys],
+                                    };
+                                }
+                            }
+                            return obj;
+                        });
+                    }
+                    done(err);
+                });
+            }
+            else {
+                done();
+            }
+        },
+        (done) => {
+            const options = Object.fromEntries(ast.table_options?.map?.((item) => [item.keyword, item.value]) || []);
+            const opts = {
+                dynamodb,
+                session,
+                database,
+                table,
+                column_list,
+                primary_key,
+                is_temp: Boolean(ast.temporary),
+                table_engine: options['engine'],
+            };
+            createTable$3(opts, done);
+        },
+        (done) => {
+            if (list?.length > 0) {
+                const engine = getEngine(database, table, session);
+                const opts = {
+                    dynamodb,
+                    session,
+                    database,
+                    table,
+                    list,
+                    duplicate_mode,
+                };
+                engine.insertRowList(opts, (err, insert_result) => {
+                    result = insert_result;
+                    done(err);
+                });
+            }
+            else {
+                done();
+            }
+        },
+    ], (err) => {
+        if (err === 'table_exists' && ast.if_not_exists) {
+            err = null;
+        }
+        done(err, result);
+    });
 }
 
-var hasRequiredCreate_handler;
-
-function requireCreate_handler () {
-	if (hasRequiredCreate_handler) return create_handler;
-	hasRequiredCreate_handler = 1;
-	const asyncSeries = requireSeries();
-	const SelectHandler = requireSelect_handler();
-	const SchemaManager = requireSchema_manager();
-	const { trackFirstSeen } = requireUtil();
-	const logger = requireLogger();
-
-	create_handler.query = query;
-
-	function query(params, done) {
-	  const { ast, session } = params;
-	  const database = ast.table?.[0]?.db || session.getCurrentDatabase();
-
-	  if (ast.keyword === 'database') {
-	    _createDatabase(params, done);
-	  } else if (!database) {
-	    done('no_current_database');
-	  } else if (ast.keyword === 'table') {
-	    _createTable(params, done);
-	  } else {
-	    logger.error('unsupported create:', ast.keyword);
-	    done('unsupported');
-	  }
-	}
-	function _createDatabase(params, done) {
-	  const { ast } = params;
-	  SchemaManager.createDatabase(ast.database, (err) => {
-	    let result;
-	    if (err === 'database_exists' && ast.if_not_exists) {
-	      err = null;
-	    } else if (err && err !== 'database_exists') {
-	      logger.error('createDatabase: err:', err);
-	    } else if (!err) {
-	      result = { affectedRows: 1, changedRows: 0 };
-	    }
-	    done(err, result);
-	  });
-	}
-	function _createTable(params, done) {
-	  const { ast, session, dynamodb } = params;
-	  const database = ast.table?.[0]?.db || session.getCurrentDatabase();
-	  const table = ast.table?.[0]?.table;
-	  const duplicate_mode = ast.ignore_replace;
-	  const column_list = [];
-	  let primary_key = [];
-	  ast.create_definitions?.forEach?.((def) => {
-	    if (def.resource === 'column') {
-	      column_list.push({
-	        name: def.column?.column,
-	        type: def.definition?.dataType,
-	        length: def.definition?.length,
-	      });
-	      if (def.primary_key === 'primary key') {
-	        primary_key.push({ name: def.column?.column });
-	      }
-	    } else if (def.constraint_type === 'primary key') {
-	      primary_key = def.definition?.map?.((sub) => ({
-	        name: sub.column,
-	        order_by: sub.order_by,
-	      }));
-	    }
-	  });
-	  let list;
-	  let result;
-	  asyncSeries(
-	    [
-	      (done) => {
-	        if (ast.as && ast.query_expr) {
-	          const opts = { ast: ast.query_expr, session, dynamodb };
-	          SelectHandler.internalQuery(opts, (err, row_list, columns) => {
-	            if (!err) {
-	              const track = new Map();
-	              list = row_list.map((row) => {
-	                const obj = {};
-	                columns.forEach((column, i) => {
-	                  obj[column.name] = row[i];
-	                });
-	                if (!err && !duplicate_mode) {
-	                  const keys = primary_key.map(({ name }) => obj[name].value);
-	                  if (!trackFirstSeen(track, keys)) {
-	                    err = {
-	                      err: 'dup_primary_key_entry',
-	                      args: [primary_key.map((key) => key.name), keys],
-	                    };
-	                  }
-	                }
-	                return obj;
-	              });
-	            }
-	            done(err);
-	          });
-	        } else {
-	          done();
-	        }
-	      },
-	      (done) => {
-	        const options = Object.fromEntries(
-	          ast.table_options?.map?.((item) => [item.keyword, item.value]) || []
-	        );
-	        const opts = {
-	          dynamodb,
-	          session,
-	          database,
-	          table,
-	          column_list,
-	          primary_key,
-	          is_temp: Boolean(ast.temporary),
-	          table_engine: options['engine'],
-	        };
-	        SchemaManager.createTable(opts, done);
-	      },
-	      (done) => {
-	        if (list?.length > 0) {
-	          const engine = SchemaManager.getEngine(database, table, session);
-	          const opts = {
-	            dynamodb,
-	            session,
-	            database,
-	            table,
-	            list,
-	            duplicate_mode,
-	          };
-	          engine.insertRowList(opts, (err, insert_result) => {
-	            result = insert_result;
-	            done(err);
-	          });
-	        } else {
-	          done();
-	        }
-	      },
-	    ],
-	    (err) => {
-	      if (err === 'table_exists' && ast.if_not_exists) {
-	        err = null;
-	      }
-	      done(err, result);
-	    }
-	  );
-	}
-	return create_handler;
+function makeEngineGroups(session, list) {
+    const ret = [];
+    list.forEach((object) => {
+        const { database, table } = object;
+        const engine = getEngine(database, table, session);
+        let found = ret.find((group) => group.engine === engine);
+        if (found) {
+            found.list.push(object);
+        }
+        else {
+            ret.push({ engine, list: [object] });
+        }
+    });
+    return ret;
 }
 
-var delete_handler = {};
-
-var engine_groups = {};
-
-var hasRequiredEngine_groups;
-
-function requireEngine_groups () {
-	if (hasRequiredEngine_groups) return engine_groups;
-	hasRequiredEngine_groups = 1;
-	const SchemaManager = requireSchema_manager();
-
-	engine_groups.makeEngineGroups = makeEngineGroups;
-
-	function makeEngineGroups(session, list) {
-	  const ret = [];
-	  list.forEach((object) => {
-	    const { database, table } = object;
-	    const engine = SchemaManager.getEngine(database, table, session);
-	    let found = ret.find((group) => group.engine === engine);
-	    if (found) {
-	      found.list.push(object);
-	    } else {
-	      ret.push({ engine, list: [object] });
-	    }
-	  });
-	  return ret;
-	}
-	return engine_groups;
+function runSelect(params, done) {
+    const { dynamodb, session, ast } = params;
+    const result_list = [];
+    asyncSeries([
+        (done) => asyncEach(ast.from, (object, done) => {
+            const { db, table } = object;
+            const engine = getEngine(db, table, session);
+            const opts = { dynamodb, session, database: db, table };
+            engine.getTableInfo(opts, (err, result) => {
+                if (err) {
+                    error('SelectModify: getTable: err:', err, table, result);
+                }
+                else if (result?.primary_key?.length > 0) {
+                    object._keyList = result.primary_key.map((key) => key.name);
+                    object._keyList.forEach((key) => object._requestSet.add(key));
+                }
+                else {
+                    err = 'bad_schema';
+                }
+                done(err);
+            });
+        }, done),
+        (done) => {
+            const opts = {
+                dynamodb,
+                session,
+                ast,
+                skip_resolve: true,
+            };
+            internalQuery(opts, (err, _ignore, _ignore2, row_list) => {
+                if (!err) {
+                    ast.from.forEach((object) => {
+                        const from_key = object.key;
+                        const key_list = object._keyList;
+                        const collection = new Map();
+                        row_list.forEach((row) => {
+                            const keys = key_list.map((key) => row[from_key]?.[key]);
+                            if (!keys.includes(undefined)) {
+                                _addCollection(collection, keys, row);
+                            }
+                        });
+                        const result = {
+                            key: from_key,
+                            list: [],
+                        };
+                        result_list.push(result);
+                        collection.forEach((value0, key0) => {
+                            if (key_list.length > 1) {
+                                value0.forEach((value1, key1) => {
+                                    result.list.push({
+                                        key: [key0, key1],
+                                        row: value1,
+                                    });
+                                });
+                            }
+                            else {
+                                result.list.push({ key: [key0], row: value0 });
+                            }
+                        });
+                    });
+                }
+                done(err);
+            });
+        },
+    ], (err) => done(err, result_list));
+}
+function _addCollection(collection, keys, value) {
+    if (keys.length > 1) {
+        let sub_map = collection.get(keys[0]);
+        if (!sub_map) {
+            sub_map = new Map();
+            collection.set(keys[0], sub_map);
+        }
+        sub_map.set(keys[1], value);
+    }
+    else {
+        collection.set(keys[0], value);
+    }
 }
 
-var select_modify = {};
-
-var hasRequiredSelect_modify;
-
-function requireSelect_modify () {
-	if (hasRequiredSelect_modify) return select_modify;
-	hasRequiredSelect_modify = 1;
-	const asyncEach = requireEach();
-	const asyncSeries = requireSeries();
-	const SchemaManager = requireSchema_manager();
-	const SelectHandler = requireSelect_handler();
-	const logger = requireLogger();
-
-	select_modify.runSelect = runSelect;
-
-	function runSelect(params, done) {
-	  const { dynamodb, session, ast } = params;
-
-	  const result_list = [];
-	  asyncSeries(
-	    [
-	      (done) =>
-	        asyncEach(
-	          ast.from,
-	          (object, done) => {
-	            const { db, table } = object;
-	            const engine = SchemaManager.getEngine(db, table, session);
-	            const opts = { dynamodb, session, database: db, table };
-	            engine.getTableInfo(opts, (err, result) => {
-	              if (err) {
-	                logger.error(
-	                  'SelectModify: getTable: err:',
-	                  err,
-	                  table,
-	                  result
-	                );
-	              } else if (result?.primary_key?.length > 0) {
-	                object._keyList = result.primary_key.map((key) => key.name);
-	                object._keyList.forEach((key) => object._requestSet.add(key));
-	              } else {
-	                err = 'bad_schema';
-	              }
-	              done(err);
-	            });
-	          },
-	          done
-	        ),
-	      (done) => {
-	        const opts = {
-	          dynamodb,
-	          session,
-	          ast,
-	          skip_resolve: true,
-	        };
-	        SelectHandler.internalQuery(
-	          opts,
-	          (err, _ignore, _ignore2, row_list) => {
-	            if (!err) {
-	              ast.from.forEach((object) => {
-	                const from_key = object.key;
-	                const key_list = object._keyList;
-	                const collection = new Map();
-	                row_list.forEach((row) => {
-	                  const keys = key_list.map((key) => row[from_key]?.[key]);
-	                  if (!keys.includes(undefined)) {
-	                    _addCollection(collection, keys, row);
-	                  }
-	                });
-	                const result = {
-	                  key: from_key,
-	                  list: [],
-	                };
-	                result_list.push(result);
-	                collection.forEach((value0, key0) => {
-	                  if (key_list.length > 1) {
-	                    value0.forEach((value1, key1) => {
-	                      result.list.push({
-	                        key: [key0, key1],
-	                        row: value1,
-	                      });
-	                    });
-	                  } else {
-	                    result.list.push({ key: [key0], row: value0 });
-	                  }
-	                });
-	              });
-	            }
-	            done(err);
-	          }
-	        );
-	      },
-	    ],
-	    (err) => done(err, result_list)
-	  );
-	}
-	function _addCollection(collection, keys, value) {
-	  if (keys.length > 1) {
-	    let sub_map = collection.get(keys[0]);
-	    if (!sub_map) {
-	      sub_map = new Map();
-	      collection.set(keys[0], sub_map);
-	    }
-	    sub_map.set(keys[1], value);
-	  } else {
-	    collection.set(keys[0], value);
-	  }
-	}
-	return select_modify;
+function query$5(params, done) {
+    const { ast, session } = params;
+    const current_database = session.getCurrentDatabase();
+    const resolve_err = resolveReferences(ast, current_database);
+    const database = ast.from?.[0]?.db;
+    if (resolve_err) {
+        error('resolve_err:', resolve_err);
+        done(resolve_err);
+    }
+    else if (!database) {
+        done('no_current_database');
+    }
+    else {
+        const opts = {
+            ...params,
+            func: _runDelete,
+        };
+        run(opts, done);
+    }
+}
+function _runDelete(params, done) {
+    const { ast, session, dynamodb } = params;
+    const database = ast.from?.[0]?.db;
+    const table = ast.from?.[0]?.table;
+    const engine = getEngine(database, table, session);
+    if (ast.from.length === 1) {
+        const opts = {
+            dynamodb,
+            session,
+            ast,
+        };
+        engine.singleDelete(opts, (err, result) => {
+            if (err === 'no_single') {
+                _multipleDelete(params, done);
+            }
+            else {
+                done(err, { affectedRows: result?.affectedRows, changedRows: 0 });
+            }
+        });
+    }
+    else {
+        _multipleDelete(params, done);
+    }
+}
+function _multipleDelete(params, done) {
+    const { dynamodb, session, ast } = params;
+    let affectedRows = 0;
+    asyncSeries([
+        (done) => runSelect(params, (err, result_list) => {
+            if (!err) {
+                ast.table.forEach((object) => {
+                    const from_key = object.from.key;
+                    const list = result_list.find((result) => result.key === from_key)?.list;
+                    object._deleteList = [];
+                    list?.forEach?.((item) => object._deleteList.push(item.key));
+                });
+            }
+            done(err);
+        }),
+        (done) => {
+            const from_list = ast.table
+                .map((obj) => ({
+                database: obj.from.db,
+                table: obj.from.table,
+                key_list: obj.from._keyList,
+                delete_list: obj._deleteList,
+            }))
+                .filter((obj) => obj.delete_list.length > 0);
+            if (from_list.length > 0) {
+                const groups = makeEngineGroups(session, from_list);
+                asyncEach(groups, (group, done) => {
+                    const { engine, list } = group;
+                    const opts = {
+                        dynamodb,
+                        session,
+                        list,
+                    };
+                    engine.multipleDelete(opts, (err, result) => {
+                        if (!err) {
+                            affectedRows += result.affectedRows;
+                        }
+                        done(err);
+                    });
+                }, done);
+            }
+            else {
+                done();
+            }
+        },
+    ], (err) => done(err, { affectedRows, changedRows: 0 }));
 }
 
-var hasRequiredDelete_handler;
-
-function requireDelete_handler () {
-	if (hasRequiredDelete_handler) return delete_handler;
-	hasRequiredDelete_handler = 1;
-	const asyncEach = requireEach();
-	const asyncSeries = requireSeries();
-	const SchemaManager = requireSchema_manager();
-	const TransactionManager = requireTransaction_manager();
-	const { makeEngineGroups } = requireEngine_groups();
-	const { resolveReferences } = requireColumn_ref_helper();
-	const { runSelect } = requireSelect_modify();
-	const logger = requireLogger();
-
-	delete_handler.query = query;
-
-	function query(params, done) {
-	  const { ast, session } = params;
-	  const current_database = session.getCurrentDatabase();
-	  const resolve_err = resolveReferences(ast, current_database);
-	  const database = ast.from?.[0]?.db;
-
-	  if (resolve_err) {
-	    logger.error('resolve_err:', resolve_err);
-	    done(resolve_err);
-	  } else if (!database) {
-	    done('no_current_database');
-	  } else {
-	    const opts = {
-	      ...params,
-	      func: _runDelete,
-	    };
-	    TransactionManager.run(opts, done);
-	  }
-	}
-	function _runDelete(params, done) {
-	  const { ast, session, dynamodb } = params;
-	  const database = ast.from?.[0]?.db;
-	  const table = ast.from?.[0]?.table;
-	  const engine = SchemaManager.getEngine(database, table, session);
-
-	  if (ast.from.length === 1) {
-	    const opts = {
-	      dynamodb,
-	      session,
-	      ast,
-	    };
-	    engine.singleDelete(opts, (err, result) => {
-	      if (err === 'no_single') {
-	        _multipleDelete(params, done);
-	      } else {
-	        done(err, { affectedRows: result?.affectedRows, changedRows: 0 });
-	      }
-	    });
-	  } else {
-	    _multipleDelete(params, done);
-	  }
-	}
-	function _multipleDelete(params, done) {
-	  const { dynamodb, session, ast } = params;
-
-	  let affectedRows = 0;
-	  asyncSeries(
-	    [
-	      (done) =>
-	        runSelect(params, (err, result_list) => {
-	          if (!err) {
-	            ast.table.forEach((object) => {
-	              const from_key = object.from.key;
-	              const list = result_list.find(
-	                (result) => result.key === from_key
-	              )?.list;
-	              object._deleteList = [];
-	              list?.forEach?.((item) => object._deleteList.push(item.key));
-	            });
-	          }
-	          done(err);
-	        }),
-	      (done) => {
-	        const from_list = ast.table
-	          .map((obj) => ({
-	            database: obj.from.db,
-	            table: obj.from.table,
-	            key_list: obj.from._keyList,
-	            delete_list: obj._deleteList,
-	          }))
-	          .filter((obj) => obj.delete_list.length > 0);
-	        if (from_list.length > 0) {
-	          const groups = makeEngineGroups(session, from_list);
-	          asyncEach(
-	            groups,
-	            (group, done) => {
-	              const { engine, list } = group;
-	              const opts = {
-	                dynamodb,
-	                session,
-	                list,
-	              };
-	              engine.multipleDelete(opts, (err, result) => {
-	                if (!err) {
-	                  affectedRows += result.affectedRows;
-	                }
-	                done(err);
-	              });
-	            },
-	            done
-	          );
-	        } else {
-	          done();
-	        }
-	      },
-	    ],
-	    (err) => done(err, { affectedRows, changedRows: 0 })
-	  );
-	}
-	return delete_handler;
+function query$4(params, done) {
+    const { ast, session, dynamodb } = params;
+    if (ast.keyword === 'database') {
+        dropDatabase({ ...params, database: ast.name }, done);
+    }
+    else if (ast.keyword === 'table') {
+        const database = ast.name?.[0]?.db || session.getCurrentDatabase();
+        const table = ast.name?.[0]?.table;
+        if (!database) {
+            done('no_current_database');
+        }
+        else {
+            const opts = {
+                dynamodb,
+                session,
+                database,
+                table,
+            };
+            dropTable(opts, (err) => {
+                if (err === 'resource_not_found' && ast.prefix === 'if exists') {
+                    err = null;
+                }
+                else if (err === 'resource_not_found') {
+                    err = {
+                        err: 'ER_BAD_TABLE_ERROR',
+                        args: [table],
+                    };
+                }
+                done(err, {});
+            });
+        }
+    }
+    else {
+        error('unsupported:', ast);
+        done('unsupported');
+    }
 }
 
-var drop_handler = {};
-
-var hasRequiredDrop_handler;
-
-function requireDrop_handler () {
-	if (hasRequiredDrop_handler) return drop_handler;
-	hasRequiredDrop_handler = 1;
-	const SchemaManager = requireSchema_manager();
-	const logger = requireLogger();
-
-	drop_handler.query = query;
-
-	function query(params, done) {
-	  const { ast, session, dynamodb } = params;
-
-	  if (ast.keyword === 'database') {
-	    SchemaManager.dropDatabase({ ...params, database: ast.name }, done);
-	  } else if (ast.keyword === 'table') {
-	    const database = ast.name?.[0]?.db || session.getCurrentDatabase();
-	    const table = ast.name?.[0]?.table;
-
-	    if (!database) {
-	      done('no_current_database');
-	    } else {
-	      const opts = {
-	        dynamodb,
-	        session,
-	        database,
-	        table,
-	      };
-	      SchemaManager.dropTable(opts, (err) => {
-	        if (err === 'resource_not_found' && ast.prefix === 'if exists') {
-	          err = null;
-	        } else if (err === 'resource_not_found') {
-	          err = {
-	            err: 'ER_BAD_TABLE_ERROR',
-	            args: [table],
-	          };
-	        }
-	        done(err, {});
-	      });
-	    }
-	  } else {
-	    logger.error('unsupported:', ast);
-	    done('unsupported');
-	  }
-	}
-	return drop_handler;
+function query$3(params, done) {
+    const { ast, session } = params;
+    const duplicate_mode = ast.type === 'replace'
+        ? 'replace'
+        : ast.prefix === 'ignore into'
+            ? 'ignore'
+            : null;
+    const database = ast.table?.[0]?.db || session.getCurrentDatabase();
+    const table = ast.table?.[0]?.table;
+    let err;
+    if (!database) {
+        err = 'no_current_database';
+    }
+    else {
+        err = _checkAst(ast);
+    }
+    if (err) {
+        done(err);
+    }
+    else {
+        const engine = getEngine(database, table, session);
+        const opts = {
+            ...params,
+            database,
+            engine,
+            duplicate_mode,
+            func: _runInsert,
+        };
+        run(opts, done);
+    }
+}
+function _runInsert(params, done) {
+    const { ast, session, engine, dynamodb, duplicate_mode } = params;
+    const table = ast.table?.[0]?.table;
+    let list;
+    let result;
+    asyncSeries([
+        (done) => {
+            if (ast.set?.length > 0) {
+                let err;
+                const obj = {};
+                ast.set.forEach((item) => {
+                    const expr_result = getValue(item.value, { session });
+                    if (!err && expr_result.err) {
+                        err = expr_result.err;
+                    }
+                    obj[item.column] = expr_result;
+                });
+                list = [obj];
+                done(err);
+            }
+            else if (ast.columns?.length > 0 && ast.values.type === 'select') {
+                const opts = { ast: ast.values, session, dynamodb };
+                internalQuery(opts, (err, row_list) => {
+                    if (err) {
+                        error('insert select err:', err);
+                    }
+                    else {
+                        list = row_list.map((row) => {
+                            const obj = {};
+                            ast.columns.forEach((name, i) => {
+                                obj[name] = row[i];
+                            });
+                            return obj;
+                        });
+                    }
+                    done(err);
+                });
+            }
+            else if (ast.columns?.length > 0) {
+                let err;
+                list = [];
+                ast.values?.forEach?.((row, i) => {
+                    const obj = {};
+                    if (row.value.length === ast.columns.length) {
+                        ast.columns.forEach((name, j) => {
+                            const expr_result = getValue(row.value[j], {
+                                session,
+                            });
+                            if (!err && expr_result.err) {
+                                err = expr_result.err;
+                            }
+                            obj[name] = expr_result;
+                        });
+                        list.push(obj);
+                    }
+                    else {
+                        err = {
+                            err: 'ER_WRONG_VALUE_COUNT_ON_ROW',
+                            args: [i],
+                        };
+                    }
+                });
+                done(err);
+            }
+            else {
+                error('unsupported insert without column names');
+                done('unsupported');
+            }
+        },
+        (done) => {
+            if (list.length > 0) {
+                const opts = {
+                    dynamodb,
+                    session,
+                    database: params.database,
+                    table,
+                    list,
+                    duplicate_mode,
+                };
+                engine.insertRowList(opts, (err, insert_result) => {
+                    result = insert_result;
+                    done(err);
+                });
+            }
+            else {
+                result = { affectedRows: 0 };
+                done();
+            }
+        },
+    ], (err) => {
+        if (err === 'resource_not_found' || err?.err === 'resource_not_found') {
+            err = { err: 'table_not_found', args: err?.args || [table] };
+        }
+        done(err, result);
+    });
+}
+function _checkAst(ast) {
+    let err;
+    if (ast.values?.type === 'select') {
+        if (ast.columns?.length !== ast.values.columns?.length) {
+            err = {
+                err: 'ER_WRONG_VALUE_COUNT_ON_ROW',
+                args: [1],
+            };
+        }
+    }
+    return err;
 }
 
-var insert_handler = {};
-
-var hasRequiredInsert_handler;
-
-function requireInsert_handler () {
-	if (hasRequiredInsert_handler) return insert_handler;
-	hasRequiredInsert_handler = 1;
-	const asyncSeries = requireSeries();
-	const Expression = requireExpression();
-	const SchemaManager = requireSchema_manager();
-	const TransactionManager = requireTransaction_manager();
-	const SelectHandler = requireSelect_handler();
-	const logger = requireLogger();
-
-	insert_handler.query = query;
-
-	function query(params, done) {
-	  const { ast, session } = params;
-	  const duplicate_mode =
-	    ast.type === 'replace'
-	      ? 'replace'
-	      : ast.prefix === 'ignore into'
-	        ? 'ignore'
-	        : null;
-
-	  const database = ast.table?.[0]?.db || session.getCurrentDatabase();
-	  const table = ast.table?.[0]?.table;
-	  let err;
-	  if (!database) {
-	    err = 'no_current_database';
-	  } else {
-	    err = _checkAst(ast);
-	  }
-
-	  if (err) {
-	    done(err);
-	  } else {
-	    const engine = SchemaManager.getEngine(database, table, session);
-	    const opts = {
-	      ...params,
-	      database,
-	      engine,
-	      duplicate_mode,
-	      func: _runInsert,
-	    };
-	    TransactionManager.run(opts, done);
-	  }
-	}
-	function _runInsert(params, done) {
-	  const { ast, session, engine, dynamodb, duplicate_mode } = params;
-	  const table = ast.table?.[0]?.table;
-
-	  let list;
-	  let result;
-	  asyncSeries(
-	    [
-	      (done) => {
-	        if (ast.set?.length > 0) {
-	          let err;
-	          const obj = {};
-	          ast.set.forEach((item) => {
-	            const expr_result = Expression.getValue(item.value, { session });
-	            if (!err && expr_result.err) {
-	              err = expr_result.err;
-	            }
-	            obj[item.column] = expr_result;
-	          });
-	          list = [obj];
-	          done(err);
-	        } else if (ast.columns?.length > 0 && ast.values.type === 'select') {
-	          const opts = { ast: ast.values, session, dynamodb };
-	          SelectHandler.internalQuery(opts, (err, row_list) => {
-	            if (err) {
-	              logger.error('insert select err:', err);
-	            } else {
-	              list = row_list.map((row) => {
-	                const obj = {};
-	                ast.columns.forEach((name, i) => {
-	                  obj[name] = row[i];
-	                });
-	                return obj;
-	              });
-	            }
-	            done(err);
-	          });
-	        } else if (ast.columns?.length > 0) {
-	          let err;
-	          list = [];
-	          ast.values?.forEach?.((row, i) => {
-	            const obj = {};
-	            if (row.value.length === ast.columns.length) {
-	              ast.columns.forEach((name, j) => {
-	                const expr_result = Expression.getValue(row.value[j], {
-	                  session,
-	                });
-	                if (!err && expr_result.err) {
-	                  err = expr_result.err;
-	                }
-	                obj[name] = expr_result;
-	              });
-	              list.push(obj);
-	            } else {
-	              err = {
-	                err: 'ER_WRONG_VALUE_COUNT_ON_ROW',
-	                args: [i],
-	              };
-	            }
-	          });
-	          done(err);
-	        } else {
-	          logger.error('unsupported insert without column names');
-	          done('unsupported');
-	        }
-	      },
-	      (done) => {
-	        if (list.length > 0) {
-	          const opts = {
-	            dynamodb,
-	            session,
-	            database: params.database,
-	            table,
-	            list,
-	            duplicate_mode,
-	          };
-	          engine.insertRowList(opts, (err, insert_result) => {
-	            result = insert_result;
-	            done(err);
-	          });
-	        } else {
-	          result = { affectedRows: 0 };
-	          done();
-	        }
-	      },
-	    ],
-	    (err) => {
-	      if (err === 'resource_not_found' || err?.err === 'resource_not_found') {
-	        err = { err: 'table_not_found', args: err?.args || [table] };
-	      }
-	      done(err, result);
-	    }
-	  );
-	}
-	function _checkAst(ast) {
-	  let err;
-	  if (ast.values?.type === 'select') {
-	    if (ast.columns?.length !== ast.values.columns?.length) {
-	      err = {
-	        err: 'ER_WRONG_VALUE_COUNT_ON_ROW',
-	        args: [1],
-	      };
-	    }
-	  }
-	  return err;
-	}
-	return insert_handler;
+function query$2(params, done) {
+    const { ast, session } = params;
+    let err;
+    const expr = ast?.expr;
+    if (expr?.type === 'assign') {
+        const { left } = expr;
+        const right = getValue(expr.right, { session });
+        if (right.err) {
+            err = right.err;
+        }
+        else if (left?.type === 'var' && left.prefix === '@') {
+            session.setVariable(left.name, right.value);
+        }
+        else {
+            error('set_handler.query: unsupported left:', left);
+            err = 'unsupported';
+        }
+    }
+    done(err);
 }
 
-var set_handler = {};
-
-var hasRequiredSet_handler;
-
-function requireSet_handler () {
-	if (hasRequiredSet_handler) return set_handler;
-	hasRequiredSet_handler = 1;
-	const Expression = requireExpression();
-	const logger = requireLogger();
-
-	set_handler.query = query;
-
-	function query(params, done) {
-	  const { ast, session } = params;
-
-	  let err;
-	  const expr = ast?.expr;
-	  if (expr?.type === 'assign') {
-	    const { left } = expr;
-	    const right = Expression.getValue(expr.right, { session });
-	    if (right.err) {
-	      err = right.err;
-	    } else if (left?.type === 'var' && left.prefix === '@') {
-	      session.setVariable(left.name, right.value);
-	    } else {
-	      logger.error('set_handler.query: unsupported left:', left);
-	      err = 'unsupported';
-	    }
-	  }
-	  done(err);
-	}
-	return set_handler;
+function query$1(params, done) {
+    const { ast, session, dynamodb } = params;
+    if (ast.keyword === 'databases') {
+        const column = Object.assign(convertType('string'), {
+            table: 'SCHEMATA',
+            orgTable: 'schemata',
+            name: 'Database',
+            orgName: 'Database',
+        });
+        const list = getDatabaseList();
+        const rows = list?.map?.((item) => [item]);
+        done(null, rows, [column]);
+    }
+    else if (ast.keyword === 'tables') {
+        const database = session.getCurrentDatabase();
+        if (database) {
+            const name = 'Tables_in_' + database;
+            const column = Object.assign(convertType('string'), {
+                table: 'TABLES',
+                orgTable: 'tables',
+                name,
+                orgName: name,
+            });
+            getTableList$2({ dynamodb, database }, (err, list) => {
+                const rows = list?.map?.((item) => [item]);
+                done(err, rows, [column]);
+            });
+        }
+        else {
+            done('no_current_database');
+        }
+    }
+    else {
+        done('unsupported');
+    }
 }
 
-var show_handler = {};
-
-var hasRequiredShow_handler;
-
-function requireShow_handler () {
-	if (hasRequiredShow_handler) return show_handler;
-	hasRequiredShow_handler = 1;
-	const SchemaManager = requireSchema_manager();
-	const { convertType } = requireColumn_type_helper();
-
-	show_handler.query = query;
-
-	function query(params, done) {
-	  const { ast, session, dynamodb } = params;
-
-	  if (ast.keyword === 'databases') {
-	    const column = Object.assign(convertType('string'), {
-	      table: 'SCHEMATA',
-	      orgTable: 'schemata',
-	      name: 'Database',
-	      orgName: 'Database',
-	    });
-	    const list = SchemaManager.getDatabaseList();
-	    const rows = list?.map?.((item) => [item]);
-	    done(null, rows, [column]);
-	  } else if (ast.keyword === 'tables') {
-	    const database = session.getCurrentDatabase();
-	    if (database) {
-	      const name = 'Tables_in_' + database;
-	      const column = Object.assign(convertType('string'), {
-	        table: 'TABLES',
-	        orgTable: 'tables',
-	        name,
-	        orgName: name,
-	      });
-	      SchemaManager.getTableList({ dynamodb, database }, (err, list) => {
-	        const rows = list?.map?.((item) => [item]);
-	        done(err, rows, [column]);
-	      });
-	    } else {
-	      done('no_current_database');
-	    }
-	  } else {
-	    done('unsupported');
-	  }
-	}
-	return show_handler;
+function query(params, done) {
+    const { ast, session } = params;
+    const current_database = session.getCurrentDatabase();
+    ast.from = ast.table;
+    delete ast.table;
+    const resolve_err = resolveReferences(ast, current_database);
+    const database = ast.from?.[0]?.db;
+    if (resolve_err) {
+        error('resolve_err:', resolve_err);
+        done(resolve_err);
+    }
+    else if (!database) {
+        done('no_current_database');
+    }
+    else {
+        const opts = {
+            ...params,
+            func: _runUpdate,
+        };
+        run(opts, done);
+    }
+}
+function _runUpdate(params, done) {
+    const { ast, session, dynamodb } = params;
+    const database = ast.from?.[0]?.db;
+    const table = ast.from?.[0]?.table;
+    const engine = getEngine(database, table, session);
+    if (ast.from.length === 1) {
+        const opts = {
+            dynamodb,
+            session,
+            ast,
+        };
+        engine.singleUpdate(opts, (err, result) => {
+            if (err === 'no_single') {
+                _multipleUpdate(params, done);
+            }
+            else {
+                done(err, result);
+            }
+        });
+    }
+    else {
+        _multipleUpdate(params, done);
+    }
+}
+function _multipleUpdate(params, done) {
+    const { dynamodb, session, ast } = params;
+    let affectedRows = 0;
+    let changedRows = 0;
+    asyncSeries([
+        (done) => runSelect(params, (err, result_list) => {
+            if (!err) {
+                ast.from.forEach((object) => {
+                    const from_key = object.key;
+                    const list = result_list.find((result) => result.key === from_key)?.list;
+                    object._updateList = [];
+                    list?.forEach?.(({ key, row }) => {
+                        const set_list = ast.set
+                            .filter((set_item) => set_item.from.key === from_key)
+                            .map((set_item) => {
+                            const expr_result = getValue(set_item.value, {
+                                session,
+                                row,
+                            });
+                            if (!err && expr_result.err) {
+                                err = expr_result.err;
+                            }
+                            return {
+                                column: set_item.column,
+                                value: expr_result,
+                            };
+                        });
+                        if (set_list.length > 0) {
+                            object._updateList.push({ key, set_list });
+                        }
+                    });
+                });
+            }
+            done(err);
+        }),
+        (done) => {
+            const from_list = ast.from
+                .map((obj) => ({
+                database: obj.db,
+                table: obj.table,
+                key_list: obj._keyList,
+                update_list: obj._updateList,
+            }))
+                .filter((obj) => obj.update_list.length > 0);
+            if (from_list.length > 0) {
+                const groups = makeEngineGroups(session, from_list);
+                asyncEach(groups, (group, done) => {
+                    const { engine, list } = group;
+                    const opts = {
+                        dynamodb,
+                        session,
+                        list,
+                    };
+                    engine.multipleUpdate(opts, (err, result) => {
+                        if (!err) {
+                            affectedRows += result.affectedRows;
+                            changedRows += result.changedRows;
+                        }
+                        done(err);
+                    });
+                }, done);
+            }
+            else {
+                done();
+            }
+        },
+    ], (err) => done(err, { affectedRows, changedRows }));
 }
 
-var update_handler = {};
-
-var hasRequiredUpdate_handler;
-
-function requireUpdate_handler () {
-	if (hasRequiredUpdate_handler) return update_handler;
-	hasRequiredUpdate_handler = 1;
-	const asyncSeries = requireSeries();
-	const asyncEach = requireEach();
-	const Expression = requireExpression();
-	const SchemaManager = requireSchema_manager();
-	const TransactionManager = requireTransaction_manager();
-	const { makeEngineGroups } = requireEngine_groups();
-	const { resolveReferences } = requireColumn_ref_helper();
-	const { runSelect } = requireSelect_modify();
-	const logger = requireLogger();
-
-	update_handler.query = query;
-
-	function query(params, done) {
-	  const { ast, session } = params;
-	  const current_database = session.getCurrentDatabase();
-
-	  ast.from = ast.table;
-	  delete ast.table;
-	  const resolve_err = resolveReferences(ast, current_database);
-	  const database = ast.from?.[0]?.db;
-
-	  if (resolve_err) {
-	    logger.error('resolve_err:', resolve_err);
-	    done(resolve_err);
-	  } else if (!database) {
-	    done('no_current_database');
-	  } else {
-	    const opts = {
-	      ...params,
-	      func: _runUpdate,
-	    };
-	    TransactionManager.run(opts, done);
-	  }
-	}
-	function _runUpdate(params, done) {
-	  const { ast, session, dynamodb } = params;
-	  const database = ast.from?.[0]?.db;
-	  const table = ast.from?.[0]?.table;
-	  const engine = SchemaManager.getEngine(database, table, session);
-
-	  if (ast.from.length === 1) {
-	    const opts = {
-	      dynamodb,
-	      session,
-	      ast,
-	    };
-	    engine.singleUpdate(opts, (err, result) => {
-	      if (err === 'no_single') {
-	        _multipleUpdate(params, done);
-	      } else {
-	        done(err, result);
-	      }
-	    });
-	  } else {
-	    _multipleUpdate(params, done);
-	  }
-	}
-	function _multipleUpdate(params, done) {
-	  const { dynamodb, session, ast } = params;
-
-	  let affectedRows = 0;
-	  let changedRows = 0;
-	  asyncSeries(
-	    [
-	      (done) =>
-	        runSelect(params, (err, result_list) => {
-	          if (!err) {
-	            ast.from.forEach((object) => {
-	              const from_key = object.key;
-	              const list = result_list.find(
-	                (result) => result.key === from_key
-	              )?.list;
-	              object._updateList = [];
-	              list?.forEach?.(({ key, row }) => {
-	                const set_list = ast.set
-	                  .filter((set_item) => set_item.from.key === from_key)
-	                  .map((set_item) => {
-	                    const expr_result = Expression.getValue(set_item.value, {
-	                      session,
-	                      row,
-	                    });
-	                    if (!err && expr_result.err) {
-	                      err = expr_result.err;
-	                    }
-	                    return {
-	                      column: set_item.column,
-	                      value: expr_result,
-	                    };
-	                  });
-	                if (set_list.length > 0) {
-	                  object._updateList.push({ key, set_list });
-	                }
-	              });
-	            });
-	          }
-	          done(err);
-	        }),
-	      (done) => {
-	        const from_list = ast.from
-	          .map((obj) => ({
-	            database: obj.db,
-	            table: obj.table,
-	            key_list: obj._keyList,
-	            update_list: obj._updateList,
-	          }))
-	          .filter((obj) => obj.update_list.length > 0);
-	        if (from_list.length > 0) {
-	          const groups = makeEngineGroups(session, from_list);
-	          asyncEach(
-	            groups,
-	            (group, done) => {
-	              const { engine, list } = group;
-	              const opts = {
-	                dynamodb,
-	                session,
-	                list,
-	              };
-	              engine.multipleUpdate(opts, (err, result) => {
-	                if (!err) {
-	                  affectedRows += result.affectedRows;
-	                  changedRows += result.changedRows;
-	                }
-	                done(err);
-	              });
-	            },
-	            done
-	          );
-	        } else {
-	          done();
-	        }
-	      },
-	    ],
-	    (err) => done(err, { affectedRows, changedRows })
-	  );
-	}
-	return update_handler;
+function typeCast(value, column, options) {
+    let ret;
+    if (value === null || value === undefined) {
+        ret = null;
+    }
+    else {
+        switch (column.columnType) {
+            case TYPES.OLDDECIMAL:
+            case TYPES.TINY:
+            case TYPES.TINYINT:
+            case TYPES.SHORT:
+            case TYPES.SMALLINT:
+            case TYPES.INT:
+            case TYPES.LONG:
+            case TYPES.FLOAT:
+            case TYPES.DOUBLE:
+            case TYPES.LONGLONG:
+            case TYPES.BIGINT:
+            case TYPES.INT24:
+            case TYPES.MEDIUMINT:
+            case TYPES.YEAR:
+            case TYPES.BIT:
+            case TYPES.DECIMAL:
+                if (typeof value === 'number') {
+                    ret = value;
+                }
+                else if (typeof value === 'string') {
+                    ret = parseFloat(value);
+                }
+                else {
+                    ret = parseFloat(String(value));
+                }
+                break;
+            case TYPES.TIMESTAMP:
+            case TYPES.DATE:
+            case TYPES.DATETIME:
+            case TYPES.NEWDATE:
+                if (options?.dateStrings) {
+                    ret = String(value);
+                }
+                else if (value instanceof Date) {
+                    ret = value;
+                }
+                else if (value.toDate) {
+                    ret = value.toDate();
+                }
+                else {
+                    ret = new Date(String(value));
+                }
+                break;
+            case TYPES.GEOMETRY:
+            case TYPES.TIME:
+                if (typeof value === 'string') {
+                    ret = value;
+                }
+                else {
+                    ret = String(value);
+                }
+                break;
+            case TYPES.VARCHAR:
+            case TYPES.ENUM:
+            case TYPES.SET:
+            case TYPES.VAR_STRING:
+            case TYPES.STRING:
+                if (column.characterSet === CHARSETS.BINARY) {
+                    if (Buffer.isBuffer(ret)) {
+                        ret = value;
+                    }
+                    else {
+                        ret = Buffer.from(String(value));
+                    }
+                }
+                else if (typeof value === 'string') {
+                    ret = value;
+                }
+                else {
+                    ret = String(value);
+                }
+                break;
+            case TYPES.JSON:
+                if (typeof value === 'object') {
+                    ret = value;
+                }
+                else if (typeof value === 'string') {
+                    ret = _jsonParse(value);
+                }
+                else {
+                    ret = value;
+                }
+                break;
+            case TYPES.TINYBLOB:
+            case TYPES.MEDIUMBLOB:
+            case TYPES.LONGBLOB:
+            case TYPES.BLOB:
+                if (Buffer.isBuffer(value)) {
+                    ret = value;
+                }
+                else {
+                    ret = Buffer.from(String(value));
+                }
+                break;
+            case TYPES.NULL:
+                ret = value;
+                break;
+        }
+    }
+    return ret;
+}
+function _jsonParse(obj) {
+    try {
+        return JSON.parse(obj);
+    }
+    catch (e) {
+        return null;
+    }
 }
 
-var type_cast_helper = {};
+var timesLimitExports = requireTimesLimit();
+var asyncTimesLimit = /*@__PURE__*/getDefaultExportFromCjs(timesLimitExports);
 
-var hasRequiredType_cast_helper;
-
-function requireType_cast_helper () {
-	if (hasRequiredType_cast_helper) return type_cast_helper;
-	hasRequiredType_cast_helper = 1;
-	const { TYPES, CHARSETS } = requireMysql();
-	type_cast_helper.typeCast = typeCast;
-
-	function typeCast(value, column, options) {
-	  let ret;
-	  if (value === null || value === undefined) {
-	    ret = null;
-	  } else {
-	    switch (column.columnType) {
-	      case TYPES.OLDDECIMAL:
-	      case TYPES.TINY:
-	      case TYPES.TINYINT:
-	      case TYPES.SHORT:
-	      case TYPES.SMALLINT:
-	      case TYPES.INT:
-	      case TYPES.LONG:
-	      case TYPES.FLOAT:
-	      case TYPES.DOUBLE:
-	      case TYPES.LONGLONG:
-	      case TYPES.BIGINT:
-	      case TYPES.INT24:
-	      case TYPES.MEDIUMINT:
-	      case TYPES.YEAR:
-	      case TYPES.BIT:
-	      case TYPES.DECIMAL:
-	        if (typeof value === 'number') {
-	          ret = value;
-	        } else if (typeof value === 'string') {
-	          ret = parseFloat(value);
-	        } else {
-	          ret = parseFloat(String(value));
-	        }
-	        break;
-	      case TYPES.TIMESTAMP:
-	      case TYPES.DATE:
-	      case TYPES.DATETIME:
-	      case TYPES.NEWDATE:
-	        if (options?.dateStrings) {
-	          ret = String(value);
-	        } else if (value instanceof Date) {
-	          ret = value;
-	        } else if (value.toDate) {
-	          ret = value.toDate();
-	        } else {
-	          ret = new Date(String(value));
-	        }
-	        break;
-	      case TYPES.GEOMETRY:
-	      case TYPES.TIME:
-	        if (typeof value === 'string') {
-	          ret = value;
-	        } else {
-	          ret = String(value);
-	        }
-	        break;
-	      case TYPES.VARCHAR:
-	      case TYPES.ENUM:
-	      case TYPES.SET:
-	      case TYPES.VAR_STRING:
-	      case TYPES.STRING:
-	        if (column.characterSet === CHARSETS.BINARY) {
-	          if (Buffer.isBuffer(ret)) {
-	            ret = value;
-	          } else {
-	            ret = Buffer.from(String(value));
-	          }
-	        } else if (typeof value === 'string') {
-	          ret = value;
-	        } else {
-	          ret = String(value);
-	        }
-	        break;
-	      case TYPES.JSON:
-	        if (typeof value === 'object') {
-	          ret = value;
-	        } else if (typeof value === 'string') {
-	          ret = _jsonParse(value);
-	        } else {
-	          ret = value;
-	        }
-	        break;
-	      case TYPES.TINYBLOB:
-	      case TYPES.MEDIUMBLOB:
-	      case TYPES.LONGBLOB:
-	      case TYPES.BLOB:
-	        if (Buffer.isBuffer(value)) {
-	          ret = value;
-	        } else {
-	          ret = Buffer.from(String(value));
-	        }
-	        break;
-	      case TYPES.NULL:
-	        ret = value;
-	        break;
-	    }
-	  }
-	  return ret;
-	}
-	function _jsonParse(obj) {
-	  try {
-	    return JSON.parse(obj);
-	  } catch (e) {
-	    return null;
-	  }
-	}
-	return type_cast_helper;
+let g_client$1;
+function init$2(client) {
+    g_client$1 = client;
+}
+function getTableList$1(done) {
+    const command = new clientDynamodb.ListTablesCommand({ Limit: 100 });
+    let next_token;
+    const results = [];
+    asyncForever((done) => {
+        if (next_token) {
+            command.input.ExclusiveStartTableName = next_token;
+        }
+        g_client$1.send(command).then((result) => {
+            let err;
+            result.TableNames.forEach((table) => results.push(table));
+            next_token = result?.LastEvaluatedTableName;
+            if (!next_token) {
+                err = 'stop';
+            }
+            done(err);
+        }, done);
+    }, (err) => {
+        if (err === 'stop') {
+            err = null;
+        }
+        done(err, results);
+    });
+}
+function getTable$2(TableName, done) {
+    const command = new clientDynamodb.DescribeTableCommand({ TableName });
+    g_client$1.send(command).then((result) => done(null, result), (err) => done(convertError(err)));
+}
+function createTable$2(params, done) {
+    const { table, billing_mode, column_list, primary_key } = params;
+    const AttributeDefinitions = column_list.map((column) => ({
+        AttributeName: column.name,
+        AttributeType: _dynamoType(column.type),
+    }));
+    const KeySchema = [
+        {
+            AttributeName: primary_key?.[0]?.name,
+            KeyType: 'HASH',
+        },
+    ];
+    if (primary_key?.[1]) {
+        KeySchema.push({
+            AttributeName: primary_key[1].name,
+            KeyType: 'RANGE',
+        });
+    }
+    const input = {
+        TableName: table,
+        BillingMode: billing_mode || 'PAY_PER_REQUEST',
+        AttributeDefinitions,
+        KeySchema,
+    };
+    const command = new clientDynamodb.CreateTableCommand(input);
+    g_client$1.send(command).then(() => done(), (err) => done(convertError(err)));
+}
+function deleteTable$2(TableName, done) {
+    const command = new clientDynamodb.DeleteTableCommand({ TableName });
+    g_client$1.send(command).then(() => done(), (err) => done(convertError(err)));
+}
+function createIndex$1(params, done) {
+    const { table, index_name, key_list, projection_type } = params;
+    const AttributeDefinitions = key_list.map((item) => ({
+        AttributeName: item.name,
+        AttributeType: _dynamoType(item.type),
+    }));
+    const KeySchema = [
+        {
+            AttributeName: key_list?.[0]?.name,
+            KeyType: 'HASH',
+        },
+    ];
+    if (key_list?.[1]) {
+        KeySchema.push({
+            AttributeName: key_list[1].name,
+            KeyType: 'RANGE',
+        });
+    }
+    const input = {
+        TableName: table,
+        AttributeDefinitions,
+        GlobalSecondaryIndexUpdates: [
+            {
+                Create: {
+                    IndexName: index_name,
+                    KeySchema,
+                    Projection: { ProjectionType: projection_type || 'KEYS_ONLY' },
+                },
+            },
+        ],
+    };
+    const command = new clientDynamodb.UpdateTableCommand(input);
+    g_client$1.send(command).then(() => done(), (err) => done(convertError(err)));
+}
+function deleteIndex$1(params, done) {
+    const { table, index_name } = params;
+    const input = {
+        TableName: table,
+        GlobalSecondaryIndexUpdates: [{ Delete: { IndexName: index_name } }],
+    };
+    const command = new clientDynamodb.UpdateTableCommand(input);
+    g_client$1.send(command).then(() => done(), (err) => done(convertError(err)));
+}
+function _dynamoType(type) {
+    let ret = type;
+    if (type === 'string') {
+        ret = 'S';
+    }
+    else if (type === 'VARCHAR') {
+        ret = 'S';
+    }
+    else if (type === 'INT') {
+        ret = 'N';
+    }
+    else if (type === 'number') {
+        ret = 'N';
+    }
+    else if (type === 'blob') {
+        ret = 'B';
+    }
+    return ret;
 }
 
-var dynamodb$1 = {};
-
-var dynamodb = {};
-
-var dynamodb_admin = {};
-
-var hasRequiredDynamodb_admin;
-
-function requireDynamodb_admin () {
-	if (hasRequiredDynamodb_admin) return dynamodb_admin;
-	hasRequiredDynamodb_admin = 1;
-	const asyncForever = requireForever();
-	const {
-	  CreateTableCommand,
-	  DeleteTableCommand,
-	  DescribeTableCommand,
-	  ListTablesCommand,
-	  UpdateTableCommand,
-	} = require$$1;
-	const { convertError } = requireDynamodb_helper();
-
-	dynamodb_admin.init = init;
-	dynamodb_admin.getTableList = getTableList;
-	dynamodb_admin.getTable = getTable;
-	dynamodb_admin.createTable = createTable;
-	dynamodb_admin.deleteTable = deleteTable;
-	dynamodb_admin.createIndex = createIndex;
-	dynamodb_admin.deleteIndex = deleteIndex;
-
-	let g_client;
-
-	function init(client) {
-	  g_client = client;
-	}
-	function getTableList(done) {
-	  const command = new ListTablesCommand({ Limit: 100 });
-	  let next_token;
-	  const results = [];
-	  asyncForever(
-	    (done) => {
-	      if (next_token) {
-	        command.input.ExclusiveStartTableName = next_token;
-	      }
-	      g_client.send(command).then((result) => {
-	        let err;
-	        result.TableNames.forEach((table) => results.push(table));
-	        next_token = result?.LastEvaluatedTableName;
-	        if (!next_token) {
-	          err = 'stop';
-	        }
-	        done(err);
-	      }, done);
-	    },
-	    (err) => {
-	      if (err === 'stop') {
-	        err = null;
-	      }
-	      done(err, results);
-	    }
-	  );
-	}
-	function getTable(TableName, done) {
-	  const command = new DescribeTableCommand({ TableName });
-	  g_client.send(command).then(
-	    (result) => done(null, result),
-	    (err) => done(convertError(err))
-	  );
-	}
-	function createTable(params, done) {
-	  const { table, billing_mode, column_list, primary_key } = params;
-	  const AttributeDefinitions = column_list.map((column) => ({
-	    AttributeName: column.name,
-	    AttributeType: _dynamoType(column.type),
-	  }));
-	  const KeySchema = [
-	    {
-	      AttributeName: primary_key?.[0]?.name,
-	      KeyType: 'HASH',
-	    },
-	  ];
-	  if (primary_key?.[1]) {
-	    KeySchema.push({
-	      AttributeName: primary_key[1].name,
-	      KeyType: 'RANGE',
-	    });
-	  }
-
-	  const input = {
-	    TableName: table,
-	    BillingMode: billing_mode || 'PAY_PER_REQUEST',
-	    AttributeDefinitions,
-	    KeySchema,
-	  };
-	  const command = new CreateTableCommand(input);
-	  g_client.send(command).then(
-	    () => done(),
-	    (err) => done(convertError(err))
-	  );
-	}
-	function deleteTable(TableName, done) {
-	  const command = new DeleteTableCommand({ TableName });
-	  g_client.send(command).then(
-	    () => done(),
-	    (err) => done(convertError(err))
-	  );
-	}
-	function createIndex(params, done) {
-	  const { table, index_name, key_list, projection_type } = params;
-	  const AttributeDefinitions = key_list.map((item) => ({
-	    AttributeName: item.name,
-	    AttributeType: _dynamoType(item.type),
-	  }));
-	  const KeySchema = [
-	    {
-	      AttributeName: key_list?.[0]?.name,
-	      KeyType: 'HASH',
-	    },
-	  ];
-	  if (key_list?.[1]) {
-	    KeySchema.push({
-	      AttributeName: key_list[1].name,
-	      KeyType: 'RANGE',
-	    });
-	  }
-	  const input = {
-	    TableName: table,
-	    AttributeDefinitions,
-	    GlobalSecondaryIndexUpdates: [
-	      {
-	        Create: {
-	          IndexName: index_name,
-	          KeySchema,
-	          Projection: { ProjectionType: projection_type || 'KEYS_ONLY' },
-	        },
-	      },
-	    ],
-	  };
-	  const command = new UpdateTableCommand(input);
-	  g_client.send(command).then(
-	    () => done(),
-	    (err) => done(convertError(err))
-	  );
-	}
-	function deleteIndex(params, done) {
-	  const { table, index_name } = params;
-	  const input = {
-	    TableName: table,
-	    GlobalSecondaryIndexUpdates: [{ Delete: { IndexName: index_name } }],
-	  };
-	  const command = new UpdateTableCommand(input);
-	  g_client.send(command).then(
-	    () => done(),
-	    (err) => done(convertError(err))
-	  );
-	}
-	function _dynamoType(type) {
-	  let ret = type;
-	  if (type === 'string') {
-	    ret = 'S';
-	  } else if (type === 'VARCHAR') {
-	    ret = 'S';
-	  } else if (type === 'INT') {
-	    ret = 'N';
-	  } else if (type === 'number') {
-	    ret = 'N';
-	  } else if (type === 'blob') {
-	    ret = 'B';
-	  }
-	  return ret;
-	}
-	return dynamodb_admin;
+const QUERY_LIMIT = 5;
+const getTableList = getTableList$1;
+const getTable$1 = getTable$2;
+const createTable$1 = createTable$2;
+const deleteTable$1 = deleteTable$2;
+const createIndex = createIndex$1;
+const deleteIndex = deleteIndex$1;
+let g_client;
+function init$1(params) {
+    if (!params) {
+        params = {};
+    }
+    if (!params.region && process.env.AWS_DEFAULT_REGION) {
+        params.region = process.env.AWS_DEFAULT_REGION;
+    }
+    g_client = new clientDynamodb.DynamoDBClient(params);
+    init$2(g_client);
+}
+function queryQL(list, done) {
+    if (!Array.isArray(list)) {
+        _queryQL(list, done);
+    }
+    else {
+        const err_list = [];
+        const result_list = [];
+        asyncTimesLimit(list.length, QUERY_LIMIT, (i, done) => {
+            const item = list[i];
+            _queryQL(item, (err, result) => {
+                result_list[i] = result;
+                err_list[i] = err;
+                done(err);
+            });
+        }, (err) => done(err ? err_list : null, result_list));
+    }
+}
+function _queryQL(params, done) {
+    const sql = params?.sql ? params.sql : params;
+    const input = {
+        Statement: sql,
+        ReturnValuesOnConditionCheckFailure: params?.return ?? 'NONE',
+    };
+    const command = new clientDynamodb.ExecuteStatementCommand(input);
+    _pagedSend(command, done);
+}
+function batchQL(params, done) {
+    const list = Array.isArray(params) ? params : params.list;
+    const input = {
+        Statements: list.map((Statement) => ({
+            Statement,
+            ReturnValuesOnConditionCheckFailure: params?.return ?? 'NONE',
+        })),
+    };
+    const command = new clientDynamodb.BatchExecuteStatementCommand(input);
+    g_client.send(command).then((result) => _successReturn(result, done), (err) => _errorReturn(err, done));
+}
+function transactionQL(params, done) {
+    const list = Array.isArray(params) ? params : params.list;
+    const input = {
+        TransactStatements: list.map((Statement) => ({
+            Statement,
+            ReturnValuesOnConditionCheckFailure: params?.return ?? 'NONE',
+        })),
+    };
+    const command = new clientDynamodb.ExecuteTransactionCommand(input);
+    g_client.send(command).then((result) => _successReturn(result, done), (err) => _errorReturn(err, done));
+}
+function deleteItems(params, done) {
+    const BATCH_LIMIT = 100;
+    const { table, key_list, list } = params;
+    const batch_count = Math.ceil(list.length / BATCH_LIMIT);
+    const prefix = `DELETE FROM ${escapeIdentifier(table)} WHERE `;
+    const err_list = [];
+    const result_list = [];
+    asyncTimesLimit(batch_count, QUERY_LIMIT, (batch_index, done) => {
+        const sql_list = [];
+        const start = BATCH_LIMIT * batch_index;
+        const end = Math.min(start + BATCH_LIMIT, list.length);
+        for (let i = start; i < end; i++) {
+            const cond = key_list
+                .map((key, j) => {
+                const value = list[i][j];
+                return `${escapeIdentifier(key)} = ${_convertValueToPQL(value)}`;
+            })
+                .join(' AND ');
+            sql_list.push(prefix + cond);
+        }
+        transactionQL(sql_list, (err, result) => {
+            for (let i = start; i < end; i++) {
+                result_list[i] = result?.[i - start];
+                err_list[i] = err?.[i - start];
+            }
+            done(err);
+        });
+    }, (err) => done(err ? err_list : null, result_list));
+}
+function updateItems(params, done) {
+    const BATCH_LIMIT = 100;
+    const { table, key_list, list } = params;
+    const batch_count = Math.ceil(list.length / BATCH_LIMIT);
+    const prefix = `UPDATE ${escapeIdentifier(table)} SET `;
+    const err_list = [];
+    const result_list = [];
+    asyncTimesLimit(batch_count, QUERY_LIMIT, (batch_index, done) => {
+        const sql_list = [];
+        const start = BATCH_LIMIT * batch_index;
+        const end = Math.min(start + BATCH_LIMIT, list.length);
+        for (let i = start; i < end; i++) {
+            const item = list[i];
+            const sets = item.set_list
+                .map((object) => {
+                const { column, value } = object;
+                return `${escapeIdentifier(column)} = ${escapeValue(value)}`;
+            })
+                .join(', ');
+            const cond = ' WHERE ' +
+                key_list
+                    .map((key, j) => {
+                    const value = item.key[j];
+                    return `${escapeIdentifier(key)} = ${_convertValueToPQL(value)}`;
+                })
+                    .join(' AND ');
+            sql_list.push(prefix + sets + cond);
+        }
+        transactionQL(sql_list, (err, result) => {
+            for (let i = start; i < end; i++) {
+                result_list[i] = result?.[i - start];
+                err_list[i] = err?.[i - start];
+            }
+            done(err);
+        });
+    }, (err) => done(err ? err_list : null, result_list));
+}
+function putItems(params, done) {
+    const BATCH_LIMIT = 100;
+    const { table, list } = params;
+    const batch_count = Math.ceil(list.length / BATCH_LIMIT);
+    const err_list = [];
+    asyncTimesLimit(batch_count, QUERY_LIMIT, (batch_index, done) => {
+        const start = BATCH_LIMIT * batch_index;
+        const end = start + BATCH_LIMIT;
+        const item_list = list.slice(start, end);
+        const input = {
+            TransactItems: item_list.map((item) => ({
+                Put: {
+                    TableName: table,
+                    Item: nativeToValue(item).M,
+                },
+            })),
+        };
+        const command = new clientDynamodb.TransactWriteItemsCommand(input);
+        g_client.send(command).then(() => done(), (err) => {
+            if (err?.name === 'TransactionCanceledException' &&
+                err.CancellationReasons?.length > 0) {
+                err.CancellationReasons.forEach((cancel_err, i) => {
+                    err_list[start + i] = {
+                        err: convertError(cancel_err),
+                        parent: cancel_err,
+                    };
+                });
+            }
+            else {
+                err_list[start] = {
+                    err: convertError(err),
+                    parent: err,
+                };
+            }
+            done(err || 'unknown');
+        });
+    }, (err) => done(err ? err_list : null));
+}
+function _pagedSend(command, done) {
+    let next_token;
+    const results = [];
+    asyncForever((done) => {
+        if (next_token) {
+            command.input.NextToken = next_token;
+        }
+        g_client.send(command).then((result) => {
+            let [err, list] = _convertSuccess(result);
+            list?.forEach?.((item) => {
+                results.push(item);
+            });
+            next_token = result?.NextToken;
+            if (!err && !next_token) {
+                err = 'stop';
+            }
+            done(err);
+        }, (err) => {
+            if (err.Item) {
+                results.push(err.Item);
+            }
+            done(convertError(err));
+        });
+    }, (err) => {
+        if (err === 'stop') {
+            err = null;
+        }
+        done(err, results);
+    });
+}
+function _convertValueToPQL(value) {
+    let ret;
+    if (!value) {
+        ret = 'NULL';
+    }
+    else if (value.S !== undefined) {
+        ret = "'" + escapeString(value.S) + "'";
+    }
+    else if (value.N !== undefined) {
+        ret = value.N;
+    }
+    else {
+        ret = "'" + escapeString(String(value)) + "'";
+    }
+    return ret;
+}
+function _successReturn(result, done) {
+    done(..._convertSuccess(result));
+}
+function _errorReturn(err, done) {
+    let ret;
+    if (err.Item) {
+        ret = [err.Item];
+    }
+    done(convertError(err), ret);
+}
+function _convertSuccess(result) {
+    let err = null;
+    let ret;
+    if (result?.Responses) {
+        ret = [];
+        result.Responses.forEach((response, i) => {
+            if (response.Error) {
+                if (!err) {
+                    err = [];
+                }
+                err[i] = convertError(response.Error);
+            }
+            ret[i] = _convertResult(response);
+        });
+    }
+    else {
+        ret = _convertResult(result);
+    }
+    return [err, ret];
+}
+function _convertResult(result) {
+    let ret;
+    if (result?.Items) {
+        ret = result.Items;
+    }
+    else if (result?.Item) {
+        ret = [result?.Item];
+    }
+    return ret;
 }
 
-var hasRequiredDynamodb$1;
+var dynamodb = /*#__PURE__*/Object.freeze({
+	__proto__: null,
+	batchQL: batchQL,
+	createIndex: createIndex,
+	createTable: createTable$1,
+	deleteIndex: deleteIndex,
+	deleteItems: deleteItems,
+	deleteTable: deleteTable$1,
+	getTable: getTable$1,
+	getTableList: getTableList,
+	init: init$1,
+	pql: pql,
+	putItems: putItems,
+	queryQL: queryQL,
+	transactionQL: transactionQL,
+	updateItems: updateItems
+});
 
-function requireDynamodb$1 () {
-	if (hasRequiredDynamodb$1) return dynamodb;
-	hasRequiredDynamodb$1 = 1;
-	(function (exports) {
-		const asyncForever = requireForever();
-		const asyncTimesLimit = requireTimesLimit();
-		const {
-		  DynamoDBClient,
-		  BatchExecuteStatementCommand,
-		  ExecuteStatementCommand,
-		  ExecuteTransactionCommand,
-		  TransactWriteItemsCommand,
-		} = require$$1;
-
-		const { init: AdminInit, ...AdminOther } = requireDynamodb_admin();
-		const {
-		  pql,
-		  convertError,
-		  escapeIdentifier,
-		  escapeString,
-		  escapeValue,
-		  nativeToValue,
-		} = requireDynamodb_helper();
-
-		const QUERY_LIMIT = 5;
-
-		exports.init = init;
-		exports.pql = pql;
-		exports.queryQL = queryQL;
-		exports.batchQL = batchQL;
-		exports.transactionQL = transactionQL;
-		exports.deleteItems = deleteItems;
-		exports.updateItems = updateItems;
-		exports.putItems = putItems;
-		Object.assign(exports, AdminOther);
-
-		let g_client;
-
-		function init(params) {
-		  if (!params) {
-		    params = {};
-		  }
-		  if (!params.region && process.env.AWS_DEFAULT_REGION) {
-		    params.region = process.env.AWS_DEFAULT_REGION;
-		  }
-		  g_client = new DynamoDBClient(params);
-		  AdminInit(g_client);
-		}
-
-		function queryQL(list, done) {
-		  if (!Array.isArray(list)) {
-		    _queryQL(list, done);
-		  } else {
-		    const err_list = [];
-		    const result_list = [];
-		    asyncTimesLimit(
-		      list.length,
-		      QUERY_LIMIT,
-		      (i, done) => {
-		        const item = list[i];
-		        _queryQL(item, (err, result) => {
-		          result_list[i] = result;
-		          err_list[i] = err;
-		          done(err);
-		        });
-		      },
-		      (err) => done(err ? err_list : null, result_list)
-		    );
-		  }
-		}
-		function _queryQL(params, done) {
-		  const sql = params?.sql ? params.sql : params;
-		  const input = {
-		    Statement: sql,
-		    ReturnValuesOnConditionCheckFailure: params?.return ?? 'NONE',
-		  };
-		  const command = new ExecuteStatementCommand(input);
-		  _pagedSend(command, done);
-		}
-		function batchQL(params, done) {
-		  const list = Array.isArray(params) ? params : params.list;
-		  const input = {
-		    Statements: list.map((Statement) => ({
-		      Statement,
-		      ReturnValuesOnConditionCheckFailure: params?.return ?? 'NONE',
-		    })),
-		  };
-		  const command = new BatchExecuteStatementCommand(input);
-		  g_client.send(command).then(
-		    (result) => _successReturn(result, done),
-		    (err) => _errorReturn(err, done)
-		  );
-		}
-		function transactionQL(params, done) {
-		  const list = Array.isArray(params) ? params : params.list;
-		  const input = {
-		    TransactStatements: list.map((Statement) => ({
-		      Statement,
-		      ReturnValuesOnConditionCheckFailure: params?.return ?? 'NONE',
-		    })),
-		  };
-		  const command = new ExecuteTransactionCommand(input);
-		  g_client.send(command).then(
-		    (result) => _successReturn(result, done),
-		    (err) => _errorReturn(err, done)
-		  );
-		}
-		function deleteItems(params, done) {
-		  const BATCH_LIMIT = 100;
-		  const { table, key_list, list } = params;
-		  const batch_count = Math.ceil(list.length / BATCH_LIMIT);
-		  const prefix = `DELETE FROM ${escapeIdentifier(table)} WHERE `;
-		  const err_list = [];
-		  const result_list = [];
-		  asyncTimesLimit(
-		    batch_count,
-		    QUERY_LIMIT,
-		    (batch_index, done) => {
-		      const sql_list = [];
-		      const start = BATCH_LIMIT * batch_index;
-		      const end = Math.min(start + BATCH_LIMIT, list.length);
-		      for (let i = start; i < end; i++) {
-		        const cond = key_list
-		          .map((key, j) => {
-		            const value = list[i][j];
-		            return `${escapeIdentifier(key)} = ${_convertValueToPQL(value)}`;
-		          })
-		          .join(' AND ');
-		        sql_list.push(prefix + cond);
-		      }
-		      transactionQL(sql_list, (err, result) => {
-		        for (let i = start; i < end; i++) {
-		          result_list[i] = result?.[i - start];
-		          err_list[i] = err?.[i - start];
-		        }
-		        done(err);
-		      });
-		    },
-		    (err) => done(err ? err_list : null, result_list)
-		  );
-		}
-		function updateItems(params, done) {
-		  const BATCH_LIMIT = 100;
-		  const { table, key_list, list } = params;
-		  const batch_count = Math.ceil(list.length / BATCH_LIMIT);
-		  const prefix = `UPDATE ${escapeIdentifier(table)} SET `;
-		  const err_list = [];
-		  const result_list = [];
-		  asyncTimesLimit(
-		    batch_count,
-		    QUERY_LIMIT,
-		    (batch_index, done) => {
-		      const sql_list = [];
-		      const start = BATCH_LIMIT * batch_index;
-		      const end = Math.min(start + BATCH_LIMIT, list.length);
-		      for (let i = start; i < end; i++) {
-		        const item = list[i];
-		        const sets = item.set_list
-		          .map((object) => {
-		            const { column, value } = object;
-		            return `${escapeIdentifier(column)} = ${escapeValue(value)}`;
-		          })
-		          .join(', ');
-		        const cond =
-		          ' WHERE ' +
-		          key_list
-		            .map((key, j) => {
-		              const value = item.key[j];
-		              return `${escapeIdentifier(key)} = ${_convertValueToPQL(value)}`;
-		            })
-		            .join(' AND ');
-		        sql_list.push(prefix + sets + cond);
-		      }
-		      transactionQL(sql_list, (err, result) => {
-		        for (let i = start; i < end; i++) {
-		          result_list[i] = result?.[i - start];
-		          err_list[i] = err?.[i - start];
-		        }
-		        done(err);
-		      });
-		    },
-		    (err) => done(err ? err_list : null, result_list)
-		  );
-		}
-		function putItems(params, done) {
-		  const BATCH_LIMIT = 100;
-		  const { table, list } = params;
-		  const batch_count = Math.ceil(list.length / BATCH_LIMIT);
-		  const err_list = [];
-		  asyncTimesLimit(
-		    batch_count,
-		    QUERY_LIMIT,
-		    (batch_index, done) => {
-		      const start = BATCH_LIMIT * batch_index;
-		      const end = start + BATCH_LIMIT;
-		      const item_list = list.slice(start, end);
-		      const input = {
-		        TransactItems: item_list.map((item) => ({
-		          Put: {
-		            TableName: table,
-		            Item: nativeToValue(item).M,
-		          },
-		        })),
-		      };
-		      const command = new TransactWriteItemsCommand(input);
-		      g_client.send(command).then(
-		        () => done(),
-		        (err) => {
-		          if (
-		            err?.name === 'TransactionCanceledException' &&
-		            err.CancellationReasons?.length > 0
-		          ) {
-		            err.CancellationReasons.forEach((cancel_err, i) => {
-		              err_list[start + i] = {
-		                err: convertError(cancel_err),
-		                parent: cancel_err,
-		              };
-		            });
-		          } else {
-		            err_list[start] = {
-		              err: convertError(err),
-		              parent: err,
-		            };
-		          }
-		          done(err || 'unknown');
-		        }
-		      );
-		    },
-		    (err) => done(err ? err_list : null)
-		  );
-		}
-		function _pagedSend(command, done) {
-		  let next_token;
-		  const results = [];
-		  asyncForever(
-		    (done) => {
-		      if (next_token) {
-		        command.input.NextToken = next_token;
-		      }
-		      g_client.send(command).then(
-		        (result) => {
-		          let [err, list] = _convertSuccess(result);
-		          list?.forEach?.((item) => {
-		            results.push(item);
-		          });
-
-		          next_token = result?.NextToken;
-		          if (!err && !next_token) {
-		            err = 'stop';
-		          }
-		          done(err);
-		        },
-		        (err) => {
-		          if (err.Item) {
-		            results.push(err.Item);
-		          }
-		          done(convertError(err));
-		        }
-		      );
-		    },
-		    (err) => {
-		      if (err === 'stop') {
-		        err = null;
-		      }
-		      done(err, results);
-		    }
-		  );
-		}
-		function _convertValueToPQL(value) {
-		  let ret;
-		  if (!value) {
-		    ret = 'NULL';
-		  } else if (value.S !== undefined) {
-		    ret = "'" + escapeString(value.S) + "'";
-		  } else if (value.N !== undefined) {
-		    ret = value.N;
-		  } else {
-		    ret = "'" + escapeString(String(value)) + "'";
-		  }
-		  return ret;
-		}
-		function _successReturn(result, done) {
-		  done(..._convertSuccess(result));
-		}
-		function _errorReturn(err, done) {
-		  let ret;
-		  if (err.Item) {
-		    ret = [err.Item];
-		  }
-		  done(convertError(err), ret);
-		}
-		function _convertSuccess(result) {
-		  let err = null;
-		  let ret;
-		  if (result?.Responses) {
-		    ret = [];
-		    result.Responses.forEach((response, i) => {
-		      if (response.Error) {
-		        if (!err) {
-		          err = [];
-		        }
-		        err[i] = convertError(response.Error);
-		      }
-		      ret[i] = _convertResult(response);
-		    });
-		  } else {
-		    ret = _convertResult(result);
-		  }
-		  return [err, ret];
-		}
-		function _convertResult(result) {
-		  let ret;
-		  if (result?.Items) {
-		    ret = result.Items;
-		  } else if (result?.Item) {
-		    ret = [result?.Item];
-		  }
-		  return ret;
-		} 
-	} (dynamodb));
-	return dynamodb;
+const g_tableCache = {};
+function getTable(table_name, done) {
+    getTable$1(table_name, (err, result) => {
+        if (err === 'resource_not_found' ||
+            (!err && result?.Table?.TableStatus === 'DELETING')) {
+            delete g_tableCache[table_name];
+        }
+        else if (!err) {
+            g_tableCache[table_name] = { last_updated: Date.now(), result };
+        }
+        done(err, result);
+    });
+}
+function getTableCached(table_name, done) {
+    if (table_name in g_tableCache) {
+        done(null, g_tableCache[table_name].result);
+    }
+    else {
+        getTable(table_name, done);
+    }
+}
+function createTable(opts, done) {
+    const table_name = opts.table;
+    delete g_tableCache[table_name];
+    createTable$1(opts, (err) => {
+        delete g_tableCache[table_name];
+        done(err);
+    });
+}
+function deleteTable(table_name, done) {
+    delete g_tableCache[table_name];
+    deleteTable$1(table_name, (err) => {
+        delete g_tableCache[table_name];
+        done(err);
+    });
 }
 
-var metadata_cache = {};
+var MetadataCache = /*#__PURE__*/Object.freeze({
+	__proto__: null,
+	createTable: createTable,
+	deleteTable: deleteTable,
+	getTable: getTable,
+	getTableCached: getTableCached
+});
 
-var hasRequiredMetadata_cache;
-
-function requireMetadata_cache () {
-	if (hasRequiredMetadata_cache) return metadata_cache;
-	hasRequiredMetadata_cache = 1;
-	const dynamodb = requireDynamodb$1();
-
-	metadata_cache.getTable = getTable;
-	metadata_cache.getTableCached = getTableCached;
-	metadata_cache.createTable = createTable;
-	metadata_cache.deleteTable = deleteTable;
-
-	const g_tableCache = {};
-
-	function getTable(table_name, done) {
-	  dynamodb.getTable(table_name, (err, result) => {
-	    if (
-	      err === 'resource_not_found' ||
-	      (!err && result?.Table?.TableStatus === 'DELETING')
-	    ) {
-	      delete g_tableCache[table_name];
-	    } else if (!err) {
-	      g_tableCache[table_name] = { last_updated: Date.now(), result };
-	    }
-	    done(err, result);
-	  });
-	}
-	function getTableCached(table_name, done) {
-	  if (table_name in g_tableCache) {
-	    done(null, g_tableCache[table_name].result);
-	  } else {
-	    getTable(table_name, done);
-	  }
-	}
-	function createTable(opts, done) {
-	  const table_name = opts.table;
-	  delete g_tableCache[table_name];
-	  dynamodb.createTable(opts, (err) => {
-	    delete g_tableCache[table_name];
-	    done(err);
-	  });
-	}
-	function deleteTable(table_name, done) {
-	  delete g_tableCache[table_name];
-	  dynamodb.deleteTable(table_name, (err) => {
-	    delete g_tableCache[table_name];
-	    done(err);
-	  });
-	}
-	return metadata_cache;
+function createDynamoDB(params, done) {
+    init$1(params);
+    const self = Object.assign({}, dynamodb, MetadataCache);
+    return self;
 }
 
-var hasRequiredDynamodb;
-
-function requireDynamodb () {
-	if (hasRequiredDynamodb) return dynamodb$1;
-	hasRequiredDynamodb = 1;
-	const dynamodb = requireDynamodb$1();
-
-	const MetadataCache = requireMetadata_cache();
-
-	dynamodb$1.createDynamoDB = createDynamoDB;
-
-	function createDynamoDB(params, done) {
-	  dynamodb.init(params);
-
-	  const self = Object.assign({}, dynamodb, MetadataCache);
-	  done?.(null, self);
-	  return self;
-	}
-	return dynamodb$1;
-}
-
-var mysqlExports = requireMysql();
-
-var utilExports = requireUtil();
-
-const { isNativeError } = require$$0$1.types;
+const { isNativeError } = util.types;
 const DEFAULT_ERRNO = 1002;
 const DEFAULT_CODE = 'ER_NO';
 const ERROR_MAP = {
@@ -28073,12 +26739,17 @@ class SQLError extends Error {
     constructor(err, sql) {
         const sql_err = ERROR_MAP[err] || ERROR_MAP[err.err];
         const code = err.code || sql_err?.code || DEFAULT_CODE;
-        const errno = err.errno || sql_err?.errno || mysqlExports.CODE_ERRNO[code] || DEFAULT_ERRNO;
+        const errno = err.errno ||
+            sql_err?.errno ||
+            CODE_ERRNO[code] ||
+            DEFAULT_ERRNO;
         let sqlMessage = err.sqlMessage || sql_err?.sqlMessage;
         if (typeof sqlMessage === 'function') {
             sqlMessage = sqlMessage(err.args);
         }
-        const message = err.message || sqlMessage || (typeof err === 'string' ? err : undefined);
+        const message = err.message ||
+            sqlMessage ||
+            (typeof err === 'string' ? err : undefined);
         if (err.cause) {
             super(message, { cause: err.cause });
         }
@@ -28118,323 +26789,279 @@ function _stringify(arg) {
     }
     else if (typeof arg === 'object' &&
         arg.toString === Object.prototype.toString) {
-        ret = utilExports.jsonStringify(arg);
+        ret = jsonStringify(arg);
     }
     return ret;
 }
 
-var error = /*#__PURE__*/Object.freeze({
-	__proto__: null,
-	SQLError: SQLError
-});
-
-var require$$15 = /*@__PURE__*/getAugmentedNamespace(error);
-
-var hasRequiredSession;
-
-function requireSession () {
-	if (hasRequiredSession) return session;
-	hasRequiredSession = 1;
-	const asyncTimesSeries = requireTimesSeries();
-	const SqlString$1 = SqlString;
-
-	const { Parser } = requireMysql_parser();
-
-	const AlterHandler = requireAlter_handler();
-	const CreateHandler = requireCreate_handler();
-	const DeleteHandler = requireDelete_handler();
-	const DropHandler = requireDrop_handler();
-	const InsertHandler = requireInsert_handler();
-	const SelectHandler = requireSelect_handler();
-	const SetHandler = requireSet_handler();
-	const ShowHandler = requireShow_handler();
-	const UpdateHandler = requireUpdate_handler();
-
-	const { typeCast } = requireType_cast_helper();
-	const DynamoDB = requireDynamodb();
-	const logger = requireLogger();
-	const { SQLError } = require$$15;
-
-	session.init = init;
-	session.createSession = createSession;
-
-	const DEFAULT_RESULT = { affectedRows: 0, changedRows: 0 };
-
-	const parser = new Parser();
-	let g_dynamodb;
-
-	function init(args) {
-	  g_dynamodb = DynamoDB.createDynamoDB(args);
-	}
-	class Session {
-	  constructor(args) {
-	    if (args?.database) {
-	      this.setCurrentDatabase(args.database);
-	    }
-	    if (args?.multipleStatements) {
-	      this._multipleStatements = true;
-	    }
-	    if (args?.resultObjects === false) {
-	      this._resultObjects = false;
-	    }
-	    if (args?.typeCast === false) {
-	      this._typeCast = false;
-	    }
-	    if (args?.dateStrings) {
-	      this._typeCastOptions.dateStrings = true;
-	    }
-	  }
-	  _typeCastOptions = {};
-	  _currentDatabase = null;
-	  _localVariables = {};
-	  _transaction = null;
-	  _isReleased = false;
-	  _multipleStatements = false;
-	  _tempTableMap = {};
-
-	  _typeCast = true;
-	  _dateStrings = false;
-	  _resultObjects = true;
-
-	  escape = SqlString$1.escpape;
-	  escapeId = SqlString$1.escapeId;
-	  release(done) {
-	    this._isReleased = true;
-	    done?.();
-	  }
-	  end(done) {
-	    this.release(done);
-	  }
-	  destroy() {
-	    this.release();
-	  }
-
-	  setCurrentDatabase(database, done) {
-	    this._currentDatabase = database;
-	    done?.();
-	  }
-	  getCurrentDatabase() {
-	    return this._currentDatabase;
-	  }
-	  setVariable(name, value) {
-	    this._localVariables[name] = value;
-	  }
-	  getVariable(name) {
-	    return this._localVariables[name];
-	  }
-	  getTransaction() {
-	    return this._transaction;
-	  }
-	  setTransaction(tx) {
-	    this._transaction = tx;
-	  }
-	  getTempTableList() {
-	    return Object.entries(this._tempTableMap);
-	  }
-	  getTempTable(database, table) {
-	    const key = database + '.' + table;
-	    return this._tempTableMap[key];
-	  }
-	  saveTempTable(database, table, contents) {
-	    const key = database + '.' + table;
-	    this._tempTableMap[key] = contents;
-	  }
-	  dropTempTable(database, table) {
-	    const prefix = database + '.';
-	    if (table) {
-	      const key = prefix + table;
-	      delete this._tempTableMap[key];
-	    } else {
-	      Object.keys(this._tempTableMap).forEach((key) => {
-	        if (key.startsWith(prefix)) {
-	          delete this._tempTableMap[key];
-	        }
-	      });
-	    }
-	  }
-
-	  query(params, values, done) {
-	    const opts = typeof params === 'object' ? params : {};
-	    if (typeof params === 'string') {
-	      opts.sql = params;
-	    }
-	    if (typeof values === 'function') {
-	      done = values;
-	    } else if (values !== undefined) {
-	      opts.values = values;
-	    }
-
-	    if (!opts.sql) {
-	      done(new SQLError('ER_EMPTY_QUERY'));
-	    } else {
-	      if (opts.values !== undefined) {
-	        opts.sql = SqlString$1.format(opts.sql, opts.values);
-	      }
-	      this._query(opts, done);
-	    }
-	  }
-	  _query(opts, done) {
-	    if (this._isReleased) {
-	      done('released');
-	    } else {
-	      const { err: parse_err, list } = _astify(opts.sql);
-	      if (parse_err) {
-	        done(new SQLError(parse_err, opts.sql));
-	      } else if (list.length === 0) {
-	        done(new SQLError('ER_EMPTY_QUERY', opts.sql));
-	      } else if (list.length === 1) {
-	        this._singleQuery(list[0], (err, result, columns) => {
-	          if (!err) {
-	            this._transformResult(result, columns, opts);
-	          }
-	          done(
-	            err ? new SQLError(err, opts.sql) : null,
-	            err ? undefined : (result ?? DEFAULT_RESULT),
-	            err ? undefined : columns,
-	            1
-	          );
-	        });
-	      } else if (this._multipleStatements) {
-	        const query_count = list.length;
-	        const result_list = [];
-	        const schema_list = [];
-	        asyncTimesSeries(
-	          query_count,
-	          (n, done) => {
-	            const ast = list[n];
-	            if (ast) {
-	              this._singleQuery(ast, (err, result, columns) => {
-	                if (!err) {
-	                  this._transformResult(result, columns, opts);
-	                  result_list[n] = result ?? DEFAULT_RESULT;
-	                  schema_list[n] = columns;
-	                }
-	                done(err);
-	              });
-	            } else {
-	              done();
-	            }
-	          },
-	          (err) => {
-	            if (err) {
-	              err = new SQLError(err, opts.sql);
-	              err.index = result_list.length;
-	            }
-	            done(err, result_list, schema_list, query_count);
-	          }
-	        );
-	      } else {
-	        done(new SQLError('multiple_statements_disabled', opts.sql));
-	      }
-	    }
-	  }
-	  _singleQuery(ast, done) {
-	    let err;
-	    let handler;
-	    switch (ast?.type) {
-	      case 'alter':
-	        handler = AlterHandler.query;
-	        break;
-	      case 'create':
-	        handler = CreateHandler.query;
-	        break;
-	      case 'delete':
-	        handler = DeleteHandler.query;
-	        break;
-	      case 'drop':
-	        handler = DropHandler.query;
-	        break;
-	      case 'insert':
-	      case 'replace':
-	        handler = InsertHandler.query;
-	        break;
-	      case 'show':
-	        handler = ShowHandler.query;
-	        break;
-	      case 'select':
-	        handler = SelectHandler.query;
-	        break;
-	      case 'set':
-	        handler = SetHandler.query;
-	        break;
-	      case 'update':
-	        handler = UpdateHandler.query;
-	        break;
-	      case 'use':
-	        handler = _useDatabase;
-	        break;
-	      default:
-	        logger.error('unsupported statement type:', ast);
-	        err = {
-	          err: 'unsupported_type',
-	          args: [ast?.type],
-	        };
-	    }
-
-	    if (handler) {
-	      handler({ ast, dynamodb: g_dynamodb, session: this }, done);
-	    } else {
-	      done(err || 'unsupported_type');
-	    }
-	  }
-	  _transformResult(list, columns, opts) {
-	    if (this._resultObjects && Array.isArray(list)) {
-	      list.forEach((result, i) => {
-	        const obj = {};
-	        columns.forEach((column, j) => {
-	          let dest = obj;
-	          if (opts.nestTables) {
-	            if (!obj[column.table]) {
-	              obj[column.table] = {};
-	            }
-	            dest = obj[column.table];
-	          }
-	          dest[column.name] = this._convertCell(result[j], column);
-	        });
-	        list[i] = obj;
-	      });
-	    }
-	  }
-	  _convertCell(value, column) {
-	    return this._typeCast
-	      ? typeCast(value, column, this._typeCastOptions)
-	      : value;
-	  }
-	}
-	function createSession(args) {
-	  if (args) {
-	    g_dynamodb = DynamoDB.createDynamoDB(args);
-	  }
-	  return new Session(args);
-	}
-	function _astify(sql) {
-	  let err;
-	  let list = [];
-	  try {
-	    const result = parser.astify(sql);
-	    if (Array.isArray(result)) {
-	      list = result;
-	    } else {
-	      list = [result];
-	    }
-	  } catch (e) {
-	    logger.error('parse error:', e);
-	    const start = e?.location?.start;
-	    err = { err: 'parse', args: [start?.line, start?.column] };
-	  }
-	  return { err, list };
-	}
-	function _useDatabase(params, done) {
-	  params.session.setCurrentDatabase(params.ast.db, done);
-	}
-	return session;
+const DEFAULT_RESULT = { affectedRows: 0, changedRows: 0 };
+const parser = new mysql_parserExports.Parser();
+let g_dynamodb;
+function init(args) {
+    g_dynamodb = createDynamoDB(args);
 }
-
-var sessionExports = requireSession();
+class Session {
+    constructor(args) {
+        this._typeCastOptions = {};
+        this._currentDatabase = null;
+        this._localVariables = {};
+        this._transaction = null;
+        this._isReleased = false;
+        this._multipleStatements = false;
+        this._tempTableMap = {};
+        this._typeCast = true;
+        this._dateStrings = false;
+        this._resultObjects = true;
+        this.escape = SqlString__namespace.escape;
+        this.escapeId = SqlString__namespace.escapeId;
+        if (args?.database) {
+            this.setCurrentDatabase(args.database);
+        }
+        if (args?.multipleStatements) {
+            this._multipleStatements = true;
+        }
+        if (args?.resultObjects === false) {
+            this._resultObjects = false;
+        }
+        if (args?.typeCast === false) {
+            this._typeCast = false;
+        }
+        if (args?.dateStrings) {
+            this._typeCastOptions.dateStrings = true;
+        }
+    }
+    release(done) {
+        this._isReleased = true;
+        done?.();
+    }
+    end(done) {
+        this.release(done);
+    }
+    destroy() {
+        this.release();
+    }
+    setCurrentDatabase(database, done) {
+        this._currentDatabase = database;
+        done?.();
+    }
+    getCurrentDatabase() {
+        return this._currentDatabase;
+    }
+    setVariable(name, value) {
+        this._localVariables[name] = value;
+    }
+    getVariable(name) {
+        return this._localVariables[name];
+    }
+    getTransaction() {
+        return this._transaction;
+    }
+    setTransaction(tx) {
+        this._transaction = tx;
+    }
+    getTempTableList() {
+        return Object.entries(this._tempTableMap);
+    }
+    getTempTable(database, table) {
+        const key = database + '.' + table;
+        return this._tempTableMap[key];
+    }
+    saveTempTable(database, table, contents) {
+        const key = database + '.' + table;
+        this._tempTableMap[key] = contents;
+    }
+    dropTempTable(database, table) {
+        const prefix = database + '.';
+        if (table) {
+            const key = prefix + table;
+            delete this._tempTableMap[key];
+        }
+        else {
+            Object.keys(this._tempTableMap).forEach((key) => {
+                if (key.startsWith(prefix)) {
+                    delete this._tempTableMap[key];
+                }
+            });
+        }
+    }
+    query(params, values, done) {
+        const opts = typeof params === 'object' ? params : {};
+        if (typeof params === 'string') {
+            opts.sql = params;
+        }
+        if (typeof values === 'function') {
+            done = values;
+        }
+        else if (values !== undefined) {
+            opts.values = values;
+        }
+        if (!opts.sql) {
+            done(new SQLError('ER_EMPTY_QUERY'));
+        }
+        else {
+            if (opts.values !== undefined) {
+                opts.sql = SqlString__namespace.format(opts.sql, opts.values);
+            }
+            this._query(opts, done);
+        }
+    }
+    _query(opts, done) {
+        if (this._isReleased) {
+            done('released');
+        }
+        else {
+            const { err: parse_err, list } = _astify(opts.sql);
+            if (parse_err) {
+                done(new SQLError(parse_err, opts.sql));
+            }
+            else if (list.length === 0) {
+                done(new SQLError('ER_EMPTY_QUERY', opts.sql));
+            }
+            else if (list.length === 1) {
+                this._singleQuery(list[0], (err, result, columns) => {
+                    if (!err) {
+                        this._transformResult(result, columns, opts);
+                    }
+                    done(err ? new SQLError(err, opts.sql) : null, err ? undefined : (result ?? DEFAULT_RESULT), err ? undefined : columns, 1);
+                });
+            }
+            else if (this._multipleStatements) {
+                const query_count = list.length;
+                const result_list = [];
+                const schema_list = [];
+                asyncTimesSeries(query_count, (n, done) => {
+                    const ast = list[n];
+                    if (ast) {
+                        this._singleQuery(ast, (err, result, columns) => {
+                            if (!err) {
+                                this._transformResult(result, columns, opts);
+                                result_list[n] = result ?? DEFAULT_RESULT;
+                                schema_list[n] = columns;
+                            }
+                            done(err);
+                        });
+                    }
+                    else {
+                        done();
+                    }
+                }, (err) => {
+                    if (err) {
+                        err = new SQLError(err, opts.sql);
+                        err.index = result_list.length;
+                    }
+                    done(err, result_list, schema_list, query_count);
+                });
+            }
+            else {
+                done(new SQLError('multiple_statements_disabled', opts.sql));
+            }
+        }
+    }
+    _singleQuery(ast, done) {
+        let err;
+        let handler;
+        switch (ast?.type) {
+            case 'alter':
+                handler = query$8;
+                break;
+            case 'create':
+                handler = query$6;
+                break;
+            case 'delete':
+                handler = query$5;
+                break;
+            case 'drop':
+                handler = query$4;
+                break;
+            case 'insert':
+            case 'replace':
+                handler = query$3;
+                break;
+            case 'show':
+                handler = query$1;
+                break;
+            case 'select':
+                handler = query$7;
+                break;
+            case 'set':
+                handler = query$2;
+                break;
+            case 'update':
+                handler = query;
+                break;
+            case 'use':
+                handler = _useDatabase;
+                break;
+            default:
+                error('unsupported statement type:', ast);
+                err = {
+                    err: 'unsupported_type',
+                    args: [ast?.type],
+                };
+        }
+        if (handler) {
+            handler({ ast, dynamodb: g_dynamodb, session: this }, done);
+        }
+        else {
+            done(err || 'unsupported_type');
+        }
+    }
+    _transformResult(list, columns, opts) {
+        if (this._resultObjects && Array.isArray(list)) {
+            list.forEach((result, i) => {
+                const obj = {};
+                columns.forEach((column, j) => {
+                    let dest = obj;
+                    if (opts.nestTables) {
+                        if (!obj[column.table]) {
+                            obj[column.table] = {};
+                        }
+                        dest = obj[column.table];
+                    }
+                    dest[column.name] = this._convertCell(result[j], column);
+                });
+                list[i] = obj;
+            });
+        }
+    }
+    _convertCell(value, column) {
+        return this._typeCast
+            ? typeCast(value, column, this._typeCastOptions)
+            : value;
+    }
+}
+function createSession$1(args) {
+    if (args) {
+        g_dynamodb = createDynamoDB(args);
+    }
+    return new Session(args);
+}
+function _astify(sql) {
+    let err;
+    let list = [];
+    try {
+        const result = parser.astify(sql);
+        if (Array.isArray(result)) {
+            list = result;
+        }
+        else {
+            list = [result];
+        }
+    }
+    catch (e) {
+        error('parse error:', e);
+        const start = e?.location?.start;
+        err = { err: 'parse', args: [start?.line, start?.column] };
+    }
+    return { err, list };
+}
+function _useDatabase(params, done) {
+    params.session.setCurrentDatabase(params.ast.db, done);
+}
 
 function createPool$1(args) {
     if (args) {
-        sessionExports.init(args);
+        init(args);
     }
     return new Pool(args || {});
 }
@@ -28448,14 +27075,14 @@ class Pool {
         done?.();
     }
     getSession(done) {
-        done(null, sessionExports.createSession(this._args));
+        done(null, createSession$1(this._args));
     }
     query(opts, values, done) {
         if (typeof values === 'function') {
             done = values;
             values = undefined;
         }
-        const session = sessionExports.createSession(this._args);
+        const session = createSession$1(this._args);
         session.query(opts, values, (...result) => {
             session.release();
             done(...result);
@@ -28463,16 +27090,8 @@ class Pool {
     }
 }
 
-var loggerExports = requireLogger();
-var logger = /*@__PURE__*/getDefaultExportFromCjs(loggerExports);
-
-var logger$1 = /*#__PURE__*/_mergeNamespaces({
-	__proto__: null,
-	default: logger
-}, [loggerExports]);
-
 const createPool = createPool$1;
-const createSession = sessionExports.createSession;
+const createSession = createSession$1;
 const escape = SqlString__namespace.escape;
 const escapeId = SqlString__namespace.escapeId;
 
@@ -28480,5 +27099,5 @@ exports.createPool = createPool;
 exports.createSession = createSession;
 exports.escape = escape;
 exports.escapeId = escapeId;
-exports.logger = logger$1;
+exports.logger = logger;
 //# sourceMappingURL=dynamosql.js.map
