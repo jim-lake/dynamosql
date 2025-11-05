@@ -1,3 +1,5 @@
+DROP TABLE IF EXISTS _dynamodb.test123;
+DROP TABLE IF EXISTS _dynamodb.test1234;
 CREATE TABLE _dynamodb.test123 (id INT PRIMARY KEY, other INT);
 
 USE _dynamodb;
