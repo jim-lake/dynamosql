@@ -2,10 +2,11 @@ import asyncEach from 'async/each';
 import { logger } from '@dynamosql/shared';
 import { convertWhere } from '../../helpers/convert_where';
 import { escapeIdentifier } from '../../../tools/dynamodb_helper';
+import type { RowListParams } from '../index';
 
 export function getRowList(
-  params: any,
-  done: (err?: any, source_map?: any, column_map?: any) => void
+  params: RowListParams,
+  done: (err?: any, source_map?: Record<string, any[]>, column_map?: Record<string, string[]>) => void
 ): void {
   const { list } = params;
 

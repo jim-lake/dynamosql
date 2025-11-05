@@ -6,10 +6,11 @@ import {
   valueToNative,
 } from '../../../tools/dynamodb_helper';
 import { logger } from '@dynamosql/shared';
+import type { UpdateParams, MutationResult } from '../index';
 
 export function singleUpdate(
-  params: any,
-  done: (err?: any, result?: any) => void
+  params: UpdateParams,
+  done: (err?: any, result?: MutationResult) => void
 ): void {
   const { dynamodb, session } = params;
   const { set, from, where } = params.ast;
@@ -75,8 +76,8 @@ RETURNING MODIFIED OLD *
 }
 
 export function multipleUpdate(
-  params: any,
-  done: (err?: any, result?: any) => void
+  params: UpdateParams,
+  done: (err?: any, result?: MutationResult) => void
 ): void {
   const { dynamodb, list } = params;
 

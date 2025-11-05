@@ -30,6 +30,8 @@ export interface TableListParams {
 export interface TableInfoParams {
   dynamodb: any;
   table: string;
+  session?: any;
+  database?: string;
 }
 
 export interface CreateTableParams {
@@ -37,11 +39,16 @@ export interface CreateTableParams {
   table: string;
   primary_key: ColumnDef[];
   column_list: ColumnDef[];
+  session?: any;
+  database?: string;
+  is_temp?: boolean;
 }
 
 export interface DropTableParams {
   dynamodb: any;
   table: string;
+  session?: any;
+  database?: string;
 }
 
 export interface IndexParams {
@@ -83,6 +90,8 @@ export interface InsertParams {
   table: string;
   list: any[];
   duplicate_mode?: 'ignore' | 'replace';
+  session?: any;
+  database?: string;
 }
 
 export interface Engine {

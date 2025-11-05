@@ -1,16 +1,17 @@
 import * as Storage from './storage';
 import { logger } from '@dynamosql/shared';
+import type { UpdateParams, MutationResult } from '../index';
 
 export function singleUpdate(
-  params: any,
-  done: (err?: any, result?: any) => void
+  params: UpdateParams,
+  done: (err?: any, result?: MutationResult) => void
 ): void {
   done('no_single');
 }
 
 export function multipleUpdate(
-  params: any,
-  done: (err?: any, result?: any) => void
+  params: UpdateParams,
+  done: (err?: any, result?: MutationResult) => void
 ): void {
   const { session, list } = params;
 

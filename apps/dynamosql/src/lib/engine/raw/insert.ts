@@ -5,10 +5,11 @@ import {
   convertError,
 } from '../../../tools/dynamodb_helper';
 import { trackFirstSeen } from '../../../tools/util';
+import type { InsertParams, MutationResult } from '../index';
 
 export function insertRowList(
-  params: any,
-  done: (err?: any, result?: any) => void
+  params: InsertParams,
+  done: (err?: any, result?: MutationResult) => void
 ): void {
   if (params.list.length === 0) {
     done(null, { affectedRows: 0 });
@@ -20,8 +21,8 @@ export function insertRowList(
 }
 
 function _insertIgnoreReplace(
-  params: any,
-  done: (err?: any, result?: any) => void
+  params: InsertParams,
+  done: (err?: any, result?: MutationResult) => void
 ): void {
   const { dynamodb, duplicate_mode, table } = params;
   let list = params.list;
@@ -108,8 +109,8 @@ function _insertIgnoreReplace(
 }
 
 function _insertNoIgnore(
-  params: any,
-  done: (err?: any, result?: any) => void
+  params: InsertParams,
+  done: (err?: any, result?: MutationResult) => void
 ): void {
   const { dynamodb, table, list } = params;
   const sql_list = list.map(

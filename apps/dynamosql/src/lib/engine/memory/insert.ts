@@ -1,8 +1,9 @@
 import * as Storage from './storage';
+import type { InsertParams, MutationResult } from '../index';
 
 export function insertRowList(
-  params: any,
-  done: (err?: any, result?: any) => void
+  params: InsertParams,
+  done: (err?: any, result?: MutationResult) => void
 ): void {
   const { session, database, table, list, duplicate_mode } = params;
   const data = Storage.getTable(database, table, session);

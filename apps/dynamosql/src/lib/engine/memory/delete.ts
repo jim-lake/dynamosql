@@ -1,16 +1,17 @@
 import * as Storage from './storage';
 import { logger } from '@dynamosql/shared';
+import type { DeleteParams, MutationResult } from '../index';
 
 export function singleDelete(
-  params: any,
-  done: (err?: any, result?: any) => void
+  params: DeleteParams,
+  done: (err?: any, result?: MutationResult) => void
 ): void {
   done('no_single');
 }
 
 export function multipleDelete(
-  params: any,
-  done: (err?: any, result?: any) => void
+  params: DeleteParams,
+  done: (err?: any, result?: MutationResult) => void
 ): void {
   const { session, list } = params;
 

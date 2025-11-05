@@ -1,8 +1,9 @@
 import * as Storage from './storage';
+import type { TableInfoParams, TableInfo, TableListParams, CreateTableParams, DropTableParams, IndexParams, AddColumnParams } from '../index';
 
 export function getTableInfo(
-  params: any,
-  done: (err?: any, result?: any) => void
+  params: TableInfoParams,
+  done: (err?: any, result?: TableInfo) => void
 ): void {
   const { session, database, table } = params;
   const data = Storage.getTable(database, table, session);
@@ -20,13 +21,13 @@ export function getTableInfo(
 }
 
 export function getTableList(
-  params: any,
-  done: (err?: any, results?: any) => void
+  params: TableListParams,
+  done: (err?: any, results?: string[]) => void
 ): void {
   done(null, []);
 }
 
-export function createTable(params: any, done: (err?: any) => void): void {
+export function createTable(params: CreateTableParams, done: (err?: any) => void): void {
   const { session, database, table, primary_key, column_list, is_temp } =
     params;
   if (primary_key.length === 0) {
@@ -47,7 +48,7 @@ export function createTable(params: any, done: (err?: any) => void): void {
   }
 }
 
-export function dropTable(params: any, done: (err?: any) => void): void {
+export function dropTable(params: DropTableParams, done: (err?: any) => void): void {
   const { session, database, table } = params;
   if (session.getTempTable(database, table)) {
     session.deleteTempTable(database, table);
@@ -57,14 +58,14 @@ export function dropTable(params: any, done: (err?: any) => void): void {
   done();
 }
 
-export function addColumn(params: any, done: (err?: any) => void): void {
+export function addColumn(params: AddColumnParams, done: (err?: any) => void): void {
   done();
 }
 
-export function createIndex(params: any, done: (err?: any) => void): void {
+export function createIndex(params: IndexParams, done: (err?: any) => void): void {
   done();
 }
 
-export function deleteIndex(params: any, done: (err?: any) => void): void {
+export function deleteIndex(params: IndexParams, done: (err?: any) => void): void {
   done();
 }

@@ -2,10 +2,11 @@ import asyncEach from 'async/each';
 import { convertWhere } from '../../helpers/convert_where';
 import { escapeIdentifier } from '../../../tools/dynamodb_helper';
 import { logger } from '@dynamosql/shared';
+import type { DeleteParams, MutationResult } from '../index';
 
 export function singleDelete(
-  params: any,
-  done: (err?: any, result?: any) => void
+  params: DeleteParams,
+  done: (err?: any, result?: MutationResult) => void
 ): void {
   const { dynamodb, session } = params;
   const { from, where } = params.ast;
@@ -44,8 +45,8 @@ RETURNING ALL OLD *
 }
 
 export function multipleDelete(
-  params: any,
-  done: (err?: any, result?: any) => void
+  params: DeleteParams,
+  done: (err?: any, result?: MutationResult) => void
 ): void {
   const { dynamodb, list } = params;
 
