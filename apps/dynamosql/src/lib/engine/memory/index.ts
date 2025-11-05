@@ -13,7 +13,7 @@ export * from './update';
 
 export function commit(params: any, done: (err?: Error) => void): void {
   const { session, data } = params;
-  for (let key in data) {
+  for (const key in data) {
     const { database, table, data: tx_data } = data[key];
     Storage.updateTableData(database, table, session, tx_data);
   }

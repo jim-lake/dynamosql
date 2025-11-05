@@ -117,7 +117,7 @@ export function nativeToValue(obj: any): any {
     ret = { NULL: true };
   } else if (typeof obj === 'object') {
     const M: any = {};
-    for (let key in obj) {
+    for (const key in obj) {
       M[key] = nativeToValue(obj[key]);
     }
     ret = { M };

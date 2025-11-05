@@ -35,6 +35,28 @@ export default tseslint.config(
     },
   },
   {
-    ignores: ['dist/**', 'node_modules/**', '*.config.js', '*.config.mjs'],
+    files: ['test/**/*.js'],
+    languageOptions: {
+      globals: {
+        describe: 'readonly',
+        it: 'readonly',
+        before: 'readonly',
+        beforeEach: 'readonly',
+        after: 'readonly',
+        afterEach: 'readonly',
+      },
+    },
+    linterOptions: {
+      reportUnusedDisableDirectives: 'warn',
+    },
+  },
+  {
+    ignores: [
+      'dist/**',
+      'node_modules/**',
+      '*.config.js',
+      '*.config.mjs',
+      'src/vendor/**',
+    ],
   }
 );

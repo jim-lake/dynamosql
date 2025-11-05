@@ -49,7 +49,7 @@ function _unroll(list: any[], obj: any): void {
   if (Array.isArray(obj)) {
     list.push({ ...obj[0], '@@group': obj });
   } else {
-    for (let key in obj) {
+    for (const key in obj) {
       _unroll(list, obj[key]);
     }
   }

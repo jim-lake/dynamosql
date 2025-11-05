@@ -150,7 +150,7 @@ function _insertNoIgnore(
 }
 
 function _fixupItem(item: any): any {
-  for (let key in item) {
+  for (const key in item) {
     item[key] = item[key].value;
   }
   return item;

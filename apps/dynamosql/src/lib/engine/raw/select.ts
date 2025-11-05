@@ -52,7 +52,7 @@ function _getFromTable(
       if (_requestAll) {
         const response_set = new Set();
         results.forEach((result: any) => {
-          for (let key in result) {
+          for (const key in result) {
             response_set.add(key);
           }
         });

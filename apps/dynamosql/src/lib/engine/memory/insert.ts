@@ -43,7 +43,7 @@ export function insertRowList(
 }
 
 function _transformRow(row: any): void {
-  for (let key in row) {
+  for (const key in row) {
     row[key] = { type: row[key].type, value: row[key].value };
   }
 }

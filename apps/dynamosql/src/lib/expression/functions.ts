@@ -122,7 +122,7 @@ export function date(expr: any, state: any): any {
 export function date_format(expr: any, state: any): any {
   const date = getValue(expr.args.value?.[0], state);
   const format = getValue(expr.args.value?.[1], state);
-  let err = date.err || format.err;
+  const err = date.err || format.err;
   let value;
   const name = `DATE_FORMAT(${date.name}, ${format.name})`;
   if (!err && (date.value === null || format.value === null)) {
@@ -137,7 +137,7 @@ export function date_format(expr: any, state: any): any {
 export function datediff(expr: any, state: any): any {
   const expr1 = getValue(expr.args.value?.[0], state);
   const expr2 = getValue(expr.args.value?.[1], state);
-  let err = expr1.err || expr2.err;
+  const err = expr1.err || expr2.err;
   let value;
   const name = `DATEDIFF(${expr1.name}, ${expr2.name})`;
   if (!err && (expr1.value === null || expr2.value === null)) {

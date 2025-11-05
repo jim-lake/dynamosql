@@ -5,7 +5,7 @@ export function makeEngineGroups(session: any, list: any[]): any[] {
   list.forEach((object) => {
     const { database, table } = object;
     const engine = SchemaManager.getEngine(database, table, session);
-    let found = ret.find((group) => group.engine === engine);
+    const found = ret.find((group) => group.engine === engine);
     if (found) {
       found.list.push(object);
     } else {

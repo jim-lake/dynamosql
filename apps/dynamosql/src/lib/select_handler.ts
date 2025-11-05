@@ -11,7 +11,7 @@ export function query(params: any, done: any) {
   internalQuery(params, (err: any, output_row_list: any, column_list: any) => {
     if (!err) {
       output_row_list?.forEach?.((row: any) => {
-        for (let key in row) {
+        for (const key in row) {
           row[key] = row[key].value;
         }
       });
