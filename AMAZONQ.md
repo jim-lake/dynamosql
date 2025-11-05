@@ -67,7 +67,7 @@ Or use AWS profiles in `~/.aws/credentials`.
 
 ## Running Tests
 
-**IMPORTANT: Never use grep, head, tail, or other output filtering when running tests. These commands hide failures and make it impossible to see what actually happened. Always run tests with full output.**
+**IMPORTANT: Never use grep, head, tail, or other output filtering when running tests. These commands hide failures and make it impossible to see what actually happened. Use `npm run test:quiet` if you want to suppress verbose output while still seeing test results.**
 
 ### Setup Test Tables
 
@@ -224,8 +224,11 @@ npm install
 # Setup test tables
 npm run test:setup --workspace=apps/dynamosql
 
-# Run all tests
+# Run all tests (verbose)
 npm test
+
+# Run tests with minimal output
+npm run test:quiet --workspace=apps/dynamosql
 
 # Lint code
 npm run lint
