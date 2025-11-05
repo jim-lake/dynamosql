@@ -1,13 +1,12 @@
-import asyncEach from 'async/each';
+import { promisify } from 'util';
 import { convertWhere } from '../../helpers/convert_where';
 import { escapeIdentifier } from '../../../tools/dynamodb_helper';
 import { logger } from '@dynamosql/shared';
 import type { DeleteParams, MutationResult } from '../index';
 
-export function singleDelete(
-  params: DeleteParams,
-  done: (err?: any, result?: MutationResult) => void
-): void {
+export async function singleDelete(
+  params: DeleteParams
+): Promise<MutationResult> {
   const { dynamodb, session } = params;
   const { from, where } = params.ast;
 
@@ -22,51 +21,49 @@ export function singleDelete(
   }
 
   if (no_single) {
-    done('no_single');
-  } else {
-    const sql = `
+    throw 'no_single';
+  }
+
+  const sql = `
 DELETE FROM ${escapeIdentifier(from[0].table)}
 WHERE ${result.value}
 RETURNING ALL OLD *
 `;
-    dynamodb.queryQL(sql, (err: any, results: any) => {
-      let affectedRows = results?.length;
-      if (err?.name === 'ValidationException') {
-        err = 'no_single';
-      } else if (err?.name === 'ConditionalCheckFailedException') {
-        err = null;
-        affectedRows = 0;
-      } else if (err) {
-        logger.error('singleDelete: query err:', err);
-      }
-      done(err, { affectedRows });
-    });
+  const queryQL = promisify(dynamodb.queryQL.bind(dynamodb));
+
+  try {
+    const results = await queryQL(sql);
+    return { affectedRows: results?.length || 0 };
+  } catch (err: any) {
+    if (err?.name === 'ValidationException') {
+      throw 'no_single';
+    } else if (err?.name === 'ConditionalCheckFailedException') {
+      return { affectedRows: 0 };
+    }
+    logger.error('singleDelete: query err:', err);
+    throw err;
   }
 }
 
-export function multipleDelete(
-  params: DeleteParams,
-  done: (err?: any, result?: MutationResult) => void
-): void {
+export async function multipleDelete(
+  params: DeleteParams
+): Promise<MutationResult> {
   const { dynamodb, list } = params;
 
   let affectedRows = 0;
-  asyncEach(
-    list,
-    (object: any, done: (err?: any) => void) => {
-      const { table, key_list, delete_list } = object;
-      dynamodb.deleteItems(
-        { table, key_list, list: delete_list },
-        (err: any, data: any) => {
-          if (err) {
-            logger.error('multipleDelete: deleteItems: err:', err, table, data);
-          } else {
-            affectedRows += delete_list.length;
-          }
-          done(err);
-        }
-      );
-    },
-    (err) => done(err, { affectedRows })
-  );
+
+  for (const object of list) {
+    const { table, key_list, delete_list } = object;
+    const deleteItems = promisify(dynamodb.deleteItems.bind(dynamodb));
+
+    try {
+      await deleteItems({ table, key_list, list: delete_list });
+      affectedRows += delete_list.length;
+    } catch (err) {
+      logger.error('multipleDelete: deleteItems: err:', err, table);
+      throw err;
+    }
+  }
+
+  return { affectedRows };
 }

@@ -6,16 +6,6 @@ export * from './insert';
 export * from './select';
 export * from './update';
 
-export function commit(
-  params: CommitParams,
-  done: (err?: Error) => void
-): void {
-  done();
-}
+export async function commit(params: CommitParams): Promise<void> {}
 
-export function rollback(
-  params: CommitParams,
-  done: (err?: Error) => void
-): void {
-  done();
-}
+export async function rollback(params: CommitParams): Promise<void> {}

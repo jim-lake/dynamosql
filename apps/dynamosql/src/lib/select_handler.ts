@@ -42,13 +42,12 @@ export function internalQuery(params: any, done: any) {
       list: ast.from,
       where: ast.where,
     };
-    engine.getRowList(opts, (err: any, source_map: any, column_map: any) => {
-      if (err) {
-        done(err);
-      } else {
+    engine.getRowList(opts).then(
+      ({ source_map, column_map }) => {
         _evaluateReturn({ ...params, source_map, column_map }, done);
-      }
-    });
+      },
+      (err) => done(err)
+    );
   } else {
     _evaluateReturn({ ...params, source_map: null, column_map: {} }, done);
   }

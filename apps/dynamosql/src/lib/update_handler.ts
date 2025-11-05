@@ -43,13 +43,16 @@ function _runUpdate(params: any, done: any) {
       session,
       ast,
     };
-    engine.singleUpdate(opts, (err: any, result: any) => {
-      if (err === 'no_single') {
-        _multipleUpdate(params, done);
-      } else {
-        done(err, result);
+    engine.singleUpdate(opts).then(
+      (result) => done(null, result),
+      (err) => {
+        if (err === 'no_single') {
+          _multipleUpdate(params, done);
+        } else {
+          done(err);
+        }
       }
-    });
+    );
   } else {
     _multipleUpdate(params, done);
   }
@@ -115,13 +118,14 @@ function _multipleUpdate(params: any, done: any) {
                 session,
                 list,
               };
-              engine.multipleUpdate(opts, (err: any, result: any) => {
-                if (!err) {
+              engine.multipleUpdate(opts).then(
+                (result) => {
                   affectedRows += result.affectedRows;
                   changedRows += result.changedRows;
-                }
-                done(err);
-              });
+                  done();
+                },
+                (err) => done(err)
+              );
             },
             done
           );

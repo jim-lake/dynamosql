@@ -1,4 +1,3 @@
-import asyncEach from 'async/each';
 import asyncSeries from 'async/series';
 import * as Engine from './engine';
 
@@ -70,40 +69,30 @@ export function startTransaction(params: any, done: any) {
   done();
 }
 
-export function commit(params: any, done: any) {
-  _txEach(
-    params,
-    ({ engine, ...other }: any, done: any) => engine.commit(other, done),
-    done
-  );
+export async function commit(params: any, done: any) {
+  await _txEach(params, async ({ engine, ...other }: any) => {
+    await engine.commit(other);
+  });
+  done();
 }
 
-export function rollback(params: any, done: any) {
-  _txEach(
-    params,
-    ({ engine, ...other }: any, done: any) => engine.rollback(other, done),
-    done
-  );
+export async function rollback(params: any, done: any) {
+  await _txEach(params, async ({ engine, ...other }: any) => {
+    await engine.rollback(other);
+  });
+  done();
 }
 
-function _txEach(params: any, callback: any, done: any) {
+async function _txEach(params: any, callback: any) {
   const { dynamodb, session } = params;
   const transaction = session.getTransaction();
   if (transaction) {
-    const list = transaction.getEngineNameList();
-    asyncEach(
-      list,
-      (name: string, done: any) => {
-        const engine = Engine.getEngineByName(name);
-        const data = transaction.getData(name);
-        callback({ engine, dynamodb, session, transaction, data }, done);
-      },
-      (err: any) => {
-        session.setTransaction(null);
-        done(err);
-      }
-    );
-  } else {
-    done();
+    const list = Array.from(transaction.getEngineNameList()) as string[];
+    for (const name of list) {
+      const engine = Engine.getEngineByName(name);
+      const data = transaction.getData(name);
+      await callback({ engine, dynamodb, session, transaction, data });
+    }
+    session.setTransaction(null);
   }
 }

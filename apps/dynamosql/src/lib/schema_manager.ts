@@ -1,4 +1,3 @@
-import asyncEach from 'async/each';
 import * as Engine from './engine';
 import { logger } from '@dynamosql/shared';
 
@@ -36,7 +35,10 @@ export function getTableList(params: any, done: any) {
   const { dynamodb, database } = params;
   if (database === '_dynamodb') {
     const engine = Engine.getEngineByName('raw');
-    engine.getTableList({ dynamodb }, done);
+    engine.getTableList({ dynamodb }).then(
+      (result) => done(null, result),
+      (err) => done(err)
+    );
   } else if (database in g_schemaMap) {
     done(null, []);
   } else {
@@ -53,33 +55,30 @@ export function createDatabase(database: string, done: any) {
   }
 }
 
-export function dropDatabase(params: any, done: any) {
+export async function dropDatabase(params: any, done: any) {
   const { session, database } = params;
   if (BUILT_IN.includes(database)) {
     done('database_no_drop_builtin');
   } else if (database in g_schemaMap) {
     session.dropTempTable(database);
     const table_list = Object.keys(g_schemaMap[database]);
-    asyncEach(
-      table_list,
-      (table: string, done: any) => {
+
+    try {
+      for (const table of table_list) {
         const engine = getEngine(database, table, session);
-        engine.dropTable({ ...params, table }, (err: any) => {
-          if (err) {
-            logger.error('dropDatabase: table:', table, 'drop err:', err);
-          } else {
-            delete g_schemaMap[database][table];
-          }
-          done(err);
-        });
-      },
-      (err: any) => {
-        if (!err) {
-          delete g_schemaMap[database];
+        try {
+          await engine.dropTable({ ...params, table });
+          delete g_schemaMap[database][table];
+        } catch (err) {
+          logger.error('dropDatabase: table:', table, 'drop err:', err);
+          throw err;
         }
-        done(err);
       }
-    );
+      delete g_schemaMap[database];
+      done();
+    } catch (err) {
+      done(err);
+    }
   } else {
     done({ err: 'db_not_found', args: [database] });
   }
@@ -95,7 +94,10 @@ export function createTable(params: any, done: any) {
     done('access_denied');
   } else if (database === '_dynamodb') {
     const engine = Engine.getEngineByName('raw');
-    engine.createTable(params, done);
+    engine.createTable(params).then(
+      () => done(),
+      (err) => done(err)
+    );
   } else if (_findTable(database, table, session)) {
     done({ err: 'table_exists', args: [table] });
   } else if (!(database in g_schemaMap)) {
@@ -103,12 +105,15 @@ export function createTable(params: any, done: any) {
   } else {
     const engine = Engine.getEngineByName(table_engine);
     if (engine) {
-      engine.createTable(params, (err: any) => {
-        if (!err && !is_temp) {
-          g_schemaMap[database][table] = { table_engine };
-        }
-        done(err);
-      });
+      engine.createTable(params).then(
+        () => {
+          if (!is_temp) {
+            g_schemaMap[database][table] = { table_engine };
+          }
+          done();
+        },
+        (err) => done(err)
+      );
     } else {
       done({ err: 'ER_UNKNOWN_STORAGE_ENGINE', args: [table_engine] });
     }
@@ -119,21 +124,28 @@ export function dropTable(params: any, done: any) {
   const { session, database, table } = params;
   if (database === '_dynamodb') {
     const engine = Engine.getEngineByName('raw');
-    engine.dropTable(params, done);
+    engine.dropTable(params).then(
+      () => done(),
+      (err) => done(err)
+    );
   } else if (_findTable(database, table, session)) {
     const engine = getEngine(database, table, session);
-    engine.dropTable(params, (err: any) => {
-      if (err) {
+    engine.dropTable(params).then(
+      () => {
+        delete g_schemaMap[database][table];
+        done();
+      },
+      (err) => {
         logger.error(
           'SchemaManager.dropTable: drop error but deleting table anyway: err:',
           err,
           database,
           table
         );
+        delete g_schemaMap[database][table];
+        done(err);
       }
-      delete g_schemaMap[database][table];
-      done(err);
-    });
+    );
   } else {
     done('resource_not_found');
   }

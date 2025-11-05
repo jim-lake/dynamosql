@@ -2,79 +2,79 @@ import * as Storage from './storage';
 import { logger } from '@dynamosql/shared';
 import type { UpdateParams, MutationResult } from '../index';
 
-export function singleUpdate(
-  params: UpdateParams,
-  done: (err?: any, result?: MutationResult) => void
-): void {
-  done('no_single');
+export async function singleUpdate(
+  params: UpdateParams
+): Promise<MutationResult> {
+  throw 'no_single';
 }
 
-export function multipleUpdate(
-  params: UpdateParams,
-  done: (err?: any, result?: MutationResult) => void
-): void {
+export async function multipleUpdate(
+  params: UpdateParams
+): Promise<MutationResult> {
   const { session, list } = params;
 
-  let err: any;
   let affectedRows = 0;
   let changedRows = 0;
-  list.some((changes: any) => {
+
+  for (const changes of list) {
     const { database, table, update_list } = changes;
     const data = Storage.getTable(database, table, session);
-    if (data) {
-      const row_list = data.row_list.slice();
-      const primary_map = new Map(data.primary_map);
-      update_list.forEach((update: any) => {
-        const { set_list } = update;
-        const key_list = update.key.map((key: any) => key.value);
-        const update_key = JSON.stringify(key_list);
-        const index = primary_map.get(update_key) as number | undefined;
-        if (index !== undefined && index >= 0) {
-          const old_row = row_list[index as number];
-          const new_row = Object.assign({}, old_row);
-          let changed = false;
-          set_list.forEach((set: any) => {
-            new_row[set.column] = _transformCell(set.value);
-            // TODO: better equality tester
-            if (old_row[set.column].value !== new_row[set.column].value) {
-              changed = true;
-            }
-          });
-          const new_key = _makePrimaryKey(data.primary_key, new_row);
-          if (new_key !== update_key && primary_map.has(new_key)) {
-            err = {
-              err: 'dup_primary_key_entry',
-              args: [data.primary_key, new_key],
-            };
-          } else if (new_key !== update_key) {
-            primary_map.delete(update_key);
-            primary_map.set(new_key, index);
-          }
-          if (!err) {
-            row_list[index as number] = new_row;
-            affectedRows++;
-            if (changed) {
-              changedRows++;
-            }
-          }
-        } else {
-          logger.error(
-            'memory.update: failed to find key:',
-            key_list,
-            'for table:',
-            table
-          );
-        }
-      });
-      if (!err) {
-        Storage.txSaveData(database, table, session, { row_list, primary_map });
-      }
-    } else {
-      err = 'table_not_found';
+
+    if (!data) {
+      throw 'table_not_found';
     }
-    return err;
-  });
-  done(err, { affectedRows, changedRows });
+
+    const row_list = data.row_list.slice();
+    const primary_map = new Map(data.primary_map);
+
+    for (const update of update_list) {
+      const { set_list } = update;
+      const key_list = update.key.map((key: any) => key.value);
+      const update_key = JSON.stringify(key_list);
+      const index = primary_map.get(update_key) as number | undefined;
+
+      if (index !== undefined && index >= 0) {
+        const old_row = row_list[index as number];
+        const new_row = Object.assign({}, old_row);
+        let changed = false;
+
+        set_list.forEach((set: any) => {
+          new_row[set.column] = _transformCell(set.value);
+          if (old_row[set.column].value !== new_row[set.column].value) {
+            changed = true;
+          }
+        });
+
+        const new_key = _makePrimaryKey(data.primary_key, new_row);
+        if (new_key !== update_key && primary_map.has(new_key)) {
+          throw {
+            err: 'dup_primary_key_entry',
+            args: [data.primary_key, new_key],
+          };
+        } else if (new_key !== update_key) {
+          primary_map.delete(update_key);
+          primary_map.set(new_key, index);
+        }
+
+        row_list[index as number] = new_row;
+        affectedRows++;
+        if (changed) {
+          changedRows++;
+        }
+      } else {
+        logger.error(
+          'memory.update: failed to find key:',
+          key_list,
+          'for table:',
+          table
+        );
+      }
+    }
+
+    Storage.txSaveData(database, table, session, { row_list, primary_map });
+  }
+
+  return { affectedRows, changedRows };
 }
 
 function _transformCell(cell: any): any {

@@ -123,10 +123,13 @@ function _createTable(params: any, done: any) {
             list,
             duplicate_mode,
           };
-          engine.insertRowList(opts, (err: any, insert_result: any) => {
-            result = insert_result;
-            done(err);
-          });
+          engine.insertRowList(opts).then(
+            (insert_result) => {
+              result = insert_result;
+              done();
+            },
+            (err) => done(err)
+          );
         } else {
           done();
         }

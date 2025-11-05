@@ -39,13 +39,18 @@ function _runDelete(params: any, done: any) {
       session,
       ast,
     };
-    engine.singleDelete(opts, (err: any, result: any) => {
-      if (err === 'no_single') {
-        _multipleDelete(params, done);
-      } else {
-        done(err, { affectedRows: result?.affectedRows, changedRows: 0 });
+    engine.singleDelete(opts).then(
+      (result) => {
+        done(null, { affectedRows: result.affectedRows, changedRows: 0 });
+      },
+      (err) => {
+        if (err === 'no_single') {
+          _multipleDelete(params, done);
+        } else {
+          done(err);
+        }
       }
-    });
+    );
   } else {
     _multipleDelete(params, done);
   }
@@ -91,12 +96,13 @@ function _multipleDelete(params: any, done: any) {
                 session,
                 list,
               };
-              engine.multipleDelete(opts, (err: any, result: any) => {
-                if (!err) {
+              engine.multipleDelete(opts).then(
+                (result) => {
                   affectedRows += result.affectedRows;
-                }
-                done(err);
-              });
+                  done();
+                },
+                (err) => done(err)
+              );
             },
             done
           );

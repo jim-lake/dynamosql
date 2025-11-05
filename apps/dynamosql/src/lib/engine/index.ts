@@ -96,67 +96,72 @@ export interface InsertParams {
 }
 
 export interface Engine {
-  commit(params: CommitParams, done: (err?: Error) => void): void;
-  rollback(params: CommitParams, done: (err?: Error) => void): void;
-  getTableList(
-    params: TableListParams,
-    done: (err?: any, results?: string[]) => void
-  ): void;
-  createTable(params: CreateTableParams, done: (err?: any) => void): void;
-  dropTable(params: DropTableParams, done: (err?: any) => void): void;
-  createIndex(params: IndexParams, done: (err?: any) => void): void;
-  deleteIndex(params: IndexParams, done: (err?: any) => void): void;
-  addColumn(params: AddColumnParams, done: (err?: any) => void): void;
-  getTableInfo(
-    params: TableInfoParams,
-    done: (err?: any, result?: TableInfo) => void
-  ): void;
-  getRowList(
-    params: RowListParams,
-    done: (
-      err?: any,
-      source_map?: Record<string, any[]>,
-      column_map?: Record<string, string[]>
-    ) => void
-  ): void;
-  singleDelete(
-    params: DeleteParams,
-    done: (err?: any, result?: MutationResult) => void
-  ): void;
-  multipleDelete(
-    params: DeleteParams,
-    done: (err?: any, result?: MutationResult) => void
-  ): void;
-  singleUpdate(
-    params: UpdateParams,
-    done: (err?: any, result?: MutationResult) => void
-  ): void;
-  multipleUpdate(
-    params: UpdateParams,
-    done: (err?: any, result?: MutationResult) => void
-  ): void;
-  insertRowList(
-    params: InsertParams,
-    done: (err?: any, result?: MutationResult) => void
-  ): void;
+  commit(params: CommitParams): Promise<void>;
+  rollback(params: CommitParams): Promise<void>;
+  getTableList(params: TableListParams): Promise<string[]>;
+  createTable(params: CreateTableParams): Promise<void>;
+  dropTable(params: DropTableParams): Promise<void>;
+  createIndex(params: IndexParams): Promise<void>;
+  deleteIndex(params: IndexParams): Promise<void>;
+  addColumn(params: AddColumnParams): Promise<void>;
+  getTableInfo(params: TableInfoParams): Promise<TableInfo>;
+  getRowList(params: RowListParams): Promise<{
+    source_map: Record<string, any[]>;
+    column_map: Record<string, string[]>;
+  }>;
+  singleDelete(params: DeleteParams): Promise<MutationResult>;
+  multipleDelete(params: DeleteParams): Promise<MutationResult>;
+  singleUpdate(params: UpdateParams): Promise<MutationResult>;
+  multipleUpdate(params: UpdateParams): Promise<MutationResult>;
+  insertRowList(params: InsertParams): Promise<MutationResult>;
 }
 
 const NullEngine: Engine = {
-  commit: (params, done) => done('unsupported' as any),
-  rollback: (params, done) => done('unsupported' as any),
-  getTableList: (params, done) => done('unsupported'),
-  createTable: (params, done) => done('unsupported'),
-  dropTable: (params, done) => done('unsupported'),
-  createIndex: (params, done) => done('unsupported'),
-  deleteIndex: (params, done) => done('unsupported'),
-  addColumn: (params, done) => done('unsupported'),
-  getTableInfo: (params, done) => done('unsupported'),
-  getRowList: (params, done) => done('unsupported'),
-  singleDelete: (params, done) => done('unsupported'),
-  multipleDelete: (params, done) => done('unsupported'),
-  singleUpdate: (params, done) => done('unsupported'),
-  multipleUpdate: (params, done) => done('unsupported'),
-  insertRowList: (params, done) => done('unsupported'),
+  commit: async () => {
+    throw new Error('unsupported');
+  },
+  rollback: async () => {
+    throw new Error('unsupported');
+  },
+  getTableList: async () => {
+    throw new Error('unsupported');
+  },
+  createTable: async () => {
+    throw new Error('unsupported');
+  },
+  dropTable: async () => {
+    throw new Error('unsupported');
+  },
+  createIndex: async () => {
+    throw new Error('unsupported');
+  },
+  deleteIndex: async () => {
+    throw new Error('unsupported');
+  },
+  addColumn: async () => {
+    throw new Error('unsupported');
+  },
+  getTableInfo: async () => {
+    throw new Error('unsupported');
+  },
+  getRowList: async () => {
+    throw new Error('unsupported');
+  },
+  singleDelete: async () => {
+    throw new Error('unsupported');
+  },
+  multipleDelete: async () => {
+    throw new Error('unsupported');
+  },
+  singleUpdate: async () => {
+    throw new Error('unsupported');
+  },
+  multipleUpdate: async () => {
+    throw new Error('unsupported');
+  },
+  insertRowList: async () => {
+    throw new Error('unsupported');
+  },
 };
 
 export function getEngineByName(name: string): Engine {
@@ -178,41 +183,101 @@ export function getEngineByName(name: string): Engine {
 export function getDatabaseError(database: string): Engine {
   const error = { err: 'db_not_found', args: [database] };
   return {
-    commit: (params, done) => done(error as any),
-    rollback: (params, done) => done(error as any),
-    getTableList: (params, done) => done(error),
-    createTable: (params, done) => done(error),
-    dropTable: (params, done) => done(error),
-    createIndex: (params, done) => done(error),
-    deleteIndex: (params, done) => done(error),
-    addColumn: (params, done) => done(error),
-    getTableInfo: (params, done) => done(error),
-    getRowList: (params, done) => done(error),
-    singleDelete: (params, done) => done(error),
-    multipleDelete: (params, done) => done(error),
-    singleUpdate: (params, done) => done(error),
-    multipleUpdate: (params, done) => done(error),
-    insertRowList: (params, done) => done(error),
+    commit: async () => {
+      throw error;
+    },
+    rollback: async () => {
+      throw error;
+    },
+    getTableList: async () => {
+      throw error;
+    },
+    createTable: async () => {
+      throw error;
+    },
+    dropTable: async () => {
+      throw error;
+    },
+    createIndex: async () => {
+      throw error;
+    },
+    deleteIndex: async () => {
+      throw error;
+    },
+    addColumn: async () => {
+      throw error;
+    },
+    getTableInfo: async () => {
+      throw error;
+    },
+    getRowList: async () => {
+      throw error;
+    },
+    singleDelete: async () => {
+      throw error;
+    },
+    multipleDelete: async () => {
+      throw error;
+    },
+    singleUpdate: async () => {
+      throw error;
+    },
+    multipleUpdate: async () => {
+      throw error;
+    },
+    insertRowList: async () => {
+      throw error;
+    },
   };
 }
 
 export function getTableError(table: string): Engine {
   const error = { err: 'table_not_found', args: [table] };
   return {
-    commit: (params, done) => done(error as any),
-    rollback: (params, done) => done(error as any),
-    getTableList: (params, done) => done(error),
-    createTable: (params, done) => done(error),
-    dropTable: (params, done) => done(error),
-    createIndex: (params, done) => done(error),
-    deleteIndex: (params, done) => done(error),
-    addColumn: (params, done) => done(error),
-    getTableInfo: (params, done) => done(error),
-    getRowList: (params, done) => done(error),
-    singleDelete: (params, done) => done(error),
-    multipleDelete: (params, done) => done(error),
-    singleUpdate: (params, done) => done(error),
-    multipleUpdate: (params, done) => done(error),
-    insertRowList: (params, done) => done(error),
+    commit: async () => {
+      throw error;
+    },
+    rollback: async () => {
+      throw error;
+    },
+    getTableList: async () => {
+      throw error;
+    },
+    createTable: async () => {
+      throw error;
+    },
+    dropTable: async () => {
+      throw error;
+    },
+    createIndex: async () => {
+      throw error;
+    },
+    deleteIndex: async () => {
+      throw error;
+    },
+    addColumn: async () => {
+      throw error;
+    },
+    getTableInfo: async () => {
+      throw error;
+    },
+    getRowList: async () => {
+      throw error;
+    },
+    singleDelete: async () => {
+      throw error;
+    },
+    multipleDelete: async () => {
+      throw error;
+    },
+    singleUpdate: async () => {
+      throw error;
+    },
+    multipleUpdate: async () => {
+      throw error;
+    },
+    insertRowList: async () => {
+      throw error;
+    },
   };
 }

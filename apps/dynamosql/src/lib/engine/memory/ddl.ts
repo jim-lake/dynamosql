@@ -9,86 +9,56 @@ import type {
   AddColumnParams,
 } from '../index';
 
-export function getTableInfo(
-  params: TableInfoParams,
-  done: (err?: any, result?: TableInfo) => void
-): void {
+export async function getTableInfo(
+  params: TableInfoParams
+): Promise<TableInfo> {
   const { session, database, table } = params;
-  const data = Storage.getTable(database, table, session);
+  const data = Storage.getTable(database!, table, session!);
   if (data) {
-    const result = {
+    return {
       table,
       primary_key: data.primary_key,
       column_list: data.column_list,
       is_open: false,
     };
-    done(null, result);
-  } else {
-    done({ err: 'table_not_found', args: [table] });
   }
+  throw { err: 'table_not_found', args: [table] };
 }
 
-export function getTableList(
-  params: TableListParams,
-  done: (err?: any, results?: string[]) => void
-): void {
-  done(null, []);
+export async function getTableList(params: TableListParams): Promise<string[]> {
+  return [];
 }
 
-export function createTable(
-  params: CreateTableParams,
-  done: (err?: any) => void
-): void {
+export async function createTable(params: CreateTableParams): Promise<void> {
   const { session, database, table, primary_key, column_list, is_temp } =
     params;
   if (primary_key.length === 0) {
-    done({ err: 'unsupported', message: 'primary key is required' });
+    throw { err: 'unsupported', message: 'primary key is required' };
+  }
+  const data = {
+    column_list,
+    primary_key,
+    row_list: [],
+    primary_map: new Map(),
+  };
+  if (is_temp) {
+    session!.saveTempTable(database!, table, data);
   } else {
-    const data = {
-      column_list,
-      primary_key,
-      row_list: [],
-      primary_map: new Map(),
-    };
-    if (is_temp) {
-      session.saveTempTable(database, table, data);
-    } else {
-      Storage.saveTable(database, table, data);
-    }
-    done();
+    Storage.saveTable(database!, table, data);
   }
 }
 
-export function dropTable(
-  params: DropTableParams,
-  done: (err?: any) => void
-): void {
+export async function dropTable(params: DropTableParams): Promise<void> {
   const { session, database, table } = params;
-  if (session.getTempTable(database, table)) {
-    session.deleteTempTable(database, table);
+  if (session!.getTempTable(database!, table)) {
+    session!.deleteTempTable(database!, table);
   } else {
-    Storage.deleteTable(database, table);
+    Storage.deleteTable(database!, table);
   }
-  done();
 }
 
-export function addColumn(
-  params: AddColumnParams,
-  done: (err?: any) => void
-): void {
-  done();
-}
+export async function addColumn(params: AddColumnParams): Promise<void> {}
 
-export function createIndex(
-  params: IndexParams,
-  done: (err?: any) => void
-): void {
-  done();
-}
+export async function createIndex(params: IndexParams): Promise<void> {}
 
-export function deleteIndex(
-  params: IndexParams,
-  done: (err?: any) => void
-): void {
-  done();
-}
+export async function deleteIndex(params: IndexParams): Promise<void> {}

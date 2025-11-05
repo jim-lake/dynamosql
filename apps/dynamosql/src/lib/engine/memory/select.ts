@@ -1,28 +1,25 @@
 import * as Storage from './storage';
 import type { RowListParams } from '../index';
 
-export function getRowList(
-  params: RowListParams,
-  done: (
-    err?: any,
-    source_map?: Record<string, any[]>,
-    column_map?: Record<string, string[]>
-  ) => void
-): void {
+export async function getRowList(params: RowListParams): Promise<{
+  source_map: Record<string, any[]>;
+  column_map: Record<string, string[]>;
+}> {
   const { list } = params;
 
-  let err: any;
-  const source_map: any = {};
-  const column_map: any = {};
-  list.forEach((from: any) => {
+  const source_map: Record<string, any[]> = {};
+  const column_map: Record<string, string[]> = {};
+
+  for (const from of list) {
     const result = _getFromTable({ ...params, from });
-    if (!err && result.err) {
-      err = result.err;
+    if (result.err) {
+      throw result.err;
     }
     source_map[from.key] = result.row_list;
     column_map[from.key] = result.column_list;
-  });
-  done(err, source_map, column_map);
+  }
+
+  return { source_map, column_map };
 }
 
 function _getFromTable(params: any): any {
