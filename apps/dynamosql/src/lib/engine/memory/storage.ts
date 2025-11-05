@@ -10,13 +10,23 @@ export function getTable(database: string, table: string, session: any): any {
   return data;
 }
 
-export function updateTableData(database: string, table: string, session: any, updates: any): void {
+export function updateTableData(
+  database: string,
+  table: string,
+  session: any,
+  updates: any
+): void {
   const key = database + '.' + table;
   const data = session.getTempTable(database, table) || g_tableMap[key];
   Object.assign(data, updates);
 }
 
-export function txSaveData(database: string, table: string, session: any, data: any): void {
+export function txSaveData(
+  database: string,
+  table: string,
+  session: any,
+  data: any
+): void {
   const tx = session.getTransaction();
   const key = database + '.' + table;
   const existing = tx.getData('memory') || {};

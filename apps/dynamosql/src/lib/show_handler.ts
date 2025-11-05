@@ -1,9 +1,7 @@
 import * as SchemaManager from './schema_manager';
 import { convertType } from './helpers/column_type_helper';
 
-export { query };
-
-function query(params: any, done: any) {
+export function query(params: any, done: any) {
   const { ast, session, dynamodb } = params;
 
   if (ast.keyword === 'databases') {
@@ -26,10 +24,13 @@ function query(params: any, done: any) {
         name,
         orgName: name,
       });
-      SchemaManager.getTableList({ dynamodb, database }, (err: any, list: any) => {
-        const rows = list?.map?.((item: any) => [item]);
-        done(err, rows, [column]);
-      });
+      SchemaManager.getTableList(
+        { dynamodb, database },
+        (err: any, list: any) => {
+          const rows = list?.map?.((item: any) => [item]);
+          done(err, rows, [column]);
+        }
+      );
     } else {
       done('no_current_database');
     }

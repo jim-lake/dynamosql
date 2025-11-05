@@ -1,23 +1,9 @@
 import * as util from 'node:util';
 
-export {
-  setLogLevel,
-  setRemoteLog,
-  error,
-  info,
-  trace,
-  inspect,
-  always,
-  LEVEL_NONE,
-  LEVEL_ERROR,
-  LEVEL_INFO,
-  LEVEL_TRACE,
-};
-
-const LEVEL_NONE = 0;
-const LEVEL_ERROR = 1;
-const LEVEL_INFO = 2;
-const LEVEL_TRACE = 3;
+export const LEVEL_NONE = 0;
+export const LEVEL_ERROR = 1;
+export const LEVEL_INFO = 2;
+export const LEVEL_TRACE = 3;
 const LEVEL_MAP: any = {
   NONE: LEVEL_NONE,
   ERROR: LEVEL_ERROR,
@@ -35,33 +21,33 @@ if (process.env.LOG) {
   }
 }
 
-function setRemoteLog(func: any) {
+export function setRemoteLog(func: any) {
   g_remoteLogFunc = func;
 }
 
-function setLogLevel(level: number) {
+export function setLogLevel(level: number) {
   g_logLevel = level;
 }
 
-function error(...args: any[]) {
+export function error(...args: any[]) {
   if (g_logLevel >= LEVEL_ERROR) {
     return _log(...args);
   }
 }
 
-function info(...args: any[]) {
+export function info(...args: any[]) {
   if (g_logLevel >= LEVEL_INFO) {
     return _log(...args);
   }
 }
 
-function trace(...args: any[]) {
+export function trace(...args: any[]) {
   if (g_logLevel >= LEVEL_TRACE) {
     return _log(...args);
   }
 }
 
-function always(...args: any[]) {
+export function always(...args: any[]) {
   return _log(...args);
 }
 
@@ -72,7 +58,7 @@ function _log(...args: any[]) {
   return s;
 }
 
-function inspect(...args: any[]) {
+export function inspect(...args: any[]) {
   let s = '';
   for (let index in args) {
     const a = args[index];

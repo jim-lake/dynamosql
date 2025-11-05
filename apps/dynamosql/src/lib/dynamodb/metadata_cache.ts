@@ -1,10 +1,8 @@
 import * as dynamodb from '../../tools/dynamodb';
 
-export { getTable, getTableCached, createTable, deleteTable };
-
 const g_tableCache: any = {};
 
-function getTable(table_name: string, done: any) {
+export function getTable(table_name: string, done: any) {
   dynamodb.getTable(table_name, (err: any, result: any) => {
     if (
       err === 'resource_not_found' ||
@@ -18,7 +16,7 @@ function getTable(table_name: string, done: any) {
   });
 }
 
-function getTableCached(table_name: string, done: any) {
+export function getTableCached(table_name: string, done: any) {
   if (table_name in g_tableCache) {
     done(null, g_tableCache[table_name].result);
   } else {
@@ -26,7 +24,7 @@ function getTableCached(table_name: string, done: any) {
   }
 }
 
-function createTable(opts: any, done: any) {
+export function createTable(opts: any, done: any) {
   const table_name = opts.table;
   delete g_tableCache[table_name];
   dynamodb.createTable(opts, (err: any) => {
@@ -35,7 +33,7 @@ function createTable(opts: any, done: any) {
   });
 }
 
-function deleteTable(table_name: string, done: any) {
+export function deleteTable(table_name: string, done: any) {
   delete g_tableCache[table_name];
   dynamodb.deleteTable(table_name, (err: any) => {
     delete g_tableCache[table_name];

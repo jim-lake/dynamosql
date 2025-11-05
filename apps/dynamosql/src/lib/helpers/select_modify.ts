@@ -4,7 +4,10 @@ import * as SchemaManager from '../schema_manager';
 import * as SelectHandler from '../select_handler';
 import * as logger from '../../tools/logger';
 
-export function runSelect(params: any, done: (err?: any, result_list?: any) => void): void {
+export function runSelect(
+  params: any,
+  done: (err?: any, result_list?: any) => void
+): void {
   const { dynamodb, session, ast } = params;
 
   const result_list: any[] = [];
@@ -26,8 +29,12 @@ export function runSelect(params: any, done: (err?: any, result_list?: any) => v
                   result
                 );
               } else if (result?.primary_key?.length > 0) {
-                object._keyList = result.primary_key.map((key: any) => key.name);
-                object._keyList.forEach((key: string) => object._requestSet.add(key));
+                object._keyList = result.primary_key.map(
+                  (key: any) => key.name
+                );
+                object._keyList.forEach((key: string) =>
+                  object._requestSet.add(key)
+                );
               } else {
                 err = 'bad_schema';
               }
@@ -52,7 +59,9 @@ export function runSelect(params: any, done: (err?: any, result_list?: any) => v
                 const key_list = object._keyList;
                 const collection = new Map();
                 row_list.forEach((row: any) => {
-                  const keys = key_list.map((key: string) => row[from_key]?.[key]);
+                  const keys = key_list.map(
+                    (key: string) => row[from_key]?.[key]
+                  );
                   if (!keys.includes(undefined)) {
                     _addCollection(collection, keys, row);
                   }
@@ -85,7 +94,11 @@ export function runSelect(params: any, done: (err?: any, result_list?: any) => v
   );
 }
 
-function _addCollection(collection: Map<any, any>, keys: any[], value: any): void {
+function _addCollection(
+  collection: Map<any, any>,
+  keys: any[],
+  value: any
+): void {
   if (keys.length > 1) {
     let sub_map = collection.get(keys[0]);
     if (!sub_map) {

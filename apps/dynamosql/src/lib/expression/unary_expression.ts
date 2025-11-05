@@ -25,4 +25,7 @@ function minus(expr: any, state: any): any {
   return result;
 }
 
-export { plus as '+', not as '!', not as 'not', minus as '-' };
+export { plus as '+' };
+export { not as '!' };
+export { not as 'not' };
+export { minus as '-' };

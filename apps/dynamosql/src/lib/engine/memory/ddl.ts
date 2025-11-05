@@ -1,6 +1,9 @@
 import * as Storage from './storage';
 
-export function getTableInfo(params: any, done: (err?: any, result?: any) => void): void {
+export function getTableInfo(
+  params: any,
+  done: (err?: any, result?: any) => void
+): void {
   const { session, database, table } = params;
   const data = Storage.getTable(database, table, session);
   if (data) {
@@ -16,7 +19,10 @@ export function getTableInfo(params: any, done: (err?: any, result?: any) => voi
   }
 }
 
-export function getTableList(params: any, done: (err?: any, results?: any) => void): void {
+export function getTableList(
+  params: any,
+  done: (err?: any, results?: any) => void
+): void {
   done(null, []);
 }
 

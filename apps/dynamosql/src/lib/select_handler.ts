@@ -7,9 +7,7 @@ import { formGroup } from './helpers/group';
 import { sort } from './helpers/sort';
 import * as logger from '../tools/logger';
 
-export { query, internalQuery };
-
-function query(params: any, done: any) {
+export function query(params: any, done: any) {
   internalQuery(params, (err: any, output_row_list: any, column_list: any) => {
     if (!err) {
       output_row_list?.forEach?.((row: any) => {
@@ -22,7 +20,7 @@ function query(params: any, done: any) {
   });
 }
 
-function internalQuery(params: any, done: any) {
+export function internalQuery(params: any, done: any) {
   const { ast, session, dynamodb } = params;
 
   let resolve_err: any;

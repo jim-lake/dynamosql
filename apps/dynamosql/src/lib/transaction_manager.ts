@@ -2,8 +2,6 @@ import asyncEach from 'async/each';
 import asyncSeries from 'async/series';
 import * as Engine from './engine';
 
-export { run, startTransaction, commit, rollback };
-
 class Transaction {
   _dataMap = new Map();
   _isAutoCommit: boolean;
@@ -29,7 +27,7 @@ class Transaction {
   }
 }
 
-function run(params: any, done: any) {
+export function run(params: any, done: any) {
   const { dynamodb, session, func } = params;
   let tx: any;
   let func_err: any;
@@ -62,7 +60,7 @@ function run(params: any, done: any) {
   );
 }
 
-function startTransaction(params: any, done: any) {
+export function startTransaction(params: any, done: any) {
   const { session, auto_commit } = params;
   const existing = session.getTransaction();
   if (!existing) {
@@ -72,7 +70,7 @@ function startTransaction(params: any, done: any) {
   done();
 }
 
-function commit(params: any, done: any) {
+export function commit(params: any, done: any) {
   _txEach(
     params,
     ({ engine, ...other }: any, done: any) => engine.commit(other, done),
@@ -80,7 +78,7 @@ function commit(params: any, done: any) {
   );
 }
 
-function rollback(params: any, done: any) {
+export function rollback(params: any, done: any) {
   _txEach(
     params,
     ({ engine, ...other }: any, done: any) => engine.rollback(other, done),

@@ -20,26 +20,9 @@ import {
 
 const QUERY_LIMIT = 5;
 
-export {
-  init,
-  pql,
-  queryQL,
-  batchQL,
-  transactionQL,
-  deleteItems,
-  updateItems,
-  putItems,
-};
-export const getTableList = DynamoDBAdmin.getTableList;
-export const getTable = DynamoDBAdmin.getTable;
-export const createTable = DynamoDBAdmin.createTable;
-export const deleteTable = DynamoDBAdmin.deleteTable;
-export const createIndex = DynamoDBAdmin.createIndex;
-export const deleteIndex = DynamoDBAdmin.deleteIndex;
-
 let g_client: DynamoDBClient;
 
-function init(params?: any) {
+export function init(params?: any) {
   if (!params) {
     params = {};
   }
@@ -50,7 +33,15 @@ function init(params?: any) {
   DynamoDBAdmin.init(g_client);
 }
 
-function queryQL(list: any, done: any) {
+export const getTableList = DynamoDBAdmin.getTableList;
+export const getTable = DynamoDBAdmin.getTable;
+export const createTable = DynamoDBAdmin.createTable;
+export const deleteTable = DynamoDBAdmin.deleteTable;
+export const createIndex = DynamoDBAdmin.createIndex;
+export const deleteIndex = DynamoDBAdmin.deleteIndex;
+export { pql } from './dynamodb_helper';
+
+export function queryQL(list: any, done: any) {
   if (!Array.isArray(list)) {
     _queryQL(list, done);
   } else {
@@ -82,7 +73,7 @@ function _queryQL(params: any, done: any) {
   _pagedSend(command, done);
 }
 
-function batchQL(params: any, done: any) {
+export function batchQL(params: any, done: any) {
   const list = Array.isArray(params) ? params : params.list;
   const input = {
     Statements: list.map((Statement: string) => ({
@@ -97,7 +88,7 @@ function batchQL(params: any, done: any) {
   );
 }
 
-function transactionQL(params: any, done: any) {
+export function transactionQL(params: any, done: any) {
   const list = Array.isArray(params) ? params : params.list;
   const input = {
     TransactStatements: list.map((Statement: string) => ({
@@ -112,7 +103,7 @@ function transactionQL(params: any, done: any) {
   );
 }
 
-function deleteItems(params: any, done: any) {
+export function deleteItems(params: any, done: any) {
   const BATCH_LIMIT = 100;
   const { table, key_list, list } = params;
   const batch_count = Math.ceil(list.length / BATCH_LIMIT);
@@ -147,7 +138,7 @@ function deleteItems(params: any, done: any) {
   );
 }
 
-function updateItems(params: any, done: any) {
+export function updateItems(params: any, done: any) {
   const BATCH_LIMIT = 100;
   const { table, key_list, list } = params;
   const batch_count = Math.ceil(list.length / BATCH_LIMIT);
@@ -191,7 +182,7 @@ function updateItems(params: any, done: any) {
   );
 }
 
-function putItems(params: any, done: any) {
+export function putItems(params: any, done: any) {
   const BATCH_LIMIT = 100;
   const { table, list } = params;
   const batch_count = Math.ceil(list.length / BATCH_LIMIT);

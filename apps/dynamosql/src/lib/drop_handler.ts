@@ -1,9 +1,7 @@
 import * as SchemaManager from './schema_manager';
 import * as logger from '../tools/logger';
 
-export { query };
-
-function query(params: any, done: any) {
+export function query(params: any, done: any) {
   const { ast, session, dynamodb } = params;
 
   if (ast.keyword === 'database') {

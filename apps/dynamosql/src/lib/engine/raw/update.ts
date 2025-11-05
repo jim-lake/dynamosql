@@ -7,7 +7,10 @@ import {
 } from '../../../tools/dynamodb_helper';
 import * as logger from '../../../tools/logger';
 
-export function singleUpdate(params: any, done: (err?: any, result?: any) => void): void {
+export function singleUpdate(
+  params: any,
+  done: (err?: any, result?: any) => void
+): void {
   const { dynamodb, session } = params;
   const { set, from, where } = params.ast;
 
@@ -36,7 +39,8 @@ export function singleUpdate(params: any, done: (err?: any, result?: any) => voi
   } else {
     const sets = set
       .map(
-        (object: any, i: number) => escapeIdentifier(object.column) + ' = ' + value_list[i]
+        (object: any, i: number) =>
+          escapeIdentifier(object.column) + ' = ' + value_list[i]
       )
       .join(', ');
 
@@ -70,7 +74,10 @@ RETURNING MODIFIED OLD *
   }
 }
 
-export function multipleUpdate(params: any, done: (err?: any, result?: any) => void): void {
+export function multipleUpdate(
+  params: any,
+  done: (err?: any, result?: any) => void
+): void {
   const { dynamodb, list } = params;
 
   let affectedRows = 0;

@@ -1,11 +1,17 @@
 import * as Storage from './storage';
 import * as logger from '../../../tools/logger';
 
-export function singleUpdate(params: any, done: (err?: any, result?: any) => void): void {
+export function singleUpdate(
+  params: any,
+  done: (err?: any, result?: any) => void
+): void {
   done('no_single');
 }
 
-export function multipleUpdate(params: any, done: (err?: any, result?: any) => void): void {
+export function multipleUpdate(
+  params: any,
+  done: (err?: any, result?: any) => void
+): void {
   const { session, list } = params;
 
   let err: any;

@@ -2,20 +2,10 @@ import asyncEach from 'async/each';
 import * as Engine from './engine';
 import * as logger from '../tools/logger';
 
-export {
-  getEngine,
-  getDatabaseList,
-  getTableList,
-  createDatabase,
-  dropDatabase,
-  createTable,
-  dropTable,
-};
-
 const BUILT_IN = ['_dynamodb'];
 const g_schemaMap: any = {};
 
-function getEngine(database: string, table: string, session: any) {
+export function getEngine(database: string, table: string, session: any) {
   let ret: any;
   const schema = g_schemaMap[database];
   if (database === '_dynamodb') {
@@ -38,11 +28,11 @@ function _findTable(database: string, table: string, session: any) {
   );
 }
 
-function getDatabaseList() {
+export function getDatabaseList() {
   return [...BUILT_IN, ...Object.keys(g_schemaMap)];
 }
 
-function getTableList(params: any, done: any) {
+export function getTableList(params: any, done: any) {
   const { dynamodb, database } = params;
   if (database === '_dynamodb') {
     const engine = Engine.getEngineByName('raw');
@@ -54,7 +44,7 @@ function getTableList(params: any, done: any) {
   }
 }
 
-function createDatabase(database: string, done: any) {
+export function createDatabase(database: string, done: any) {
   if (BUILT_IN.includes(database) || database in g_schemaMap) {
     done('database_exists');
   } else {
@@ -63,7 +53,7 @@ function createDatabase(database: string, done: any) {
   }
 }
 
-function dropDatabase(params: any, done: any) {
+export function dropDatabase(params: any, done: any) {
   const { session, database } = params;
   if (BUILT_IN.includes(database)) {
     done('database_no_drop_builtin');
@@ -95,7 +85,7 @@ function dropDatabase(params: any, done: any) {
   }
 }
 
-function createTable(params: any, done: any) {
+export function createTable(params: any, done: any) {
   const { session, database, table, is_temp } = params;
   const table_engine = is_temp
     ? 'memory'
@@ -125,7 +115,7 @@ function createTable(params: any, done: any) {
   }
 }
 
-function dropTable(params: any, done: any) {
+export function dropTable(params: any, done: any) {
   const { session, database, table } = params;
   if (database === '_dynamodb') {
     const engine = Engine.getEngineByName('raw');

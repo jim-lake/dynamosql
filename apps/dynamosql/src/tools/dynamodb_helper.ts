@@ -1,15 +1,4 @@
-export {
-  pql,
-  escapeIdentifier,
-  escapeString,
-  escapeValue,
-  convertError,
-  mapToObject,
-  valueToNative,
-  nativeToValue,
-};
-
-function pql(strings: TemplateStringsArray, ...values: any[]) {
+export function pql(strings: TemplateStringsArray, ...values: any[]) {
   let s = '';
   for (let i = 0; i < strings.length; i++) {
     s += strings[i];
@@ -21,11 +10,11 @@ function pql(strings: TemplateStringsArray, ...values: any[]) {
   return s;
 }
 
-function escapeIdentifier(string: string) {
+export function escapeIdentifier(string: string) {
   return '"' + string.replace('"', '""') + '"';
 }
 
-function escapeString(string: string) {
+export function escapeString(string: string) {
   let ret = '';
   for (let i = 0; i < string.length; i++) {
     const c = string.charCodeAt(i);
@@ -44,7 +33,7 @@ function escapeNumber(value: any) {
   return String(value).replace(/[^0-9.]/g, '');
 }
 
-function escapeValue(value: any, type?: string): string {
+export function escapeValue(value: any, type?: string): string {
   let s: string;
   if (type === 'string') {
     s = "'" + escapeString(String(value)) + "'";
@@ -72,7 +61,7 @@ function escapeValue(value: any, type?: string): string {
   return s;
 }
 
-function convertError(err: any) {
+export function convertError(err: any) {
   let ret: any = err;
   if (err.name === 'ConditionalCheckFailedException' && err.Item) {
     ret = 'cond_fail';
@@ -97,7 +86,7 @@ function convertError(err: any) {
   return ret;
 }
 
-function mapToObject(obj: any) {
+export function mapToObject(obj: any) {
   const ret: any = {};
   ret.toString = toString;
   Object.keys(obj).forEach((key) => {
@@ -106,7 +95,7 @@ function mapToObject(obj: any) {
   return ret;
 }
 
-function valueToNative(value: any): any {
+export function valueToNative(value: any): any {
   let ret = value;
   if (value) {
     if (value.N) {
@@ -122,7 +111,7 @@ function valueToNative(value: any): any {
   return ret;
 }
 
-function nativeToValue(obj: any): any {
+export function nativeToValue(obj: any): any {
   let ret: any;
   if (obj === null) {
     ret = { NULL: true };

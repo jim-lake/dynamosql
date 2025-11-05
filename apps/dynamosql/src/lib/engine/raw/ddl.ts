@@ -7,7 +7,10 @@ const TYPE_MAP: Record<string, string> = {
   B: 'buffer',
 };
 
-export function getTableInfo(params: any, done: (err?: any, result?: any) => void): void {
+export function getTableInfo(
+  params: any,
+  done: (err?: any, result?: any) => void
+): void {
   const { dynamodb, table } = params;
   dynamodb.getTable(table, (err: any, data: any) => {
     let result;
@@ -37,7 +40,10 @@ export function getTableInfo(params: any, done: (err?: any, result?: any) => voi
   });
 }
 
-export function getTableList(params: any, done: (err?: any, results?: any) => void): void {
+export function getTableList(
+  params: any,
+  done: (err?: any, results?: any) => void
+): void {
   const { dynamodb } = params;
   dynamodb.getTableList((err: any, results: any) => {
     if (err) {

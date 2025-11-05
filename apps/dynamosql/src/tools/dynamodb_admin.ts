@@ -9,15 +9,13 @@ import {
 } from '@aws-sdk/client-dynamodb';
 import { convertError } from './dynamodb_helper';
 
-export { init, getTableList, getTable, createTable, deleteTable, createIndex, deleteIndex };
-
 let g_client: DynamoDBClient;
 
-function init(client: DynamoDBClient) {
+export function init(client: DynamoDBClient) {
   g_client = client;
 }
 
-function getTableList(done: any) {
+export function getTableList(done: any) {
   const command = new ListTablesCommand({ Limit: 100 });
   let next_token: any;
   const results: string[] = [];
@@ -45,7 +43,7 @@ function getTableList(done: any) {
   );
 }
 
-function getTable(TableName: string, done: any) {
+export function getTable(TableName: string, done: any) {
   const command = new DescribeTableCommand({ TableName });
   g_client.send(command).then(
     (result) => done(null, result),
@@ -53,7 +51,7 @@ function getTable(TableName: string, done: any) {
   );
 }
 
-function createTable(params: any, done: any) {
+export function createTable(params: any, done: any) {
   const { table, billing_mode, column_list, primary_key } = params;
   const AttributeDefinitions = column_list.map((column: any) => ({
     AttributeName: column.name,
@@ -85,7 +83,7 @@ function createTable(params: any, done: any) {
   );
 }
 
-function deleteTable(TableName: string, done: any) {
+export function deleteTable(TableName: string, done: any) {
   const command = new DeleteTableCommand({ TableName });
   g_client.send(command).then(
     () => done(),
@@ -93,7 +91,7 @@ function deleteTable(TableName: string, done: any) {
   );
 }
 
-function createIndex(params: any, done: any) {
+export function createIndex(params: any, done: any) {
   const { table, index_name, key_list, projection_type } = params;
   const AttributeDefinitions = key_list.map((item: any) => ({
     AttributeName: item.name,
@@ -131,7 +129,7 @@ function createIndex(params: any, done: any) {
   );
 }
 
-function deleteIndex(params: any, done: any) {
+export function deleteIndex(params: any, done: any) {
   const { table, index_name } = params;
   const input = {
     TableName: table,

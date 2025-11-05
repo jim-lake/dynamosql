@@ -4,9 +4,7 @@ import * as SchemaManager from './schema_manager';
 import { trackFirstSeen } from '../tools/util';
 import * as logger from '../tools/logger';
 
-export { query };
-
-function query(params: any, done: any) {
+export function query(params: any, done: any) {
   const { ast, session } = params;
   const database = ast.table?.[0]?.db || session.getCurrentDatabase();
 
@@ -68,35 +66,39 @@ function _createTable(params: any, done: any) {
       (done: any) => {
         if (ast.as && ast.query_expr) {
           const opts = { ast: ast.query_expr, session, dynamodb };
-          SelectHandler.internalQuery(opts, (err: any, row_list: any, columns: any) => {
-            if (!err) {
-              const track = new Map();
-              list = row_list.map((row: any) => {
-                const obj: any = {};
-                columns.forEach((column: any, i: number) => {
-                  obj[column.name] = row[i];
-                });
-                if (!err && !duplicate_mode) {
-                  const keys = primary_key.map(({ name }) => obj[name].value);
-                  if (!trackFirstSeen(track, keys)) {
-                    err = {
-                      err: 'dup_primary_key_entry',
-                      args: [primary_key.map((key) => key.name), keys],
-                    };
+          SelectHandler.internalQuery(
+            opts,
+            (err: any, row_list: any, columns: any) => {
+              if (!err) {
+                const track = new Map();
+                list = row_list.map((row: any) => {
+                  const obj: any = {};
+                  columns.forEach((column: any, i: number) => {
+                    obj[column.name] = row[i];
+                  });
+                  if (!err && !duplicate_mode) {
+                    const keys = primary_key.map(({ name }) => obj[name].value);
+                    if (!trackFirstSeen(track, keys)) {
+                      err = {
+                        err: 'dup_primary_key_entry',
+                        args: [primary_key.map((key) => key.name), keys],
+                      };
+                    }
                   }
-                }
-                return obj;
-              });
+                  return obj;
+                });
+              }
+              done(err);
             }
-            done(err);
-          });
+          );
         } else {
           done();
         }
       },
       (done: any) => {
         const options = Object.fromEntries(
-          ast.table_options?.map?.((item: any) => [item.keyword, item.value]) || []
+          ast.table_options?.map?.((item: any) => [item.keyword, item.value]) ||
+            []
         );
         const opts = {
           dynamodb,

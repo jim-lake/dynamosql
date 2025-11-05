@@ -3,7 +3,10 @@ import * as logger from '../../../tools/logger';
 import { convertWhere } from '../../helpers/convert_where';
 import { escapeIdentifier } from '../../../tools/dynamodb_helper';
 
-export function getRowList(params: any, done: (err?: any, source_map?: any, column_map?: any) => void): void {
+export function getRowList(
+  params: any,
+  done: (err?: any, source_map?: any, column_map?: any) => void
+): void {
   const { list } = params;
 
   const source_map: any = {};
@@ -21,7 +24,10 @@ export function getRowList(params: any, done: (err?: any, source_map?: any, colu
   );
 }
 
-function _getFromTable(params: any, done: (err?: any, results?: any, column_list?: any) => void): void {
+function _getFromTable(
+  params: any,
+  done: (err?: any, results?: any, column_list?: any) => void
+): void {
   const { dynamodb, session, from, where } = params;
   const { table, _requestSet, _requestAll } = params.from;
   const request_columns = [..._requestSet];

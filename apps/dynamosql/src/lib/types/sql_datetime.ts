@@ -122,7 +122,11 @@ export class SQLDateTime {
   }
 }
 
-export function createSQLDateTime(arg: any, type?: string, decimals?: number): SQLDateTime | null {
+export function createSQLDateTime(
+  arg: any,
+  type?: string,
+  decimals?: number
+): SQLDateTime | null {
   let ret;
   if (arg instanceof SQLDateTime) {
     if (arg._type === type && arg._decimals === decimals) {
@@ -149,7 +153,11 @@ export function createSQLDateTime(arg: any, type?: string, decimals?: number): S
   return ret;
 }
 
-export function createDateTime(arg: any, type?: string, decimals?: number): SQLDateTime | null {
+export function createDateTime(
+  arg: any,
+  type?: string,
+  decimals?: number
+): SQLDateTime | null {
   return createSQLDateTime(arg, type, decimals);
 }
 

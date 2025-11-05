@@ -1,11 +1,17 @@
 import * as Storage from './storage';
 import * as logger from '../../../tools/logger';
 
-export function singleDelete(params: any, done: (err?: any, result?: any) => void): void {
+export function singleDelete(
+  params: any,
+  done: (err?: any, result?: any) => void
+): void {
   done('no_single');
 }
 
-export function multipleDelete(params: any, done: (err?: any, result?: any) => void): void {
+export function multipleDelete(
+  params: any,
+  done: (err?: any, result?: any) => void
+): void {
   const { session, list } = params;
 
   let err: any;

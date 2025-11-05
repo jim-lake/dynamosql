@@ -3,7 +3,10 @@ import { convertWhere } from '../../helpers/convert_where';
 import { escapeIdentifier } from '../../../tools/dynamodb_helper';
 import * as logger from '../../../tools/logger';
 
-export function singleDelete(params: any, done: (err?: any, result?: any) => void): void {
+export function singleDelete(
+  params: any,
+  done: (err?: any, result?: any) => void
+): void {
   const { dynamodb, session } = params;
   const { from, where } = params.ast;
 
@@ -40,7 +43,10 @@ RETURNING ALL OLD *
   }
 }
 
-export function multipleDelete(params: any, done: (err?: any, result?: any) => void): void {
+export function multipleDelete(
+  params: any,
+  done: (err?: any, result?: any) => void
+): void {
   const { dynamodb, list } = params;
 
   let affectedRows = 0;

@@ -3,9 +3,7 @@ import asyncEachSeries from 'async/eachSeries';
 import * as SchemaManager from './schema_manager';
 import * as TransactionManager from './transaction_manager';
 
-export { query };
-
-function query(params: any, done: any) {
+export function query(params: any, done: any) {
   const { ast, dynamodb, session } = params;
   const database = ast.table?.[0]?.db || session.getCurrentDatabase();
   const table = ast.table?.[0]?.table;

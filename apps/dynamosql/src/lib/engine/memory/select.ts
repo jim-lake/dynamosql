@@ -1,6 +1,9 @@
 import * as Storage from './storage';
 
-export function getRowList(params: any, done: (err?: any, source_map?: any, column_map?: any) => void): void {
+export function getRowList(
+  params: any,
+  done: (err?: any, source_map?: any, column_map?: any) => void
+): void {
   const { list } = params;
 
   let err: any;

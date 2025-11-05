@@ -6,7 +6,10 @@ import {
 } from '../../../tools/dynamodb_helper';
 import { trackFirstSeen } from '../../../tools/util';
 
-export function insertRowList(params: any, done: (err?: any, result?: any) => void): void {
+export function insertRowList(
+  params: any,
+  done: (err?: any, result?: any) => void
+): void {
   if (params.list.length === 0) {
     done(null, { affectedRows: 0 });
   } else if (params.duplicate_mode) {
@@ -16,7 +19,10 @@ export function insertRowList(params: any, done: (err?: any, result?: any) => vo
   }
 }
 
-function _insertIgnoreReplace(params: any, done: (err?: any, result?: any) => void): void {
+function _insertIgnoreReplace(
+  params: any,
+  done: (err?: any, result?: any) => void
+): void {
   const { dynamodb, duplicate_mode, table } = params;
   let list = params.list;
   let affectedRows: number;
@@ -101,7 +107,10 @@ function _insertIgnoreReplace(params: any, done: (err?: any, result?: any) => vo
   );
 }
 
-function _insertNoIgnore(params: any, done: (err?: any, result?: any) => void): void {
+function _insertNoIgnore(
+  params: any,
+  done: (err?: any, result?: any) => void
+): void {
   const { dynamodb, table, list } = params;
   const sql_list = list.map(
     (item: any) =>

@@ -187,21 +187,19 @@ const _between = constantFixup(unsupported);
 const _not = constantFixup(not);
 const _minus = constantFixup(minus);
 
-export {
-  _equal as '=',
-  _notEqual as '!=',
-  _notEqual as '<>',
-  _gt as '>',
-  _lt as '<',
-  _gte as '>=',
-  _lte as '<=',
-  _and as 'and',
-  _or as 'or',
-  _inOp as 'in',
-  _isOp as 'is',
-  _isNotOp as 'is not',
-  _between as 'between',
-  _not as 'not',
-  _not as '!',
-  _minus as '-'
-};
+export { _equal as '=' };
+export { _notEqual as '!=' };
+export { _notEqual as '<>' };
+export { _gt as '>' };
+export { _lt as '<' };
+export { _gte as '>=' };
+export { _lte as '<=' };
+export { _and as 'and' };
+export { _or as 'or' };
+export { _inOp as 'in' };
+export { _isOp as 'is' };
+export { _isNotOp as 'is not' };
+export { _between as 'between' };
+export { _not as 'not' };
+export { _not as '!' };
+export { _minus as '-' };

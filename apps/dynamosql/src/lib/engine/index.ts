@@ -1,8 +1,6 @@
 import * as RawEngine from './raw';
 import * as MemoryEngine from './memory';
 
-export { getEngineByName, getDatabaseError, getTableError };
-
 const KEYS = [
   'commit',
   'rollback',
@@ -22,7 +20,7 @@ const KEYS = [
 ];
 const NullEngine = _makeErrorEngine('unsupported');
 
-function getEngineByName(name: string) {
+export function getEngineByName(name: string) {
   let ret: any;
   switch (name) {
     case 'raw':
@@ -38,11 +36,11 @@ function getEngineByName(name: string) {
   return ret;
 }
 
-function getDatabaseError(database: string) {
+export function getDatabaseError(database: string) {
   return _makeErrorEngine({ err: 'db_not_found', args: [database] });
 }
 
-function getTableError(table: string) {
+export function getTableError(table: string) {
   return _makeErrorEngine({ err: 'table_not_found', args: [table] });
 }
 

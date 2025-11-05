@@ -1,4 +1,8 @@
-import { convertDateTime, convertTime, convertNum } from '../helpers/sql_conversion';
+import {
+  convertDateTime,
+  convertTime,
+  convertNum,
+} from '../helpers/sql_conversion';
 import { createSQLInterval } from '../types/sql_interval';
 import { getValue } from './evaluate';
 

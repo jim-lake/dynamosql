@@ -15,14 +15,12 @@ import * as DynamoDB from './lib/dynamodb';
 import * as logger from './tools/logger';
 import { SQLError } from './error';
 
-export { init, createSession };
-
 const DEFAULT_RESULT = { affectedRows: 0, changedRows: 0 };
 
 const parser = new Parser();
 let g_dynamodb: any;
 
-function init(args: any) {
+export function init(args: any) {
   g_dynamodb = DynamoDB.createDynamoDB(args);
 }
 
@@ -278,7 +276,7 @@ class Session {
   }
 }
 
-function createSession(args?: any) {
+export function createSession(args?: any) {
   if (args) {
     g_dynamodb = DynamoDB.createDynamoDB(args);
   }

@@ -1,6 +1,9 @@
 import * as Storage from './storage';
 
-export function insertRowList(params: any, done: (err?: any, result?: any) => void): void {
+export function insertRowList(
+  params: any,
+  done: (err?: any, result?: any) => void
+): void {
   const { session, database, table, list, duplicate_mode } = params;
   const data = Storage.getTable(database, table, session);
   if (list.length === 0) {

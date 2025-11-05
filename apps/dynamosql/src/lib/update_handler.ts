@@ -8,9 +8,7 @@ import { resolveReferences } from './helpers/column_ref_helper';
 import { runSelect } from './helpers/select_modify';
 import * as logger from '../tools/logger';
 
-export { query };
-
-function query(params: any, done: any) {
+export function query(params: any, done: any) {
   const { ast, session } = params;
   const current_database = session.getCurrentDatabase();
 

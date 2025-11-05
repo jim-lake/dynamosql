@@ -1,9 +1,7 @@
 import * as Expression from './expression';
 import * as logger from '../tools/logger';
 
-export { query };
-
-function query(params: any, done: any) {
+export function query(params: any, done: any) {
   const { ast, session } = params;
 
   let err: any;

@@ -1,4 +1,8 @@
-import { convertNum, convertBooleanValue, convertDateTime } from '../helpers/sql_conversion';
+import {
+  convertNum,
+  convertBooleanValue,
+  convertDateTime,
+} from '../helpers/sql_conversion';
 import { getValue } from './evaluate';
 
 function _isDateOrTimeLike(type: string): boolean {
@@ -9,7 +13,12 @@ function _isDateLike(type: string): boolean {
   return type === 'date' || type === 'datetime';
 }
 
-function _numBothSides(expr: any, state: any, op: string, allow_interval?: boolean): any {
+function _numBothSides(
+  expr: any,
+  state: any,
+  op: string,
+  allow_interval?: boolean
+): any {
   const left = getValue(expr.left, state);
   const right = getValue(expr.right, state);
   let err = left.err || right.err;
@@ -60,7 +69,8 @@ function _numBothSides(expr: any, state: any, op: string, allow_interval?: boole
 }
 
 function plus(expr: any, state: any): any {
-  let { err, name, value, left_num, right_num, interval, datetime } = _numBothSides(expr, state, ' + ', true);
+  let { err, name, value, left_num, right_num, interval, datetime } =
+    _numBothSides(expr, state, ' + ', true);
   let type;
   if (!err && value !== null) {
     if (datetime) {
@@ -76,7 +86,8 @@ function plus(expr: any, state: any): any {
 }
 
 function minus(expr: any, state: any): any {
-  let { err, name, value, left_num, right_num, interval, datetime } = _numBothSides(expr, state, ' - ', true);
+  let { err, name, value, left_num, right_num, interval, datetime } =
+    _numBothSides(expr, state, ' - ', true);
   let type;
   if (!err && value !== null) {
     if (datetime) {
@@ -92,7 +103,11 @@ function minus(expr: any, state: any): any {
 }
 
 function mul(expr: any, state: any): any {
-  let { err, name, value, left_num, right_num } = _numBothSides(expr, state, ' * ');
+  let { err, name, value, left_num, right_num } = _numBothSides(
+    expr,
+    state,
+    ' * '
+  );
   if (!err && value !== null) {
     value = left_num * right_num;
   }
@@ -100,25 +115,44 @@ function mul(expr: any, state: any): any {
 }
 
 function div(expr: any, state: any): any {
-  let { err, name, value, left_num, right_num } = _numBothSides(expr, state, ' / ');
+  let { err, name, value, left_num, right_num } = _numBothSides(
+    expr,
+    state,
+    ' / '
+  );
   if (!err && value !== null) {
     value = left_num / right_num;
   }
   return { err, value, name };
 }
 
-export { plus as '+', minus as '-', mul as '*', div as '/' };
+export { plus as '+' };
+export { minus as '-' };
+export { mul as '*' };
+export { div as '/' };
 
 function _convertCompare(left: any, right: any): void {
-  if (left.value !== null && right.value !== null && left.value !== right.value) {
-    if ((_isDateLike(left.type) || _isDateLike(right.type)) && left.type !== right.type) {
+  if (
+    left.value !== null &&
+    right.value !== null &&
+    left.value !== right.value
+  ) {
+    if (
+      (_isDateLike(left.type) || _isDateLike(right.type)) &&
+      left.type !== right.type
+    ) {
       const union = _unionDateTime(left.type, right.type);
       if (union === 'date' || union === 'datetime') {
         left.value = convertDateTime(left.value, union, 6) ?? left.value;
         right.value = convertDateTime(right.value, union, 6) ?? right.value;
       }
     }
-    if (typeof left.value === 'number' || typeof right.value === 'number' || left.type === 'number' || right.type === 'number') {
+    if (
+      typeof left.value === 'number' ||
+      typeof right.value === 'number' ||
+      left.type === 'number' ||
+      right.type === 'number'
+    ) {
       left.value = convertNum(left.value);
       right.value = convertNum(right.value);
     } else {
@@ -163,9 +197,17 @@ function notEqual(expr: any, state: any): any {
   return ret;
 }
 
-export { equal as '=', notEqual as '!=', notEqual as '<>' };
+export { equal as '=' };
+export { notEqual as '!=' };
+export { notEqual as '<>' };
 
-function _gt(expr_left: any, expr_right: any, state: any, op: string, flip: boolean): any {
+function _gt(
+  expr_left: any,
+  expr_right: any,
+  state: any,
+  op: string,
+  flip: boolean
+): any {
   const left = getValue(expr_left, state);
   const right = getValue(expr_right, state);
   const err = left.err || right.err;
@@ -194,9 +236,16 @@ function lt(expr: any, state: any): any {
   return _gt(expr.right, expr.left, state, ' < ', true);
 }
 
-export { gt as '>', lt as '<' };
+export { gt as '>' };
+export { lt as '<' };
 
-function _gte(expr_left: any, expr_right: any, state: any, op: string, flip: boolean): any {
+function _gte(
+  expr_left: any,
+  expr_right: any,
+  state: any,
+  op: string,
+  flip: boolean
+): any {
   const left = getValue(expr_left, state);
   const right = getValue(expr_right, state);
   const err = left.err || right.err;
@@ -225,7 +274,8 @@ function lte(expr: any, state: any): any {
   return _gte(expr.right, expr.left, state, ' <= ', true);
 }
 
-export { gte as '>=', lte as '<=' };
+export { gte as '>=' };
+export { lte as '<=' };
 
 export function and(expr: any, state: any): any {
   const left = getValue(expr.left, state);

@@ -51,7 +51,11 @@ const DATETIME4_REGEX = new RegExp(DATETIME4_RS);
 const DATE2_REGEX = new RegExp(DATE2_RS);
 const DATETIME2_REGEX = new RegExp(DATETIME2_RS);
 
-export function convertDateTime(value: any, type?: string, decimals?: number): any {
+export function convertDateTime(
+  value: any,
+  type?: string,
+  decimals?: number
+): any {
   let ret;
   if (value === null) {
     ret = null;
@@ -273,7 +277,15 @@ function _fix2year(num: any): any {
   return ret;
 }
 
-function _partsToTime(year: any, month: any, day: any, hour: any, min: any, sec: any, fraction?: number): any {
+function _partsToTime(
+  year: any,
+  month: any,
+  day: any,
+  hour: any,
+  min: any,
+  sec: any,
+  fraction?: number
+): any {
   const iso = `${_pad4(year)}-${_pad2(month)}-${_pad2(day)}T${_pad2(
     hour
   )}:${_pad2(min)}:${_pad2(sec)}Z`;

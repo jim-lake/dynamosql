@@ -60,7 +60,10 @@ export function getValue(expr: any, state: any): any {
         result.name = expr.operator;
       }
     } else {
-      logger.trace('expression.getValue: unknown binary operator:', expr.operator);
+      logger.trace(
+        'expression.getValue: unknown binary operator:',
+        expr.operator
+      );
       result.err = { err: 'ER_SP_DOES_NOT_EXIST', args: [expr.operator] };
     }
   } else if (type === 'unary_expr') {
@@ -71,7 +74,10 @@ export function getValue(expr: any, state: any): any {
         result.name = expr.operator;
       }
     } else {
-      logger.trace('expression.getValue: unknown unanary operator:', expr.operator);
+      logger.trace(
+        'expression.getValue: unknown unanary operator:',
+        expr.operator
+      );
       result.err = { err: 'ER_SP_DOES_NOT_EXIST', args: [expr.operator] };
     }
   } else if (type === 'cast') {
@@ -82,8 +88,14 @@ export function getValue(expr: any, state: any): any {
         result.name = `CAST(? AS ${expr.target.dataType})`;
       }
     } else {
-      logger.trace('expression.getValue: unknown cast type:', expr.target.dataType);
-      result.err = { err: 'ER_SP_DOES_NOT_EXIST', args: [expr.target.dataType] };
+      logger.trace(
+        'expression.getValue: unknown cast type:',
+        expr.target.dataType
+      );
+      result.err = {
+        err: 'ER_SP_DOES_NOT_EXIST',
+        args: [expr.target.dataType],
+      };
     }
   } else if (type === 'var') {
     const { prefix } = expr;
@@ -92,7 +104,10 @@ export function getValue(expr: any, state: any): any {
       if (func) {
         result.value = func(session);
       } else {
-        logger.trace('expression.getValue: unknown system variable:', expr.name);
+        logger.trace(
+          'expression.getValue: unknown system variable:',
+          expr.name
+        );
         result.err = { err: 'ER_UNKNOWN_SYSTEM_VARIABLE', args: [expr.name] };
       }
     } else if (prefix === '@') {

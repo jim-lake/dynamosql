@@ -1,6 +1,4 @@
-export { hex, jsonStringify, trackFirstSeen };
-
-function jsonStringify(...args: any[]) {
+export function jsonStringify(...args: any[]) {
   try {
     return JSON.stringify(...args);
   } catch {
@@ -8,7 +6,7 @@ function jsonStringify(...args: any[]) {
   }
 }
 
-function hex(s: string) {
+export function hex(s: string) {
   let ret = '';
   for (let i = 0; i < s.length; i++) {
     ret += s.charCodeAt(i).toString(16).padStart(4, '0');
@@ -17,7 +15,7 @@ function hex(s: string) {
   return ret;
 }
 
-function trackFirstSeen(map: Map<any, any>, keys: any[]) {
+export function trackFirstSeen(map: Map<any, any>, keys: any[]) {
   let ret = true;
   if (keys.length > 1) {
     let sub = map.get(keys[0]);

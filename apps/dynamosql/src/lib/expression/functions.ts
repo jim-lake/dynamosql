@@ -102,7 +102,8 @@ export function from_unixtime(expr: any, state: any): any {
   if (!result.err && result.value !== null) {
     const time = convertNum(result.value);
     const decimals = Math.min(6, String(time).split('.')?.[1]?.length || 0);
-    result.value = time < 0 ? null : createSQLDateTime(time, 'datetime', decimals);
+    result.value =
+      time < 0 ? null : createSQLDateTime(time, 'datetime', decimals);
   }
   return result;
 }
@@ -127,7 +128,8 @@ export function date_format(expr: any, state: any): any {
   if (!err && (date.value === null || format.value === null)) {
     value = null;
   } else if (!err) {
-    value = convertDateTime(date.value)?.dateFormat?.(String(format.value)) || null;
+    value =
+      convertDateTime(date.value)?.dateFormat?.(String(format.value)) || null;
   }
   return { err, name, value, type: 'string' };
 }
@@ -141,7 +143,9 @@ export function datediff(expr: any, state: any): any {
   if (!err && (expr1.value === null || expr2.value === null)) {
     value = null;
   } else if (!err) {
-    value = convertDateTime(expr1.value)?.diff?.(convertDateTime(expr2.value)) || null;
+    value =
+      convertDateTime(expr1.value)?.diff?.(convertDateTime(expr2.value)) ||
+      null;
   }
   return { err, name, value, type: 'int' };
 }

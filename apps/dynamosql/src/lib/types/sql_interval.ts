@@ -58,7 +58,12 @@ export class SQLInterval {
   private _isMonth: boolean;
   private _forceDate: boolean;
 
-  constructor(number: number, decimals: number, is_month: boolean, force_date: boolean) {
+  constructor(
+    number: number,
+    decimals: number,
+    is_month: boolean,
+    force_date: boolean
+  ) {
     this._isMonth = is_month;
     this._forceDate = force_date;
     this._decimals = decimals || 0;
@@ -138,7 +143,10 @@ export class SQLInterval {
   }
 }
 
-export function createSQLInterval(value: any, unit_name: string): SQLInterval | null {
+export function createSQLInterval(
+  value: any,
+  unit_name: string
+): SQLInterval | null {
   let is_month = false;
   let unit: number | number[] | undefined;
   if (unit_name in MONTH) {
@@ -163,7 +171,11 @@ export function createSQLInterval(value: any, unit_name: string): SQLInterval | 
   return ret;
 }
 
-function _convertNumber(value: any, unit: number | number[], unit_name: string): number | null {
+function _convertNumber(
+  value: any,
+  unit: number | number[],
+  unit_name: string
+): number | null {
   let ret: number | null = null;
   if (Array.isArray(unit)) {
     if (typeof value === 'number') {
