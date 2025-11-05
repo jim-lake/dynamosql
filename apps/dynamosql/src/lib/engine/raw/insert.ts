@@ -74,7 +74,7 @@ function _insertIgnoreReplace(
                   affectedRows--;
                 } else if (!err && item_err) {
                   affectedRows--;
-                  err = convertError(item_err, { table });
+                  err = convertError(item_err);
                 }
               });
             } else if (err_list?.name === 'ValidationException') {

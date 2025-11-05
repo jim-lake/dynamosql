@@ -23,10 +23,10 @@ export function insertRowList(
         primary_map.set(key, row_list.push(row) - 1);
         affectedRows++;
       } else if (duplicate_mode === 'replace') {
-        if (!_rowEqual(row_list[index], row)) {
+        if (!_rowEqual(row_list[index as number], row)) {
           affectedRows++;
         }
-        row_list[index] = row;
+        row_list[index as number] = row;
         affectedRows++;
       } else if (!duplicate_mode) {
         err = { err: 'dup_primary_key_entry', args: [primary_key, key_values] };

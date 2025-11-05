@@ -43,7 +43,7 @@ export function escapeValue(value: any, type?: string): string {
     s = 'NULL';
   } else if (Array.isArray(value)) {
     s = '[ ';
-    s += value.map(escapeValue).join(', ');
+    s += value.map((v) => escapeValue(v)).join(', ');
     s += ' ]';
   } else if (typeof value === 'object') {
     s = '{ ';

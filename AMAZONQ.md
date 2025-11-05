@@ -67,6 +67,8 @@ Or use AWS profiles in `~/.aws/credentials`.
 
 ## Running Tests
 
+**IMPORTANT: Never use grep, head, tail, or other output filtering when running tests. These commands hide failures and make it impossible to see what actually happened. Always run tests with full output.**
+
 ### Setup Test Tables
 
 Before running tests, create the required DynamoDB tables:

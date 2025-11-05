@@ -129,14 +129,18 @@ export function createSQLDateTime(
 ): SQLDateTime | null {
   let ret;
   if (arg instanceof SQLDateTime) {
-    if (arg._type === type && arg._decimals === decimals) {
+    if (arg.getType() === type && arg.getDecimals() === decimals) {
       ret = arg;
     } else {
       const opts = {
-        time: arg._time,
-        fraction: arg._fraction,
+        time: arg.getTime(),
+        fraction: arg.getFraction(),
       };
-      ret = new SQLDateTime(opts, type ?? arg._type, decimals ?? arg._decimals);
+      ret = new SQLDateTime(
+        opts,
+        type ?? arg.getType(),
+        decimals ?? arg.getDecimals()
+      );
     }
   } else {
     const time = arg?.time ?? arg;

@@ -25,11 +25,11 @@ export function multipleDelete(
       delete_list.forEach((object: any) => {
         const key_list = object.map((key: any) => key.value);
         const delete_key = JSON.stringify(key_list);
-        const index = primary_map.get(delete_key);
-        if (index >= 0) {
+        const index = primary_map.get(delete_key) as number | undefined;
+        if (index !== undefined && index >= 0) {
           primary_map.delete(delete_key);
           row_list.splice(index, 1);
-          primary_map.forEach((value, key) => {
+          primary_map.forEach((value: number, key) => {
             if (value > index) {
               primary_map.set(key, value - 1);
             }

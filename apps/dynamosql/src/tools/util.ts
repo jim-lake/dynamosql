@@ -1,6 +1,10 @@
-export function jsonStringify(...args: any[]) {
+export function jsonStringify(
+  value: any,
+  replacer?: any,
+  space?: string | number
+) {
   try {
-    return JSON.stringify(...args);
+    return JSON.stringify(value, replacer, space);
   } catch {
     return '';
   }

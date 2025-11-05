@@ -27,9 +27,9 @@ export function multipleUpdate(
         const { set_list } = update;
         const key_list = update.key.map((key: any) => key.value);
         const update_key = JSON.stringify(key_list);
-        const index = primary_map.get(update_key);
-        if (index >= 0) {
-          const old_row = row_list[index];
+        const index = primary_map.get(update_key) as number | undefined;
+        if (index !== undefined && index >= 0) {
+          const old_row = row_list[index as number];
           const new_row = Object.assign({}, old_row);
           let changed = false;
           set_list.forEach((set: any) => {
@@ -50,7 +50,7 @@ export function multipleUpdate(
             primary_map.set(new_key, index);
           }
           if (!err) {
-            row_list[index] = new_row;
+            row_list[index as number] = new_row;
             affectedRows++;
             if (changed) {
               changedRows++;

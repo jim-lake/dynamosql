@@ -49,9 +49,13 @@ class Pool {
       values = undefined;
     }
     const session = Session.createSession(this._args);
-    session.query(opts, values, (...result: any[]) => {
-      session.release();
-      done!(...result);
-    });
+    session.query(
+      opts,
+      values,
+      (error: Error | null, results?: any, fields?: any) => {
+        session.release();
+        done!(error, results, fields);
+      }
+    );
   }
 }

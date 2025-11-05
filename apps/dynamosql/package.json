@@ -10,8 +10,8 @@
     "build": "rollup -c",
     "pretty": "prettier --write src test examples",
     "ts:check": "tsc --noEmit",
-    "test:setup": "node --require tsx/cjs ../../node_modules/mocha/bin/mocha.js test/setup/setup.js",
-    "test": "node --require tsx/cjs ../../node_modules/mocha/bin/mocha.js 'test/**/*.test.js'"
+    "test:setup": "dotenv -- node --require tsx/cjs ../../node_modules/mocha/bin/mocha.js test/setup/setup.js",
+    "test": "dotenv -- node --require tsx/cjs ../../node_modules/mocha/bin/mocha.js 'test/**/*.test.js'"
   },
   "dependencies": {
     "@aws-sdk/client-dynamodb": "^3.922.0",
@@ -25,6 +25,7 @@
     "@rollup/plugin-typescript": "^12.3.0",
     "@types/node": "^24.10.0",
     "chai": "4.3.10",
+    "dotenv-cli": "^11.0.0",
     "mocha": "10.2.0",
     "mysql": "2.18.1",
     "rollup": "^4.52.5",

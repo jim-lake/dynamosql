@@ -6,6 +6,8 @@ import {
   ListTablesCommand,
   UpdateTableCommand,
   DynamoDBClient,
+  KeyType,
+  KeySchemaElement,
 } from '@aws-sdk/client-dynamodb';
 import { convertError } from './dynamodb_helper';
 
@@ -57,16 +59,16 @@ export function createTable(params: any, done: any) {
     AttributeName: column.name,
     AttributeType: _dynamoType(column.type),
   }));
-  const KeySchema = [
+  const KeySchema: KeySchemaElement[] = [
     {
       AttributeName: primary_key?.[0]?.name,
-      KeyType: 'HASH',
+      KeyType: KeyType.HASH,
     },
   ];
   if (primary_key?.[1]) {
     KeySchema.push({
       AttributeName: primary_key[1].name,
-      KeyType: 'RANGE',
+      KeyType: KeyType.RANGE,
     });
   }
 
@@ -97,16 +99,16 @@ export function createIndex(params: any, done: any) {
     AttributeName: item.name,
     AttributeType: _dynamoType(item.type),
   }));
-  const KeySchema = [
+  const KeySchema: KeySchemaElement[] = [
     {
       AttributeName: key_list?.[0]?.name,
-      KeyType: 'HASH',
+      KeyType: KeyType.HASH,
     },
   ];
   if (key_list?.[1]) {
     KeySchema.push({
       AttributeName: key_list[1].name,
-      KeyType: 'RANGE',
+      KeyType: KeyType.RANGE,
     });
   }
   const input = {
