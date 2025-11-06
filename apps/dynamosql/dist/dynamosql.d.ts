@@ -68,7 +68,7 @@ declare class Session implements Session$1 {
     deleteTempTable(database: string, table: string): void;
     dropTempTable(database: string, table?: string): void;
     query(params: any, values?: any, done?: any): void;
-    _query(opts: any, done: any): void;
+    _query(opts: any, done: any): Promise<void>;
     _singleQuery(ast: any): Promise<{
         result: any;
         columns: any;

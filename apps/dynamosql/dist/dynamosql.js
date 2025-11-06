@@ -2,7 +2,6 @@
 
 var SqlString = require('sqlstring');
 var require$$0 = require('big-integer');
-var util = require('util');
 var shared = require('@dynamosql/shared');
 var node_util = require('node:util');
 var clientDynamodb = require('@aws-sdk/client-dynamodb');
@@ -19525,11 +19524,14 @@ const TYPE_MAP = {
 const sleep$1 = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 async function getTableInfo$1(params) {
     const { dynamodb, table } = params;
-    const getTable = util.promisify(dynamodb.getTable.bind(dynamodb));
-    const data = await getTable(table).catch((err) => {
+    let data;
+    try {
+        data = await dynamodb.getTable(table);
+    }
+    catch (err) {
         shared.logger.error('getTableInfo: err:', err, table);
         throw err;
-    });
+    }
     if (!data || !data.Table) {
         throw new Error('bad_data');
     }
@@ -19550,20 +19552,20 @@ async function getTableInfo$1(params) {
 }
 async function getTableList$4(params) {
     const { dynamodb } = params;
-    const getTableList = util.promisify(dynamodb.getTableList.bind(dynamodb));
-    const results = await getTableList().catch((err) => {
+    try {
+        return await dynamodb.getTableList();
+    }
+    catch (err) {
         shared.logger.error('raw_engine.getTableList: err:', err);
         throw err;
-    });
-    return results;
+    }
 }
 async function createTable$5(params) {
     const { dynamodb, table, primary_key, ...other } = params;
     const column_list = params.column_list.filter((column) => primary_key.find((key) => key.name === column.name));
     const opts = { ...other, table, primary_key, column_list };
-    const createTable = util.promisify(dynamodb.createTable.bind(dynamodb));
     try {
-        await createTable(opts);
+        await dynamodb.createTable(opts);
         await _waitForTable({ dynamodb, table });
     }
     catch (err) {
@@ -19576,9 +19578,8 @@ async function createTable$5(params) {
 }
 async function dropTable$2(params) {
     const { dynamodb, table } = params;
-    const deleteTable = util.promisify(dynamodb.deleteTable.bind(dynamodb));
     try {
-        await deleteTable(table);
+        await dynamodb.deleteTable(table);
     }
     catch (delete_err) {
         if (delete_err?.code === 'ResourceNotFoundException') {
@@ -19602,9 +19603,8 @@ async function addColumn$1(params) { }
 async function createIndex$3(params) {
     const { dynamodb, table, index_name, key_list } = params;
     const opts = { table, index_name, key_list };
-    const createIndex = util.promisify(dynamodb.createIndex.bind(dynamodb));
     try {
-        await createIndex(opts);
+        await dynamodb.createIndex(opts);
         await _waitForTable({ dynamodb, table, index_name });
     }
     catch (err) {
@@ -19618,9 +19618,8 @@ async function createIndex$3(params) {
 }
 async function deleteIndex$3(params) {
     const { dynamodb, table, index_name } = params;
-    const deleteIndex = util.promisify(dynamodb.deleteIndex.bind(dynamodb));
     try {
-        await deleteIndex({ table, index_name });
+        await dynamodb.deleteIndex({ table, index_name });
         await _waitForTable({ dynamodb, table, index_name });
     }
     catch (err) {
@@ -19634,10 +19633,9 @@ async function deleteIndex$3(params) {
 async function _waitForTable(params) {
     const { dynamodb, table, index_name } = params;
     const LOOP_MS = 500;
-    const getTable = util.promisify(dynamodb.getTable.bind(dynamodb));
     while (true) {
         try {
-            const result = await getTable(table);
+            const result = await dynamodb.getTable(table);
             const status = result?.Table?.TableStatus;
             if (status === 'CREATING' ||
                 status === 'UPDATING' ||
@@ -21861,9 +21859,8 @@ DELETE FROM ${escapeIdentifier(from[0].table)}
 WHERE ${result.value}
 RETURNING ALL OLD *
 `;
-    const queryQL = util.promisify(dynamodb.queryQL.bind(dynamodb));
     try {
-        const results = await queryQL(sql);
+        const results = await dynamodb.queryQL(sql);
         return { affectedRows: results?.length || 0 };
     }
     catch (err) {
@@ -21882,9 +21879,8 @@ async function multipleDelete$1(params) {
     let affectedRows = 0;
     for (const object of list) {
         const { table, key_list, delete_list } = object;
-        const deleteItems = util.promisify(dynamodb.deleteItems.bind(dynamodb));
         try {
-            await deleteItems({ table, key_list, list: delete_list });
+            await dynamodb.deleteItems({ table, key_list, list: delete_list });
             affectedRows += delete_list.length;
         }
         catch (err) {
@@ -21911,9 +21907,8 @@ async function _insertIgnoreReplace(params) {
     let list = params.list;
     let affectedRows;
     if (list.length > 1) {
-        const getTableCached = util.promisify(dynamodb.getTableCached.bind(dynamodb));
         try {
-            const result = await getTableCached(table);
+            const result = await dynamodb.getTableCached(table);
             const key_list = result.Table.KeySchema.map((k) => k.AttributeName);
             const track = new Map();
             if (duplicate_mode === 'replace') {
@@ -21934,50 +21929,45 @@ async function _insertIgnoreReplace(params) {
     if (duplicate_mode === 'ignore') {
         affectedRows = list.length;
         const sql_list = list.map((item) => `INSERT INTO ${escapeIdentifier(table)} VALUE ${_escapeItem(item)}`);
-        const [err_list] = await new Promise((resolve, reject) => {
-            dynamodb.batchQL(sql_list, (err, result) => {
-                if (err && !Array.isArray(err)) {
-                    if (err?.name === 'ResourceNotFoundException' ||
-                        err?.message?.toLowerCase().includes('resource not found')) {
-                        reject(new SQLError({ err: 'table_not_found', args: [table] }));
-                    }
-                    else {
-                        reject(err);
-                    }
-                }
-                else {
-                    resolve([err, result]);
-                }
-            });
-        });
-        if (err_list?.length > 0) {
-            let err;
-            err_list.forEach((item_err) => {
-                if (item_err?.Code === 'DuplicateItem') {
-                    affectedRows--;
-                }
-                else if (!err && item_err) {
-                    affectedRows--;
-                    err = convertError(item_err);
-                }
-            });
-            if (err)
-                throw err;
+        try {
+            await dynamodb.batchQL(sql_list);
         }
-        else if (err_list?.name === 'ValidationException') {
-            throw new SQLError({
-                err: 'dup_table_insert',
-                sqlMessage: err_list.message,
-                cause: err_list,
-            });
+        catch (err) {
+            if (err?.name === 'ResourceNotFoundException' ||
+                err?.message?.toLowerCase().includes('resource not found')) {
+                throw new SQLError({ err: 'table_not_found', args: [table] });
+            }
+            if (Array.isArray(err)) {
+                let error;
+                err.forEach((item_err) => {
+                    if (item_err?.Code === 'DuplicateItem') {
+                        affectedRows--;
+                    }
+                    else if (!error && item_err) {
+                        affectedRows--;
+                        error = convertError(item_err);
+                    }
+                });
+                if (error)
+                    throw error;
+            }
+            else if (err?.name === 'ValidationException') {
+                throw new SQLError({
+                    err: 'dup_table_insert',
+                    sqlMessage: err.message,
+                    cause: err,
+                });
+            }
+            else {
+                throw err;
+            }
         }
     }
     else {
         list.forEach(_fixupItem);
         const opts = { table, list };
-        const putItems = util.promisify(dynamodb.putItems.bind(dynamodb));
         try {
-            await putItems(opts);
+            await dynamodb.putItems(opts);
             affectedRows = list.length;
         }
         catch (err) {
@@ -21989,9 +21979,8 @@ async function _insertIgnoreReplace(params) {
 async function _insertNoIgnore(params) {
     const { dynamodb, table, list } = params;
     const sql_list = list.map((item) => `INSERT INTO ${escapeIdentifier(table)} VALUE ${_escapeItem(item)}`);
-    const transactionQL = util.promisify(dynamodb.transactionQL.bind(dynamodb));
     try {
-        await transactionQL(sql_list);
+        await dynamodb.transactionQL(sql_list);
         return { affectedRows: list.length };
     }
     catch (err) {
@@ -22069,9 +22058,8 @@ async function _getFromTable$1(params) {
     if (!where_result?.err && where_result?.value) {
         sql += ' WHERE ' + where_result.value;
     }
-    const queryQL = util.promisify(dynamodb.queryQL.bind(dynamodb));
     try {
-        const results = await queryQL(sql);
+        const results = await dynamodb.queryQL(sql);
         let column_list;
         if (_requestAll) {
             const response_set = new Set();
@@ -22131,9 +22119,8 @@ SET ${sets}
 WHERE ${where_result.value}
 RETURNING MODIFIED OLD *
 `;
-    const queryQL = util.promisify(dynamodb.queryQL.bind(dynamodb));
     try {
-        const results = await queryQL(sql);
+        const results = await dynamodb.queryQL(sql);
         const result = { affectedRows: 1, changedRows: 0 };
         set.forEach((object, i) => {
             const { column } = object;
@@ -22162,9 +22149,8 @@ async function multipleUpdate$1(params) {
     for (const object of list) {
         const { table, key_list, update_list } = object;
         update_list.forEach((item) => item.set_list.forEach((set) => (set.value = set.value.value)));
-        const updateItems = util.promisify(dynamodb.updateItems.bind(dynamodb));
         try {
-            await updateItems({ table, key_list, list: update_list });
+            await dynamodb.updateItems({ table, key_list, list: update_list });
             affectedRows += list.length;
             changedRows += list.length;
         }
@@ -25413,35 +25399,45 @@ let g_client$1;
 function init$2(client) {
     g_client$1 = client;
 }
-function getTableList$1(done) {
+async function getTableList$1() {
     const command = new clientDynamodb.ListTablesCommand({ Limit: 100 });
     let next_token;
     const results = [];
-    asyncForever((done) => {
-        if (next_token) {
-            command.input.ExclusiveStartTableName = next_token;
-        }
-        g_client$1.send(command).then((result) => {
-            let err;
-            result.TableNames.forEach((table) => results.push(table));
-            next_token = result?.LastEvaluatedTableName;
-            if (!next_token) {
-                err = 'stop';
+    await new Promise((resolve, reject) => {
+        asyncForever((done) => {
+            if (next_token) {
+                command.input.ExclusiveStartTableName = next_token;
             }
-            done(err);
-        }, done);
-    }, (err) => {
-        if (err === 'stop') {
-            err = null;
-        }
-        done(err, results);
+            g_client$1.send(command).then((result) => {
+                let err;
+                result.TableNames.forEach((table) => results.push(table));
+                next_token = result?.LastEvaluatedTableName;
+                if (!next_token) {
+                    err = 'stop';
+                }
+                done(err);
+            }, (err) => done(err));
+        }, (err) => {
+            if (err === 'stop') {
+                resolve(results);
+            }
+            else {
+                reject(err);
+            }
+        });
     });
+    return results;
 }
-function getTable$2(TableName, done) {
+async function getTable$2(TableName) {
     const command = new clientDynamodb.DescribeTableCommand({ TableName });
-    g_client$1.send(command).then((result) => done(null, result), (err) => done(convertError(err)));
+    try {
+        return await g_client$1.send(command);
+    }
+    catch (err) {
+        throw convertError(err);
+    }
 }
-function createTable$2(params, done) {
+async function createTable$2(params) {
     const { table, billing_mode, column_list, primary_key } = params;
     const AttributeDefinitions = column_list.map((column) => ({
         AttributeName: column.name,
@@ -25466,13 +25462,23 @@ function createTable$2(params, done) {
         KeySchema,
     };
     const command = new clientDynamodb.CreateTableCommand(input);
-    g_client$1.send(command).then(() => done(), (err) => done(convertError(err)));
+    try {
+        await g_client$1.send(command);
+    }
+    catch (err) {
+        throw convertError(err);
+    }
 }
-function deleteTable$2(TableName, done) {
+async function deleteTable$2(TableName) {
     const command = new clientDynamodb.DeleteTableCommand({ TableName });
-    g_client$1.send(command).then(() => done(), (err) => done(convertError(err)));
+    try {
+        await g_client$1.send(command);
+    }
+    catch (err) {
+        throw convertError(err);
+    }
 }
-function createIndex$1(params, done) {
+async function createIndex$1(params) {
     const { table, index_name, key_list, projection_type } = params;
     const AttributeDefinitions = key_list.map((item) => ({
         AttributeName: item.name,
@@ -25504,16 +25510,26 @@ function createIndex$1(params, done) {
         ],
     };
     const command = new clientDynamodb.UpdateTableCommand(input);
-    g_client$1.send(command).then(() => done(), (err) => done(convertError(err)));
+    try {
+        await g_client$1.send(command);
+    }
+    catch (err) {
+        throw convertError(err);
+    }
 }
-function deleteIndex$1(params, done) {
+async function deleteIndex$1(params) {
     const { table, index_name } = params;
     const input = {
         TableName: table,
         GlobalSecondaryIndexUpdates: [{ Delete: { IndexName: index_name } }],
     };
     const command = new clientDynamodb.UpdateTableCommand(input);
-    g_client$1.send(command).then(() => done(), (err) => done(convertError(err)));
+    try {
+        await g_client$1.send(command);
+    }
+    catch (err) {
+        throw convertError(err);
+    }
 }
 function _dynamoType(type) {
     let ret = type;
@@ -25553,33 +25569,39 @@ const createTable$1 = createTable$2;
 const deleteTable$1 = deleteTable$2;
 const createIndex = createIndex$1;
 const deleteIndex = deleteIndex$1;
-function queryQL(list, done) {
+async function queryQL(list) {
     if (!Array.isArray(list)) {
-        _queryQL(list, done);
+        return _queryQL(list);
     }
     else {
         const err_list = [];
         const result_list = [];
-        asyncTimesLimit(list.length, QUERY_LIMIT, (i, done) => {
-            const item = list[i];
-            _queryQL(item, (err, result) => {
-                result_list[i] = result;
-                err_list[i] = err;
-                done(err);
-            });
-        }, (err) => done(err ? err_list : null, result_list));
+        await new Promise((resolve, reject) => {
+            asyncTimesLimit(list.length, QUERY_LIMIT, (i, done) => {
+                const item = list[i];
+                _queryQL(item).then((result) => {
+                    result_list[i] = result;
+                    done();
+                }, (err) => {
+                    result_list[i] = undefined;
+                    err_list[i] = err;
+                    done(err);
+                });
+            }, (err) => (err ? reject(err_list) : resolve(result_list)));
+        });
+        return result_list;
     }
 }
-function _queryQL(params, done) {
+async function _queryQL(params) {
     const sql = params?.sql ? params.sql : params;
     const input = {
         Statement: sql,
         ReturnValuesOnConditionCheckFailure: params?.return ?? 'NONE',
     };
     const command = new clientDynamodb.ExecuteStatementCommand(input);
-    _pagedSend(command, done);
+    return _pagedSend(command);
 }
-function batchQL(params, done) {
+async function batchQL(params) {
     const list = Array.isArray(params) ? params : params.list;
     const input = {
         Statements: list.map((Statement) => ({
@@ -25588,9 +25610,26 @@ function batchQL(params, done) {
         })),
     };
     const command = new clientDynamodb.BatchExecuteStatementCommand(input);
-    g_client.send(command).then((result) => _successReturn(result, done), (err) => _errorReturn(err, done));
+    try {
+        const result = await g_client.send(command);
+        const [err, ret] = _convertSuccess(result);
+        if (err) {
+            throw err;
+        }
+        return ret;
+    }
+    catch (err) {
+        const converted = _convertSuccess(err);
+        if (converted[0]) {
+            throw converted[0];
+        }
+        if (converted[1]) {
+            return converted[1];
+        }
+        throw convertError(err);
+    }
 }
-function transactionQL(params, done) {
+async function transactionQL(params) {
     const list = Array.isArray(params) ? params : params.list;
     const input = {
         TransactStatements: list.map((Statement) => ({
@@ -25599,141 +25638,179 @@ function transactionQL(params, done) {
         })),
     };
     const command = new clientDynamodb.ExecuteTransactionCommand(input);
-    g_client.send(command).then((result) => _successReturn(result, done), (err) => _errorReturn(err, done));
+    try {
+        const result = await g_client.send(command);
+        const [err, ret] = _convertSuccess(result);
+        if (err) {
+            throw err;
+        }
+        return ret;
+    }
+    catch (err) {
+        const converted = _convertSuccess(err);
+        if (converted[0]) {
+            throw converted[0];
+        }
+        if (converted[1]) {
+            return converted[1];
+        }
+        throw convertError(err);
+    }
 }
-function deleteItems(params, done) {
+async function deleteItems(params) {
     const BATCH_LIMIT = 100;
     const { table, key_list, list } = params;
     const batch_count = Math.ceil(list.length / BATCH_LIMIT);
     const prefix = `DELETE FROM ${escapeIdentifier(table)} WHERE `;
     const err_list = [];
     const result_list = [];
-    asyncTimesLimit(batch_count, QUERY_LIMIT, (batch_index, done) => {
-        const sql_list = [];
-        const start = BATCH_LIMIT * batch_index;
-        const end = Math.min(start + BATCH_LIMIT, list.length);
-        for (let i = start; i < end; i++) {
-            const cond = key_list
-                .map((key, j) => {
-                const value = list[i][j];
-                return `${escapeIdentifier(key)} = ${_convertValueToPQL(value)}`;
-            })
-                .join(' AND ');
-            sql_list.push(prefix + cond);
-        }
-        transactionQL(sql_list, (err, result) => {
+    await new Promise((resolve, reject) => {
+        asyncTimesLimit(batch_count, QUERY_LIMIT, (batch_index, done) => {
+            const sql_list = [];
+            const start = BATCH_LIMIT * batch_index;
+            const end = Math.min(start + BATCH_LIMIT, list.length);
             for (let i = start; i < end; i++) {
-                result_list[i] = result?.[i - start];
-                err_list[i] = err?.[i - start];
+                const cond = key_list
+                    .map((key, j) => {
+                    const value = list[i][j];
+                    return `${escapeIdentifier(key)} = ${_convertValueToPQL(value)}`;
+                })
+                    .join(' AND ');
+                sql_list.push(prefix + cond);
             }
-            done(err);
-        });
-    }, (err) => done(err ? err_list : null, result_list));
+            transactionQL(sql_list).then((result) => {
+                for (let i = start; i < end; i++) {
+                    result_list[i] = result?.[i - start];
+                }
+                done();
+            }, (err) => {
+                for (let i = start; i < end; i++) {
+                    err_list[i] = err?.[i - start];
+                }
+                done(err);
+            });
+        }, (err) => (err ? reject(err_list) : resolve(result_list)));
+    });
+    return result_list;
 }
-function updateItems(params, done) {
+async function updateItems(params) {
     const BATCH_LIMIT = 100;
     const { table, key_list, list } = params;
     const batch_count = Math.ceil(list.length / BATCH_LIMIT);
     const prefix = `UPDATE ${escapeIdentifier(table)} SET `;
     const err_list = [];
     const result_list = [];
-    asyncTimesLimit(batch_count, QUERY_LIMIT, (batch_index, done) => {
-        const sql_list = [];
-        const start = BATCH_LIMIT * batch_index;
-        const end = Math.min(start + BATCH_LIMIT, list.length);
-        for (let i = start; i < end; i++) {
-            const item = list[i];
-            const sets = item.set_list
-                .map((object) => {
-                const { column, value } = object;
-                return `${escapeIdentifier(column)} = ${escapeValue(value)}`;
-            })
-                .join(', ');
-            const cond = ' WHERE ' +
-                key_list
-                    .map((key, j) => {
-                    const value = item.key[j];
-                    return `${escapeIdentifier(key)} = ${_convertValueToPQL(value)}`;
-                })
-                    .join(' AND ');
-            sql_list.push(prefix + sets + cond);
-        }
-        transactionQL(sql_list, (err, result) => {
+    await new Promise((resolve, reject) => {
+        asyncTimesLimit(batch_count, QUERY_LIMIT, (batch_index, done) => {
+            const sql_list = [];
+            const start = BATCH_LIMIT * batch_index;
+            const end = Math.min(start + BATCH_LIMIT, list.length);
             for (let i = start; i < end; i++) {
-                result_list[i] = result?.[i - start];
-                err_list[i] = err?.[i - start];
+                const item = list[i];
+                const sets = item.set_list
+                    .map((object) => {
+                    const { column, value } = object;
+                    return `${escapeIdentifier(column)} = ${escapeValue(value)}`;
+                })
+                    .join(', ');
+                const cond = ' WHERE ' +
+                    key_list
+                        .map((key, j) => {
+                        const value = item.key[j];
+                        return `${escapeIdentifier(key)} = ${_convertValueToPQL(value)}`;
+                    })
+                        .join(' AND ');
+                sql_list.push(prefix + sets + cond);
             }
-            done(err);
-        });
-    }, (err) => done(err ? err_list : null, result_list));
+            transactionQL(sql_list).then((result) => {
+                for (let i = start; i < end; i++) {
+                    result_list[i] = result?.[i - start];
+                }
+                done();
+            }, (err) => {
+                for (let i = start; i < end; i++) {
+                    err_list[i] = err?.[i - start];
+                }
+                done(err);
+            });
+        }, (err) => (err ? reject(err_list) : resolve(result_list)));
+    });
+    return result_list;
 }
-function putItems(params, done) {
+async function putItems(params) {
     const BATCH_LIMIT = 100;
     const { table, list } = params;
     const batch_count = Math.ceil(list.length / BATCH_LIMIT);
     const err_list = [];
-    asyncTimesLimit(batch_count, QUERY_LIMIT, (batch_index, done) => {
-        const start = BATCH_LIMIT * batch_index;
-        const end = start + BATCH_LIMIT;
-        const item_list = list.slice(start, end);
-        const input = {
-            TransactItems: item_list.map((item) => ({
-                Put: {
-                    TableName: table,
-                    Item: nativeToValue(item).M,
-                },
-            })),
-        };
-        const command = new clientDynamodb.TransactWriteItemsCommand(input);
-        g_client.send(command).then(() => done(), (err) => {
-            if (err?.name === 'TransactionCanceledException' &&
-                err.CancellationReasons?.length > 0) {
-                err.CancellationReasons.forEach((cancel_err, i) => {
-                    err_list[start + i] = {
-                        err: convertError(cancel_err),
-                        parent: cancel_err,
+    await new Promise((resolve, reject) => {
+        asyncTimesLimit(batch_count, QUERY_LIMIT, (batch_index, done) => {
+            const start = BATCH_LIMIT * batch_index;
+            const end = start + BATCH_LIMIT;
+            const item_list = list.slice(start, end);
+            const input = {
+                TransactItems: item_list.map((item) => ({
+                    Put: {
+                        TableName: table,
+                        Item: nativeToValue(item).M,
+                    },
+                })),
+            };
+            const command = new clientDynamodb.TransactWriteItemsCommand(input);
+            g_client.send(command).then(() => done(), (err) => {
+                if (err?.name === 'TransactionCanceledException' &&
+                    err.CancellationReasons?.length > 0) {
+                    err.CancellationReasons.forEach((cancel_err, i) => {
+                        err_list[start + i] = {
+                            err: convertError(cancel_err),
+                            parent: cancel_err,
+                        };
+                    });
+                }
+                else {
+                    err_list[start] = {
+                        err: convertError(err),
+                        parent: err,
                     };
-                });
-            }
-            else {
-                err_list[start] = {
-                    err: convertError(err),
-                    parent: err,
-                };
-            }
-            done(err || 'unknown');
-        });
-    }, (err) => done(err ? err_list : null));
+                }
+                done(err || 'unknown');
+            });
+        }, (err) => (err ? reject(err_list) : resolve(undefined)));
+    });
 }
-function _pagedSend(command, done) {
+async function _pagedSend(command) {
     let next_token;
     const results = [];
-    asyncForever((done) => {
-        if (next_token) {
-            command.input.NextToken = next_token;
-        }
-        g_client.send(command).then((result) => {
-            let [err, list] = _convertSuccess(result);
-            list?.forEach?.((item) => {
-                results.push(item);
+    await new Promise((resolve, reject) => {
+        asyncForever((done) => {
+            if (next_token) {
+                command.input.NextToken = next_token;
+            }
+            g_client.send(command).then((result) => {
+                let [err, list] = _convertSuccess(result);
+                list?.forEach?.((item) => {
+                    results.push(item);
+                });
+                next_token = result?.NextToken;
+                if (!err && !next_token) {
+                    err = 'stop';
+                }
+                done(err);
+            }, (err) => {
+                if (err.Item) {
+                    results.push(err.Item);
+                }
+                done(convertError(err));
             });
-            next_token = result?.NextToken;
-            if (!err && !next_token) {
-                err = 'stop';
-            }
-            done(err);
         }, (err) => {
-            if (err.Item) {
-                results.push(err.Item);
+            if (err === 'stop') {
+                resolve(results);
             }
-            done(convertError(err));
+            else {
+                reject(err);
+            }
         });
-    }, (err) => {
-        if (err === 'stop') {
-            err = null;
-        }
-        done(err, results);
     });
+    return results;
 }
 function _convertValueToPQL(value) {
     let ret;
@@ -25750,16 +25827,6 @@ function _convertValueToPQL(value) {
         ret = "'" + escapeString(String(value)) + "'";
     }
     return ret;
-}
-function _successReturn(result, done) {
-    done(..._convertSuccess(result));
-}
-function _errorReturn(err, done) {
-    let ret;
-    if (err.Item) {
-        ret = [err.Item];
-    }
-    done(convertError(err), ret);
 }
 function _convertSuccess(result) {
     let err = null;
@@ -25811,40 +25878,50 @@ var dynamodb = /*#__PURE__*/Object.freeze({
 });
 
 const g_tableCache = {};
-function getTable(table_name, done) {
-    getTable$1(table_name, (err, result) => {
-        if (err?.message === 'resource_not_found' ||
-            (!err && result?.Table?.TableStatus === 'DELETING')) {
+async function getTable(table_name) {
+    try {
+        const result = await getTable$1(table_name);
+        if (result?.Table?.TableStatus === 'DELETING') {
             delete g_tableCache[table_name];
         }
-        else if (!err) {
+        else {
             g_tableCache[table_name] = { last_updated: Date.now(), result };
         }
-        done(err, result);
-    });
+        return result;
+    }
+    catch (err) {
+        if (err?.message === 'resource_not_found') {
+            delete g_tableCache[table_name];
+        }
+        throw err;
+    }
 }
-function getTableCached(table_name, done) {
+async function getTableCached(table_name) {
     if (table_name in g_tableCache) {
-        done(null, g_tableCache[table_name].result);
+        return g_tableCache[table_name].result;
     }
     else {
-        getTable(table_name, done);
+        return getTable(table_name);
     }
 }
-function createTable(opts, done) {
+async function createTable(opts) {
     const table_name = opts.table;
     delete g_tableCache[table_name];
-    createTable$1(opts, (err) => {
+    try {
+        await createTable$1(opts);
+    }
+    finally {
         delete g_tableCache[table_name];
-        done(err);
-    });
+    }
 }
-function deleteTable(table_name, done) {
+async function deleteTable(table_name) {
     delete g_tableCache[table_name];
-    deleteTable$1(table_name, (err) => {
+    try {
+        await deleteTable$1(table_name);
+    }
+    finally {
         delete g_tableCache[table_name];
-        done(err);
-    });
+    }
 }
 
 var MetadataCache = /*#__PURE__*/Object.freeze({
@@ -25975,7 +26052,7 @@ class Session {
             this._query(opts, done);
         }
     }
-    _query(opts, done) {
+    async _query(opts, done) {
         if (this._isReleased) {
             done('released');
             return;
@@ -25990,16 +26067,16 @@ class Session {
             return;
         }
         if (list.length === 1) {
-            this._singleQuery(list[0])
-                .then(({ result, columns }) => {
+            try {
+                const { result, columns } = await this._singleQuery(list[0]);
                 if (result !== undefined) {
                     this._transformResult(result, columns, opts);
                 }
                 done(null, result ?? DEFAULT_RESULT, columns, 1);
-            })
-                .catch((err) => {
+            }
+            catch (err) {
                 done(new SQLError(err, opts.sql));
-            });
+            }
             return;
         }
         if (!this._multipleStatements) {
@@ -26008,7 +26085,7 @@ class Session {
         }
         // Multiple statements
         const result_list = [];
-        (async () => {
+        try {
             const schema_list = [];
             for (let n = 0; n < list.length; n++) {
                 const ast = list[n];
@@ -26021,16 +26098,13 @@ class Session {
                     schema_list[n] = columns;
                 }
             }
-            return { result_list, schema_list, query_count: list.length };
-        })()
-            .then(({ result_list, schema_list, query_count }) => {
-            done(null, result_list, schema_list, query_count);
-        })
-            .catch((err) => {
+            done(null, result_list, schema_list, list.length);
+        }
+        catch (err) {
             const sqlErr = new SQLError(err, opts.sql);
             sqlErr.index = result_list.length;
             done(sqlErr);
-        });
+        }
     }
     async _singleQuery(ast) {
         let handler;
