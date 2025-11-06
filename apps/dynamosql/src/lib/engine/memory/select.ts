@@ -1,5 +1,6 @@
 import * as Storage from './storage';
 import type { RowListParams } from '../index';
+import { SQLError } from '../../../error';
 
 export async function getRowList(params: RowListParams): Promise<{
   source_map: Record<string, any[]>;
@@ -13,7 +14,7 @@ export async function getRowList(params: RowListParams): Promise<{
   for (const from of list) {
     const result = _getFromTable({ ...params, from });
     if (result.err) {
-      throw result.err;
+      throw new SQLError(result.err);
     }
     source_map[from.key] = result.row_list;
     column_map[from.key] = result.column_list;

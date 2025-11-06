@@ -1,5 +1,6 @@
 import * as SchemaManager from './schema_manager';
 import * as TransactionManager from './transaction_manager';
+import { SQLError } from '../error';
 
 export async function query(params: any): Promise<any> {
   const { ast, dynamodb, session } = params;
@@ -17,9 +18,9 @@ export async function query(params: any): Promise<any> {
     };
     return await TransactionManager.run(opts);
   } else if (ast.table) {
-    throw 'no_current_database';
+    throw new SQLError('no_current_database');
   } else {
-    throw 'unsupported';
+    throw new SQLError('unsupported');
   }
 }
 
@@ -74,7 +75,7 @@ async function _runAlterTable(params: any): Promise<any> {
         }) || [];
 
       if (key_err) {
-        throw key_err;
+        throw new SQLError(key_err);
       }
 
       const opts = {
@@ -89,10 +90,10 @@ async function _runAlterTable(params: any): Promise<any> {
         await engine.createIndex(opts);
       } catch (err) {
         if (err === 'index_exists') {
-          throw {
+          throw new SQLError({
             err: 'ER_DUP_KEYNAME',
             args: [def.index],
-          };
+          });
         }
         throw err;
       }
@@ -108,10 +109,10 @@ async function _runAlterTable(params: any): Promise<any> {
         await engine.deleteIndex(opts);
       } catch (err) {
         if (err === 'index_not_found') {
-          throw {
+          throw new SQLError({
             err: 'ER_CANT_DROP_FIELD_OR_KEY',
             args: [def.index],
-          };
+          });
         }
         throw err;
       }

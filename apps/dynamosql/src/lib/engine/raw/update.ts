@@ -7,6 +7,7 @@ import {
 } from '../../../tools/dynamodb_helper';
 import { logger } from '@dynamosql/shared';
 import type { UpdateParams, MutationResult } from '../index';
+import { NoSingleOperationError } from '../../../error';
 
 export async function singleUpdate(
   params: UpdateParams
@@ -35,7 +36,7 @@ export async function singleUpdate(
   });
 
   if (no_single) {
-    throw 'no_single';
+    throw new NoSingleOperationError();
   }
 
   const sets = set
@@ -66,7 +67,7 @@ RETURNING MODIFIED OLD *
     return result;
   } catch (err: any) {
     if (err?.name === 'ValidationException') {
-      throw 'no_single';
+      throw new NoSingleOperationError();
     } else if (err?.name === 'ConditionalCheckFailedException') {
       return { affectedRows: 0, changedRows: 0 };
     }

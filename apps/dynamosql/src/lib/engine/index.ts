@@ -1,6 +1,7 @@
 import * as RawEngine from './raw';
 import * as MemoryEngine from './memory';
 import type { Session } from '../types/session';
+import { SQLError } from '../../error';
 
 export interface ColumnDef {
   name: string;
@@ -181,7 +182,7 @@ export function getEngineByName(name: string): Engine {
 }
 
 export function getDatabaseError(database: string): Engine {
-  const error = { err: 'db_not_found', args: [database] };
+  const error = new SQLError({ err: 'db_not_found', args: [database] });
   return {
     commit: async () => {
       throw error;
@@ -232,7 +233,7 @@ export function getDatabaseError(database: string): Engine {
 }
 
 export function getTableError(table: string): Engine {
-  const error = { err: 'table_not_found', args: [table] };
+  const error = new SQLError({ err: 'table_not_found', args: [table] });
   return {
     commit: async () => {
       throw error;

@@ -8,6 +8,7 @@ import type {
   IndexParams,
   AddColumnParams,
 } from '../index';
+import { SQLError } from '../../../error';
 
 export async function getTableInfo(
   params: TableInfoParams
@@ -22,7 +23,7 @@ export async function getTableInfo(
       is_open: false,
     };
   }
-  throw { err: 'table_not_found', args: [table] };
+  throw new SQLError({ err: 'table_not_found', args: [table] });
 }
 
 export async function getTableList(params: TableListParams): Promise<string[]> {
@@ -33,7 +34,7 @@ export async function createTable(params: CreateTableParams): Promise<void> {
   const { session, database, table, primary_key, column_list, is_temp } =
     params;
   if (primary_key.length === 0) {
-    throw { err: 'unsupported', message: 'primary key is required' };
+    throw new SQLError({ err: 'unsupported', message: 'primary key is required' });
   }
   const data = {
     column_list,

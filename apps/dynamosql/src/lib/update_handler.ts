@@ -5,6 +5,7 @@ import { makeEngineGroups } from './helpers/engine_groups';
 import { resolveReferences } from './helpers/column_ref_helper';
 import { runSelect } from './helpers/select_modify';
 import { logger } from '@dynamosql/shared';
+import { SQLError, NoSingleOperationError } from '../error';
 
 export async function query(params: any): Promise<any> {
   const { ast, session } = params;
@@ -17,9 +18,9 @@ export async function query(params: any): Promise<any> {
 
   if (resolve_err) {
     logger.error('resolve_err:', resolve_err);
-    throw resolve_err;
+    throw new SQLError(resolve_err);
   } else if (!database) {
-    throw 'no_current_database';
+    throw new SQLError('no_current_database');
   }
 
   const opts = {
@@ -44,7 +45,7 @@ async function _runUpdate(params: any): Promise<any> {
     try {
       return await engine.singleUpdate(opts);
     } catch (err) {
-      if (err === 'no_single') {
+      if (err instanceof NoSingleOperationError) {
         return await _multipleUpdate(params);
       }
       throw err;
@@ -77,7 +78,7 @@ async function _multipleUpdate(params: any): Promise<any> {
             row,
           });
           if (expr_result.err) {
-            throw expr_result.err;
+            throw new SQLError(expr_result.err);
           }
           return {
             column: set_item.column,

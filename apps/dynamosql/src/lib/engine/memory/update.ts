@@ -1,11 +1,12 @@
 import * as Storage from './storage';
 import { logger } from '@dynamosql/shared';
 import type { UpdateParams, MutationResult } from '../index';
+import { SQLError, NoSingleOperationError } from '../../../error';
 
 export async function singleUpdate(
   params: UpdateParams
 ): Promise<MutationResult> {
-  throw 'no_single';
+  throw new NoSingleOperationError();
 }
 
 export async function multipleUpdate(
@@ -21,7 +22,7 @@ export async function multipleUpdate(
     const data = Storage.getTable(database, table, session);
 
     if (!data) {
-      throw 'table_not_found';
+      throw new SQLError('table_not_found');
     }
 
     const row_list = data.row_list.slice();
@@ -47,10 +48,10 @@ export async function multipleUpdate(
 
         const new_key = _makePrimaryKey(data.primary_key, new_row);
         if (new_key !== update_key && primary_map.has(new_key)) {
-          throw {
+          throw new SQLError({
             err: 'dup_primary_key_entry',
             args: [data.primary_key, new_key],
-          };
+          });
         } else if (new_key !== update_key) {
           primary_map.delete(update_key);
           primary_map.set(new_key, index);

@@ -30,7 +30,7 @@ export async function getTableInfo(
   });
 
   if (!data || !data.Table) {
-    throw 'bad_data';
+    throw new Error('bad_data');
   }
 
   const column_list = data.Table.AttributeDefinitions.map((def: any) => ({

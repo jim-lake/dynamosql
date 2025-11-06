@@ -1,5 +1,6 @@
 import * as Expression from './expression';
 import { logger } from '@dynamosql/shared';
+import { SQLError } from '../error';
 
 export function query(params: any): void {
   const { ast, session } = params;
@@ -9,12 +10,12 @@ export function query(params: any): void {
     const { left } = expr;
     const right = Expression.getValue(expr.right, { session });
     if (right.err) {
-      throw right.err;
+      throw new SQLError(right.err);
     } else if (left?.type === 'var' && left.prefix === '@') {
       session.setVariable(left.name, right.value);
     } else {
       logger.error('set_handler.query: unsupported left:', left);
-      throw 'unsupported';
+      throw new SQLError('unsupported');
     }
   }
 }

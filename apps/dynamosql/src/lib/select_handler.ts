@@ -6,6 +6,7 @@ import { formJoin } from './helpers/join';
 import { formGroup } from './helpers/group';
 import { sort } from './helpers/sort';
 import { logger } from '@dynamosql/shared';
+import { SQLError } from '../error';
 
 export async function query(params: any): Promise<{ output_row_list: any[]; column_list: any[] }> {
   const { output_row_list, column_list } = await internalQuery(params);
@@ -27,7 +28,7 @@ export async function internalQuery(params: any): Promise<{ output_row_list: any
     const resolve_err = resolveReferences(ast, current_database);
     if (resolve_err) {
       logger.error('select: resolve err:', resolve_err);
-      throw resolve_err;
+      throw new SQLError(resolve_err);
     }
   }
 
@@ -113,7 +114,7 @@ function _evaluateReturn(params: any): { output_row_list: any[]; column_list: an
   }
 
   if (err) {
-    throw err;
+    throw new SQLError(err);
   }
 
   const column_list: any[] = [];
@@ -134,7 +135,7 @@ function _evaluateReturn(params: any): { output_row_list: any[]; column_list: an
   if (ast.orderby) {
     const sort_err = sort(row_list, ast.orderby, { session, column_list });
     if (sort_err) {
-      throw sort_err;
+      throw new SQLError(sort_err);
     }
   }
 

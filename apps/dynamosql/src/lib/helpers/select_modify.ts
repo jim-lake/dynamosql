@@ -1,6 +1,7 @@
 import * as SchemaManager from '../schema_manager';
 import * as SelectHandler from '../select_handler';
 import { logger } from '@dynamosql/shared';
+import { SQLError } from '../../error';
 
 export async function runSelect(params: any): Promise<any[]> {
   const { dynamodb, session, ast } = params;
@@ -18,7 +19,7 @@ export async function runSelect(params: any): Promise<any[]> {
         object._keyList = result.primary_key.map((key: any) => key.name);
         object._keyList.forEach((key: string) => object._requestSet.add(key));
       } else {
-        throw 'bad_schema';
+        throw new SQLError('bad_schema');
       }
     } catch (err) {
       logger.error('SelectModify: getTable: err:', err, table);

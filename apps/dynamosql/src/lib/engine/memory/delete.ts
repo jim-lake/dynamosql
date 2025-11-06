@@ -1,11 +1,12 @@
 import * as Storage from './storage';
 import { logger } from '@dynamosql/shared';
 import type { DeleteParams, MutationResult } from '../index';
+import { SQLError, NoSingleOperationError } from '../../../error';
 
 export async function singleDelete(
   params: DeleteParams
 ): Promise<MutationResult> {
-  throw 'no_single';
+  throw new NoSingleOperationError();
 }
 
 export async function multipleDelete(
@@ -20,7 +21,7 @@ export async function multipleDelete(
     const data = Storage.getTable(database, table, session);
 
     if (!data) {
-      throw 'table_not_found';
+      throw new SQLError('table_not_found');
     }
 
     const row_list = data.row_list.slice();

@@ -249,14 +249,14 @@ class Session implements ISession {
         return await _useDatabase({ ast, session: this });
       default:
         logger.error('unsupported statement type:', ast);
-        throw {
+        throw new SQLError({
           err: 'unsupported_type',
           args: [ast?.type],
-        };
+        });
     }
 
     if (!handler) {
-      throw 'unsupported_type';
+      throw new SQLError('unsupported_type');
     }
 
     const result = await handler({ ast, dynamodb: g_dynamodb, session: this });

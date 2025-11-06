@@ -3,6 +3,7 @@ import * as SchemaManager from './schema_manager';
 import * as TransactionManager from './transaction_manager';
 import * as SelectHandler from './select_handler';
 import { logger } from '@dynamosql/shared';
+import { SQLError } from '../error';
 
 export async function query(params: any): Promise<any> {
   const { ast, session } = params;
@@ -17,12 +18,12 @@ export async function query(params: any): Promise<any> {
   const table = ast.table?.[0]?.table;
   
   if (!database) {
-    throw 'no_current_database';
+    throw new SQLError('no_current_database');
   }
   
   const err = _checkAst(ast);
   if (err) {
-    throw err;
+    throw new SQLError(err);
   }
 
   const engine = SchemaManager.getEngine(database, table, session);
@@ -47,7 +48,7 @@ async function _runInsert(params: any): Promise<any> {
     ast.set.forEach((item: any) => {
       const expr_result = Expression.getValue(item.value, { session });
       if (expr_result.err) {
-        throw expr_result.err;
+        throw new SQLError(expr_result.err);
       }
       obj[item.column] = expr_result;
     });
@@ -70,21 +71,21 @@ async function _runInsert(params: any): Promise<any> {
         ast.columns.forEach((name: string, j: number) => {
           const expr_result = Expression.getValue(row.value[j], { session });
           if (expr_result.err) {
-            throw expr_result.err;
+            throw new SQLError(expr_result.err);
           }
           obj[name] = expr_result;
         });
         list.push(obj);
       } else {
-        throw {
+        throw new SQLError({
           err: 'ER_WRONG_VALUE_COUNT_ON_ROW',
           args: [i],
-        };
+        });
       }
     });
   } else {
     logger.error('unsupported insert without column names');
-    throw 'unsupported';
+    throw new SQLError('unsupported');
   }
 
   // Insert the rows
@@ -101,7 +102,7 @@ async function _runInsert(params: any): Promise<any> {
       return await engine.insertRowList(opts);
     } catch (err) {
       if (err === 'resource_not_found' || err?.err === 'resource_not_found') {
-        throw { err: 'table_not_found', args: err?.args || [table] };
+        throw new SQLError({ err: 'table_not_found', args: err?.args || [table] });
       }
       throw err;
     }

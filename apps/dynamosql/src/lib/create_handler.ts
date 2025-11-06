@@ -2,6 +2,7 @@ import * as SelectHandler from './select_handler';
 import * as SchemaManager from './schema_manager';
 import { trackFirstSeen } from '../tools/util';
 import { logger } from '@dynamosql/shared';
+import { SQLError } from '../error';
 
 export async function query(params: any): Promise<any> {
   const { ast, session } = params;
@@ -10,12 +11,12 @@ export async function query(params: any): Promise<any> {
   if (ast.keyword === 'database') {
     return await _createDatabase(params);
   } else if (!database) {
-    throw 'no_current_database';
+    throw new SQLError('no_current_database');
   } else if (ast.keyword === 'table') {
     return await _createTable(params);
   } else {
     logger.error('unsupported create:', ast.keyword);
-    throw 'unsupported';
+    throw new SQLError('unsupported');
   }
 }
 
@@ -77,10 +78,10 @@ async function _createTable(params: any): Promise<any> {
       if (!duplicate_mode) {
         const keys = primary_key.map(({ name }) => obj[name].value);
         if (!trackFirstSeen(track, keys)) {
-          throw {
+          throw new SQLError({
             err: 'dup_primary_key_entry',
             args: [primary_key.map((key) => key.name), keys],
-          };
+          });
         }
       }
       return obj;

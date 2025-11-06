@@ -3,6 +3,7 @@ import { convertWhere } from '../../helpers/convert_where';
 import { escapeIdentifier } from '../../../tools/dynamodb_helper';
 import { logger } from '@dynamosql/shared';
 import type { DeleteParams, MutationResult } from '../index';
+import { NoSingleOperationError } from '../../../error';
 
 export async function singleDelete(
   params: DeleteParams
@@ -21,7 +22,7 @@ export async function singleDelete(
   }
 
   if (no_single) {
-    throw 'no_single';
+    throw new NoSingleOperationError();
   }
 
   const sql = `
@@ -36,7 +37,7 @@ RETURNING ALL OLD *
     return { affectedRows: results?.length || 0 };
   } catch (err: any) {
     if (err?.name === 'ValidationException') {
-      throw 'no_single';
+      throw new NoSingleOperationError();
     } else if (err?.name === 'ConditionalCheckFailedException') {
       return { affectedRows: 0 };
     }

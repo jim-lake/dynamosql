@@ -1,5 +1,6 @@
 import * as SchemaManager from './schema_manager';
 import { convertType } from './helpers/column_type_helper';
+import { SQLError } from '../error';
 
 export async function query(params: any): Promise<{ rows: any[]; columns: any[] }> {
   const { ast, session, dynamodb } = params;
@@ -17,7 +18,7 @@ export async function query(params: any): Promise<{ rows: any[]; columns: any[] 
   } else if (ast.keyword === 'tables') {
     const database = session.getCurrentDatabase();
     if (!database) {
-      throw 'no_current_database';
+      throw new SQLError('no_current_database');
     }
     
     const name = 'Tables_in_' + database;
@@ -31,6 +32,6 @@ export async function query(params: any): Promise<{ rows: any[]; columns: any[] 
     const rows = list?.map?.((item: any) => [item]);
     return { rows, columns: [column] };
   } else {
-    throw 'unsupported';
+    throw new SQLError('unsupported');
   }
 }

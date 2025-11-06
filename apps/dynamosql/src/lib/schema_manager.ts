@@ -1,5 +1,6 @@
 import * as Engine from './engine';
 import { logger } from '@dynamosql/shared';
+import { SQLError } from '../error';
 
 const BUILT_IN = ['_dynamodb'];
 const g_schemaMap: any = {};
@@ -39,13 +40,13 @@ export async function getTableList(params: any): Promise<string[]> {
   } else if (database in g_schemaMap) {
     return [];
   } else {
-    throw { err: 'db_not_found', args: [database] };
+    throw new SQLError({ err: 'db_not_found', args: [database] });
   }
 }
 
 export function createDatabase(database: string): void {
   if (BUILT_IN.includes(database) || database in g_schemaMap) {
-    throw 'database_exists';
+    throw new SQLError('database_exists');
   }
   g_schemaMap[database] = {};
 }
@@ -53,7 +54,7 @@ export function createDatabase(database: string): void {
 export async function dropDatabase(params: any): Promise<void> {
   const { session, database } = params;
   if (BUILT_IN.includes(database)) {
-    throw 'database_no_drop_builtin';
+    throw new SQLError('database_no_drop_builtin');
   } else if (database in g_schemaMap) {
     session.dropTempTable(database);
     const table_list = Object.keys(g_schemaMap[database]);
@@ -70,7 +71,7 @@ export async function dropDatabase(params: any): Promise<void> {
     }
     delete g_schemaMap[database];
   } else {
-    throw { err: 'db_not_found', args: [database] };
+    throw new SQLError({ err: 'db_not_found', args: [database] });
   }
 }
 
@@ -81,14 +82,14 @@ export async function createTable(params: any): Promise<void> {
     : (params.table_engine?.toLowerCase?.() ?? 'raw');
 
   if (database === '_dynamodb' && table_engine !== 'raw') {
-    throw 'access_denied';
+    throw new SQLError('access_denied');
   } else if (database === '_dynamodb') {
     const engine = Engine.getEngineByName('raw');
     await engine.createTable(params);
   } else if (_findTable(database, table, session)) {
-    throw { err: 'table_exists', args: [table] };
+    throw new SQLError({ err: 'table_exists', args: [table] });
   } else if (!(database in g_schemaMap)) {
-    throw { err: 'db_not_found', args: [database] };
+    throw new SQLError({ err: 'db_not_found', args: [database] });
   } else {
     const engine = Engine.getEngineByName(table_engine);
     if (engine) {
@@ -97,7 +98,7 @@ export async function createTable(params: any): Promise<void> {
         g_schemaMap[database][table] = { table_engine };
       }
     } else {
-      throw { err: 'ER_UNKNOWN_STORAGE_ENGINE', args: [table_engine] };
+      throw new SQLError({ err: 'ER_UNKNOWN_STORAGE_ENGINE', args: [table_engine] });
     }
   }
 }
@@ -123,6 +124,6 @@ export async function dropTable(params: any): Promise<void> {
       throw err;
     }
   } else {
-    throw 'resource_not_found';
+    throw new SQLError('resource_not_found');
   }
 }

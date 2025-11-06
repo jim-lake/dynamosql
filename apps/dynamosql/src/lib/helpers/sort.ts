@@ -1,4 +1,5 @@
 import { getValue } from '../expression';
+import { SQLError } from '../../error';
 
 export function sort(row_list: any[], orderby: any[], state: any): any {
   try {
@@ -30,7 +31,7 @@ function _sort(orderby: any[], state: any, a: any, b: any): number {
       const b_value = getValue(expr, { ...state, row: b });
       const err = a_value.err || b_value.err;
       if (err) {
-        throw err;
+        throw new SQLError(err);
       }
       const result = func(a_value.value, b_value.value, a_value.type);
       if (result !== 0) {

@@ -1,5 +1,6 @@
 import * as Storage from './storage';
 import type { InsertParams, MutationResult } from '../index';
+import { SQLError } from '../../../error';
 
 export async function insertRowList(
   params: InsertParams
@@ -12,7 +13,7 @@ export async function insertRowList(
   }
 
   if (!data) {
-    throw 'table_not_found';
+    throw new SQLError('table_not_found');
   }
 
   const { primary_key } = data;
@@ -36,7 +37,7 @@ export async function insertRowList(
       row_list[index as number] = row;
       affectedRows++;
     } else if (!duplicate_mode) {
-      throw { err: 'dup_primary_key_entry', args: [primary_key, key_values] };
+      throw new SQLError({ err: 'dup_primary_key_entry', args: [primary_key, key_values] });
     }
   }
 

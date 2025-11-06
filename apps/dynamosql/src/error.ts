@@ -207,3 +207,10 @@ function _stringify(arg: any): string {
   }
   return ret;
 }
+
+export class NoSingleOperationError extends Error {
+  constructor() {
+    super('no_single');
+    this.name = 'NoSingleOperationError';
+  }
+}
