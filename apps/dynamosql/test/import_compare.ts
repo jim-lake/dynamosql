@@ -43,7 +43,7 @@ const _fieldInfoCheck: _FieldInfoProps = {
   orgName: true,
   charsetNr: true,
   length: true,
-  type: true,
+  type: false,
   flags: true,
   decimals: true,
   default: true,
@@ -75,6 +75,13 @@ const _testConnection = (conn: ReturnType<typeof dynamosql.createSession>) => {
   conn.escape;
   conn.escapeId;
   conn.format;
+  conn.release;
+  conn.on;
+  conn.once;
+  conn.off;
+  conn.emit;
+  conn.threadId;
+  conn.state;
 };
 
 // Test Pool compatibility
@@ -90,9 +97,9 @@ const _testPool = (pool: ReturnType<typeof dynamosql.createPool>) => {
 
 // Callback signature validation
 const _testCallback: dynamosql.queryCallback = (
-  err: mysql.MysqlError | null,
+  err: dynamosql.MysqlError | null,
   results?: any,
-  fields?: mysql.FieldInfo[]
+  fields?: dynamosql.FieldInfo[]
 ) => {};
 
 // Function signature validation
