@@ -1,7 +1,7 @@
 import * as SchemaManager from './schema_manager';
 import { convertType } from './helpers/column_type_helper';
 
-export function query(params: any, done: any) {
+export async function query(params: any): Promise<{ rows: any[]; columns: any[] }> {
   const { ast, session, dynamodb } = params;
 
   if (ast.keyword === 'databases') {
@@ -13,28 +13,24 @@ export function query(params: any, done: any) {
     });
     const list = SchemaManager.getDatabaseList();
     const rows = list?.map?.((item: any) => [item]);
-    done(null, rows, [column]);
+    return { rows, columns: [column] };
   } else if (ast.keyword === 'tables') {
     const database = session.getCurrentDatabase();
-    if (database) {
-      const name = 'Tables_in_' + database;
-      const column = Object.assign(convertType('string'), {
-        table: 'TABLES',
-        orgTable: 'tables',
-        name,
-        orgName: name,
-      });
-      SchemaManager.getTableList(
-        { dynamodb, database },
-        (err: any, list: any) => {
-          const rows = list?.map?.((item: any) => [item]);
-          done(err, rows, [column]);
-        }
-      );
-    } else {
-      done('no_current_database');
+    if (!database) {
+      throw 'no_current_database';
     }
+    
+    const name = 'Tables_in_' + database;
+    const column = Object.assign(convertType('string'), {
+      table: 'TABLES',
+      orgTable: 'tables',
+      name,
+      orgName: name,
+    });
+    const list = await SchemaManager.getTableList({ dynamodb, database });
+    const rows = list?.map?.((item: any) => [item]);
+    return { rows, columns: [column] };
   } else {
-    done('unsupported');
+    throw 'unsupported';
   }
 }

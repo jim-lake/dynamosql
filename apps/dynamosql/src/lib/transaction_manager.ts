@@ -1,4 +1,3 @@
-import asyncSeries from 'async/series';
 import * as Engine from './engine';
 
 class Transaction {
@@ -26,61 +25,46 @@ class Transaction {
   }
 }
 
-export function run(params: any, done: any) {
+export async function run(params: any): Promise<any> {
   const { dynamodb, session, func } = params;
-  let tx: any;
-  let func_err: any;
-  let result_list: any[] = [];
-  asyncSeries(
-    [
-      (done: any) => startTransaction({ session, auto_commit: true }, done),
-      (done: any) => {
-        tx = session.getTransaction();
-        params.transaction = tx;
-        func(params, (err: any, ...results: any[]) => {
-          func_err = err;
-          result_list = results;
-          done();
-        });
-      },
-      (done: any) => {
-        if (tx.isAutoCommit()) {
-          if (func_err) {
-            rollback({ dynamodb, session }, done);
-          } else {
-            commit({ dynamodb, session }, done);
-          }
-        } else {
-          done();
-        }
-      },
-    ],
-    (err: any) => done(func_err || err, ...result_list)
-  );
+  
+  startTransaction({ session, auto_commit: true });
+  const tx = session.getTransaction();
+  params.transaction = tx;
+  
+  try {
+    const result = await func(params);
+    if (tx.isAutoCommit()) {
+      await commit({ dynamodb, session });
+    }
+    return result;
+  } catch (err) {
+    if (tx.isAutoCommit()) {
+      await rollback({ dynamodb, session });
+    }
+    throw err;
+  }
 }
 
-export function startTransaction(params: any, done: any) {
+export function startTransaction(params: any): void {
   const { session, auto_commit } = params;
   const existing = session.getTransaction();
   if (!existing) {
     const tx = new Transaction(auto_commit);
     session.setTransaction(tx);
   }
-  done();
 }
 
-export async function commit(params: any, done: any) {
+export async function commit(params: any): Promise<void> {
   await _txEach(params, async ({ engine, ...other }: any) => {
     await engine.commit(other);
   });
-  done();
 }
 
-export async function rollback(params: any, done: any) {
+export async function rollback(params: any): Promise<void> {
   await _txEach(params, async ({ engine, ...other }: any) => {
     await engine.rollback(other);
   });
-  done();
 }
 
 async function _txEach(params: any, callback: any) {

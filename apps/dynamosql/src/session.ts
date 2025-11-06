@@ -1,4 +1,3 @@
-import asyncTimesSeries from 'async/timesSeries';
 import * as SqlString from 'sqlstring';
 import { Parser } from './vendor/mysql_parser';
 import * as AlterHandler from './lib/alter_handler';
@@ -152,62 +151,71 @@ class Session implements ISession {
   _query(opts: any, done: any) {
     if (this._isReleased) {
       done('released');
-    } else {
-      const { err: parse_err, list } = _astify(opts.sql);
-      if (parse_err) {
-        done(new SQLError(parse_err, opts.sql));
-      } else if (list.length === 0) {
-        done(new SQLError('ER_EMPTY_QUERY', opts.sql));
-      } else if (list.length === 1) {
-        this._singleQuery(list[0], (err: any, result: any, columns: any) => {
-          if (!err) {
+      return;
+    }
+
+    const { err: parse_err, list } = _astify(opts.sql);
+    if (parse_err) {
+      done(new SQLError(parse_err, opts.sql));
+      return;
+    }
+    
+    if (list.length === 0) {
+      done(new SQLError('ER_EMPTY_QUERY', opts.sql));
+      return;
+    }
+
+    if (list.length === 1) {
+      this._singleQuery(list[0])
+        .then(({ result, columns }) => {
+          if (result !== undefined) {
             this._transformResult(result, columns, opts);
           }
-          done(
-            err ? new SQLError(err, opts.sql) : null,
-            err ? undefined : (result ?? DEFAULT_RESULT),
-            err ? undefined : columns,
-            1
-          );
+          done(null, result ?? DEFAULT_RESULT, columns, 1);
+        })
+        .catch((err) => {
+          done(new SQLError(err, opts.sql));
         });
-      } else if (this._multipleStatements) {
-        const query_count = list.length;
-        const result_list: any[] = [];
-        const schema_list: any[] = [];
-        asyncTimesSeries(
-          query_count,
-          (n: number, done: any) => {
-            const ast = list[n];
-            if (ast) {
-              this._singleQuery(ast, (err: any, result: any, columns: any) => {
-                if (!err) {
-                  this._transformResult(result, columns, opts);
-                  result_list[n] = result ?? DEFAULT_RESULT;
-                  schema_list[n] = columns;
-                }
-                done(err);
-              });
-            } else {
-              done();
-            }
-          },
-          (err: any) => {
-            if (err) {
-              err = new SQLError(err, opts.sql);
-              err.index = result_list.length;
-            }
-            done(err, result_list, schema_list, query_count);
-          }
-        );
-      } else {
-        done(new SQLError('multiple_statements_disabled', opts.sql));
-      }
+      return;
     }
+
+    if (!this._multipleStatements) {
+      done(new SQLError('multiple_statements_disabled', opts.sql));
+      return;
+    }
+
+    // Multiple statements
+    const result_list: any[] = [];
+    (async () => {
+      const schema_list: any[] = [];
+      
+      for (let n = 0; n < list.length; n++) {
+        const ast = list[n];
+        if (ast) {
+          const { result, columns } = await this._singleQuery(ast);
+          if (result !== undefined) {
+            this._transformResult(result, columns, opts);
+          }
+          result_list[n] = result ?? DEFAULT_RESULT;
+          schema_list[n] = columns;
+        }
+      }
+      
+      return { result_list, schema_list, query_count: list.length };
+    })()
+      .then(({ result_list, schema_list, query_count }) => {
+        done(null, result_list, schema_list, query_count);
+      })
+      .catch((err) => {
+        const sqlErr = new SQLError(err, opts.sql);
+        (sqlErr as any).index = result_list.length;
+        done(sqlErr);
+      });
   }
 
-  _singleQuery(ast: any, done: any) {
-    let err: any;
+  async _singleQuery(ast: any): Promise<{ result: any; columns: any }> {
     let handler: any;
+    
     switch (ast?.type) {
       case 'alter':
         handler = AlterHandler.query;
@@ -238,21 +246,37 @@ class Session implements ISession {
         handler = UpdateHandler.query;
         break;
       case 'use':
-        handler = _useDatabase;
-        break;
+        return await _useDatabase({ ast, session: this });
       default:
         logger.error('unsupported statement type:', ast);
-        err = {
+        throw {
           err: 'unsupported_type',
           args: [ast?.type],
         };
     }
 
-    if (handler) {
-      handler({ ast, dynamodb: g_dynamodb, session: this }, done);
-    } else {
-      done(err || 'unsupported_type');
+    if (!handler) {
+      throw 'unsupported_type';
     }
+
+    const result = await handler({ ast, dynamodb: g_dynamodb, session: this });
+    
+    // Handle different return types from handlers
+    if (result && typeof result === 'object') {
+      if ('rows' in result && 'columns' in result) {
+        // show handler
+        return { result: result.rows, columns: result.columns };
+      } else if ('output_row_list' in result && 'column_list' in result) {
+        // select handler
+        return { result: result.output_row_list, columns: result.column_list };
+      } else {
+        // mutation handlers (insert, update, delete, etc.)
+        return { result, columns: undefined };
+      }
+    }
+    
+    // set handler returns void, drop handler may return undefined
+    return { result: undefined, columns: undefined };
   }
 
   _transformResult(list: any, columns: any, opts: any) {
@@ -306,6 +330,7 @@ function _astify(sql: string) {
   return { err, list };
 }
 
-function _useDatabase(params: any, done: any) {
-  params.session.setCurrentDatabase(params.ast.db, done);
+async function _useDatabase(params: any): Promise<{ result: any; columns: any }> {
+  params.session.setCurrentDatabase(params.ast.db);
+  return { result: undefined, columns: undefined };
 }

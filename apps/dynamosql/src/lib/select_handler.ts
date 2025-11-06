@@ -7,32 +7,34 @@ import { formGroup } from './helpers/group';
 import { sort } from './helpers/sort';
 import { logger } from '@dynamosql/shared';
 
-export function query(params: any, done: any) {
-  internalQuery(params, (err: any, output_row_list: any, column_list: any) => {
-    if (!err) {
-      output_row_list?.forEach?.((row: any) => {
-        for (const key in row) {
-          row[key] = row[key].value;
-        }
-      });
+export async function query(params: any): Promise<{ output_row_list: any[]; column_list: any[] }> {
+  const { output_row_list, column_list } = await internalQuery(params);
+  
+  output_row_list?.forEach?.((row: any) => {
+    for (const key in row) {
+      row[key] = row[key].value;
     }
-    done(err, output_row_list, column_list);
   });
+  
+  return { output_row_list, column_list };
 }
 
-export function internalQuery(params: any, done: any) {
+export async function internalQuery(params: any): Promise<{ output_row_list: any[]; column_list: any[]; row_list: any[] }> {
   const { ast, session, dynamodb } = params;
 
-  let resolve_err: any;
   const current_database = session.getCurrentDatabase();
   if (!params.skip_resolve) {
-    resolve_err = resolveReferences(ast, current_database);
+    const resolve_err = resolveReferences(ast, current_database);
+    if (resolve_err) {
+      logger.error('select: resolve err:', resolve_err);
+      throw resolve_err;
+    }
   }
 
-  if (resolve_err) {
-    logger.error('select: resolve err:', resolve_err);
-    done(resolve_err);
-  } else if (ast?.from?.length) {
+  let source_map: any = null;
+  let column_map: any = {};
+
+  if (ast?.from?.length) {
     const db = ast.from?.[0]?.db;
     const table = ast.from?.[0]?.table;
     const engine = SchemaManager.getEngine(db, table, session);
@@ -42,18 +44,15 @@ export function internalQuery(params: any, done: any) {
       list: ast.from,
       where: ast.where,
     };
-    engine.getRowList(opts).then(
-      ({ source_map, column_map }) => {
-        _evaluateReturn({ ...params, source_map, column_map }, done);
-      },
-      (err) => done(err)
-    );
-  } else {
-    _evaluateReturn({ ...params, source_map: null, column_map: {} }, done);
+    const result = await engine.getRowList(opts);
+    source_map = result.source_map;
+    column_map = result.column_map;
   }
+
+  return _evaluateReturn({ ...params, source_map, column_map });
 }
 
-function _evaluateReturn(params: any, done: any) {
+function _evaluateReturn(params: any): { output_row_list: any[]; column_list: any[]; row_list: any[] } {
   const { session, source_map, ast } = params;
   const query_columns = _expandStarColumns(params);
 
@@ -61,6 +60,7 @@ function _evaluateReturn(params: any, done: any) {
   let err: any;
   let row_list: any;
   let sleep_ms = 9;
+  
   if (from) {
     const result = formJoin({ source_map, from, where, session });
     if (result.err) {
@@ -71,6 +71,7 @@ function _evaluateReturn(params: any, done: any) {
   } else {
     row_list = [{ 0: {} }];
   }
+  
   if (!err && groupby) {
     const result = formGroup({ groupby, ast, row_list, session });
     if (result.err) {
@@ -79,6 +80,7 @@ function _evaluateReturn(params: any, done: any) {
       row_list = result.row_list;
     }
   }
+  
   const row_count = row_list?.length || 0;
   const column_count = query_columns?.length || 0;
 
@@ -110,50 +112,56 @@ function _evaluateReturn(params: any, done: any) {
     row['@@result'] = output_row;
   }
 
-  let output_row_list: any;
+  if (err) {
+    throw err;
+  }
+
   const column_list: any[] = [];
-  if (!err) {
-    for (let i = 0; i < column_count; i++) {
-      const column = query_columns[i];
-      const column_type = convertType(
-        column.result_type,
-        column.result_nullable
-      );
-      column_type.orgName = column.result_name || '';
-      column_type.name = column.as || column_type.orgName;
-      column_type.orgTable = column?.expr?.from?.table || '';
-      column_type.table = column?.expr?.from?.as || column_type.orgTable;
-      column_type.schema = column.expr?.from?.db || '';
-      column_list.push(column_type);
-    }
-    if (ast.orderby) {
-      err = sort(row_list, ast.orderby, { session, column_list });
-    }
+  for (let i = 0; i < column_count; i++) {
+    const column = query_columns[i];
+    const column_type = convertType(
+      column.result_type,
+      column.result_nullable
+    );
+    column_type.orgName = column.result_name || '';
+    column_type.name = column.as || column_type.orgName;
+    column_type.orgTable = column?.expr?.from?.table || '';
+    column_type.table = column?.expr?.from?.as || column_type.orgTable;
+    column_type.schema = column.expr?.from?.db || '';
+    column_list.push(column_type);
   }
-  if (!err) {
-    let start = 0;
-    let end = row_list.length;
-    if (ast.limit?.seperator === 'offset') {
-      start = ast.limit.value[1].value;
-      end = Math.min(end, start + ast.limit.value[0].value);
-    } else if (ast.limit?.value?.length > 1) {
-      start = ast.limit.value[0].value;
-      end = Math.min(end, start + ast.limit.value[1].value);
-    } else if (ast.limit) {
-      end = Math.min(end, ast.limit.value[0].value);
+  
+  if (ast.orderby) {
+    const sort_err = sort(row_list, ast.orderby, { session, column_list });
+    if (sort_err) {
+      throw sort_err;
     }
-
-    row_list = row_list.slice(start, end);
-    output_row_list = row_list.map((row: any) => row['@@result']);
   }
 
-  if (!err && sleep_ms) {
-    setTimeout(() => {
-      done(err, output_row_list, column_list, row_list);
-    }, sleep_ms);
-  } else {
-    done(err, output_row_list, column_list, row_list);
+  let start = 0;
+  let end = row_list.length;
+  if (ast.limit?.seperator === 'offset') {
+    start = ast.limit.value[1].value;
+    end = Math.min(end, start + ast.limit.value[0].value);
+  } else if (ast.limit?.value?.length > 1) {
+    start = ast.limit.value[0].value;
+    end = Math.min(end, start + ast.limit.value[1].value);
+  } else if (ast.limit) {
+    end = Math.min(end, ast.limit.value[0].value);
   }
+
+  row_list = row_list.slice(start, end);
+  const output_row_list = row_list.map((row: any) => row['@@result']);
+
+  if (sleep_ms) {
+    return new Promise((resolve) => {
+      setTimeout(() => {
+        resolve({ output_row_list, column_list, row_list });
+      }, sleep_ms);
+    }) as any;
+  }
+
+  return { output_row_list, column_list, row_list };
 }
 
 function _expandStarColumns(params: any) {
