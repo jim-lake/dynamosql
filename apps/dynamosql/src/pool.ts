@@ -4,6 +4,7 @@ import * as SqlString from 'sqlstring';
 import * as Session from './session';
 
 import type {
+  SessionConfig,
   PoolConnection,
   MysqlError,
   FieldInfo,
@@ -11,31 +12,20 @@ import type {
   QueryCallback,
 } from './types';
 
-export interface PoolOptions {
-  database?: string;
-  region?: string;
-  accessKeyId?: string;
-  secretAccessKey?: string;
-  resultObjects?: boolean;
-  typeCast?: boolean | ((field: any, next: () => any) => any);
-  dateStrings?: boolean | string[];
-  multipleStatements?: boolean;
-}
-
-export function createPool(args?: PoolOptions) {
+export type PoolConfig = SessionConfig;
+export function createPool(args?: PoolConfig) {
   if (args) {
     Session.init(args);
   }
-  return new Pool(args || {});
+  return new Pool(args ?? {});
 }
-
-class Pool extends EventEmitter {
-  config: PoolOptions;
+export class Pool extends EventEmitter {
+  config: SessionConfig;
   escape = SqlString.escape;
   escapeId = SqlString.escapeId;
   format = SqlString.format;
 
-  constructor(args: PoolOptions) {
+  constructor(args: PoolConfig) {
     super();
     this.config = args;
   }

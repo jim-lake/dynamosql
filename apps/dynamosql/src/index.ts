@@ -5,7 +5,9 @@ import * as Session from './session';
 
 import type { EscapeFunctions } from './types';
 
+export type { PoolConfig } from './pool';
 export type {
+  SessionConfig,
   Connection,
   MysqlError,
   FieldInfo,
@@ -14,7 +16,6 @@ export type {
   OkPacket,
 } from './types';
 export type { QueryCallback as queryCallback } from './types';
-export type { PoolOptions } from './pool';
 
 export const createConnection = Session.createSession;
 export const createPool = Pool.createPool;

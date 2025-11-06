@@ -2,8 +2,8 @@
 
 var SqlString = require('sqlstring');
 var node_events = require('node:events');
-var require$$0 = require('big-integer');
 var shared = require('@dynamosql/shared');
+var require$$0 = require('big-integer');
 var node_util = require('node:util');
 var clientDynamodb = require('@aws-sdk/client-dynamodb');
 
@@ -25968,7 +25968,7 @@ class Session extends node_events.EventEmitter {
     _isReleased = false;
     _multipleStatements = false;
     _tempTableMap = {};
-    _typeCast = true;
+    _typeCast;
     _dateStrings = false;
     _resultObjects = true;
     escape = SqlString__namespace.escape;
@@ -26250,7 +26250,7 @@ function createPool$1(args) {
     if (args) {
         init(args);
     }
-    return new Pool(args || {});
+    return new Pool(args ?? {});
 }
 class Pool extends node_events.EventEmitter {
     config;

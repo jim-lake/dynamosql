@@ -1,4 +1,5 @@
 import { EventEmitter } from 'node:events';
+import { logger } from '@dynamosql/shared';
 import * as SqlString from 'sqlstring';
 
 import { Parser } from './vendor/mysql_parser';
@@ -13,10 +14,11 @@ import * as ShowHandler from './lib/show_handler';
 import * as UpdateHandler from './lib/update_handler';
 import { typeCast } from './lib/helpers/type_cast_helper';
 import * as DynamoDB from './lib/dynamodb';
-import { logger } from '@dynamosql/shared';
 import { SQLError } from './error';
 
 import type {
+  SessionConfig,
+  TypeCast,
   PoolConnection,
   MysqlError,
   FieldInfo,
@@ -41,9 +43,8 @@ let g_dynamodb: any;
 export function init(args: any) {
   g_dynamodb = DynamoDB.createDynamoDB(args);
 }
-
 export class Session extends EventEmitter implements PoolConnection {
-  config: any;
+  config: SessionConfig;
   state: string = 'connected';
   threadId: number | null = g_threadId++;
 
@@ -54,7 +55,7 @@ export class Session extends EventEmitter implements PoolConnection {
   private _isReleased = false;
   private _multipleStatements = false;
   private _tempTableMap: any = {};
-  private _typeCast: boolean | ((field: any, next: () => any) => any) = true;
+  private _typeCast: TypeCast;
   private _dateStrings: boolean | string[] = false;
   private _resultObjects = true;
 
@@ -62,7 +63,7 @@ export class Session extends EventEmitter implements PoolConnection {
   escapeId = SqlString.escapeId;
   format = SqlString.format;
 
-  constructor(args?: any) {
+  constructor(args?: SessionConfig) {
     super();
     this.config = args || {};
     if (args?.database) {
@@ -338,7 +339,7 @@ export class Session extends EventEmitter implements PoolConnection {
   }
 }
 
-export function createSession(args?: any): PoolConnection {
+export function createSession(args?: SessionConfig): PoolConnection {
   if (args) {
     g_dynamodb = DynamoDB.createDynamoDB(args);
   }

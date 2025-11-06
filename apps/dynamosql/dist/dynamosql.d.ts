@@ -96,6 +96,14 @@ interface EscapeFunctions {
     escapeId(value: string, forbidQualified?: boolean): string;
     format(sql: string, values?: any[], stringifyObjects?: boolean, timeZone?: string): string;
 }
+interface SessionConfig {
+    region?: string | undefined;
+    database?: string | undefined;
+    multipleStatements?: boolean | undefined;
+    resultObjects?: boolean | undefined;
+    typeCast?: TypeCast | undefined;
+    dateStrings?: boolean | Array<"TIMESTAMP" | "DATETIME" | "DATE"> | undefined;
+}
 interface PoolConnection extends Connection {
     release(): void;
 }
@@ -119,29 +127,20 @@ interface OkPacket {
     protocol41: boolean;
 }
 
-interface PoolOptions {
-    database?: string;
-    region?: string;
-    accessKeyId?: string;
-    secretAccessKey?: string;
-    resultObjects?: boolean;
-    typeCast?: boolean | ((field: any, next: () => any) => any);
-    dateStrings?: boolean | string[];
-    multipleStatements?: boolean;
-}
-declare function createPool$1(args?: PoolOptions): Pool;
+type PoolConfig = SessionConfig;
+declare function createPool$1(args?: PoolConfig): Pool;
 declare class Pool extends EventEmitter {
-    config: PoolOptions;
+    config: SessionConfig;
     escape: any;
     escapeId: any;
     format: any;
-    constructor(args: PoolOptions);
+    constructor(args: PoolConfig);
     end(done?: (err?: MysqlError) => void): void;
     getConnection(done: (err: MysqlError | null, connection?: PoolConnection) => void): void;
     query(opts: string | QueryOptions, values?: any, done?: QueryCallback): void;
 }
 
-declare function createSession$1(args?: any): PoolConnection;
+declare function createSession$1(args?: SessionConfig): PoolConnection;
 
 declare const createConnection: typeof createSession$1;
 declare const createPool: typeof createPool$1;
@@ -151,4 +150,4 @@ declare const escapeId: EscapeFunctions["escapeId"];
 declare const format: EscapeFunctions["format"];
 
 export { SQLError, createConnection, createPool, createSession, escape, escapeId, format };
-export type { Connection, FieldInfo, MysqlError, OkPacket, PoolOptions, QueryCallback, QueryOptions, QueryCallback as queryCallback };
+export type { Connection, FieldInfo, MysqlError, OkPacket, PoolConfig, QueryCallback, QueryOptions, SessionConfig, QueryCallback as queryCallback };
