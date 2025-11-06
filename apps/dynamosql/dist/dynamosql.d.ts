@@ -22,7 +22,40 @@ declare class SQLError extends Error {
 }
 
 type MysqlError = SQLError;
-interface FieldInfo {
+declare const enum Types {
+    DECIMAL = 0,// aka DECIMAL (http://dev.mysql.com/doc/refman/5.0/en/precision-math-decimal-changes.html)
+    TINY = 1,
+    SHORT = 2,
+    LONG = 3,
+    FLOAT = 4,
+    DOUBLE = 5,
+    NULL = 6,// NULL (used for prepared statements, I think)
+    TIMESTAMP = 7,
+    LONGLONG = 8,// aka BIGINT, 8 bytes
+    INT24 = 9,// aka MEDIUMINT, 3 bytes
+    DATE = 10,
+    TIME = 11,
+    DATETIME = 12,
+    YEAR = 13,// aka YEAR, 1 byte (don't ask)
+    NEWDATE = 14,// aka ?
+    VARCHAR = 15,// aka VARCHAR (?)
+    BIT = 16,// aka BIT, 1-8 byte
+    TIMESTAMP2 = 17,// aka TIMESTAMP with fractional seconds
+    DATETIME2 = 18,// aka DATETIME with fractional seconds
+    TIME2 = 19,// aka TIME with fractional seconds
+    JSON = 245,
+    NEWDECIMAL = 246,// aka DECIMAL
+    ENUM = 247,
+    SET = 248,
+    TINY_BLOB = 249,
+    MEDIUM_BLOB = 250,
+    LONG_BLOB = 251,
+    BLOB = 252,
+    VAR_STRING = 253,// aka VARCHAR, VARBINARY
+    STRING = 254,// aka CHAR, BINARY
+    GEOMETRY = 255
+}
+interface UntypedFieldInfo {
     catalog: string;
     db: string;
     table: string;
@@ -31,21 +64,47 @@ interface FieldInfo {
     orgName: string;
     charsetNr: number;
     length: number;
-    type: number;
     flags: number;
     decimals: number;
-    default?: string;
+    default?: string | undefined;
     zeroFill: boolean;
     protocol41: boolean;
 }
+interface FieldInfo extends UntypedFieldInfo {
+    type: Types;
+}
+type TypeCast = boolean | ((field: UntypedFieldInfo & {
+    type: string;
+    length: number;
+    string(): null | string;
+    buffer(): null | Buffer;
+}, next: () => any) => any);
 interface QueryOptions {
     sql: string;
     values?: any;
     timeout?: number;
     nestTables?: boolean | string;
-    typeCast?: boolean | ((field: any, next: () => any) => any);
+    typeCast?: TypeCast | undefined;
 }
-type queryCallback = (err: MysqlError | null, results?: any, fields?: FieldInfo[]) => void;
+type QueryCallback = (err: MysqlError | null, results?: any, fields?: FieldInfo[]) => void;
+interface QueryFunction {
+    (options: string | QueryOptions, callback?: QueryCallback): void;
+    (options: string | QueryOptions, values: any, callback?: QueryCallback): void;
+}
+interface EscapeFunctions {
+    escape(value: any, stringifyObjects?: boolean, timeZone?: string): string;
+    escapeId(value: string, forbidQualified?: boolean): string;
+    format(sql: string, values?: any[], stringifyObjects?: boolean, timeZone?: string): string;
+}
+interface PoolConnection extends Connection {
+    release(): void;
+}
+interface Connection extends EscapeFunctions {
+    query: QueryFunction;
+    end(callback?: (err?: MysqlError) => void): void;
+    end(options: any, callback: (err?: MysqlError) => void): void;
+    destroy(): void;
+}
 interface OkPacket {
     fieldCount: number;
     affectedRows: number;
@@ -75,70 +134,17 @@ declare class Pool extends EventEmitter {
     format: any;
     constructor(args: PoolOptions);
     end(done?: (err?: MysqlError) => void): void;
-    getConnection(done: (err: MysqlError | null, connection?: any) => void): void;
-    query(opts: string | QueryOptions, values?: any, done?: queryCallback): void;
+    getConnection(done: (err: MysqlError | null, connection?: PoolConnection) => void): void;
+    query(opts: string | QueryOptions, values?: any, done?: QueryCallback): void;
 }
 
-interface Session$1 {
-    getCurrentDatabase(): string | null;
-    setCurrentDatabase(database: string, done?: () => void): void;
-    getVariable(name: string): any;
-    setVariable(name: string, value: any): void;
-    getTransaction(): any;
-    setTransaction(tx: any): void;
-    getTempTable(database: string, table: string): any;
-    saveTempTable(database: string, table: string, contents: any): void;
-    deleteTempTable(database: string, table: string): void;
-    dropTempTable(database: string, table?: string): void;
-    getTempTableList(): [string, any][];
-}
-
-declare class Session extends EventEmitter implements Session$1 {
-    config: any;
-    state: string;
-    threadId: number | null;
-    private _typeCastOptions;
-    private _currentDatabase;
-    private _localVariables;
-    private _transaction;
-    private _isReleased;
-    private _multipleStatements;
-    private _tempTableMap;
-    private _typeCast;
-    private _dateStrings;
-    private _resultObjects;
-    escape: any;
-    escapeId: any;
-    format: any;
-    constructor(args?: any);
-    release(done?: () => void): void;
-    end(done?: () => void): void;
-    destroy(): void;
-    setCurrentDatabase(database: string, done?: () => void): void;
-    getCurrentDatabase(): string;
-    setVariable(name: string, value: any): void;
-    getVariable(name: string): any;
-    getTransaction(): any;
-    setTransaction(tx: any): void;
-    getTempTableList(): [string, unknown][];
-    getTempTable(database: string, table: string): any;
-    saveTempTable(database: string, table: string, contents: any): void;
-    deleteTempTable(database: string, table: string): void;
-    dropTempTable(database: string, table?: string): void;
-    query(params: string | QueryOptions, values?: any, done?: queryCallback): void;
-    private _query;
-    private _singleQuery;
-    private _transformResult;
-    private _convertCell;
-}
-declare function createSession$1(args?: any): Session;
+declare function createSession$1(args?: any): PoolConnection;
 
 declare const createPool: typeof createPool$1;
 declare const createSession: typeof createSession$1;
-declare const escape: any;
-declare const escapeId: any;
-declare const format: any;
-type Connection = Session;
+declare const escape: EscapeFunctions["escape"];
+declare const escapeId: EscapeFunctions["escapeId"];
+declare const format: EscapeFunctions["format"];
 
 export { SQLError, createPool, createSession, escape, escapeId, format };
-export type { Connection, FieldInfo, MysqlError, OkPacket, PoolOptions, QueryOptions, queryCallback };
+export type { Connection, FieldInfo, MysqlError, OkPacket, PoolOptions, QueryCallback, QueryOptions, QueryCallback as queryCallback };

@@ -14,12 +14,13 @@ import { typeCast } from './lib/helpers/type_cast_helper';
 import * as DynamoDB from './lib/dynamodb';
 import { logger } from '@dynamosql/shared';
 import { SQLError } from './error';
-import type { Session as ISession } from './lib/types/session';
+
 import type {
+  PoolConnection,
   MysqlError,
   FieldInfo,
   QueryOptions,
-  queryCallback,
+  QueryCallback,
   OkPacket,
 } from './types';
 
@@ -39,7 +40,7 @@ export function init(args: any) {
   g_dynamodb = DynamoDB.createDynamoDB(args);
 }
 
-export class Session extends EventEmitter implements ISession {
+export class Session extends EventEmitter implements PoolConnection {
   config: any;
   state: string = 'disconnected';
   threadId: number | null = null;
@@ -152,7 +153,7 @@ export class Session extends EventEmitter implements ISession {
   query(
     params: string | QueryOptions,
     values?: any,
-    done?: queryCallback
+    done?: QueryCallback
   ): void {
     const opts: any = typeof params === 'object' ? { ...params } : {};
     if (typeof params === 'string') {
@@ -174,7 +175,7 @@ export class Session extends EventEmitter implements ISession {
     }
   }
 
-  private async _query(opts: any, done?: queryCallback) {
+  private async _query(opts: any, done?: QueryCallback) {
     if (this._isReleased) {
       done?.(new SQLError('released') as MysqlError);
       return;
@@ -333,7 +334,7 @@ export class Session extends EventEmitter implements ISession {
   }
 }
 
-export function createSession(args?: any) {
+export function createSession(args?: any): PoolConnection {
   if (args) {
     g_dynamodb = DynamoDB.createDynamoDB(args);
   }

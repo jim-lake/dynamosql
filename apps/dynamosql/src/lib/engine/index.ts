@@ -1,7 +1,8 @@
 import * as RawEngine from './raw';
 import * as MemoryEngine from './memory';
-import type { Session } from '../types/session';
 import { SQLError } from '../../error';
+
+import type { Session } from '../../session';
 
 export interface ColumnDef {
   name: string;

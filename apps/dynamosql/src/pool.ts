@@ -1,11 +1,13 @@
 import * as SqlString from 'sqlstring';
 import { EventEmitter } from 'events';
 import * as Session from './session';
+
 import type {
+  PoolConnection,
   MysqlError,
   FieldInfo,
   QueryOptions,
-  queryCallback,
+  QueryCallback,
 } from './types';
 
 export interface PoolOptions {
@@ -41,11 +43,13 @@ class Pool extends EventEmitter {
     done?.();
   }
 
-  getConnection(done: (err: MysqlError | null, connection?: any) => void) {
+  getConnection(
+    done: (err: MysqlError | null, connection?: PoolConnection) => void
+  ) {
     done(null, Session.createSession(this.config));
   }
 
-  query(opts: string | QueryOptions, values?: any, done?: queryCallback): void {
+  query(opts: string | QueryOptions, values?: any, done?: QueryCallback): void {
     if (typeof values === 'function') {
       done = values;
       values = undefined;
