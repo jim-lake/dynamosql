@@ -17,7 +17,6 @@
   },
   "dependencies": {
     "@aws-sdk/client-dynamodb": "^3.922.0",
-    "async": "^3.2.6",
     "big-integer": "^1.6.52",
     "sqlstring": "^2.3.3"
   },
@@ -26,7 +25,9 @@
     "@rollup/plugin-commonjs": "^29.0.0",
     "@rollup/plugin-node-resolve": "^16.0.3",
     "@rollup/plugin-typescript": "^12.3.0",
+    "@types/mysql": "^2.15.27",
     "@types/node": "^24.10.0",
+    "async": "^3.2.6",
     "chai": "^6.2.0",
     "dotenv-cli": "^11.0.0",
     "eslint": "^9.20.0",
