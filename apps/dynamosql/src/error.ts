@@ -141,6 +141,10 @@ const ERROR_MAP: Record<string, ErrorMapEntry> = {
 export class SQLError extends Error {
   code: string;
   errno: number;
+  sqlStateMarker?: string;
+  sqlState?: string;
+  fieldCount?: number;
+  fatal: boolean = false;
   sqlMessage?: string;
   sql?: string;
 

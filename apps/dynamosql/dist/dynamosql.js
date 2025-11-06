@@ -1,6 +1,7 @@
 'use strict';
 
 var SqlString = require('sqlstring');
+var events = require('events');
 var require$$0 = require('big-integer');
 var shared = require('@dynamosql/shared');
 var node_util = require('node:util');
@@ -19450,6 +19451,10 @@ const ERROR_MAP = {
 class SQLError extends Error {
     code;
     errno;
+    sqlStateMarker;
+    sqlState;
+    fieldCount;
+    fatal = false;
     sqlMessage;
     sql;
     constructor(err, sql) {
@@ -25938,13 +25943,23 @@ function createDynamoDB(params, done) {
     return self;
 }
 
-const DEFAULT_RESULT = { affectedRows: 0, changedRows: 0 };
+const DEFAULT_RESULT = {
+    fieldCount: 0,
+    affectedRows: 0,
+    insertId: 0,
+    message: '',
+    changedRows: 0,
+    protocol41: true,
+};
 const parser = new mysql_parserExports.Parser();
 let g_dynamodb;
 function init(args) {
     g_dynamodb = createDynamoDB(args);
 }
-class Session {
+class Session extends events.EventEmitter {
+    config;
+    state = 'disconnected';
+    threadId = null;
     _typeCastOptions = {};
     _currentDatabase = null;
     _localVariables = {};
@@ -25957,7 +25972,10 @@ class Session {
     _resultObjects = true;
     escape = SqlString__namespace.escape;
     escapeId = SqlString__namespace.escapeId;
+    format = SqlString__namespace.format;
     constructor(args) {
+        super();
+        this.config = args || {};
         if (args?.database) {
             this.setCurrentDatabase(args.database);
         }
@@ -25967,10 +25985,11 @@ class Session {
         if (args?.resultObjects === false) {
             this._resultObjects = false;
         }
-        if (args?.typeCast === false) {
-            this._typeCast = false;
+        if (args?.typeCast !== undefined) {
+            this._typeCast = args.typeCast;
         }
         if (args?.dateStrings) {
+            this._dateStrings = args.dateStrings;
             this._typeCastOptions.dateStrings = true;
         }
     }
@@ -26032,7 +26051,7 @@ class Session {
         }
     }
     query(params, values, done) {
-        const opts = typeof params === 'object' ? params : {};
+        const opts = typeof params === 'object' ? { ...params } : {};
         if (typeof params === 'string') {
             opts.sql = params;
         }
@@ -26043,7 +26062,7 @@ class Session {
             opts.values = values;
         }
         if (!opts.sql) {
-            done(new SQLError('ER_EMPTY_QUERY'));
+            done?.(new SQLError('ER_EMPTY_QUERY'));
         }
         else {
             if (opts.values !== undefined) {
@@ -26054,16 +26073,16 @@ class Session {
     }
     async _query(opts, done) {
         if (this._isReleased) {
-            done('released');
+            done?.(new SQLError('released'));
             return;
         }
         const { err: parse_err, list } = _astify(opts.sql);
         if (parse_err) {
-            done(new SQLError(parse_err, opts.sql));
+            done?.(new SQLError(parse_err, opts.sql));
             return;
         }
         if (list.length === 0) {
-            done(new SQLError('ER_EMPTY_QUERY', opts.sql));
+            done?.(new SQLError('ER_EMPTY_QUERY', opts.sql));
             return;
         }
         if (list.length === 1) {
@@ -26072,15 +26091,15 @@ class Session {
                 if (result !== undefined) {
                     this._transformResult(result, columns, opts);
                 }
-                done(null, result ?? DEFAULT_RESULT, columns, 1);
+                done?.(null, result ?? DEFAULT_RESULT, columns);
             }
             catch (err) {
-                done(new SQLError(err, opts.sql));
+                done?.(new SQLError(err, opts.sql));
             }
             return;
         }
         if (!this._multipleStatements) {
-            done(new SQLError('multiple_statements_disabled', opts.sql));
+            done?.(new SQLError('multiple_statements_disabled', opts.sql));
             return;
         }
         // Multiple statements
@@ -26098,12 +26117,12 @@ class Session {
                     schema_list[n] = columns;
                 }
             }
-            done(null, result_list, schema_list, list.length);
+            done?.(null, result_list, schema_list);
         }
         catch (err) {
             const sqlErr = new SQLError(err, opts.sql);
             sqlErr.index = result_list.length;
-            done(sqlErr);
+            done?.(sqlErr);
         }
     }
     async _singleQuery(ast) {
@@ -26187,6 +26206,9 @@ class Session {
         }
     }
     _convertCell(value, column) {
+        if (typeof this._typeCast === 'function') {
+            return this._typeCast(column, () => typeCast(value, column, this._typeCastOptions));
+        }
         return this._typeCast
             ? typeCast(value, column, this._typeCastOptions)
             : value;
@@ -26228,28 +26250,30 @@ function createPool$1(args) {
     }
     return new Pool(args || {});
 }
-class Pool {
-    _args;
+class Pool extends events.EventEmitter {
+    config;
     escape = SqlString__namespace.escape;
     escapeId = SqlString__namespace.escapeId;
+    format = SqlString__namespace.format;
     constructor(args) {
-        this._args = args;
+        super();
+        this.config = args;
     }
     end(done) {
         done?.();
     }
-    getSession(done) {
-        done(null, createSession$1(this._args));
+    getConnection(done) {
+        done(null, createSession$1(this.config));
     }
     query(opts, values, done) {
         if (typeof values === 'function') {
             done = values;
             values = undefined;
         }
-        const session = createSession$1(this._args);
+        const session = createSession$1(this.config);
         session.query(opts, values, (error, results, fields) => {
             session.release();
-            done(error, results, fields);
+            done?.(error, results, fields);
         });
     }
 }
@@ -26258,9 +26282,12 @@ const createPool = createPool$1;
 const createSession = createSession$1;
 const escape = SqlString__namespace.escape;
 const escapeId = SqlString__namespace.escapeId;
+const format = SqlString__namespace.format;
 
+exports.SQLError = SQLError;
 exports.createPool = createPool;
 exports.createSession = createSession;
 exports.escape = escape;
 exports.escapeId = escapeId;
+exports.format = format;
 //# sourceMappingURL=dynamosql.js.map

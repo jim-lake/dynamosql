@@ -1,4 +1,5 @@
 import * as SqlString from 'sqlstring';
+import { EventEmitter } from 'events';
 import { Parser } from './vendor/mysql_parser';
 import * as AlterHandler from './lib/alter_handler';
 import * as CreateHandler from './lib/create_handler';
@@ -14,8 +15,22 @@ import * as DynamoDB from './lib/dynamodb';
 import { logger } from '@dynamosql/shared';
 import { SQLError } from './error';
 import type { Session as ISession } from './lib/types/session';
+import type {
+  MysqlError,
+  FieldInfo,
+  QueryOptions,
+  queryCallback,
+  OkPacket,
+} from './types';
 
-const DEFAULT_RESULT = { affectedRows: 0, changedRows: 0 };
+const DEFAULT_RESULT: OkPacket = {
+  fieldCount: 0,
+  affectedRows: 0,
+  insertId: 0,
+  message: '',
+  changedRows: 0,
+  protocol41: true,
+};
 
 const parser = new Parser();
 let g_dynamodb: any;
@@ -24,7 +39,10 @@ export function init(args: any) {
   g_dynamodb = DynamoDB.createDynamoDB(args);
 }
 
-class Session implements ISession {
+class Session extends EventEmitter implements ISession {
+  config: any;
+  state: string = 'disconnected';
+  threadId: number | null = null;
   _typeCastOptions: any = {};
   _currentDatabase: string | null = null;
   _localVariables: any = {};
@@ -32,14 +50,17 @@ class Session implements ISession {
   _isReleased = false;
   _multipleStatements = false;
   _tempTableMap: any = {};
-  _typeCast = true;
-  _dateStrings = false;
+  _typeCast: boolean | ((field: any, next: () => any) => any) = true;
+  _dateStrings: boolean | string[] = false;
   _resultObjects = true;
 
   escape = SqlString.escape;
   escapeId = SqlString.escapeId;
+  format = SqlString.format;
 
   constructor(args?: any) {
+    super();
+    this.config = args || {};
     if (args?.database) {
       this.setCurrentDatabase(args.database);
     }
@@ -49,10 +70,11 @@ class Session implements ISession {
     if (args?.resultObjects === false) {
       this._resultObjects = false;
     }
-    if (args?.typeCast === false) {
-      this._typeCast = false;
+    if (args?.typeCast !== undefined) {
+      this._typeCast = args.typeCast;
     }
     if (args?.dateStrings) {
+      this._dateStrings = args.dateStrings;
       this._typeCastOptions.dateStrings = true;
     }
   }
@@ -127,8 +149,12 @@ class Session implements ISession {
     }
   }
 
-  query(params: any, values?: any, done?: any) {
-    const opts = typeof params === 'object' ? params : {};
+  query(
+    params: string | QueryOptions,
+    values?: any,
+    done?: queryCallback
+  ): void {
+    const opts: any = typeof params === 'object' ? { ...params } : {};
     if (typeof params === 'string') {
       opts.sql = params;
     }
@@ -139,7 +165,7 @@ class Session implements ISession {
     }
 
     if (!opts.sql) {
-      done(new SQLError('ER_EMPTY_QUERY'));
+      done?.(new SQLError('ER_EMPTY_QUERY') as MysqlError);
     } else {
       if (opts.values !== undefined) {
         opts.sql = SqlString.format(opts.sql, opts.values);
@@ -148,20 +174,20 @@ class Session implements ISession {
     }
   }
 
-  async _query(opts: any, done: any) {
+  async _query(opts: any, done?: queryCallback) {
     if (this._isReleased) {
-      done('released');
+      done?.(new SQLError('released') as MysqlError);
       return;
     }
 
     const { err: parse_err, list } = _astify(opts.sql);
     if (parse_err) {
-      done(new SQLError(parse_err, opts.sql));
+      done?.(new SQLError(parse_err, opts.sql) as MysqlError);
       return;
     }
 
     if (list.length === 0) {
-      done(new SQLError('ER_EMPTY_QUERY', opts.sql));
+      done?.(new SQLError('ER_EMPTY_QUERY', opts.sql) as MysqlError);
       return;
     }
 
@@ -171,22 +197,24 @@ class Session implements ISession {
         if (result !== undefined) {
           this._transformResult(result, columns, opts);
         }
-        done(null, result ?? DEFAULT_RESULT, columns, 1);
+        done?.(null, result ?? DEFAULT_RESULT, columns);
       } catch (err) {
-        done(new SQLError(err, opts.sql));
+        done?.(new SQLError(err, opts.sql) as MysqlError);
       }
       return;
     }
 
     if (!this._multipleStatements) {
-      done(new SQLError('multiple_statements_disabled', opts.sql));
+      done?.(
+        new SQLError('multiple_statements_disabled', opts.sql) as MysqlError
+      );
       return;
     }
 
     // Multiple statements
     const result_list: any[] = [];
     try {
-      const schema_list: any[] = [];
+      const schema_list: FieldInfo[][] = [];
 
       for (let n = 0; n < list.length; n++) {
         const ast = list[n];
@@ -200,11 +228,11 @@ class Session implements ISession {
         }
       }
 
-      done(null, result_list, schema_list, list.length);
+      done?.(null, result_list, schema_list as any);
     } catch (err) {
-      const sqlErr = new SQLError(err, opts.sql);
+      const sqlErr = new SQLError(err, opts.sql) as MysqlError;
       (sqlErr as any).index = result_list.length;
-      done(sqlErr);
+      done?.(sqlErr);
     }
   }
 
@@ -294,6 +322,11 @@ class Session implements ISession {
   }
 
   _convertCell(value: any, column: any) {
+    if (typeof this._typeCast === 'function') {
+      return this._typeCast(column, () =>
+        typeCast(value, column, this._typeCastOptions)
+      );
+    }
     return this._typeCast
       ? typeCast(value, column, this._typeCastOptions)
       : value;

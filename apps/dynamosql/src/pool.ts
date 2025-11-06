@@ -1,5 +1,12 @@
 import * as SqlString from 'sqlstring';
+import { EventEmitter } from 'events';
 import * as Session from './session';
+import type {
+  MysqlError,
+  FieldInfo,
+  QueryOptions,
+  queryCallback,
+} from './types';
 
 export interface PoolOptions {
   database?: string;
@@ -7,13 +14,10 @@ export interface PoolOptions {
   accessKeyId?: string;
   secretAccessKey?: string;
   resultObjects?: boolean;
-  typeCast?: boolean;
-  dateStrings?: boolean;
+  typeCast?: boolean | ((field: any, next: () => any) => any);
+  dateStrings?: boolean | string[];
   multipleStatements?: boolean;
 }
-
-type QueryCallback = (error: Error | null, results?: any, fields?: any) => void;
-type QueryOptions = string | { sql: string; timeout?: number; values?: any[] };
 
 export function createPool(args?: PoolOptions) {
   if (args) {
@@ -22,39 +26,37 @@ export function createPool(args?: PoolOptions) {
   return new Pool(args || {});
 }
 
-class Pool {
-  private _args: PoolOptions;
+class Pool extends EventEmitter {
+  config: PoolOptions;
   escape = SqlString.escape;
   escapeId = SqlString.escapeId;
+  format = SqlString.format;
 
   constructor(args: PoolOptions) {
-    this._args = args;
+    super();
+    this.config = args;
   }
 
-  end(done?: () => void) {
+  end(done?: (err?: MysqlError) => void) {
     done?.();
   }
 
-  getSession(done: (err: Error | null, session?: any) => void) {
-    done(null, Session.createSession(this._args));
+  getConnection(done: (err: MysqlError | null, connection?: any) => void) {
+    done(null, Session.createSession(this.config));
   }
 
-  query(
-    opts: QueryOptions,
-    values?: any[] | QueryCallback,
-    done?: QueryCallback
-  ) {
+  query(opts: string | QueryOptions, values?: any, done?: queryCallback): void {
     if (typeof values === 'function') {
       done = values;
       values = undefined;
     }
-    const session = Session.createSession(this._args);
+    const session = Session.createSession(this.config);
     session.query(
       opts,
       values,
-      (error: Error | null, results?: any, fields?: any) => {
+      (error: MysqlError | null, results?: any, fields?: FieldInfo[]) => {
         session.release();
-        done!(error, results, fields);
+        done?.(error, results, fields);
       }
     );
   }
