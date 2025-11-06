@@ -55,7 +55,7 @@ export class Session extends EventEmitter implements PoolConnection {
   private _isReleased = false;
   private _multipleStatements = false;
   private _tempTableMap: any = {};
-  private _typeCast: TypeCast;
+  private _typeCast: TypeCast = true;
   private _dateStrings: boolean | string[] = false;
   private _resultObjects = true;
 
