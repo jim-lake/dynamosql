@@ -11,6 +11,7 @@
     "lint": "eslint src test examples",
     "pretty": "prettier -u --write \"**/*\" --log-level warn",
     "ts:check": "tsc --noEmit",
+    "test:export:check": "tsc --noEmit -p test/import_compare_tsconfig.json",
     "test:setup": "dotenv -- node --require tsx/cjs ../../node_modules/mocha/bin/mocha.js test/setup/setup.js",
     "test": "dotenv -- node --require tsx/cjs ../../node_modules/mocha/bin/mocha.js 'test/**/*.test.js'",
     "test:quiet": "dotenv -- npx tsx --no-warnings ../../node_modules/.bin/mocha --no-clean --reporter test/silent_reporter.js 'test/**/*.test.js'"

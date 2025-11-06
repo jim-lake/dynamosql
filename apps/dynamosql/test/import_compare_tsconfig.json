@@ -10,9 +10,8 @@
     "strict": false,
     "skipLibCheck": true,
     "declaration": true,
-    "outDir": "./dist",
     "noEmit": true
   },
-  "include": ["src/**/*", "test/**/*"],
-  "exclude": ["node_modules", "dist"]
+  "files": ["import_compare.ts"],
+  "exclude": ["../node_modules", "../dist"]
 }
