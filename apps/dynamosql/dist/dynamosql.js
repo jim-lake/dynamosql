@@ -25952,14 +25952,15 @@ const DEFAULT_RESULT = {
     protocol41: true,
 };
 const parser = new mysql_parserExports.Parser();
+let g_threadId = 1;
 let g_dynamodb;
 function init(args) {
     g_dynamodb = createDynamoDB(args);
 }
 class Session extends node_events.EventEmitter {
     config;
-    state = 'disconnected';
-    threadId = null;
+    state = 'connected';
+    threadId = g_threadId++;
     _typeCastOptions = {};
     _currentDatabase = null;
     _localVariables = {};
@@ -26071,6 +26072,7 @@ class Session extends node_events.EventEmitter {
             this._query(opts, done);
         }
     }
+    createQuery = this.query;
     async _query(opts, done) {
         if (this._isReleased) {
             done?.(new SQLError('released'));

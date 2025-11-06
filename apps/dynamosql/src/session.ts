@@ -35,6 +35,7 @@ const DEFAULT_RESULT: OkPacket = {
 };
 
 const parser = new Parser();
+let g_threadId = 1;
 let g_dynamodb: any;
 
 export function init(args: any) {
@@ -43,8 +44,9 @@ export function init(args: any) {
 
 export class Session extends EventEmitter implements PoolConnection {
   config: any;
-  state: string = 'disconnected';
-  threadId: number | null = null;
+  state: string = 'connected';
+  threadId: number | null = g_threadId++;
+
   private _typeCastOptions: any = {};
   private _currentDatabase: string | null = null;
   private _localVariables: any = {};
@@ -175,6 +177,7 @@ export class Session extends EventEmitter implements PoolConnection {
       this._query(opts, done);
     }
   }
+  createQuery = this.query;
 
   private async _query(opts: any, done?: QueryCallback) {
     if (this._isReleased) {

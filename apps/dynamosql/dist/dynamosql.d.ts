@@ -100,6 +100,9 @@ interface PoolConnection extends Connection {
     release(): void;
 }
 interface Connection extends EscapeFunctions, EventEmitter {
+    state: 'connected' | 'authenticated' | 'disconnected' | 'protocol_error' | string;
+    threadId: number | null;
+    createQuery: QueryFunction;
     query: QueryFunction;
     end(callback?: (err?: MysqlError) => void): void;
     end(options: any, callback: (err?: MysqlError) => void): void;
