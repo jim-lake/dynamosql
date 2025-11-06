@@ -2,41 +2,46 @@ import * as dynamodb from '../../tools/dynamodb';
 
 const g_tableCache: any = {};
 
-export function getTable(table_name: string, done: any) {
-  dynamodb.getTable(table_name, (err: any, result: any) => {
-    if (
-      err?.message === 'resource_not_found' ||
-      (!err && result?.Table?.TableStatus === 'DELETING')
-    ) {
+export async function getTable(table_name: string): Promise<any> {
+  try {
+    const result = await dynamodb.getTable(table_name);
+    if (result?.Table?.TableStatus === 'DELETING') {
       delete g_tableCache[table_name];
-    } else if (!err) {
+    } else {
       g_tableCache[table_name] = { last_updated: Date.now(), result };
     }
-    done(err, result);
-  });
-}
-
-export function getTableCached(table_name: string, done: any) {
-  if (table_name in g_tableCache) {
-    done(null, g_tableCache[table_name].result);
-  } else {
-    getTable(table_name, done);
+    return result;
+  } catch (err: any) {
+    if (err?.message === 'resource_not_found') {
+      delete g_tableCache[table_name];
+    }
+    throw err;
   }
 }
 
-export function createTable(opts: any, done: any) {
-  const table_name = opts.table;
-  delete g_tableCache[table_name];
-  dynamodb.createTable(opts, (err: any) => {
-    delete g_tableCache[table_name];
-    done(err);
-  });
+export async function getTableCached(table_name: string): Promise<any> {
+  if (table_name in g_tableCache) {
+    return g_tableCache[table_name].result;
+  } else {
+    return getTable(table_name);
+  }
 }
 
-export function deleteTable(table_name: string, done: any) {
+export async function createTable(opts: any): Promise<void> {
+  const table_name = opts.table;
   delete g_tableCache[table_name];
-  dynamodb.deleteTable(table_name, (err: any) => {
+  try {
+    await dynamodb.createTable(opts);
+  } finally {
     delete g_tableCache[table_name];
-    done(err);
-  });
+  }
+}
+
+export async function deleteTable(table_name: string): Promise<void> {
+  delete g_tableCache[table_name];
+  try {
+    await dynamodb.deleteTable(table_name);
+  } finally {
+    delete g_tableCache[table_name];
+  }
 }

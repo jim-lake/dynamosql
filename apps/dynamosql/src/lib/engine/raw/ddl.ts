@@ -1,4 +1,3 @@
-import { promisify } from 'util';
 import { logger } from '@dynamosql/shared';
 import { SQLError } from '../../../error';
 import type {
@@ -23,12 +22,14 @@ export async function getTableInfo(
   params: TableInfoParams
 ): Promise<TableInfo> {
   const { dynamodb, table } = params;
-  const getTable = promisify(dynamodb.getTable.bind(dynamodb));
 
-  const data = await getTable(table).catch((err: any) => {
+  let data;
+  try {
+    data = await dynamodb.getTable(table);
+  } catch (err) {
     logger.error('getTableInfo: err:', err, table);
     throw err;
-  });
+  }
 
   if (!data || !data.Table) {
     throw new Error('bad_data');
@@ -55,14 +56,13 @@ export async function getTableInfo(
 
 export async function getTableList(params: TableListParams): Promise<string[]> {
   const { dynamodb } = params;
-  const getTableList = promisify(dynamodb.getTableList.bind(dynamodb));
 
-  const results = await getTableList().catch((err: any) => {
+  try {
+    return await dynamodb.getTableList();
+  } catch (err) {
     logger.error('raw_engine.getTableList: err:', err);
     throw err;
-  });
-
-  return results;
+  }
 }
 
 export async function createTable(params: CreateTableParams): Promise<void> {
@@ -71,10 +71,9 @@ export async function createTable(params: CreateTableParams): Promise<void> {
     primary_key.find((key: any) => key.name === column.name)
   );
   const opts = { ...other, table, primary_key, column_list };
-  const createTable = promisify(dynamodb.createTable.bind(dynamodb));
 
   try {
-    await createTable(opts);
+    await dynamodb.createTable(opts);
     await _waitForTable({ dynamodb, table });
   } catch (err: any) {
     if (err?.message === 'resource_in_use') {
@@ -87,10 +86,9 @@ export async function createTable(params: CreateTableParams): Promise<void> {
 
 export async function dropTable(params: DropTableParams): Promise<void> {
   const { dynamodb, table } = params;
-  const deleteTable = promisify(dynamodb.deleteTable.bind(dynamodb));
 
   try {
-    await deleteTable(table);
+    await dynamodb.deleteTable(table);
   } catch (delete_err: any) {
     if (delete_err?.code === 'ResourceNotFoundException') {
       throw new SQLError('table_not_found');
@@ -115,10 +113,9 @@ export async function addColumn(params: AddColumnParams): Promise<void> {}
 export async function createIndex(params: IndexParams): Promise<void> {
   const { dynamodb, table, index_name, key_list } = params;
   const opts = { table, index_name, key_list };
-  const createIndex = promisify(dynamodb.createIndex.bind(dynamodb));
 
   try {
-    await createIndex(opts);
+    await dynamodb.createIndex(opts);
     await _waitForTable({ dynamodb, table, index_name });
   } catch (err: any) {
     if (
@@ -134,10 +131,9 @@ export async function createIndex(params: IndexParams): Promise<void> {
 
 export async function deleteIndex(params: IndexParams): Promise<void> {
   const { dynamodb, table, index_name } = params;
-  const deleteIndex = promisify(dynamodb.deleteIndex.bind(dynamodb));
 
   try {
-    await deleteIndex({ table, index_name });
+    await dynamodb.deleteIndex({ table, index_name });
     await _waitForTable({ dynamodb, table, index_name });
   } catch (err: any) {
     if (err?.message === 'resource_not_found') {
@@ -151,11 +147,10 @@ export async function deleteIndex(params: IndexParams): Promise<void> {
 async function _waitForTable(params: any): Promise<void> {
   const { dynamodb, table, index_name } = params;
   const LOOP_MS = 500;
-  const getTable = promisify(dynamodb.getTable.bind(dynamodb));
 
   while (true) {
     try {
-      const result = await getTable(table);
+      const result = await dynamodb.getTable(table);
       const status = result?.Table?.TableStatus;
 
       if (

@@ -1,4 +1,3 @@
-import { promisify } from 'util';
 import { convertWhere } from '../../helpers/convert_where';
 import {
   escapeIdentifier,
@@ -52,10 +51,9 @@ SET ${sets}
 WHERE ${where_result.value}
 RETURNING MODIFIED OLD *
 `;
-  const queryQL = promisify(dynamodb.queryQL.bind(dynamodb));
 
   try {
-    const results = await queryQL(sql);
+    const results = await dynamodb.queryQL(sql);
     const result = { affectedRows: 1, changedRows: 0 };
     set.forEach((object: any, i: number) => {
       const { column } = object;
@@ -89,10 +87,9 @@ export async function multipleUpdate(
     update_list.forEach((item: any) =>
       item.set_list.forEach((set: any) => (set.value = set.value.value))
     );
-    const updateItems = promisify(dynamodb.updateItems.bind(dynamodb));
 
     try {
-      await updateItems({ table, key_list, list: update_list });
+      await dynamodb.updateItems({ table, key_list, list: update_list });
       affectedRows += list.length;
       changedRows += list.length;
     } catch (err) {

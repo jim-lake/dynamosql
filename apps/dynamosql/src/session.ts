@@ -148,7 +148,7 @@ class Session implements ISession {
     }
   }
 
-  _query(opts: any, done: any) {
+  async _query(opts: any, done: any) {
     if (this._isReleased) {
       done('released');
       return;
@@ -166,16 +166,15 @@ class Session implements ISession {
     }
 
     if (list.length === 1) {
-      this._singleQuery(list[0])
-        .then(({ result, columns }) => {
-          if (result !== undefined) {
-            this._transformResult(result, columns, opts);
-          }
-          done(null, result ?? DEFAULT_RESULT, columns, 1);
-        })
-        .catch((err) => {
-          done(new SQLError(err, opts.sql));
-        });
+      try {
+        const { result, columns } = await this._singleQuery(list[0]);
+        if (result !== undefined) {
+          this._transformResult(result, columns, opts);
+        }
+        done(null, result ?? DEFAULT_RESULT, columns, 1);
+      } catch (err) {
+        done(new SQLError(err, opts.sql));
+      }
       return;
     }
 
@@ -186,7 +185,7 @@ class Session implements ISession {
 
     // Multiple statements
     const result_list: any[] = [];
-    (async () => {
+    try {
       const schema_list: any[] = [];
 
       for (let n = 0; n < list.length; n++) {
@@ -201,16 +200,12 @@ class Session implements ISession {
         }
       }
 
-      return { result_list, schema_list, query_count: list.length };
-    })()
-      .then(({ result_list, schema_list, query_count }) => {
-        done(null, result_list, schema_list, query_count);
-      })
-      .catch((err) => {
-        const sqlErr = new SQLError(err, opts.sql);
-        (sqlErr as any).index = result_list.length;
-        done(sqlErr);
-      });
+      done(null, result_list, schema_list, list.length);
+    } catch (err) {
+      const sqlErr = new SQLError(err, opts.sql);
+      (sqlErr as any).index = result_list.length;
+      done(sqlErr);
+    }
   }
 
   async _singleQuery(ast: any): Promise<{ result: any; columns: any }> {

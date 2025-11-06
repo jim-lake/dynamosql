@@ -1,4 +1,3 @@
-import { promisify } from 'util';
 import { logger } from '@dynamosql/shared';
 import { convertWhere } from '../../helpers/convert_where';
 import { escapeIdentifier } from '../../../tools/dynamodb_helper';
@@ -41,10 +40,8 @@ async function _getFromTable(
     sql += ' WHERE ' + where_result.value;
   }
 
-  const queryQL = promisify(dynamodb.queryQL.bind(dynamodb));
-
   try {
-    const results = await queryQL(sql);
+    const results = await dynamodb.queryQL(sql);
     let column_list: string[];
 
     if (_requestAll) {

@@ -1,4 +1,3 @@
-import { promisify } from 'util';
 import { convertWhere } from '../../helpers/convert_where';
 import { escapeIdentifier } from '../../../tools/dynamodb_helper';
 import { logger } from '@dynamosql/shared';
@@ -30,10 +29,9 @@ DELETE FROM ${escapeIdentifier(from[0].table)}
 WHERE ${result.value}
 RETURNING ALL OLD *
 `;
-  const queryQL = promisify(dynamodb.queryQL.bind(dynamodb));
 
   try {
-    const results = await queryQL(sql);
+    const results = await dynamodb.queryQL(sql);
     return { affectedRows: results?.length || 0 };
   } catch (err: any) {
     if (err?.name === 'ValidationException') {
@@ -55,10 +53,9 @@ export async function multipleDelete(
 
   for (const object of list) {
     const { table, key_list, delete_list } = object;
-    const deleteItems = promisify(dynamodb.deleteItems.bind(dynamodb));
 
     try {
-      await deleteItems({ table, key_list, list: delete_list });
+      await dynamodb.deleteItems({ table, key_list, list: delete_list });
       affectedRows += delete_list.length;
     } catch (err) {
       logger.error('multipleDelete: deleteItems: err:', err, table);

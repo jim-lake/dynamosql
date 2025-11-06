@@ -41,39 +41,48 @@ export const createIndex = DynamoDBAdmin.createIndex;
 export const deleteIndex = DynamoDBAdmin.deleteIndex;
 export { pql } from './dynamodb_helper';
 
-export function queryQL(list: any, done: any) {
+export async function queryQL(list: any): Promise<any> {
   if (!Array.isArray(list)) {
-    _queryQL(list, done);
+    return _queryQL(list);
   } else {
     const err_list: any[] = [];
     const result_list: any[] = [];
-    asyncTimesLimit(
-      list.length,
-      QUERY_LIMIT,
-      (i: number, done: any) => {
-        const item = list[i];
-        _queryQL(item, (err: any, result: any) => {
-          result_list[i] = result;
-          err_list[i] = err;
-          done(err);
-        });
-      },
-      (err: any) => done(err ? err_list : null, result_list)
-    );
+    await new Promise((resolve, reject) => {
+      asyncTimesLimit(
+        list.length,
+        QUERY_LIMIT,
+        (i: number, done: any) => {
+          const item = list[i];
+          _queryQL(item).then(
+            (result) => {
+              result_list[i] = result;
+              done();
+            },
+            (err) => {
+              result_list[i] = undefined;
+              err_list[i] = err;
+              done(err);
+            }
+          );
+        },
+        (err: any) => (err ? reject(err_list) : resolve(result_list))
+      );
+    });
+    return result_list;
   }
 }
 
-function _queryQL(params: any, done: any) {
+async function _queryQL(params: any): Promise<any> {
   const sql = params?.sql ? params.sql : params;
   const input = {
     Statement: sql,
     ReturnValuesOnConditionCheckFailure: params?.return ?? 'NONE',
   };
   const command = new ExecuteStatementCommand(input);
-  _pagedSend(command, done);
+  return _pagedSend(command);
 }
 
-export function batchQL(params: any, done: any) {
+export async function batchQL(params: any): Promise<any> {
   const list = Array.isArray(params) ? params : params.list;
   const input = {
     Statements: list.map((Statement: string) => ({
@@ -82,13 +91,26 @@ export function batchQL(params: any, done: any) {
     })),
   };
   const command = new BatchExecuteStatementCommand(input);
-  g_client.send(command).then(
-    (result) => _successReturn(result, done),
-    (err) => _errorReturn(err, done)
-  );
+  try {
+    const result = await g_client.send(command);
+    const [err, ret] = _convertSuccess(result);
+    if (err) {
+      throw err;
+    }
+    return ret;
+  } catch (err) {
+    const converted = _convertSuccess(err as any);
+    if (converted[0]) {
+      throw converted[0];
+    }
+    if (converted[1]) {
+      return converted[1];
+    }
+    throw convertError(err);
+  }
 }
 
-export function transactionQL(params: any, done: any) {
+export async function transactionQL(params: any): Promise<any> {
   const list = Array.isArray(params) ? params : params.list;
   const input = {
     TransactStatements: list.map((Statement: string) => ({
@@ -97,175 +119,214 @@ export function transactionQL(params: any, done: any) {
     })),
   };
   const command = new ExecuteTransactionCommand(input);
-  g_client.send(command).then(
-    (result) => _successReturn(result, done),
-    (err) => _errorReturn(err, done)
-  );
+  try {
+    const result = await g_client.send(command);
+    const [err, ret] = _convertSuccess(result);
+    if (err) {
+      throw err;
+    }
+    return ret;
+  } catch (err) {
+    const converted = _convertSuccess(err as any);
+    if (converted[0]) {
+      throw converted[0];
+    }
+    if (converted[1]) {
+      return converted[1];
+    }
+    throw convertError(err);
+  }
 }
 
-export function deleteItems(params: any, done: any) {
+export async function deleteItems(params: any): Promise<any> {
   const BATCH_LIMIT = 100;
   const { table, key_list, list } = params;
   const batch_count = Math.ceil(list.length / BATCH_LIMIT);
   const prefix = `DELETE FROM ${escapeIdentifier(table)} WHERE `;
   const err_list: any[] = [];
   const result_list: any[] = [];
-  asyncTimesLimit(
-    batch_count,
-    QUERY_LIMIT,
-    (batch_index: number, done: any) => {
-      const sql_list: string[] = [];
-      const start = BATCH_LIMIT * batch_index;
-      const end = Math.min(start + BATCH_LIMIT, list.length);
-      for (let i = start; i < end; i++) {
-        const cond = key_list
-          .map((key: string, j: number) => {
-            const value = list[i][j];
-            return `${escapeIdentifier(key)} = ${_convertValueToPQL(value)}`;
-          })
-          .join(' AND ');
-        sql_list.push(prefix + cond);
-      }
-      transactionQL(sql_list, (err: any, result: any) => {
+  await new Promise((resolve, reject) => {
+    asyncTimesLimit(
+      batch_count,
+      QUERY_LIMIT,
+      (batch_index: number, done: any) => {
+        const sql_list: string[] = [];
+        const start = BATCH_LIMIT * batch_index;
+        const end = Math.min(start + BATCH_LIMIT, list.length);
         for (let i = start; i < end; i++) {
-          result_list[i] = result?.[i - start];
-          err_list[i] = err?.[i - start];
+          const cond = key_list
+            .map((key: string, j: number) => {
+              const value = list[i][j];
+              return `${escapeIdentifier(key)} = ${_convertValueToPQL(value)}`;
+            })
+            .join(' AND ');
+          sql_list.push(prefix + cond);
         }
-        done(err);
-      });
-    },
-    (err: any) => done(err ? err_list : null, result_list)
-  );
+        transactionQL(sql_list).then(
+          (result) => {
+            for (let i = start; i < end; i++) {
+              result_list[i] = result?.[i - start];
+            }
+            done();
+          },
+          (err) => {
+            for (let i = start; i < end; i++) {
+              err_list[i] = err?.[i - start];
+            }
+            done(err);
+          }
+        );
+      },
+      (err: any) => (err ? reject(err_list) : resolve(result_list))
+    );
+  });
+  return result_list;
 }
 
-export function updateItems(params: any, done: any) {
+export async function updateItems(params: any): Promise<any> {
   const BATCH_LIMIT = 100;
   const { table, key_list, list } = params;
   const batch_count = Math.ceil(list.length / BATCH_LIMIT);
   const prefix = `UPDATE ${escapeIdentifier(table)} SET `;
   const err_list: any[] = [];
   const result_list: any[] = [];
-  asyncTimesLimit(
-    batch_count,
-    QUERY_LIMIT,
-    (batch_index: number, done: any) => {
-      const sql_list: string[] = [];
-      const start = BATCH_LIMIT * batch_index;
-      const end = Math.min(start + BATCH_LIMIT, list.length);
-      for (let i = start; i < end; i++) {
-        const item = list[i];
-        const sets = item.set_list
-          .map((object: any) => {
-            const { column, value } = object;
-            return `${escapeIdentifier(column)} = ${escapeValue(value)}`;
-          })
-          .join(', ');
-        const cond =
-          ' WHERE ' +
-          key_list
-            .map((key: string, j: number) => {
-              const value = item.key[j];
-              return `${escapeIdentifier(key)} = ${_convertValueToPQL(value)}`;
-            })
-            .join(' AND ');
-        sql_list.push(prefix + sets + cond);
-      }
-      transactionQL(sql_list, (err: any, result: any) => {
+  await new Promise((resolve, reject) => {
+    asyncTimesLimit(
+      batch_count,
+      QUERY_LIMIT,
+      (batch_index: number, done: any) => {
+        const sql_list: string[] = [];
+        const start = BATCH_LIMIT * batch_index;
+        const end = Math.min(start + BATCH_LIMIT, list.length);
         for (let i = start; i < end; i++) {
-          result_list[i] = result?.[i - start];
-          err_list[i] = err?.[i - start];
+          const item = list[i];
+          const sets = item.set_list
+            .map((object: any) => {
+              const { column, value } = object;
+              return `${escapeIdentifier(column)} = ${escapeValue(value)}`;
+            })
+            .join(', ');
+          const cond =
+            ' WHERE ' +
+            key_list
+              .map((key: string, j: number) => {
+                const value = item.key[j];
+                return `${escapeIdentifier(key)} = ${_convertValueToPQL(value)}`;
+              })
+              .join(' AND ');
+          sql_list.push(prefix + sets + cond);
         }
-        done(err);
-      });
-    },
-    (err: any) => done(err ? err_list : null, result_list)
-  );
+        transactionQL(sql_list).then(
+          (result) => {
+            for (let i = start; i < end; i++) {
+              result_list[i] = result?.[i - start];
+            }
+            done();
+          },
+          (err) => {
+            for (let i = start; i < end; i++) {
+              err_list[i] = err?.[i - start];
+            }
+            done(err);
+          }
+        );
+      },
+      (err: any) => (err ? reject(err_list) : resolve(result_list))
+    );
+  });
+  return result_list;
 }
 
-export function putItems(params: any, done: any) {
+export async function putItems(params: any): Promise<void> {
   const BATCH_LIMIT = 100;
   const { table, list } = params;
   const batch_count = Math.ceil(list.length / BATCH_LIMIT);
   const err_list: any[] = [];
-  asyncTimesLimit(
-    batch_count,
-    QUERY_LIMIT,
-    (batch_index: number, done: any) => {
-      const start = BATCH_LIMIT * batch_index;
-      const end = start + BATCH_LIMIT;
-      const item_list = list.slice(start, end);
-      const input = {
-        TransactItems: item_list.map((item: any) => ({
-          Put: {
-            TableName: table,
-            Item: nativeToValue(item).M,
-          },
-        })),
-      };
-      const command = new TransactWriteItemsCommand(input);
-      g_client.send(command).then(
-        () => done(),
-        (err: any) => {
-          if (
-            err?.name === 'TransactionCanceledException' &&
-            err.CancellationReasons?.length > 0
-          ) {
-            err.CancellationReasons.forEach((cancel_err: any, i: number) => {
-              err_list[start + i] = {
-                err: convertError(cancel_err),
-                parent: cancel_err,
+  await new Promise((resolve, reject) => {
+    asyncTimesLimit(
+      batch_count,
+      QUERY_LIMIT,
+      (batch_index: number, done: any) => {
+        const start = BATCH_LIMIT * batch_index;
+        const end = start + BATCH_LIMIT;
+        const item_list = list.slice(start, end);
+        const input = {
+          TransactItems: item_list.map((item: any) => ({
+            Put: {
+              TableName: table,
+              Item: nativeToValue(item).M,
+            },
+          })),
+        };
+        const command = new TransactWriteItemsCommand(input);
+        g_client.send(command).then(
+          () => done(),
+          (err: any) => {
+            if (
+              err?.name === 'TransactionCanceledException' &&
+              err.CancellationReasons?.length > 0
+            ) {
+              err.CancellationReasons.forEach((cancel_err: any, i: number) => {
+                err_list[start + i] = {
+                  err: convertError(cancel_err),
+                  parent: cancel_err,
+                };
+              });
+            } else {
+              err_list[start] = {
+                err: convertError(err),
+                parent: err,
               };
-            });
-          } else {
-            err_list[start] = {
-              err: convertError(err),
-              parent: err,
-            };
+            }
+            done(err || 'unknown');
           }
-          done(err || 'unknown');
-        }
-      );
-    },
-    (err: any) => done(err ? err_list : null)
-  );
+        );
+      },
+      (err: any) => (err ? reject(err_list) : resolve(undefined))
+    );
+  });
 }
 
-function _pagedSend(command: any, done: any) {
+async function _pagedSend(command: any): Promise<any> {
   let next_token: any;
   const results: any[] = [];
-  asyncForever(
-    (done: any) => {
-      if (next_token) {
-        command.input.NextToken = next_token;
-      }
-      g_client.send(command).then(
-        (result: any) => {
-          let [err, list] = _convertSuccess(result);
-          list?.forEach?.((item: any) => {
-            results.push(item);
-          });
-
-          next_token = result?.NextToken;
-          if (!err && !next_token) {
-            err = 'stop';
-          }
-          done(err);
-        },
-        (err: any) => {
-          if (err.Item) {
-            results.push(err.Item);
-          }
-          done(convertError(err));
+  await new Promise((resolve, reject) => {
+    asyncForever(
+      (done: any) => {
+        if (next_token) {
+          command.input.NextToken = next_token;
         }
-      );
-    },
-    (err: any) => {
-      if (err === 'stop') {
-        err = null;
+        g_client.send(command).then(
+          (result: any) => {
+            let [err, list] = _convertSuccess(result);
+            list?.forEach?.((item: any) => {
+              results.push(item);
+            });
+
+            next_token = result?.NextToken;
+            if (!err && !next_token) {
+              err = 'stop';
+            }
+            done(err);
+          },
+          (err: any) => {
+            if (err.Item) {
+              results.push(err.Item);
+            }
+            done(convertError(err));
+          }
+        );
+      },
+      (err: any) => {
+        if (err === 'stop') {
+          resolve(results);
+        } else {
+          reject(err);
+        }
       }
-      done(err, results);
-    }
-  );
+    );
+  });
+  return results;
 }
 
 function _convertValueToPQL(value: any) {
@@ -280,18 +341,6 @@ function _convertValueToPQL(value: any) {
     ret = "'" + escapeString(String(value)) + "'";
   }
   return ret;
-}
-
-function _successReturn(result: any, done: any) {
-  done(..._convertSuccess(result));
-}
-
-function _errorReturn(err: any, done: any) {
-  let ret: any;
-  if (err.Item) {
-    ret = [err.Item];
-  }
-  done(convertError(err), ret);
 }
 
 function _convertSuccess(result: any): [any, any] {

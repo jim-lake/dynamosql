@@ -1,4 +1,3 @@
-import { promisify } from 'util';
 import {
   escapeValue,
   escapeIdentifier,
@@ -28,9 +27,8 @@ async function _insertIgnoreReplace(
   let affectedRows: number;
 
   if (list.length > 1) {
-    const getTableCached = promisify(dynamodb.getTableCached.bind(dynamodb));
     try {
-      const result = await getTableCached(table);
+      const result = await dynamodb.getTableCached(table);
       const key_list = result.Table.KeySchema.map((k: any) => k.AttributeName);
       const track = new Map();
       if (duplicate_mode === 'replace') {
@@ -60,48 +58,42 @@ async function _insertIgnoreReplace(
         `INSERT INTO ${escapeIdentifier(table)} VALUE ${_escapeItem(item)}`
     );
 
-    const [err_list] = await new Promise<[any, any]>((resolve, reject) => {
-      dynamodb.batchQL(sql_list, (err: any, result: any) => {
-        if (err && !Array.isArray(err)) {
-          if (
-            err?.name === 'ResourceNotFoundException' ||
-            err?.message?.toLowerCase().includes('resource not found')
-          ) {
-            reject(new SQLError({ err: 'table_not_found', args: [table] }));
-          } else {
-            reject(err);
+    try {
+      await dynamodb.batchQL(sql_list);
+    } catch (err: any) {
+      if (
+        err?.name === 'ResourceNotFoundException' ||
+        err?.message?.toLowerCase().includes('resource not found')
+      ) {
+        throw new SQLError({ err: 'table_not_found', args: [table] });
+      }
+      if (Array.isArray(err)) {
+        let error;
+        err.forEach((item_err: any) => {
+          if (item_err?.Code === 'DuplicateItem') {
+            affectedRows--;
+          } else if (!error && item_err) {
+            affectedRows--;
+            error = convertError(item_err);
           }
-        } else {
-          resolve([err, result]);
-        }
-      });
-    });
-
-    if (err_list?.length > 0) {
-      let err;
-      err_list.forEach((item_err: any) => {
-        if (item_err?.Code === 'DuplicateItem') {
-          affectedRows--;
-        } else if (!err && item_err) {
-          affectedRows--;
-          err = convertError(item_err);
-        }
-      });
-      if (err) throw err;
-    } else if (err_list?.name === 'ValidationException') {
-      throw new SQLError({
-        err: 'dup_table_insert',
-        sqlMessage: err_list.message,
-        cause: err_list,
-      });
+        });
+        if (error) throw error;
+      } else if (err?.name === 'ValidationException') {
+        throw new SQLError({
+          err: 'dup_table_insert',
+          sqlMessage: err.message,
+          cause: err,
+        });
+      } else {
+        throw err;
+      }
     }
   } else {
     list.forEach(_fixupItem);
     const opts = { table, list };
-    const putItems = promisify(dynamodb.putItems.bind(dynamodb));
 
     try {
-      await putItems(opts);
+      await dynamodb.putItems(opts);
       affectedRows = list.length;
     } catch (err) {
       throw convertError(err);
@@ -117,10 +109,9 @@ async function _insertNoIgnore(params: InsertParams): Promise<MutationResult> {
     (item: any) =>
       `INSERT INTO ${escapeIdentifier(table)} VALUE ${_escapeItem(item)}`
   );
-  const transactionQL = promisify(dynamodb.transactionQL.bind(dynamodb));
 
   try {
-    await transactionQL(sql_list);
+    await dynamodb.transactionQL(sql_list);
     return { affectedRows: list.length };
   } catch (err: any) {
     if (
