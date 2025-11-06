@@ -62,7 +62,7 @@ async function _multipleUpdate(params: any): Promise<any> {
 
   // Get rows to update
   const result_list = await runSelect(params);
-  
+
   ast.from.forEach((object: any) => {
     const from_key = object.key;
     const list = result_list.find(
@@ -100,7 +100,7 @@ async function _multipleUpdate(params: any): Promise<any> {
       update_list: obj._updateList,
     }))
     .filter((obj: any) => obj.update_list.length > 0);
-    
+
   if (from_list.length > 0) {
     const groups = makeEngineGroups(session, from_list);
     for (const group of groups) {

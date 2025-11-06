@@ -42,7 +42,7 @@ async function _createTable(params: any): Promise<any> {
   const duplicate_mode = ast.ignore_replace;
   const column_list: any[] = [];
   let primary_key: any[] = [];
-  
+
   ast.create_definitions?.forEach?.((def: any) => {
     if (def.resource === 'column') {
       column_list.push({
@@ -60,15 +60,16 @@ async function _createTable(params: any): Promise<any> {
       }));
     }
   });
-  
+
   let list: any;
   let result: any;
 
   // Handle CREATE TABLE AS SELECT
   if (ast.as && ast.query_expr) {
     const opts = { ast: ast.query_expr, session, dynamodb };
-    const { output_row_list, column_list: columns } = await SelectHandler.internalQuery(opts);
-    
+    const { output_row_list, column_list: columns } =
+      await SelectHandler.internalQuery(opts);
+
     const track = new Map();
     list = output_row_list.map((row: any) => {
       const obj: any = {};
@@ -102,11 +103,11 @@ async function _createTable(params: any): Promise<any> {
     is_temp: Boolean(ast.temporary),
     table_engine: options['engine'],
   };
-  
+
   try {
     await SchemaManager.createTable(opts);
-  } catch (err) {
-    if (err === 'table_exists' && ast.if_not_exists) {
+  } catch (err: any) {
+    if (err?.code === 'ER_TABLE_EXISTS_ERROR' && ast.if_not_exists) {
       return undefined;
     }
     throw err;

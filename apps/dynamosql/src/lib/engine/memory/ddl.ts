@@ -34,7 +34,10 @@ export async function createTable(params: CreateTableParams): Promise<void> {
   const { session, database, table, primary_key, column_list, is_temp } =
     params;
   if (primary_key.length === 0) {
-    throw new SQLError({ err: 'unsupported', message: 'primary key is required' });
+    throw new SQLError({
+      err: 'unsupported',
+      message: 'primary key is required',
+    });
   }
   const data = {
     column_list,

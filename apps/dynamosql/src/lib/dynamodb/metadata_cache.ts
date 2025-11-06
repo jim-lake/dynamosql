@@ -5,7 +5,7 @@ const g_tableCache: any = {};
 export function getTable(table_name: string, done: any) {
   dynamodb.getTable(table_name, (err: any, result: any) => {
     if (
-      err === 'resource_not_found' ||
+      err?.message === 'resource_not_found' ||
       (!err && result?.Table?.TableStatus === 'DELETING')
     ) {
       delete g_tableCache[table_name];

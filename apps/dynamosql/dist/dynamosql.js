@@ -2,9 +2,10 @@
 
 var SqlString = require('sqlstring');
 var require$$0 = require('big-integer');
+var util = require('util');
 var shared = require('@dynamosql/shared');
-var clientDynamodb = require('@aws-sdk/client-dynamodb');
 var node_util = require('node:util');
+var clientDynamodb = require('@aws-sdk/client-dynamodb');
 
 function _interopNamespaceDefault(e) {
 	var n = Object.create(null);
@@ -30,879 +31,6 @@ var commonjsGlobal = typeof globalThis !== 'undefined' ? globalThis : typeof win
 function getDefaultExportFromCjs (x) {
 	return x && x.__esModule && Object.prototype.hasOwnProperty.call(x, 'default') ? x['default'] : x;
 }
-
-var timesSeries = {exports: {}};
-
-var timesLimit = {exports: {}};
-
-var mapLimit = {exports: {}};
-
-var map = {exports: {}};
-
-var wrapAsync = {};
-
-var asyncify = {exports: {}};
-
-var initialParams = {exports: {}};
-
-var hasRequiredInitialParams;
-
-function requireInitialParams () {
-	if (hasRequiredInitialParams) return initialParams.exports;
-	hasRequiredInitialParams = 1;
-	(function (module, exports) {
-
-		Object.defineProperty(exports, "__esModule", {
-		    value: true
-		});
-
-		exports.default = function (fn) {
-		    return function (...args /*, callback*/) {
-		        var callback = args.pop();
-		        return fn.call(this, args, callback);
-		    };
-		};
-
-		module.exports = exports["default"]; 
-	} (initialParams, initialParams.exports));
-	return initialParams.exports;
-}
-
-var setImmediate$1 = {};
-
-var hasRequiredSetImmediate;
-
-function requireSetImmediate () {
-	if (hasRequiredSetImmediate) return setImmediate$1;
-	hasRequiredSetImmediate = 1;
-
-	Object.defineProperty(setImmediate$1, "__esModule", {
-	    value: true
-	});
-	setImmediate$1.fallback = fallback;
-	setImmediate$1.wrap = wrap;
-	/* istanbul ignore file */
-
-	var hasQueueMicrotask = setImmediate$1.hasQueueMicrotask = typeof queueMicrotask === 'function' && queueMicrotask;
-	var hasSetImmediate = setImmediate$1.hasSetImmediate = typeof setImmediate === 'function' && setImmediate;
-	var hasNextTick = setImmediate$1.hasNextTick = typeof process === 'object' && typeof process.nextTick === 'function';
-
-	function fallback(fn) {
-	    setTimeout(fn, 0);
-	}
-
-	function wrap(defer) {
-	    return (fn, ...args) => defer(() => fn(...args));
-	}
-
-	var _defer;
-
-	if (hasQueueMicrotask) {
-	    _defer = queueMicrotask;
-	} else if (hasSetImmediate) {
-	    _defer = setImmediate;
-	} else if (hasNextTick) {
-	    _defer = process.nextTick;
-	} else {
-	    _defer = fallback;
-	}
-
-	setImmediate$1.default = wrap(_defer);
-	return setImmediate$1;
-}
-
-var hasRequiredAsyncify;
-
-function requireAsyncify () {
-	if (hasRequiredAsyncify) return asyncify.exports;
-	hasRequiredAsyncify = 1;
-	(function (module, exports) {
-
-		Object.defineProperty(exports, "__esModule", {
-		    value: true
-		});
-		exports.default = asyncify;
-
-		var _initialParams = requireInitialParams();
-
-		var _initialParams2 = _interopRequireDefault(_initialParams);
-
-		var _setImmediate = requireSetImmediate();
-
-		var _setImmediate2 = _interopRequireDefault(_setImmediate);
-
-		var _wrapAsync = requireWrapAsync();
-
-		function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
-
-		/**
-		 * Take a sync function and make it async, passing its return value to a
-		 * callback. This is useful for plugging sync functions into a waterfall,
-		 * series, or other async functions. Any arguments passed to the generated
-		 * function will be passed to the wrapped function (except for the final
-		 * callback argument). Errors thrown will be passed to the callback.
-		 *
-		 * If the function passed to `asyncify` returns a Promise, that promises's
-		 * resolved/rejected state will be used to call the callback, rather than simply
-		 * the synchronous return value.
-		 *
-		 * This also means you can asyncify ES2017 `async` functions.
-		 *
-		 * @name asyncify
-		 * @static
-		 * @memberOf module:Utils
-		 * @method
-		 * @alias wrapSync
-		 * @category Util
-		 * @param {Function} func - The synchronous function, or Promise-returning
-		 * function to convert to an {@link AsyncFunction}.
-		 * @returns {AsyncFunction} An asynchronous wrapper of the `func`. To be
-		 * invoked with `(args..., callback)`.
-		 * @example
-		 *
-		 * // passing a regular synchronous function
-		 * async.waterfall([
-		 *     async.apply(fs.readFile, filename, "utf8"),
-		 *     async.asyncify(JSON.parse),
-		 *     function (data, next) {
-		 *         // data is the result of parsing the text.
-		 *         // If there was a parsing error, it would have been caught.
-		 *     }
-		 * ], callback);
-		 *
-		 * // passing a function returning a promise
-		 * async.waterfall([
-		 *     async.apply(fs.readFile, filename, "utf8"),
-		 *     async.asyncify(function (contents) {
-		 *         return db.model.create(contents);
-		 *     }),
-		 *     function (model, next) {
-		 *         // `model` is the instantiated model object.
-		 *         // If there was an error, this function would be skipped.
-		 *     }
-		 * ], callback);
-		 *
-		 * // es2017 example, though `asyncify` is not needed if your JS environment
-		 * // supports async functions out of the box
-		 * var q = async.queue(async.asyncify(async function(file) {
-		 *     var intermediateStep = await processFile(file);
-		 *     return await somePromise(intermediateStep)
-		 * }));
-		 *
-		 * q.push(files);
-		 */
-		function asyncify(func) {
-		    if ((0, _wrapAsync.isAsync)(func)) {
-		        return function (...args /*, callback*/) {
-		            const callback = args.pop();
-		            const promise = func.apply(this, args);
-		            return handlePromise(promise, callback);
-		        };
-		    }
-
-		    return (0, _initialParams2.default)(function (args, callback) {
-		        var result;
-		        try {
-		            result = func.apply(this, args);
-		        } catch (e) {
-		            return callback(e);
-		        }
-		        // if result is Promise object
-		        if (result && typeof result.then === 'function') {
-		            return handlePromise(result, callback);
-		        } else {
-		            callback(null, result);
-		        }
-		    });
-		}
-
-		function handlePromise(promise, callback) {
-		    return promise.then(value => {
-		        invokeCallback(callback, null, value);
-		    }, err => {
-		        invokeCallback(callback, err && err.message ? err : new Error(err));
-		    });
-		}
-
-		function invokeCallback(callback, error, value) {
-		    try {
-		        callback(error, value);
-		    } catch (err) {
-		        (0, _setImmediate2.default)(e => {
-		            throw e;
-		        }, err);
-		    }
-		}
-		module.exports = exports['default']; 
-	} (asyncify, asyncify.exports));
-	return asyncify.exports;
-}
-
-var hasRequiredWrapAsync;
-
-function requireWrapAsync () {
-	if (hasRequiredWrapAsync) return wrapAsync;
-	hasRequiredWrapAsync = 1;
-
-	Object.defineProperty(wrapAsync, "__esModule", {
-	    value: true
-	});
-	wrapAsync.isAsyncIterable = wrapAsync.isAsyncGenerator = wrapAsync.isAsync = undefined;
-
-	var _asyncify = requireAsyncify();
-
-	var _asyncify2 = _interopRequireDefault(_asyncify);
-
-	function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
-
-	function isAsync(fn) {
-	    return fn[Symbol.toStringTag] === 'AsyncFunction';
-	}
-
-	function isAsyncGenerator(fn) {
-	    return fn[Symbol.toStringTag] === 'AsyncGenerator';
-	}
-
-	function isAsyncIterable(obj) {
-	    return typeof obj[Symbol.asyncIterator] === 'function';
-	}
-
-	function wrapAsync$1(asyncFn) {
-	    if (typeof asyncFn !== 'function') throw new Error('expected a function');
-	    return isAsync(asyncFn) ? (0, _asyncify2.default)(asyncFn) : asyncFn;
-	}
-
-	wrapAsync.default = wrapAsync$1;
-	wrapAsync.isAsync = isAsync;
-	wrapAsync.isAsyncGenerator = isAsyncGenerator;
-	wrapAsync.isAsyncIterable = isAsyncIterable;
-	return wrapAsync;
-}
-
-var hasRequiredMap;
-
-function requireMap () {
-	if (hasRequiredMap) return map.exports;
-	hasRequiredMap = 1;
-	(function (module, exports) {
-
-		Object.defineProperty(exports, "__esModule", {
-		    value: true
-		});
-		exports.default = _asyncMap;
-
-		var _wrapAsync = requireWrapAsync();
-
-		var _wrapAsync2 = _interopRequireDefault(_wrapAsync);
-
-		function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
-
-		function _asyncMap(eachfn, arr, iteratee, callback) {
-		    arr = arr || [];
-		    var results = [];
-		    var counter = 0;
-		    var _iteratee = (0, _wrapAsync2.default)(iteratee);
-
-		    return eachfn(arr, (value, _, iterCb) => {
-		        var index = counter++;
-		        _iteratee(value, (err, v) => {
-		            results[index] = v;
-		            iterCb(err);
-		        });
-		    }, err => {
-		        callback(err, results);
-		    });
-		}
-		module.exports = exports['default']; 
-	} (map, map.exports));
-	return map.exports;
-}
-
-var eachOfLimit$1 = {exports: {}};
-
-var once = {exports: {}};
-
-var hasRequiredOnce;
-
-function requireOnce () {
-	if (hasRequiredOnce) return once.exports;
-	hasRequiredOnce = 1;
-	(function (module, exports) {
-
-		Object.defineProperty(exports, "__esModule", {
-		    value: true
-		});
-		exports.default = once;
-		function once(fn) {
-		    function wrapper(...args) {
-		        if (fn === null) return;
-		        var callFn = fn;
-		        fn = null;
-		        callFn.apply(this, args);
-		    }
-		    Object.assign(wrapper, fn);
-		    return wrapper;
-		}
-		module.exports = exports["default"]; 
-	} (once, once.exports));
-	return once.exports;
-}
-
-var iterator = {exports: {}};
-
-var isArrayLike = {exports: {}};
-
-var hasRequiredIsArrayLike;
-
-function requireIsArrayLike () {
-	if (hasRequiredIsArrayLike) return isArrayLike.exports;
-	hasRequiredIsArrayLike = 1;
-	(function (module, exports) {
-
-		Object.defineProperty(exports, "__esModule", {
-		    value: true
-		});
-		exports.default = isArrayLike;
-		function isArrayLike(value) {
-		    return value && typeof value.length === 'number' && value.length >= 0 && value.length % 1 === 0;
-		}
-		module.exports = exports['default']; 
-	} (isArrayLike, isArrayLike.exports));
-	return isArrayLike.exports;
-}
-
-var getIterator = {exports: {}};
-
-var hasRequiredGetIterator;
-
-function requireGetIterator () {
-	if (hasRequiredGetIterator) return getIterator.exports;
-	hasRequiredGetIterator = 1;
-	(function (module, exports) {
-
-		Object.defineProperty(exports, "__esModule", {
-		    value: true
-		});
-
-		exports.default = function (coll) {
-		    return coll[Symbol.iterator] && coll[Symbol.iterator]();
-		};
-
-		module.exports = exports["default"]; 
-	} (getIterator, getIterator.exports));
-	return getIterator.exports;
-}
-
-var hasRequiredIterator;
-
-function requireIterator () {
-	if (hasRequiredIterator) return iterator.exports;
-	hasRequiredIterator = 1;
-	(function (module, exports) {
-
-		Object.defineProperty(exports, "__esModule", {
-		    value: true
-		});
-		exports.default = createIterator;
-
-		var _isArrayLike = requireIsArrayLike();
-
-		var _isArrayLike2 = _interopRequireDefault(_isArrayLike);
-
-		var _getIterator = requireGetIterator();
-
-		var _getIterator2 = _interopRequireDefault(_getIterator);
-
-		function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
-
-		function createArrayIterator(coll) {
-		    var i = -1;
-		    var len = coll.length;
-		    return function next() {
-		        return ++i < len ? { value: coll[i], key: i } : null;
-		    };
-		}
-
-		function createES2015Iterator(iterator) {
-		    var i = -1;
-		    return function next() {
-		        var item = iterator.next();
-		        if (item.done) return null;
-		        i++;
-		        return { value: item.value, key: i };
-		    };
-		}
-
-		function createObjectIterator(obj) {
-		    var okeys = obj ? Object.keys(obj) : [];
-		    var i = -1;
-		    var len = okeys.length;
-		    return function next() {
-		        var key = okeys[++i];
-		        if (key === '__proto__') {
-		            return next();
-		        }
-		        return i < len ? { value: obj[key], key } : null;
-		    };
-		}
-
-		function createIterator(coll) {
-		    if ((0, _isArrayLike2.default)(coll)) {
-		        return createArrayIterator(coll);
-		    }
-
-		    var iterator = (0, _getIterator2.default)(coll);
-		    return iterator ? createES2015Iterator(iterator) : createObjectIterator(coll);
-		}
-		module.exports = exports['default']; 
-	} (iterator, iterator.exports));
-	return iterator.exports;
-}
-
-var onlyOnce = {exports: {}};
-
-var hasRequiredOnlyOnce;
-
-function requireOnlyOnce () {
-	if (hasRequiredOnlyOnce) return onlyOnce.exports;
-	hasRequiredOnlyOnce = 1;
-	(function (module, exports) {
-
-		Object.defineProperty(exports, "__esModule", {
-		    value: true
-		});
-		exports.default = onlyOnce;
-		function onlyOnce(fn) {
-		    return function (...args) {
-		        if (fn === null) throw new Error("Callback was already called.");
-		        var callFn = fn;
-		        fn = null;
-		        callFn.apply(this, args);
-		    };
-		}
-		module.exports = exports["default"]; 
-	} (onlyOnce, onlyOnce.exports));
-	return onlyOnce.exports;
-}
-
-var asyncEachOfLimit = {exports: {}};
-
-var breakLoop = {exports: {}};
-
-var hasRequiredBreakLoop;
-
-function requireBreakLoop () {
-	if (hasRequiredBreakLoop) return breakLoop.exports;
-	hasRequiredBreakLoop = 1;
-	(function (module, exports) {
-
-		Object.defineProperty(exports, "__esModule", {
-		  value: true
-		});
-		// A temporary value used to identify if the loop should be broken.
-		// See #1064, #1293
-		const breakLoop = {};
-		exports.default = breakLoop;
-		module.exports = exports["default"]; 
-	} (breakLoop, breakLoop.exports));
-	return breakLoop.exports;
-}
-
-var hasRequiredAsyncEachOfLimit;
-
-function requireAsyncEachOfLimit () {
-	if (hasRequiredAsyncEachOfLimit) return asyncEachOfLimit.exports;
-	hasRequiredAsyncEachOfLimit = 1;
-	(function (module, exports) {
-
-		Object.defineProperty(exports, "__esModule", {
-		    value: true
-		});
-		exports.default = asyncEachOfLimit;
-
-		var _breakLoop = requireBreakLoop();
-
-		var _breakLoop2 = _interopRequireDefault(_breakLoop);
-
-		function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
-
-		// for async generators
-		function asyncEachOfLimit(generator, limit, iteratee, callback) {
-		    let done = false;
-		    let canceled = false;
-		    let awaiting = false;
-		    let running = 0;
-		    let idx = 0;
-
-		    function replenish() {
-		        //console.log('replenish')
-		        if (running >= limit || awaiting || done) return;
-		        //console.log('replenish awaiting')
-		        awaiting = true;
-		        generator.next().then(({ value, done: iterDone }) => {
-		            //console.log('got value', value)
-		            if (canceled || done) return;
-		            awaiting = false;
-		            if (iterDone) {
-		                done = true;
-		                if (running <= 0) {
-		                    //console.log('done nextCb')
-		                    callback(null);
-		                }
-		                return;
-		            }
-		            running++;
-		            iteratee(value, idx, iterateeCallback);
-		            idx++;
-		            replenish();
-		        }).catch(handleError);
-		    }
-
-		    function iterateeCallback(err, result) {
-		        //console.log('iterateeCallback')
-		        running -= 1;
-		        if (canceled) return;
-		        if (err) return handleError(err);
-
-		        if (err === false) {
-		            done = true;
-		            canceled = true;
-		            return;
-		        }
-
-		        if (result === _breakLoop2.default || done && running <= 0) {
-		            done = true;
-		            //console.log('done iterCb')
-		            return callback(null);
-		        }
-		        replenish();
-		    }
-
-		    function handleError(err) {
-		        if (canceled) return;
-		        awaiting = false;
-		        done = true;
-		        callback(err);
-		    }
-
-		    replenish();
-		}
-		module.exports = exports['default']; 
-	} (asyncEachOfLimit, asyncEachOfLimit.exports));
-	return asyncEachOfLimit.exports;
-}
-
-var hasRequiredEachOfLimit$1;
-
-function requireEachOfLimit$1 () {
-	if (hasRequiredEachOfLimit$1) return eachOfLimit$1.exports;
-	hasRequiredEachOfLimit$1 = 1;
-	(function (module, exports) {
-
-		Object.defineProperty(exports, "__esModule", {
-		    value: true
-		});
-
-		var _once = requireOnce();
-
-		var _once2 = _interopRequireDefault(_once);
-
-		var _iterator = requireIterator();
-
-		var _iterator2 = _interopRequireDefault(_iterator);
-
-		var _onlyOnce = requireOnlyOnce();
-
-		var _onlyOnce2 = _interopRequireDefault(_onlyOnce);
-
-		var _wrapAsync = requireWrapAsync();
-
-		var _asyncEachOfLimit = requireAsyncEachOfLimit();
-
-		var _asyncEachOfLimit2 = _interopRequireDefault(_asyncEachOfLimit);
-
-		var _breakLoop = requireBreakLoop();
-
-		var _breakLoop2 = _interopRequireDefault(_breakLoop);
-
-		function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
-
-		exports.default = limit => {
-		    return (obj, iteratee, callback) => {
-		        callback = (0, _once2.default)(callback);
-		        if (limit <= 0) {
-		            throw new RangeError('concurrency limit cannot be less than 1');
-		        }
-		        if (!obj) {
-		            return callback(null);
-		        }
-		        if ((0, _wrapAsync.isAsyncGenerator)(obj)) {
-		            return (0, _asyncEachOfLimit2.default)(obj, limit, iteratee, callback);
-		        }
-		        if ((0, _wrapAsync.isAsyncIterable)(obj)) {
-		            return (0, _asyncEachOfLimit2.default)(obj[Symbol.asyncIterator](), limit, iteratee, callback);
-		        }
-		        var nextElem = (0, _iterator2.default)(obj);
-		        var done = false;
-		        var canceled = false;
-		        var running = 0;
-		        var looping = false;
-
-		        function iterateeCallback(err, value) {
-		            if (canceled) return;
-		            running -= 1;
-		            if (err) {
-		                done = true;
-		                callback(err);
-		            } else if (err === false) {
-		                done = true;
-		                canceled = true;
-		            } else if (value === _breakLoop2.default || done && running <= 0) {
-		                done = true;
-		                return callback(null);
-		            } else if (!looping) {
-		                replenish();
-		            }
-		        }
-
-		        function replenish() {
-		            looping = true;
-		            while (running < limit && !done) {
-		                var elem = nextElem();
-		                if (elem === null) {
-		                    done = true;
-		                    if (running <= 0) {
-		                        callback(null);
-		                    }
-		                    return;
-		                }
-		                running += 1;
-		                iteratee(elem.value, elem.key, (0, _onlyOnce2.default)(iterateeCallback));
-		            }
-		            looping = false;
-		        }
-
-		        replenish();
-		    };
-		};
-
-		module.exports = exports['default']; 
-	} (eachOfLimit$1, eachOfLimit$1.exports));
-	return eachOfLimit$1.exports;
-}
-
-var awaitify = {exports: {}};
-
-var hasRequiredAwaitify;
-
-function requireAwaitify () {
-	if (hasRequiredAwaitify) return awaitify.exports;
-	hasRequiredAwaitify = 1;
-	(function (module, exports) {
-
-		Object.defineProperty(exports, "__esModule", {
-		    value: true
-		});
-		exports.default = awaitify;
-		// conditionally promisify a function.
-		// only return a promise if a callback is omitted
-		function awaitify(asyncFn, arity = asyncFn.length) {
-		    if (!arity) throw new Error('arity is undefined');
-		    function awaitable(...args) {
-		        if (typeof args[arity - 1] === 'function') {
-		            return asyncFn.apply(this, args);
-		        }
-
-		        return new Promise((resolve, reject) => {
-		            args[arity - 1] = (err, ...cbArgs) => {
-		                if (err) return reject(err);
-		                resolve(cbArgs.length > 1 ? cbArgs : cbArgs[0]);
-		            };
-		            asyncFn.apply(this, args);
-		        });
-		    }
-
-		    return awaitable;
-		}
-		module.exports = exports['default']; 
-	} (awaitify, awaitify.exports));
-	return awaitify.exports;
-}
-
-var hasRequiredMapLimit;
-
-function requireMapLimit () {
-	if (hasRequiredMapLimit) return mapLimit.exports;
-	hasRequiredMapLimit = 1;
-	(function (module, exports) {
-
-		Object.defineProperty(exports, "__esModule", {
-		  value: true
-		});
-
-		var _map2 = requireMap();
-
-		var _map3 = _interopRequireDefault(_map2);
-
-		var _eachOfLimit = requireEachOfLimit$1();
-
-		var _eachOfLimit2 = _interopRequireDefault(_eachOfLimit);
-
-		var _awaitify = requireAwaitify();
-
-		var _awaitify2 = _interopRequireDefault(_awaitify);
-
-		function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
-
-		/**
-		 * The same as [`map`]{@link module:Collections.map} but runs a maximum of `limit` async operations at a time.
-		 *
-		 * @name mapLimit
-		 * @static
-		 * @memberOf module:Collections
-		 * @method
-		 * @see [async.map]{@link module:Collections.map}
-		 * @category Collection
-		 * @param {Array|Iterable|AsyncIterable|Object} coll - A collection to iterate over.
-		 * @param {number} limit - The maximum number of async operations at a time.
-		 * @param {AsyncFunction} iteratee - An async function to apply to each item in
-		 * `coll`.
-		 * The iteratee should complete with the transformed item.
-		 * Invoked with (item, callback).
-		 * @param {Function} [callback] - A callback which is called when all `iteratee`
-		 * functions have finished, or an error occurs. Results is an array of the
-		 * transformed items from the `coll`. Invoked with (err, results).
-		 * @returns {Promise} a promise, if no callback is passed
-		 */
-		function mapLimit(coll, limit, iteratee, callback) {
-		  return (0, _map3.default)((0, _eachOfLimit2.default)(limit), coll, iteratee, callback);
-		}
-		exports.default = (0, _awaitify2.default)(mapLimit, 4);
-		module.exports = exports['default']; 
-	} (mapLimit, mapLimit.exports));
-	return mapLimit.exports;
-}
-
-var range = {exports: {}};
-
-var hasRequiredRange;
-
-function requireRange () {
-	if (hasRequiredRange) return range.exports;
-	hasRequiredRange = 1;
-	(function (module, exports) {
-
-		Object.defineProperty(exports, "__esModule", {
-		    value: true
-		});
-		exports.default = range;
-		function range(size) {
-		    var result = Array(size);
-		    while (size--) {
-		        result[size] = size;
-		    }
-		    return result;
-		}
-		module.exports = exports["default"]; 
-	} (range, range.exports));
-	return range.exports;
-}
-
-var hasRequiredTimesLimit;
-
-function requireTimesLimit () {
-	if (hasRequiredTimesLimit) return timesLimit.exports;
-	hasRequiredTimesLimit = 1;
-	(function (module, exports) {
-
-		Object.defineProperty(exports, "__esModule", {
-		  value: true
-		});
-		exports.default = timesLimit;
-
-		var _mapLimit = requireMapLimit();
-
-		var _mapLimit2 = _interopRequireDefault(_mapLimit);
-
-		var _range = requireRange();
-
-		var _range2 = _interopRequireDefault(_range);
-
-		var _wrapAsync = requireWrapAsync();
-
-		var _wrapAsync2 = _interopRequireDefault(_wrapAsync);
-
-		function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
-
-		/**
-		 * The same as [times]{@link module:ControlFlow.times} but runs a maximum of `limit` async operations at a
-		 * time.
-		 *
-		 * @name timesLimit
-		 * @static
-		 * @memberOf module:ControlFlow
-		 * @method
-		 * @see [async.times]{@link module:ControlFlow.times}
-		 * @category Control Flow
-		 * @param {number} count - The number of times to run the function.
-		 * @param {number} limit - The maximum number of async operations at a time.
-		 * @param {AsyncFunction} iteratee - The async function to call `n` times.
-		 * Invoked with the iteration index and a callback: (n, next).
-		 * @param {Function} callback - see [async.map]{@link module:Collections.map}.
-		 * @returns {Promise} a promise, if no callback is provided
-		 */
-		function timesLimit(count, limit, iteratee, callback) {
-		  var _iteratee = (0, _wrapAsync2.default)(iteratee);
-		  return (0, _mapLimit2.default)((0, _range2.default)(count), limit, _iteratee, callback);
-		}
-		module.exports = exports['default']; 
-	} (timesLimit, timesLimit.exports));
-	return timesLimit.exports;
-}
-
-var hasRequiredTimesSeries;
-
-function requireTimesSeries () {
-	if (hasRequiredTimesSeries) return timesSeries.exports;
-	hasRequiredTimesSeries = 1;
-	(function (module, exports) {
-
-		Object.defineProperty(exports, "__esModule", {
-		  value: true
-		});
-		exports.default = timesSeries;
-
-		var _timesLimit = requireTimesLimit();
-
-		var _timesLimit2 = _interopRequireDefault(_timesLimit);
-
-		function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
-
-		/**
-		 * The same as [times]{@link module:ControlFlow.times} but runs only a single async operation at a time.
-		 *
-		 * @name timesSeries
-		 * @static
-		 * @memberOf module:ControlFlow
-		 * @method
-		 * @see [async.times]{@link module:ControlFlow.times}
-		 * @category Control Flow
-		 * @param {number} n - The number of times to run the function.
-		 * @param {AsyncFunction} iteratee - The async function to call `n` times.
-		 * Invoked with the iteration index and a callback: (n, next).
-		 * @param {Function} callback - see {@link module:Collections.map}.
-		 * @returns {Promise} a promise, if no callback is provided
-		 */
-		function timesSeries(n, iteratee, callback) {
-		  return (0, _timesLimit2.default)(n, 1, iteratee, callback);
-		}
-		module.exports = exports['default']; 
-	} (timesSeries, timesSeries.exports));
-	return timesSeries.exports;
-}
-
-var timesSeriesExports = requireTimesSeries();
-var asyncTimesSeries = /*@__PURE__*/getDefaultExportFromCjs(timesSeriesExports);
 
 var mysql_parser = {};
 
@@ -18892,4408 +18020,6 @@ function requireMysql_parser () {
 
 var mysql_parserExports = requireMysql_parser();
 
-var series = {exports: {}};
-
-var parallel = {exports: {}};
-
-var hasRequiredParallel;
-
-function requireParallel () {
-	if (hasRequiredParallel) return parallel.exports;
-	hasRequiredParallel = 1;
-	(function (module, exports) {
-
-		Object.defineProperty(exports, "__esModule", {
-		    value: true
-		});
-
-		var _isArrayLike = requireIsArrayLike();
-
-		var _isArrayLike2 = _interopRequireDefault(_isArrayLike);
-
-		var _wrapAsync = requireWrapAsync();
-
-		var _wrapAsync2 = _interopRequireDefault(_wrapAsync);
-
-		var _awaitify = requireAwaitify();
-
-		var _awaitify2 = _interopRequireDefault(_awaitify);
-
-		function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
-
-		exports.default = (0, _awaitify2.default)((eachfn, tasks, callback) => {
-		    var results = (0, _isArrayLike2.default)(tasks) ? [] : {};
-
-		    eachfn(tasks, (task, key, taskCb) => {
-		        (0, _wrapAsync2.default)(task)((err, ...result) => {
-		            if (result.length < 2) {
-		                [result] = result;
-		            }
-		            results[key] = result;
-		            taskCb(err);
-		        });
-		    }, err => callback(err, results));
-		}, 3);
-		module.exports = exports['default']; 
-	} (parallel, parallel.exports));
-	return parallel.exports;
-}
-
-var eachOfSeries = {exports: {}};
-
-var eachOfLimit = {exports: {}};
-
-var hasRequiredEachOfLimit;
-
-function requireEachOfLimit () {
-	if (hasRequiredEachOfLimit) return eachOfLimit.exports;
-	hasRequiredEachOfLimit = 1;
-	(function (module, exports) {
-
-		Object.defineProperty(exports, "__esModule", {
-		  value: true
-		});
-
-		var _eachOfLimit2 = requireEachOfLimit$1();
-
-		var _eachOfLimit3 = _interopRequireDefault(_eachOfLimit2);
-
-		var _wrapAsync = requireWrapAsync();
-
-		var _wrapAsync2 = _interopRequireDefault(_wrapAsync);
-
-		var _awaitify = requireAwaitify();
-
-		var _awaitify2 = _interopRequireDefault(_awaitify);
-
-		function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
-
-		/**
-		 * The same as [`eachOf`]{@link module:Collections.eachOf} but runs a maximum of `limit` async operations at a
-		 * time.
-		 *
-		 * @name eachOfLimit
-		 * @static
-		 * @memberOf module:Collections
-		 * @method
-		 * @see [async.eachOf]{@link module:Collections.eachOf}
-		 * @alias forEachOfLimit
-		 * @category Collection
-		 * @param {Array|Iterable|AsyncIterable|Object} coll - A collection to iterate over.
-		 * @param {number} limit - The maximum number of async operations at a time.
-		 * @param {AsyncFunction} iteratee - An async function to apply to each
-		 * item in `coll`. The `key` is the item's key, or index in the case of an
-		 * array.
-		 * Invoked with (item, key, callback).
-		 * @param {Function} [callback] - A callback which is called when all
-		 * `iteratee` functions have finished, or an error occurs. Invoked with (err).
-		 * @returns {Promise} a promise, if a callback is omitted
-		 */
-		function eachOfLimit(coll, limit, iteratee, callback) {
-		  return (0, _eachOfLimit3.default)(limit)(coll, (0, _wrapAsync2.default)(iteratee), callback);
-		}
-
-		exports.default = (0, _awaitify2.default)(eachOfLimit, 4);
-		module.exports = exports['default']; 
-	} (eachOfLimit, eachOfLimit.exports));
-	return eachOfLimit.exports;
-}
-
-var hasRequiredEachOfSeries;
-
-function requireEachOfSeries () {
-	if (hasRequiredEachOfSeries) return eachOfSeries.exports;
-	hasRequiredEachOfSeries = 1;
-	(function (module, exports) {
-
-		Object.defineProperty(exports, "__esModule", {
-		  value: true
-		});
-
-		var _eachOfLimit = requireEachOfLimit();
-
-		var _eachOfLimit2 = _interopRequireDefault(_eachOfLimit);
-
-		var _awaitify = requireAwaitify();
-
-		var _awaitify2 = _interopRequireDefault(_awaitify);
-
-		function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
-
-		/**
-		 * The same as [`eachOf`]{@link module:Collections.eachOf} but runs only a single async operation at a time.
-		 *
-		 * @name eachOfSeries
-		 * @static
-		 * @memberOf module:Collections
-		 * @method
-		 * @see [async.eachOf]{@link module:Collections.eachOf}
-		 * @alias forEachOfSeries
-		 * @category Collection
-		 * @param {Array|Iterable|AsyncIterable|Object} coll - A collection to iterate over.
-		 * @param {AsyncFunction} iteratee - An async function to apply to each item in
-		 * `coll`.
-		 * Invoked with (item, key, callback).
-		 * @param {Function} [callback] - A callback which is called when all `iteratee`
-		 * functions have finished, or an error occurs. Invoked with (err).
-		 * @returns {Promise} a promise, if a callback is omitted
-		 */
-		function eachOfSeries(coll, iteratee, callback) {
-		  return (0, _eachOfLimit2.default)(coll, 1, iteratee, callback);
-		}
-		exports.default = (0, _awaitify2.default)(eachOfSeries, 3);
-		module.exports = exports['default']; 
-	} (eachOfSeries, eachOfSeries.exports));
-	return eachOfSeries.exports;
-}
-
-var hasRequiredSeries;
-
-function requireSeries () {
-	if (hasRequiredSeries) return series.exports;
-	hasRequiredSeries = 1;
-	(function (module, exports) {
-
-		Object.defineProperty(exports, "__esModule", {
-		  value: true
-		});
-		exports.default = series;
-
-		var _parallel2 = requireParallel();
-
-		var _parallel3 = _interopRequireDefault(_parallel2);
-
-		var _eachOfSeries = requireEachOfSeries();
-
-		var _eachOfSeries2 = _interopRequireDefault(_eachOfSeries);
-
-		function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
-
-		/**
-		 * Run the functions in the `tasks` collection in series, each one running once
-		 * the previous function has completed. If any functions in the series pass an
-		 * error to its callback, no more functions are run, and `callback` is
-		 * immediately called with the value of the error. Otherwise, `callback`
-		 * receives an array of results when `tasks` have completed.
-		 *
-		 * It is also possible to use an object instead of an array. Each property will
-		 * be run as a function, and the results will be passed to the final `callback`
-		 * as an object instead of an array. This can be a more readable way of handling
-		 *  results from {@link async.series}.
-		 *
-		 * **Note** that while many implementations preserve the order of object
-		 * properties, the [ECMAScript Language Specification](http://www.ecma-international.org/ecma-262/5.1/#sec-8.6)
-		 * explicitly states that
-		 *
-		 * > The mechanics and order of enumerating the properties is not specified.
-		 *
-		 * So if you rely on the order in which your series of functions are executed,
-		 * and want this to work on all platforms, consider using an array.
-		 *
-		 * @name series
-		 * @static
-		 * @memberOf module:ControlFlow
-		 * @method
-		 * @category Control Flow
-		 * @param {Array|Iterable|AsyncIterable|Object} tasks - A collection containing
-		 * [async functions]{@link AsyncFunction} to run in series.
-		 * Each function can complete with any number of optional `result` values.
-		 * @param {Function} [callback] - An optional callback to run once all the
-		 * functions have completed. This function gets a results array (or object)
-		 * containing all the result arguments passed to the `task` callbacks. Invoked
-		 * with (err, result).
-		 * @return {Promise} a promise, if no callback is passed
-		 * @example
-		 *
-		 * //Using Callbacks
-		 * async.series([
-		 *     function(callback) {
-		 *         setTimeout(function() {
-		 *             // do some async task
-		 *             callback(null, 'one');
-		 *         }, 200);
-		 *     },
-		 *     function(callback) {
-		 *         setTimeout(function() {
-		 *             // then do another async task
-		 *             callback(null, 'two');
-		 *         }, 100);
-		 *     }
-		 * ], function(err, results) {
-		 *     console.log(results);
-		 *     // results is equal to ['one','two']
-		 * });
-		 *
-		 * // an example using objects instead of arrays
-		 * async.series({
-		 *     one: function(callback) {
-		 *         setTimeout(function() {
-		 *             // do some async task
-		 *             callback(null, 1);
-		 *         }, 200);
-		 *     },
-		 *     two: function(callback) {
-		 *         setTimeout(function() {
-		 *             // then do another async task
-		 *             callback(null, 2);
-		 *         }, 100);
-		 *     }
-		 * }, function(err, results) {
-		 *     console.log(results);
-		 *     // results is equal to: { one: 1, two: 2 }
-		 * });
-		 *
-		 * //Using Promises
-		 * async.series([
-		 *     function(callback) {
-		 *         setTimeout(function() {
-		 *             callback(null, 'one');
-		 *         }, 200);
-		 *     },
-		 *     function(callback) {
-		 *         setTimeout(function() {
-		 *             callback(null, 'two');
-		 *         }, 100);
-		 *     }
-		 * ]).then(results => {
-		 *     console.log(results);
-		 *     // results is equal to ['one','two']
-		 * }).catch(err => {
-		 *     console.log(err);
-		 * });
-		 *
-		 * // an example using an object instead of an array
-		 * async.series({
-		 *     one: function(callback) {
-		 *         setTimeout(function() {
-		 *             // do some async task
-		 *             callback(null, 1);
-		 *         }, 200);
-		 *     },
-		 *     two: function(callback) {
-		 *         setTimeout(function() {
-		 *             // then do another async task
-		 *             callback(null, 2);
-		 *         }, 100);
-		 *     }
-		 * }).then(results => {
-		 *     console.log(results);
-		 *     // results is equal to: { one: 1, two: 2 }
-		 * }).catch(err => {
-		 *     console.log(err);
-		 * });
-		 *
-		 * //Using async/await
-		 * async () => {
-		 *     try {
-		 *         let results = await async.series([
-		 *             function(callback) {
-		 *                 setTimeout(function() {
-		 *                     // do some async task
-		 *                     callback(null, 'one');
-		 *                 }, 200);
-		 *             },
-		 *             function(callback) {
-		 *                 setTimeout(function() {
-		 *                     // then do another async task
-		 *                     callback(null, 'two');
-		 *                 }, 100);
-		 *             }
-		 *         ]);
-		 *         console.log(results);
-		 *         // results is equal to ['one','two']
-		 *     }
-		 *     catch (err) {
-		 *         console.log(err);
-		 *     }
-		 * }
-		 *
-		 * // an example using an object instead of an array
-		 * async () => {
-		 *     try {
-		 *         let results = await async.parallel({
-		 *             one: function(callback) {
-		 *                 setTimeout(function() {
-		 *                     // do some async task
-		 *                     callback(null, 1);
-		 *                 }, 200);
-		 *             },
-		 *            two: function(callback) {
-		 *                 setTimeout(function() {
-		 *                     // then do another async task
-		 *                     callback(null, 2);
-		 *                 }, 100);
-		 *            }
-		 *         });
-		 *         console.log(results);
-		 *         // results is equal to: { one: 1, two: 2 }
-		 *     }
-		 *     catch (err) {
-		 *         console.log(err);
-		 *     }
-		 * }
-		 *
-		 */
-		function series(tasks, callback) {
-		  return (0, _parallel3.default)(_eachOfSeries2.default, tasks, callback);
-		}
-		module.exports = exports['default']; 
-	} (series, series.exports));
-	return series.exports;
-}
-
-var seriesExports = requireSeries();
-var asyncSeries = /*@__PURE__*/getDefaultExportFromCjs(seriesExports);
-
-var eachSeries = {exports: {}};
-
-var eachLimit = {exports: {}};
-
-var withoutIndex = {exports: {}};
-
-var hasRequiredWithoutIndex;
-
-function requireWithoutIndex () {
-	if (hasRequiredWithoutIndex) return withoutIndex.exports;
-	hasRequiredWithoutIndex = 1;
-	(function (module, exports) {
-
-		Object.defineProperty(exports, "__esModule", {
-		    value: true
-		});
-		exports.default = _withoutIndex;
-		function _withoutIndex(iteratee) {
-		    return (value, index, callback) => iteratee(value, callback);
-		}
-		module.exports = exports["default"]; 
-	} (withoutIndex, withoutIndex.exports));
-	return withoutIndex.exports;
-}
-
-var hasRequiredEachLimit;
-
-function requireEachLimit () {
-	if (hasRequiredEachLimit) return eachLimit.exports;
-	hasRequiredEachLimit = 1;
-	(function (module, exports) {
-
-		Object.defineProperty(exports, "__esModule", {
-		  value: true
-		});
-
-		var _eachOfLimit = requireEachOfLimit$1();
-
-		var _eachOfLimit2 = _interopRequireDefault(_eachOfLimit);
-
-		var _withoutIndex = requireWithoutIndex();
-
-		var _withoutIndex2 = _interopRequireDefault(_withoutIndex);
-
-		var _wrapAsync = requireWrapAsync();
-
-		var _wrapAsync2 = _interopRequireDefault(_wrapAsync);
-
-		var _awaitify = requireAwaitify();
-
-		var _awaitify2 = _interopRequireDefault(_awaitify);
-
-		function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
-
-		/**
-		 * The same as [`each`]{@link module:Collections.each} but runs a maximum of `limit` async operations at a time.
-		 *
-		 * @name eachLimit
-		 * @static
-		 * @memberOf module:Collections
-		 * @method
-		 * @see [async.each]{@link module:Collections.each}
-		 * @alias forEachLimit
-		 * @category Collection
-		 * @param {Array|Iterable|AsyncIterable|Object} coll - A collection to iterate over.
-		 * @param {number} limit - The maximum number of async operations at a time.
-		 * @param {AsyncFunction} iteratee - An async function to apply to each item in
-		 * `coll`.
-		 * The array index is not passed to the iteratee.
-		 * If you need the index, use `eachOfLimit`.
-		 * Invoked with (item, callback).
-		 * @param {Function} [callback] - A callback which is called when all
-		 * `iteratee` functions have finished, or an error occurs. Invoked with (err).
-		 * @returns {Promise} a promise, if a callback is omitted
-		 */
-		function eachLimit(coll, limit, iteratee, callback) {
-		  return (0, _eachOfLimit2.default)(limit)(coll, (0, _withoutIndex2.default)((0, _wrapAsync2.default)(iteratee)), callback);
-		}
-		exports.default = (0, _awaitify2.default)(eachLimit, 4);
-		module.exports = exports['default']; 
-	} (eachLimit, eachLimit.exports));
-	return eachLimit.exports;
-}
-
-var hasRequiredEachSeries;
-
-function requireEachSeries () {
-	if (hasRequiredEachSeries) return eachSeries.exports;
-	hasRequiredEachSeries = 1;
-	(function (module, exports) {
-
-		Object.defineProperty(exports, "__esModule", {
-		  value: true
-		});
-
-		var _eachLimit = requireEachLimit();
-
-		var _eachLimit2 = _interopRequireDefault(_eachLimit);
-
-		var _awaitify = requireAwaitify();
-
-		var _awaitify2 = _interopRequireDefault(_awaitify);
-
-		function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
-
-		/**
-		 * The same as [`each`]{@link module:Collections.each} but runs only a single async operation at a time.
-		 *
-		 * Note, that unlike [`each`]{@link module:Collections.each}, this function applies iteratee to each item
-		 * in series and therefore the iteratee functions will complete in order.
-
-		 * @name eachSeries
-		 * @static
-		 * @memberOf module:Collections
-		 * @method
-		 * @see [async.each]{@link module:Collections.each}
-		 * @alias forEachSeries
-		 * @category Collection
-		 * @param {Array|Iterable|AsyncIterable|Object} coll - A collection to iterate over.
-		 * @param {AsyncFunction} iteratee - An async function to apply to each
-		 * item in `coll`.
-		 * The array index is not passed to the iteratee.
-		 * If you need the index, use `eachOfSeries`.
-		 * Invoked with (item, callback).
-		 * @param {Function} [callback] - A callback which is called when all
-		 * `iteratee` functions have finished, or an error occurs. Invoked with (err).
-		 * @returns {Promise} a promise, if a callback is omitted
-		 */
-		function eachSeries(coll, iteratee, callback) {
-		  return (0, _eachLimit2.default)(coll, 1, iteratee, callback);
-		}
-		exports.default = (0, _awaitify2.default)(eachSeries, 3);
-		module.exports = exports['default']; 
-	} (eachSeries, eachSeries.exports));
-	return eachSeries.exports;
-}
-
-var eachSeriesExports = requireEachSeries();
-var asyncEachSeries = /*@__PURE__*/getDefaultExportFromCjs(eachSeriesExports);
-
-var each = {exports: {}};
-
-var eachOf = {exports: {}};
-
-var hasRequiredEachOf;
-
-function requireEachOf () {
-	if (hasRequiredEachOf) return eachOf.exports;
-	hasRequiredEachOf = 1;
-	(function (module, exports) {
-
-		Object.defineProperty(exports, "__esModule", {
-		    value: true
-		});
-
-		var _isArrayLike = requireIsArrayLike();
-
-		var _isArrayLike2 = _interopRequireDefault(_isArrayLike);
-
-		var _breakLoop = requireBreakLoop();
-
-		var _breakLoop2 = _interopRequireDefault(_breakLoop);
-
-		var _eachOfLimit = requireEachOfLimit();
-
-		var _eachOfLimit2 = _interopRequireDefault(_eachOfLimit);
-
-		var _once = requireOnce();
-
-		var _once2 = _interopRequireDefault(_once);
-
-		var _onlyOnce = requireOnlyOnce();
-
-		var _onlyOnce2 = _interopRequireDefault(_onlyOnce);
-
-		var _wrapAsync = requireWrapAsync();
-
-		var _wrapAsync2 = _interopRequireDefault(_wrapAsync);
-
-		var _awaitify = requireAwaitify();
-
-		var _awaitify2 = _interopRequireDefault(_awaitify);
-
-		function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
-
-		// eachOf implementation optimized for array-likes
-		function eachOfArrayLike(coll, iteratee, callback) {
-		    callback = (0, _once2.default)(callback);
-		    var index = 0,
-		        completed = 0,
-		        { length } = coll,
-		        canceled = false;
-		    if (length === 0) {
-		        callback(null);
-		    }
-
-		    function iteratorCallback(err, value) {
-		        if (err === false) {
-		            canceled = true;
-		        }
-		        if (canceled === true) return;
-		        if (err) {
-		            callback(err);
-		        } else if (++completed === length || value === _breakLoop2.default) {
-		            callback(null);
-		        }
-		    }
-
-		    for (; index < length; index++) {
-		        iteratee(coll[index], index, (0, _onlyOnce2.default)(iteratorCallback));
-		    }
-		}
-
-		// a generic version of eachOf which can handle array, object, and iterator cases.
-		function eachOfGeneric(coll, iteratee, callback) {
-		    return (0, _eachOfLimit2.default)(coll, Infinity, iteratee, callback);
-		}
-
-		/**
-		 * Like [`each`]{@link module:Collections.each}, except that it passes the key (or index) as the second argument
-		 * to the iteratee.
-		 *
-		 * @name eachOf
-		 * @static
-		 * @memberOf module:Collections
-		 * @method
-		 * @alias forEachOf
-		 * @category Collection
-		 * @see [async.each]{@link module:Collections.each}
-		 * @param {Array|Iterable|AsyncIterable|Object} coll - A collection to iterate over.
-		 * @param {AsyncFunction} iteratee - A function to apply to each
-		 * item in `coll`.
-		 * The `key` is the item's key, or index in the case of an array.
-		 * Invoked with (item, key, callback).
-		 * @param {Function} [callback] - A callback which is called when all
-		 * `iteratee` functions have finished, or an error occurs. Invoked with (err).
-		 * @returns {Promise} a promise, if a callback is omitted
-		 * @example
-		 *
-		 * // dev.json is a file containing a valid json object config for dev environment
-		 * // dev.json is a file containing a valid json object config for test environment
-		 * // prod.json is a file containing a valid json object config for prod environment
-		 * // invalid.json is a file with a malformed json object
-		 *
-		 * let configs = {}; //global variable
-		 * let validConfigFileMap = {dev: 'dev.json', test: 'test.json', prod: 'prod.json'};
-		 * let invalidConfigFileMap = {dev: 'dev.json', test: 'test.json', invalid: 'invalid.json'};
-		 *
-		 * // asynchronous function that reads a json file and parses the contents as json object
-		 * function parseFile(file, key, callback) {
-		 *     fs.readFile(file, "utf8", function(err, data) {
-		 *         if (err) return calback(err);
-		 *         try {
-		 *             configs[key] = JSON.parse(data);
-		 *         } catch (e) {
-		 *             return callback(e);
-		 *         }
-		 *         callback();
-		 *     });
-		 * }
-		 *
-		 * // Using callbacks
-		 * async.forEachOf(validConfigFileMap, parseFile, function (err) {
-		 *     if (err) {
-		 *         console.error(err);
-		 *     } else {
-		 *         console.log(configs);
-		 *         // configs is now a map of JSON data, e.g.
-		 *         // { dev: //parsed dev.json, test: //parsed test.json, prod: //parsed prod.json}
-		 *     }
-		 * });
-		 *
-		 * //Error handing
-		 * async.forEachOf(invalidConfigFileMap, parseFile, function (err) {
-		 *     if (err) {
-		 *         console.error(err);
-		 *         // JSON parse error exception
-		 *     } else {
-		 *         console.log(configs);
-		 *     }
-		 * });
-		 *
-		 * // Using Promises
-		 * async.forEachOf(validConfigFileMap, parseFile)
-		 * .then( () => {
-		 *     console.log(configs);
-		 *     // configs is now a map of JSON data, e.g.
-		 *     // { dev: //parsed dev.json, test: //parsed test.json, prod: //parsed prod.json}
-		 * }).catch( err => {
-		 *     console.error(err);
-		 * });
-		 *
-		 * //Error handing
-		 * async.forEachOf(invalidConfigFileMap, parseFile)
-		 * .then( () => {
-		 *     console.log(configs);
-		 * }).catch( err => {
-		 *     console.error(err);
-		 *     // JSON parse error exception
-		 * });
-		 *
-		 * // Using async/await
-		 * async () => {
-		 *     try {
-		 *         let result = await async.forEachOf(validConfigFileMap, parseFile);
-		 *         console.log(configs);
-		 *         // configs is now a map of JSON data, e.g.
-		 *         // { dev: //parsed dev.json, test: //parsed test.json, prod: //parsed prod.json}
-		 *     }
-		 *     catch (err) {
-		 *         console.log(err);
-		 *     }
-		 * }
-		 *
-		 * //Error handing
-		 * async () => {
-		 *     try {
-		 *         let result = await async.forEachOf(invalidConfigFileMap, parseFile);
-		 *         console.log(configs);
-		 *     }
-		 *     catch (err) {
-		 *         console.log(err);
-		 *         // JSON parse error exception
-		 *     }
-		 * }
-		 *
-		 */
-		function eachOf(coll, iteratee, callback) {
-		    var eachOfImplementation = (0, _isArrayLike2.default)(coll) ? eachOfArrayLike : eachOfGeneric;
-		    return eachOfImplementation(coll, (0, _wrapAsync2.default)(iteratee), callback);
-		}
-
-		exports.default = (0, _awaitify2.default)(eachOf, 3);
-		module.exports = exports['default']; 
-	} (eachOf, eachOf.exports));
-	return eachOf.exports;
-}
-
-var hasRequiredEach;
-
-function requireEach () {
-	if (hasRequiredEach) return each.exports;
-	hasRequiredEach = 1;
-	(function (module, exports) {
-
-		Object.defineProperty(exports, "__esModule", {
-		  value: true
-		});
-
-		var _eachOf = requireEachOf();
-
-		var _eachOf2 = _interopRequireDefault(_eachOf);
-
-		var _withoutIndex = requireWithoutIndex();
-
-		var _withoutIndex2 = _interopRequireDefault(_withoutIndex);
-
-		var _wrapAsync = requireWrapAsync();
-
-		var _wrapAsync2 = _interopRequireDefault(_wrapAsync);
-
-		var _awaitify = requireAwaitify();
-
-		var _awaitify2 = _interopRequireDefault(_awaitify);
-
-		function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
-
-		/**
-		 * Applies the function `iteratee` to each item in `coll`, in parallel.
-		 * The `iteratee` is called with an item from the list, and a callback for when
-		 * it has finished. If the `iteratee` passes an error to its `callback`, the
-		 * main `callback` (for the `each` function) is immediately called with the
-		 * error.
-		 *
-		 * Note, that since this function applies `iteratee` to each item in parallel,
-		 * there is no guarantee that the iteratee functions will complete in order.
-		 *
-		 * @name each
-		 * @static
-		 * @memberOf module:Collections
-		 * @method
-		 * @alias forEach
-		 * @category Collection
-		 * @param {Array|Iterable|AsyncIterable|Object} coll - A collection to iterate over.
-		 * @param {AsyncFunction} iteratee - An async function to apply to
-		 * each item in `coll`. Invoked with (item, callback).
-		 * The array index is not passed to the iteratee.
-		 * If you need the index, use `eachOf`.
-		 * @param {Function} [callback] - A callback which is called when all
-		 * `iteratee` functions have finished, or an error occurs. Invoked with (err).
-		 * @returns {Promise} a promise, if a callback is omitted
-		 * @example
-		 *
-		 * // dir1 is a directory that contains file1.txt, file2.txt
-		 * // dir2 is a directory that contains file3.txt, file4.txt
-		 * // dir3 is a directory that contains file5.txt
-		 * // dir4 does not exist
-		 *
-		 * const fileList = [ 'dir1/file2.txt', 'dir2/file3.txt', 'dir/file5.txt'];
-		 * const withMissingFileList = ['dir1/file1.txt', 'dir4/file2.txt'];
-		 *
-		 * // asynchronous function that deletes a file
-		 * const deleteFile = function(file, callback) {
-		 *     fs.unlink(file, callback);
-		 * };
-		 *
-		 * // Using callbacks
-		 * async.each(fileList, deleteFile, function(err) {
-		 *     if( err ) {
-		 *         console.log(err);
-		 *     } else {
-		 *         console.log('All files have been deleted successfully');
-		 *     }
-		 * });
-		 *
-		 * // Error Handling
-		 * async.each(withMissingFileList, deleteFile, function(err){
-		 *     console.log(err);
-		 *     // [ Error: ENOENT: no such file or directory ]
-		 *     // since dir4/file2.txt does not exist
-		 *     // dir1/file1.txt could have been deleted
-		 * });
-		 *
-		 * // Using Promises
-		 * async.each(fileList, deleteFile)
-		 * .then( () => {
-		 *     console.log('All files have been deleted successfully');
-		 * }).catch( err => {
-		 *     console.log(err);
-		 * });
-		 *
-		 * // Error Handling
-		 * async.each(fileList, deleteFile)
-		 * .then( () => {
-		 *     console.log('All files have been deleted successfully');
-		 * }).catch( err => {
-		 *     console.log(err);
-		 *     // [ Error: ENOENT: no such file or directory ]
-		 *     // since dir4/file2.txt does not exist
-		 *     // dir1/file1.txt could have been deleted
-		 * });
-		 *
-		 * // Using async/await
-		 * async () => {
-		 *     try {
-		 *         await async.each(files, deleteFile);
-		 *     }
-		 *     catch (err) {
-		 *         console.log(err);
-		 *     }
-		 * }
-		 *
-		 * // Error Handling
-		 * async () => {
-		 *     try {
-		 *         await async.each(withMissingFileList, deleteFile);
-		 *     }
-		 *     catch (err) {
-		 *         console.log(err);
-		 *         // [ Error: ENOENT: no such file or directory ]
-		 *         // since dir4/file2.txt does not exist
-		 *         // dir1/file1.txt could have been deleted
-		 *     }
-		 * }
-		 *
-		 */
-		function eachLimit(coll, iteratee, callback) {
-		  return (0, _eachOf2.default)(coll, (0, _withoutIndex2.default)((0, _wrapAsync2.default)(iteratee)), callback);
-		}
-
-		exports.default = (0, _awaitify2.default)(eachLimit, 3);
-		module.exports = exports['default']; 
-	} (each, each.exports));
-	return each.exports;
-}
-
-var eachExports = requireEach();
-var asyncEach = /*@__PURE__*/getDefaultExportFromCjs(eachExports);
-
-var forever = {exports: {}};
-
-var ensureAsync = {exports: {}};
-
-var hasRequiredEnsureAsync;
-
-function requireEnsureAsync () {
-	if (hasRequiredEnsureAsync) return ensureAsync.exports;
-	hasRequiredEnsureAsync = 1;
-	(function (module, exports) {
-
-		Object.defineProperty(exports, "__esModule", {
-		    value: true
-		});
-		exports.default = ensureAsync;
-
-		var _setImmediate = requireSetImmediate();
-
-		var _setImmediate2 = _interopRequireDefault(_setImmediate);
-
-		var _wrapAsync = requireWrapAsync();
-
-		function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
-
-		/**
-		 * Wrap an async function and ensure it calls its callback on a later tick of
-		 * the event loop.  If the function already calls its callback on a next tick,
-		 * no extra deferral is added. This is useful for preventing stack overflows
-		 * (`RangeError: Maximum call stack size exceeded`) and generally keeping
-		 * [Zalgo](http://blog.izs.me/post/59142742143/designing-apis-for-asynchrony)
-		 * contained. ES2017 `async` functions are returned as-is -- they are immune
-		 * to Zalgo's corrupting influences, as they always resolve on a later tick.
-		 *
-		 * @name ensureAsync
-		 * @static
-		 * @memberOf module:Utils
-		 * @method
-		 * @category Util
-		 * @param {AsyncFunction} fn - an async function, one that expects a node-style
-		 * callback as its last argument.
-		 * @returns {AsyncFunction} Returns a wrapped function with the exact same call
-		 * signature as the function passed in.
-		 * @example
-		 *
-		 * function sometimesAsync(arg, callback) {
-		 *     if (cache[arg]) {
-		 *         return callback(null, cache[arg]); // this would be synchronous!!
-		 *     } else {
-		 *         doSomeIO(arg, callback); // this IO would be asynchronous
-		 *     }
-		 * }
-		 *
-		 * // this has a risk of stack overflows if many results are cached in a row
-		 * async.mapSeries(args, sometimesAsync, done);
-		 *
-		 * // this will defer sometimesAsync's callback if necessary,
-		 * // preventing stack overflows
-		 * async.mapSeries(args, async.ensureAsync(sometimesAsync), done);
-		 */
-		function ensureAsync(fn) {
-		    if ((0, _wrapAsync.isAsync)(fn)) return fn;
-		    return function (...args /*, callback*/) {
-		        var callback = args.pop();
-		        var sync = true;
-		        args.push((...innerArgs) => {
-		            if (sync) {
-		                (0, _setImmediate2.default)(() => callback(...innerArgs));
-		            } else {
-		                callback(...innerArgs);
-		            }
-		        });
-		        fn.apply(this, args);
-		        sync = false;
-		    };
-		}
-		module.exports = exports['default']; 
-	} (ensureAsync, ensureAsync.exports));
-	return ensureAsync.exports;
-}
-
-var hasRequiredForever;
-
-function requireForever () {
-	if (hasRequiredForever) return forever.exports;
-	hasRequiredForever = 1;
-	(function (module, exports) {
-
-		Object.defineProperty(exports, "__esModule", {
-		    value: true
-		});
-
-		var _onlyOnce = requireOnlyOnce();
-
-		var _onlyOnce2 = _interopRequireDefault(_onlyOnce);
-
-		var _ensureAsync = requireEnsureAsync();
-
-		var _ensureAsync2 = _interopRequireDefault(_ensureAsync);
-
-		var _wrapAsync = requireWrapAsync();
-
-		var _wrapAsync2 = _interopRequireDefault(_wrapAsync);
-
-		var _awaitify = requireAwaitify();
-
-		var _awaitify2 = _interopRequireDefault(_awaitify);
-
-		function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
-
-		/**
-		 * Calls the asynchronous function `fn` with a callback parameter that allows it
-		 * to call itself again, in series, indefinitely.
-
-		 * If an error is passed to the callback then `errback` is called with the
-		 * error, and execution stops, otherwise it will never be called.
-		 *
-		 * @name forever
-		 * @static
-		 * @memberOf module:ControlFlow
-		 * @method
-		 * @category Control Flow
-		 * @param {AsyncFunction} fn - an async function to call repeatedly.
-		 * Invoked with (next).
-		 * @param {Function} [errback] - when `fn` passes an error to it's callback,
-		 * this function will be called, and execution stops. Invoked with (err).
-		 * @returns {Promise} a promise that rejects if an error occurs and an errback
-		 * is not passed
-		 * @example
-		 *
-		 * async.forever(
-		 *     function(next) {
-		 *         // next is suitable for passing to things that need a callback(err [, whatever]);
-		 *         // it will result in this function being called again.
-		 *     },
-		 *     function(err) {
-		 *         // if next is called with a value in its first parameter, it will appear
-		 *         // in here as 'err', and execution will stop.
-		 *     }
-		 * );
-		 */
-		function forever(fn, errback) {
-		    var done = (0, _onlyOnce2.default)(errback);
-		    var task = (0, _wrapAsync2.default)((0, _ensureAsync2.default)(fn));
-
-		    function next(err) {
-		        if (err) return done(err);
-		        if (err === false) return;
-		        task(next);
-		    }
-		    return next();
-		}
-		exports.default = (0, _awaitify2.default)(forever, 2);
-		module.exports = exports['default']; 
-	} (forever, forever.exports));
-	return forever.exports;
-}
-
-var foreverExports = requireForever();
-var asyncForever = /*@__PURE__*/getDefaultExportFromCjs(foreverExports);
-
-const TYPE_MAP = {
-    S: 'string',
-    N: 'number',
-    B: 'buffer',
-};
-function getTableInfo$1(params, done) {
-    const { dynamodb, table } = params;
-    dynamodb.getTable(table, (err, data) => {
-        let result;
-        if (err) {
-            shared.logger.error('getTableInfo: err:', err, table, data);
-        }
-        else if (!data || !data.Table) {
-            err = 'bad_data';
-        }
-        else {
-            const column_list = data.Table.AttributeDefinitions.map((def) => ({
-                name: def.AttributeName,
-                type: TYPE_MAP[def.AttributeType],
-            }));
-            const primary_key = data.Table.KeySchema.map((key) => {
-                const type = column_list.find((col) => col.name === key.AttributeName).type;
-                return { name: key.AttributeName, type };
-            });
-            result = {
-                table,
-                primary_key,
-                column_list,
-                is_open: true,
-            };
-        }
-        done(err, result);
-    });
-}
-function getTableList$4(params, done) {
-    const { dynamodb } = params;
-    dynamodb.getTableList((err, results) => {
-        if (err) {
-            shared.logger.error('raw_engine.getTableList: err:', err);
-        }
-        done(err, results);
-    });
-}
-function createTable$5(params, done) {
-    const { dynamodb, table, primary_key, ...other } = params;
-    const column_list = params.column_list.filter((column) => primary_key.find((key) => key.name === column.name));
-    const opts = { ...other, table, primary_key, column_list };
-    dynamodb.createTable(opts, (err) => {
-        if (err === 'resource_in_use') {
-            done('table_exists');
-        }
-        else if (err) {
-            shared.logger.error('raw_engine.createTable: err:', err);
-            done(err);
-        }
-        else {
-            _waitForTable({ dynamodb, table }, done);
-        }
-    });
-}
-function dropTable$2(params, done) {
-    const { dynamodb, table } = params;
-    dynamodb.deleteTable(table, (err) => {
-        if (err) {
-            shared.logger.error('raw_engine.dropTable: err:', err);
-            done(err);
-        }
-        else {
-            _waitForTable({ dynamodb, table }, (wait_err) => {
-                if (wait_err === 'resource_not_found') {
-                    done();
-                }
-                else {
-                    done(wait_err);
-                }
-            });
-        }
-    });
-}
-function addColumn$1(params, done) {
-    done();
-}
-function createIndex$3(params, done) {
-    const { dynamodb, table, index_name, key_list } = params;
-    const opts = { table, index_name, key_list };
-    dynamodb.createIndex(opts, (err) => {
-        if (err === 'resource_in_use' ||
-            err?.message?.indexOf?.('already exists') >= 0) {
-            done('index_exists');
-        }
-        else if (err) {
-            shared.logger.error('raw_engine.createIndex: err:', err);
-            done(err);
-        }
-        else {
-            _waitForTable({ dynamodb, table, index_name }, done);
-        }
-    });
-}
-function deleteIndex$3(params, done) {
-    const { dynamodb, table, index_name } = params;
-    dynamodb.deleteIndex({ table, index_name }, (err) => {
-        if (err === 'resource_not_found') {
-            done('index_not_found');
-        }
-        else if (err) {
-            shared.logger.error('raw_engine.deleteIndex: err:', err);
-            done(err);
-        }
-        else {
-            _waitForTable({ dynamodb, table, index_name }, done);
-        }
-    });
-}
-function _waitForTable(params, done) {
-    const { dynamodb, table, index_name } = params;
-    const LOOP_MS = 500;
-    let return_err;
-    asyncForever((done) => {
-        dynamodb.getTable(table, (err, result) => {
-            const status = result?.Table?.TableStatus;
-            if (!err &&
-                (status === 'CREATING' ||
-                    status === 'UPDATING' ||
-                    status === 'DELETING')) {
-                err = null;
-            }
-            else if (!err && index_name) {
-                const index = result?.Table?.GlobalSecondaryIndexes?.find?.((item) => item.IndexName === index_name);
-                if (!index || index.IndexStatus === 'ACTIVE') {
-                    err = 'stop';
-                }
-            }
-            else if (!err) {
-                err = 'stop';
-            }
-            else {
-                return_err = err;
-            }
-            if (err) {
-                done(err);
-            }
-            else {
-                setTimeout(() => done(), LOOP_MS);
-            }
-        });
-    }, () => done(return_err));
-}
-
-const YEAR_MULT = 10000;
-const MONTH_MULT = 100;
-const DAY_MULT = 1;
-const HOUR_MULT = 10000;
-const MINUTE_MULT = 100;
-const DATE_TIME_MULT = 10000;
-class SQLDateTime {
-    constructor(time_arg, type, decimals) {
-        this._fraction = 0;
-        this._fractionText = '';
-        this._date = null;
-        this._time = Math.floor(time_arg?.time ?? time_arg);
-        if (time_arg?.fraction !== undefined) {
-            this._fraction = time_arg.fraction;
-        }
-        else if (typeof time_arg === 'number') {
-            this._fraction = parseFloat('0.' + (String(time_arg).split('.')[1] || '').slice(0, 6).padEnd(6, '0'));
-        }
-        else {
-            this._fraction = 0;
-        }
-        this._type = type || 'datetime';
-        if (type === 'date') {
-            this._decimals = 0;
-            this._time -= this._time % (24 * 60 * 60);
-            this._fraction = 0;
-        }
-        else {
-            this._decimals = decimals ?? (this._fraction ? 6 : 0);
-            this._fraction = parseFloat(this._fraction.toFixed(this._decimals));
-            let fd = 0;
-            if (this._fraction >= 1.0) {
-                this._fraction = 0;
-                this._time += this._time < 0 ? -1 : 1;
-            }
-            else {
-                fd = this._fraction;
-            }
-            if (this._decimals > 0) {
-                this._fractionText =
-                    '.' + fd.toFixed(this._decimals).slice(-this._decimals);
-            }
-        }
-    }
-    _makeDate() {
-        if (!this._date) {
-            this._date = new Date(Math.floor(this._time * 1000));
-        }
-    }
-    getType() {
-        return this._type;
-    }
-    getTime() {
-        return this._time;
-    }
-    getFraction() {
-        return this._fraction;
-    }
-    getDecimals() {
-        return this._decimals;
-    }
-    toString() {
-        let ret;
-        this._makeDate();
-        if (isNaN(this._date)) {
-            ret = '';
-        }
-        else {
-            ret = this._date.toISOString().replace('T', ' ');
-            if (this._type === 'date') {
-                ret = ret.slice(0, 10);
-            }
-            else {
-                ret = ret.replace(/\..*/, '');
-                if (this._decimals > 0) {
-                    ret = ret + this._fractionText;
-                }
-            }
-        }
-        return ret;
-    }
-    dateFormat(format) {
-        let ret;
-        this._makeDate();
-        if (isNaN(this._date)) {
-            ret = '';
-        }
-        else {
-            ret = _dateFormat(this._date, format);
-        }
-        return ret;
-    }
-    toDate() {
-        this._makeDate();
-        return this._date;
-    }
-    toNumber() {
-        let ret = 0;
-        this._makeDate();
-        ret += this._date.getUTCFullYear() * YEAR_MULT;
-        ret += (this._date.getUTCMonth() + 1) * MONTH_MULT;
-        ret += this._date.getUTCDate() * DAY_MULT;
-        if (this._type === 'datetime') {
-            ret = ret * DATE_TIME_MULT;
-            ret += this._date.getUTCHours() * HOUR_MULT;
-            ret += this._date.getUTCMinutes() * MINUTE_MULT;
-            ret += this._date.getUTCSeconds();
-            if (this._decimals > 0) {
-                ret += this._fraction;
-            }
-        }
-        return ret;
-    }
-}
-function createSQLDateTime(arg, type, decimals) {
-    let ret;
-    if (arg instanceof SQLDateTime) {
-        if (arg._type === type && arg._decimals === decimals) {
-            ret = arg;
-        }
-        else {
-            const opts = {
-                time: arg._time,
-                fraction: arg._fraction,
-            };
-            ret = new SQLDateTime(opts, type ?? arg._type, decimals ?? arg._decimals);
-        }
-    }
-    else {
-        const time = arg?.time ?? arg;
-        if (isNaN(time)) {
-            ret = null;
-        }
-        else if (time >= 253402300800) {
-            ret = null;
-        }
-        else if (time <= -62167219201) {
-            ret = null;
-        }
-        else {
-            ret = new SQLDateTime(arg, type, decimals);
-        }
-    }
-    return ret;
-}
-function createDateTime(arg, type, decimals) {
-    return createSQLDateTime(arg, type, decimals);
-}
-const FORMAT_LONG_NUMBER = new Intl.DateTimeFormat('en-US', {
-    weekday: 'long',
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit',
-    fractionalSecondDigits: 3,
-    hour12: false,
-});
-const FORMAT_SHORT_NUMBER = new Intl.DateTimeFormat('en-US', {
-    weekday: 'short',
-    year: '2-digit',
-    month: 'numeric',
-    day: 'numeric',
-    hour: 'numeric',
-    minute: 'numeric',
-    second: 'numeric',
-    fractionalSecondDigits: 3,
-    hour12: false,
-});
-const FORMAT_LONG_NUMBER_12H = new Intl.DateTimeFormat('en-US', {
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit',
-    fractionalSecondDigits: 3,
-    hour12: true,
-});
-const FORMAT_SHORT_NUMBER_12H = new Intl.DateTimeFormat('en-US', {
-    hour: 'numeric',
-    minute: 'numeric',
-    second: 'numeric',
-    fractionalSecondDigits: 3,
-    hour12: true,
-});
-const FORMAT_LONG_TEXT = new Intl.DateTimeFormat('en-US', {
-    weekday: 'long',
-    month: 'long',
-});
-const FORMAT_SHORT_TEXT = new Intl.DateTimeFormat('en-US', {
-    weekday: 'short',
-    month: 'short',
-});
-function _dateFormat(date, format) {
-    const format_map = new Map();
-    function _getPart(formatter, type) {
-        let cached = format_map.get(formatter);
-        if (!cached) {
-            cached = formatter.formatToParts(date);
-            format_map.set(formatter, cached);
-        }
-        const found = cached.find((part) => part.type === type);
-        return found?.value || '';
-    }
-    function _time(formatter) {
-        return (_getPart(formatter, 'hour') +
-            ':' +
-            _getPart(formatter, 'minute') +
-            ':' +
-            _getPart(formatter, 'second'));
-    }
-    return format.replace(/%(.)/g, (_ignore, part) => {
-        let ret = part;
-        let day;
-        switch (part) {
-            case '%':
-                ret = '%';
-                break;
-            case 'a':
-                ret = _getPart(FORMAT_SHORT_NUMBER, 'weekday');
-                break;
-            case 'b':
-                ret = _getPart(FORMAT_SHORT_TEXT, 'month');
-                break;
-            case 'c':
-                ret = _getPart(FORMAT_SHORT_NUMBER, 'month');
-                break;
-            case 'D':
-                day = date.getDate();
-                ret = day + _nthNumber(day);
-                break;
-            case 'd':
-                ret = _getPart(FORMAT_LONG_NUMBER, 'day');
-                break;
-            case 'e':
-                ret = _getPart(FORMAT_SHORT_NUMBER, 'day');
-                break;
-            case 'f':
-                ret = _getPart(FORMAT_LONG_NUMBER, 'fractionalSecond');
-                break;
-            case 'H':
-                ret = _getPart(FORMAT_LONG_NUMBER, 'hour');
-                break;
-            case 'h':
-            case 'I':
-                ret = _getPart(FORMAT_LONG_NUMBER_12H, 'hour');
-                break;
-            case 'i':
-                ret = _getPart(FORMAT_LONG_NUMBER, 'minutes');
-                break;
-            case 'j':
-                //ret = _getPart(, 'dayOfYear');
-                break;
-            case 'k':
-                ret = _getPart(FORMAT_SHORT_NUMBER, 'hour');
-                break;
-            case 'l':
-                ret = _getPart(FORMAT_SHORT_NUMBER_12H, 'hour');
-                break;
-            case 'M':
-                ret = _getPart(FORMAT_LONG_TEXT, 'month');
-                break;
-            case 'm':
-                ret = _getPart(FORMAT_LONG_NUMBER, 'month');
-                break;
-            case 'p':
-                ret = _getPart(FORMAT_SHORT_NUMBER_12H, 'dayPeriod');
-                break;
-            case 'r':
-                ret =
-                    _time(FORMAT_LONG_NUMBER_12H) +
-                        _getPart(FORMAT_LONG_NUMBER_12H, 'dayPeriod');
-                break;
-            case 'S':
-                ret = _getPart(FORMAT_LONG_NUMBER, 'seconds');
-                break;
-            case 's':
-                ret = _getPart(FORMAT_LONG_NUMBER, 'seconds');
-                break;
-            case 'T':
-                ret = _time(FORMAT_LONG_NUMBER);
-                break;
-            case 'U':
-                //ret = _getPart(, 'week');
-                break;
-            case 'u':
-                //ret = _getPart(, 'week');
-                break;
-            case 'V':
-                //ret = _getPart(, 'week');
-                break;
-            case 'v':
-                //ret = _getPart(, 'week');
-                break;
-            case 'W':
-                ret = _getPart(FORMAT_LONG_NUMBER, 'weekday');
-                break;
-            case 'w':
-                ret = String(date.getDay());
-                break;
-            case 'X':
-                ret = _getPart(FORMAT_LONG_NUMBER, 'year');
-                break;
-            case 'x':
-                ret = _getPart(FORMAT_LONG_NUMBER, 'year');
-                break;
-            case 'Y':
-                ret = _getPart(FORMAT_LONG_NUMBER, 'year');
-                break;
-            case 'y':
-                ret = _getPart(FORMAT_SHORT_NUMBER, 'year');
-                break;
-        }
-        return ret;
-    });
-}
-function _nthNumber(number) {
-    let ret = '';
-    if (number > 3 && number < 21) {
-        ret = 'th';
-    }
-    else {
-        const temp = number % 10;
-        if (temp === 1) {
-            ret = 'st';
-        }
-        else if (temp === 2) {
-            ret = 'nd';
-        }
-        else if (temp === 3) {
-            ret = 'rd';
-        }
-        else {
-            ret = 'th';
-        }
-    }
-    return ret;
-}
-
-const MINUTE$1 = 60;
-const HOUR$1 = MINUTE$1 * 60;
-const DAY$2 = 24 * HOUR$1;
-class SQLTime {
-    constructor(time, decimals) {
-        this._time = time;
-        this._decimals = decimals || 0;
-    }
-    getType() {
-        return 'time';
-    }
-    getTime() {
-        return this._time;
-    }
-    getFraction() {
-        return 0;
-    }
-    getDecimals() {
-        return this._decimals;
-    }
-    toString() {
-        let ret;
-        if (isNaN(this._time)) {
-            ret = '';
-        }
-        else {
-            let seconds = this._time;
-            const neg = seconds < 0 ? '-' : '';
-            if (neg) {
-                seconds = -seconds;
-            }
-            const hours = Math.floor(seconds / HOUR$1);
-            seconds -= hours * HOUR$1;
-            const minutes = Math.floor(seconds / MINUTE$1);
-            seconds -= minutes * MINUTE$1;
-            const ret_secs = (seconds < 10 ? '0' : '') + seconds.toFixed(this._decimals);
-            ret = `${neg}${_pad(hours)}:${_pad(minutes)}:${ret_secs}`;
-        }
-        return ret;
-    }
-    toSQLDateTime(decimals) {
-        const now = Date.now() / 1000;
-        const time = now - (now % DAY$2) + this._time;
-        return createDateTime(time, 'datetime', decimals ?? this._decimals);
-    }
-    toNumber() {
-        let seconds = this._time;
-        const hours = Math.floor(seconds / HOUR$1);
-        seconds -= hours * HOUR$1;
-        const minutes = Math.floor(seconds / MINUTE$1);
-        seconds -= minutes * MINUTE$1;
-        return hours * 10000 + minutes * 100 + seconds;
-    }
-}
-function createSQLTime(time, decimals) {
-    let ret;
-    if (isNaN(time)) {
-        ret = null;
-    }
-    else {
-        ret = new SQLTime(time, decimals);
-    }
-    return ret;
-}
-function _pad(num) {
-    return (num < 10 ? '0' : '') + num;
-}
-
-const MINUTE = 60;
-const HOUR = 60 * MINUTE;
-const DAY$1 = 24 * HOUR;
-function convertNum(value) {
-    let ret = value;
-    if (value === null) {
-        ret = null;
-    }
-    else if (value === '') {
-        ret = 0;
-    }
-    else if (typeof value === 'string') {
-        ret = parseFloat(value);
-        if (isNaN(ret)) {
-            ret = 0;
-        }
-    }
-    else if (value?.toNumber) {
-        ret = value.toNumber();
-    }
-    return ret;
-}
-function convertBooleanValue(value) {
-    let ret;
-    if (value === null) {
-        ret = null;
-    }
-    else if (typeof value === 'number') {
-        ret = value ? 1 : 0;
-    }
-    else {
-        ret = convertNum(value) ? 1 : 0;
-    }
-    return ret;
-}
-const SEP = `[-^\\][!@#$%&*()_+={}\\|/\\\\<>,.:;"']+`;
-const DATE_RS = `^([0-9]{1,4})${SEP}([0-2]?[0-9])${SEP}([0-3]?[0-9])`;
-const DEC_RS = `(\\.[0-9]{1,6})?`;
-const DIGIT_RS = `(${SEP}([0-5]?[0-9]))?`;
-const DT_RS = `${DATE_RS}(\\s+|T)([0-2]?[0-9])${DIGIT_RS}${DIGIT_RS}${DEC_RS}`;
-const DATE4_RS = `^([0-9]{4})([0-1][0-9])([0-3][0-9])`;
-const DATETIME4_RS = `${DATE4_RS}([0-2][0-9])([0-5][0-9])(([0-5][0-9])${DEC_RS})?`;
-const DATE2_RS = `^([0-9]{2})([0-1][0-9])([0-3][0-9])`;
-const DATETIME2_RS = `${DATE2_RS}([0-2][0-9])([0-5][0-9])(([0-5][0-9])${DEC_RS})?`;
-const DATE_REGEX = new RegExp(DATE_RS + '$');
-const DATETIME_REGEX = new RegExp(DT_RS);
-const DATE4_REGEX = new RegExp(DATE4_RS);
-const DATETIME4_REGEX = new RegExp(DATETIME4_RS);
-const DATE2_REGEX = new RegExp(DATE2_RS);
-const DATETIME2_REGEX = new RegExp(DATETIME2_RS);
-function convertDateTime(value, type, decimals) {
-    let ret;
-    if (value === null) {
-        ret = null;
-    }
-    else if (value instanceof SQLDateTime) {
-        ret = createSQLDateTime(value, type, decimals);
-    }
-    else if (value instanceof SQLTime) {
-        ret = value.toSQLDateTime(decimals);
-    }
-    else if (typeof value === 'string') {
-        let time = _stringToDateTime(value);
-        if (time === undefined) {
-            time = _stringToDate(value);
-            if (!type) {
-                type = 'date';
-            }
-        }
-        if (time === undefined) {
-            time = _numToDateTime(value);
-        }
-        if (time === undefined) {
-            ret = null;
-        }
-        else {
-            ret = createSQLDateTime(time, type ?? 'datetime', decimals);
-        }
-    }
-    else if (typeof value === 'number') {
-        const time = _numToDateTime(value);
-        if (time === undefined) {
-            ret = null;
-        }
-        else {
-            ret = createSQLDateTime(time, type, decimals);
-        }
-    }
-    return ret;
-}
-const DAY_TIME_REGEX = /^(-)?([0-9]+)\s+([0-9]*)(:([0-9]{1,2}))?(:([0-9]{1,2}))?(\.[0-9]+)?/;
-const TIME_REGEX = /^(-)?([0-9]*):([0-9]{1,2})(:([0-9]{1,2}))?(\.[0-9]+)?/;
-function convertTime(value, decimals) {
-    let ret;
-    if (value instanceof SQLTime) {
-        ret = value;
-    }
-    else if (typeof value === 'string') {
-        let time = _stringToTime(value);
-        if (time === undefined) {
-            const result = _stringToDateTime(value);
-            if (result !== undefined) {
-                time = (result.time % DAY$1) + (result.fraction || 0);
-            }
-        }
-        if (time === undefined) {
-            const num = parseFloat(value);
-            if (!isNaN(num)) {
-                time = _numToTime(num);
-            }
-        }
-        if (time === undefined) {
-            ret = null;
-        }
-        else {
-            ret = createSQLTime(time, decimals);
-        }
-    }
-    else if (typeof value === 'number') {
-        const time = _numToTime(value);
-        ret = createSQLTime(time, decimals);
-    }
-    return ret;
-}
-function _stringToTime(value) {
-    let ret;
-    value = value.trim();
-    let match = value.match(DAY_TIME_REGEX);
-    if (match) {
-        const negative = match[1];
-        const days = parseInt(match[2]);
-        const hours = parseInt(match[3]);
-        const mins = parseInt(match[5] || '0');
-        const secs = parseInt(match[7] || '0');
-        const fraction = parseFloat('0' + match[8]);
-        ret = days * DAY$1 + hours * HOUR + mins * MINUTE + secs + fraction;
-        if (negative) {
-            ret = -ret;
-        }
-    }
-    if (ret === undefined) {
-        match = value.match(TIME_REGEX);
-        if (match) {
-            const negative = match[1];
-            const hours = parseInt(match[2]);
-            const mins = parseInt(match[3] || '0');
-            const secs = parseInt(match[5] || '0');
-            const fraction = parseFloat('0' + match[6]);
-            ret = hours * HOUR + mins * MINUTE + secs + fraction;
-            if (negative) {
-                ret = -ret;
-            }
-        }
-    }
-    return ret;
-}
-function _stringToDate(value) {
-    let ret;
-    const match = value.trim().match(DATE_REGEX);
-    if (match) {
-        const year = _fix2year(match[1]);
-        const month = match[2];
-        const day = match[3];
-        ret = _partsToTime(year, month, day, 0, 0, 0);
-    }
-    return ret;
-}
-function _stringToDateTime(value) {
-    let ret;
-    const match = value.trim().match(DATETIME_REGEX);
-    if (match) {
-        const year = _fix2year(match[1]);
-        const month = match[2];
-        const day = match[3];
-        const hour = match[5];
-        const min = match[7] || '0';
-        const sec = match[9] || '0';
-        const fraction = parseFloat('0' + match[10]);
-        ret = _partsToTime(year, month, day, hour, min, sec, fraction);
-    }
-    return ret;
-}
-function _numToDateTime(number) {
-    let ret;
-    const s = String(number);
-    let match = s.match(DATETIME4_REGEX);
-    if (match) {
-        const year = match[1];
-        const month = match[2];
-        const day = match[3];
-        const hour = match[4];
-        const min = match[5];
-        const sec = match[7] || '0';
-        const fraction = parseFloat('0' + match[8]);
-        ret = _partsToTime(year, month, day, hour, min, sec, fraction);
-    }
-    if (ret === undefined) {
-        match = s.match(DATETIME2_REGEX);
-        if (match) {
-            const year = _fix2year(match[1]);
-            const month = match[2];
-            const day = match[3];
-            const hour = match[4];
-            const min = match[5];
-            const sec = match[7] || '0';
-            const fraction = parseFloat('0' + match[8]);
-            ret = _partsToTime(year, month, day, hour, min, sec, fraction);
-        }
-    }
-    if (ret === undefined) {
-        match = s.match(DATE4_REGEX);
-        if (match) {
-            const year = match[1];
-            const month = match[2];
-            const day = match[3];
-            ret = _partsToTime(year, month, day, 0, 0, 0);
-        }
-    }
-    if (ret === undefined) {
-        match = s.match(DATE2_REGEX);
-        if (match) {
-            const year = _fix2year(match[1]);
-            const month = match[2];
-            const day = match[3];
-            ret = _partsToTime(year, month, day, 0, 0, 0);
-        }
-    }
-    return ret;
-}
-function _numToTime(number) {
-    const hours = Math.floor(number / 10000);
-    number -= hours * 10000;
-    const minutes = Math.floor(number / 100);
-    number -= minutes * 100;
-    return hours * HOUR + minutes * MINUTE + number;
-}
-function getDecimals(value, max) {
-    let ret = 0;
-    if (typeof value === 'number') {
-        ret = String(value).split('.')?.[1]?.length || 0;
-    }
-    else if (typeof value === 'string') {
-        ret = value.split('.')?.[1]?.length || 0;
-    }
-    {
-        ret = Math.min(max, ret);
-    }
-    return ret;
-}
-function _pad2(num) {
-    return String(num).padStart(2, '0');
-}
-function _pad4(num) {
-    return String(num).padStart(4, '0');
-}
-function _fix2year(num) {
-    let ret = num;
-    if (num?.length <= 2) {
-        ret = parseInt(num);
-        if (num >= 0 && num <= 69) {
-            ret += 2000;
-        }
-        else if (num >= 70 && num <= 99) {
-            ret += 1900;
-        }
-    }
-    return ret;
-}
-function _partsToTime(year, month, day, hour, min, sec, fraction) {
-    const iso = `${_pad4(year)}-${_pad2(month)}-${_pad2(day)}T${_pad2(hour)}:${_pad2(min)}:${_pad2(sec)}Z`;
-    const time = Date.parse(iso);
-    let ret;
-    if (!isNaN(time)) {
-        ret = {
-            time: time / 1000,
-            fraction,
-        };
-    }
-    return ret;
-}
-
-function sum(expr, state) {
-    const { row, ...other } = state;
-    const group = row?.['@@group'] || [{}];
-    let err;
-    let value = 0;
-    let name = 'SUM(';
-    group.forEach((group_row, i) => {
-        other.row = group_row;
-        const result = getValue(expr.args?.expr, other);
-        if (i === 0) {
-            name += result.name;
-        }
-        if (!err && result.err) {
-            err = result.err;
-        }
-        else if (result.value === null) {
-            value = null;
-        }
-        else if (value !== null) {
-            value += convertNum(result.value);
-        }
-    });
-    name += ')';
-    return { err, value, type: 'number', name };
-}
-
-var AggregateFunctions = /*#__PURE__*/Object.freeze({
-	__proto__: null,
-	sum: sum
-});
-
-function _isDateOrTimeLike(type) {
-    return type === 'date' || type === 'datetime' || type === 'time';
-}
-function _isDateLike(type) {
-    return type === 'date' || type === 'datetime';
-}
-function _numBothSides(expr, state, op, allow_interval) {
-    const left = getValue(expr.left, state);
-    const right = getValue(expr.right, state);
-    let err = left.err || right.err;
-    const name = left.name + op + right.name;
-    let value;
-    let left_num;
-    let right_num;
-    let interval;
-    let datetime;
-    if (!err) {
-        if (left.value === null || right.value === null) {
-            value = null;
-        }
-        else if (allow_interval && left.type === 'interval') {
-            interval = left.value;
-            if (_isDateOrTimeLike(right.type)) {
-                datetime = right.value;
-            }
-            else if (typeof right.value === 'string') {
-                datetime = convertDateTime(left.value);
-                if (!datetime) {
-                    value = null;
-                }
-            }
-            else {
-                value = null;
-            }
-        }
-        else if (allow_interval && right.type === 'interval') {
-            interval = right.value;
-            if (_isDateOrTimeLike(left.type)) {
-                datetime = left.value;
-            }
-            else if (typeof left.value === 'string') {
-                datetime = convertDateTime(left.value);
-                if (!datetime) {
-                    value = null;
-                }
-            }
-            else {
-                value = null;
-            }
-        }
-        else if (right.type === 'interval' || left.type === 'interval') {
-            err = 'bad_interval_usage';
-        }
-        else {
-            left_num = convertNum(left.value);
-            right_num = convertNum(right.value);
-            if (left_num === null || right_num === null) {
-                value = null;
-            }
-        }
-    }
-    return { err, name, value, left_num, right_num, interval, datetime };
-}
-function plus$1(expr, state) {
-    let { err, name, value, left_num, right_num, interval, datetime } = _numBothSides(expr, state, ' + ', true);
-    let type;
-    if (!err && value !== null) {
-        if (datetime) {
-            const result = interval.add(datetime);
-            value = result.value;
-            type = result.type;
-        }
-        else {
-            value = left_num + right_num;
-            type = 'number';
-        }
-    }
-    return { err, value, type, name };
-}
-function minus$2(expr, state) {
-    let { err, name, value, left_num, right_num, interval, datetime } = _numBothSides(expr, state, ' - ', true);
-    let type;
-    if (!err && value !== null) {
-        if (datetime) {
-            const result = interval.sub(datetime);
-            value = result.value;
-            type = result.type;
-        }
-        else {
-            value = left_num - right_num;
-            type = 'number';
-        }
-    }
-    return { err, value, type, name };
-}
-function div(expr, state) {
-    let { err, name, value, left_num, right_num } = _numBothSides(expr, state, ' / ');
-    if (!err && value !== null) {
-        value = left_num / right_num;
-    }
-    return { err, value, name };
-}
-function _convertCompare(left, right) {
-    if (left.value !== null &&
-        right.value !== null &&
-        left.value !== right.value) {
-        if ((_isDateLike(left.type) || _isDateLike(right.type)) &&
-            left.type !== right.type) {
-            const union = _unionDateTime(left.type, right.type);
-            if (union === 'date' || union === 'datetime') {
-                left.value = convertDateTime(left.value, union, 6) ?? left.value;
-                right.value = convertDateTime(right.value, union, 6) ?? right.value;
-            }
-        }
-        if (typeof left.value === 'number' ||
-            typeof right.value === 'number' ||
-            left.type === 'number' ||
-            right.type === 'number') {
-            left.value = convertNum(left.value);
-            right.value = convertNum(right.value);
-        }
-        else {
-            if (typeof left.value !== 'string') {
-                left.value = String(left.value);
-            }
-            if (typeof right.value !== 'string') {
-                right.value = String(right.value);
-            }
-        }
-    }
-}
-function _equal$1(expr, state, op) {
-    const left = getValue(expr.left, state);
-    const right = getValue(expr.right, state);
-    const err = left.err || right.err;
-    const name = left.name + op + right.name;
-    let value = 0;
-    if (!err) {
-        _convertCompare(left, right);
-        if (left.value === null || right.value === null) {
-            value = null;
-        }
-        else if (left.value === right.value) {
-            value = 1;
-        }
-        else if (typeof left.value === 'string') {
-            value = left.value.localeCompare(right.value) === 0 ? 1 : 0;
-        }
-    }
-    return { err, value, name };
-}
-function equal$1(expr, state) {
-    return _equal$1(expr, state, ' = ');
-}
-function notEqual$1(expr, state) {
-    const ret = _equal$1(expr, state, ' != ');
-    if (ret.value !== null) {
-        ret.value = ret.value ? 0 : 1;
-    }
-    return ret;
-}
-function _gt$1(expr_left, expr_right, state, op, flip) {
-    const left = getValue(expr_left, state);
-    const right = getValue(expr_right, state);
-    const err = left.err || right.err;
-    const name = flip ? right.name + op + left.name : left.name + op + right.name;
-    let value = 0;
-    if (!err) {
-        _convertCompare(left, right);
-        if (left.value === null || right.value === null) {
-            value = null;
-        }
-        else if (left.value === right.value) {
-            value = 0;
-        }
-        else if (typeof left.value === 'number') {
-            value = left.value > right.value ? 1 : 0;
-        }
-        else {
-            value = left.value.localeCompare(right.value) > 0 ? 1 : 0;
-        }
-    }
-    return { err, value, name };
-}
-function gt$1(expr, state) {
-    return _gt$1(expr.left, expr.right, state, ' > ', false);
-}
-function lt$1(expr, state) {
-    return _gt$1(expr.right, expr.left, state, ' < ', true);
-}
-function _gte$1(expr_left, expr_right, state, op, flip) {
-    const left = getValue(expr_left, state);
-    const right = getValue(expr_right, state);
-    const err = left.err || right.err;
-    const name = flip ? right.name + op + left.name : left.name + op + right.name;
-    let value = 0;
-    if (!err) {
-        _convertCompare(left, right);
-        if (left.value === null || right.value === null) {
-            value = null;
-        }
-        else if (left.value === right.value) {
-            value = 1;
-        }
-        else if (typeof left.value === 'number') {
-            value = convertNum(left.value) >= convertNum(right.value) ? 1 : 0;
-        }
-        else {
-            value = left.value.localeCompare(right.value) >= 0 ? 1 : 0;
-        }
-    }
-    return { err, value, name };
-}
-function gte$1(expr, state) {
-    return _gte$1(expr.left, expr.right, state, ' >= ', false);
-}
-function lte$1(expr, state) {
-    return _gte$1(expr.right, expr.left, state, ' <= ', true);
-}
-function and$1(expr, state) {
-    const left = getValue(expr.left, state);
-    let err = left.err;
-    let name = left.name + ' AND ';
-    let value = 0;
-    if (!err) {
-        value = convertBooleanValue(left.value);
-        if (value !== 0) {
-            const right = getValue(expr.right, state);
-            err = right.err;
-            value = convertBooleanValue(right.value) && value;
-            name = left.name + ' AND ' + right.name;
-        }
-    }
-    return { err, value, name };
-}
-function or$1(expr, state) {
-    const left = getValue(expr.left, state);
-    let err = left.err;
-    let name = left.name + ' OR ';
-    let value = 1;
-    if (!err) {
-        value = convertBooleanValue(left.value);
-        if (!value) {
-            const right = getValue(expr.right, state);
-            err = right.err;
-            const result = convertBooleanValue(right.value);
-            if (result) {
-                value = 1;
-            }
-            else if (value !== null) {
-                value = result;
-            }
-            name = left.name + ' OR ' + right.name;
-        }
-    }
-    return { err, value, name };
-}
-function xor(expr, state) {
-    const left = getValue(expr.left, state);
-    const right = getValue(expr.right, state);
-    const err = left.err || right.err;
-    const name = left.name + ' XOR ' + right.name;
-    let value = 1;
-    if (!err) {
-        const right_bool = convertBooleanValue(right.value);
-        const left_bool = convertBooleanValue(left.value);
-        if (right_bool === null || left_bool === null) {
-            value = null;
-        }
-        else {
-            value = right_bool ^ left_bool;
-        }
-    }
-    return { err, value, name };
-}
-function is$1(expr, state) {
-    return _is$1(expr, state, 'IS');
-}
-function isNot$1(expr, state) {
-    const result = _is$1(expr, state, 'IS NOT');
-    result.value = result.value ? 0 : 1;
-    return result;
-}
-function _is$1(expr, state, op) {
-    const result = getValue(expr.left, state);
-    let right;
-    let right_name;
-    if (expr.right.value === null) {
-        right = null;
-        right_name = 'NULL';
-    }
-    else if (expr.right.value === true) {
-        right = true;
-        right_name = 'TRUE';
-    }
-    else if (expr.right.value === false) {
-        right = false;
-        right_name = 'FALSE';
-    }
-    else if (!result.err) {
-        result.err = { err: 'syntax_err', args: [op] };
-    }
-    result.name = `${result.name} ${op} ${right_name}`;
-    if (!result.err) {
-        if (right === null) {
-            result.value = right === result.value ? 1 : 0;
-        }
-        else if (right && result.value) {
-            result.value = 1;
-        }
-        else if (!right && !result.value) {
-            result.value = 1;
-        }
-        else {
-            result.value = 0;
-        }
-    }
-    return result;
-}
-function _unionDateTime(type1, type2) {
-    let ret;
-    if (type1 === 'string') {
-        ret = 'datetime';
-    }
-    else if (type2 === 'string') {
-        ret = 'datetime';
-    }
-    else if (type1 === 'time' || type2 === 'time') {
-        ret = 'datetime';
-    }
-    else if (_isDateLike(type1) && _isDateLike(type2)) {
-        ret = 'datetime';
-    }
-    return ret;
-}
-
-var BinaryExpression = /*#__PURE__*/Object.freeze({
-	__proto__: null,
-	"!=": notEqual$1,
-	"+": plus$1,
-	"-": minus$2,
-	"/": div,
-	"<": lt$1,
-	"<=": lte$1,
-	"<>": notEqual$1,
-	"=": equal$1,
-	">": gt$1,
-	">=": gte$1,
-	and: and$1,
-	is: is$1,
-	"is not": isNot$1,
-	or: or$1,
-	xor: xor
-});
-
-const SINGLE_TIME = {
-    microsecond: 0.000001,
-    second: 1,
-    minute: 60,
-    hour: 60 * 60,
-    day: 24 * 60 * 60,
-    week: 7 * 24 * 60 * 60,
-};
-const DOUBLE_TIME = {
-    second_microsecond: [1, 0.000001],
-    minute_microsecond: [60, 0.000001],
-    minute_second: [60, 1],
-    hour_microsecond: [60 * 60, 0.000001],
-    hour_second: [60 * 60, 1],
-    hour_minute: [60 * 60, 60],
-    day_microsecond: [24 * 60 * 60, 0.000001],
-    day_second: [24 * 60 * 60, 1],
-    day_minute: [24 * 60 * 60, 60],
-    day_hour: [24 * 60 * 60, 60 * 60],
-};
-const MONTH = {
-    month: 1,
-    quarter: 3,
-    year: 12,
-    year_month: [12, 1],
-};
-const FORCE_DATE = {
-    day: true,
-    week: true,
-    month: true,
-    quarter: true,
-    year: true,
-    day_microsecond: true,
-    day_second: true,
-    day_minute: true,
-    day_hour: true,
-    year_month: true,
-};
-const DECIMALS = {
-    microsecond: 6,
-    second_microsecond: 6,
-    minute_microsecond: 6,
-    hour_microsecond: 6,
-    day_microsecond: 6,
-};
-class SQLInterval {
-    constructor(number, decimals, is_month, force_date) {
-        this._isMonth = is_month;
-        this._forceDate = force_date;
-        this._decimals = decimals || 0;
-        if (this._decimals > 0) {
-            this._number = parseFloat(number.toFixed(this._decimals + 1).slice(0, -1));
-        }
-        else {
-            this._number = Math.trunc(number);
-        }
-    }
-    getNumber() {
-        return this._number;
-    }
-    isMonth() {
-        return this._isMonth;
-    }
-    forceDate() {
-        return this._forceDate;
-    }
-    toString() {
-        return null;
-    }
-    _add(datetime, mult) {
-        let old_time = datetime.getTime?.();
-        let fraction = datetime.getFraction?.();
-        const old_type = datetime?.getType?.();
-        let type;
-        if (old_type === 'datetime') {
-            type = 'datetime';
-        }
-        else if (old_type === 'date' && !this._forceDate) {
-            type = 'datetime';
-        }
-        else if (old_type === 'date') {
-            type = 'date';
-        }
-        else if (old_type === 'time' && this._forceDate) {
-            type = 'datetime';
-        }
-        else if (old_type === 'time') {
-            type = 'time';
-        }
-        const decimals = Math.max(datetime.getDecimals?.(), this._decimals);
-        const number = this._number * mult;
-        let value = null;
-        if (type === 'time') {
-            value = createSQLTime(old_time + number, decimals);
-        }
-        else {
-            if (old_type === 'time') {
-                const now = Date.now() / 1000;
-                old_time += now - (now % (24 * 60 * 60));
-            }
-            let time;
-            if (this._isMonth) {
-                time = _addMonth(old_time, number);
-            }
-            else {
-                const add_time = Math.floor(number);
-                time = old_time + add_time;
-                fraction += number - add_time;
-                const overflow = Math.floor(fraction);
-                time += overflow;
-                fraction -= overflow;
-            }
-            value = createSQLDateTime({ time, fraction }, type, decimals);
-        }
-        return { type, value };
-    }
-    add(datetime) {
-        return this._add(datetime, 1);
-    }
-    sub(datetime) {
-        return this._add(datetime, -1);
-    }
-}
-function createSQLInterval(value, unit_name) {
-    let is_month = false;
-    let unit;
-    if (unit_name in MONTH) {
-        is_month = true;
-        unit = MONTH[unit_name];
-    }
-    else {
-        unit = SINGLE_TIME[unit_name] ?? DOUBLE_TIME[unit_name];
-    }
-    let ret = null;
-    const number = unit ? _convertNumber(value, unit, unit_name) : null;
-    if (number !== null) {
-        const force_date = unit_name in FORCE_DATE;
-        let decimals = DECIMALS[unit_name] || 0;
-        if (!decimals && unit_name.endsWith('second')) {
-            decimals = getDecimals(value, 6);
-            if (typeof value === 'string' && decimals) {
-                decimals = 6;
-            }
-        }
-        ret = new SQLInterval(number, decimals, is_month, force_date);
-    }
-    return ret;
-}
-function _convertNumber(value, unit, unit_name) {
-    let ret = null;
-    if (Array.isArray(unit)) {
-        if (typeof value === 'number') {
-            ret = value * unit[1];
-        }
-        else {
-            const match = String(value).match(/\d+/g);
-            if (match && match.length === 2) {
-                ret = parseInt(match[0]) * unit[0] + parseInt(match[1]) * unit[2];
-            }
-            else if (match && match.length === 1) {
-                ret = parseInt(match[0]) * unit[1];
-            }
-            else if (match && match.length === 0) {
-                ret = 0;
-            }
-            else {
-                ret = null;
-            }
-        }
-    }
-    else {
-        ret = convertNum(value);
-        if (ret !== null) {
-            if (unit_name !== 'second') {
-                ret = Math.trunc(ret);
-            }
-            ret *= unit;
-        }
-    }
-    return ret;
-}
-function _addMonth(old_time, number) {
-    const date = new Date(old_time * 1000);
-    const start_time = date.getTime();
-    const new_months = date.getUTCFullYear() * 12 + date.getUTCMonth() + number;
-    const year = Math.floor(new_months / 12);
-    const month = new_months - year * 12;
-    let day = date.getUTCDate();
-    date.setUTCFullYear(year);
-    date.setUTCMonth(month);
-    while (date.getUTCMonth() !== month) {
-        date.setUTCMonth(0);
-        date.setUTCDate(day--);
-        date.setUTCMonth(month);
-    }
-    const delta = date.getTime() - start_time;
-    return old_time + delta / 1000;
-}
-
-function datetime(expr, state) {
-    const result = getValue(expr.expr, state);
-    result.name = `CAST(${result.name} AS DATETIME)`;
-    result.type = 'datetime';
-    if (!result.err && result.value !== null) {
-        const decimals = expr.target.length || 0;
-        if (decimals > 6) {
-            result.err = 'ER_TOO_BIG_PRECISION';
-        }
-        result.value = convertDateTime(result.value, 'datetime', decimals);
-    }
-    return result;
-}
-function date$1(expr, state) {
-    const result = getValue(expr.expr, state);
-    result.name = `CAST(${result.name} AS DATE)`;
-    result.type = 'date';
-    if (!result.err && result.value !== null) {
-        result.value = convertDateTime(result.value, 'date');
-    }
-    return result;
-}
-function time(expr, state) {
-    const result = getValue(expr.expr, state);
-    result.name = `CAST(${result.name} AS TIME)`;
-    result.type = 'time';
-    if (!result.err && result.value !== null) {
-        const decimals = expr.target.length || 0;
-        if (decimals > 6) {
-            result.err = 'ER_TOO_BIG_PRECISION';
-        }
-        result.value = convertTime(result.value, decimals);
-    }
-    return result;
-}
-function interval(expr, state) {
-    const result = getValue(expr.expr, state);
-    result.name = `INTERVAL ${result.name} ${expr.unit}`;
-    result.type = 'interval';
-    if (!result.err && result.value !== null) {
-        result.value = createSQLInterval(result.value, expr.unit);
-    }
-    return result;
-}
-function signed(expr, state) {
-    const result = getValue(expr.expr, state);
-    result.name = `CAST(${result.name} AS SIGNED)`;
-    result.type = 'bigint';
-    if (!result.err && result.value !== null) {
-        result.value = Math.trunc(convertNum(result.value));
-    }
-    return result;
-}
-function char(expr, state) {
-    const result = getValue(expr.expr, state);
-    result.name = `CAST(${result.name} AS CHAR)`;
-    if (!result.err && result.value !== null && result.type !== 'string') {
-        result.type = 'string';
-        result.value = String(result.value);
-    }
-    return result;
-}
-
-var Cast = /*#__PURE__*/Object.freeze({
-	__proto__: null,
-	char: char,
-	date: date$1,
-	datetime: datetime,
-	interval: interval,
-	signed: signed,
-	time: time
-});
-
-const DAY = 24 * 60 * 60;
-function database(expr, state) {
-    return { value: state.session.getCurrentDatabase() };
-}
-function sleep(expr, state) {
-    const result = getValue(expr.args.value?.[0], state);
-    result.name = `SLEEP(${result.name})`;
-    const sleep_ms = convertNum(result.value);
-    if (sleep_ms > 0) {
-        result.sleep_ms = sleep_ms * 1000;
-    }
-    return result;
-}
-function length(expr, state) {
-    const result = getValue(expr.args.value?.[0], state);
-    result.name = `LENGTH(${result.name})`;
-    result.type = 'number';
-    if (!result.err && result.value !== null) {
-        result.value = String(result.value).length;
-    }
-    return result;
-}
-function concat(expr, state) {
-    let err;
-    let value = '';
-    expr.args.value?.every?.((sub) => {
-        const result = getValue(sub, state);
-        if (!err && result.err) {
-            err = result.err;
-        }
-        else if (result.value === null) {
-            value = null;
-        }
-        else {
-            value += String(result.value);
-        }
-        return value !== null;
-    });
-    return { err, value };
-}
-function left(expr, state) {
-    const result = getValue(expr.args?.value?.[0], state);
-    const len_result = getValue(expr.args?.value?.[1], state);
-    result.name = `LEFT(${result.name ?? ''}, ${len_result.name ?? ''})`;
-    result.err = result.err || len_result.err;
-    result.type = 'string';
-    if (!result.err && (result.value === null || len_result.value === null)) {
-        result.value = null;
-    }
-    else if (!result.err) {
-        const length = convertNum(len_result.value);
-        result.value = String(result.value).substring(0, length);
-    }
-    return result;
-}
-function coalesce(expr, state) {
-    let err;
-    let value = null;
-    let type;
-    expr.args.value?.some?.((sub) => {
-        const result = getValue(sub, state);
-        if (result.err) {
-            err = result.err;
-        }
-        value = result.value;
-        type = result.type;
-        return !err && value !== null;
-    });
-    return { err, value, type };
-}
-const ifnull = coalesce;
-function now(expr, state) {
-    const result = getValue(expr.args?.value?.[0], state);
-    result.name = expr.args ? `NOW(${result.name ?? ''})` : 'CURRENT_TIMESTAMP';
-    if (!result.err && result.type) {
-        const decimals = result.value || 0;
-        if (decimals > 6) {
-            result.err = 'ER_TOO_BIG_PRECISION';
-        }
-        result.value = createSQLDateTime(Date.now() / 1000, 'datetime', decimals);
-        result.type = 'datetime';
-    }
-    return result;
-}
-const current_timestamp = now;
-function from_unixtime(expr, state) {
-    const result = getValue(expr.args.value?.[0], state);
-    result.name = `FROM_UNIXTIME(${result.name})`;
-    result.type = 'datetime';
-    if (!result.err && result.value !== null) {
-        const time = convertNum(result.value);
-        const decimals = Math.min(6, String(time).split('.')?.[1]?.length || 0);
-        result.value =
-            time < 0 ? null : createSQLDateTime(time, 'datetime', decimals);
-    }
-    return result;
-}
-function date(expr, state) {
-    const result = getValue(expr.args.value?.[0], state);
-    result.name = `DATE(${result.name})`;
-    result.type = 'date';
-    if (!result.err && result.value !== null) {
-        result.value = convertDateTime(result.value);
-        result.value?.setType?.('date');
-    }
-    return result;
-}
-function date_format(expr, state) {
-    const date = getValue(expr.args.value?.[0], state);
-    const format = getValue(expr.args.value?.[1], state);
-    let err = date.err || format.err;
-    let value;
-    const name = `DATE_FORMAT(${date.name}, ${format.name})`;
-    if (!err && (date.value === null || format.value === null)) {
-        value = null;
-    }
-    else if (!err) {
-        value =
-            convertDateTime(date.value)?.dateFormat?.(String(format.value)) || null;
-    }
-    return { err, name, value, type: 'string' };
-}
-function datediff(expr, state) {
-    const expr1 = getValue(expr.args.value?.[0], state);
-    const expr2 = getValue(expr.args.value?.[1], state);
-    let err = expr1.err || expr2.err;
-    let value;
-    const name = `DATEDIFF(${expr1.name}, ${expr2.name})`;
-    if (!err && (expr1.value === null || expr2.value === null)) {
-        value = null;
-    }
-    else if (!err) {
-        value =
-            convertDateTime(expr1.value)?.diff?.(convertDateTime(expr2.value)) ||
-                null;
-    }
-    return { err, name, value, type: 'int' };
-}
-function curdate(expr) {
-    const value = createSQLDateTime(Date.now() / 1000, 'date');
-    const name = expr.args ? 'CURDATE()' : 'CURRENT_DATE';
-    return { value, name, type: 'date' };
-}
-const current_date = curdate;
-function curtime(expr, state) {
-    const result = getValue(expr.args?.value?.[0], state);
-    result.name = expr.args ? `CURTIME(${result.name ?? ''})` : 'CURRENT_TIME';
-    if (!result.err && result.type) {
-        const decimals = result.value || 0;
-        if (decimals > 6) {
-            result.err = 'ER_TOO_BIG_PRECISION';
-        }
-        const time = (Date.now() / 1000) % DAY;
-        result.value = createSQLTime(time, decimals);
-        result.type = 'time';
-    }
-    return result;
-}
-const current_time = curtime;
-
-var Functions$1 = /*#__PURE__*/Object.freeze({
-	__proto__: null,
-	coalesce: coalesce,
-	concat: concat,
-	curdate: curdate,
-	current_date: current_date,
-	current_time: current_time,
-	current_timestamp: current_timestamp,
-	curtime: curtime,
-	database: database,
-	date: date,
-	date_format: date_format,
-	datediff: datediff,
-	from_unixtime: from_unixtime,
-	ifnull: ifnull,
-	left: left,
-	length: length,
-	now: now,
-	sleep: sleep
-});
-
-function plus(expr, state) {
-    return getValue(expr.expr, state);
-}
-function not$1(expr, state) {
-    const result = getValue(expr.expr, state);
-    result.name = 'NOT ' + result.name;
-    result.type = 'number';
-    if (!result.err && result.value !== null) {
-        result.value = convertNum(result.value) ? 0 : 1;
-    }
-    return result;
-}
-function minus$1(expr, state) {
-    const result = getValue(expr.expr, state);
-    result.name = '-' + result.name;
-    result.type = 'number';
-    if (!result.err && result.value !== null) {
-        result.value = -convertNum(result.value);
-    }
-    return result;
-}
-
-var UnaryExpression = /*#__PURE__*/Object.freeze({
-	__proto__: null,
-	"!": not$1,
-	"+": plus,
-	"-": minus$1,
-	not: not$1
-});
-
-function version_comment() {
-    return 'dynamosql source version';
-}
-
-var SystemVariables = /*#__PURE__*/Object.freeze({
-	__proto__: null,
-	version_comment: version_comment
-});
-
-function pql(strings, ...values) {
-    let s = '';
-    for (let i = 0; i < strings.length; i++) {
-        s += strings[i];
-        if (i < values.length) {
-            s += escapeValue(values[i]);
-        }
-    }
-    s = s.replace(/\s+/g, ' ').trim();
-    return s;
-}
-function escapeIdentifier(string) {
-    return '"' + string.replace('"', '""') + '"';
-}
-function escapeString(string) {
-    let ret = '';
-    for (let i = 0; i < string.length; i++) {
-        const c = string.charCodeAt(i);
-        if (c < 32) {
-            ret += '\\x' + c.toString(16);
-        }
-        else if (c === 39) {
-            ret += "''";
-        }
-        else {
-            ret += string[i];
-        }
-    }
-    return ret;
-}
-function escapeNumber(value) {
-    return String(value).replace(/[^0-9.]/g, '');
-}
-function escapeValue(value, type) {
-    let s;
-    if (type === 'string') {
-        s = "'" + escapeString(String(value)) + "'";
-    }
-    else if (type === 'number') {
-        s = escapeNumber(value);
-    }
-    else if (value === null) {
-        s = 'NULL';
-    }
-    else if (Array.isArray(value)) {
-        s = '[ ';
-        s += value.map(escapeValue).join(', ');
-        s += ' ]';
-    }
-    else if (typeof value === 'object') {
-        s = '{ ';
-        s += Object.keys(value)
-            .map((key) => `'${key}': ${escapeValue(value[key])}`)
-            .join(', ');
-        s += ' }';
-    }
-    else if (typeof value === 'number') {
-        s = String(value);
-    }
-    else if (value !== undefined) {
-        s = "'" + escapeString(String(value)) + "'";
-    }
-    else {
-        s = 'undefined';
-    }
-    return s;
-}
-function convertError(err) {
-    let ret = err;
-    if (err.name === 'ConditionalCheckFailedException' && err.Item) {
-        ret = 'cond_fail';
-    }
-    else if (err.Code === 'ConditionalCheckFailed') {
-        ret = 'cond_fail';
-    }
-    else if (err.name === 'ResourceNotFoundException' ||
-        err.Code === 'ResourceNotFound') {
-        ret = 'resource_not_found';
-    }
-    else if (err.name === 'ResourceInUseException') {
-        ret = 'resource_in_use';
-    }
-    else if (err.Code === 'ValidationError' || err.name === 'ValidationError') {
-        if (err.Message?.match?.(/expected: [^\s]* actual: NULL/)) {
-            ret = 'ER_BAD_NULL_ERROR';
-        }
-        else if (err.Message?.match?.(/expected: [^\s]* actual:/)) {
-            ret = 'ER_TRUNCATED_WRONG_VALUE_FOR_FIELD';
-        }
-        else {
-            ret = 'validation';
-        }
-    }
-    return ret;
-}
-function mapToObject(obj) {
-    const ret = {};
-    ret.toString = toString;
-    Object.keys(obj).forEach((key) => {
-        ret[key] = valueToNative(obj[key]);
-    });
-    return ret;
-}
-function valueToNative(value) {
-    let ret = value;
-    if (value) {
-        if (value.N) {
-            ret = parseFloat(value.N);
-        }
-        else if (value.L?.map) {
-            ret = value.L.map(valueToNative);
-        }
-        else if (value.M) {
-            ret = mapToObject(value.M);
-        }
-        else {
-            ret = value.S ?? value.B ?? value.BOOL ?? value;
-        }
-    }
-    return ret;
-}
-function nativeToValue(obj) {
-    let ret;
-    if (obj === null) {
-        ret = { NULL: true };
-    }
-    else if (typeof obj === 'object') {
-        const M = {};
-        for (let key in obj) {
-            M[key] = nativeToValue(obj[key]);
-        }
-        ret = { M };
-    }
-    else if (typeof obj === 'number') {
-        ret = { N: String(obj) };
-    }
-    else if (typeof obj === 'boolean') {
-        ret = { BOOL: obj };
-    }
-    else {
-        ret = { S: String(obj) };
-    }
-    return ret;
-}
-function toString() {
-    return JSON.stringify(this);
-}
-
-function getValue(expr, state) {
-    const { session, row } = state;
-    let result = { err: null, value: undefined, name: undefined };
-    const type = expr?.type;
-    if (!expr) ;
-    else if (type === 'number') {
-        result.value = expr.value;
-    }
-    else if (type === 'double_quote_string') {
-        result.value = expr.value;
-        result.name = `"${result.value}"`;
-    }
-    else if (type === 'null') {
-        result.value = null;
-    }
-    else if (type === 'bool') {
-        result.value = expr.value ? 1 : 0;
-        result.name = expr.value ? 'TRUE' : 'FALSE';
-    }
-    else if (type === 'hex_string' || type === 'full_hex_string') {
-        result.value = Buffer.from(expr.value, 'hex');
-        result.name = 'x' + expr.value.slice(0, 10);
-        result.type = 'buffer';
-    }
-    else if (type === 'interval') {
-        result = interval(expr, state);
-    }
-    else if (type === 'function') {
-        const func = Functions$1[expr.name.toLowerCase()];
-        if (func) {
-            result = func(expr, state);
-            if (!result.name) {
-                result.name = expr.name + '()';
-            }
-        }
-        else {
-            shared.logger.trace('expression.getValue: unknown function:', expr.name);
-            result.err = { err: 'ER_SP_DOES_NOT_EXIST', args: [expr.name] };
-        }
-    }
-    else if (type === 'aggr_func') {
-        const func = AggregateFunctions[expr.name.toLowerCase()];
-        if (func) {
-            result = func(expr, state);
-            if (!result.name) {
-                result.name = expr.name + '()';
-            }
-        }
-        else {
-            shared.logger.trace('expression.getValue: unknown aggregate:', expr.name);
-            result.err = { err: 'ER_SP_DOES_NOT_EXIST', args: [expr.name] };
-        }
-    }
-    else if (type === 'binary_expr') {
-        const func = BinaryExpression[expr.operator.toLowerCase()];
-        if (func) {
-            result = func(expr, state);
-            if (!result.name) {
-                result.name = expr.operator;
-            }
-        }
-        else {
-            shared.logger.trace('expression.getValue: unknown binary operator:', expr.operator);
-            result.err = { err: 'ER_SP_DOES_NOT_EXIST', args: [expr.operator] };
-        }
-    }
-    else if (type === 'unary_expr') {
-        const func = UnaryExpression[expr.operator.toLowerCase()];
-        if (func) {
-            result = func(expr, state);
-            if (!result.name) {
-                result.name = expr.operator;
-            }
-        }
-        else {
-            shared.logger.trace('expression.getValue: unknown unanary operator:', expr.operator);
-            result.err = { err: 'ER_SP_DOES_NOT_EXIST', args: [expr.operator] };
-        }
-    }
-    else if (type === 'cast') {
-        const func = Cast[expr.target.dataType.toLowerCase()];
-        if (func) {
-            result = func(expr, state);
-            if (!result.name) {
-                result.name = `CAST(? AS ${expr.target.dataType})`;
-            }
-        }
-        else {
-            shared.logger.trace('expression.getValue: unknown cast type:', expr.target.dataType);
-            result.err = {
-                err: 'ER_SP_DOES_NOT_EXIST',
-                args: [expr.target.dataType],
-            };
-        }
-    }
-    else if (type === 'var') {
-        const { prefix } = expr;
-        if (prefix === '@@') {
-            const func = SystemVariables[expr.name.toLowerCase()];
-            if (func) {
-                result.value = func(session);
-            }
-            else {
-                shared.logger.trace('expression.getValue: unknown system variable:', expr.name);
-                result.err = { err: 'ER_UNKNOWN_SYSTEM_VARIABLE', args: [expr.name] };
-            }
-        }
-        else if (prefix === '@') {
-            result.value = session.getVariable(expr.name) ?? null;
-        }
-        else {
-            result.err = 'unsupported';
-        }
-        result.name = prefix + expr.name;
-    }
-    else if (type === 'column_ref') {
-        result.name = expr.column;
-        if (row && expr._resultIndex >= 0) {
-            const output_result = row['@@result']?.[expr._resultIndex];
-            result.value = output_result?.value;
-            result.type = output_result?.type;
-        }
-        else if (row) {
-            const cell = row[expr.from?.key]?.[expr.column];
-            const decode = _decodeCell(cell);
-            result.type = decode?.type;
-            result.value = decode?.value;
-        }
-        else {
-            result.err = 'no_row_list';
-            result.value = expr.column;
-        }
-    }
-    else {
-        shared.logger.error('unsupported expr:', expr);
-        result.err = 'unsupported';
-    }
-    if (!result.type) {
-        result.type = result.value === null ? 'null' : typeof result.value;
-    }
-    if (result.name === undefined && result.value !== undefined) {
-        result.name = String(result.value);
-    }
-    return result;
-}
-function _decodeCell(cell) {
-    let type;
-    let value;
-    if (!cell || cell.NULL) {
-        type = 'null';
-        value = null;
-    }
-    else if (cell.value) {
-        type = cell.type ?? typeof cell.value;
-        value = cell.value;
-    }
-    else if (cell.S) {
-        type = 'string';
-        value = cell.S;
-    }
-    else if (cell.N) {
-        type = 'number';
-        value = cell.N;
-    }
-    else if (cell.BOOL) {
-        type = 'boolean';
-        value = cell.BOOL;
-    }
-    else if (cell.M) {
-        type = 'json';
-        value = mapToObject(cell.M);
-    }
-    else {
-        type = typeof cell;
-        value = cell;
-        if (type === 'object') {
-            type = 'json';
-        }
-    }
-    return { type, value };
-}
-
-function constantFixup(func) {
-    return (expr, state) => {
-        let result;
-        result = getValue(expr, state);
-        if (result.err) {
-            result = func(expr, state);
-        }
-        return result;
-    };
-}
-function and(expr, state) {
-    const left = convertWhere(expr.left, state);
-    const right = convertWhere(expr.right, state);
-    if (left.err === 'unsupported' && state?.default_true) {
-        left.err = null;
-        left.value = 1;
-    }
-    if (right.err === 'unsupported' && state?.default_true) {
-        right.err = null;
-        right.value = 1;
-    }
-    const err = left.err || right.err;
-    let value;
-    if (!left.value || !right.value) {
-        value = 0;
-    }
-    else if (left.value === 1 && right.value === 1) {
-        value = 1;
-    }
-    else if (right.value === 1) {
-        value = left.value;
-    }
-    else if (left.value === 1) {
-        value = right.value;
-    }
-    else {
-        value = `(${left.value}) AND (${right.value})`;
-    }
-    return { err, value };
-}
-function or(expr, state) {
-    const left = convertWhere(expr.left, state);
-    const right = convertWhere(expr.right, state);
-    let err = left.err || right.err;
-    let value;
-    if (err === 'unsupported' && state?.default_true) {
-        value = 1;
-        err = null;
-    }
-    else if (!left.value && !right.value) {
-        value = 0;
-    }
-    else if (left.value === 1 || right.value === 1) {
-        value = 1;
-    }
-    else if (!right.value) {
-        value = left.value;
-    }
-    else if (!left.value) {
-        value = right.value;
-    }
-    else {
-        value = `(${left.value}) OR (${right.value})`;
-    }
-    return { err, value };
-}
-function _in(expr, state) {
-    const left = convertWhere(expr.left, state);
-    let err;
-    let value;
-    if (left.err) {
-        err = left.err;
-    }
-    else if (left.value === null) {
-        value = null;
-    }
-    else {
-        const count = expr.right?.value?.length;
-        const list = [];
-        for (let i = 0; i < count; i++) {
-            const right = convertWhere(expr.right.value[i], state);
-            if (right.err) {
-                err = right.err;
-                break;
-            }
-            else if (right.value === null) {
-                value = null;
-                break;
-            }
-            else {
-                list.push(right.value);
-            }
-        }
-        if (value === undefined) {
-            value = `${left.value} IN (${list.join(',')})`;
-        }
-    }
-    return { err, value };
-}
-function _comparator(expr, state, op) {
-    const left = convertWhere(expr.left, state);
-    const right = convertWhere(expr.right, state);
-    const err = left.err || right.err;
-    const value = `${left.value} ${op} ${right.value}`;
-    return { err, value };
-}
-function equal(expr, state) {
-    return _comparator(expr, state, '=');
-}
-function notEqual(expr, state) {
-    return _comparator(expr, state, '!=');
-}
-function gt(expr, state) {
-    return _comparator(expr, state, '>');
-}
-function lt(expr, state) {
-    return _comparator(expr, state, '<');
-}
-function gte(expr, state) {
-    return _comparator(expr, state, '>=');
-}
-function lte(expr, state) {
-    return _comparator(expr, state, '<=');
-}
-function is(expr, state) {
-    return _is(expr, state, 'IS');
-}
-function isNot(expr, state) {
-    return _is(expr, state, 'IS NOT');
-}
-function _is(expr, state, op) {
-    const left = convertWhere(expr.left, state);
-    let right;
-    let err = left.err;
-    if (!err) {
-        if (expr.right.value === null) {
-            right = 'NULL';
-        }
-        else if (expr.right.value === true) {
-            right = 'TRUE';
-        }
-        else if (expr.right.value === false) {
-            right = 'FALSE';
-        }
-        else {
-            err = 'syntax_err';
-        }
-    }
-    const value = `${left.value} ${op} ${right}`;
-    return { err, value };
-}
-function not(expr, state) {
-    const result = convertWhere(expr.expr, state);
-    if (!result.err) {
-        result.value = 'NOT ' + result.value;
-    }
-    return result;
-}
-function minus(expr, state) {
-    const result = convertWhere(expr.expr, state);
-    if (!result.err) {
-        result.value = '-' + result.value;
-    }
-    return result;
-}
-function unsupported() {
-    return { err: 'unsupported' };
-}
-const _equal = constantFixup(equal);
-const _notEqual = constantFixup(notEqual);
-const _gt = constantFixup(gt);
-const _lt = constantFixup(lt);
-const _gte = constantFixup(gte);
-const _lte = constantFixup(lte);
-const _and = constantFixup(and);
-const _or = constantFixup(or);
-const _inOp = constantFixup(_in);
-const _isOp = constantFixup(is);
-const _isNotOp = constantFixup(isNot);
-const _between = constantFixup(unsupported);
-const _not = constantFixup(not);
-const _minus = constantFixup(minus);
-
-var ConvertExpression = /*#__PURE__*/Object.freeze({
-	__proto__: null,
-	"!": _not,
-	"!=": _notEqual,
-	"-": _minus,
-	"<": _lt,
-	"<=": _lte,
-	"<>": _notEqual,
-	"=": _equal,
-	">": _gt,
-	">=": _gte,
-	and: _and,
-	between: _between,
-	in: _inOp,
-	is: _isOp,
-	"is not": _isNotOp,
-	not: _not,
-	or: _or
-});
-
-function foo() {
-    return { err: 'unsupported' };
-}
-
-var Functions = /*#__PURE__*/Object.freeze({
-	__proto__: null,
-	foo: foo
-});
-
-function convertWhere(expr, state) {
-    const { from_key } = state;
-    let err = null;
-    let value = null;
-    if (expr) {
-        const { type } = expr;
-        if (type === 'number') {
-            value = expr.value;
-        }
-        else if (type === 'double_quote_string') {
-            value = `'${expr.value}'`;
-        }
-        else if (type === 'null') {
-            value = null;
-        }
-        else if (type === 'bool') {
-            value = expr.value;
-        }
-        else if (type === 'function') {
-            const func = Functions[expr.name.toLowerCase()];
-            if (func) {
-                const result = func(expr, state);
-                if (result.err) {
-                    err = result.err;
-                }
-                else {
-                    value = result.value;
-                }
-            }
-            else {
-                err = 'unsupported';
-            }
-        }
-        else if (type === 'binary_expr' || type === 'unary_expr') {
-            const func = ConvertExpression[expr.operator.toLowerCase()];
-            if (func) {
-                const result = func(expr, state);
-                if (result.err) {
-                    err = result.err;
-                }
-                else {
-                    value = result.value;
-                }
-            }
-            else {
-                err = 'unsupported';
-            }
-        }
-        else if (type === 'column_ref') {
-            if (expr.from?.key === from_key) {
-                value = expr.column;
-            }
-            else {
-                err = 'unsupported';
-            }
-        }
-        else {
-            const result = getValue(expr, state);
-            err = result.err;
-            value = result.value;
-        }
-    }
-    return { err, value };
-}
-
-function singleDelete$1(params, done) {
-    const { dynamodb, session } = params;
-    const { from, where } = params.ast;
-    let no_single = false;
-    const result = convertWhere(where, { session, from_key: from?.[0]?.key });
-    if (result.err) {
-        no_single = true;
-    }
-    else if (from.length > 1) {
-        no_single = true;
-    }
-    else if (!result.value) {
-        no_single = true;
-    }
-    if (no_single) {
-        done('no_single');
-    }
-    else {
-        const sql = `
-DELETE FROM ${escapeIdentifier(from[0].table)}
-WHERE ${result.value}
-RETURNING ALL OLD *
-`;
-        dynamodb.queryQL(sql, (err, results) => {
-            let affectedRows = results?.length;
-            if (err?.name === 'ValidationException') {
-                err = 'no_single';
-            }
-            else if (err?.name === 'ConditionalCheckFailedException') {
-                err = null;
-                affectedRows = 0;
-            }
-            else if (err) {
-                shared.logger.error('singleDelete: query err:', err);
-            }
-            done(err, { affectedRows });
-        });
-    }
-}
-function multipleDelete$1(params, done) {
-    const { dynamodb, list } = params;
-    let affectedRows = 0;
-    asyncEach(list, (object, done) => {
-        const { table, key_list, delete_list } = object;
-        dynamodb.deleteItems({ table, key_list, list: delete_list }, (err, data) => {
-            if (err) {
-                shared.logger.error('multipleDelete: deleteItems: err:', err, table, data);
-            }
-            else {
-                affectedRows += delete_list.length;
-            }
-            done(err);
-        });
-    }, (err) => done(err, { affectedRows }));
-}
-
-function jsonStringify(...args) {
-    try {
-        return JSON.stringify(...args);
-    }
-    catch {
-        return '';
-    }
-}
-function trackFirstSeen(map, keys) {
-    let ret = true;
-    if (keys.length > 1) {
-        let sub = map.get(keys[0]);
-        if (sub) {
-            if (sub.has(keys[1])) {
-                ret = false;
-            }
-            else {
-                sub.set(keys[1], true);
-            }
-        }
-        else {
-            sub = new Map();
-            sub.set(keys[1], true);
-            map.set(keys[0], sub);
-        }
-    }
-    else if (map.has(keys[0])) {
-        ret = false;
-    }
-    else {
-        map.set(keys[0], true);
-    }
-    return ret;
-}
-
-function insertRowList$1(params, done) {
-    if (params.list.length === 0) {
-        done(null, { affectedRows: 0 });
-    }
-    else if (params.duplicate_mode) {
-        _insertIgnoreReplace(params, done);
-    }
-    else {
-        _insertNoIgnore(params, done);
-    }
-}
-function _insertIgnoreReplace(params, done) {
-    const { dynamodb, duplicate_mode, table } = params;
-    let list = params.list;
-    let affectedRows;
-    asyncSeries([
-        (done) => {
-            if (list.length > 1) {
-                dynamodb.getTableCached(table, (err, result) => {
-                    if (err === 'resource_not_found') {
-                        err = { err: 'table_not_found', args: [table] };
-                    }
-                    else if (!err) {
-                        const key_list = result.Table.KeySchema.map((k) => k.AttributeName);
-                        const track = new Map();
-                        if (duplicate_mode === 'replace') {
-                            list.reverse();
-                        }
-                        list = list.filter((row) => trackFirstSeen(track, key_list.map((key) => row[key].value)));
-                        if (duplicate_mode === 'replace') {
-                            list.reverse();
-                        }
-                    }
-                    done(err);
-                });
-            }
-            else {
-                done();
-            }
-        },
-        (done) => {
-            if (duplicate_mode === 'ignore') {
-                affectedRows = list.length;
-                const sql_list = list.map((item) => `INSERT INTO ${escapeIdentifier(table)} VALUE ${_escapeItem(item)}`);
-                dynamodb.batchQL(sql_list, (err_list) => {
-                    let err;
-                    if (err_list?.length > 0) {
-                        err_list.forEach((item_err) => {
-                            if (item_err?.Code === 'DuplicateItem') {
-                                affectedRows--;
-                            }
-                            else if (!err && item_err) {
-                                affectedRows--;
-                                err = convertError(item_err);
-                            }
-                        });
-                    }
-                    else if (err_list?.name === 'ValidationException') {
-                        err = {
-                            err: 'dup_table_insert',
-                            sqlMessage: err_list.message,
-                            cause: err_list,
-                        };
-                    }
-                    else if (err_list) {
-                        err = err_list;
-                    }
-                    done(err);
-                });
-            }
-            else {
-                list.forEach(_fixupItem);
-                const opts = {
-                    table,
-                    list,
-                };
-                dynamodb.putItems(opts, (err) => {
-                    if (err) {
-                        err = convertError(err);
-                    }
-                    done(err, err ? undefined : { affectedRows: list.length });
-                });
-            }
-        },
-    ], (err) => done(err, err ? undefined : { affectedRows }));
-}
-function _insertNoIgnore(params, done) {
-    const { dynamodb, table, list } = params;
-    const sql_list = list.map((item) => `INSERT INTO ${escapeIdentifier(table)} VALUE ${_escapeItem(item)}`);
-    dynamodb.transactionQL(sql_list, (err) => {
-        if (err?.name === 'TransactionCanceledException' &&
-            err.CancellationReasons) {
-            for (let i = 0; i < err.CancellationReasons.length; i++) {
-                if (err.CancellationReasons[i].Code === 'DuplicateItem') {
-                    err = {
-                        err: 'dup_table_insert',
-                        args: [table, _fixupItem(list[i])],
-                    };
-                    break;
-                }
-                else if (err.CancellationReasons[i].Code !== 'None') {
-                    err = {
-                        err: convertError(err.CancellationReasons[i]),
-                        message: err.CancellationReasons[i].Message,
-                    };
-                    break;
-                }
-            }
-        }
-        else if (err?.name === 'ValidationException') {
-            err = {
-                err: 'dup_table_insert',
-                sqlMessage: err.message,
-                cause: err,
-            };
-        }
-        else if (err) {
-            err = convertError(err);
-        }
-        done(err, err ? undefined : { affectedRows: list.length });
-    });
-}
-function _fixupItem(item) {
-    for (let key in item) {
-        item[key] = item[key].value;
-    }
-    return item;
-}
-function _escapeItem(item) {
-    let s = '{ ';
-    s += Object.keys(item)
-        .map((key) => `'${key}': ${escapeValue(item[key].value)}`)
-        .join(', ');
-    s += ' }';
-    return s;
-}
-
-function getRowList$1(params, done) {
-    const { list } = params;
-    const source_map = {};
-    const column_map = {};
-    asyncEach(list, (from, done) => {
-        _getFromTable$1({ ...params, from }, (err, results, column_list) => {
-            source_map[from.key] = results;
-            column_map[from.key] = column_list;
-            done(err);
-        });
-    }, (err) => done(err, source_map, column_map));
-}
-function _getFromTable$1(params, done) {
-    const { dynamodb, session, from, where } = params;
-    const { table, _requestSet, _requestAll } = params.from;
-    const request_columns = [..._requestSet];
-    const columns = _requestAll || request_columns.length === 0
-        ? '*'
-        : request_columns.map(escapeIdentifier).join(',');
-    let sql = `SELECT ${columns} FROM ${escapeIdentifier(table)}`;
-    const where_result = where
-        ? convertWhere(where, { session, from_key: from.key, default_true: true })
-        : null;
-    if (!where_result?.err && where_result?.value) {
-        sql += ' WHERE ' + where_result.value;
-    }
-    dynamodb.queryQL(sql, (err, results) => {
-        let column_list;
-        if (err === 'resource_not_found') {
-            done({ err: 'table_not_found', args: [table] });
-        }
-        else if (err) {
-            shared.logger.error('raw_engine.getRowList err:', err, results, sql);
-        }
-        else {
-            if (_requestAll) {
-                const response_set = new Set();
-                results.forEach((result) => {
-                    for (let key in result) {
-                        response_set.add(key);
-                    }
-                });
-                column_list = [...response_set.keys()];
-            }
-            else {
-                column_list = request_columns;
-            }
-        }
-        done(err, results, column_list);
-    });
-}
-
-function singleUpdate$1(params, done) {
-    const { dynamodb, session } = params;
-    const { set, from, where } = params.ast;
-    const where_result = convertWhere(where, {
-        session,
-        from_key: from?.[0]?.key,
-    });
-    let no_single = where_result.err;
-    if (from.length > 1 || !where_result.value) {
-        no_single = true;
-    }
-    const value_list = set.map((object) => {
-        const { value } = object;
-        let ret;
-        const result = convertWhere(value, { session, from_key: from?.[0]?.key });
-        if (result.err) {
-            no_single = true;
-        }
-        else {
-            ret = result.value;
-        }
-        return ret;
-    });
-    if (no_single) {
-        done('no_single');
-    }
-    else {
-        const sets = set
-            .map((object, i) => escapeIdentifier(object.column) + ' = ' + value_list[i])
-            .join(', ');
-        const sql = `
-UPDATE ${escapeIdentifier(from[0].table)}
-SET ${sets}
-WHERE ${where_result.value}
-RETURNING MODIFIED OLD *
-`;
-        dynamodb.queryQL(sql, (err, results) => {
-            let result;
-            if (err?.name === 'ValidationException') {
-                err = 'no_single';
-            }
-            else if (err?.name === 'ConditionalCheckFailedException') {
-                err = null;
-                result = { affectedRows: 0, changedRows: 0 };
-            }
-            else if (err) {
-                shared.logger.error('singleUpdate: err:', err);
-            }
-            else {
-                result = { affectedRows: 1, changedRows: 0 };
-                set.forEach((object, i) => {
-                    const { column } = object;
-                    const value = value_list[i];
-                    if (value !== escapeValue(valueToNative(results?.[0]?.[column]))) {
-                        result.changedRows = 1;
-                    }
-                });
-            }
-            done(err, result);
-        });
-    }
-}
-function multipleUpdate$1(params, done) {
-    const { dynamodb, list } = params;
-    let affectedRows = 0;
-    let changedRows = 0;
-    asyncEach(list, (object, done) => {
-        const { table, key_list, update_list } = object;
-        update_list.forEach((item) => item.set_list.forEach((set) => (set.value = set.value.value)));
-        dynamodb.updateItems({ table, key_list, list: update_list }, (err, data) => {
-            if (err) {
-                shared.logger.error('multipleUpdate: updateItems: err:', err, 'table:', table, data);
-            }
-            else {
-                affectedRows += list.length;
-                changedRows += list.length;
-            }
-            done(err);
-        });
-    }, (err) => done(err, { affectedRows, changedRows }));
-}
-
-function commit$2(params, done) {
-    done();
-}
-function rollback$2(params, done) {
-    done();
-}
-
-var RawEngine = /*#__PURE__*/Object.freeze({
-	__proto__: null,
-	addColumn: addColumn$1,
-	commit: commit$2,
-	createIndex: createIndex$3,
-	createTable: createTable$5,
-	deleteIndex: deleteIndex$3,
-	dropTable: dropTable$2,
-	getRowList: getRowList$1,
-	getTableInfo: getTableInfo$1,
-	getTableList: getTableList$4,
-	insertRowList: insertRowList$1,
-	multipleDelete: multipleDelete$1,
-	multipleUpdate: multipleUpdate$1,
-	rollback: rollback$2,
-	singleDelete: singleDelete$1,
-	singleUpdate: singleUpdate$1
-});
-
-const g_tableMap = {};
-function getTable$3(database, table, session) {
-    const key = database + '.' + table;
-    let data = session.getTempTable(database, table) || g_tableMap[key];
-    const updates = txGetData(database, table, session)?.data;
-    if (data && updates) {
-        data = Object.assign({}, data, updates);
-    }
-    return data;
-}
-function updateTableData(database, table, session, updates) {
-    const key = database + '.' + table;
-    const data = session.getTempTable(database, table) || g_tableMap[key];
-    Object.assign(data, updates);
-}
-function txSaveData(database, table, session, data) {
-    const tx = session.getTransaction();
-    const key = database + '.' + table;
-    const existing = tx.getData('memory') || {};
-    existing[key] = { database, table, data };
-    tx.setData('memory', existing);
-}
-function txGetData(database, table, session) {
-    const key = database + '.' + table;
-    const tx = session.getTransaction();
-    return tx?.getData?.('memory')?.[key];
-}
-function saveTable(database, table, data) {
-    const key = database + '.' + table;
-    g_tableMap[key] = data;
-}
-function deleteTable$3(database, table) {
-    const key = database + '.' + table;
-    delete g_tableMap[key];
-}
-
-function getTableInfo(params, done) {
-    const { session, database, table } = params;
-    const data = getTable$3(database, table, session);
-    if (data) {
-        const result = {
-            table,
-            primary_key: data.primary_key,
-            column_list: data.column_list,
-            is_open: false,
-        };
-        done(null, result);
-    }
-    else {
-        done({ err: 'table_not_found', args: [table] });
-    }
-}
-function getTableList$3(params, done) {
-    done(null, []);
-}
-function createTable$4(params, done) {
-    const { session, database, table, primary_key, column_list, is_temp } = params;
-    if (primary_key.length === 0) {
-        done({ err: 'unsupported', message: 'primary key is required' });
-    }
-    else {
-        const data = {
-            column_list,
-            primary_key,
-            row_list: [],
-            primary_map: new Map(),
-        };
-        if (is_temp) {
-            session.saveTempTable(database, table, data);
-        }
-        else {
-            saveTable(database, table, data);
-        }
-        done();
-    }
-}
-function dropTable$1(params, done) {
-    const { session, database, table } = params;
-    if (session.getTempTable(database, table)) {
-        session.deleteTempTable(database, table);
-    }
-    else {
-        deleteTable$3(database, table);
-    }
-    done();
-}
-function addColumn(params, done) {
-    done();
-}
-function createIndex$2(params, done) {
-    done();
-}
-function deleteIndex$2(params, done) {
-    done();
-}
-
-function singleDelete(params, done) {
-    done('no_single');
-}
-function multipleDelete(params, done) {
-    const { session, list } = params;
-    let err;
-    let affectedRows = 0;
-    list.some((changes) => {
-        const { database, table, delete_list } = changes;
-        const data = getTable$3(database, table, session);
-        if (data) {
-            const row_list = data.row_list.slice();
-            const primary_map = new Map(data.primary_map);
-            delete_list.forEach((object) => {
-                const key_list = object.map((key) => key.value);
-                const delete_key = JSON.stringify(key_list);
-                const index = primary_map.get(delete_key);
-                if (index >= 0) {
-                    primary_map.delete(delete_key);
-                    row_list.splice(index, 1);
-                    primary_map.forEach((value, key) => {
-                        if (value > index) {
-                            primary_map.set(key, value - 1);
-                        }
-                    });
-                    affectedRows++;
-                }
-                else {
-                    shared.logger.info('memory.delete: failed to find key:', key_list, 'for table:', table);
-                }
-            });
-            if (!err) {
-                txSaveData(database, table, session, { row_list, primary_map });
-            }
-        }
-        else {
-            err = 'table_not_found';
-        }
-        return err;
-    });
-    done(err, { affectedRows });
-}
-
-function insertRowList(params, done) {
-    const { session, database, table, list, duplicate_mode } = params;
-    const data = getTable$3(database, table, session);
-    if (list.length === 0) {
-        done(null, { affectedRows: 0 });
-    }
-    else if (data) {
-        const { primary_key } = data;
-        const row_list = data.row_list.slice();
-        const primary_map = new Map(data.primary_map);
-        let err;
-        let affectedRows = 0;
-        list.some((row) => {
-            _transformRow(row);
-            const key_values = primary_key.map((key) => row[key.name].value);
-            const key = JSON.stringify(key_values);
-            const index = primary_map.get(key);
-            if (index === undefined) {
-                primary_map.set(key, row_list.push(row) - 1);
-                affectedRows++;
-            }
-            else if (duplicate_mode === 'replace') {
-                if (!_rowEqual(row_list[index], row)) {
-                    affectedRows++;
-                }
-                row_list[index] = row;
-                affectedRows++;
-            }
-            else if (!duplicate_mode) {
-                err = { err: 'dup_primary_key_entry', args: [primary_key, key_values] };
-            }
-            return err;
-        });
-        if (!err) {
-            txSaveData(database, table, session, { row_list, primary_map });
-        }
-        done(err, { affectedRows, changedRows: 0 });
-    }
-    else {
-        done('table_not_found');
-    }
-}
-function _transformRow(row) {
-    for (let key in row) {
-        row[key] = { type: row[key].type, value: row[key].value };
-    }
-}
-function _rowEqual(a, b) {
-    const keys_a = Object.keys(a);
-    return keys_a.every((key) => {
-        return a[key].value === b[key].value;
-    });
-}
-
-function getRowList(params, done) {
-    const { list } = params;
-    let err;
-    const source_map = {};
-    const column_map = {};
-    list.forEach((from) => {
-        const result = _getFromTable({ ...params, from });
-        if (!err && result.err) {
-            err = result.err;
-        }
-        source_map[from.key] = result.row_list;
-        column_map[from.key] = result.column_list;
-    });
-    done(err, source_map, column_map);
-}
-function _getFromTable(params) {
-    const { session } = params;
-    const { db, table } = params.from;
-    const data = getTable$3(db, table, session);
-    return {
-        err: data ? null : 'table_not_found',
-        row_list: data?.row_list,
-        column_list: data?.column_list?.map?.((column) => column.name) || [],
-    };
-}
-
-function singleUpdate(params, done) {
-    done('no_single');
-}
-function multipleUpdate(params, done) {
-    const { session, list } = params;
-    let err;
-    let affectedRows = 0;
-    let changedRows = 0;
-    list.some((changes) => {
-        const { database, table, update_list } = changes;
-        const data = getTable$3(database, table, session);
-        if (data) {
-            const row_list = data.row_list.slice();
-            const primary_map = new Map(data.primary_map);
-            update_list.forEach((update) => {
-                const { set_list } = update;
-                const key_list = update.key.map((key) => key.value);
-                const update_key = JSON.stringify(key_list);
-                const index = primary_map.get(update_key);
-                if (index >= 0) {
-                    const old_row = row_list[index];
-                    const new_row = Object.assign({}, old_row);
-                    let changed = false;
-                    set_list.forEach((set) => {
-                        new_row[set.column] = _transformCell(set.value);
-                        // TODO: better equality tester
-                        if (old_row[set.column].value !== new_row[set.column].value) {
-                            changed = true;
-                        }
-                    });
-                    const new_key = _makePrimaryKey(data.primary_key, new_row);
-                    if (new_key !== update_key && primary_map.has(new_key)) {
-                        err = {
-                            err: 'dup_primary_key_entry',
-                            args: [data.primary_key, new_key],
-                        };
-                    }
-                    else if (new_key !== update_key) {
-                        primary_map.delete(update_key);
-                        primary_map.set(new_key, index);
-                    }
-                    if (!err) {
-                        row_list[index] = new_row;
-                        affectedRows++;
-                        if (changed) {
-                            changedRows++;
-                        }
-                    }
-                }
-                else {
-                    shared.logger.error('memory.update: failed to find key:', key_list, 'for table:', table);
-                }
-            });
-            if (!err) {
-                txSaveData(database, table, session, { row_list, primary_map });
-            }
-        }
-        else {
-            err = 'table_not_found';
-        }
-        return err;
-    });
-    done(err, { affectedRows, changedRows });
-}
-function _transformCell(cell) {
-    return { value: cell.value, type: cell.type };
-}
-function _makePrimaryKey(primary_key, row) {
-    const key_values = primary_key.map((key) => row[key.name].value);
-    return JSON.stringify(key_values);
-}
-
-function commit$1(params, done) {
-    const { session, data } = params;
-    for (let key in data) {
-        const { database, table, data: tx_data } = data[key];
-        updateTableData(database, table, session, tx_data);
-    }
-    done();
-}
-function rollback$1(params, done) {
-    done();
-}
-
-var MemoryEngine = /*#__PURE__*/Object.freeze({
-	__proto__: null,
-	addColumn: addColumn,
-	commit: commit$1,
-	createIndex: createIndex$2,
-	createTable: createTable$4,
-	deleteIndex: deleteIndex$2,
-	dropTable: dropTable$1,
-	getRowList: getRowList,
-	getTableInfo: getTableInfo,
-	getTableList: getTableList$3,
-	insertRowList: insertRowList,
-	multipleDelete: multipleDelete,
-	multipleUpdate: multipleUpdate,
-	rollback: rollback$1,
-	singleDelete: singleDelete,
-	singleUpdate: singleUpdate
-});
-
-const KEYS = [
-    'commit',
-    'rollback',
-    'getTableList',
-    'createTable',
-    'dropTable',
-    'createIndex',
-    'deleteIndex',
-    'addColumn',
-    'getTableInfo',
-    'getRowList',
-    'singleDelete',
-    'multipleDelete',
-    'singleUpdate',
-    'multipleUpdate',
-    'insertRowList',
-];
-const NullEngine = _makeErrorEngine('unsupported');
-function getEngineByName(name) {
-    let ret;
-    switch (name) {
-        case 'raw':
-            ret = RawEngine;
-            break;
-        case 'memory':
-            ret = MemoryEngine;
-            break;
-        default:
-            ret = NullEngine;
-            break;
-    }
-    return ret;
-}
-function getDatabaseError(database) {
-    return _makeErrorEngine({ err: 'db_not_found', args: [database] });
-}
-function getTableError(table) {
-    return _makeErrorEngine({ err: 'table_not_found', args: [table] });
-}
-function _makeErrorEngine(error) {
-    return Object.fromEntries(KEYS.map((key) => [key, _makeErrorCallback(error)]));
-}
-function _makeErrorCallback(error) {
-    return function (arg, done) {
-        done(error);
-    };
-}
-
-const BUILT_IN = ['_dynamodb'];
-const g_schemaMap = {};
-function getEngine(database, table, session) {
-    let ret;
-    const schema = g_schemaMap[database];
-    if (database === '_dynamodb') {
-        ret = getEngineByName('raw');
-    }
-    else if (!schema) {
-        ret = getDatabaseError(database);
-    }
-    else if (session.getTempTable(database, table)) {
-        ret = getEngineByName('memory');
-    }
-    else if (schema[table]) {
-        ret = getEngineByName(schema[table].table_engine);
-    }
-    else {
-        ret = getTableError(table);
-    }
-    return ret;
-}
-function _findTable(database, table, session) {
-    return (session.getTempTable(database, table) || g_schemaMap[database]?.[table]);
-}
-function getDatabaseList() {
-    return [...BUILT_IN, ...Object.keys(g_schemaMap)];
-}
-function getTableList$2(params, done) {
-    const { dynamodb, database } = params;
-    if (database === '_dynamodb') {
-        const engine = getEngineByName('raw');
-        engine.getTableList({ dynamodb }, done);
-    }
-    else if (database in g_schemaMap) {
-        done(null, []);
-    }
-    else {
-        done({ err: 'db_not_found', args: [database] });
-    }
-}
-function createDatabase(database, done) {
-    if (BUILT_IN.includes(database) || database in g_schemaMap) {
-        done('database_exists');
-    }
-    else {
-        g_schemaMap[database] = {};
-        done();
-    }
-}
-function dropDatabase(params, done) {
-    const { session, database } = params;
-    if (BUILT_IN.includes(database)) {
-        done('database_no_drop_builtin');
-    }
-    else if (database in g_schemaMap) {
-        session.dropTempTable(database);
-        const table_list = Object.keys(g_schemaMap[database]);
-        asyncEach(table_list, (table, done) => {
-            const engine = getEngine(database, table, session);
-            engine.dropTable({ ...params, table }, (err) => {
-                if (err) {
-                    shared.logger.error('dropDatabase: table:', table, 'drop err:', err);
-                }
-                else {
-                    delete g_schemaMap[database][table];
-                }
-                done(err);
-            });
-        }, (err) => {
-            if (!err) {
-                delete g_schemaMap[database];
-            }
-            done(err);
-        });
-    }
-    else {
-        done({ err: 'db_not_found', args: [database] });
-    }
-}
-function createTable$3(params, done) {
-    const { session, database, table, is_temp } = params;
-    const table_engine = is_temp
-        ? 'memory'
-        : (params.table_engine?.toLowerCase?.() ?? 'raw');
-    if (database === '_dynamodb' && table_engine !== 'raw') {
-        done('access_denied');
-    }
-    else if (database === '_dynamodb') {
-        const engine = getEngineByName('raw');
-        engine.createTable(params, done);
-    }
-    else if (_findTable(database, table, session)) {
-        done({ err: 'table_exists', args: [table] });
-    }
-    else if (!(database in g_schemaMap)) {
-        done({ err: 'db_not_found', args: [database] });
-    }
-    else {
-        const engine = getEngineByName(table_engine);
-        if (engine) {
-            engine.createTable(params, (err) => {
-                if (!err && !is_temp) {
-                    g_schemaMap[database][table] = { table_engine };
-                }
-                done(err);
-            });
-        }
-        else {
-            done({ err: 'ER_UNKNOWN_STORAGE_ENGINE', args: [table_engine] });
-        }
-    }
-}
-function dropTable(params, done) {
-    const { session, database, table } = params;
-    if (database === '_dynamodb') {
-        const engine = getEngineByName('raw');
-        engine.dropTable(params, done);
-    }
-    else if (_findTable(database, table, session)) {
-        const engine = getEngine(database, table, session);
-        engine.dropTable(params, (err) => {
-            if (err) {
-                shared.logger.error('SchemaManager.dropTable: drop error but deleting table anyway: err:', err, database, table);
-            }
-            delete g_schemaMap[database][table];
-            done(err);
-        });
-    }
-    else {
-        done('resource_not_found');
-    }
-}
-
-class Transaction {
-    constructor(auto_commit) {
-        this._dataMap = new Map();
-        this._isAutoCommit = Boolean(auto_commit);
-    }
-    isAutoCommit() {
-        return this._isAutoCommit;
-    }
-    getEngineNameList() {
-        return this._dataMap.keys();
-    }
-    getData(name) {
-        return this._dataMap.get(name);
-    }
-    setData(name, data) {
-        this._dataMap.set(name, data);
-    }
-}
-function run(params, done) {
-    const { dynamodb, session, func } = params;
-    let tx;
-    let func_err;
-    let result_list = [];
-    asyncSeries([
-        (done) => startTransaction({ session, auto_commit: true }, done),
-        (done) => {
-            tx = session.getTransaction();
-            params.transaction = tx;
-            func(params, (err, ...results) => {
-                func_err = err;
-                result_list = results;
-                done();
-            });
-        },
-        (done) => {
-            if (tx.isAutoCommit()) {
-                if (func_err) {
-                    rollback({ dynamodb, session }, done);
-                }
-                else {
-                    commit({ dynamodb, session }, done);
-                }
-            }
-            else {
-                done();
-            }
-        },
-    ], (err) => done(func_err || err, ...result_list));
-}
-function startTransaction(params, done) {
-    const { session, auto_commit } = params;
-    const existing = session.getTransaction();
-    if (!existing) {
-        const tx = new Transaction(auto_commit);
-        session.setTransaction(tx);
-    }
-    done();
-}
-function commit(params, done) {
-    _txEach(params, ({ engine, ...other }, done) => engine.commit(other, done), done);
-}
-function rollback(params, done) {
-    _txEach(params, ({ engine, ...other }, done) => engine.rollback(other, done), done);
-}
-function _txEach(params, callback, done) {
-    const { dynamodb, session } = params;
-    const transaction = session.getTransaction();
-    if (transaction) {
-        const list = transaction.getEngineNameList();
-        asyncEach(list, (name, done) => {
-            const engine = getEngineByName(name);
-            const data = transaction.getData(name);
-            callback({ engine, dynamodb, session, transaction, data }, done);
-        }, (err) => {
-            session.setTransaction(null);
-            done(err);
-        });
-    }
-    else {
-        done();
-    }
-}
-
-function query$8(params, done) {
-    const { ast, dynamodb, session } = params;
-    const database = ast.table?.[0]?.db || session.getCurrentDatabase();
-    const table = ast.table?.[0]?.table;
-    const engine = getEngine(database, table, session);
-    if (ast.table && database) {
-        const opts = {
-            dynamodb,
-            ast,
-            engine,
-            session,
-            func: _runAlterTable,
-        };
-        run(opts, done);
-    }
-    else if (ast.table) {
-        done('no_current_database');
-    }
-    else {
-        done('unsupported');
-    }
-}
-function _runAlterTable(params, done) {
-    const { ast, dynamodb, engine, session } = params;
-    const table = ast.table?.[0]?.table;
-    const column_list = [];
-    asyncSeries([
-        (done) => asyncEachSeries(ast.expr, (def, done) => {
-            if (def.resource === 'column' && def.action === 'add') {
-                const column_name = def.column?.column;
-                const type = def.definition?.dataType;
-                const length = def.definition?.length;
-                column_list.push({
-                    name: column_name,
-                    type,
-                    length,
-                });
-                const opts = {
-                    dynamodb,
-                    session,
-                    table,
-                    column_name,
-                    type,
-                    length,
-                };
-                engine.addColumn(opts, done);
-            }
-            else {
-                done();
-            }
-        }, done),
-        (done) => asyncEachSeries(ast.expr, (def, done) => {
-            if (def.resource === 'index' && def.action === 'add') {
-                let key_err;
-                const key_list = def.definition?.map?.((sub) => {
-                    const column_def = column_list.find((col) => col.name === sub.column);
-                    if (!column_def) {
-                        key_err = {
-                            err: 'ER_KEY_COLUMN_DOES_NOT_EXITS',
-                            args: [sub.column],
-                        };
-                    }
-                    return {
-                        name: sub.column,
-                        order_by: sub.order_by,
-                        type: column_def?.type,
-                    };
-                }) || [];
-                if (key_err) {
-                    done(key_err);
-                }
-                else {
-                    const opts = {
-                        dynamodb,
-                        session,
-                        table,
-                        index_name: def.index,
-                        key_list,
-                    };
-                    engine.createIndex(opts, (err) => {
-                        if (err === 'index_exists') {
-                            err = {
-                                err: 'ER_DUP_KEYNAME',
-                                args: [def.index],
-                            };
-                        }
-                        done(err);
-                    });
-                }
-            }
-            else if (def.resource === 'index' && def.action === 'drop') {
-                const opts = {
-                    dynamodb,
-                    session,
-                    table,
-                    index_name: def.index,
-                };
-                engine.deleteIndex(opts, (err) => {
-                    if (err === 'index_not_found') {
-                        err = {
-                            err: 'ER_CANT_DROP_FIELD_OR_KEY',
-                            args: [def.index],
-                        };
-                    }
-                    done(err);
-                });
-            }
-            else {
-                done();
-            }
-        }, done),
-    ], (err) => done(err, err ? undefined : {}));
-}
-
 const FIELD_FLAGS = {
     NOT_NULL: 1,
     UNSIGNED: 32,
@@ -24572,6 +19298,3671 @@ const CODE_ERRNO = {
     ER_CANT_START_SERVER_NAMED_PIPE: 3230,
 };
 
+function jsonStringify(value, replacer, space) {
+    try {
+        return JSON.stringify(value, replacer, space);
+    }
+    catch {
+        return '';
+    }
+}
+function trackFirstSeen(map, keys) {
+    let ret = true;
+    if (keys.length > 1) {
+        let sub = map.get(keys[0]);
+        if (sub) {
+            if (sub.has(keys[1])) {
+                ret = false;
+            }
+            else {
+                sub.set(keys[1], true);
+            }
+        }
+        else {
+            sub = new Map();
+            sub.set(keys[1], true);
+            map.set(keys[0], sub);
+        }
+    }
+    else if (map.has(keys[0])) {
+        ret = false;
+    }
+    else {
+        map.set(keys[0], true);
+    }
+    return ret;
+}
+
+const { isNativeError } = node_util.types;
+const DEFAULT_ERRNO = 1002;
+const DEFAULT_CODE = 'ER_NO';
+const ERROR_MAP = {
+    dup_table_insert: {
+        code: 'ER_DUP_ENTRY',
+        sqlMessage: errStr `Duplicate entry for table '${0}' and item '${1}'`,
+    },
+    dup: {
+        code: 'ER_DUP_ENTRY',
+        sqlMessage: 'Duplicate entry',
+    },
+    dup_primary_key_entry: {
+        code: 'ER_DUP_ENTRY',
+        sqlMessage: errStr `Duplicate entry for value '${1}' for '${0}'`,
+    },
+    parse: {
+        code: 'ER_PARSE_ERROR',
+        sqlMessage: errStr `You have an error in your SQL syntax; check your syntax near column ${1} at line ${0}`,
+    },
+    syntax_err: {
+        code: 'ER_PARSE_ERROR',
+        sqlMessage: errStr `You have an error in your SQL syntax; check your syntax near ${0}`,
+    },
+    ER_EMPTY_QUERY: {
+        code: 'ER_EMPTY_QUERY',
+        sqlMessage: 'Query was empty',
+    },
+    multiple_statements_disabled: {
+        code: 'ER_PARSE_ERROR',
+        sqlMessage: 'Multiple statements are disabled.  See the "multipleStatements" session option.',
+    },
+    unsupported: {
+        code: 'ER_NO',
+        sqlMessage: 'Unsupport sql feature.',
+    },
+    unsupported_type: {
+        code: 'ER_NO',
+        sqlMessage: errStr `Unsupported query type: ${0}`,
+    },
+    database_no_drop_builtin: {
+        code: 'ER_DBACCESS_DENIED_ERROR',
+        sqlMessage: "Can't drop a built in database",
+    },
+    database_exists: {
+        code: 'ER_DB_CREATE_EXISTS',
+        sqlMessage: 'Database exists',
+    },
+    no_current_database: {
+        code: 'ER_NO_DB_ERROR',
+        sqlMessage: 'No database selected',
+    },
+    db_not_found: {
+        code: 'ER_BAD_DB_ERROR',
+        sqlMessage: errStr `Unknown database '${0}'`,
+    },
+    table_not_found: {
+        code: 'ER_NO_SUCH_TABLE',
+        sqlMessage: errStr `Table '${0}' doesn't exist`,
+    },
+    column_not_found: {
+        code: 'ER_BAD_FIELD_ERROR',
+        sqlMessage: errStr `Unknown column '${0}'`,
+    },
+    ER_BAD_TABLE_ERROR: {
+        code: 'ER_BAD_TABLE_ERROR',
+        sqlMessage: errStr `Unknown  table '${0}'`,
+    },
+    ER_SP_DOES_NOT_EXIST: {
+        code: 'ER_SP_DOES_NOT_EXIST',
+        sqlMessage: errStr `FUNCTION ${0} does not exist`,
+    },
+    ER_TOO_BIG_PRECISION: {
+        code: 'ER_TOO_BIG_PRECISION',
+        sqlMessage: 'Too-big precision specified. Maximum is 6.',
+    },
+    table_exists: {
+        code: 'ER_TABLE_EXISTS_ERROR',
+        sqlMessage: 'Table already exists.',
+    },
+    bad_interval_usage: {
+        code: 'ER_PARSE_ERROR',
+        sqlMessage: 'You have an error in your SQL syntax.  Check near "INTERVAL".',
+    },
+    ER_WRONG_VALUE_COUNT_ON_ROW: {
+        code: 'ER_WRONG_VALUE_COUNT_ON_ROW',
+        sqlMessage: errStr `Column count doesn't match value count at row ${0}`,
+    },
+    ER_BAD_NULL_ERROR: {
+        code: 'ER_BAD_NULL_ERROR',
+    },
+    ER_TRUNCATED_WRONG_VALUE_FOR_FIELD: {
+        code: 'ER_TRUNCATED_WRONG_VALUE_FOR_FIELD',
+    },
+    ER_KEY_COLUMN_DOES_NOT_EXITS: {
+        code: 'ER_KEY_COLUMN_DOES_NOT_EXITS',
+        sqlMessage: errStr `Key column '${0}' doesn't exist in table`,
+    },
+    ER_DUP_KEYNAME: {
+        code: 'ER_DUP_KEYNAME',
+        sqlMessage: errStr `Duplicate key name '${0}'`,
+    },
+    ER_CANT_DROP_FIELD_OR_KEY: {
+        code: 'ER_CANT_DROP_FIELD_OR_KEY',
+        sqlMessage: errStr `Can't DROP '${0}'; check that column/key exists`,
+    },
+    ER_UNKNOWN_STORAGE_ENGINE: {
+        code: 'ER_UNKNOWN_STORAGE_ENGINE',
+        sqlMessage: errStr `Unknown storage engine '${0}'`,
+    },
+    access_denied: {
+        code: 'ER_DBACCESS_DENIED_ERROR',
+        sqlMessage: 'Access denied',
+    },
+};
+class SQLError extends Error {
+    code;
+    errno;
+    sqlMessage;
+    sql;
+    constructor(err, sql) {
+        const sql_err = ERROR_MAP[err] || ERROR_MAP[err.err];
+        const code = err.code || sql_err?.code || DEFAULT_CODE;
+        const errno = err.errno ||
+            sql_err?.errno ||
+            CODE_ERRNO[code] ||
+            DEFAULT_ERRNO;
+        let sqlMessage = err.sqlMessage || sql_err?.sqlMessage;
+        if (typeof sqlMessage === 'function') {
+            sqlMessage = sqlMessage(err.args);
+        }
+        const message = err.message ||
+            sqlMessage ||
+            (typeof err === 'string' ? err : undefined);
+        if (err.cause) {
+            super(message, { cause: err.cause });
+        }
+        else if (isNativeError(err) || code === DEFAULT_CODE) {
+            super(message, { cause: err });
+        }
+        else {
+            super(message);
+        }
+        this.code = code;
+        this.errno = errno;
+        if (sqlMessage) {
+            this.sqlMessage = sqlMessage;
+        }
+        if (sql) {
+            this.sql = sql;
+        }
+    }
+}
+function errStr(strings, ...index_list) {
+    return function (arg_list) {
+        let s = '';
+        for (let i = 0; i < strings.length; i++) {
+            s += strings[i];
+            s += _stringify(arg_list?.[index_list?.[i]]);
+        }
+        return s;
+    };
+}
+function _stringify(arg) {
+    let ret = arg || '';
+    if (arg === null) {
+        ret = 'NULL';
+    }
+    else if (Array.isArray(arg)) {
+        ret = arg.map(_stringify).join(',');
+    }
+    else if (typeof arg === 'object' &&
+        arg.toString === Object.prototype.toString) {
+        ret = jsonStringify(arg);
+    }
+    return ret;
+}
+class NoSingleOperationError extends Error {
+    constructor() {
+        super('no_single');
+        this.name = 'NoSingleOperationError';
+    }
+}
+
+const TYPE_MAP = {
+    S: 'string',
+    N: 'number',
+    B: 'buffer',
+};
+const sleep$1 = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+async function getTableInfo$1(params) {
+    const { dynamodb, table } = params;
+    const getTable = util.promisify(dynamodb.getTable.bind(dynamodb));
+    const data = await getTable(table).catch((err) => {
+        shared.logger.error('getTableInfo: err:', err, table);
+        throw err;
+    });
+    if (!data || !data.Table) {
+        throw new Error('bad_data');
+    }
+    const column_list = data.Table.AttributeDefinitions.map((def) => ({
+        name: def.AttributeName,
+        type: TYPE_MAP[def.AttributeType],
+    }));
+    const primary_key = data.Table.KeySchema.map((key) => {
+        const type = column_list.find((col) => col.name === key.AttributeName).type;
+        return { name: key.AttributeName, type };
+    });
+    return {
+        table,
+        primary_key,
+        column_list,
+        is_open: true,
+    };
+}
+async function getTableList$4(params) {
+    const { dynamodb } = params;
+    const getTableList = util.promisify(dynamodb.getTableList.bind(dynamodb));
+    const results = await getTableList().catch((err) => {
+        shared.logger.error('raw_engine.getTableList: err:', err);
+        throw err;
+    });
+    return results;
+}
+async function createTable$5(params) {
+    const { dynamodb, table, primary_key, ...other } = params;
+    const column_list = params.column_list.filter((column) => primary_key.find((key) => key.name === column.name));
+    const opts = { ...other, table, primary_key, column_list };
+    const createTable = util.promisify(dynamodb.createTable.bind(dynamodb));
+    try {
+        await createTable(opts);
+        await _waitForTable({ dynamodb, table });
+    }
+    catch (err) {
+        if (err?.message === 'resource_in_use') {
+            throw new SQLError('table_exists');
+        }
+        shared.logger.error('raw_engine.createTable: err:', err);
+        throw err;
+    }
+}
+async function dropTable$2(params) {
+    const { dynamodb, table } = params;
+    const deleteTable = util.promisify(dynamodb.deleteTable.bind(dynamodb));
+    try {
+        await deleteTable(table);
+    }
+    catch (delete_err) {
+        if (delete_err?.code === 'ResourceNotFoundException') {
+            throw new SQLError('table_not_found');
+        }
+        shared.logger.error('raw_engine.dropTable: deleteTable err:', delete_err);
+        throw delete_err;
+    }
+    try {
+        await _waitForTable({ dynamodb, table });
+    }
+    catch (wait_err) {
+        if (wait_err?.message === 'resource_not_found') {
+            return;
+        }
+        shared.logger.error('raw_engine.dropTable: waitForTable err:', wait_err);
+        throw wait_err;
+    }
+}
+async function addColumn$1(params) { }
+async function createIndex$3(params) {
+    const { dynamodb, table, index_name, key_list } = params;
+    const opts = { table, index_name, key_list };
+    const createIndex = util.promisify(dynamodb.createIndex.bind(dynamodb));
+    try {
+        await createIndex(opts);
+        await _waitForTable({ dynamodb, table, index_name });
+    }
+    catch (err) {
+        if (err?.message === 'resource_in_use' ||
+            err?.message?.indexOf?.('already exists') >= 0) {
+            throw new Error('index_exists');
+        }
+        shared.logger.error('raw_engine.createIndex: err:', err);
+        throw err;
+    }
+}
+async function deleteIndex$3(params) {
+    const { dynamodb, table, index_name } = params;
+    const deleteIndex = util.promisify(dynamodb.deleteIndex.bind(dynamodb));
+    try {
+        await deleteIndex({ table, index_name });
+        await _waitForTable({ dynamodb, table, index_name });
+    }
+    catch (err) {
+        if (err?.message === 'resource_not_found') {
+            throw new Error('index_not_found');
+        }
+        shared.logger.error('raw_engine.deleteIndex: err:', err);
+        throw err;
+    }
+}
+async function _waitForTable(params) {
+    const { dynamodb, table, index_name } = params;
+    const LOOP_MS = 500;
+    const getTable = util.promisify(dynamodb.getTable.bind(dynamodb));
+    while (true) {
+        try {
+            const result = await getTable(table);
+            const status = result?.Table?.TableStatus;
+            if (status === 'CREATING' ||
+                status === 'UPDATING' ||
+                status === 'DELETING') {
+                await sleep$1(LOOP_MS);
+                continue;
+            }
+            if (index_name) {
+                const index = result?.Table?.GlobalSecondaryIndexes?.find?.((item) => item.IndexName === index_name);
+                if (index && index.IndexStatus !== 'ACTIVE') {
+                    await sleep$1(LOOP_MS);
+                    continue;
+                }
+            }
+            return;
+        }
+        catch (err) {
+            throw err;
+        }
+    }
+}
+
+const YEAR_MULT = 10000;
+const MONTH_MULT = 100;
+const DAY_MULT = 1;
+const HOUR_MULT = 10000;
+const MINUTE_MULT = 100;
+const DATE_TIME_MULT = 10000;
+class SQLDateTime {
+    _time;
+    _fraction = 0;
+    _fractionText = '';
+    _type;
+    _decimals;
+    _date = null;
+    constructor(time_arg, type, decimals) {
+        this._time = Math.floor(time_arg?.time ?? time_arg);
+        if (time_arg?.fraction !== undefined) {
+            this._fraction = time_arg.fraction;
+        }
+        else if (typeof time_arg === 'number') {
+            this._fraction = parseFloat('0.' + (String(time_arg).split('.')[1] || '').slice(0, 6).padEnd(6, '0'));
+        }
+        else {
+            this._fraction = 0;
+        }
+        this._type = type || 'datetime';
+        if (type === 'date') {
+            this._decimals = 0;
+            this._time -= this._time % (24 * 60 * 60);
+            this._fraction = 0;
+        }
+        else {
+            this._decimals = decimals ?? (this._fraction ? 6 : 0);
+            this._fraction = parseFloat(this._fraction.toFixed(this._decimals));
+            let fd = 0;
+            if (this._fraction >= 1.0) {
+                this._fraction = 0;
+                this._time += this._time < 0 ? -1 : 1;
+            }
+            else {
+                fd = this._fraction;
+            }
+            if (this._decimals > 0) {
+                this._fractionText =
+                    '.' + fd.toFixed(this._decimals).slice(-this._decimals);
+            }
+        }
+    }
+    _makeDate() {
+        if (!this._date) {
+            this._date = new Date(Math.floor(this._time * 1000));
+        }
+    }
+    getType() {
+        return this._type;
+    }
+    getTime() {
+        return this._time;
+    }
+    getFraction() {
+        return this._fraction;
+    }
+    getDecimals() {
+        return this._decimals;
+    }
+    toString() {
+        let ret;
+        this._makeDate();
+        if (isNaN(this._date)) {
+            ret = '';
+        }
+        else {
+            ret = this._date.toISOString().replace('T', ' ');
+            if (this._type === 'date') {
+                ret = ret.slice(0, 10);
+            }
+            else {
+                ret = ret.replace(/\..*/, '');
+                if (this._decimals > 0) {
+                    ret = ret + this._fractionText;
+                }
+            }
+        }
+        return ret;
+    }
+    dateFormat(format) {
+        let ret;
+        this._makeDate();
+        if (isNaN(this._date)) {
+            ret = '';
+        }
+        else {
+            ret = _dateFormat(this._date, format);
+        }
+        return ret;
+    }
+    toDate() {
+        this._makeDate();
+        return this._date;
+    }
+    toNumber() {
+        let ret = 0;
+        this._makeDate();
+        ret += this._date.getUTCFullYear() * YEAR_MULT;
+        ret += (this._date.getUTCMonth() + 1) * MONTH_MULT;
+        ret += this._date.getUTCDate() * DAY_MULT;
+        if (this._type === 'datetime') {
+            ret = ret * DATE_TIME_MULT;
+            ret += this._date.getUTCHours() * HOUR_MULT;
+            ret += this._date.getUTCMinutes() * MINUTE_MULT;
+            ret += this._date.getUTCSeconds();
+            if (this._decimals > 0) {
+                ret += this._fraction;
+            }
+        }
+        return ret;
+    }
+}
+function createSQLDateTime(arg, type, decimals) {
+    let ret;
+    if (arg instanceof SQLDateTime) {
+        if (arg.getType() === type && arg.getDecimals() === decimals) {
+            ret = arg;
+        }
+        else {
+            const opts = {
+                time: arg.getTime(),
+                fraction: arg.getFraction(),
+            };
+            ret = new SQLDateTime(opts, type ?? arg.getType(), decimals ?? arg.getDecimals());
+        }
+    }
+    else {
+        const time = arg?.time ?? arg;
+        if (isNaN(time)) {
+            ret = null;
+        }
+        else if (time >= 253402300800) {
+            ret = null;
+        }
+        else if (time <= -62167219201) {
+            ret = null;
+        }
+        else {
+            ret = new SQLDateTime(arg, type, decimals);
+        }
+    }
+    return ret;
+}
+function createDateTime(arg, type, decimals) {
+    return createSQLDateTime(arg, type, decimals);
+}
+const FORMAT_LONG_NUMBER = new Intl.DateTimeFormat('en-US', {
+    weekday: 'long',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    fractionalSecondDigits: 3,
+    hour12: false,
+});
+const FORMAT_SHORT_NUMBER = new Intl.DateTimeFormat('en-US', {
+    weekday: 'short',
+    year: '2-digit',
+    month: 'numeric',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: 'numeric',
+    second: 'numeric',
+    fractionalSecondDigits: 3,
+    hour12: false,
+});
+const FORMAT_LONG_NUMBER_12H = new Intl.DateTimeFormat('en-US', {
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    fractionalSecondDigits: 3,
+    hour12: true,
+});
+const FORMAT_SHORT_NUMBER_12H = new Intl.DateTimeFormat('en-US', {
+    hour: 'numeric',
+    minute: 'numeric',
+    second: 'numeric',
+    fractionalSecondDigits: 3,
+    hour12: true,
+});
+const FORMAT_LONG_TEXT = new Intl.DateTimeFormat('en-US', {
+    weekday: 'long',
+    month: 'long',
+});
+const FORMAT_SHORT_TEXT = new Intl.DateTimeFormat('en-US', {
+    weekday: 'short',
+    month: 'short',
+});
+function _dateFormat(date, format) {
+    const format_map = new Map();
+    function _getPart(formatter, type) {
+        let cached = format_map.get(formatter);
+        if (!cached) {
+            cached = formatter.formatToParts(date);
+            format_map.set(formatter, cached);
+        }
+        const found = cached.find((part) => part.type === type);
+        return found?.value || '';
+    }
+    function _time(formatter) {
+        return (_getPart(formatter, 'hour') +
+            ':' +
+            _getPart(formatter, 'minute') +
+            ':' +
+            _getPart(formatter, 'second'));
+    }
+    return format.replace(/%(.)/g, (_ignore, part) => {
+        let ret = part;
+        let day;
+        switch (part) {
+            case '%':
+                ret = '%';
+                break;
+            case 'a':
+                ret = _getPart(FORMAT_SHORT_NUMBER, 'weekday');
+                break;
+            case 'b':
+                ret = _getPart(FORMAT_SHORT_TEXT, 'month');
+                break;
+            case 'c':
+                ret = _getPart(FORMAT_SHORT_NUMBER, 'month');
+                break;
+            case 'D':
+                day = date.getDate();
+                ret = day + _nthNumber(day);
+                break;
+            case 'd':
+                ret = _getPart(FORMAT_LONG_NUMBER, 'day');
+                break;
+            case 'e':
+                ret = _getPart(FORMAT_SHORT_NUMBER, 'day');
+                break;
+            case 'f':
+                ret = _getPart(FORMAT_LONG_NUMBER, 'fractionalSecond');
+                break;
+            case 'H':
+                ret = _getPart(FORMAT_LONG_NUMBER, 'hour');
+                break;
+            case 'h':
+            case 'I':
+                ret = _getPart(FORMAT_LONG_NUMBER_12H, 'hour');
+                break;
+            case 'i':
+                ret = _getPart(FORMAT_LONG_NUMBER, 'minutes');
+                break;
+            case 'j':
+                //ret = _getPart(, 'dayOfYear');
+                break;
+            case 'k':
+                ret = _getPart(FORMAT_SHORT_NUMBER, 'hour');
+                break;
+            case 'l':
+                ret = _getPart(FORMAT_SHORT_NUMBER_12H, 'hour');
+                break;
+            case 'M':
+                ret = _getPart(FORMAT_LONG_TEXT, 'month');
+                break;
+            case 'm':
+                ret = _getPart(FORMAT_LONG_NUMBER, 'month');
+                break;
+            case 'p':
+                ret = _getPart(FORMAT_SHORT_NUMBER_12H, 'dayPeriod');
+                break;
+            case 'r':
+                ret =
+                    _time(FORMAT_LONG_NUMBER_12H) +
+                        _getPart(FORMAT_LONG_NUMBER_12H, 'dayPeriod');
+                break;
+            case 'S':
+                ret = _getPart(FORMAT_LONG_NUMBER, 'seconds');
+                break;
+            case 's':
+                ret = _getPart(FORMAT_LONG_NUMBER, 'seconds');
+                break;
+            case 'T':
+                ret = _time(FORMAT_LONG_NUMBER);
+                break;
+            case 'U':
+                //ret = _getPart(, 'week');
+                break;
+            case 'u':
+                //ret = _getPart(, 'week');
+                break;
+            case 'V':
+                //ret = _getPart(, 'week');
+                break;
+            case 'v':
+                //ret = _getPart(, 'week');
+                break;
+            case 'W':
+                ret = _getPart(FORMAT_LONG_NUMBER, 'weekday');
+                break;
+            case 'w':
+                ret = String(date.getDay());
+                break;
+            case 'X':
+                ret = _getPart(FORMAT_LONG_NUMBER, 'year');
+                break;
+            case 'x':
+                ret = _getPart(FORMAT_LONG_NUMBER, 'year');
+                break;
+            case 'Y':
+                ret = _getPart(FORMAT_LONG_NUMBER, 'year');
+                break;
+            case 'y':
+                ret = _getPart(FORMAT_SHORT_NUMBER, 'year');
+                break;
+        }
+        return ret;
+    });
+}
+function _nthNumber(number) {
+    let ret = '';
+    if (number > 3 && number < 21) {
+        ret = 'th';
+    }
+    else {
+        const temp = number % 10;
+        if (temp === 1) {
+            ret = 'st';
+        }
+        else if (temp === 2) {
+            ret = 'nd';
+        }
+        else if (temp === 3) {
+            ret = 'rd';
+        }
+        else {
+            ret = 'th';
+        }
+    }
+    return ret;
+}
+
+const MINUTE$1 = 60;
+const HOUR$1 = MINUTE$1 * 60;
+const DAY$2 = 24 * HOUR$1;
+class SQLTime {
+    _time;
+    _decimals;
+    constructor(time, decimals) {
+        this._time = time;
+        this._decimals = decimals || 0;
+    }
+    getType() {
+        return 'time';
+    }
+    getTime() {
+        return this._time;
+    }
+    getFraction() {
+        return 0;
+    }
+    getDecimals() {
+        return this._decimals;
+    }
+    toString() {
+        let ret;
+        if (isNaN(this._time)) {
+            ret = '';
+        }
+        else {
+            let seconds = this._time;
+            const neg = seconds < 0 ? '-' : '';
+            if (neg) {
+                seconds = -seconds;
+            }
+            const hours = Math.floor(seconds / HOUR$1);
+            seconds -= hours * HOUR$1;
+            const minutes = Math.floor(seconds / MINUTE$1);
+            seconds -= minutes * MINUTE$1;
+            const ret_secs = (seconds < 10 ? '0' : '') + seconds.toFixed(this._decimals);
+            ret = `${neg}${_pad(hours)}:${_pad(minutes)}:${ret_secs}`;
+        }
+        return ret;
+    }
+    toSQLDateTime(decimals) {
+        const now = Date.now() / 1000;
+        const time = now - (now % DAY$2) + this._time;
+        return createDateTime(time, 'datetime', decimals ?? this._decimals);
+    }
+    toNumber() {
+        let seconds = this._time;
+        const hours = Math.floor(seconds / HOUR$1);
+        seconds -= hours * HOUR$1;
+        const minutes = Math.floor(seconds / MINUTE$1);
+        seconds -= minutes * MINUTE$1;
+        return hours * 10000 + minutes * 100 + seconds;
+    }
+}
+function createSQLTime(time, decimals) {
+    let ret;
+    if (isNaN(time)) {
+        ret = null;
+    }
+    else {
+        ret = new SQLTime(time, decimals);
+    }
+    return ret;
+}
+function _pad(num) {
+    return (num < 10 ? '0' : '') + num;
+}
+
+const MINUTE = 60;
+const HOUR = 60 * MINUTE;
+const DAY$1 = 24 * HOUR;
+function convertNum(value) {
+    let ret = value;
+    if (value === null) {
+        ret = null;
+    }
+    else if (value === '') {
+        ret = 0;
+    }
+    else if (typeof value === 'string') {
+        ret = parseFloat(value);
+        if (isNaN(ret)) {
+            ret = 0;
+        }
+    }
+    else if (value?.toNumber) {
+        ret = value.toNumber();
+    }
+    return ret;
+}
+function convertBooleanValue(value) {
+    let ret;
+    if (value === null) {
+        ret = null;
+    }
+    else if (typeof value === 'number') {
+        ret = value ? 1 : 0;
+    }
+    else {
+        ret = convertNum(value) ? 1 : 0;
+    }
+    return ret;
+}
+const SEP = `[-^\\][!@#$%&*()_+={}\\|/\\\\<>,.:;"']+`;
+const DATE_RS = `^([0-9]{1,4})${SEP}([0-2]?[0-9])${SEP}([0-3]?[0-9])`;
+const DEC_RS = `(\\.[0-9]{1,6})?`;
+const DIGIT_RS = `(${SEP}([0-5]?[0-9]))?`;
+const DT_RS = `${DATE_RS}(\\s+|T)([0-2]?[0-9])${DIGIT_RS}${DIGIT_RS}${DEC_RS}`;
+const DATE4_RS = `^([0-9]{4})([0-1][0-9])([0-3][0-9])`;
+const DATETIME4_RS = `${DATE4_RS}([0-2][0-9])([0-5][0-9])(([0-5][0-9])${DEC_RS})?`;
+const DATE2_RS = `^([0-9]{2})([0-1][0-9])([0-3][0-9])`;
+const DATETIME2_RS = `${DATE2_RS}([0-2][0-9])([0-5][0-9])(([0-5][0-9])${DEC_RS})?`;
+const DATE_REGEX = new RegExp(DATE_RS + '$');
+const DATETIME_REGEX = new RegExp(DT_RS);
+const DATE4_REGEX = new RegExp(DATE4_RS);
+const DATETIME4_REGEX = new RegExp(DATETIME4_RS);
+const DATE2_REGEX = new RegExp(DATE2_RS);
+const DATETIME2_REGEX = new RegExp(DATETIME2_RS);
+function convertDateTime(value, type, decimals) {
+    let ret;
+    if (value === null) {
+        ret = null;
+    }
+    else if (value instanceof SQLDateTime) {
+        ret = createSQLDateTime(value, type, decimals);
+    }
+    else if (value instanceof SQLTime) {
+        ret = value.toSQLDateTime(decimals);
+    }
+    else if (typeof value === 'string') {
+        let time = _stringToDateTime(value);
+        if (time === undefined) {
+            time = _stringToDate(value);
+            if (!type) {
+                type = 'date';
+            }
+        }
+        if (time === undefined) {
+            time = _numToDateTime(value);
+        }
+        if (time === undefined) {
+            ret = null;
+        }
+        else {
+            ret = createSQLDateTime(time, type ?? 'datetime', decimals);
+        }
+    }
+    else if (typeof value === 'number') {
+        const time = _numToDateTime(value);
+        if (time === undefined) {
+            ret = null;
+        }
+        else {
+            ret = createSQLDateTime(time, type, decimals);
+        }
+    }
+    return ret;
+}
+const DAY_TIME_REGEX = /^(-)?([0-9]+)\s+([0-9]*)(:([0-9]{1,2}))?(:([0-9]{1,2}))?(\.[0-9]+)?/;
+const TIME_REGEX = /^(-)?([0-9]*):([0-9]{1,2})(:([0-9]{1,2}))?(\.[0-9]+)?/;
+function convertTime(value, decimals) {
+    let ret;
+    if (value instanceof SQLTime) {
+        ret = value;
+    }
+    else if (typeof value === 'string') {
+        let time = _stringToTime(value);
+        if (time === undefined) {
+            const result = _stringToDateTime(value);
+            if (result !== undefined) {
+                time = (result.time % DAY$1) + (result.fraction || 0);
+            }
+        }
+        if (time === undefined) {
+            const num = parseFloat(value);
+            if (!isNaN(num)) {
+                time = _numToTime(num);
+            }
+        }
+        if (time === undefined) {
+            ret = null;
+        }
+        else {
+            ret = createSQLTime(time, decimals);
+        }
+    }
+    else if (typeof value === 'number') {
+        const time = _numToTime(value);
+        ret = createSQLTime(time, decimals);
+    }
+    return ret;
+}
+function _stringToTime(value) {
+    let ret;
+    value = value.trim();
+    let match = value.match(DAY_TIME_REGEX);
+    if (match) {
+        const negative = match[1];
+        const days = parseInt(match[2]);
+        const hours = parseInt(match[3]);
+        const mins = parseInt(match[5] || '0');
+        const secs = parseInt(match[7] || '0');
+        const fraction = parseFloat('0' + match[8]);
+        ret = days * DAY$1 + hours * HOUR + mins * MINUTE + secs + fraction;
+        if (negative) {
+            ret = -ret;
+        }
+    }
+    if (ret === undefined) {
+        match = value.match(TIME_REGEX);
+        if (match) {
+            const negative = match[1];
+            const hours = parseInt(match[2]);
+            const mins = parseInt(match[3] || '0');
+            const secs = parseInt(match[5] || '0');
+            const fraction = parseFloat('0' + match[6]);
+            ret = hours * HOUR + mins * MINUTE + secs + fraction;
+            if (negative) {
+                ret = -ret;
+            }
+        }
+    }
+    return ret;
+}
+function _stringToDate(value) {
+    let ret;
+    const match = value.trim().match(DATE_REGEX);
+    if (match) {
+        const year = _fix2year(match[1]);
+        const month = match[2];
+        const day = match[3];
+        ret = _partsToTime(year, month, day, 0, 0, 0);
+    }
+    return ret;
+}
+function _stringToDateTime(value) {
+    let ret;
+    const match = value.trim().match(DATETIME_REGEX);
+    if (match) {
+        const year = _fix2year(match[1]);
+        const month = match[2];
+        const day = match[3];
+        const hour = match[5];
+        const min = match[7] || '0';
+        const sec = match[9] || '0';
+        const fraction = parseFloat('0' + match[10]);
+        ret = _partsToTime(year, month, day, hour, min, sec, fraction);
+    }
+    return ret;
+}
+function _numToDateTime(number) {
+    let ret;
+    const s = String(number);
+    let match = s.match(DATETIME4_REGEX);
+    if (match) {
+        const year = match[1];
+        const month = match[2];
+        const day = match[3];
+        const hour = match[4];
+        const min = match[5];
+        const sec = match[7] || '0';
+        const fraction = parseFloat('0' + match[8]);
+        ret = _partsToTime(year, month, day, hour, min, sec, fraction);
+    }
+    if (ret === undefined) {
+        match = s.match(DATETIME2_REGEX);
+        if (match) {
+            const year = _fix2year(match[1]);
+            const month = match[2];
+            const day = match[3];
+            const hour = match[4];
+            const min = match[5];
+            const sec = match[7] || '0';
+            const fraction = parseFloat('0' + match[8]);
+            ret = _partsToTime(year, month, day, hour, min, sec, fraction);
+        }
+    }
+    if (ret === undefined) {
+        match = s.match(DATE4_REGEX);
+        if (match) {
+            const year = match[1];
+            const month = match[2];
+            const day = match[3];
+            ret = _partsToTime(year, month, day, 0, 0, 0);
+        }
+    }
+    if (ret === undefined) {
+        match = s.match(DATE2_REGEX);
+        if (match) {
+            const year = _fix2year(match[1]);
+            const month = match[2];
+            const day = match[3];
+            ret = _partsToTime(year, month, day, 0, 0, 0);
+        }
+    }
+    return ret;
+}
+function _numToTime(number) {
+    const hours = Math.floor(number / 10000);
+    number -= hours * 10000;
+    const minutes = Math.floor(number / 100);
+    number -= minutes * 100;
+    return hours * HOUR + minutes * MINUTE + number;
+}
+function getDecimals(value, max) {
+    let ret = 0;
+    if (typeof value === 'number') {
+        ret = String(value).split('.')?.[1]?.length || 0;
+    }
+    else if (typeof value === 'string') {
+        ret = value.split('.')?.[1]?.length || 0;
+    }
+    {
+        ret = Math.min(max, ret);
+    }
+    return ret;
+}
+function _pad2(num) {
+    return String(num).padStart(2, '0');
+}
+function _pad4(num) {
+    return String(num).padStart(4, '0');
+}
+function _fix2year(num) {
+    let ret = num;
+    if (num?.length <= 2) {
+        ret = parseInt(num);
+        if (num >= 0 && num <= 69) {
+            ret += 2000;
+        }
+        else if (num >= 70 && num <= 99) {
+            ret += 1900;
+        }
+    }
+    return ret;
+}
+function _partsToTime(year, month, day, hour, min, sec, fraction) {
+    const iso = `${_pad4(year)}-${_pad2(month)}-${_pad2(day)}T${_pad2(hour)}:${_pad2(min)}:${_pad2(sec)}Z`;
+    const time = Date.parse(iso);
+    let ret;
+    if (!isNaN(time)) {
+        ret = {
+            time: time / 1000,
+            fraction,
+        };
+    }
+    return ret;
+}
+
+function sum(expr, state) {
+    const { row, ...other } = state;
+    const group = row?.['@@group'] || [{}];
+    let err;
+    let value = 0;
+    let name = 'SUM(';
+    group.forEach((group_row, i) => {
+        other.row = group_row;
+        const result = getValue(expr.args?.expr, other);
+        if (i === 0) {
+            name += result.name;
+        }
+        if (!err && result.err) {
+            err = result.err;
+        }
+        else if (result.value === null) {
+            value = null;
+        }
+        else if (value !== null) {
+            value += convertNum(result.value);
+        }
+    });
+    name += ')';
+    return { err, value, type: 'number', name };
+}
+
+var AggregateFunctions = /*#__PURE__*/Object.freeze({
+	__proto__: null,
+	sum: sum
+});
+
+function _isDateOrTimeLike(type) {
+    return type === 'date' || type === 'datetime' || type === 'time';
+}
+function _isDateLike(type) {
+    return type === 'date' || type === 'datetime';
+}
+function _numBothSides(expr, state, op, allow_interval) {
+    const left = getValue(expr.left, state);
+    const right = getValue(expr.right, state);
+    let err = left.err || right.err;
+    const name = left.name + op + right.name;
+    let value;
+    let left_num;
+    let right_num;
+    let interval;
+    let datetime;
+    if (!err) {
+        if (left.value === null || right.value === null) {
+            value = null;
+        }
+        else if (allow_interval && left.type === 'interval') {
+            interval = left.value;
+            if (_isDateOrTimeLike(right.type)) {
+                datetime = right.value;
+            }
+            else if (typeof right.value === 'string') {
+                datetime = convertDateTime(left.value);
+                if (!datetime) {
+                    value = null;
+                }
+            }
+            else {
+                value = null;
+            }
+        }
+        else if (allow_interval && right.type === 'interval') {
+            interval = right.value;
+            if (_isDateOrTimeLike(left.type)) {
+                datetime = left.value;
+            }
+            else if (typeof left.value === 'string') {
+                datetime = convertDateTime(left.value);
+                if (!datetime) {
+                    value = null;
+                }
+            }
+            else {
+                value = null;
+            }
+        }
+        else if (right.type === 'interval' || left.type === 'interval') {
+            err = 'bad_interval_usage';
+        }
+        else {
+            left_num = convertNum(left.value);
+            right_num = convertNum(right.value);
+            if (left_num === null || right_num === null) {
+                value = null;
+            }
+        }
+    }
+    return { err, name, value, left_num, right_num, interval, datetime };
+}
+function plus$1(expr, state) {
+    let { err, name, value, left_num, right_num, interval, datetime } = _numBothSides(expr, state, ' + ', true);
+    let type;
+    if (!err && value !== null) {
+        if (datetime) {
+            const result = interval.add(datetime);
+            value = result.value;
+            type = result.type;
+        }
+        else {
+            value = left_num + right_num;
+            type = 'number';
+        }
+    }
+    return { err, value, type, name };
+}
+function minus$2(expr, state) {
+    let { err, name, value, left_num, right_num, interval, datetime } = _numBothSides(expr, state, ' - ', true);
+    let type;
+    if (!err && value !== null) {
+        if (datetime) {
+            const result = interval.sub(datetime);
+            value = result.value;
+            type = result.type;
+        }
+        else {
+            value = left_num - right_num;
+            type = 'number';
+        }
+    }
+    return { err, value, type, name };
+}
+function div(expr, state) {
+    let { err, name, value, left_num, right_num } = _numBothSides(expr, state, ' / ');
+    if (!err && value !== null) {
+        value = left_num / right_num;
+    }
+    return { err, value, name };
+}
+function _convertCompare(left, right) {
+    if (left.value !== null &&
+        right.value !== null &&
+        left.value !== right.value) {
+        if ((_isDateLike(left.type) || _isDateLike(right.type)) &&
+            left.type !== right.type) {
+            const union = _unionDateTime(left.type, right.type);
+            if (union === 'date' || union === 'datetime') {
+                left.value = convertDateTime(left.value, union, 6) ?? left.value;
+                right.value = convertDateTime(right.value, union, 6) ?? right.value;
+            }
+        }
+        if (typeof left.value === 'number' ||
+            typeof right.value === 'number' ||
+            left.type === 'number' ||
+            right.type === 'number') {
+            left.value = convertNum(left.value);
+            right.value = convertNum(right.value);
+        }
+        else {
+            if (typeof left.value !== 'string') {
+                left.value = String(left.value);
+            }
+            if (typeof right.value !== 'string') {
+                right.value = String(right.value);
+            }
+        }
+    }
+}
+function _equal$1(expr, state, op) {
+    const left = getValue(expr.left, state);
+    const right = getValue(expr.right, state);
+    const err = left.err || right.err;
+    const name = left.name + op + right.name;
+    let value = 0;
+    if (!err) {
+        _convertCompare(left, right);
+        if (left.value === null || right.value === null) {
+            value = null;
+        }
+        else if (left.value === right.value) {
+            value = 1;
+        }
+        else if (typeof left.value === 'string') {
+            value = left.value.localeCompare(right.value) === 0 ? 1 : 0;
+        }
+    }
+    return { err, value, name };
+}
+function equal$1(expr, state) {
+    return _equal$1(expr, state, ' = ');
+}
+function notEqual$1(expr, state) {
+    const ret = _equal$1(expr, state, ' != ');
+    if (ret.value !== null) {
+        ret.value = ret.value ? 0 : 1;
+    }
+    return ret;
+}
+function _gt$1(expr_left, expr_right, state, op, flip) {
+    const left = getValue(expr_left, state);
+    const right = getValue(expr_right, state);
+    const err = left.err || right.err;
+    const name = flip ? right.name + op + left.name : left.name + op + right.name;
+    let value = 0;
+    if (!err) {
+        _convertCompare(left, right);
+        if (left.value === null || right.value === null) {
+            value = null;
+        }
+        else if (left.value === right.value) {
+            value = 0;
+        }
+        else if (typeof left.value === 'number') {
+            value = left.value > right.value ? 1 : 0;
+        }
+        else {
+            value = left.value.localeCompare(right.value) > 0 ? 1 : 0;
+        }
+    }
+    return { err, value, name };
+}
+function gt$1(expr, state) {
+    return _gt$1(expr.left, expr.right, state, ' > ', false);
+}
+function lt$1(expr, state) {
+    return _gt$1(expr.right, expr.left, state, ' < ', true);
+}
+function _gte$1(expr_left, expr_right, state, op, flip) {
+    const left = getValue(expr_left, state);
+    const right = getValue(expr_right, state);
+    const err = left.err || right.err;
+    const name = flip ? right.name + op + left.name : left.name + op + right.name;
+    let value = 0;
+    if (!err) {
+        _convertCompare(left, right);
+        if (left.value === null || right.value === null) {
+            value = null;
+        }
+        else if (left.value === right.value) {
+            value = 1;
+        }
+        else if (typeof left.value === 'number') {
+            value = convertNum(left.value) >= convertNum(right.value) ? 1 : 0;
+        }
+        else {
+            value = left.value.localeCompare(right.value) >= 0 ? 1 : 0;
+        }
+    }
+    return { err, value, name };
+}
+function gte$1(expr, state) {
+    return _gte$1(expr.left, expr.right, state, ' >= ', false);
+}
+function lte$1(expr, state) {
+    return _gte$1(expr.right, expr.left, state, ' <= ', true);
+}
+function and$1(expr, state) {
+    const left = getValue(expr.left, state);
+    let err = left.err;
+    let name = left.name + ' AND ';
+    let value = 0;
+    if (!err) {
+        value = convertBooleanValue(left.value);
+        if (value !== 0) {
+            const right = getValue(expr.right, state);
+            err = right.err;
+            value = convertBooleanValue(right.value) && value;
+            name = left.name + ' AND ' + right.name;
+        }
+    }
+    return { err, value, name };
+}
+function or$1(expr, state) {
+    const left = getValue(expr.left, state);
+    let err = left.err;
+    let name = left.name + ' OR ';
+    let value = 1;
+    if (!err) {
+        value = convertBooleanValue(left.value);
+        if (!value) {
+            const right = getValue(expr.right, state);
+            err = right.err;
+            const result = convertBooleanValue(right.value);
+            if (result) {
+                value = 1;
+            }
+            else if (value !== null) {
+                value = result;
+            }
+            name = left.name + ' OR ' + right.name;
+        }
+    }
+    return { err, value, name };
+}
+function xor(expr, state) {
+    const left = getValue(expr.left, state);
+    const right = getValue(expr.right, state);
+    const err = left.err || right.err;
+    const name = left.name + ' XOR ' + right.name;
+    let value = 1;
+    if (!err) {
+        const right_bool = convertBooleanValue(right.value);
+        const left_bool = convertBooleanValue(left.value);
+        if (right_bool === null || left_bool === null) {
+            value = null;
+        }
+        else {
+            value = right_bool ^ left_bool;
+        }
+    }
+    return { err, value, name };
+}
+function is$1(expr, state) {
+    return _is$1(expr, state, 'IS');
+}
+function isNot$1(expr, state) {
+    const result = _is$1(expr, state, 'IS NOT');
+    result.value = result.value ? 0 : 1;
+    return result;
+}
+function _is$1(expr, state, op) {
+    const result = getValue(expr.left, state);
+    let right;
+    let right_name;
+    if (expr.right.value === null) {
+        right = null;
+        right_name = 'NULL';
+    }
+    else if (expr.right.value === true) {
+        right = true;
+        right_name = 'TRUE';
+    }
+    else if (expr.right.value === false) {
+        right = false;
+        right_name = 'FALSE';
+    }
+    else if (!result.err) {
+        result.err = { err: 'syntax_err', args: [op] };
+    }
+    result.name = `${result.name} ${op} ${right_name}`;
+    if (!result.err) {
+        if (right === null) {
+            result.value = right === result.value ? 1 : 0;
+        }
+        else if (right && result.value) {
+            result.value = 1;
+        }
+        else if (!right && !result.value) {
+            result.value = 1;
+        }
+        else {
+            result.value = 0;
+        }
+    }
+    return result;
+}
+function _unionDateTime(type1, type2) {
+    let ret;
+    if (type1 === 'string') {
+        ret = 'datetime';
+    }
+    else if (type2 === 'string') {
+        ret = 'datetime';
+    }
+    else if (type1 === 'time' || type2 === 'time') {
+        ret = 'datetime';
+    }
+    else if (_isDateLike(type1) && _isDateLike(type2)) {
+        ret = 'datetime';
+    }
+    return ret;
+}
+
+var BinaryExpression = /*#__PURE__*/Object.freeze({
+	__proto__: null,
+	"!=": notEqual$1,
+	"+": plus$1,
+	"-": minus$2,
+	"/": div,
+	"<": lt$1,
+	"<=": lte$1,
+	"<>": notEqual$1,
+	"=": equal$1,
+	">": gt$1,
+	">=": gte$1,
+	and: and$1,
+	is: is$1,
+	"is not": isNot$1,
+	or: or$1,
+	xor: xor
+});
+
+const SINGLE_TIME = {
+    microsecond: 0.000001,
+    second: 1,
+    minute: 60,
+    hour: 60 * 60,
+    day: 24 * 60 * 60,
+    week: 7 * 24 * 60 * 60,
+};
+const DOUBLE_TIME = {
+    second_microsecond: [1, 0.000001],
+    minute_microsecond: [60, 0.000001],
+    minute_second: [60, 1],
+    hour_microsecond: [60 * 60, 0.000001],
+    hour_second: [60 * 60, 1],
+    hour_minute: [60 * 60, 60],
+    day_microsecond: [24 * 60 * 60, 0.000001],
+    day_second: [24 * 60 * 60, 1],
+    day_minute: [24 * 60 * 60, 60],
+    day_hour: [24 * 60 * 60, 60 * 60],
+};
+const MONTH = {
+    month: 1,
+    quarter: 3,
+    year: 12,
+    year_month: [12, 1],
+};
+const FORCE_DATE = {
+    day: true,
+    week: true,
+    month: true,
+    quarter: true,
+    year: true,
+    day_microsecond: true,
+    day_second: true,
+    day_minute: true,
+    day_hour: true,
+    year_month: true,
+};
+const DECIMALS = {
+    microsecond: 6,
+    second_microsecond: 6,
+    minute_microsecond: 6,
+    hour_microsecond: 6,
+    day_microsecond: 6,
+};
+class SQLInterval {
+    _number;
+    _decimals;
+    _isMonth;
+    _forceDate;
+    constructor(number, decimals, is_month, force_date) {
+        this._isMonth = is_month;
+        this._forceDate = force_date;
+        this._decimals = decimals || 0;
+        if (this._decimals > 0) {
+            this._number = parseFloat(number.toFixed(this._decimals + 1).slice(0, -1));
+        }
+        else {
+            this._number = Math.trunc(number);
+        }
+    }
+    getNumber() {
+        return this._number;
+    }
+    isMonth() {
+        return this._isMonth;
+    }
+    forceDate() {
+        return this._forceDate;
+    }
+    toString() {
+        return null;
+    }
+    _add(datetime, mult) {
+        let old_time = datetime.getTime?.();
+        let fraction = datetime.getFraction?.();
+        const old_type = datetime?.getType?.();
+        let type;
+        if (old_type === 'datetime') {
+            type = 'datetime';
+        }
+        else if (old_type === 'date' && !this._forceDate) {
+            type = 'datetime';
+        }
+        else if (old_type === 'date') {
+            type = 'date';
+        }
+        else if (old_type === 'time' && this._forceDate) {
+            type = 'datetime';
+        }
+        else if (old_type === 'time') {
+            type = 'time';
+        }
+        const decimals = Math.max(datetime.getDecimals?.(), this._decimals);
+        const number = this._number * mult;
+        let value = null;
+        if (type === 'time') {
+            value = createSQLTime(old_time + number, decimals);
+        }
+        else {
+            if (old_type === 'time') {
+                const now = Date.now() / 1000;
+                old_time += now - (now % (24 * 60 * 60));
+            }
+            let time;
+            if (this._isMonth) {
+                time = _addMonth(old_time, number);
+            }
+            else {
+                const add_time = Math.floor(number);
+                time = old_time + add_time;
+                fraction += number - add_time;
+                const overflow = Math.floor(fraction);
+                time += overflow;
+                fraction -= overflow;
+            }
+            value = createSQLDateTime({ time, fraction }, type, decimals);
+        }
+        return { type, value };
+    }
+    add(datetime) {
+        return this._add(datetime, 1);
+    }
+    sub(datetime) {
+        return this._add(datetime, -1);
+    }
+}
+function createSQLInterval(value, unit_name) {
+    let is_month = false;
+    let unit;
+    if (unit_name in MONTH) {
+        is_month = true;
+        unit = MONTH[unit_name];
+    }
+    else {
+        unit = SINGLE_TIME[unit_name] ?? DOUBLE_TIME[unit_name];
+    }
+    let ret = null;
+    const number = unit ? _convertNumber(value, unit, unit_name) : null;
+    if (number !== null) {
+        const force_date = unit_name in FORCE_DATE;
+        let decimals = DECIMALS[unit_name] || 0;
+        if (!decimals && unit_name.endsWith('second')) {
+            decimals = getDecimals(value, 6);
+            if (typeof value === 'string' && decimals) {
+                decimals = 6;
+            }
+        }
+        ret = new SQLInterval(number, decimals, is_month, force_date);
+    }
+    return ret;
+}
+function _convertNumber(value, unit, unit_name) {
+    let ret = null;
+    if (Array.isArray(unit)) {
+        if (typeof value === 'number') {
+            ret = value * unit[1];
+        }
+        else {
+            const match = String(value).match(/\d+/g);
+            if (match && match.length === 2) {
+                ret = parseInt(match[0]) * unit[0] + parseInt(match[1]) * unit[2];
+            }
+            else if (match && match.length === 1) {
+                ret = parseInt(match[0]) * unit[1];
+            }
+            else if (match && match.length === 0) {
+                ret = 0;
+            }
+            else {
+                ret = null;
+            }
+        }
+    }
+    else {
+        ret = convertNum(value);
+        if (ret !== null) {
+            if (unit_name !== 'second') {
+                ret = Math.trunc(ret);
+            }
+            ret *= unit;
+        }
+    }
+    return ret;
+}
+function _addMonth(old_time, number) {
+    const date = new Date(old_time * 1000);
+    const start_time = date.getTime();
+    const new_months = date.getUTCFullYear() * 12 + date.getUTCMonth() + number;
+    const year = Math.floor(new_months / 12);
+    const month = new_months - year * 12;
+    let day = date.getUTCDate();
+    date.setUTCFullYear(year);
+    date.setUTCMonth(month);
+    while (date.getUTCMonth() !== month) {
+        date.setUTCMonth(0);
+        date.setUTCDate(day--);
+        date.setUTCMonth(month);
+    }
+    const delta = date.getTime() - start_time;
+    return old_time + delta / 1000;
+}
+
+function datetime(expr, state) {
+    const result = getValue(expr.expr, state);
+    result.name = `CAST(${result.name} AS DATETIME)`;
+    result.type = 'datetime';
+    if (!result.err && result.value !== null) {
+        const decimals = expr.target.length || 0;
+        if (decimals > 6) {
+            result.err = 'ER_TOO_BIG_PRECISION';
+        }
+        result.value = convertDateTime(result.value, 'datetime', decimals);
+    }
+    return result;
+}
+function date$1(expr, state) {
+    const result = getValue(expr.expr, state);
+    result.name = `CAST(${result.name} AS DATE)`;
+    result.type = 'date';
+    if (!result.err && result.value !== null) {
+        result.value = convertDateTime(result.value, 'date');
+    }
+    return result;
+}
+function time(expr, state) {
+    const result = getValue(expr.expr, state);
+    result.name = `CAST(${result.name} AS TIME)`;
+    result.type = 'time';
+    if (!result.err && result.value !== null) {
+        const decimals = expr.target.length || 0;
+        if (decimals > 6) {
+            result.err = 'ER_TOO_BIG_PRECISION';
+        }
+        result.value = convertTime(result.value, decimals);
+    }
+    return result;
+}
+function interval(expr, state) {
+    const result = getValue(expr.expr, state);
+    result.name = `INTERVAL ${result.name} ${expr.unit}`;
+    result.type = 'interval';
+    if (!result.err && result.value !== null) {
+        result.value = createSQLInterval(result.value, expr.unit);
+    }
+    return result;
+}
+function signed(expr, state) {
+    const result = getValue(expr.expr, state);
+    result.name = `CAST(${result.name} AS SIGNED)`;
+    result.type = 'bigint';
+    if (!result.err && result.value !== null) {
+        result.value = Math.trunc(convertNum(result.value));
+    }
+    return result;
+}
+function char(expr, state) {
+    const result = getValue(expr.expr, state);
+    result.name = `CAST(${result.name} AS CHAR)`;
+    if (!result.err && result.value !== null && result.type !== 'string') {
+        result.type = 'string';
+        result.value = String(result.value);
+    }
+    return result;
+}
+
+var Cast = /*#__PURE__*/Object.freeze({
+	__proto__: null,
+	char: char,
+	date: date$1,
+	datetime: datetime,
+	interval: interval,
+	signed: signed,
+	time: time
+});
+
+const DAY = 24 * 60 * 60;
+function database(expr, state) {
+    return { value: state.session.getCurrentDatabase() };
+}
+function sleep(expr, state) {
+    const result = getValue(expr.args.value?.[0], state);
+    result.name = `SLEEP(${result.name})`;
+    const sleep_ms = convertNum(result.value);
+    if (sleep_ms > 0) {
+        result.sleep_ms = sleep_ms * 1000;
+    }
+    return result;
+}
+function length(expr, state) {
+    const result = getValue(expr.args.value?.[0], state);
+    result.name = `LENGTH(${result.name})`;
+    result.type = 'number';
+    if (!result.err && result.value !== null) {
+        result.value = String(result.value).length;
+    }
+    return result;
+}
+function concat(expr, state) {
+    let err;
+    let value = '';
+    expr.args.value?.every?.((sub) => {
+        const result = getValue(sub, state);
+        if (!err && result.err) {
+            err = result.err;
+        }
+        else if (result.value === null) {
+            value = null;
+        }
+        else {
+            value += String(result.value);
+        }
+        return value !== null;
+    });
+    return { err, value };
+}
+function left(expr, state) {
+    const result = getValue(expr.args?.value?.[0], state);
+    const len_result = getValue(expr.args?.value?.[1], state);
+    result.name = `LEFT(${result.name ?? ''}, ${len_result.name ?? ''})`;
+    result.err = result.err || len_result.err;
+    result.type = 'string';
+    if (!result.err && (result.value === null || len_result.value === null)) {
+        result.value = null;
+    }
+    else if (!result.err) {
+        const length = convertNum(len_result.value);
+        result.value = String(result.value).substring(0, length);
+    }
+    return result;
+}
+function coalesce(expr, state) {
+    let err;
+    let value = null;
+    let type;
+    expr.args.value?.some?.((sub) => {
+        const result = getValue(sub, state);
+        if (result.err) {
+            err = result.err;
+        }
+        value = result.value;
+        type = result.type;
+        return !err && value !== null;
+    });
+    return { err, value, type };
+}
+const ifnull = coalesce;
+function now(expr, state) {
+    const result = getValue(expr.args?.value?.[0], state);
+    result.name = expr.args ? `NOW(${result.name ?? ''})` : 'CURRENT_TIMESTAMP';
+    if (!result.err && result.type) {
+        const decimals = result.value || 0;
+        if (decimals > 6) {
+            result.err = 'ER_TOO_BIG_PRECISION';
+        }
+        result.value = createSQLDateTime(Date.now() / 1000, 'datetime', decimals);
+        result.type = 'datetime';
+    }
+    return result;
+}
+const current_timestamp = now;
+function from_unixtime(expr, state) {
+    const result = getValue(expr.args.value?.[0], state);
+    result.name = `FROM_UNIXTIME(${result.name})`;
+    result.type = 'datetime';
+    if (!result.err && result.value !== null) {
+        const time = convertNum(result.value);
+        const decimals = Math.min(6, String(time).split('.')?.[1]?.length || 0);
+        result.value =
+            time < 0 ? null : createSQLDateTime(time, 'datetime', decimals);
+    }
+    return result;
+}
+function date(expr, state) {
+    const result = getValue(expr.args.value?.[0], state);
+    result.name = `DATE(${result.name})`;
+    result.type = 'date';
+    if (!result.err && result.value !== null) {
+        result.value = convertDateTime(result.value);
+        result.value?.setType?.('date');
+    }
+    return result;
+}
+function date_format(expr, state) {
+    const date = getValue(expr.args.value?.[0], state);
+    const format = getValue(expr.args.value?.[1], state);
+    const err = date.err || format.err;
+    let value;
+    const name = `DATE_FORMAT(${date.name}, ${format.name})`;
+    if (!err && (date.value === null || format.value === null)) {
+        value = null;
+    }
+    else if (!err) {
+        value =
+            convertDateTime(date.value)?.dateFormat?.(String(format.value)) || null;
+    }
+    return { err, name, value, type: 'string' };
+}
+function datediff(expr, state) {
+    const expr1 = getValue(expr.args.value?.[0], state);
+    const expr2 = getValue(expr.args.value?.[1], state);
+    const err = expr1.err || expr2.err;
+    let value;
+    const name = `DATEDIFF(${expr1.name}, ${expr2.name})`;
+    if (!err && (expr1.value === null || expr2.value === null)) {
+        value = null;
+    }
+    else if (!err) {
+        value =
+            convertDateTime(expr1.value)?.diff?.(convertDateTime(expr2.value)) ||
+                null;
+    }
+    return { err, name, value, type: 'int' };
+}
+function curdate(expr) {
+    const value = createSQLDateTime(Date.now() / 1000, 'date');
+    const name = expr.args ? 'CURDATE()' : 'CURRENT_DATE';
+    return { value, name, type: 'date' };
+}
+const current_date = curdate;
+function curtime(expr, state) {
+    const result = getValue(expr.args?.value?.[0], state);
+    result.name = expr.args ? `CURTIME(${result.name ?? ''})` : 'CURRENT_TIME';
+    if (!result.err && result.type) {
+        const decimals = result.value || 0;
+        if (decimals > 6) {
+            result.err = 'ER_TOO_BIG_PRECISION';
+        }
+        const time = (Date.now() / 1000) % DAY;
+        result.value = createSQLTime(time, decimals);
+        result.type = 'time';
+    }
+    return result;
+}
+const current_time = curtime;
+
+var Functions$1 = /*#__PURE__*/Object.freeze({
+	__proto__: null,
+	coalesce: coalesce,
+	concat: concat,
+	curdate: curdate,
+	current_date: current_date,
+	current_time: current_time,
+	current_timestamp: current_timestamp,
+	curtime: curtime,
+	database: database,
+	date: date,
+	date_format: date_format,
+	datediff: datediff,
+	from_unixtime: from_unixtime,
+	ifnull: ifnull,
+	left: left,
+	length: length,
+	now: now,
+	sleep: sleep
+});
+
+function plus(expr, state) {
+    return getValue(expr.expr, state);
+}
+function not$1(expr, state) {
+    const result = getValue(expr.expr, state);
+    result.name = 'NOT ' + result.name;
+    result.type = 'number';
+    if (!result.err && result.value !== null) {
+        result.value = convertNum(result.value) ? 0 : 1;
+    }
+    return result;
+}
+function minus$1(expr, state) {
+    const result = getValue(expr.expr, state);
+    result.name = '-' + result.name;
+    result.type = 'number';
+    if (!result.err && result.value !== null) {
+        result.value = -convertNum(result.value);
+    }
+    return result;
+}
+
+var UnaryExpression = /*#__PURE__*/Object.freeze({
+	__proto__: null,
+	"!": not$1,
+	"+": plus,
+	"-": minus$1,
+	not: not$1
+});
+
+function version_comment() {
+    return 'dynamosql source version';
+}
+
+var SystemVariables = /*#__PURE__*/Object.freeze({
+	__proto__: null,
+	version_comment: version_comment
+});
+
+function pql(strings, ...values) {
+    let s = '';
+    for (let i = 0; i < strings.length; i++) {
+        s += strings[i];
+        if (i < values.length) {
+            s += escapeValue(values[i]);
+        }
+    }
+    s = s.replace(/\s+/g, ' ').trim();
+    return s;
+}
+function escapeIdentifier(string) {
+    return '"' + string.replace('"', '""') + '"';
+}
+function escapeString(string) {
+    let ret = '';
+    for (let i = 0; i < string.length; i++) {
+        const c = string.charCodeAt(i);
+        if (c < 32) {
+            ret += '\\x' + c.toString(16);
+        }
+        else if (c === 39) {
+            ret += "''";
+        }
+        else {
+            ret += string[i];
+        }
+    }
+    return ret;
+}
+function escapeValue(value, type) {
+    let s;
+    if (value === null) {
+        s = 'NULL';
+    }
+    else if (Array.isArray(value)) {
+        s = '[ ';
+        s += value.map((v) => escapeValue(v)).join(', ');
+        s += ' ]';
+    }
+    else if (typeof value === 'object') {
+        s = '{ ';
+        s += Object.keys(value)
+            .map((key) => `'${key}': ${escapeValue(value[key])}`)
+            .join(', ');
+        s += ' }';
+    }
+    else if (typeof value === 'number') {
+        s = String(value);
+    }
+    else if (value !== undefined) {
+        s = "'" + escapeString(String(value)) + "'";
+    }
+    else {
+        s = 'undefined';
+    }
+    return s;
+}
+function convertError(err) {
+    if (!err)
+        return err;
+    let ret;
+    if (err.name === 'ConditionalCheckFailedException' && err.Item) {
+        ret = new Error('cond_fail');
+    }
+    else if (err.Code === 'ConditionalCheckFailed') {
+        ret = new Error('cond_fail');
+    }
+    else if (err.name === 'ResourceNotFoundException' ||
+        err.Code === 'ResourceNotFound' ||
+        (err.message && err.message.includes('resource not found'))) {
+        ret = new Error('resource_not_found');
+    }
+    else if (err.name === 'ResourceInUseException' ||
+        (err.message && err.message.includes('resource in use'))) {
+        ret = new Error('resource_in_use');
+    }
+    else if (err.Code === 'ValidationError' || err.name === 'ValidationError') {
+        if (err.Message?.match?.(/expected: [^\s]* actual: NULL/)) {
+            ret = new Error('ER_BAD_NULL_ERROR');
+        }
+        else if (err.Message?.match?.(/expected: [^\s]* actual:/)) {
+            ret = new Error('ER_TRUNCATED_WRONG_VALUE_FOR_FIELD');
+        }
+        else {
+            ret = new Error('validation');
+        }
+    }
+    else {
+        ret = err;
+    }
+    return ret;
+}
+function mapToObject(obj) {
+    const ret = {};
+    ret.toString = toString;
+    Object.keys(obj).forEach((key) => {
+        ret[key] = valueToNative(obj[key]);
+    });
+    return ret;
+}
+function valueToNative(value) {
+    let ret = value;
+    if (value) {
+        if (value.N) {
+            ret = parseFloat(value.N);
+        }
+        else if (value.L?.map) {
+            ret = value.L.map(valueToNative);
+        }
+        else if (value.M) {
+            ret = mapToObject(value.M);
+        }
+        else {
+            ret = value.S ?? value.B ?? value.BOOL ?? value;
+        }
+    }
+    return ret;
+}
+function nativeToValue(obj) {
+    let ret;
+    if (obj === null) {
+        ret = { NULL: true };
+    }
+    else if (typeof obj === 'object') {
+        const M = {};
+        for (const key in obj) {
+            M[key] = nativeToValue(obj[key]);
+        }
+        ret = { M };
+    }
+    else if (typeof obj === 'number') {
+        ret = { N: String(obj) };
+    }
+    else if (typeof obj === 'boolean') {
+        ret = { BOOL: obj };
+    }
+    else {
+        ret = { S: String(obj) };
+    }
+    return ret;
+}
+function toString() {
+    return JSON.stringify(this);
+}
+
+function getValue(expr, state) {
+    const { session, row } = state;
+    let result = { err: null, value: undefined, name: undefined };
+    const type = expr?.type;
+    if (!expr) ;
+    else if (type === 'number') {
+        result.value = expr.value;
+    }
+    else if (type === 'double_quote_string') {
+        result.value = expr.value;
+        result.name = `"${result.value}"`;
+    }
+    else if (type === 'null') {
+        result.value = null;
+    }
+    else if (type === 'bool') {
+        result.value = expr.value ? 1 : 0;
+        result.name = expr.value ? 'TRUE' : 'FALSE';
+    }
+    else if (type === 'hex_string' || type === 'full_hex_string') {
+        result.value = Buffer.from(expr.value, 'hex');
+        result.name = 'x' + expr.value.slice(0, 10);
+        result.type = 'buffer';
+    }
+    else if (type === 'interval') {
+        result = interval(expr, state);
+    }
+    else if (type === 'function') {
+        const func = Functions$1[expr.name.toLowerCase()];
+        if (func) {
+            result = func(expr, state);
+            if (!result.name) {
+                result.name = expr.name + '()';
+            }
+        }
+        else {
+            shared.logger.trace('expression.getValue: unknown function:', expr.name);
+            result.err = { err: 'ER_SP_DOES_NOT_EXIST', args: [expr.name] };
+        }
+    }
+    else if (type === 'aggr_func') {
+        const func = AggregateFunctions[expr.name.toLowerCase()];
+        if (func) {
+            result = func(expr, state);
+            if (!result.name) {
+                result.name = expr.name + '()';
+            }
+        }
+        else {
+            shared.logger.trace('expression.getValue: unknown aggregate:', expr.name);
+            result.err = { err: 'ER_SP_DOES_NOT_EXIST', args: [expr.name] };
+        }
+    }
+    else if (type === 'binary_expr') {
+        const func = BinaryExpression[expr.operator.toLowerCase()];
+        if (func) {
+            result = func(expr, state);
+            if (!result.name) {
+                result.name = expr.operator;
+            }
+        }
+        else {
+            shared.logger.trace('expression.getValue: unknown binary operator:', expr.operator);
+            result.err = { err: 'ER_SP_DOES_NOT_EXIST', args: [expr.operator] };
+        }
+    }
+    else if (type === 'unary_expr') {
+        const func = UnaryExpression[expr.operator.toLowerCase()];
+        if (func) {
+            result = func(expr, state);
+            if (!result.name) {
+                result.name = expr.operator;
+            }
+        }
+        else {
+            shared.logger.trace('expression.getValue: unknown unanary operator:', expr.operator);
+            result.err = { err: 'ER_SP_DOES_NOT_EXIST', args: [expr.operator] };
+        }
+    }
+    else if (type === 'cast') {
+        const func = Cast[expr.target.dataType.toLowerCase()];
+        if (func) {
+            result = func(expr, state);
+            if (!result.name) {
+                result.name = `CAST(? AS ${expr.target.dataType})`;
+            }
+        }
+        else {
+            shared.logger.trace('expression.getValue: unknown cast type:', expr.target.dataType);
+            result.err = {
+                err: 'ER_SP_DOES_NOT_EXIST',
+                args: [expr.target.dataType],
+            };
+        }
+    }
+    else if (type === 'var') {
+        const { prefix } = expr;
+        if (prefix === '@@') {
+            const func = SystemVariables[expr.name.toLowerCase()];
+            if (func) {
+                result.value = func(session);
+            }
+            else {
+                shared.logger.trace('expression.getValue: unknown system variable:', expr.name);
+                result.err = { err: 'ER_UNKNOWN_SYSTEM_VARIABLE', args: [expr.name] };
+            }
+        }
+        else if (prefix === '@') {
+            result.value = session.getVariable(expr.name) ?? null;
+        }
+        else {
+            result.err = 'unsupported';
+        }
+        result.name = prefix + expr.name;
+    }
+    else if (type === 'column_ref') {
+        result.name = expr.column;
+        if (row && expr._resultIndex >= 0) {
+            const output_result = row['@@result']?.[expr._resultIndex];
+            result.value = output_result?.value;
+            result.type = output_result?.type;
+        }
+        else if (row) {
+            const cell = row[expr.from?.key]?.[expr.column];
+            const decode = _decodeCell(cell);
+            result.type = decode?.type;
+            result.value = decode?.value;
+        }
+        else {
+            result.err = 'no_row_list';
+            result.value = expr.column;
+        }
+    }
+    else {
+        shared.logger.error('unsupported expr:', expr);
+        result.err = 'unsupported';
+    }
+    if (!result.type) {
+        result.type = result.value === null ? 'null' : typeof result.value;
+    }
+    if (result.name === undefined && result.value !== undefined) {
+        result.name = String(result.value);
+    }
+    return result;
+}
+function _decodeCell(cell) {
+    let type;
+    let value;
+    if (!cell || cell.NULL) {
+        type = 'null';
+        value = null;
+    }
+    else if (cell.value) {
+        type = cell.type ?? typeof cell.value;
+        value = cell.value;
+    }
+    else if (cell.S) {
+        type = 'string';
+        value = cell.S;
+    }
+    else if (cell.N) {
+        type = 'number';
+        value = cell.N;
+    }
+    else if (cell.BOOL) {
+        type = 'boolean';
+        value = cell.BOOL;
+    }
+    else if (cell.M) {
+        type = 'json';
+        value = mapToObject(cell.M);
+    }
+    else {
+        type = typeof cell;
+        value = cell;
+        if (type === 'object') {
+            type = 'json';
+        }
+    }
+    return { type, value };
+}
+
+function constantFixup(func) {
+    return (expr, state) => {
+        let result;
+        result = getValue(expr, state);
+        if (result.err) {
+            result = func(expr, state);
+        }
+        return result;
+    };
+}
+function and(expr, state) {
+    const left = convertWhere(expr.left, state);
+    const right = convertWhere(expr.right, state);
+    if (left.err === 'unsupported' && state?.default_true) {
+        left.err = null;
+        left.value = 1;
+    }
+    if (right.err === 'unsupported' && state?.default_true) {
+        right.err = null;
+        right.value = 1;
+    }
+    const err = left.err || right.err;
+    let value;
+    if (!left.value || !right.value) {
+        value = 0;
+    }
+    else if (left.value === 1 && right.value === 1) {
+        value = 1;
+    }
+    else if (right.value === 1) {
+        value = left.value;
+    }
+    else if (left.value === 1) {
+        value = right.value;
+    }
+    else {
+        value = `(${left.value}) AND (${right.value})`;
+    }
+    return { err, value };
+}
+function or(expr, state) {
+    const left = convertWhere(expr.left, state);
+    const right = convertWhere(expr.right, state);
+    let err = left.err || right.err;
+    let value;
+    if (err === 'unsupported' && state?.default_true) {
+        value = 1;
+        err = null;
+    }
+    else if (!left.value && !right.value) {
+        value = 0;
+    }
+    else if (left.value === 1 || right.value === 1) {
+        value = 1;
+    }
+    else if (!right.value) {
+        value = left.value;
+    }
+    else if (!left.value) {
+        value = right.value;
+    }
+    else {
+        value = `(${left.value}) OR (${right.value})`;
+    }
+    return { err, value };
+}
+function _in(expr, state) {
+    const left = convertWhere(expr.left, state);
+    let err;
+    let value;
+    if (left.err) {
+        err = left.err;
+    }
+    else if (left.value === null) {
+        value = null;
+    }
+    else {
+        const count = expr.right?.value?.length;
+        const list = [];
+        for (let i = 0; i < count; i++) {
+            const right = convertWhere(expr.right.value[i], state);
+            if (right.err) {
+                err = right.err;
+                break;
+            }
+            else if (right.value === null) {
+                value = null;
+                break;
+            }
+            else {
+                list.push(right.value);
+            }
+        }
+        if (value === undefined) {
+            value = `${left.value} IN (${list.join(',')})`;
+        }
+    }
+    return { err, value };
+}
+function _comparator(expr, state, op) {
+    const left = convertWhere(expr.left, state);
+    const right = convertWhere(expr.right, state);
+    const err = left.err || right.err;
+    const value = `${left.value} ${op} ${right.value}`;
+    return { err, value };
+}
+function equal(expr, state) {
+    return _comparator(expr, state, '=');
+}
+function notEqual(expr, state) {
+    return _comparator(expr, state, '!=');
+}
+function gt(expr, state) {
+    return _comparator(expr, state, '>');
+}
+function lt(expr, state) {
+    return _comparator(expr, state, '<');
+}
+function gte(expr, state) {
+    return _comparator(expr, state, '>=');
+}
+function lte(expr, state) {
+    return _comparator(expr, state, '<=');
+}
+function is(expr, state) {
+    return _is(expr, state, 'IS');
+}
+function isNot(expr, state) {
+    return _is(expr, state, 'IS NOT');
+}
+function _is(expr, state, op) {
+    const left = convertWhere(expr.left, state);
+    let right;
+    let err = left.err;
+    if (!err) {
+        if (expr.right.value === null) {
+            right = 'NULL';
+        }
+        else if (expr.right.value === true) {
+            right = 'TRUE';
+        }
+        else if (expr.right.value === false) {
+            right = 'FALSE';
+        }
+        else {
+            err = 'syntax_err';
+        }
+    }
+    const value = `${left.value} ${op} ${right}`;
+    return { err, value };
+}
+function not(expr, state) {
+    const result = convertWhere(expr.expr, state);
+    if (!result.err) {
+        result.value = 'NOT ' + result.value;
+    }
+    return result;
+}
+function minus(expr, state) {
+    const result = convertWhere(expr.expr, state);
+    if (!result.err) {
+        result.value = '-' + result.value;
+    }
+    return result;
+}
+function unsupported() {
+    return { err: 'unsupported' };
+}
+const _equal = constantFixup(equal);
+const _notEqual = constantFixup(notEqual);
+const _gt = constantFixup(gt);
+const _lt = constantFixup(lt);
+const _gte = constantFixup(gte);
+const _lte = constantFixup(lte);
+const _and = constantFixup(and);
+const _or = constantFixup(or);
+const _inOp = constantFixup(_in);
+const _isOp = constantFixup(is);
+const _isNotOp = constantFixup(isNot);
+const _between = constantFixup(unsupported);
+const _not = constantFixup(not);
+const _minus = constantFixup(minus);
+
+var ConvertExpression = /*#__PURE__*/Object.freeze({
+	__proto__: null,
+	"!": _not,
+	"!=": _notEqual,
+	"-": _minus,
+	"<": _lt,
+	"<=": _lte,
+	"<>": _notEqual,
+	"=": _equal,
+	">": _gt,
+	">=": _gte,
+	and: _and,
+	between: _between,
+	in: _inOp,
+	is: _isOp,
+	"is not": _isNotOp,
+	not: _not,
+	or: _or
+});
+
+function foo() {
+    return { err: 'unsupported' };
+}
+
+var Functions = /*#__PURE__*/Object.freeze({
+	__proto__: null,
+	foo: foo
+});
+
+function convertWhere(expr, state) {
+    const { from_key } = state;
+    let err = null;
+    let value = null;
+    if (expr) {
+        const { type } = expr;
+        if (type === 'number') {
+            value = expr.value;
+        }
+        else if (type === 'double_quote_string') {
+            value = `'${expr.value}'`;
+        }
+        else if (type === 'null') {
+            value = null;
+        }
+        else if (type === 'bool') {
+            value = expr.value;
+        }
+        else if (type === 'function') {
+            const func = Functions[expr.name.toLowerCase()];
+            if (func) {
+                const result = func(expr, state);
+                if (result.err) {
+                    err = result.err;
+                }
+                else {
+                    value = result.value;
+                }
+            }
+            else {
+                err = 'unsupported';
+            }
+        }
+        else if (type === 'binary_expr' || type === 'unary_expr') {
+            const func = ConvertExpression[expr.operator.toLowerCase()];
+            if (func) {
+                const result = func(expr, state);
+                if (result.err) {
+                    err = result.err;
+                }
+                else {
+                    value = result.value;
+                }
+            }
+            else {
+                err = 'unsupported';
+            }
+        }
+        else if (type === 'column_ref') {
+            if (expr.from?.key === from_key) {
+                value = expr.column;
+            }
+            else {
+                err = 'unsupported';
+            }
+        }
+        else {
+            const result = getValue(expr, state);
+            err = result.err;
+            value = result.value;
+        }
+    }
+    return { err, value };
+}
+
+async function singleDelete$1(params) {
+    const { dynamodb, session } = params;
+    const { from, where } = params.ast;
+    let no_single = false;
+    const result = convertWhere(where, { session, from_key: from?.[0]?.key });
+    if (result.err) {
+        no_single = true;
+    }
+    else if (from.length > 1) {
+        no_single = true;
+    }
+    else if (!result.value) {
+        no_single = true;
+    }
+    if (no_single) {
+        throw new NoSingleOperationError();
+    }
+    const sql = `
+DELETE FROM ${escapeIdentifier(from[0].table)}
+WHERE ${result.value}
+RETURNING ALL OLD *
+`;
+    const queryQL = util.promisify(dynamodb.queryQL.bind(dynamodb));
+    try {
+        const results = await queryQL(sql);
+        return { affectedRows: results?.length || 0 };
+    }
+    catch (err) {
+        if (err?.name === 'ValidationException') {
+            throw new NoSingleOperationError();
+        }
+        else if (err?.name === 'ConditionalCheckFailedException') {
+            return { affectedRows: 0 };
+        }
+        shared.logger.error('singleDelete: query err:', err);
+        throw err;
+    }
+}
+async function multipleDelete$1(params) {
+    const { dynamodb, list } = params;
+    let affectedRows = 0;
+    for (const object of list) {
+        const { table, key_list, delete_list } = object;
+        const deleteItems = util.promisify(dynamodb.deleteItems.bind(dynamodb));
+        try {
+            await deleteItems({ table, key_list, list: delete_list });
+            affectedRows += delete_list.length;
+        }
+        catch (err) {
+            shared.logger.error('multipleDelete: deleteItems: err:', err, table);
+            throw err;
+        }
+    }
+    return { affectedRows };
+}
+
+async function insertRowList$1(params) {
+    if (params.list.length === 0) {
+        return { affectedRows: 0 };
+    }
+    else if (params.duplicate_mode) {
+        return _insertIgnoreReplace(params);
+    }
+    else {
+        return _insertNoIgnore(params);
+    }
+}
+async function _insertIgnoreReplace(params) {
+    const { dynamodb, duplicate_mode, table } = params;
+    let list = params.list;
+    let affectedRows;
+    if (list.length > 1) {
+        const getTableCached = util.promisify(dynamodb.getTableCached.bind(dynamodb));
+        try {
+            const result = await getTableCached(table);
+            const key_list = result.Table.KeySchema.map((k) => k.AttributeName);
+            const track = new Map();
+            if (duplicate_mode === 'replace') {
+                list.reverse();
+            }
+            list = list.filter((row) => trackFirstSeen(track, key_list.map((key) => row[key].value)));
+            if (duplicate_mode === 'replace') {
+                list.reverse();
+            }
+        }
+        catch (err) {
+            if (err?.message === 'resource_not_found') {
+                throw new SQLError({ err: 'table_not_found', args: [table] });
+            }
+            throw err;
+        }
+    }
+    if (duplicate_mode === 'ignore') {
+        affectedRows = list.length;
+        const sql_list = list.map((item) => `INSERT INTO ${escapeIdentifier(table)} VALUE ${_escapeItem(item)}`);
+        const [err_list] = await new Promise((resolve, reject) => {
+            dynamodb.batchQL(sql_list, (err, result) => {
+                if (err && !Array.isArray(err)) {
+                    if (err?.name === 'ResourceNotFoundException' ||
+                        err?.message?.toLowerCase().includes('resource not found')) {
+                        reject(new SQLError({ err: 'table_not_found', args: [table] }));
+                    }
+                    else {
+                        reject(err);
+                    }
+                }
+                else {
+                    resolve([err, result]);
+                }
+            });
+        });
+        if (err_list?.length > 0) {
+            let err;
+            err_list.forEach((item_err) => {
+                if (item_err?.Code === 'DuplicateItem') {
+                    affectedRows--;
+                }
+                else if (!err && item_err) {
+                    affectedRows--;
+                    err = convertError(item_err);
+                }
+            });
+            if (err)
+                throw err;
+        }
+        else if (err_list?.name === 'ValidationException') {
+            throw new SQLError({
+                err: 'dup_table_insert',
+                sqlMessage: err_list.message,
+                cause: err_list,
+            });
+        }
+    }
+    else {
+        list.forEach(_fixupItem);
+        const opts = { table, list };
+        const putItems = util.promisify(dynamodb.putItems.bind(dynamodb));
+        try {
+            await putItems(opts);
+            affectedRows = list.length;
+        }
+        catch (err) {
+            throw convertError(err);
+        }
+    }
+    return { affectedRows };
+}
+async function _insertNoIgnore(params) {
+    const { dynamodb, table, list } = params;
+    const sql_list = list.map((item) => `INSERT INTO ${escapeIdentifier(table)} VALUE ${_escapeItem(item)}`);
+    const transactionQL = util.promisify(dynamodb.transactionQL.bind(dynamodb));
+    try {
+        await transactionQL(sql_list);
+        return { affectedRows: list.length };
+    }
+    catch (err) {
+        if (err?.name === 'TransactionCanceledException' &&
+            err.CancellationReasons) {
+            for (let i = 0; i < err.CancellationReasons.length; i++) {
+                if (err.CancellationReasons[i].Code === 'DuplicateItem') {
+                    throw new SQLError({
+                        err: 'dup_table_insert',
+                        args: [table, _fixupItem(list[i])],
+                    });
+                }
+                else if (err.CancellationReasons[i].Code !== 'None') {
+                    throw new SQLError({
+                        err: convertError(err.CancellationReasons[i]),
+                        message: err.CancellationReasons[i].Message,
+                    });
+                }
+            }
+        }
+        else if (err?.name === 'ValidationException') {
+            throw new SQLError({
+                err: 'dup_table_insert',
+                sqlMessage: err.message,
+                cause: err,
+            });
+        }
+        // Check for resource not found errors
+        const errStr = String(err?.message || err || '').toLowerCase();
+        if (err?.name === 'ResourceNotFoundException' ||
+            errStr.includes('resource not found') ||
+            errStr.includes('requested resource not found')) {
+            throw new SQLError({ err: 'table_not_found', args: [table] });
+        }
+        throw err;
+    }
+}
+function _fixupItem(item) {
+    for (const key in item) {
+        item[key] = item[key].value;
+    }
+    return item;
+}
+function _escapeItem(item) {
+    let s = '{ ';
+    s += Object.keys(item)
+        .map((key) => `'${key}': ${escapeValue(item[key].value)}`)
+        .join(', ');
+    s += ' }';
+    return s;
+}
+
+async function getRowList$1(params) {
+    const { list } = params;
+    const source_map = {};
+    const column_map = {};
+    for (const from of list) {
+        const { results, column_list } = await _getFromTable$1({ ...params, from });
+        source_map[from.key] = results;
+        column_map[from.key] = column_list;
+    }
+    return { source_map, column_map };
+}
+async function _getFromTable$1(params) {
+    const { dynamodb, session, from, where } = params;
+    const { table, _requestSet, _requestAll } = params.from;
+    const request_columns = [..._requestSet];
+    const columns = _requestAll || request_columns.length === 0
+        ? '*'
+        : request_columns.map(escapeIdentifier).join(',');
+    let sql = `SELECT ${columns} FROM ${escapeIdentifier(table)}`;
+    const where_result = where
+        ? convertWhere(where, { session, from_key: from.key, default_true: true })
+        : null;
+    if (!where_result?.err && where_result?.value) {
+        sql += ' WHERE ' + where_result.value;
+    }
+    const queryQL = util.promisify(dynamodb.queryQL.bind(dynamodb));
+    try {
+        const results = await queryQL(sql);
+        let column_list;
+        if (_requestAll) {
+            const response_set = new Set();
+            results.forEach((result) => {
+                for (const key in result) {
+                    response_set.add(key);
+                }
+            });
+            column_list = [...response_set.keys()];
+        }
+        else {
+            column_list = request_columns;
+        }
+        return { results, column_list };
+    }
+    catch (err) {
+        if (err?.message === 'resource_not_found') {
+            throw new SQLError({ err: 'table_not_found', args: [table] });
+        }
+        shared.logger.error('raw_engine.getRowList err:', err, sql);
+        throw err;
+    }
+}
+
+async function singleUpdate$1(params) {
+    const { dynamodb, session } = params;
+    const { set, from, where } = params.ast;
+    const where_result = convertWhere(where, {
+        session,
+        from_key: from?.[0]?.key,
+    });
+    let no_single = where_result.err;
+    if (from.length > 1 || !where_result.value) {
+        no_single = true;
+    }
+    const value_list = set.map((object) => {
+        const { value } = object;
+        let ret;
+        const result = convertWhere(value, { session, from_key: from?.[0]?.key });
+        if (result.err) {
+            no_single = true;
+        }
+        else {
+            ret = result.value;
+        }
+        return ret;
+    });
+    if (no_single) {
+        throw new NoSingleOperationError();
+    }
+    const sets = set
+        .map((object, i) => escapeIdentifier(object.column) + ' = ' + value_list[i])
+        .join(', ');
+    const sql = `
+UPDATE ${escapeIdentifier(from[0].table)}
+SET ${sets}
+WHERE ${where_result.value}
+RETURNING MODIFIED OLD *
+`;
+    const queryQL = util.promisify(dynamodb.queryQL.bind(dynamodb));
+    try {
+        const results = await queryQL(sql);
+        const result = { affectedRows: 1, changedRows: 0 };
+        set.forEach((object, i) => {
+            const { column } = object;
+            const value = value_list[i];
+            if (value !== escapeValue(valueToNative(results?.[0]?.[column]))) {
+                result.changedRows = 1;
+            }
+        });
+        return result;
+    }
+    catch (err) {
+        if (err?.name === 'ValidationException') {
+            throw new NoSingleOperationError();
+        }
+        else if (err?.name === 'ConditionalCheckFailedException') {
+            return { affectedRows: 0, changedRows: 0 };
+        }
+        shared.logger.error('singleUpdate: err:', err);
+        throw err;
+    }
+}
+async function multipleUpdate$1(params) {
+    const { dynamodb, list } = params;
+    let affectedRows = 0;
+    let changedRows = 0;
+    for (const object of list) {
+        const { table, key_list, update_list } = object;
+        update_list.forEach((item) => item.set_list.forEach((set) => (set.value = set.value.value)));
+        const updateItems = util.promisify(dynamodb.updateItems.bind(dynamodb));
+        try {
+            await updateItems({ table, key_list, list: update_list });
+            affectedRows += list.length;
+            changedRows += list.length;
+        }
+        catch (err) {
+            shared.logger.error('multipleUpdate: updateItems: err:', err, 'table:', table);
+            throw err;
+        }
+    }
+    return { affectedRows, changedRows };
+}
+
+async function commit$2(params) { }
+async function rollback$2(params) { }
+
+var RawEngine = /*#__PURE__*/Object.freeze({
+	__proto__: null,
+	addColumn: addColumn$1,
+	commit: commit$2,
+	createIndex: createIndex$3,
+	createTable: createTable$5,
+	deleteIndex: deleteIndex$3,
+	dropTable: dropTable$2,
+	getRowList: getRowList$1,
+	getTableInfo: getTableInfo$1,
+	getTableList: getTableList$4,
+	insertRowList: insertRowList$1,
+	multipleDelete: multipleDelete$1,
+	multipleUpdate: multipleUpdate$1,
+	rollback: rollback$2,
+	singleDelete: singleDelete$1,
+	singleUpdate: singleUpdate$1
+});
+
+const g_tableMap = {};
+function getTable$3(database, table, session) {
+    const key = database + '.' + table;
+    let data = session.getTempTable(database, table) || g_tableMap[key];
+    const updates = txGetData(database, table, session)?.data;
+    if (data && updates) {
+        data = Object.assign({}, data, updates);
+    }
+    return data;
+}
+function updateTableData(database, table, session, updates) {
+    const key = database + '.' + table;
+    const data = session.getTempTable(database, table) || g_tableMap[key];
+    Object.assign(data, updates);
+}
+function txSaveData(database, table, session, data) {
+    const tx = session.getTransaction();
+    const key = database + '.' + table;
+    const existing = tx.getData('memory') || {};
+    existing[key] = { database, table, data };
+    tx.setData('memory', existing);
+}
+function txGetData(database, table, session) {
+    const key = database + '.' + table;
+    const tx = session.getTransaction();
+    return tx?.getData?.('memory')?.[key];
+}
+function saveTable(database, table, data) {
+    const key = database + '.' + table;
+    g_tableMap[key] = data;
+}
+function deleteTable$3(database, table) {
+    const key = database + '.' + table;
+    delete g_tableMap[key];
+}
+
+async function getTableInfo(params) {
+    const { session, database, table } = params;
+    const data = getTable$3(database, table, session);
+    if (data) {
+        return {
+            table,
+            primary_key: data.primary_key,
+            column_list: data.column_list,
+            is_open: false,
+        };
+    }
+    throw new SQLError({ err: 'table_not_found', args: [table] });
+}
+async function getTableList$3(params) {
+    return [];
+}
+async function createTable$4(params) {
+    const { session, database, table, primary_key, column_list, is_temp } = params;
+    if (primary_key.length === 0) {
+        throw new SQLError({
+            err: 'unsupported',
+            message: 'primary key is required',
+        });
+    }
+    const data = {
+        column_list,
+        primary_key,
+        row_list: [],
+        primary_map: new Map(),
+    };
+    if (is_temp) {
+        session.saveTempTable(database, table, data);
+    }
+    else {
+        saveTable(database, table, data);
+    }
+}
+async function dropTable$1(params) {
+    const { session, database, table } = params;
+    if (session.getTempTable(database, table)) {
+        session.deleteTempTable(database, table);
+    }
+    else {
+        deleteTable$3(database, table);
+    }
+}
+async function addColumn(params) { }
+async function createIndex$2(params) { }
+async function deleteIndex$2(params) { }
+
+async function singleDelete(params) {
+    throw new NoSingleOperationError();
+}
+async function multipleDelete(params) {
+    const { session, list } = params;
+    let affectedRows = 0;
+    for (const changes of list) {
+        const { database, table, delete_list } = changes;
+        const data = getTable$3(database, table, session);
+        if (!data) {
+            throw new SQLError('table_not_found');
+        }
+        const row_list = data.row_list.slice();
+        const primary_map = new Map(data.primary_map);
+        for (const object of delete_list) {
+            const key_list = object.map((key) => key.value);
+            const delete_key = JSON.stringify(key_list);
+            const index = primary_map.get(delete_key);
+            if (index !== undefined && index >= 0) {
+                primary_map.delete(delete_key);
+                row_list.splice(index, 1);
+                primary_map.forEach((value, key) => {
+                    if (value > index) {
+                        primary_map.set(key, value - 1);
+                    }
+                });
+                affectedRows++;
+            }
+            else {
+                shared.logger.info('memory.delete: failed to find key:', key_list, 'for table:', table);
+            }
+        }
+        txSaveData(database, table, session, { row_list, primary_map });
+    }
+    return { affectedRows };
+}
+
+async function insertRowList(params) {
+    const { session, database, table, list, duplicate_mode } = params;
+    const data = getTable$3(database, table, session);
+    if (list.length === 0) {
+        return { affectedRows: 0 };
+    }
+    if (!data) {
+        throw new SQLError('table_not_found');
+    }
+    const { primary_key } = data;
+    const row_list = data.row_list.slice();
+    const primary_map = new Map(data.primary_map);
+    let affectedRows = 0;
+    for (const row of list) {
+        _transformRow(row);
+        const key_values = primary_key.map((key) => row[key.name].value);
+        const key = JSON.stringify(key_values);
+        const index = primary_map.get(key);
+        if (index === undefined) {
+            primary_map.set(key, row_list.push(row) - 1);
+            affectedRows++;
+        }
+        else if (duplicate_mode === 'replace') {
+            if (!_rowEqual(row_list[index], row)) {
+                affectedRows++;
+            }
+            row_list[index] = row;
+            affectedRows++;
+        }
+        else if (!duplicate_mode) {
+            throw new SQLError({
+                err: 'dup_primary_key_entry',
+                args: [primary_key, key_values],
+            });
+        }
+    }
+    txSaveData(database, table, session, { row_list, primary_map });
+    return { affectedRows, changedRows: 0 };
+}
+function _transformRow(row) {
+    for (const key in row) {
+        row[key] = { type: row[key].type, value: row[key].value };
+    }
+}
+function _rowEqual(a, b) {
+    const keys_a = Object.keys(a);
+    return keys_a.every((key) => {
+        return a[key].value === b[key].value;
+    });
+}
+
+async function getRowList(params) {
+    const { list } = params;
+    const source_map = {};
+    const column_map = {};
+    for (const from of list) {
+        const result = _getFromTable({ ...params, from });
+        if (result.err) {
+            throw new SQLError(result.err);
+        }
+        source_map[from.key] = result.row_list;
+        column_map[from.key] = result.column_list;
+    }
+    return { source_map, column_map };
+}
+function _getFromTable(params) {
+    const { session } = params;
+    const { db, table } = params.from;
+    const data = getTable$3(db, table, session);
+    return {
+        err: data ? null : 'table_not_found',
+        row_list: data?.row_list,
+        column_list: data?.column_list?.map?.((column) => column.name) || [],
+    };
+}
+
+async function singleUpdate(params) {
+    throw new NoSingleOperationError();
+}
+async function multipleUpdate(params) {
+    const { session, list } = params;
+    let affectedRows = 0;
+    let changedRows = 0;
+    for (const changes of list) {
+        const { database, table, update_list } = changes;
+        const data = getTable$3(database, table, session);
+        if (!data) {
+            throw new SQLError('table_not_found');
+        }
+        const row_list = data.row_list.slice();
+        const primary_map = new Map(data.primary_map);
+        for (const update of update_list) {
+            const { set_list } = update;
+            const key_list = update.key.map((key) => key.value);
+            const update_key = JSON.stringify(key_list);
+            const index = primary_map.get(update_key);
+            if (index !== undefined && index >= 0) {
+                const old_row = row_list[index];
+                const new_row = Object.assign({}, old_row);
+                let changed = false;
+                set_list.forEach((set) => {
+                    new_row[set.column] = _transformCell(set.value);
+                    if (old_row[set.column].value !== new_row[set.column].value) {
+                        changed = true;
+                    }
+                });
+                const new_key = _makePrimaryKey(data.primary_key, new_row);
+                if (new_key !== update_key && primary_map.has(new_key)) {
+                    throw new SQLError({
+                        err: 'dup_primary_key_entry',
+                        args: [data.primary_key, new_key],
+                    });
+                }
+                else if (new_key !== update_key) {
+                    primary_map.delete(update_key);
+                    primary_map.set(new_key, index);
+                }
+                row_list[index] = new_row;
+                affectedRows++;
+                if (changed) {
+                    changedRows++;
+                }
+            }
+            else {
+                shared.logger.error('memory.update: failed to find key:', key_list, 'for table:', table);
+            }
+        }
+        txSaveData(database, table, session, { row_list, primary_map });
+    }
+    return { affectedRows, changedRows };
+}
+function _transformCell(cell) {
+    return { value: cell.value, type: cell.type };
+}
+function _makePrimaryKey(primary_key, row) {
+    const key_values = primary_key.map((key) => row[key.name].value);
+    return JSON.stringify(key_values);
+}
+
+async function commit$1(params) {
+    const { session, data } = params;
+    for (const key in data) {
+        const { database, table, data: tx_data } = data[key];
+        updateTableData(database, table, session, tx_data);
+    }
+}
+async function rollback$1(params) { }
+
+var MemoryEngine = /*#__PURE__*/Object.freeze({
+	__proto__: null,
+	addColumn: addColumn,
+	commit: commit$1,
+	createIndex: createIndex$2,
+	createTable: createTable$4,
+	deleteIndex: deleteIndex$2,
+	dropTable: dropTable$1,
+	getRowList: getRowList,
+	getTableInfo: getTableInfo,
+	getTableList: getTableList$3,
+	insertRowList: insertRowList,
+	multipleDelete: multipleDelete,
+	multipleUpdate: multipleUpdate,
+	rollback: rollback$1,
+	singleDelete: singleDelete,
+	singleUpdate: singleUpdate
+});
+
+const NullEngine = {
+    commit: async () => {
+        throw new Error('unsupported');
+    },
+    rollback: async () => {
+        throw new Error('unsupported');
+    },
+    getTableList: async () => {
+        throw new Error('unsupported');
+    },
+    createTable: async () => {
+        throw new Error('unsupported');
+    },
+    dropTable: async () => {
+        throw new Error('unsupported');
+    },
+    createIndex: async () => {
+        throw new Error('unsupported');
+    },
+    deleteIndex: async () => {
+        throw new Error('unsupported');
+    },
+    addColumn: async () => {
+        throw new Error('unsupported');
+    },
+    getTableInfo: async () => {
+        throw new Error('unsupported');
+    },
+    getRowList: async () => {
+        throw new Error('unsupported');
+    },
+    singleDelete: async () => {
+        throw new Error('unsupported');
+    },
+    multipleDelete: async () => {
+        throw new Error('unsupported');
+    },
+    singleUpdate: async () => {
+        throw new Error('unsupported');
+    },
+    multipleUpdate: async () => {
+        throw new Error('unsupported');
+    },
+    insertRowList: async () => {
+        throw new Error('unsupported');
+    },
+};
+function getEngineByName(name) {
+    let ret;
+    switch (name) {
+        case 'raw':
+            ret = RawEngine;
+            break;
+        case 'memory':
+            ret = MemoryEngine;
+            break;
+        default:
+            ret = NullEngine;
+            break;
+    }
+    return ret;
+}
+function getDatabaseError(database) {
+    const error = new SQLError({ err: 'db_not_found', args: [database] });
+    return {
+        commit: async () => {
+            throw error;
+        },
+        rollback: async () => {
+            throw error;
+        },
+        getTableList: async () => {
+            throw error;
+        },
+        createTable: async () => {
+            throw error;
+        },
+        dropTable: async () => {
+            throw error;
+        },
+        createIndex: async () => {
+            throw error;
+        },
+        deleteIndex: async () => {
+            throw error;
+        },
+        addColumn: async () => {
+            throw error;
+        },
+        getTableInfo: async () => {
+            throw error;
+        },
+        getRowList: async () => {
+            throw error;
+        },
+        singleDelete: async () => {
+            throw error;
+        },
+        multipleDelete: async () => {
+            throw error;
+        },
+        singleUpdate: async () => {
+            throw error;
+        },
+        multipleUpdate: async () => {
+            throw error;
+        },
+        insertRowList: async () => {
+            throw error;
+        },
+    };
+}
+function getTableError(table) {
+    const error = new SQLError({ err: 'table_not_found', args: [table] });
+    return {
+        commit: async () => {
+            throw error;
+        },
+        rollback: async () => {
+            throw error;
+        },
+        getTableList: async () => {
+            throw error;
+        },
+        createTable: async () => {
+            throw error;
+        },
+        dropTable: async () => {
+            throw error;
+        },
+        createIndex: async () => {
+            throw error;
+        },
+        deleteIndex: async () => {
+            throw error;
+        },
+        addColumn: async () => {
+            throw error;
+        },
+        getTableInfo: async () => {
+            throw error;
+        },
+        getRowList: async () => {
+            throw error;
+        },
+        singleDelete: async () => {
+            throw error;
+        },
+        multipleDelete: async () => {
+            throw error;
+        },
+        singleUpdate: async () => {
+            throw error;
+        },
+        multipleUpdate: async () => {
+            throw error;
+        },
+        insertRowList: async () => {
+            throw error;
+        },
+    };
+}
+
+const BUILT_IN = ['_dynamodb'];
+const g_schemaMap = {};
+function getEngine(database, table, session) {
+    let ret;
+    const schema = g_schemaMap[database];
+    if (database === '_dynamodb') {
+        ret = getEngineByName('raw');
+    }
+    else if (!schema) {
+        ret = getDatabaseError(database);
+    }
+    else if (session.getTempTable(database, table)) {
+        ret = getEngineByName('memory');
+    }
+    else if (schema[table]) {
+        ret = getEngineByName(schema[table].table_engine);
+    }
+    else {
+        ret = getTableError(table);
+    }
+    return ret;
+}
+function _findTable(database, table, session) {
+    return (session.getTempTable(database, table) || g_schemaMap[database]?.[table]);
+}
+function getDatabaseList() {
+    return [...BUILT_IN, ...Object.keys(g_schemaMap)];
+}
+async function getTableList$2(params) {
+    const { dynamodb, database } = params;
+    if (database === '_dynamodb') {
+        const engine = getEngineByName('raw');
+        return await engine.getTableList({ dynamodb });
+    }
+    else if (database in g_schemaMap) {
+        return [];
+    }
+    else {
+        throw new SQLError({ err: 'db_not_found', args: [database] });
+    }
+}
+function createDatabase(database) {
+    if (BUILT_IN.includes(database) || database in g_schemaMap) {
+        throw new SQLError('database_exists');
+    }
+    g_schemaMap[database] = {};
+}
+async function dropDatabase(params) {
+    const { session, database } = params;
+    if (BUILT_IN.includes(database)) {
+        throw new SQLError('database_no_drop_builtin');
+    }
+    else if (database in g_schemaMap) {
+        session.dropTempTable(database);
+        const table_list = Object.keys(g_schemaMap[database]);
+        for (const table of table_list) {
+            const engine = getEngine(database, table, session);
+            try {
+                await engine.dropTable({ ...params, table });
+                delete g_schemaMap[database][table];
+            }
+            catch (err) {
+                shared.logger.error('dropDatabase: table:', table, 'drop err:', err);
+                throw err;
+            }
+        }
+        delete g_schemaMap[database];
+    }
+    else {
+        throw new SQLError({ err: 'db_not_found', args: [database] });
+    }
+}
+async function createTable$3(params) {
+    const { session, database, table, is_temp } = params;
+    const table_engine = is_temp
+        ? 'memory'
+        : (params.table_engine?.toLowerCase?.() ?? 'raw');
+    if (database === '_dynamodb' && table_engine !== 'raw') {
+        throw new SQLError('access_denied');
+    }
+    else if (database === '_dynamodb') {
+        const engine = getEngineByName('raw');
+        await engine.createTable(params);
+    }
+    else if (_findTable(database, table, session)) {
+        throw new SQLError({ err: 'table_exists', args: [table] });
+    }
+    else if (!(database in g_schemaMap)) {
+        throw new SQLError({ err: 'db_not_found', args: [database] });
+    }
+    else {
+        const engine = getEngineByName(table_engine);
+        if (engine) {
+            await engine.createTable(params);
+            if (!is_temp) {
+                g_schemaMap[database][table] = { table_engine };
+            }
+        }
+        else {
+            throw new SQLError({
+                err: 'ER_UNKNOWN_STORAGE_ENGINE',
+                args: [table_engine],
+            });
+        }
+    }
+}
+async function dropTable(params) {
+    const { session, database, table } = params;
+    if (database === '_dynamodb') {
+        const engine = getEngineByName('raw');
+        await engine.dropTable(params);
+    }
+    else if (_findTable(database, table, session)) {
+        const engine = getEngine(database, table, session);
+        try {
+            await engine.dropTable(params);
+            delete g_schemaMap[database][table];
+        }
+        catch (err) {
+            shared.logger.error('SchemaManager.dropTable: drop error but deleting table anyway: err:', err, database, table);
+            delete g_schemaMap[database][table];
+            throw err;
+        }
+    }
+    else {
+        throw new SQLError('resource_not_found');
+    }
+}
+
+class Transaction {
+    _dataMap = new Map();
+    _isAutoCommit;
+    constructor(auto_commit) {
+        this._isAutoCommit = Boolean(auto_commit);
+    }
+    isAutoCommit() {
+        return this._isAutoCommit;
+    }
+    getEngineNameList() {
+        return this._dataMap.keys();
+    }
+    getData(name) {
+        return this._dataMap.get(name);
+    }
+    setData(name, data) {
+        this._dataMap.set(name, data);
+    }
+}
+async function run(params) {
+    const { dynamodb, session, func } = params;
+    startTransaction({ session, auto_commit: true });
+    const tx = session.getTransaction();
+    params.transaction = tx;
+    try {
+        const result = await func(params);
+        if (tx.isAutoCommit()) {
+            await commit({ dynamodb, session });
+        }
+        return result;
+    }
+    catch (err) {
+        if (tx.isAutoCommit()) {
+            await rollback({ dynamodb, session });
+        }
+        throw err;
+    }
+}
+function startTransaction(params) {
+    const { session, auto_commit } = params;
+    const existing = session.getTransaction();
+    if (!existing) {
+        const tx = new Transaction(auto_commit);
+        session.setTransaction(tx);
+    }
+}
+async function commit(params) {
+    await _txEach(params, async ({ engine, ...other }) => {
+        await engine.commit(other);
+    });
+}
+async function rollback(params) {
+    await _txEach(params, async ({ engine, ...other }) => {
+        await engine.rollback(other);
+    });
+}
+async function _txEach(params, callback) {
+    const { dynamodb, session } = params;
+    const transaction = session.getTransaction();
+    if (transaction) {
+        const list = Array.from(transaction.getEngineNameList());
+        for (const name of list) {
+            const engine = getEngineByName(name);
+            const data = transaction.getData(name);
+            await callback({ engine, dynamodb, session, transaction, data });
+        }
+        session.setTransaction(null);
+    }
+}
+
+async function query$8(params) {
+    const { ast, dynamodb, session } = params;
+    const database = ast.table?.[0]?.db || session.getCurrentDatabase();
+    const table = ast.table?.[0]?.table;
+    const engine = getEngine(database, table, session);
+    if (ast.table && database) {
+        const opts = {
+            dynamodb,
+            ast,
+            engine,
+            session,
+            func: _runAlterTable,
+        };
+        return await run(opts);
+    }
+    else if (ast.table) {
+        throw new SQLError('no_current_database');
+    }
+    else {
+        throw new SQLError('unsupported');
+    }
+}
+async function _runAlterTable(params) {
+    const { ast, dynamodb, engine, session } = params;
+    const table = ast.table?.[0]?.table;
+    const column_list = [];
+    // Process column additions
+    for (const def of ast.expr) {
+        if (def.resource === 'column' && def.action === 'add') {
+            const column_name = def.column?.column;
+            const type = def.definition?.dataType;
+            const length = def.definition?.length;
+            column_list.push({
+                name: column_name,
+                type,
+                length,
+            });
+            const opts = {
+                dynamodb,
+                session,
+                table,
+                column_name,
+                type,
+                length,
+            };
+            await engine.addColumn(opts);
+        }
+    }
+    // Process index operations
+    for (const def of ast.expr) {
+        if (def.resource === 'index' && def.action === 'add') {
+            let key_err;
+            const key_list = def.definition?.map?.((sub) => {
+                const column_def = column_list.find((col) => col.name === sub.column);
+                if (!column_def) {
+                    key_err = {
+                        err: 'ER_KEY_COLUMN_DOES_NOT_EXITS',
+                        args: [sub.column],
+                    };
+                }
+                return {
+                    name: sub.column,
+                    order_by: sub.order_by,
+                    type: column_def?.type,
+                };
+            }) || [];
+            if (key_err) {
+                throw new SQLError(key_err);
+            }
+            const opts = {
+                dynamodb,
+                session,
+                table,
+                index_name: def.index,
+                key_list,
+            };
+            try {
+                await engine.createIndex(opts);
+            }
+            catch (err) {
+                if (err?.message === 'index_exists') {
+                    throw new SQLError({
+                        err: 'ER_DUP_KEYNAME',
+                        args: [def.index],
+                    });
+                }
+                throw err;
+            }
+        }
+        else if (def.resource === 'index' && def.action === 'drop') {
+            const opts = {
+                dynamodb,
+                session,
+                table,
+                index_name: def.index,
+            };
+            try {
+                await engine.deleteIndex(opts);
+            }
+            catch (err) {
+                if (err?.message === 'index_not_found') {
+                    throw new SQLError({
+                        err: 'ER_CANT_DROP_FIELD_OR_KEY',
+                        args: [def.index],
+                    });
+                }
+                throw err;
+            }
+        }
+    }
+    return {};
+}
+
 function convertType(type, nullable) {
     let ret = type;
     if (type === 'number') {
@@ -25030,7 +23421,7 @@ function _unroll(list, obj) {
         list.push({ ...obj[0], '@@group': obj });
     }
     else {
-        for (let key in obj) {
+        for (const key in obj) {
             _unroll(list, obj[key]);
         }
     }
@@ -25063,7 +23454,7 @@ function _sort(orderby, state, a, b) {
             const b_value = getValue(expr, { ...state, row: b });
             const err = a_value.err || b_value.err;
             if (err) {
-                throw err;
+                throw new SQLError(err);
             }
             const result = func(a_value.value, b_value.value, a_value.type);
             if (result !== 0) {
@@ -25113,30 +23504,28 @@ function _convertNum(value) {
     return ret;
 }
 
-function query$7(params, done) {
-    internalQuery(params, (err, output_row_list, column_list) => {
-        if (!err) {
-            output_row_list?.forEach?.((row) => {
-                for (let key in row) {
-                    row[key] = row[key].value;
-                }
-            });
+async function query$7(params) {
+    const { output_row_list, column_list } = await internalQuery(params);
+    output_row_list?.forEach?.((row) => {
+        for (const key in row) {
+            row[key] = row[key].value;
         }
-        done(err, output_row_list, column_list);
     });
+    return { output_row_list, column_list };
 }
-function internalQuery(params, done) {
+async function internalQuery(params) {
     const { ast, session, dynamodb } = params;
-    let resolve_err;
     const current_database = session.getCurrentDatabase();
     if (!params.skip_resolve) {
-        resolve_err = resolveReferences(ast, current_database);
+        const resolve_err = resolveReferences(ast, current_database);
+        if (resolve_err) {
+            shared.logger.error('select: resolve err:', resolve_err);
+            throw new SQLError(resolve_err);
+        }
     }
-    if (resolve_err) {
-        shared.logger.error('select: resolve err:', resolve_err);
-        done(resolve_err);
-    }
-    else if (ast?.from?.length) {
+    let source_map = null;
+    let column_map = {};
+    if (ast?.from?.length) {
         const db = ast.from?.[0]?.db;
         const table = ast.from?.[0]?.table;
         const engine = getEngine(db, table, session);
@@ -25146,20 +23535,13 @@ function internalQuery(params, done) {
             list: ast.from,
             where: ast.where,
         };
-        engine.getRowList(opts, (err, source_map, column_map) => {
-            if (err) {
-                done(err);
-            }
-            else {
-                _evaluateReturn({ ...params, source_map, column_map }, done);
-            }
-        });
+        const result = await engine.getRowList(opts);
+        source_map = result.source_map;
+        column_map = result.column_map;
     }
-    else {
-        _evaluateReturn({ ...params, source_map: null, column_map: {} }, done);
-    }
+    return _evaluateReturn({ ...params, source_map, column_map });
 }
-function _evaluateReturn(params, done) {
+function _evaluateReturn(params) {
     const { session, source_map, ast } = params;
     const query_columns = _expandStarColumns(params);
     const { from, where, groupby } = ast;
@@ -25217,48 +23599,49 @@ function _evaluateReturn(params, done) {
         }
         row['@@result'] = output_row;
     }
-    let output_row_list;
+    if (err) {
+        throw new SQLError(err);
+    }
     const column_list = [];
-    if (!err) {
-        for (let i = 0; i < column_count; i++) {
-            const column = query_columns[i];
-            const column_type = convertType(column.result_type, column.result_nullable);
-            column_type.orgName = column.result_name || '';
-            column_type.name = column.as || column_type.orgName;
-            column_type.orgTable = column?.expr?.from?.table || '';
-            column_type.table = column?.expr?.from?.as || column_type.orgTable;
-            column_type.schema = column.expr?.from?.db || '';
-            column_list.push(column_type);
-        }
-        if (ast.orderby) {
-            err = sort(row_list, ast.orderby, { session, column_list });
+    for (let i = 0; i < column_count; i++) {
+        const column = query_columns[i];
+        const column_type = convertType(column.result_type, column.result_nullable);
+        column_type.orgName = column.result_name || '';
+        column_type.name = column.as || column_type.orgName;
+        column_type.orgTable = column?.expr?.from?.table || '';
+        column_type.table = column?.expr?.from?.as || column_type.orgTable;
+        column_type.schema = column.expr?.from?.db || '';
+        column_list.push(column_type);
+    }
+    if (ast.orderby) {
+        const sort_err = sort(row_list, ast.orderby, { session, column_list });
+        if (sort_err) {
+            throw new SQLError(sort_err);
         }
     }
-    if (!err) {
-        let start = 0;
-        let end = row_list.length;
-        if (ast.limit?.seperator === 'offset') {
-            start = ast.limit.value[1].value;
-            end = Math.min(end, start + ast.limit.value[0].value);
-        }
-        else if (ast.limit?.value?.length > 1) {
-            start = ast.limit.value[0].value;
-            end = Math.min(end, start + ast.limit.value[1].value);
-        }
-        else if (ast.limit) {
-            end = Math.min(end, ast.limit.value[0].value);
-        }
-        row_list = row_list.slice(start, end);
-        output_row_list = row_list.map((row) => row['@@result']);
+    let start = 0;
+    let end = row_list.length;
+    if (ast.limit?.seperator === 'offset') {
+        start = ast.limit.value[1].value;
+        end = Math.min(end, start + ast.limit.value[0].value);
     }
-    if (!err && sleep_ms) {
-        setTimeout(() => {
-            done(err, output_row_list, column_list, row_list);
-        }, sleep_ms);
+    else if (ast.limit?.value?.length > 1) {
+        start = ast.limit.value[0].value;
+        end = Math.min(end, start + ast.limit.value[1].value);
     }
-    else {
-        done(err, output_row_list, column_list, row_list);
+    else if (ast.limit) {
+        end = Math.min(end, ast.limit.value[0].value);
     }
+    row_list = row_list.slice(start, end);
+    const output_row_list = row_list.map((row) => row['@@result']);
+    if (sleep_ms) {
+        return new Promise((resolve) => {
+            setTimeout(() => {
+                resolve({ output_row_list, column_list, row_list });
+            }, sleep_ms);
+        });
+    }
+    return { output_row_list, column_list, row_list };
 }
 function _expandStarColumns(params) {
     const { ast, column_map } = params;
@@ -25308,40 +23691,40 @@ function _unionType(old_type, new_type) {
     return ret;
 }
 
-function query$6(params, done) {
+async function query$6(params) {
     const { ast, session } = params;
     const database = ast.table?.[0]?.db || session.getCurrentDatabase();
     if (ast.keyword === 'database') {
-        _createDatabase(params, done);
+        return await _createDatabase(params);
     }
     else if (!database) {
-        done('no_current_database');
+        throw new SQLError('no_current_database');
     }
     else if (ast.keyword === 'table') {
-        _createTable(params, done);
+        return await _createTable(params);
     }
     else {
         shared.logger.error('unsupported create:', ast.keyword);
-        done('unsupported');
+        throw new SQLError('unsupported');
     }
 }
-function _createDatabase(params, done) {
+async function _createDatabase(params) {
     const { ast } = params;
-    createDatabase(ast.database, (err) => {
-        let result;
+    try {
+        createDatabase(ast.database);
+        return { affectedRows: 1, changedRows: 0 };
+    }
+    catch (err) {
         if (err === 'database_exists' && ast.if_not_exists) {
-            err = null;
+            return undefined;
         }
         else if (err && err !== 'database_exists') {
             shared.logger.error('createDatabase: err:', err);
         }
-        else if (!err) {
-            result = { affectedRows: 1, changedRows: 0 };
-        }
-        done(err, result);
-    });
+        throw err;
+    }
 }
-function _createTable(params, done) {
+async function _createTable(params) {
     const { ast, session, dynamodb } = params;
     const database = ast.table?.[0]?.db || session.getCurrentDatabase();
     const table = ast.table?.[0]?.table;
@@ -25368,78 +23751,63 @@ function _createTable(params, done) {
     });
     let list;
     let result;
-    asyncSeries([
-        (done) => {
-            if (ast.as && ast.query_expr) {
-                const opts = { ast: ast.query_expr, session, dynamodb };
-                internalQuery(opts, (err, row_list, columns) => {
-                    if (!err) {
-                        const track = new Map();
-                        list = row_list.map((row) => {
-                            const obj = {};
-                            columns.forEach((column, i) => {
-                                obj[column.name] = row[i];
-                            });
-                            if (!err && !duplicate_mode) {
-                                const keys = primary_key.map(({ name }) => obj[name].value);
-                                if (!trackFirstSeen(track, keys)) {
-                                    err = {
-                                        err: 'dup_primary_key_entry',
-                                        args: [primary_key.map((key) => key.name), keys],
-                                    };
-                                }
-                            }
-                            return obj;
-                        });
-                    }
-                    done(err);
-                });
+    // Handle CREATE TABLE AS SELECT
+    if (ast.as && ast.query_expr) {
+        const opts = { ast: ast.query_expr, session, dynamodb };
+        const { output_row_list, column_list: columns } = await internalQuery(opts);
+        const track = new Map();
+        list = output_row_list.map((row) => {
+            const obj = {};
+            columns.forEach((column, i) => {
+                obj[column.name] = row[i];
+            });
+            if (!duplicate_mode) {
+                const keys = primary_key.map(({ name }) => obj[name].value);
+                if (!trackFirstSeen(track, keys)) {
+                    throw new SQLError({
+                        err: 'dup_primary_key_entry',
+                        args: [primary_key.map((key) => key.name), keys],
+                    });
+                }
             }
-            else {
-                done();
-            }
-        },
-        (done) => {
-            const options = Object.fromEntries(ast.table_options?.map?.((item) => [item.keyword, item.value]) ||
-                []);
-            const opts = {
-                dynamodb,
-                session,
-                database,
-                table,
-                column_list,
-                primary_key,
-                is_temp: Boolean(ast.temporary),
-                table_engine: options['engine'],
-            };
-            createTable$3(opts, done);
-        },
-        (done) => {
-            if (list?.length > 0) {
-                const engine = getEngine(database, table, session);
-                const opts = {
-                    dynamodb,
-                    session,
-                    database,
-                    table,
-                    list,
-                    duplicate_mode,
-                };
-                engine.insertRowList(opts, (err, insert_result) => {
-                    result = insert_result;
-                    done(err);
-                });
-            }
-            else {
-                done();
-            }
-        },
-    ], (err) => {
-        if (err === 'table_exists' && ast.if_not_exists) {
-            err = null;
+            return obj;
+        });
+    }
+    // Create the table
+    const options = Object.fromEntries(ast.table_options?.map?.((item) => [item.keyword, item.value]) || []);
+    const opts = {
+        dynamodb,
+        session,
+        database,
+        table,
+        column_list,
+        primary_key,
+        is_temp: Boolean(ast.temporary),
+        table_engine: options['engine'],
+    };
+    try {
+        await createTable$3(opts);
+    }
+    catch (err) {
+        if (err?.code === 'ER_TABLE_EXISTS_ERROR' && ast.if_not_exists) {
+            return undefined;
         }
-        done(err, result);
-    });
+        throw err;
+    }
+    // Insert data if any
+    if (list?.length > 0) {
+        const engine = getEngine(database, table, session);
+        const insertOpts = {
+            dynamodb,
+            session,
+            database,
+            table,
+            list,
+            duplicate_mode,
+        };
+        result = await engine.insertRowList(insertOpts);
+    }
+    return result;
 }
 
 function makeEngineGroups(session, list) {
@@ -25447,7 +23815,7 @@ function makeEngineGroups(session, list) {
     list.forEach((object) => {
         const { database, table } = object;
         const engine = getEngine(database, table, session);
-        let found = ret.find((group) => group.engine === engine);
+        const found = ret.find((group) => group.engine === engine);
         if (found) {
             found.list.push(object);
         }
@@ -25458,71 +23826,67 @@ function makeEngineGroups(session, list) {
     return ret;
 }
 
-function runSelect(params, done) {
+async function runSelect(params) {
     const { dynamodb, session, ast } = params;
     const result_list = [];
-    asyncSeries([
-        (done) => asyncEach(ast.from, (object, done) => {
-            const { db, table } = object;
-            const engine = getEngine(db, table, session);
-            const opts = { dynamodb, session, database: db, table };
-            engine.getTableInfo(opts, (err, result) => {
-                if (err) {
-                    shared.logger.error('SelectModify: getTable: err:', err, table, result);
-                }
-                else if (result?.primary_key?.length > 0) {
-                    object._keyList = result.primary_key.map((key) => key.name);
-                    object._keyList.forEach((key) => object._requestSet.add(key));
-                }
-                else {
-                    err = 'bad_schema';
-                }
-                done(err);
-            });
-        }, done),
-        (done) => {
-            const opts = {
-                dynamodb,
-                session,
-                ast,
-                skip_resolve: true,
-            };
-            internalQuery(opts, (err, _ignore, _ignore2, row_list) => {
-                if (!err) {
-                    ast.from.forEach((object) => {
-                        const from_key = object.key;
-                        const key_list = object._keyList;
-                        const collection = new Map();
-                        row_list.forEach((row) => {
-                            const keys = key_list.map((key) => row[from_key]?.[key]);
-                            if (!keys.includes(undefined)) {
-                                _addCollection(collection, keys, row);
-                            }
-                        });
-                        const result = {
-                            key: from_key,
-                            list: [],
-                        };
-                        result_list.push(result);
-                        collection.forEach((value0, key0) => {
-                            if (key_list.length > 1) {
-                                value0.forEach((value1, key1) => {
-                                    result.list.push({
-                                        key: [key0, key1],
-                                        row: value1,
-                                    });
-                                });
-                            }
-                            else {
-                                result.list.push({ key: [key0], row: value0 });
-                            }
-                        });
+    // Get table info for all tables
+    for (const object of ast.from) {
+        const { db, table } = object;
+        const engine = getEngine(db, table, session);
+        const opts = { dynamodb, session, database: db, table };
+        try {
+            const result = await engine.getTableInfo(opts);
+            if (result?.primary_key?.length > 0) {
+                object._keyList = result.primary_key.map((key) => key.name);
+                object._keyList.forEach((key) => object._requestSet.add(key));
+            }
+            else {
+                throw new SQLError('bad_schema');
+            }
+        }
+        catch (err) {
+            shared.logger.error('SelectModify: getTable: err:', err, table);
+            throw err;
+        }
+    }
+    // Run the select query
+    const opts = {
+        dynamodb,
+        session,
+        ast,
+        skip_resolve: true,
+    };
+    const { row_list } = await internalQuery(opts);
+    ast.from.forEach((object) => {
+        const from_key = object.key;
+        const key_list = object._keyList;
+        const collection = new Map();
+        row_list.forEach((row) => {
+            const keys = key_list.map((key) => row[from_key]?.[key]);
+            if (!keys.includes(undefined)) {
+                _addCollection(collection, keys, row);
+            }
+        });
+        const result = {
+            key: from_key,
+            list: [],
+        };
+        result_list.push(result);
+        collection.forEach((value0, key0) => {
+            if (key_list.length > 1) {
+                value0.forEach((value1, key1) => {
+                    result.list.push({
+                        key: [key0, key1],
+                        row: value1,
                     });
-                }
-                done(err);
-            });
-        },
-    ], (err) => done(err, result_list));
+                });
+            }
+            else {
+                result.list.push({ key: [key0], row: value0 });
+            }
+        });
+    });
+    return result_list;
 }
 function _addCollection(collection, keys, value) {
     if (keys.length > 1) {
@@ -25538,27 +23902,25 @@ function _addCollection(collection, keys, value) {
     }
 }
 
-function query$5(params, done) {
+async function query$5(params) {
     const { ast, session } = params;
     const current_database = session.getCurrentDatabase();
     const resolve_err = resolveReferences(ast, current_database);
     const database = ast.from?.[0]?.db;
     if (resolve_err) {
         shared.logger.error('resolve_err:', resolve_err);
-        done(resolve_err);
+        throw new SQLError(resolve_err);
     }
     else if (!database) {
-        done('no_current_database');
+        throw new SQLError('no_current_database');
     }
-    else {
-        const opts = {
-            ...params,
-            func: _runDelete,
-        };
-        run(opts, done);
-    }
+    const opts = {
+        ...params,
+        func: _runDelete,
+    };
+    return await run(opts);
 }
-function _runDelete(params, done) {
+async function _runDelete(params) {
     const { ast, session, dynamodb } = params;
     const database = ast.from?.[0]?.db;
     const table = ast.from?.[0]?.table;
@@ -25569,106 +23931,99 @@ function _runDelete(params, done) {
             session,
             ast,
         };
-        engine.singleDelete(opts, (err, result) => {
-            if (err === 'no_single') {
-                _multipleDelete(params, done);
+        try {
+            const result = await engine.singleDelete(opts);
+            return { affectedRows: result.affectedRows, changedRows: 0 };
+        }
+        catch (err) {
+            if (err instanceof NoSingleOperationError) {
+                return await _multipleDelete(params);
             }
-            else {
-                done(err, { affectedRows: result?.affectedRows, changedRows: 0 });
-            }
-        });
+            throw err;
+        }
     }
     else {
-        _multipleDelete(params, done);
+        return await _multipleDelete(params);
     }
 }
-function _multipleDelete(params, done) {
+async function _multipleDelete(params) {
     const { dynamodb, session, ast } = params;
     let affectedRows = 0;
-    asyncSeries([
-        (done) => runSelect(params, (err, result_list) => {
-            if (!err) {
-                ast.table.forEach((object) => {
-                    const from_key = object.from.key;
-                    const list = result_list.find((result) => result.key === from_key)?.list;
-                    object._deleteList = [];
-                    list?.forEach?.((item) => object._deleteList.push(item.key));
-                });
-            }
-            done(err);
-        }),
-        (done) => {
-            const from_list = ast.table
-                .map((obj) => ({
-                database: obj.from.db,
-                table: obj.from.table,
-                key_list: obj.from._keyList,
-                delete_list: obj._deleteList,
-            }))
-                .filter((obj) => obj.delete_list.length > 0);
-            if (from_list.length > 0) {
-                const groups = makeEngineGroups(session, from_list);
-                asyncEach(groups, (group, done) => {
-                    const { engine, list } = group;
-                    const opts = {
-                        dynamodb,
-                        session,
-                        list,
-                    };
-                    engine.multipleDelete(opts, (err, result) => {
-                        if (!err) {
-                            affectedRows += result.affectedRows;
-                        }
-                        done(err);
-                    });
-                }, done);
-            }
-            else {
-                done();
-            }
-        },
-    ], (err) => done(err, { affectedRows, changedRows: 0 }));
+    // Get rows to delete
+    const result_list = await runSelect(params);
+    ast.table.forEach((object) => {
+        const from_key = object.from.key;
+        const list = result_list.find((result) => result.key === from_key)?.list;
+        object._deleteList = [];
+        list?.forEach?.((item) => object._deleteList.push(item.key));
+    });
+    // Delete rows
+    const from_list = ast.table
+        .map((obj) => ({
+        database: obj.from.db,
+        table: obj.from.table,
+        key_list: obj.from._keyList,
+        delete_list: obj._deleteList,
+    }))
+        .filter((obj) => obj.delete_list.length > 0);
+    if (from_list.length > 0) {
+        const groups = makeEngineGroups(session, from_list);
+        for (const group of groups) {
+            const { engine, list } = group;
+            const opts = {
+                dynamodb,
+                session,
+                list,
+            };
+            const result = await engine.multipleDelete(opts);
+            affectedRows += result.affectedRows;
+        }
+    }
+    return { affectedRows, changedRows: 0 };
 }
 
-function query$4(params, done) {
+async function query$4(params) {
     const { ast, session, dynamodb } = params;
     if (ast.keyword === 'database') {
-        dropDatabase({ ...params, database: ast.name }, done);
+        await dropDatabase({ ...params, database: ast.name });
+        return undefined;
     }
     else if (ast.keyword === 'table') {
         const database = ast.name?.[0]?.db || session.getCurrentDatabase();
         const table = ast.name?.[0]?.table;
         if (!database) {
-            done('no_current_database');
+            throw new SQLError('no_current_database');
         }
-        else {
-            const opts = {
-                dynamodb,
-                session,
-                database,
-                table,
-            };
-            dropTable(opts, (err) => {
-                if (err === 'resource_not_found' && ast.prefix === 'if exists') {
-                    err = null;
-                }
-                else if (err === 'resource_not_found') {
-                    err = {
-                        err: 'ER_BAD_TABLE_ERROR',
-                        args: [table],
-                    };
-                }
-                done(err, {});
-            });
+        const opts = {
+            dynamodb,
+            session,
+            database,
+            table,
+        };
+        try {
+            await dropTable(opts);
+            return {};
+        }
+        catch (err) {
+            if (err?.message === 'resource_not_found' && ast.prefix === 'if exists') {
+                return undefined;
+            }
+            else if (err?.message === 'resource_not_found') {
+                throw new SQLError({
+                    err: 'ER_BAD_TABLE_ERROR',
+                    args: [table],
+                });
+            }
+            throw err;
         }
     }
     else {
         shared.logger.error('unsupported:', ast);
-        done('unsupported');
+        throw new SQLError('unsupported');
     }
 }
 
-function query$3(params, done) {
+async function query$3(params) {
     const { ast, session } = params;
     const duplicate_mode = ast.type === 'replace'
         ? 'replace'
@@ -25677,123 +24032,106 @@ function query$3(params, done) {
             : null;
     const database = ast.table?.[0]?.db || session.getCurrentDatabase();
     const table = ast.table?.[0]?.table;
-    let err;
     if (!database) {
-        err = 'no_current_database';
+        throw new SQLError('no_current_database');
     }
-    else {
-        err = _checkAst(ast);
-    }
+    const err = _checkAst(ast);
     if (err) {
-        done(err);
+        throw new SQLError(err);
     }
-    else {
-        const engine = getEngine(database, table, session);
-        const opts = {
-            ...params,
-            database,
-            engine,
-            duplicate_mode,
-            func: _runInsert,
-        };
-        run(opts, done);
-    }
+    const engine = getEngine(database, table, session);
+    const opts = {
+        ...params,
+        database,
+        engine,
+        duplicate_mode,
+        func: _runInsert,
+    };
+    return await run(opts);
 }
-function _runInsert(params, done) {
+async function _runInsert(params) {
     const { ast, session, engine, dynamodb, duplicate_mode } = params;
     const table = ast.table?.[0]?.table;
     let list;
-    let result;
-    asyncSeries([
-        (done) => {
-            if (ast.set?.length > 0) {
-                let err;
-                const obj = {};
-                ast.set.forEach((item) => {
-                    const expr_result = getValue(item.value, { session });
-                    if (!err && expr_result.err) {
-                        err = expr_result.err;
-                    }
-                    obj[item.column] = expr_result;
-                });
-                list = [obj];
-                done(err);
+    // Build the list of rows to insert
+    if (ast.set?.length > 0) {
+        const obj = {};
+        ast.set.forEach((item) => {
+            const expr_result = getValue(item.value, { session });
+            if (expr_result.err) {
+                throw new SQLError(expr_result.err);
             }
-            else if (ast.columns?.length > 0 && ast.values.type === 'select') {
-                const opts = { ast: ast.values, session, dynamodb };
-                internalQuery(opts, (err, row_list) => {
-                    if (err) {
-                        shared.logger.error('insert select err:', err);
+            obj[item.column] = expr_result;
+        });
+        list = [obj];
+    }
+    else if (ast.columns?.length > 0 && ast.values.type === 'select') {
+        const opts = { ast: ast.values, session, dynamodb };
+        const { output_row_list } = await internalQuery(opts);
+        list = output_row_list.map((row) => {
+            const obj = {};
+            ast.columns.forEach((name, i) => {
+                obj[name] = row[i];
+            });
+            return obj;
+        });
+    }
+    else if (ast.columns?.length > 0) {
+        list = [];
+        ast.values?.forEach?.((row, i) => {
+            const obj = {};
+            if (row.value.length === ast.columns.length) {
+                ast.columns.forEach((name, j) => {
+                    const expr_result = getValue(row.value[j], { session });
+                    if (expr_result.err) {
+                        throw new SQLError(expr_result.err);
                     }
-                    else {
-                        list = row_list.map((row) => {
-                            const obj = {};
-                            ast.columns.forEach((name, i) => {
-                                obj[name] = row[i];
-                            });
-                            return obj;
-                        });
-                    }
-                    done(err);
+                    obj[name] = expr_result;
                 });
-            }
-            else if (ast.columns?.length > 0) {
-                let err;
-                list = [];
-                ast.values?.forEach?.((row, i) => {
-                    const obj = {};
-                    if (row.value.length === ast.columns.length) {
-                        ast.columns.forEach((name, j) => {
-                            const expr_result = getValue(row.value[j], {
-                                session,
-                            });
-                            if (!err && expr_result.err) {
-                                err = expr_result.err;
-                            }
-                            obj[name] = expr_result;
-                        });
-                        list.push(obj);
-                    }
-                    else {
-                        err = {
-                            err: 'ER_WRONG_VALUE_COUNT_ON_ROW',
-                            args: [i],
-                        };
-                    }
-                });
-                done(err);
+                list.push(obj);
             }
             else {
-                shared.logger.error('unsupported insert without column names');
-                done('unsupported');
-            }
-        },
-        (done) => {
-            if (list.length > 0) {
-                const opts = {
-                    dynamodb,
-                    session,
-                    database: params.database,
-                    table,
-                    list,
-                    duplicate_mode,
-                };
-                engine.insertRowList(opts, (err, insert_result) => {
-                    result = insert_result;
-                    done(err);
+                throw new SQLError({
+                    err: 'ER_WRONG_VALUE_COUNT_ON_ROW',
+                    args: [i],
                 });
             }
-            else {
-                result = { affectedRows: 0 };
-                done();
-            }
-        },
-    ], (err) => {
-        if (err === 'resource_not_found' || err?.err === 'resource_not_found') {
-            err = { err: 'table_not_found', args: err?.args || [table] };
+        });
+    }
+    else {
+        shared.logger.error('unsupported insert without column names');
+        throw new SQLError('unsupported');
+    }
+    // Insert the rows
+    if (list.length > 0) {
+        const opts = {
+            dynamodb,
+            session,
+            database: params.database,
+            table,
+            list,
+            duplicate_mode,
+        };
+        try {
+            return await engine.insertRowList(opts);
         }
-        done(err, result);
-    });
+        catch (err) {
+            const errStr = String(err?.message || '').toLowerCase();
+            if (err?.message === 'resource_not_found' ||
+                err?.err === 'resource_not_found' ||
+                err?.name === 'ResourceNotFoundException' ||
+                errStr.includes('resource not found')) {
+                throw new SQLError({
+                    err: 'table_not_found',
+                    args: err?.args || [table],
+                });
+            }
+            throw err;
+        }
+    }
+    else {
+        return { affectedRows: 0 };
+    }
 }
 function _checkAst(ast) {
     let err;
@@ -25808,28 +24146,26 @@ function _checkAst(ast) {
     return err;
 }
 
-function query$2(params, done) {
+function query$2(params) {
     const { ast, session } = params;
-    let err;
     const expr = ast?.expr;
     if (expr?.type === 'assign') {
         const { left } = expr;
         const right = getValue(expr.right, { session });
         if (right.err) {
-            err = right.err;
+            throw new SQLError(right.err);
         }
         else if (left?.type === 'var' && left.prefix === '@') {
             session.setVariable(left.name, right.value);
         }
         else {
             shared.logger.error('set_handler.query: unsupported left:', left);
-            err = 'unsupported';
+            throw new SQLError('unsupported');
         }
     }
-    done(err);
 }
 
-function query$1(params, done) {
+async function query$1(params) {
     const { ast, session, dynamodb } = params;
     if (ast.keyword === 'databases') {
         const column = Object.assign(convertType('string'), {
@@ -25840,33 +24176,30 @@ function query$1(params, done) {
         });
         const list = getDatabaseList();
         const rows = list?.map?.((item) => [item]);
-        done(null, rows, [column]);
+        return { rows, columns: [column] };
     }
     else if (ast.keyword === 'tables') {
         const database = session.getCurrentDatabase();
-        if (database) {
-            const name = 'Tables_in_' + database;
-            const column = Object.assign(convertType('string'), {
-                table: 'TABLES',
-                orgTable: 'tables',
-                name,
-                orgName: name,
-            });
-            getTableList$2({ dynamodb, database }, (err, list) => {
-                const rows = list?.map?.((item) => [item]);
-                done(err, rows, [column]);
-            });
+        if (!database) {
+            throw new SQLError('no_current_database');
         }
-        else {
-            done('no_current_database');
-        }
+        const name = 'Tables_in_' + database;
+        const column = Object.assign(convertType('string'), {
+            table: 'TABLES',
+            orgTable: 'tables',
+            name,
+            orgName: name,
+        });
+        const list = await getTableList$2({ dynamodb, database });
+        const rows = list?.map?.((item) => [item]);
+        return { rows, columns: [column] };
     }
     else {
-        done('unsupported');
+        throw new SQLError('unsupported');
     }
 }
 
-function query(params, done) {
+async function query(params) {
     const { ast, session } = params;
     const current_database = session.getCurrentDatabase();
     ast.from = ast.table;
@@ -25875,20 +24208,18 @@ function query(params, done) {
     const database = ast.from?.[0]?.db;
     if (resolve_err) {
         shared.logger.error('resolve_err:', resolve_err);
-        done(resolve_err);
+        throw new SQLError(resolve_err);
     }
     else if (!database) {
-        done('no_current_database');
+        throw new SQLError('no_current_database');
     }
-    else {
-        const opts = {
-            ...params,
-            func: _runUpdate,
-        };
-        run(opts, done);
-    }
+    const opts = {
+        ...params,
+        func: _runUpdate,
+    };
+    return await run(opts);
 }
-function _runUpdate(params, done) {
+async function _runUpdate(params) {
     const { ast, session, dynamodb } = params;
     const database = ast.from?.[0]?.db;
     const table = ast.from?.[0]?.table;
@@ -25899,86 +24230,75 @@ function _runUpdate(params, done) {
             session,
             ast,
         };
-        engine.singleUpdate(opts, (err, result) => {
-            if (err === 'no_single') {
-                _multipleUpdate(params, done);
+        try {
+            return await engine.singleUpdate(opts);
+        }
+        catch (err) {
+            if (err instanceof NoSingleOperationError) {
+                return await _multipleUpdate(params);
             }
-            else {
-                done(err, result);
-            }
-        });
+            throw err;
+        }
     }
     else {
-        _multipleUpdate(params, done);
+        return await _multipleUpdate(params);
     }
 }
-function _multipleUpdate(params, done) {
+async function _multipleUpdate(params) {
     const { dynamodb, session, ast } = params;
     let affectedRows = 0;
     let changedRows = 0;
-    asyncSeries([
-        (done) => runSelect(params, (err, result_list) => {
-            if (!err) {
-                ast.from.forEach((object) => {
-                    const from_key = object.key;
-                    const list = result_list.find((result) => result.key === from_key)?.list;
-                    object._updateList = [];
-                    list?.forEach?.(({ key, row }) => {
-                        const set_list = ast.set
-                            .filter((set_item) => set_item.from.key === from_key)
-                            .map((set_item) => {
-                            const expr_result = getValue(set_item.value, {
-                                session,
-                                row,
-                            });
-                            if (!err && expr_result.err) {
-                                err = expr_result.err;
-                            }
-                            return {
-                                column: set_item.column,
-                                value: expr_result,
-                            };
-                        });
-                        if (set_list.length > 0) {
-                            object._updateList.push({ key, set_list });
-                        }
-                    });
+    // Get rows to update
+    const result_list = await runSelect(params);
+    ast.from.forEach((object) => {
+        const from_key = object.key;
+        const list = result_list.find((result) => result.key === from_key)?.list;
+        object._updateList = [];
+        list?.forEach?.(({ key, row }) => {
+            const set_list = ast.set
+                .filter((set_item) => set_item.from.key === from_key)
+                .map((set_item) => {
+                const expr_result = getValue(set_item.value, {
+                    session,
+                    row,
                 });
+                if (expr_result.err) {
+                    throw new SQLError(expr_result.err);
+                }
+                return {
+                    column: set_item.column,
+                    value: expr_result,
+                };
+            });
+            if (set_list.length > 0) {
+                object._updateList.push({ key, set_list });
             }
-            done(err);
-        }),
-        (done) => {
-            const from_list = ast.from
-                .map((obj) => ({
-                database: obj.db,
-                table: obj.table,
-                key_list: obj._keyList,
-                update_list: obj._updateList,
-            }))
-                .filter((obj) => obj.update_list.length > 0);
-            if (from_list.length > 0) {
-                const groups = makeEngineGroups(session, from_list);
-                asyncEach(groups, (group, done) => {
-                    const { engine, list } = group;
-                    const opts = {
-                        dynamodb,
-                        session,
-                        list,
-                    };
-                    engine.multipleUpdate(opts, (err, result) => {
-                        if (!err) {
-                            affectedRows += result.affectedRows;
-                            changedRows += result.changedRows;
-                        }
-                        done(err);
-                    });
-                }, done);
-            }
-            else {
-                done();
-            }
-        },
-    ], (err) => done(err, { affectedRows, changedRows }));
+        });
+    });
+    // Update rows
+    const from_list = ast.from
+        .map((obj) => ({
+        database: obj.db,
+        table: obj.table,
+        key_list: obj._keyList,
+        update_list: obj._updateList,
+    }))
+        .filter((obj) => obj.update_list.length > 0);
+    if (from_list.length > 0) {
+        const groups = makeEngineGroups(session, from_list);
+        for (const group of groups) {
+            const { engine, list } = group;
+            const opts = {
+                dynamodb,
+                session,
+                list,
+            };
+            const result = await engine.multipleUpdate(opts);
+            affectedRows += result.affectedRows;
+            changedRows += result.changedRows;
+        }
+    }
+    return { affectedRows, changedRows };
 }
 
 function typeCast(value, column, options) {
@@ -26098,6 +24418,994 @@ function _jsonParse(obj) {
     }
 }
 
+var forever = {exports: {}};
+
+var onlyOnce = {exports: {}};
+
+var hasRequiredOnlyOnce;
+
+function requireOnlyOnce () {
+	if (hasRequiredOnlyOnce) return onlyOnce.exports;
+	hasRequiredOnlyOnce = 1;
+	(function (module, exports) {
+
+		Object.defineProperty(exports, "__esModule", {
+		    value: true
+		});
+		exports.default = onlyOnce;
+		function onlyOnce(fn) {
+		    return function (...args) {
+		        if (fn === null) throw new Error("Callback was already called.");
+		        var callFn = fn;
+		        fn = null;
+		        callFn.apply(this, args);
+		    };
+		}
+		module.exports = exports.default; 
+	} (onlyOnce, onlyOnce.exports));
+	return onlyOnce.exports;
+}
+
+var ensureAsync = {exports: {}};
+
+var setImmediate$1 = {};
+
+var hasRequiredSetImmediate;
+
+function requireSetImmediate () {
+	if (hasRequiredSetImmediate) return setImmediate$1;
+	hasRequiredSetImmediate = 1;
+
+	Object.defineProperty(setImmediate$1, "__esModule", {
+	    value: true
+	});
+	setImmediate$1.fallback = fallback;
+	setImmediate$1.wrap = wrap;
+	/* istanbul ignore file */
+
+	var hasQueueMicrotask = setImmediate$1.hasQueueMicrotask = typeof queueMicrotask === 'function' && queueMicrotask;
+	var hasSetImmediate = setImmediate$1.hasSetImmediate = typeof setImmediate === 'function' && setImmediate;
+	var hasNextTick = setImmediate$1.hasNextTick = typeof process === 'object' && typeof process.nextTick === 'function';
+
+	function fallback(fn) {
+	    setTimeout(fn, 0);
+	}
+
+	function wrap(defer) {
+	    return (fn, ...args) => defer(() => fn(...args));
+	}
+
+	var _defer;
+
+	if (hasQueueMicrotask) {
+	    _defer = queueMicrotask;
+	} else if (hasSetImmediate) {
+	    _defer = setImmediate;
+	} else if (hasNextTick) {
+	    _defer = process.nextTick;
+	} else {
+	    _defer = fallback;
+	}
+
+	setImmediate$1.default = wrap(_defer);
+	return setImmediate$1;
+}
+
+var wrapAsync = {};
+
+var asyncify = {exports: {}};
+
+var initialParams = {exports: {}};
+
+var hasRequiredInitialParams;
+
+function requireInitialParams () {
+	if (hasRequiredInitialParams) return initialParams.exports;
+	hasRequiredInitialParams = 1;
+	(function (module, exports) {
+
+		Object.defineProperty(exports, "__esModule", {
+		    value: true
+		});
+
+		exports.default = function (fn) {
+		    return function (...args /*, callback*/) {
+		        var callback = args.pop();
+		        return fn.call(this, args, callback);
+		    };
+		};
+
+		module.exports = exports.default; 
+	} (initialParams, initialParams.exports));
+	return initialParams.exports;
+}
+
+var hasRequiredAsyncify;
+
+function requireAsyncify () {
+	if (hasRequiredAsyncify) return asyncify.exports;
+	hasRequiredAsyncify = 1;
+	(function (module, exports) {
+
+		Object.defineProperty(exports, "__esModule", {
+		    value: true
+		});
+		exports.default = asyncify;
+
+		var _initialParams = requireInitialParams();
+
+		var _initialParams2 = _interopRequireDefault(_initialParams);
+
+		var _setImmediate = requireSetImmediate();
+
+		var _setImmediate2 = _interopRequireDefault(_setImmediate);
+
+		var _wrapAsync = requireWrapAsync();
+
+		function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+
+		/**
+		 * Take a sync function and make it async, passing its return value to a
+		 * callback. This is useful for plugging sync functions into a waterfall,
+		 * series, or other async functions. Any arguments passed to the generated
+		 * function will be passed to the wrapped function (except for the final
+		 * callback argument). Errors thrown will be passed to the callback.
+		 *
+		 * If the function passed to `asyncify` returns a Promise, that promises's
+		 * resolved/rejected state will be used to call the callback, rather than simply
+		 * the synchronous return value.
+		 *
+		 * This also means you can asyncify ES2017 `async` functions.
+		 *
+		 * @name asyncify
+		 * @static
+		 * @memberOf module:Utils
+		 * @method
+		 * @alias wrapSync
+		 * @category Util
+		 * @param {Function} func - The synchronous function, or Promise-returning
+		 * function to convert to an {@link AsyncFunction}.
+		 * @returns {AsyncFunction} An asynchronous wrapper of the `func`. To be
+		 * invoked with `(args..., callback)`.
+		 * @example
+		 *
+		 * // passing a regular synchronous function
+		 * async.waterfall([
+		 *     async.apply(fs.readFile, filename, "utf8"),
+		 *     async.asyncify(JSON.parse),
+		 *     function (data, next) {
+		 *         // data is the result of parsing the text.
+		 *         // If there was a parsing error, it would have been caught.
+		 *     }
+		 * ], callback);
+		 *
+		 * // passing a function returning a promise
+		 * async.waterfall([
+		 *     async.apply(fs.readFile, filename, "utf8"),
+		 *     async.asyncify(function (contents) {
+		 *         return db.model.create(contents);
+		 *     }),
+		 *     function (model, next) {
+		 *         // `model` is the instantiated model object.
+		 *         // If there was an error, this function would be skipped.
+		 *     }
+		 * ], callback);
+		 *
+		 * // es2017 example, though `asyncify` is not needed if your JS environment
+		 * // supports async functions out of the box
+		 * var q = async.queue(async.asyncify(async function(file) {
+		 *     var intermediateStep = await processFile(file);
+		 *     return await somePromise(intermediateStep)
+		 * }));
+		 *
+		 * q.push(files);
+		 */
+		function asyncify(func) {
+		    if ((0, _wrapAsync.isAsync)(func)) {
+		        return function (...args /*, callback*/) {
+		            const callback = args.pop();
+		            const promise = func.apply(this, args);
+		            return handlePromise(promise, callback);
+		        };
+		    }
+
+		    return (0, _initialParams2.default)(function (args, callback) {
+		        var result;
+		        try {
+		            result = func.apply(this, args);
+		        } catch (e) {
+		            return callback(e);
+		        }
+		        // if result is Promise object
+		        if (result && typeof result.then === 'function') {
+		            return handlePromise(result, callback);
+		        } else {
+		            callback(null, result);
+		        }
+		    });
+		}
+
+		function handlePromise(promise, callback) {
+		    return promise.then(value => {
+		        invokeCallback(callback, null, value);
+		    }, err => {
+		        invokeCallback(callback, err && (err instanceof Error || err.message) ? err : new Error(err));
+		    });
+		}
+
+		function invokeCallback(callback, error, value) {
+		    try {
+		        callback(error, value);
+		    } catch (err) {
+		        (0, _setImmediate2.default)(e => {
+		            throw e;
+		        }, err);
+		    }
+		}
+		module.exports = exports.default; 
+	} (asyncify, asyncify.exports));
+	return asyncify.exports;
+}
+
+var hasRequiredWrapAsync;
+
+function requireWrapAsync () {
+	if (hasRequiredWrapAsync) return wrapAsync;
+	hasRequiredWrapAsync = 1;
+
+	Object.defineProperty(wrapAsync, "__esModule", {
+	    value: true
+	});
+	wrapAsync.isAsyncIterable = wrapAsync.isAsyncGenerator = wrapAsync.isAsync = undefined;
+
+	var _asyncify = requireAsyncify();
+
+	var _asyncify2 = _interopRequireDefault(_asyncify);
+
+	function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+
+	function isAsync(fn) {
+	    return fn[Symbol.toStringTag] === 'AsyncFunction';
+	}
+
+	function isAsyncGenerator(fn) {
+	    return fn[Symbol.toStringTag] === 'AsyncGenerator';
+	}
+
+	function isAsyncIterable(obj) {
+	    return typeof obj[Symbol.asyncIterator] === 'function';
+	}
+
+	function wrapAsync$1(asyncFn) {
+	    if (typeof asyncFn !== 'function') throw new Error('expected a function');
+	    return isAsync(asyncFn) ? (0, _asyncify2.default)(asyncFn) : asyncFn;
+	}
+
+	wrapAsync.default = wrapAsync$1;
+	wrapAsync.isAsync = isAsync;
+	wrapAsync.isAsyncGenerator = isAsyncGenerator;
+	wrapAsync.isAsyncIterable = isAsyncIterable;
+	return wrapAsync;
+}
+
+var hasRequiredEnsureAsync;
+
+function requireEnsureAsync () {
+	if (hasRequiredEnsureAsync) return ensureAsync.exports;
+	hasRequiredEnsureAsync = 1;
+	(function (module, exports) {
+
+		Object.defineProperty(exports, "__esModule", {
+		    value: true
+		});
+		exports.default = ensureAsync;
+
+		var _setImmediate = requireSetImmediate();
+
+		var _setImmediate2 = _interopRequireDefault(_setImmediate);
+
+		var _wrapAsync = requireWrapAsync();
+
+		function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+
+		/**
+		 * Wrap an async function and ensure it calls its callback on a later tick of
+		 * the event loop.  If the function already calls its callback on a next tick,
+		 * no extra deferral is added. This is useful for preventing stack overflows
+		 * (`RangeError: Maximum call stack size exceeded`) and generally keeping
+		 * [Zalgo](http://blog.izs.me/post/59142742143/designing-apis-for-asynchrony)
+		 * contained. ES2017 `async` functions are returned as-is -- they are immune
+		 * to Zalgo's corrupting influences, as they always resolve on a later tick.
+		 *
+		 * @name ensureAsync
+		 * @static
+		 * @memberOf module:Utils
+		 * @method
+		 * @category Util
+		 * @param {AsyncFunction} fn - an async function, one that expects a node-style
+		 * callback as its last argument.
+		 * @returns {AsyncFunction} Returns a wrapped function with the exact same call
+		 * signature as the function passed in.
+		 * @example
+		 *
+		 * function sometimesAsync(arg, callback) {
+		 *     if (cache[arg]) {
+		 *         return callback(null, cache[arg]); // this would be synchronous!!
+		 *     } else {
+		 *         doSomeIO(arg, callback); // this IO would be asynchronous
+		 *     }
+		 * }
+		 *
+		 * // this has a risk of stack overflows if many results are cached in a row
+		 * async.mapSeries(args, sometimesAsync, done);
+		 *
+		 * // this will defer sometimesAsync's callback if necessary,
+		 * // preventing stack overflows
+		 * async.mapSeries(args, async.ensureAsync(sometimesAsync), done);
+		 */
+		function ensureAsync(fn) {
+		    if ((0, _wrapAsync.isAsync)(fn)) return fn;
+		    return function (...args /*, callback*/) {
+		        var callback = args.pop();
+		        var sync = true;
+		        args.push((...innerArgs) => {
+		            if (sync) {
+		                (0, _setImmediate2.default)(() => callback(...innerArgs));
+		            } else {
+		                callback(...innerArgs);
+		            }
+		        });
+		        fn.apply(this, args);
+		        sync = false;
+		    };
+		}
+		module.exports = exports.default; 
+	} (ensureAsync, ensureAsync.exports));
+	return ensureAsync.exports;
+}
+
+var awaitify = {exports: {}};
+
+var hasRequiredAwaitify;
+
+function requireAwaitify () {
+	if (hasRequiredAwaitify) return awaitify.exports;
+	hasRequiredAwaitify = 1;
+	(function (module, exports) {
+
+		Object.defineProperty(exports, "__esModule", {
+		    value: true
+		});
+		exports.default = awaitify;
+		// conditionally promisify a function.
+		// only return a promise if a callback is omitted
+		function awaitify(asyncFn, arity) {
+		    if (!arity) arity = asyncFn.length;
+		    if (!arity) throw new Error('arity is undefined');
+		    function awaitable(...args) {
+		        if (typeof args[arity - 1] === 'function') {
+		            return asyncFn.apply(this, args);
+		        }
+
+		        return new Promise((resolve, reject) => {
+		            args[arity - 1] = (err, ...cbArgs) => {
+		                if (err) return reject(err);
+		                resolve(cbArgs.length > 1 ? cbArgs : cbArgs[0]);
+		            };
+		            asyncFn.apply(this, args);
+		        });
+		    }
+
+		    return awaitable;
+		}
+		module.exports = exports.default; 
+	} (awaitify, awaitify.exports));
+	return awaitify.exports;
+}
+
+var hasRequiredForever;
+
+function requireForever () {
+	if (hasRequiredForever) return forever.exports;
+	hasRequiredForever = 1;
+	(function (module, exports) {
+
+		Object.defineProperty(exports, "__esModule", {
+		    value: true
+		});
+
+		var _onlyOnce = requireOnlyOnce();
+
+		var _onlyOnce2 = _interopRequireDefault(_onlyOnce);
+
+		var _ensureAsync = requireEnsureAsync();
+
+		var _ensureAsync2 = _interopRequireDefault(_ensureAsync);
+
+		var _wrapAsync = requireWrapAsync();
+
+		var _wrapAsync2 = _interopRequireDefault(_wrapAsync);
+
+		var _awaitify = requireAwaitify();
+
+		var _awaitify2 = _interopRequireDefault(_awaitify);
+
+		function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+
+		/**
+		 * Calls the asynchronous function `fn` with a callback parameter that allows it
+		 * to call itself again, in series, indefinitely.
+
+		 * If an error is passed to the callback then `errback` is called with the
+		 * error, and execution stops, otherwise it will never be called.
+		 *
+		 * @name forever
+		 * @static
+		 * @memberOf module:ControlFlow
+		 * @method
+		 * @category Control Flow
+		 * @param {AsyncFunction} fn - an async function to call repeatedly.
+		 * Invoked with (next).
+		 * @param {Function} [errback] - when `fn` passes an error to it's callback,
+		 * this function will be called, and execution stops. Invoked with (err).
+		 * @returns {Promise} a promise that rejects if an error occurs and an errback
+		 * is not passed
+		 * @example
+		 *
+		 * async.forever(
+		 *     function(next) {
+		 *         // next is suitable for passing to things that need a callback(err [, whatever]);
+		 *         // it will result in this function being called again.
+		 *     },
+		 *     function(err) {
+		 *         // if next is called with a value in its first parameter, it will appear
+		 *         // in here as 'err', and execution will stop.
+		 *     }
+		 * );
+		 */
+		function forever(fn, errback) {
+		    var done = (0, _onlyOnce2.default)(errback);
+		    var task = (0, _wrapAsync2.default)((0, _ensureAsync2.default)(fn));
+
+		    function next(err) {
+		        if (err) return done(err);
+		        if (err === false) return;
+		        task(next);
+		    }
+		    return next();
+		}
+		exports.default = (0, _awaitify2.default)(forever, 2);
+		module.exports = exports.default; 
+	} (forever, forever.exports));
+	return forever.exports;
+}
+
+var foreverExports = requireForever();
+var asyncForever = /*@__PURE__*/getDefaultExportFromCjs(foreverExports);
+
+var timesLimit = {exports: {}};
+
+var mapLimit = {exports: {}};
+
+var map = {exports: {}};
+
+var hasRequiredMap;
+
+function requireMap () {
+	if (hasRequiredMap) return map.exports;
+	hasRequiredMap = 1;
+	(function (module, exports) {
+
+		Object.defineProperty(exports, "__esModule", {
+		    value: true
+		});
+		exports.default = _asyncMap;
+
+		var _wrapAsync = requireWrapAsync();
+
+		var _wrapAsync2 = _interopRequireDefault(_wrapAsync);
+
+		function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+
+		function _asyncMap(eachfn, arr, iteratee, callback) {
+		    arr = arr || [];
+		    var results = [];
+		    var counter = 0;
+		    var _iteratee = (0, _wrapAsync2.default)(iteratee);
+
+		    return eachfn(arr, (value, _, iterCb) => {
+		        var index = counter++;
+		        _iteratee(value, (err, v) => {
+		            results[index] = v;
+		            iterCb(err);
+		        });
+		    }, err => {
+		        callback(err, results);
+		    });
+		}
+		module.exports = exports.default; 
+	} (map, map.exports));
+	return map.exports;
+}
+
+var eachOfLimit = {exports: {}};
+
+var once = {exports: {}};
+
+var hasRequiredOnce;
+
+function requireOnce () {
+	if (hasRequiredOnce) return once.exports;
+	hasRequiredOnce = 1;
+	(function (module, exports) {
+
+		Object.defineProperty(exports, "__esModule", {
+		    value: true
+		});
+		exports.default = once;
+		function once(fn) {
+		    function wrapper(...args) {
+		        if (fn === null) return;
+		        var callFn = fn;
+		        fn = null;
+		        callFn.apply(this, args);
+		    }
+		    Object.assign(wrapper, fn);
+		    return wrapper;
+		}
+		module.exports = exports.default; 
+	} (once, once.exports));
+	return once.exports;
+}
+
+var iterator = {exports: {}};
+
+var isArrayLike = {exports: {}};
+
+var hasRequiredIsArrayLike;
+
+function requireIsArrayLike () {
+	if (hasRequiredIsArrayLike) return isArrayLike.exports;
+	hasRequiredIsArrayLike = 1;
+	(function (module, exports) {
+
+		Object.defineProperty(exports, "__esModule", {
+		    value: true
+		});
+		exports.default = isArrayLike;
+		function isArrayLike(value) {
+		    return value && typeof value.length === 'number' && value.length >= 0 && value.length % 1 === 0;
+		}
+		module.exports = exports.default; 
+	} (isArrayLike, isArrayLike.exports));
+	return isArrayLike.exports;
+}
+
+var getIterator = {exports: {}};
+
+var hasRequiredGetIterator;
+
+function requireGetIterator () {
+	if (hasRequiredGetIterator) return getIterator.exports;
+	hasRequiredGetIterator = 1;
+	(function (module, exports) {
+
+		Object.defineProperty(exports, "__esModule", {
+		    value: true
+		});
+
+		exports.default = function (coll) {
+		    return coll[Symbol.iterator] && coll[Symbol.iterator]();
+		};
+
+		module.exports = exports.default; 
+	} (getIterator, getIterator.exports));
+	return getIterator.exports;
+}
+
+var hasRequiredIterator;
+
+function requireIterator () {
+	if (hasRequiredIterator) return iterator.exports;
+	hasRequiredIterator = 1;
+	(function (module, exports) {
+
+		Object.defineProperty(exports, "__esModule", {
+		    value: true
+		});
+		exports.default = createIterator;
+
+		var _isArrayLike = requireIsArrayLike();
+
+		var _isArrayLike2 = _interopRequireDefault(_isArrayLike);
+
+		var _getIterator = requireGetIterator();
+
+		var _getIterator2 = _interopRequireDefault(_getIterator);
+
+		function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+
+		function createArrayIterator(coll) {
+		    var i = -1;
+		    var len = coll.length;
+		    return function next() {
+		        return ++i < len ? { value: coll[i], key: i } : null;
+		    };
+		}
+
+		function createES2015Iterator(iterator) {
+		    var i = -1;
+		    return function next() {
+		        var item = iterator.next();
+		        if (item.done) return null;
+		        i++;
+		        return { value: item.value, key: i };
+		    };
+		}
+
+		function createObjectIterator(obj) {
+		    var okeys = obj ? Object.keys(obj) : [];
+		    var i = -1;
+		    var len = okeys.length;
+		    return function next() {
+		        var key = okeys[++i];
+		        if (key === '__proto__') {
+		            return next();
+		        }
+		        return i < len ? { value: obj[key], key } : null;
+		    };
+		}
+
+		function createIterator(coll) {
+		    if ((0, _isArrayLike2.default)(coll)) {
+		        return createArrayIterator(coll);
+		    }
+
+		    var iterator = (0, _getIterator2.default)(coll);
+		    return iterator ? createES2015Iterator(iterator) : createObjectIterator(coll);
+		}
+		module.exports = exports.default; 
+	} (iterator, iterator.exports));
+	return iterator.exports;
+}
+
+var asyncEachOfLimit = {exports: {}};
+
+var breakLoop = {exports: {}};
+
+var hasRequiredBreakLoop;
+
+function requireBreakLoop () {
+	if (hasRequiredBreakLoop) return breakLoop.exports;
+	hasRequiredBreakLoop = 1;
+	(function (module, exports) {
+
+		Object.defineProperty(exports, "__esModule", {
+		    value: true
+		});
+		// A temporary value used to identify if the loop should be broken.
+		// See #1064, #1293
+		const breakLoop = {};
+		exports.default = breakLoop;
+		module.exports = exports.default; 
+	} (breakLoop, breakLoop.exports));
+	return breakLoop.exports;
+}
+
+var hasRequiredAsyncEachOfLimit;
+
+function requireAsyncEachOfLimit () {
+	if (hasRequiredAsyncEachOfLimit) return asyncEachOfLimit.exports;
+	hasRequiredAsyncEachOfLimit = 1;
+	(function (module, exports) {
+
+		Object.defineProperty(exports, "__esModule", {
+		    value: true
+		});
+		exports.default = asyncEachOfLimit;
+
+		var _breakLoop = requireBreakLoop();
+
+		var _breakLoop2 = _interopRequireDefault(_breakLoop);
+
+		function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+
+		// for async generators
+		function asyncEachOfLimit(generator, limit, iteratee, callback) {
+		    let done = false;
+		    let canceled = false;
+		    let awaiting = false;
+		    let running = 0;
+		    let idx = 0;
+
+		    function replenish() {
+		        //console.log('replenish')
+		        if (running >= limit || awaiting || done) return;
+		        //console.log('replenish awaiting')
+		        awaiting = true;
+		        generator.next().then(({ value, done: iterDone }) => {
+		            //console.log('got value', value)
+		            if (canceled || done) return;
+		            awaiting = false;
+		            if (iterDone) {
+		                done = true;
+		                if (running <= 0) {
+		                    //console.log('done nextCb')
+		                    callback(null);
+		                }
+		                return;
+		            }
+		            running++;
+		            iteratee(value, idx, iterateeCallback);
+		            idx++;
+		            replenish();
+		        }).catch(handleError);
+		    }
+
+		    function iterateeCallback(err, result) {
+		        //console.log('iterateeCallback')
+		        running -= 1;
+		        if (canceled) return;
+		        if (err) return handleError(err);
+
+		        if (err === false) {
+		            done = true;
+		            canceled = true;
+		            return;
+		        }
+
+		        if (result === _breakLoop2.default || done && running <= 0) {
+		            done = true;
+		            //console.log('done iterCb')
+		            return callback(null);
+		        }
+		        replenish();
+		    }
+
+		    function handleError(err) {
+		        if (canceled) return;
+		        awaiting = false;
+		        done = true;
+		        callback(err);
+		    }
+
+		    replenish();
+		}
+		module.exports = exports.default; 
+	} (asyncEachOfLimit, asyncEachOfLimit.exports));
+	return asyncEachOfLimit.exports;
+}
+
+var hasRequiredEachOfLimit;
+
+function requireEachOfLimit () {
+	if (hasRequiredEachOfLimit) return eachOfLimit.exports;
+	hasRequiredEachOfLimit = 1;
+	(function (module, exports) {
+
+		Object.defineProperty(exports, "__esModule", {
+		    value: true
+		});
+
+		var _once = requireOnce();
+
+		var _once2 = _interopRequireDefault(_once);
+
+		var _iterator = requireIterator();
+
+		var _iterator2 = _interopRequireDefault(_iterator);
+
+		var _onlyOnce = requireOnlyOnce();
+
+		var _onlyOnce2 = _interopRequireDefault(_onlyOnce);
+
+		var _wrapAsync = requireWrapAsync();
+
+		var _asyncEachOfLimit = requireAsyncEachOfLimit();
+
+		var _asyncEachOfLimit2 = _interopRequireDefault(_asyncEachOfLimit);
+
+		var _breakLoop = requireBreakLoop();
+
+		var _breakLoop2 = _interopRequireDefault(_breakLoop);
+
+		function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+
+		exports.default = limit => {
+		    return (obj, iteratee, callback) => {
+		        callback = (0, _once2.default)(callback);
+		        if (limit <= 0) {
+		            throw new RangeError('concurrency limit cannot be less than 1');
+		        }
+		        if (!obj) {
+		            return callback(null);
+		        }
+		        if ((0, _wrapAsync.isAsyncGenerator)(obj)) {
+		            return (0, _asyncEachOfLimit2.default)(obj, limit, iteratee, callback);
+		        }
+		        if ((0, _wrapAsync.isAsyncIterable)(obj)) {
+		            return (0, _asyncEachOfLimit2.default)(obj[Symbol.asyncIterator](), limit, iteratee, callback);
+		        }
+		        var nextElem = (0, _iterator2.default)(obj);
+		        var done = false;
+		        var canceled = false;
+		        var running = 0;
+		        var looping = false;
+
+		        function iterateeCallback(err, value) {
+		            if (canceled) return;
+		            running -= 1;
+		            if (err) {
+		                done = true;
+		                callback(err);
+		            } else if (err === false) {
+		                done = true;
+		                canceled = true;
+		            } else if (value === _breakLoop2.default || done && running <= 0) {
+		                done = true;
+		                return callback(null);
+		            } else if (!looping) {
+		                replenish();
+		            }
+		        }
+
+		        function replenish() {
+		            looping = true;
+		            while (running < limit && !done) {
+		                var elem = nextElem();
+		                if (elem === null) {
+		                    done = true;
+		                    if (running <= 0) {
+		                        callback(null);
+		                    }
+		                    return;
+		                }
+		                running += 1;
+		                iteratee(elem.value, elem.key, (0, _onlyOnce2.default)(iterateeCallback));
+		            }
+		            looping = false;
+		        }
+
+		        replenish();
+		    };
+		};
+
+		module.exports = exports.default; 
+	} (eachOfLimit, eachOfLimit.exports));
+	return eachOfLimit.exports;
+}
+
+var hasRequiredMapLimit;
+
+function requireMapLimit () {
+	if (hasRequiredMapLimit) return mapLimit.exports;
+	hasRequiredMapLimit = 1;
+	(function (module, exports) {
+
+		Object.defineProperty(exports, "__esModule", {
+		    value: true
+		});
+
+		var _map2 = requireMap();
+
+		var _map3 = _interopRequireDefault(_map2);
+
+		var _eachOfLimit = requireEachOfLimit();
+
+		var _eachOfLimit2 = _interopRequireDefault(_eachOfLimit);
+
+		var _awaitify = requireAwaitify();
+
+		var _awaitify2 = _interopRequireDefault(_awaitify);
+
+		function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+
+		/**
+		 * The same as [`map`]{@link module:Collections.map} but runs a maximum of `limit` async operations at a time.
+		 *
+		 * @name mapLimit
+		 * @static
+		 * @memberOf module:Collections
+		 * @method
+		 * @see [async.map]{@link module:Collections.map}
+		 * @category Collection
+		 * @param {Array|Iterable|AsyncIterable|Object} coll - A collection to iterate over.
+		 * @param {number} limit - The maximum number of async operations at a time.
+		 * @param {AsyncFunction} iteratee - An async function to apply to each item in
+		 * `coll`.
+		 * The iteratee should complete with the transformed item.
+		 * Invoked with (item, callback).
+		 * @param {Function} [callback] - A callback which is called when all `iteratee`
+		 * functions have finished, or an error occurs. Results is an array of the
+		 * transformed items from the `coll`. Invoked with (err, results).
+		 * @returns {Promise} a promise, if no callback is passed
+		 */
+		function mapLimit(coll, limit, iteratee, callback) {
+		    return (0, _map3.default)((0, _eachOfLimit2.default)(limit), coll, iteratee, callback);
+		}
+		exports.default = (0, _awaitify2.default)(mapLimit, 4);
+		module.exports = exports.default; 
+	} (mapLimit, mapLimit.exports));
+	return mapLimit.exports;
+}
+
+var range = {exports: {}};
+
+var hasRequiredRange;
+
+function requireRange () {
+	if (hasRequiredRange) return range.exports;
+	hasRequiredRange = 1;
+	(function (module, exports) {
+
+		Object.defineProperty(exports, "__esModule", {
+		    value: true
+		});
+		exports.default = range;
+		function range(size) {
+		    var result = Array(size);
+		    while (size--) {
+		        result[size] = size;
+		    }
+		    return result;
+		}
+		module.exports = exports.default; 
+	} (range, range.exports));
+	return range.exports;
+}
+
+var hasRequiredTimesLimit;
+
+function requireTimesLimit () {
+	if (hasRequiredTimesLimit) return timesLimit.exports;
+	hasRequiredTimesLimit = 1;
+	(function (module, exports) {
+
+		Object.defineProperty(exports, "__esModule", {
+		    value: true
+		});
+		exports.default = timesLimit;
+
+		var _mapLimit = requireMapLimit();
+
+		var _mapLimit2 = _interopRequireDefault(_mapLimit);
+
+		var _range = requireRange();
+
+		var _range2 = _interopRequireDefault(_range);
+
+		var _wrapAsync = requireWrapAsync();
+
+		var _wrapAsync2 = _interopRequireDefault(_wrapAsync);
+
+		function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+
+		/**
+		 * The same as [times]{@link module:ControlFlow.times} but runs a maximum of `limit` async operations at a
+		 * time.
+		 *
+		 * @name timesLimit
+		 * @static
+		 * @memberOf module:ControlFlow
+		 * @method
+		 * @see [async.times]{@link module:ControlFlow.times}
+		 * @category Control Flow
+		 * @param {number} count - The number of times to run the function.
+		 * @param {number} limit - The maximum number of async operations at a time.
+		 * @param {AsyncFunction} iteratee - The async function to call `n` times.
+		 * Invoked with the iteration index and a callback: (n, next).
+		 * @param {Function} callback - see [async.map]{@link module:Collections.map}.
+		 * @returns {Promise} a promise, if no callback is provided
+		 */
+		function timesLimit(count, limit, iteratee, callback) {
+		    var _iteratee = (0, _wrapAsync2.default)(iteratee);
+		    return (0, _mapLimit2.default)((0, _range2.default)(count), limit, _iteratee, callback);
+		}
+		module.exports = exports.default; 
+	} (timesLimit, timesLimit.exports));
+	return timesLimit.exports;
+}
+
 var timesLimitExports = requireTimesLimit();
 var asyncTimesLimit = /*@__PURE__*/getDefaultExportFromCjs(timesLimitExports);
 
@@ -26142,13 +25450,13 @@ function createTable$2(params, done) {
     const KeySchema = [
         {
             AttributeName: primary_key?.[0]?.name,
-            KeyType: 'HASH',
+            KeyType: clientDynamodb.KeyType.HASH,
         },
     ];
     if (primary_key?.[1]) {
         KeySchema.push({
             AttributeName: primary_key[1].name,
-            KeyType: 'RANGE',
+            KeyType: clientDynamodb.KeyType.RANGE,
         });
     }
     const input = {
@@ -26173,13 +25481,13 @@ function createIndex$1(params, done) {
     const KeySchema = [
         {
             AttributeName: key_list?.[0]?.name,
-            KeyType: 'HASH',
+            KeyType: clientDynamodb.KeyType.HASH,
         },
     ];
     if (key_list?.[1]) {
         KeySchema.push({
             AttributeName: key_list[1].name,
-            KeyType: 'RANGE',
+            KeyType: clientDynamodb.KeyType.RANGE,
         });
     }
     const input = {
@@ -26505,7 +25813,7 @@ var dynamodb = /*#__PURE__*/Object.freeze({
 const g_tableCache = {};
 function getTable(table_name, done) {
     getTable$1(table_name, (err, result) => {
-        if (err === 'resource_not_found' ||
+        if (err?.message === 'resource_not_found' ||
             (!err && result?.Table?.TableStatus === 'DELETING')) {
             delete g_tableCache[table_name];
         }
@@ -26553,180 +25861,6 @@ function createDynamoDB(params, done) {
     return self;
 }
 
-const { isNativeError } = node_util.types;
-const DEFAULT_ERRNO = 1002;
-const DEFAULT_CODE = 'ER_NO';
-const ERROR_MAP = {
-    dup_table_insert: {
-        code: 'ER_DUP_ENTRY',
-        sqlMessage: errStr `Duplicate entry for table '${0}' and item '${1}'`,
-    },
-    dup: {
-        code: 'ER_DUP_ENTRY',
-        sqlMessage: 'Duplicate entry',
-    },
-    dup_primary_key_entry: {
-        code: 'ER_DUP_ENTRY',
-        sqlMessage: errStr `Duplicate entry for value '${1}' for '${0}'`,
-    },
-    parse: {
-        code: 'ER_PARSE_ERROR',
-        sqlMessage: errStr `You have an error in your SQL syntax; check your syntax near column ${1} at line ${0}`,
-    },
-    syntax_err: {
-        code: 'ER_PARSE_ERROR',
-        sqlMessage: errStr `You have an error in your SQL syntax; check your syntax near ${0}`,
-    },
-    ER_EMPTY_QUERY: {
-        code: 'ER_EMPTY_QUERY',
-        sqlMessage: 'Query was empty',
-    },
-    multiple_statements_disabled: {
-        code: 'ER_PARSE_ERROR',
-        sqlMessage: 'Multiple statements are disabled.  See the "multipleStatements" session option.',
-    },
-    unsupported: {
-        code: 'ER_NO',
-        sqlMessage: 'Unsupport sql feature.',
-    },
-    unsupported_type: {
-        code: 'ER_NO',
-        sqlMessage: errStr `Unsupported query type: ${0}`,
-    },
-    database_no_drop_builtin: {
-        code: 'ER_DBACCESS_DENIED_ERROR',
-        sqlMessage: "Can't drop a built in database",
-    },
-    database_exists: {
-        code: 'ER_DB_CREATE_EXISTS',
-        sqlMessage: 'Database exists',
-    },
-    no_current_database: {
-        code: 'ER_NO_DB_ERROR',
-        sqlMessage: 'No database selected',
-    },
-    db_not_found: {
-        code: 'ER_BAD_DB_ERROR',
-        sqlMessage: errStr `Unknown database '${0}'`,
-    },
-    table_not_found: {
-        code: 'ER_NO_SUCH_TABLE',
-        sqlMessage: errStr `Table '${0}' doesn't exist`,
-    },
-    column_not_found: {
-        code: 'ER_BAD_FIELD_ERROR',
-        sqlMessage: errStr `Unknown column '${0}'`,
-    },
-    ER_BAD_TABLE_ERROR: {
-        code: 'ER_BAD_TABLE_ERROR',
-        sqlMessage: errStr `Unknown  table '${0}'`,
-    },
-    ER_SP_DOES_NOT_EXIST: {
-        code: 'ER_SP_DOES_NOT_EXIST',
-        sqlMessage: errStr `FUNCTION ${0} does not exist`,
-    },
-    ER_TOO_BIG_PRECISION: {
-        code: 'ER_TOO_BIG_PRECISION',
-        sqlMessage: 'Too-big precision specified. Maximum is 6.',
-    },
-    table_exists: {
-        code: 'ER_TABLE_EXISTS_ERROR',
-        sqlMessage: 'Table already exists.',
-    },
-    bad_interval_usage: {
-        code: 'ER_PARSE_ERROR',
-        sqlMessage: 'You have an error in your SQL syntax.  Check near "INTERVAL".',
-    },
-    ER_WRONG_VALUE_COUNT_ON_ROW: {
-        code: 'ER_WRONG_VALUE_COUNT_ON_ROW',
-        sqlMessage: errStr `Column count doesn't match value count at row ${0}`,
-    },
-    ER_BAD_NULL_ERROR: {
-        code: 'ER_BAD_NULL_ERROR',
-    },
-    ER_TRUNCATED_WRONG_VALUE_FOR_FIELD: {
-        code: 'ER_TRUNCATED_WRONG_VALUE_FOR_FIELD',
-    },
-    ER_KEY_COLUMN_DOES_NOT_EXITS: {
-        code: 'ER_KEY_COLUMN_DOES_NOT_EXITS',
-        sqlMessage: errStr `Key column '${0}' doesn't exist in table`,
-    },
-    ER_DUP_KEYNAME: {
-        code: 'ER_DUP_KEYNAME',
-        sqlMessage: errStr `Duplicate key name '${0}'`,
-    },
-    ER_CANT_DROP_FIELD_OR_KEY: {
-        code: 'ER_CANT_DROP_FIELD_OR_KEY',
-        sqlMessage: errStr `Can't DROP '${0}'; check that column/key exists`,
-    },
-    ER_UNKNOWN_STORAGE_ENGINE: {
-        code: 'ER_UNKNOWN_STORAGE_ENGINE',
-        sqlMessage: errStr `Unknown storage engine '${0}'`,
-    },
-    access_denied: {
-        code: 'ER_DBACCESS_DENIED_ERROR',
-        sqlMessage: 'Access denied',
-    },
-};
-class SQLError extends Error {
-    constructor(err, sql) {
-        const sql_err = ERROR_MAP[err] || ERROR_MAP[err.err];
-        const code = err.code || sql_err?.code || DEFAULT_CODE;
-        const errno = err.errno ||
-            sql_err?.errno ||
-            CODE_ERRNO[code] ||
-            DEFAULT_ERRNO;
-        let sqlMessage = err.sqlMessage || sql_err?.sqlMessage;
-        if (typeof sqlMessage === 'function') {
-            sqlMessage = sqlMessage(err.args);
-        }
-        const message = err.message ||
-            sqlMessage ||
-            (typeof err === 'string' ? err : undefined);
-        if (err.cause) {
-            super(message, { cause: err.cause });
-        }
-        else if (isNativeError(err) || code === DEFAULT_CODE) {
-            super(message, { cause: err });
-        }
-        else {
-            super(message);
-        }
-        this.code = code;
-        this.errno = errno;
-        if (sqlMessage) {
-            this.sqlMessage = sqlMessage;
-        }
-        if (sql) {
-            this.sql = sql;
-        }
-    }
-}
-function errStr(strings, ...index_list) {
-    return function (arg_list) {
-        let s = '';
-        for (let i = 0; i < strings.length; i++) {
-            s += strings[i];
-            s += _stringify(arg_list?.[index_list?.[i]]);
-        }
-        return s;
-    };
-}
-function _stringify(arg) {
-    let ret = arg || '';
-    if (arg === null) {
-        ret = 'NULL';
-    }
-    else if (Array.isArray(arg)) {
-        ret = arg.map(_stringify).join(',');
-    }
-    else if (typeof arg === 'object' &&
-        arg.toString === Object.prototype.toString) {
-        ret = jsonStringify(arg);
-    }
-    return ret;
-}
-
 const DEFAULT_RESULT = { affectedRows: 0, changedRows: 0 };
 const parser = new mysql_parserExports.Parser();
 let g_dynamodb;
@@ -26734,19 +25868,19 @@ function init(args) {
     g_dynamodb = createDynamoDB(args);
 }
 class Session {
+    _typeCastOptions = {};
+    _currentDatabase = null;
+    _localVariables = {};
+    _transaction = null;
+    _isReleased = false;
+    _multipleStatements = false;
+    _tempTableMap = {};
+    _typeCast = true;
+    _dateStrings = false;
+    _resultObjects = true;
+    escape = SqlString__namespace.escape;
+    escapeId = SqlString__namespace.escapeId;
     constructor(args) {
-        this._typeCastOptions = {};
-        this._currentDatabase = null;
-        this._localVariables = {};
-        this._transaction = null;
-        this._isReleased = false;
-        this._multipleStatements = false;
-        this._tempTableMap = {};
-        this._typeCast = true;
-        this._dateStrings = false;
-        this._resultObjects = true;
-        this.escape = SqlString__namespace.escape;
-        this.escapeId = SqlString__namespace.escapeId;
         if (args?.database) {
             this.setCurrentDatabase(args.database);
         }
@@ -26803,6 +25937,9 @@ class Session {
         const key = database + '.' + table;
         this._tempTableMap[key] = contents;
     }
+    deleteTempTable(database, table) {
+        this.dropTempTable(database, table);
+    }
     dropTempTable(database, table) {
         const prefix = database + '.';
         if (table) {
@@ -26841,57 +25978,61 @@ class Session {
     _query(opts, done) {
         if (this._isReleased) {
             done('released');
+            return;
         }
-        else {
-            const { err: parse_err, list } = _astify(opts.sql);
-            if (parse_err) {
-                done(new SQLError(parse_err, opts.sql));
-            }
-            else if (list.length === 0) {
-                done(new SQLError('ER_EMPTY_QUERY', opts.sql));
-            }
-            else if (list.length === 1) {
-                this._singleQuery(list[0], (err, result, columns) => {
-                    if (!err) {
+        const { err: parse_err, list } = _astify(opts.sql);
+        if (parse_err) {
+            done(new SQLError(parse_err, opts.sql));
+            return;
+        }
+        if (list.length === 0) {
+            done(new SQLError('ER_EMPTY_QUERY', opts.sql));
+            return;
+        }
+        if (list.length === 1) {
+            this._singleQuery(list[0])
+                .then(({ result, columns }) => {
+                if (result !== undefined) {
+                    this._transformResult(result, columns, opts);
+                }
+                done(null, result ?? DEFAULT_RESULT, columns, 1);
+            })
+                .catch((err) => {
+                done(new SQLError(err, opts.sql));
+            });
+            return;
+        }
+        if (!this._multipleStatements) {
+            done(new SQLError('multiple_statements_disabled', opts.sql));
+            return;
+        }
+        // Multiple statements
+        const result_list = [];
+        (async () => {
+            const schema_list = [];
+            for (let n = 0; n < list.length; n++) {
+                const ast = list[n];
+                if (ast) {
+                    const { result, columns } = await this._singleQuery(ast);
+                    if (result !== undefined) {
                         this._transformResult(result, columns, opts);
                     }
-                    done(err ? new SQLError(err, opts.sql) : null, err ? undefined : (result ?? DEFAULT_RESULT), err ? undefined : columns, 1);
-                });
+                    result_list[n] = result ?? DEFAULT_RESULT;
+                    schema_list[n] = columns;
+                }
             }
-            else if (this._multipleStatements) {
-                const query_count = list.length;
-                const result_list = [];
-                const schema_list = [];
-                asyncTimesSeries(query_count, (n, done) => {
-                    const ast = list[n];
-                    if (ast) {
-                        this._singleQuery(ast, (err, result, columns) => {
-                            if (!err) {
-                                this._transformResult(result, columns, opts);
-                                result_list[n] = result ?? DEFAULT_RESULT;
-                                schema_list[n] = columns;
-                            }
-                            done(err);
-                        });
-                    }
-                    else {
-                        done();
-                    }
-                }, (err) => {
-                    if (err) {
-                        err = new SQLError(err, opts.sql);
-                        err.index = result_list.length;
-                    }
-                    done(err, result_list, schema_list, query_count);
-                });
-            }
-            else {
-                done(new SQLError('multiple_statements_disabled', opts.sql));
-            }
-        }
+            return { result_list, schema_list, query_count: list.length };
+        })()
+            .then(({ result_list, schema_list, query_count }) => {
+            done(null, result_list, schema_list, query_count);
+        })
+            .catch((err) => {
+            const sqlErr = new SQLError(err, opts.sql);
+            sqlErr.index = result_list.length;
+            done(sqlErr);
+        });
     }
-    _singleQuery(ast, done) {
-        let err;
+    async _singleQuery(ast) {
         let handler;
         switch (ast?.type) {
             case 'alter':
@@ -26923,21 +26064,35 @@ class Session {
                 handler = query;
                 break;
             case 'use':
-                handler = _useDatabase;
-                break;
+                return await _useDatabase({ ast, session: this });
             default:
                 shared.logger.error('unsupported statement type:', ast);
-                err = {
+                throw new SQLError({
                     err: 'unsupported_type',
                     args: [ast?.type],
-                };
+                });
         }
-        if (handler) {
-            handler({ ast, dynamodb: g_dynamodb, session: this }, done);
+        if (!handler) {
+            throw new SQLError('unsupported_type');
         }
-        else {
-            done(err || 'unsupported_type');
+        const result = await handler({ ast, dynamodb: g_dynamodb, session: this });
+        // Handle different return types from handlers
+        if (result && typeof result === 'object') {
+            if ('rows' in result && 'columns' in result) {
+                // show handler
+                return { result: result.rows, columns: result.columns };
+            }
+            else if ('output_row_list' in result && 'column_list' in result) {
+                // select handler
+                return { result: result.output_row_list, columns: result.column_list };
+            }
+            else {
+                // mutation handlers (insert, update, delete, etc.)
+                return { result, columns: undefined };
+            }
         }
+        // set handler returns void, drop handler may return undefined
+        return { result: undefined, columns: undefined };
     }
     _transformResult(list, columns, opts) {
         if (this._resultObjects && Array.isArray(list)) {
@@ -26988,8 +26143,9 @@ function _astify(sql) {
     }
     return { err, list };
 }
-function _useDatabase(params, done) {
-    params.session.setCurrentDatabase(params.ast.db, done);
+async function _useDatabase(params) {
+    params.session.setCurrentDatabase(params.ast.db);
+    return { result: undefined, columns: undefined };
 }
 
 function createPool$1(args) {
@@ -26999,9 +26155,10 @@ function createPool$1(args) {
     return new Pool(args || {});
 }
 class Pool {
+    _args;
+    escape = SqlString__namespace.escape;
+    escapeId = SqlString__namespace.escapeId;
     constructor(args) {
-        this.escape = SqlString__namespace.escape;
-        this.escapeId = SqlString__namespace.escapeId;
         this._args = args;
     }
     end(done) {
@@ -27016,9 +26173,9 @@ class Pool {
             values = undefined;
         }
         const session = createSession$1(this._args);
-        session.query(opts, values, (...result) => {
+        session.query(opts, values, (error, results, fields) => {
             session.release();
-            done(...result);
+            done(error, results, fields);
         });
     }
 }

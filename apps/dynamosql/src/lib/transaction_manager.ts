@@ -27,11 +27,11 @@ class Transaction {
 
 export async function run(params: any): Promise<any> {
   const { dynamodb, session, func } = params;
-  
+
   startTransaction({ session, auto_commit: true });
   const tx = session.getTransaction();
   params.transaction = tx;
-  
+
   try {
     const result = await func(params);
     if (tx.isAutoCommit()) {

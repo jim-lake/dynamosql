@@ -2,7 +2,9 @@ import * as SchemaManager from './schema_manager';
 import { convertType } from './helpers/column_type_helper';
 import { SQLError } from '../error';
 
-export async function query(params: any): Promise<{ rows: any[]; columns: any[] }> {
+export async function query(
+  params: any
+): Promise<{ rows: any[]; columns: any[] }> {
   const { ast, session, dynamodb } = params;
 
   if (ast.keyword === 'databases') {
@@ -20,7 +22,7 @@ export async function query(params: any): Promise<{ rows: any[]; columns: any[] 
     if (!database) {
       throw new SQLError('no_current_database');
     }
-    
+
     const name = 'Tables_in_' + database;
     const column = Object.assign(convertType('string'), {
       table: 'TABLES',

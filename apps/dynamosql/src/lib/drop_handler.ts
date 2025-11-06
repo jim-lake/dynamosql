@@ -22,14 +22,14 @@ export async function query(params: any): Promise<any> {
       database,
       table,
     };
-    
+
     try {
       await SchemaManager.dropTable(opts);
       return {};
-    } catch (err) {
-      if (err === 'resource_not_found' && ast.prefix === 'if exists') {
+    } catch (err: any) {
+      if (err?.message === 'resource_not_found' && ast.prefix === 'if exists') {
         return undefined;
-      } else if (err === 'resource_not_found') {
+      } else if (err?.message === 'resource_not_found') {
         throw new SQLError({
           err: 'ER_BAD_TABLE_ERROR',
           args: [table],

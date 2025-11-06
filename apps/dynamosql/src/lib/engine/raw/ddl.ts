@@ -1,5 +1,6 @@
 import { promisify } from 'util';
 import { logger } from '@dynamosql/shared';
+import { SQLError } from '../../../error';
 import type {
   TableInfoParams,
   TableInfo,
@@ -75,9 +76,9 @@ export async function createTable(params: CreateTableParams): Promise<void> {
   try {
     await createTable(opts);
     await _waitForTable({ dynamodb, table });
-  } catch (err) {
-    if (err === 'resource_in_use') {
-      throw 'table_exists';
+  } catch (err: any) {
+    if (err?.message === 'resource_in_use') {
+      throw new SQLError('table_exists');
     }
     logger.error('raw_engine.createTable: err:', err);
     throw err;
@@ -92,7 +93,7 @@ export async function dropTable(params: DropTableParams): Promise<void> {
     await deleteTable(table);
   } catch (delete_err: any) {
     if (delete_err?.code === 'ResourceNotFoundException') {
-      throw 'resource_not_found';
+      throw new SQLError('table_not_found');
     }
     logger.error('raw_engine.dropTable: deleteTable err:', delete_err);
     throw delete_err;
@@ -100,8 +101,8 @@ export async function dropTable(params: DropTableParams): Promise<void> {
 
   try {
     await _waitForTable({ dynamodb, table });
-  } catch (wait_err) {
-    if (wait_err === 'resource_not_found') {
+  } catch (wait_err: any) {
+    if (wait_err?.message === 'resource_not_found') {
       return;
     }
     logger.error('raw_engine.dropTable: waitForTable err:', wait_err);
@@ -121,10 +122,10 @@ export async function createIndex(params: IndexParams): Promise<void> {
     await _waitForTable({ dynamodb, table, index_name });
   } catch (err: any) {
     if (
-      err === 'resource_in_use' ||
+      err?.message === 'resource_in_use' ||
       err?.message?.indexOf?.('already exists') >= 0
     ) {
-      throw 'index_exists';
+      throw new Error('index_exists');
     }
     logger.error('raw_engine.createIndex: err:', err);
     throw err;
@@ -138,9 +139,9 @@ export async function deleteIndex(params: IndexParams): Promise<void> {
   try {
     await deleteIndex({ table, index_name });
     await _waitForTable({ dynamodb, table, index_name });
-  } catch (err) {
-    if (err === 'resource_not_found') {
-      throw 'index_not_found';
+  } catch (err: any) {
+    if (err?.message === 'resource_not_found') {
+      throw new Error('index_not_found');
     }
     logger.error('raw_engine.deleteIndex: err:', err);
     throw err;

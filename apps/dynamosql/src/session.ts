@@ -159,7 +159,7 @@ class Session implements ISession {
       done(new SQLError(parse_err, opts.sql));
       return;
     }
-    
+
     if (list.length === 0) {
       done(new SQLError('ER_EMPTY_QUERY', opts.sql));
       return;
@@ -188,7 +188,7 @@ class Session implements ISession {
     const result_list: any[] = [];
     (async () => {
       const schema_list: any[] = [];
-      
+
       for (let n = 0; n < list.length; n++) {
         const ast = list[n];
         if (ast) {
@@ -200,7 +200,7 @@ class Session implements ISession {
           schema_list[n] = columns;
         }
       }
-      
+
       return { result_list, schema_list, query_count: list.length };
     })()
       .then(({ result_list, schema_list, query_count }) => {
@@ -215,7 +215,7 @@ class Session implements ISession {
 
   async _singleQuery(ast: any): Promise<{ result: any; columns: any }> {
     let handler: any;
-    
+
     switch (ast?.type) {
       case 'alter':
         handler = AlterHandler.query;
@@ -260,7 +260,7 @@ class Session implements ISession {
     }
 
     const result = await handler({ ast, dynamodb: g_dynamodb, session: this });
-    
+
     // Handle different return types from handlers
     if (result && typeof result === 'object') {
       if ('rows' in result && 'columns' in result) {
@@ -274,7 +274,7 @@ class Session implements ISession {
         return { result, columns: undefined };
       }
     }
-    
+
     // set handler returns void, drop handler may return undefined
     return { result: undefined, columns: undefined };
   }
@@ -330,7 +330,9 @@ function _astify(sql: string) {
   return { err, list };
 }
 
-async function _useDatabase(params: any): Promise<{ result: any; columns: any }> {
+async function _useDatabase(
+  params: any
+): Promise<{ result: any; columns: any }> {
   params.session.setCurrentDatabase(params.ast.db);
   return { result: undefined, columns: undefined };
 }

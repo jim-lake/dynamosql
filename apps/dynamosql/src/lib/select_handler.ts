@@ -8,19 +8,23 @@ import { sort } from './helpers/sort';
 import { logger } from '@dynamosql/shared';
 import { SQLError } from '../error';
 
-export async function query(params: any): Promise<{ output_row_list: any[]; column_list: any[] }> {
+export async function query(
+  params: any
+): Promise<{ output_row_list: any[]; column_list: any[] }> {
   const { output_row_list, column_list } = await internalQuery(params);
-  
+
   output_row_list?.forEach?.((row: any) => {
     for (const key in row) {
       row[key] = row[key].value;
     }
   });
-  
+
   return { output_row_list, column_list };
 }
 
-export async function internalQuery(params: any): Promise<{ output_row_list: any[]; column_list: any[]; row_list: any[] }> {
+export async function internalQuery(
+  params: any
+): Promise<{ output_row_list: any[]; column_list: any[]; row_list: any[] }> {
   const { ast, session, dynamodb } = params;
 
   const current_database = session.getCurrentDatabase();
@@ -53,7 +57,11 @@ export async function internalQuery(params: any): Promise<{ output_row_list: any
   return _evaluateReturn({ ...params, source_map, column_map });
 }
 
-function _evaluateReturn(params: any): { output_row_list: any[]; column_list: any[]; row_list: any[] } {
+function _evaluateReturn(params: any): {
+  output_row_list: any[];
+  column_list: any[];
+  row_list: any[];
+} {
   const { session, source_map, ast } = params;
   const query_columns = _expandStarColumns(params);
 
@@ -61,7 +69,7 @@ function _evaluateReturn(params: any): { output_row_list: any[]; column_list: an
   let err: any;
   let row_list: any;
   let sleep_ms = 9;
-  
+
   if (from) {
     const result = formJoin({ source_map, from, where, session });
     if (result.err) {
@@ -72,7 +80,7 @@ function _evaluateReturn(params: any): { output_row_list: any[]; column_list: an
   } else {
     row_list = [{ 0: {} }];
   }
-  
+
   if (!err && groupby) {
     const result = formGroup({ groupby, ast, row_list, session });
     if (result.err) {
@@ -81,7 +89,7 @@ function _evaluateReturn(params: any): { output_row_list: any[]; column_list: an
       row_list = result.row_list;
     }
   }
-  
+
   const row_count = row_list?.length || 0;
   const column_count = query_columns?.length || 0;
 
@@ -120,10 +128,7 @@ function _evaluateReturn(params: any): { output_row_list: any[]; column_list: an
   const column_list: any[] = [];
   for (let i = 0; i < column_count; i++) {
     const column = query_columns[i];
-    const column_type = convertType(
-      column.result_type,
-      column.result_nullable
-    );
+    const column_type = convertType(column.result_type, column.result_nullable);
     column_type.orgName = column.result_name || '';
     column_type.name = column.as || column_type.orgName;
     column_type.orgTable = column?.expr?.from?.table || '';
@@ -131,7 +136,7 @@ function _evaluateReturn(params: any): { output_row_list: any[]; column_list: an
     column_type.schema = column.expr?.from?.db || '';
     column_list.push(column_type);
   }
-  
+
   if (ast.orderby) {
     const sort_err = sort(row_list, ast.orderby, { session, column_list });
     if (sort_err) {

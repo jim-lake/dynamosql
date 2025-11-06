@@ -58,7 +58,7 @@ async function _multipleDelete(params: any): Promise<any> {
 
   // Get rows to delete
   const result_list = await runSelect(params);
-  
+
   ast.table.forEach((object: any) => {
     const from_key = object.from.key;
     const list = result_list.find(
@@ -77,7 +77,7 @@ async function _multipleDelete(params: any): Promise<any> {
       delete_list: obj._deleteList,
     }))
     .filter((obj: any) => obj.delete_list.length > 0);
-    
+
   if (from_list.length > 0) {
     const groups = makeEngineGroups(session, from_list);
     for (const group of groups) {

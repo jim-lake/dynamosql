@@ -58,9 +58,7 @@ async function _runAlterTable(params: any): Promise<any> {
       let key_err: any;
       const key_list =
         def.definition?.map?.((sub: any) => {
-          const column_def = column_list.find(
-            (col) => col.name === sub.column
-          );
+          const column_def = column_list.find((col) => col.name === sub.column);
           if (!column_def) {
             key_err = {
               err: 'ER_KEY_COLUMN_DOES_NOT_EXITS',
@@ -88,8 +86,8 @@ async function _runAlterTable(params: any): Promise<any> {
 
       try {
         await engine.createIndex(opts);
-      } catch (err) {
-        if (err === 'index_exists') {
+      } catch (err: any) {
+        if (err?.message === 'index_exists') {
           throw new SQLError({
             err: 'ER_DUP_KEYNAME',
             args: [def.index],
@@ -107,8 +105,8 @@ async function _runAlterTable(params: any): Promise<any> {
 
       try {
         await engine.deleteIndex(opts);
-      } catch (err) {
-        if (err === 'index_not_found') {
+      } catch (err: any) {
+        if (err?.message === 'index_not_found') {
           throw new SQLError({
             err: 'ER_CANT_DROP_FIELD_OR_KEY',
             args: [def.index],

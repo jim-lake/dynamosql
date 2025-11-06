@@ -25,7 +25,21 @@ declare class Pool {
     query(opts: QueryOptions, values?: any[] | QueryCallback, done?: QueryCallback): void;
 }
 
-declare class Session {
+interface Session$1 {
+    getCurrentDatabase(): string | null;
+    setCurrentDatabase(database: string, done?: () => void): void;
+    getVariable(name: string): any;
+    setVariable(name: string, value: any): void;
+    getTransaction(): any;
+    setTransaction(tx: any): void;
+    getTempTable(database: string, table: string): any;
+    saveTempTable(database: string, table: string, contents: any): void;
+    deleteTempTable(database: string, table: string): void;
+    dropTempTable(database: string, table?: string): void;
+    getTempTableList(): [string, any][];
+}
+
+declare class Session implements Session$1 {
     _typeCastOptions: any;
     _currentDatabase: string | null;
     _localVariables: any;
@@ -51,10 +65,14 @@ declare class Session {
     getTempTableList(): [string, unknown][];
     getTempTable(database: string, table: string): any;
     saveTempTable(database: string, table: string, contents: any): void;
+    deleteTempTable(database: string, table: string): void;
     dropTempTable(database: string, table?: string): void;
     query(params: any, values?: any, done?: any): void;
     _query(opts: any, done: any): void;
-    _singleQuery(ast: any, done: any): void;
+    _singleQuery(ast: any): Promise<{
+        result: any;
+        columns: any;
+    }>;
     _transformResult(list: any, columns: any, opts: any): void;
     _convertCell(value: any, column: any): any;
 }

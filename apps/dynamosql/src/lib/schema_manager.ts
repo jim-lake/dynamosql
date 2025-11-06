@@ -98,7 +98,10 @@ export async function createTable(params: any): Promise<void> {
         g_schemaMap[database][table] = { table_engine };
       }
     } else {
-      throw new SQLError({ err: 'ER_UNKNOWN_STORAGE_ENGINE', args: [table_engine] });
+      throw new SQLError({
+        err: 'ER_UNKNOWN_STORAGE_ENGINE',
+        args: [table_engine],
+      });
     }
   }
 }

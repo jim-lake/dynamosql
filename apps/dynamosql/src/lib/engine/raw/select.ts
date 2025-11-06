@@ -2,6 +2,7 @@ import { promisify } from 'util';
 import { logger } from '@dynamosql/shared';
 import { convertWhere } from '../../helpers/convert_where';
 import { escapeIdentifier } from '../../../tools/dynamodb_helper';
+import { SQLError } from '../../../error';
 import type { RowListParams } from '../index';
 
 export async function getRowList(params: RowListParams): Promise<{
@@ -59,9 +60,9 @@ async function _getFromTable(
     }
 
     return { results, column_list };
-  } catch (err) {
-    if (err === 'resource_not_found') {
-      throw { err: 'table_not_found', args: [table] };
+  } catch (err: any) {
+    if (err?.message === 'resource_not_found') {
+      throw new SQLError({ err: 'table_not_found', args: [table] });
     }
     logger.error('raw_engine.getRowList err:', err, sql);
     throw err;

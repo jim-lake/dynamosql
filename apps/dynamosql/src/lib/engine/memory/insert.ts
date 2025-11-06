@@ -37,7 +37,10 @@ export async function insertRowList(
       row_list[index as number] = row;
       affectedRows++;
     } else if (!duplicate_mode) {
-      throw new SQLError({ err: 'dup_primary_key_entry', args: [primary_key, key_values] });
+      throw new SQLError({
+        err: 'dup_primary_key_entry',
+        args: [primary_key, key_values],
+      });
     }
   }
 

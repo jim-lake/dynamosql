@@ -5,6 +5,7 @@ import {
   convertError,
 } from '../../../tools/dynamodb_helper';
 import { trackFirstSeen } from '../../../tools/util';
+import { SQLError } from '../../../error';
 import type { InsertParams, MutationResult } from '../index';
 
 export async function insertRowList(
@@ -44,9 +45,9 @@ async function _insertIgnoreReplace(
       if (duplicate_mode === 'replace') {
         list.reverse();
       }
-    } catch (err) {
-      if (err === 'resource_not_found') {
-        throw { err: 'table_not_found', args: [table] };
+    } catch (err: any) {
+      if (err?.message === 'resource_not_found') {
+        throw new SQLError({ err: 'table_not_found', args: [table] });
       }
       throw err;
     }
@@ -62,7 +63,14 @@ async function _insertIgnoreReplace(
     const [err_list] = await new Promise<[any, any]>((resolve, reject) => {
       dynamodb.batchQL(sql_list, (err: any, result: any) => {
         if (err && !Array.isArray(err)) {
-          reject(err);
+          if (
+            err?.name === 'ResourceNotFoundException' ||
+            err?.message?.toLowerCase().includes('resource not found')
+          ) {
+            reject(new SQLError({ err: 'table_not_found', args: [table] }));
+          } else {
+            reject(err);
+          }
         } else {
           resolve([err, result]);
         }
@@ -81,11 +89,11 @@ async function _insertIgnoreReplace(
       });
       if (err) throw err;
     } else if (err_list?.name === 'ValidationException') {
-      throw {
+      throw new SQLError({
         err: 'dup_table_insert',
         sqlMessage: err_list.message,
         cause: err_list,
-      };
+      });
     }
   } else {
     list.forEach(_fixupItem);
@@ -121,25 +129,36 @@ async function _insertNoIgnore(params: InsertParams): Promise<MutationResult> {
     ) {
       for (let i = 0; i < err.CancellationReasons.length; i++) {
         if (err.CancellationReasons[i].Code === 'DuplicateItem') {
-          throw {
+          throw new SQLError({
             err: 'dup_table_insert',
             args: [table, _fixupItem(list[i])],
-          };
+          });
         } else if (err.CancellationReasons[i].Code !== 'None') {
-          throw {
+          throw new SQLError({
             err: convertError(err.CancellationReasons[i]),
             message: err.CancellationReasons[i].Message,
-          };
+          });
         }
       }
     } else if (err?.name === 'ValidationException') {
-      throw {
+      throw new SQLError({
         err: 'dup_table_insert',
         sqlMessage: err.message,
         cause: err,
-      };
+      });
     }
-    throw convertError(err);
+
+    // Check for resource not found errors
+    const errStr = String(err?.message || err || '').toLowerCase();
+    if (
+      err?.name === 'ResourceNotFoundException' ||
+      errStr.includes('resource not found') ||
+      errStr.includes('requested resource not found')
+    ) {
+      throw new SQLError({ err: 'table_not_found', args: [table] });
+    }
+
+    throw err;
   }
 }
 

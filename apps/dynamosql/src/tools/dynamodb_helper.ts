@@ -62,26 +62,34 @@ export function escapeValue(value: any, type?: string): string {
 }
 
 export function convertError(err: any) {
-  let ret: any = err;
+  if (!err) return err;
+
+  let ret: any;
   if (err.name === 'ConditionalCheckFailedException' && err.Item) {
-    ret = 'cond_fail';
+    ret = new Error('cond_fail');
   } else if (err.Code === 'ConditionalCheckFailed') {
-    ret = 'cond_fail';
+    ret = new Error('cond_fail');
   } else if (
     err.name === 'ResourceNotFoundException' ||
-    err.Code === 'ResourceNotFound'
+    err.Code === 'ResourceNotFound' ||
+    (err.message && err.message.includes('resource not found'))
   ) {
-    ret = 'resource_not_found';
-  } else if (err.name === 'ResourceInUseException') {
-    ret = 'resource_in_use';
+    ret = new Error('resource_not_found');
+  } else if (
+    err.name === 'ResourceInUseException' ||
+    (err.message && err.message.includes('resource in use'))
+  ) {
+    ret = new Error('resource_in_use');
   } else if (err.Code === 'ValidationError' || err.name === 'ValidationError') {
     if (err.Message?.match?.(/expected: [^\s]* actual: NULL/)) {
-      ret = 'ER_BAD_NULL_ERROR';
+      ret = new Error('ER_BAD_NULL_ERROR');
     } else if (err.Message?.match?.(/expected: [^\s]* actual:/)) {
-      ret = 'ER_TRUNCATED_WRONG_VALUE_FOR_FIELD';
+      ret = new Error('ER_TRUNCATED_WRONG_VALUE_FOR_FIELD');
     } else {
-      ret = 'validation';
+      ret = new Error('validation');
     }
+  } else {
+    ret = err;
   }
   return ret;
 }

@@ -16,11 +16,11 @@ export async function query(params: any): Promise<any> {
 
   const database = ast.table?.[0]?.db || session.getCurrentDatabase();
   const table = ast.table?.[0]?.table;
-  
+
   if (!database) {
     throw new SQLError('no_current_database');
   }
-  
+
   const err = _checkAst(ast);
   if (err) {
     throw new SQLError(err);
@@ -100,9 +100,18 @@ async function _runInsert(params: any): Promise<any> {
     };
     try {
       return await engine.insertRowList(opts);
-    } catch (err) {
-      if (err === 'resource_not_found' || err?.err === 'resource_not_found') {
-        throw new SQLError({ err: 'table_not_found', args: err?.args || [table] });
+    } catch (err: any) {
+      const errStr = String(err?.message || '').toLowerCase();
+      if (
+        err?.message === 'resource_not_found' ||
+        err?.err === 'resource_not_found' ||
+        err?.name === 'ResourceNotFoundException' ||
+        errStr.includes('resource not found')
+      ) {
+        throw new SQLError({
+          err: 'table_not_found',
+          args: err?.args || [table],
+        });
       }
       throw err;
     }
