@@ -1,7 +1,7 @@
 'use strict';
 
 var SqlString = require('sqlstring');
-var events = require('events');
+var node_events = require('node:events');
 var require$$0 = require('big-integer');
 var shared = require('@dynamosql/shared');
 var node_util = require('node:util');
@@ -25956,7 +25956,7 @@ let g_dynamodb;
 function init(args) {
     g_dynamodb = createDynamoDB(args);
 }
-class Session extends events.EventEmitter {
+class Session extends node_events.EventEmitter {
     config;
     state = 'disconnected';
     threadId = null;
@@ -26250,7 +26250,7 @@ function createPool$1(args) {
     }
     return new Pool(args || {});
 }
-class Pool extends events.EventEmitter {
+class Pool extends node_events.EventEmitter {
     config;
     escape = SqlString__namespace.escape;
     escapeId = SqlString__namespace.escapeId;
@@ -26278,6 +26278,7 @@ class Pool extends events.EventEmitter {
     }
 }
 
+const createConnection = createSession$1;
 const createPool = createPool$1;
 const createSession = createSession$1;
 const escape = SqlString__namespace.escape;
@@ -26285,6 +26286,7 @@ const escapeId = SqlString__namespace.escapeId;
 const format = SqlString__namespace.format;
 
 exports.SQLError = SQLError;
+exports.createConnection = createConnection;
 exports.createPool = createPool;
 exports.createSession = createSession;
 exports.escape = escape;

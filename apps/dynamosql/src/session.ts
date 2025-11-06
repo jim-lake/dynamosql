@@ -1,5 +1,6 @@
+import { EventEmitter } from 'node:events';
 import * as SqlString from 'sqlstring';
-import { EventEmitter } from 'events';
+
 import { Parser } from './vendor/mysql_parser';
 import * as AlterHandler from './lib/alter_handler';
 import * as CreateHandler from './lib/create_handler';

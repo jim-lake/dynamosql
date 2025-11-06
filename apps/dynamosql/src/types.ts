@@ -1,3 +1,4 @@
+import type { EventEmitter } from 'node:events';
 import type { Readable, ReadableOptions } from 'node:stream';
 
 import type { SQLError } from './error';
@@ -115,7 +116,7 @@ export interface EscapeFunctions {
 export interface PoolConnection extends Connection {
   release(): void;
 }
-export interface Connection extends EscapeFunctions {
+export interface Connection extends EscapeFunctions, EventEmitter {
   query: QueryFunction;
   end(callback?: (err?: MysqlError) => void): void;
   end(options: any, callback: (err?: MysqlError) => void): void;

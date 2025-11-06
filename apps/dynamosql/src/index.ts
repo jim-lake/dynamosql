@@ -1,4 +1,5 @@
 import * as SqlString from 'sqlstring';
+
 import * as Pool from './pool';
 import * as Session from './session';
 
@@ -15,8 +16,10 @@ export type {
 export type { QueryCallback as queryCallback } from './types';
 export type { PoolOptions } from './pool';
 
+export const createConnection = Session.createSession;
 export const createPool = Pool.createPool;
 export const createSession = Session.createSession;
+
 export const escape = SqlString.escape as EscapeFunctions['escape'];
 export const escapeId = SqlString.escapeId as EscapeFunctions['escapeId'];
 export const format = SqlString.format as EscapeFunctions['format'];

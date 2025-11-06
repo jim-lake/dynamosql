@@ -1,5 +1,6 @@
+import { EventEmitter } from 'node:events';
 import * as SqlString from 'sqlstring';
-import { EventEmitter } from 'events';
+
 import * as Session from './session';
 
 import type {

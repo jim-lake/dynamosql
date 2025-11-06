@@ -1,4 +1,4 @@
-import { EventEmitter } from 'events';
+import { EventEmitter } from 'node:events';
 
 interface ErrorInput {
     err?: string;
@@ -99,7 +99,7 @@ interface EscapeFunctions {
 interface PoolConnection extends Connection {
     release(): void;
 }
-interface Connection extends EscapeFunctions {
+interface Connection extends EscapeFunctions, EventEmitter {
     query: QueryFunction;
     end(callback?: (err?: MysqlError) => void): void;
     end(options: any, callback: (err?: MysqlError) => void): void;
@@ -140,11 +140,12 @@ declare class Pool extends EventEmitter {
 
 declare function createSession$1(args?: any): PoolConnection;
 
+declare const createConnection: typeof createSession$1;
 declare const createPool: typeof createPool$1;
 declare const createSession: typeof createSession$1;
 declare const escape: EscapeFunctions["escape"];
 declare const escapeId: EscapeFunctions["escapeId"];
 declare const format: EscapeFunctions["format"];
 
-export { SQLError, createPool, createSession, escape, escapeId, format };
+export { SQLError, createConnection, createPool, createSession, escape, escapeId, format };
 export type { Connection, FieldInfo, MysqlError, OkPacket, PoolOptions, QueryCallback, QueryOptions, QueryCallback as queryCallback };
