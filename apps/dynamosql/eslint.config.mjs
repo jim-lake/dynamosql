@@ -35,7 +35,7 @@ export default tseslint.config(
     },
   },
   {
-    files: ['test/**/*.js'],
+    files: ['test/**/*.js', 'test/**/*.ts'],
     languageOptions: {
       globals: {
         describe: 'readonly',

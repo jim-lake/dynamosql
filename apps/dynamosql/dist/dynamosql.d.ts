@@ -97,16 +97,16 @@ declare class Session extends EventEmitter implements Session$1 {
     config: any;
     state: string;
     threadId: number | null;
-    _typeCastOptions: any;
-    _currentDatabase: string | null;
-    _localVariables: any;
-    _transaction: any;
-    _isReleased: boolean;
-    _multipleStatements: boolean;
-    _tempTableMap: any;
-    _typeCast: boolean | ((field: any, next: () => any) => any);
-    _dateStrings: boolean | string[];
-    _resultObjects: boolean;
+    private _typeCastOptions;
+    private _currentDatabase;
+    private _localVariables;
+    private _transaction;
+    private _isReleased;
+    private _multipleStatements;
+    private _tempTableMap;
+    private _typeCast;
+    private _dateStrings;
+    private _resultObjects;
     escape: any;
     escapeId: any;
     format: any;
@@ -126,13 +126,10 @@ declare class Session extends EventEmitter implements Session$1 {
     deleteTempTable(database: string, table: string): void;
     dropTempTable(database: string, table?: string): void;
     query(params: string | QueryOptions, values?: any, done?: queryCallback): void;
-    _query(opts: any, done?: queryCallback): Promise<void>;
-    _singleQuery(ast: any): Promise<{
-        result: any;
-        columns: any;
-    }>;
-    _transformResult(list: any, columns: any, opts: any): void;
-    _convertCell(value: any, column: any): any;
+    private _query;
+    private _singleQuery;
+    private _transformResult;
+    private _convertCell;
 }
 declare function createSession$1(args?: any): Session;
 
@@ -141,6 +138,7 @@ declare const createSession: typeof createSession$1;
 declare const escape: any;
 declare const escapeId: any;
 declare const format: any;
+type Connection = Session;
 
 export { SQLError, createPool, createSession, escape, escapeId, format };
-export type { FieldInfo, MysqlError, OkPacket, PoolOptions, QueryOptions, queryCallback };
+export type { Connection, FieldInfo, MysqlError, OkPacket, PoolOptions, QueryOptions, queryCallback };

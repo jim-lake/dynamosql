@@ -39,20 +39,20 @@ export function init(args: any) {
   g_dynamodb = DynamoDB.createDynamoDB(args);
 }
 
-class Session extends EventEmitter implements ISession {
+export class Session extends EventEmitter implements ISession {
   config: any;
   state: string = 'disconnected';
   threadId: number | null = null;
-  _typeCastOptions: any = {};
-  _currentDatabase: string | null = null;
-  _localVariables: any = {};
-  _transaction: any = null;
-  _isReleased = false;
-  _multipleStatements = false;
-  _tempTableMap: any = {};
-  _typeCast: boolean | ((field: any, next: () => any) => any) = true;
-  _dateStrings: boolean | string[] = false;
-  _resultObjects = true;
+  private _typeCastOptions: any = {};
+  private _currentDatabase: string | null = null;
+  private _localVariables: any = {};
+  private _transaction: any = null;
+  private _isReleased = false;
+  private _multipleStatements = false;
+  private _tempTableMap: any = {};
+  private _typeCast: boolean | ((field: any, next: () => any) => any) = true;
+  private _dateStrings: boolean | string[] = false;
+  private _resultObjects = true;
 
   escape = SqlString.escape;
   escapeId = SqlString.escapeId;
@@ -174,7 +174,7 @@ class Session extends EventEmitter implements ISession {
     }
   }
 
-  async _query(opts: any, done?: queryCallback) {
+  private async _query(opts: any, done?: queryCallback) {
     if (this._isReleased) {
       done?.(new SQLError('released') as MysqlError);
       return;
@@ -236,7 +236,7 @@ class Session extends EventEmitter implements ISession {
     }
   }
 
-  async _singleQuery(ast: any): Promise<{ result: any; columns: any }> {
+  private async _singleQuery(ast: any): Promise<{ result: any; columns: any }> {
     let handler: any;
 
     switch (ast?.type) {
@@ -302,7 +302,7 @@ class Session extends EventEmitter implements ISession {
     return { result: undefined, columns: undefined };
   }
 
-  _transformResult(list: any, columns: any, opts: any) {
+  private _transformResult(list: any, columns: any, opts: any) {
     if (this._resultObjects && Array.isArray(list)) {
       list.forEach((result: any, i: number) => {
         const obj: any = {};
@@ -321,7 +321,7 @@ class Session extends EventEmitter implements ISession {
     }
   }
 
-  _convertCell(value: any, column: any) {
+  private _convertCell(value: any, column: any) {
     if (typeof this._typeCast === 'function') {
       return this._typeCast(column, () =>
         typeCast(value, column, this._typeCastOptions)

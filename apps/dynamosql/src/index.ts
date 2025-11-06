@@ -8,6 +8,8 @@ export const escape = SqlString.escape;
 export const escapeId = SqlString.escapeId;
 export const format = SqlString.format;
 
+export type Connection = Session.Session;
+
 export type {
   MysqlError,
   FieldInfo,
