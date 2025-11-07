@@ -149,10 +149,22 @@ function _checkEqual(name, i, left, right) {
     expect(left.length, `results[${i}].${name} length equal`).to.equal(
       right.length
     );
-    left = String(left).replace(SECONDS_REGEX, '');
-    right = String(right).replace(SECONDS_REGEX, '');
-  }
-  if (left instanceof Date) {
+    if (left.length === 8) {
+      const l_time = Date.parse('2020-01-01 ' + left);
+      const r_time = Date.parse('2020-01-01 ' + right);
+      const delta = Math.abs(l_time - r_time);
+      expect(delta, `delta results[${i}].${name} < 2000`).to.be.lt(2000);
+    } else if (left.length >= 19) {
+      const l_time = Date.parse(left);
+      const r_time = Date.parse(right);
+      const delta = Math.abs(l_time - r_time);
+      expect(delta, `delta results[${i}].${name} < 2000`).to.be.lt(2000);
+    } else {
+      left = String(left).replace(SECONDS_REGEX, '');
+      right = String(right).replace(SECONDS_REGEX, '');
+      expect(left, `results[${i}].${name} equal`).to.equal(right);
+    }
+  } else if (left instanceof Date) {
     assert(right instanceof Date, 'both are dates');
     expect(left.getTime(), `results[${i}].${name} typeof equal`).to.equal(
       right.getTime()
