@@ -142,3 +142,63 @@ export function nativeToValue(obj: any): any {
 function toString(this: any) {
   return JSON.stringify(this);
 }
+
+export function convertValueToPQL(value: any) {
+  let ret: string;
+  if (!value) {
+    ret = 'NULL';
+  } else if (value.S !== undefined) {
+    ret = "'" + escapeString(value.S) + "'";
+  } else if (value.N !== undefined) {
+    ret = value.N;
+  } else {
+    ret = "'" + escapeString(String(value)) + "'";
+  }
+  return ret;
+}
+
+export function convertSuccess(result: any): [any, any] {
+  let err: any = null;
+  let ret: any;
+  if (result?.Responses) {
+    ret = [];
+    result.Responses.forEach((response: any, i: number) => {
+      if (response.Error) {
+        if (!err) {
+          err = [];
+        }
+        err[i] = convertError(response.Error);
+      }
+      ret[i] = convertResult(response);
+    });
+  } else {
+    ret = convertResult(result);
+  }
+  return [err, ret];
+}
+
+export function convertResult(result: any) {
+  let ret: any;
+  if (result?.Items) {
+    ret = result.Items;
+  } else if (result?.Item) {
+    ret = [result?.Item];
+  }
+  return ret;
+}
+
+export function dynamoType(type: string) {
+  let ret = type;
+  if (type === 'string') {
+    ret = 'S';
+  } else if (type === 'VARCHAR') {
+    ret = 'S';
+  } else if (type === 'INT') {
+    ret = 'N';
+  } else if (type === 'number') {
+    ret = 'N';
+  } else if (type === 'blob') {
+    ret = 'B';
+  }
+  return ret;
+}
