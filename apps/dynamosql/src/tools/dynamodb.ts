@@ -24,6 +24,8 @@ import {
   convertSuccess,
   dynamoType,
 } from './dynamodb_helper';
+import { parallelBatch } from './parallel_batch';
+import { parallelLimit } from './parallel_limit';
 
 import type { DynamoDBClientConfig } from '@aws-sdk/client-dynamodb';
 import type { AwsCredentialIdentity } from '@aws-sdk/types';
@@ -54,30 +56,10 @@ export class DynamoDB {
     if (!Array.isArray(list)) {
       return this._queryQL(list);
     } else {
-      const err_list: any[] = [];
-      const result_list: any[] = [];
-      await new Promise((resolve, reject) => {
-        asyncTimesLimit(
-          list.length,
-          QUERY_LIMIT,
-          (i: number, done: any) => {
-            const item = list[i];
-            this._queryQL(item).then(
-              (result) => {
-                result_list[i] = result;
-                done();
-              },
-              (err) => {
-                result_list[i] = undefined;
-                err_list[i] = err;
-                done(err);
-              }
-            );
-          },
-          (err: any) => (err ? reject(err_list) : resolve(result_list))
-        );
+      return parallelLimit(list, QUERY_LIMIT, async (item) => {
+        console.log('parallel queryQL:', item);
+        return this._queryQL(item);
       });
-      return result_list;
     }
   }
 
@@ -150,46 +132,20 @@ export class DynamoDB {
   async deleteItems(params: any): Promise<any> {
     const BATCH_LIMIT = 100;
     const { table, key_list, list } = params;
-    const batch_count = Math.ceil(list.length / BATCH_LIMIT);
     const prefix = `DELETE FROM ${escapeIdentifier(table)} WHERE `;
-    const err_list: any[] = [];
-    const result_list: any[] = [];
-    await new Promise((resolve, reject) => {
-      asyncTimesLimit(
-        batch_count,
-        QUERY_LIMIT,
-        (batch_index: number, done: any) => {
-          const sql_list: string[] = [];
-          const start = BATCH_LIMIT * batch_index;
-          const end = Math.min(start + BATCH_LIMIT, list.length);
-          for (let i = start; i < end; i++) {
-            const cond = key_list
-              .map((key: string, j: number) => {
-                const value = list[i][j];
-                return `${escapeIdentifier(key)} = ${convertValueToPQL(value)}`;
-              })
-              .join(' AND ');
-            sql_list.push(prefix + cond);
-          }
-          this.transactionQL(sql_list).then(
-            (result) => {
-              for (let i = start; i < end; i++) {
-                result_list[i] = result?.[i - start];
-              }
-              done();
-            },
-            (err) => {
-              for (let i = start; i < end; i++) {
-                err_list[i] = err?.[i - start];
-              }
-              done(err);
-            }
-          );
-        },
-        (err: any) => (err ? reject(err_list) : resolve(result_list))
-      );
+    return parallelBatch(list, BATCH_LIMIT, QUERY_LIMIT, async (batch) => {
+      const sql_list: string[] = [];
+      for (const item of batch) {
+        const cond = key_list
+          .map((key: string, j: number) => {
+            const value = item[j];
+            return `${escapeIdentifier(key)} = ${convertValueToPQL(value)}`;
+          })
+          .join(' AND ');
+        sql_list.push(prefix + cond);
+      }
+      return this.transactionQL(sql_list);
     });
-    return result_list;
   }
 
   async updateItems(params: any): Promise<any> {

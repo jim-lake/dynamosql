@@ -1,3 +1,4 @@
+DELETE FROM _dynamodb.foo;
 INSERT IGNORE INTO _dynamodb.foo (id, other, comment) VALUES
   ("4", 4, "4 comment"),
   ("99", null, "99 comment with null"),
