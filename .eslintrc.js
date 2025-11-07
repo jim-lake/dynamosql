@@ -1,17 +1,9 @@
 module.exports = {
   ignorePatterns: ['src/vendor/*'],
-  env: {
-    node: true,
-    es6: true,
-  },
+  env: { node: true, es6: true },
   extends: 'eslint:recommended',
-  parserOptions: {
-    ecmaVersion: 2022,
-  },
-  globals: {
-    BigInt: true,
-    Promise: true,
-  },
+  parserOptions: { ecmaVersion: 2022 },
+  globals: { BigInt: true, Promise: true },
   rules: {
     indent: 0,
     'linebreak-style': ['error', 'unix'],

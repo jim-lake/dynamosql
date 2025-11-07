@@ -100,9 +100,7 @@ Create a pool and use it directly:
 
 ```js
 const dynamosql = require('dynamosql');
-const pool = dynamosql.createPool({
-  database: '_dynamodb',
-});
+const pool = dynamosql.createPool({ database: '_dynamodb' });
 
 pool.query('SELECT 1 + 1 AS solution', function (error, results, fields) {
   if (error) throw error;
