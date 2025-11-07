@@ -33,6 +33,8 @@ import { parallelLimit } from './parallel_limit';
 import type { DynamoDBClientConfig } from '@aws-sdk/client-dynamodb';
 import type { AwsCredentialIdentity } from '@aws-sdk/types';
 
+export type { DescribeTableCommandOutput } from '@aws-sdk/client-dynamodb';
+
 const QUERY_LIMIT = 5;
 
 export interface DynamoDBConstructorParams {
