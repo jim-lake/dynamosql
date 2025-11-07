@@ -35,7 +35,7 @@ function runTests(test_name, file_path, extra) {
 
   const data = fs.readFileSync(file_path, 'utf8');
   const sql_list = data
-    .replace(/\-\-.*/g, '\n')
+    .replace(/--.*$/gm, '\n')
     .split(';')
     .map((s) => s.trim())
     .filter((s) => s.length > 0);
@@ -109,7 +109,7 @@ function runTests(test_name, file_path, extra) {
                     _checkEqual(name, i, left, right);
                   });
                 } else {
-                  ddb_result.columns.forEach((column, j) => {
+                  ddb_result.columns.forEach((column) => {
                     const { table, name } = column;
                     const left = opts.nestTables
                       ? result[table]?.[name]

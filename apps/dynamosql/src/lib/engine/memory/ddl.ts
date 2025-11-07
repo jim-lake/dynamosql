@@ -26,7 +26,9 @@ export async function getTableInfo(
   throw new SQLError({ err: 'table_not_found', args: [table] });
 }
 
-export async function getTableList(params: TableListParams): Promise<string[]> {
+export async function getTableList(
+  _params: TableListParams
+): Promise<string[]> {
   return [];
 }
 
@@ -61,8 +63,8 @@ export async function dropTable(params: DropTableParams): Promise<void> {
   }
 }
 
-export async function addColumn(params: AddColumnParams): Promise<void> {}
+export async function addColumn(_params: AddColumnParams): Promise<void> {}
 
-export async function createIndex(params: IndexParams): Promise<void> {}
+export async function createIndex(_params: IndexParams): Promise<void> {}
 
-export async function deleteIndex(params: IndexParams): Promise<void> {}
+export async function deleteIndex(_params: IndexParams): Promise<void> {}

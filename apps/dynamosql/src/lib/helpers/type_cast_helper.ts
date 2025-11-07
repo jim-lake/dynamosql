@@ -99,7 +99,7 @@ export function typeCast(value: any, column: any, options?: any): any {
 function _jsonParse(obj: string): any {
   try {
     return JSON.parse(obj);
-  } catch (e) {
+  } catch {
     return null;
   }
 }

@@ -2,7 +2,6 @@ process.env.TZ = 'UTC';
 
 const mysql = require('mysql');
 const config = require('../../../config');
-const { TYPES_MAP } = require('../src/constants/mysql');
 
 const host = process.argv[2];
 const port = parseInt(process.argv[3]);

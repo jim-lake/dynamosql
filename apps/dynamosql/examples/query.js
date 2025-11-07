@@ -43,7 +43,7 @@ session.query(sql, (err, results, fields) => {
 function tryRequire(file) {
   try {
     return require(file);
-  } catch (e) {
+  } catch {
     return {};
   }
 }

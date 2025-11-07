@@ -438,7 +438,8 @@ export class DynamoDB {
           }
           this.client.send(command).then(
             (result: any) => {
-              let [err, list] = convertSuccess(result);
+              let err;
+              const list: any[] = convertSuccess(result)[1];
               list?.forEach?.((item: any) => {
                 results.push(item);
               });

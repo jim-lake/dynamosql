@@ -108,7 +108,7 @@ export async function dropTable(params: DropTableParams): Promise<void> {
   }
 }
 
-export async function addColumn(params: AddColumnParams): Promise<void> {}
+export async function addColumn(_params: AddColumnParams): Promise<void> {}
 
 export async function createIndex(params: IndexParams): Promise<void> {
   const { dynamodb, table, index_name, key_list } = params;
@@ -149,32 +149,28 @@ async function _waitForTable(params: any): Promise<void> {
   const LOOP_MS = 500;
 
   while (true) {
-    try {
-      const result = await dynamodb.getTable(table);
-      const status = result?.Table?.TableStatus;
+    const result = await dynamodb.getTable(table);
+    const status = result?.Table?.TableStatus;
 
-      if (
-        status === 'CREATING' ||
-        status === 'UPDATING' ||
-        status === 'DELETING'
-      ) {
+    if (
+      status === 'CREATING' ||
+      status === 'UPDATING' ||
+      status === 'DELETING'
+    ) {
+      await sleep(LOOP_MS);
+      continue;
+    }
+
+    if (index_name) {
+      const index = result?.Table?.GlobalSecondaryIndexes?.find?.(
+        (item: any) => item.IndexName === index_name
+      );
+      if (index && index.IndexStatus !== 'ACTIVE') {
         await sleep(LOOP_MS);
         continue;
       }
-
-      if (index_name) {
-        const index = result?.Table?.GlobalSecondaryIndexes?.find?.(
-          (item: any) => item.IndexName === index_name
-        );
-        if (index && index.IndexStatus !== 'ACTIVE') {
-          await sleep(LOOP_MS);
-          continue;
-        }
-      }
-
-      return;
-    } catch (err) {
-      throw err;
     }
+
+    return;
   }
 }

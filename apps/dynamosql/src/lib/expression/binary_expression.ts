@@ -69,8 +69,9 @@ function _numBothSides(
 }
 
 function plus(expr: any, state: any): any {
-  let { err, name, value, left_num, right_num, interval, datetime } =
-    _numBothSides(expr, state, ' + ', true);
+  const result = _numBothSides(expr, state, ' + ', true);
+  const { err, name, left_num, right_num, interval, datetime } = result;
+  let value = result.value;
   let type;
   if (!err && value !== null) {
     if (datetime) {
@@ -86,8 +87,9 @@ function plus(expr: any, state: any): any {
 }
 
 function minus(expr: any, state: any): any {
-  let { err, name, value, left_num, right_num, interval, datetime } =
-    _numBothSides(expr, state, ' - ', true);
+  const result = _numBothSides(expr, state, ' - ', true);
+  const { err, name, left_num, right_num, interval, datetime } = result;
+  let value = result.value;
   let type;
   if (!err && value !== null) {
     if (datetime) {
@@ -103,11 +105,9 @@ function minus(expr: any, state: any): any {
 }
 
 function mul(expr: any, state: any): any {
-  let { err, name, value, left_num, right_num } = _numBothSides(
-    expr,
-    state,
-    ' * '
-  );
+  const result = _numBothSides(expr, state, ' * ');
+  const { err, name, left_num, right_num } = result;
+  let value = result.value;
   if (!err && value !== null) {
     value = left_num * right_num;
   }
@@ -115,11 +115,9 @@ function mul(expr: any, state: any): any {
 }
 
 function div(expr: any, state: any): any {
-  let { err, name, value, left_num, right_num } = _numBothSides(
-    expr,
-    state,
-    ' / '
-  );
+  const result = _numBothSides(expr, state, ' / ');
+  const { err, name, left_num, right_num } = result;
+  let value = result.value;
   if (!err && value !== null) {
     value = left_num / right_num;
   }

@@ -48,7 +48,7 @@ session.query({ sql, nestTables: true }, (err, results, fields) => {
 function tryRequire(path) {
   try {
     return require(path);
-  } catch (e) {
+  } catch {
     return {};
   }
 }

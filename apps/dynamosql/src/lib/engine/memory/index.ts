@@ -15,4 +15,4 @@ export async function commit(params: CommitParams): Promise<void> {
   }
 }
 
-export async function rollback(params: CommitParams): Promise<void> {}
+export async function rollback(_params: CommitParams): Promise<void> {}

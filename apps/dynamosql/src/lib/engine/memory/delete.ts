@@ -4,7 +4,7 @@ import type { DeleteParams, MutationResult } from '../index';
 import { SQLError, NoSingleOperationError } from '../../../error';
 
 export async function singleDelete(
-  params: DeleteParams
+  _params: DeleteParams
 ): Promise<MutationResult> {
   throw new NoSingleOperationError();
 }

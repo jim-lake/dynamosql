@@ -4,7 +4,7 @@ import type { UpdateParams, MutationResult } from '../index';
 import { SQLError, NoSingleOperationError } from '../../../error';
 
 export async function singleUpdate(
-  params: UpdateParams
+  _params: UpdateParams
 ): Promise<MutationResult> {
   throw new NoSingleOperationError();
 }
