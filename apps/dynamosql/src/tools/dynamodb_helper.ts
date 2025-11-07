@@ -1,4 +1,7 @@
-export function pql(strings: TemplateStringsArray, ...values: any[]) {
+export function pql(
+  strings: TemplateStringsArray,
+  ...values: unknown[]
+): string {
   let s = '';
   for (let i = 0; i < strings.length; i++) {
     s += strings[i];
@@ -10,11 +13,11 @@ export function pql(strings: TemplateStringsArray, ...values: any[]) {
   return s;
 }
 
-export function escapeIdentifier(string: string) {
+export function escapeIdentifier(string: string): string {
   return '"' + string.replace('"', '""') + '"';
 }
 
-export function escapeString(string: string) {
+export function escapeString(string: string): string {
   let ret = '';
   for (let i = 0; i < string.length; i++) {
     const c = string.charCodeAt(i);
@@ -29,11 +32,11 @@ export function escapeString(string: string) {
   return ret;
 }
 
-function escapeNumber(value: any) {
+function escapeNumber(value: unknown): string {
   return String(value).replace(/[^0-9.]/g, '');
 }
 
-export function escapeValue(value: any, type?: string): string {
+export function escapeValue(value: unknown, type?: string): string {
   let s: string;
   if (type === 'string') {
     s = "'" + escapeString(String(value)) + "'";
@@ -61,32 +64,40 @@ export function escapeValue(value: any, type?: string): string {
   return s;
 }
 
-export function convertError(err: any) {
+export function convertError(err: unknown): any {
   if (!err) return err;
 
   let ret: any;
-  if (err.name === 'ConditionalCheckFailedException' && err.Item) {
-    ret = new Error('cond_fail');
-  } else if (err.Code === 'ConditionalCheckFailed') {
-    ret = new Error('cond_fail');
-  } else if (
-    err.name === 'ResourceNotFoundException' ||
-    err.Code === 'ResourceNotFound' ||
-    (err.message && err.message.includes('resource not found'))
-  ) {
-    ret = new Error('resource_not_found');
-  } else if (
-    err.name === 'ResourceInUseException' ||
-    (err.message && err.message.includes('resource in use'))
-  ) {
-    ret = new Error('resource_in_use');
-  } else if (err.Code === 'ValidationError' || err.name === 'ValidationError') {
-    if (err.Message?.match?.(/expected: [^\s]* actual: NULL/)) {
-      ret = new Error('ER_BAD_NULL_ERROR');
-    } else if (err.Message?.match?.(/expected: [^\s]* actual:/)) {
-      ret = new Error('ER_TRUNCATED_WRONG_VALUE_FOR_FIELD');
+  if (err && typeof err === 'object') {
+    const error = err as any;
+    if (error.name === 'ConditionalCheckFailedException' && error.Item) {
+      ret = new Error('cond_fail');
+    } else if (error.Code === 'ConditionalCheckFailed') {
+      ret = new Error('cond_fail');
+    } else if (
+      error.name === 'ResourceNotFoundException' ||
+      error.Code === 'ResourceNotFound' ||
+      (error.message && String(error.message).includes('resource not found'))
+    ) {
+      ret = new Error('resource_not_found');
+    } else if (
+      error.name === 'ResourceInUseException' ||
+      (error.message && String(error.message).includes('resource in use'))
+    ) {
+      ret = new Error('resource_in_use');
+    } else if (
+      error.Code === 'ValidationError' ||
+      error.name === 'ValidationError'
+    ) {
+      if (error.Message?.match?.(/expected: [^\s]* actual: NULL/)) {
+        ret = new Error('ER_BAD_NULL_ERROR');
+      } else if (error.Message?.match?.(/expected: [^\s]* actual:/)) {
+        ret = new Error('ER_TRUNCATED_WRONG_VALUE_FOR_FIELD');
+      } else {
+        ret = new Error('validation');
+      }
     } else {
-      ret = new Error('validation');
+      ret = err;
     }
   } else {
     ret = err;
@@ -94,100 +105,121 @@ export function convertError(err: any) {
   return ret;
 }
 
-export function mapToObject(obj: any) {
-  const ret: any = {};
-  ret.toString = toString;
+export function mapToObject(
+  obj: Record<string, unknown>
+): Record<string, unknown> {
+  const ret: Record<string, unknown> = {};
+  (ret as any).toString = toString;
   Object.keys(obj).forEach((key) => {
     ret[key] = valueToNative(obj[key]);
   });
   return ret;
 }
 
-export function valueToNative(value: any): any {
+export function valueToNative(value: unknown): unknown {
   let ret = value;
-  if (value) {
-    if (value.N) {
-      ret = parseFloat(value.N);
-    } else if (value.L?.map) {
-      ret = value.L.map(valueToNative);
-    } else if (value.M) {
-      ret = mapToObject(value.M);
+  if (value && typeof value === 'object') {
+    const v = value as Record<string, unknown>;
+    if (v.N) {
+      ret = parseFloat(v.N as string);
+    } else if (Array.isArray(v.L)) {
+      ret = v.L.map(valueToNative);
+    } else if (v.M) {
+      ret = mapToObject(v.M as Record<string, unknown>);
     } else {
-      ret = value.S ?? value.B ?? value.BOOL ?? value;
+      ret = v.S ?? v.B ?? v.BOOL ?? value;
     }
   }
   return ret;
 }
 
-export function nativeToValue(obj: any): any {
-  let ret: any;
+export function nativeToValue(
+  obj: unknown
+):
+  | { M: Record<string, unknown> }
+  | { N: string }
+  | { BOOL: boolean }
+  | { S: string }
+  | { NULL: true } {
   if (obj === null) {
-    ret = { NULL: true };
+    return { NULL: true };
   } else if (typeof obj === 'object') {
-    const M: any = {};
-    for (const key in obj) {
-      M[key] = nativeToValue(obj[key]);
+    const M: Record<string, unknown> = {};
+    for (const key in obj as Record<string, unknown>) {
+      M[key] = nativeToValue((obj as Record<string, unknown>)[key]);
     }
-    ret = { M };
+    return { M };
   } else if (typeof obj === 'number') {
-    ret = { N: String(obj) };
+    return { N: String(obj) };
   } else if (typeof obj === 'boolean') {
-    ret = { BOOL: obj };
+    return { BOOL: obj };
   } else {
-    ret = { S: String(obj) };
+    return { S: String(obj) };
   }
-  return ret;
 }
 
-function toString(this: any) {
+function toString(this: Record<string, unknown>): string {
   return JSON.stringify(this);
 }
 
-export function convertValueToPQL(value: any) {
+export function convertValueToPQL(value: unknown): string {
   let ret: string;
   if (!value) {
     ret = 'NULL';
-  } else if (value.S !== undefined) {
-    ret = "'" + escapeString(value.S) + "'";
-  } else if (value.N !== undefined) {
-    ret = value.N;
+  } else if (typeof value === 'object' && value !== null) {
+    const v = value as Record<string, unknown>;
+    if (v.S !== undefined) {
+      ret = "'" + escapeString(v.S as string) + "'";
+    } else if (v.N !== undefined) {
+      ret = String(v.N);
+    } else {
+      ret = "'" + escapeString(String(value)) + "'";
+    }
   } else {
     ret = "'" + escapeString(String(value)) + "'";
   }
   return ret;
 }
 
-export function convertSuccess(result: any): [any, any] {
+export function convertSuccess(result: unknown): [any, any] {
   let err: any = null;
   let ret: any;
-  if (result?.Responses) {
-    ret = [];
-    result.Responses.forEach((response: any, i: number) => {
-      if (response.Error) {
-        if (!err) {
-          err = [];
+  if (result && typeof result === 'object') {
+    const res = result as any;
+    if (res.Responses && Array.isArray(res.Responses)) {
+      ret = [];
+      res.Responses.forEach((response: any, i: number) => {
+        if (response.Error) {
+          if (!err) {
+            err = [];
+          }
+          err[i] = convertError(response.Error);
         }
-        err[i] = convertError(response.Error);
-      }
-      ret[i] = convertResult(response);
-    });
+        ret[i] = convertResult(response);
+      });
+    } else {
+      ret = convertResult(result);
+    }
   } else {
     ret = convertResult(result);
   }
   return [err, ret];
 }
 
-export function convertResult(result: any) {
+export function convertResult(result: unknown): any {
   let ret: any;
-  if (result?.Items) {
-    ret = result.Items;
-  } else if (result?.Item) {
-    ret = [result?.Item];
+  if (result && typeof result === 'object') {
+    const res = result as any;
+    if (res.Items) {
+      ret = res.Items;
+    } else if (res.Item) {
+      ret = [res.Item];
+    }
   }
   return ret;
 }
 
-export function dynamoType(type: string) {
+export function dynamoType(type: string): string {
   let ret = type;
   if (type === 'string') {
     ret = 'S';
