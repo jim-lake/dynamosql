@@ -14,9 +14,6 @@ import type {
 
 export type PoolConfig = SessionConfig;
 export function createPool(args?: PoolConfig) {
-  if (args) {
-    Session.init(args);
-  }
   return new Pool(args ?? {});
 }
 export class Pool extends EventEmitter {

@@ -1,5 +1,7 @@
 import { DynamoDB } from '../../tools/dynamodb';
 
+import type { DynamoDBConstructorParams } from '../../tools/dynamodb';
+
 class DynamoDBWithCache extends DynamoDB {
   private tableCache: any = {};
 
@@ -47,9 +49,6 @@ class DynamoDBWithCache extends DynamoDB {
     }
   }
 }
-
-export function createDynamoDB(params?: any, done?: any) {
-  const instance = new DynamoDBWithCache(params);
-  done?.(null, instance);
-  return instance;
+export function createDynamoDB(params?: DynamoDBConstructorParams) {
+  return new DynamoDBWithCache(params);
 }

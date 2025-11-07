@@ -102,7 +102,7 @@ interface SessionConfig {
     multipleStatements?: boolean | undefined;
     resultObjects?: boolean | undefined;
     typeCast?: TypeCast | undefined;
-    dateStrings?: boolean | Array<"TIMESTAMP" | "DATETIME" | "DATE"> | undefined;
+    dateStrings?: boolean | Array<'TIMESTAMP' | 'DATETIME' | 'DATE'> | undefined;
 }
 interface PoolConnection extends Connection {
     release(): void;

@@ -38,16 +38,13 @@ const DEFAULT_RESULT: OkPacket = {
 
 const parser = new Parser();
 let g_threadId = 1;
-let g_dynamodb: any;
 
-export function init(args: any) {
-  g_dynamodb = DynamoDB.createDynamoDB(args);
-}
 export class Session extends EventEmitter implements PoolConnection {
   config: SessionConfig;
   state: string = 'connected';
   threadId: number | null = g_threadId++;
 
+  private _dynamodb: ReturnType<typeof DynamoDB.createDynamoDB>;
   private _typeCastOptions: any = {};
   private _currentDatabase: string | null = null;
   private _localVariables: any = {};
@@ -66,6 +63,7 @@ export class Session extends EventEmitter implements PoolConnection {
   constructor(args?: SessionConfig) {
     super();
     this.config = args || {};
+    this._dynamodb = DynamoDB.createDynamoDB(args);
     if (args?.database) {
       this.setCurrentDatabase(args.database);
     }
@@ -288,7 +286,11 @@ export class Session extends EventEmitter implements PoolConnection {
       throw new SQLError('unsupported_type');
     }
 
-    const result = await handler({ ast, dynamodb: g_dynamodb, session: this });
+    const result = await handler({
+      ast,
+      dynamodb: this._dynamodb,
+      session: this,
+    });
 
     // Handle different return types from handlers
     if (result && typeof result === 'object') {
@@ -340,9 +342,6 @@ export class Session extends EventEmitter implements PoolConnection {
 }
 
 export function createSession(args?: SessionConfig): PoolConnection {
-  if (args) {
-    g_dynamodb = DynamoDB.createDynamoDB(args);
-  }
   return new Session(args);
 }
 

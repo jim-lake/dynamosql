@@ -25,19 +25,29 @@ import {
   dynamoType,
 } from './dynamodb_helper';
 
+import type { DynamoDBClientConfig } from '@aws-sdk/client-dynamodb';
+import type { AwsCredentialIdentity } from '@aws-sdk/types';
+
 const QUERY_LIMIT = 5;
 
+export interface DynamoDBConstructorParams {
+  region?: string | undefined;
+  credentials?: AwsCredentialIdentity | undefined;
+}
 export class DynamoDB {
   protected client: DynamoDBClient;
 
-  constructor(params?: any) {
-    if (!params) {
-      params = {};
+  constructor(params?: DynamoDBConstructorParams) {
+    const opts: DynamoDBClientConfig = {
+      region:
+        params.region ??
+        process.env.AWS_REGION ??
+        process.env.AWS_DEFAULT_REGION,
+    };
+    if (params.credentials) {
+      opts.credentials = params.credentials;
     }
-    if (!params.region && process.env.AWS_DEFAULT_REGION) {
-      params.region = process.env.AWS_DEFAULT_REGION;
-    }
-    this.client = new DynamoDBClient(params);
+    this.client = new DynamoDBClient(opts);
   }
 
   async queryQL(list: any): Promise<any> {
