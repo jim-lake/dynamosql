@@ -1,3 +1,5 @@
+import type { ScalarAttributeType } from '@aws-sdk/client-dynamodb';
+
 export function pql(
   strings: TemplateStringsArray,
   ...values: unknown[]
@@ -219,8 +221,8 @@ export function convertResult(result: unknown): any {
   return ret;
 }
 
-export function dynamoType(type: string): string {
-  let ret = type;
+export function dynamoType(type: string): ScalarAttributeType {
+  let ret = type as ScalarAttributeType;
   if (type === 'string') {
     ret = 'S';
   } else if (type === 'VARCHAR') {

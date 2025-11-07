@@ -12,7 +12,6 @@ import {
   UpdateTableCommand,
   KeyType,
   KeySchemaElement,
-  ScalarAttributeType,
   ReturnValuesOnConditionCheckFailure,
   BillingMode,
   ProjectionType,
@@ -120,7 +119,6 @@ export class DynamoDB {
       return this._queryQL(list);
     } else {
       return parallelLimit(list, QUERY_LIMIT, async (item) => {
-        console.log('parallel queryQL:', item);
         return this._queryQL(item);
       });
     }
@@ -164,7 +162,7 @@ export class DynamoDB {
       }
       return ret ?? [];
     } catch (err) {
-      const converted = convertSuccess(err as any);
+      const converted = convertSuccess(err);
       if (converted[0]) {
         throw converted[0];
       }
@@ -198,7 +196,7 @@ export class DynamoDB {
       }
       return ret ?? [];
     } catch (err) {
-      const converted = convertSuccess(err as any);
+      const converted = convertSuccess(err);
       if (converted[0]) {
         throw converted[0];
       }
@@ -341,7 +339,7 @@ export class DynamoDB {
     const { table, billing_mode, column_list, primary_key } = params;
     const AttributeDefinitions = column_list.map((column: any) => ({
       AttributeName: column.name,
-      AttributeType: dynamoType(column.type) as ScalarAttributeType,
+      AttributeType: dynamoType(column.type),
     }));
     const KeySchema: KeySchemaElement[] = [
       {
@@ -358,7 +356,7 @@ export class DynamoDB {
 
     const input = {
       TableName: table,
-      BillingMode: (billing_mode || 'PAY_PER_REQUEST') as BillingMode,
+      BillingMode: (billing_mode ?? 'PAY_PER_REQUEST') as BillingMode,
       AttributeDefinitions,
       KeySchema,
     };
@@ -383,7 +381,7 @@ export class DynamoDB {
     const { table, index_name, key_list, projection_type } = params;
     const AttributeDefinitions = key_list.map((item: any) => ({
       AttributeName: item.name,
-      AttributeType: dynamoType(item.type) as ScalarAttributeType,
+      AttributeType: dynamoType(item.type),
     }));
     const KeySchema: KeySchemaElement[] = [
       {
