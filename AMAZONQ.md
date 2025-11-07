@@ -90,6 +90,13 @@ npm test
 
 This runs tests for the dynamosql package only (as configured in root package.json).
 
+### Run Single Test File
+
+```bash
+cd apps/dynamosql
+npm run test:single -- test/unit_query/unit_query.test.ts
+```
+
 ### Run Tests for Specific Package
 
 ```bash
