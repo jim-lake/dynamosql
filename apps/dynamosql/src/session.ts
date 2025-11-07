@@ -15,6 +15,7 @@ import * as UpdateHandler from './lib/update_handler';
 import { typeCast } from './lib/helpers/type_cast_helper';
 import * as DynamoDB from './lib/dynamodb';
 import { SQLError } from './error';
+import { Query } from './query';
 
 import type {
   SessionConfig,
@@ -25,6 +26,7 @@ import type {
   QueryOptions,
   QueryCallback,
   OkPacket,
+  Query as MysqlQuery,
 } from './types';
 
 const DEFAULT_RESULT: OkPacket = {
@@ -44,17 +46,17 @@ export class Session extends EventEmitter implements PoolConnection {
   state: string = 'connected';
   threadId: number | null = g_threadId++;
 
-  private _dynamodb: ReturnType<typeof DynamoDB.createDynamoDB>;
-  private _typeCastOptions: any = {};
+  dynamodb: ReturnType<typeof DynamoDB.createDynamoDB>;
+  typeCastOptions: any = {};
+  typeCast: TypeCast = true;
+  resultObjects = true;
+  multipleStatements = false;
+
   private _currentDatabase: string | null = null;
   private _localVariables: any = {};
   private _transaction: any = null;
   private _isReleased = false;
-  private _multipleStatements = false;
   private _tempTableMap: any = {};
-  private _typeCast: TypeCast = true;
-  private _dateStrings: boolean | string[] = false;
-  private _resultObjects = true;
 
   escape = SqlString.escape;
   escapeId = SqlString.escapeId;
@@ -63,22 +65,21 @@ export class Session extends EventEmitter implements PoolConnection {
   constructor(args?: SessionConfig) {
     super();
     this.config = args || {};
-    this._dynamodb = DynamoDB.createDynamoDB(args);
+    this.dynamodb = DynamoDB.createDynamoDB(args);
     if (args?.database) {
       this.setCurrentDatabase(args.database);
     }
     if (args?.multipleStatements) {
-      this._multipleStatements = true;
+      this.multipleStatements = true;
     }
     if (args?.resultObjects === false) {
-      this._resultObjects = false;
+      this.resultObjects = false;
     }
     if (args?.typeCast !== undefined) {
-      this._typeCast = args.typeCast;
+      this.typeCast = args.typeCast;
     }
     if (args?.dateStrings) {
-      this._dateStrings = args.dateStrings;
-      this._typeCastOptions.dateStrings = true;
+      this.typeCastOptions.dateStrings = true;
     }
   }
 
@@ -156,7 +157,11 @@ export class Session extends EventEmitter implements PoolConnection {
     params: string | QueryOptions,
     values?: any,
     done?: QueryCallback
-  ): void {
+  ): MysqlQuery {
+    if (this._isReleased) {
+      done?.(new SQLError('released') as MysqlError);
+      return;
+    }
     const opts: any = typeof params === 'object' ? { ...params } : {};
     if (typeof params === 'string') {
       opts.sql = params;
@@ -167,16 +172,24 @@ export class Session extends EventEmitter implements PoolConnection {
       opts.values = values;
     }
 
-    if (!opts.sql) {
-      done?.(new SQLError('ER_EMPTY_QUERY') as MysqlError);
-    } else {
-      if (opts.values !== undefined) {
-        opts.sql = SqlString.format(opts.sql, opts.values);
-      }
-      this._query(opts, done);
+    if (opts.values !== undefined) {
+      opts.sql = SqlString.format(opts.sql ?? '', opts.values);
     }
+    //this._query(opts, done);
+    const query = new Query({ ...opts, session: this });
+    void this._run(query, done);
+    return query;
   }
   createQuery = this.query;
+
+  private async _run(query: Query, done?: QueryCallback) {
+    try {
+      const result = await query.run();
+      done?.(null, ...result);
+    } catch (e) {
+      done?.(e);
+    }
+  }
 
   private async _query(opts: any, done?: QueryCallback) {
     if (this._isReleased) {
@@ -208,7 +221,7 @@ export class Session extends EventEmitter implements PoolConnection {
       return;
     }
 
-    if (!this._multipleStatements) {
+    if (!this.multipleStatements) {
       done?.(
         new SQLError('multiple_statements_disabled', opts.sql) as MysqlError
       );
@@ -288,7 +301,7 @@ export class Session extends EventEmitter implements PoolConnection {
 
     const result = await handler({
       ast,
-      dynamodb: this._dynamodb,
+      dynamodb: this.dynamodb,
       session: this,
     });
 
@@ -311,7 +324,7 @@ export class Session extends EventEmitter implements PoolConnection {
   }
 
   private _transformResult(list: any, columns: any, opts: any) {
-    if (this._resultObjects && Array.isArray(list)) {
+    if (this.resultObjects && Array.isArray(list)) {
       list.forEach((result: any, i: number) => {
         const obj: any = {};
         columns.forEach((column: any, j: number) => {
@@ -330,13 +343,13 @@ export class Session extends EventEmitter implements PoolConnection {
   }
 
   private _convertCell(value: any, column: any) {
-    if (typeof this._typeCast === 'function') {
-      return this._typeCast(column, () =>
-        typeCast(value, column, this._typeCastOptions)
+    if (typeof this.typeCast === 'function') {
+      return this.typeCast(column, () =>
+        typeCast(value, column, this.typeCastOptions)
       );
     }
-    return this._typeCast
-      ? typeCast(value, column, this._typeCastOptions)
+    return this.typeCast
+      ? typeCast(value, column, this.typeCastOptions)
       : value;
   }
 }

@@ -84,7 +84,7 @@ export interface Query {
   sql: string;
   values?: string[] | undefined;
   typeCast?: TypeCast | undefined;
-  nestedTables: boolean;
+  nestedTables: boolean | string;
 
   start(): void;
   stream(options?: ReadableOptions): Readable;
@@ -100,8 +100,12 @@ export interface Query {
   on(ev: 'end', callback: () => void): Query;
 }
 export interface QueryFunction {
-  (options: string | QueryOptions, callback?: QueryCallback): void;
-  (options: string | QueryOptions, values: any, callback?: QueryCallback): void;
+  (options: string | QueryOptions, callback?: QueryCallback): Query;
+  (
+    options: string | QueryOptions,
+    values: any,
+    callback?: QueryCallback
+  ): Query;
 }
 export interface EscapeFunctions {
   escape(value: any, stringifyObjects?: boolean, timeZone?: string): string;

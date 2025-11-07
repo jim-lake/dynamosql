@@ -4,6 +4,7 @@ import * as SqlString from 'sqlstring';
 import * as Session from './session';
 
 import type {
+  Query,
   SessionConfig,
   PoolConnection,
   MysqlError,
@@ -37,13 +38,17 @@ export class Pool extends EventEmitter {
     done(null, Session.createSession(this.config));
   }
 
-  query(opts: string | QueryOptions, values?: any, done?: QueryCallback): void {
+  query(
+    opts: string | QueryOptions,
+    values?: any,
+    done?: QueryCallback
+  ): Query {
     if (typeof values === 'function') {
       done = values;
       values = undefined;
     }
     const session = Session.createSession(this.config);
-    session.query(
+    return session.query(
       opts,
       values,
       (error: MysqlError | null, results?: any, fields?: FieldInfo[]) => {

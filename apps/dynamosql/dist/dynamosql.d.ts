@@ -1,4 +1,5 @@
 import { EventEmitter } from 'node:events';
+import { ReadableOptions, Readable } from 'node:stream';
 
 interface ErrorInput {
     err?: string;
@@ -8,6 +9,7 @@ interface ErrorInput {
     message?: string;
     args?: any[];
     cause?: Error;
+    index?: number;
 }
 declare class SQLError extends Error {
     code: string;
@@ -18,6 +20,7 @@ declare class SQLError extends Error {
     fatal: boolean;
     sqlMessage?: string;
     sql?: string;
+    index: number;
     constructor(err: string | ErrorInput, sql?: string);
 }
 
@@ -87,9 +90,23 @@ interface QueryOptions {
     typeCast?: TypeCast | undefined;
 }
 type QueryCallback = (err: MysqlError | null, results?: any, fields?: FieldInfo[]) => void;
+interface Query {
+    sql: string;
+    values?: string[] | undefined;
+    typeCast?: TypeCast | undefined;
+    nestedTables: boolean | string;
+    start(): void;
+    stream(options?: ReadableOptions): Readable;
+    on(ev: string, callback: (...args: any[]) => void): Query;
+    on(ev: 'result', callback: (row: any, index: number) => void): Query;
+    on(ev: 'error', callback: (err: MysqlError) => void): Query;
+    on(ev: 'fields', callback: (fields: FieldInfo[], index: number) => void): Query;
+    on(ev: 'packet', callback: (packet: any) => void): Query;
+    on(ev: 'end', callback: () => void): Query;
+}
 interface QueryFunction {
-    (options: string | QueryOptions, callback?: QueryCallback): void;
-    (options: string | QueryOptions, values: any, callback?: QueryCallback): void;
+    (options: string | QueryOptions, callback?: QueryCallback): Query;
+    (options: string | QueryOptions, values: any, callback?: QueryCallback): Query;
 }
 interface EscapeFunctions {
     escape(value: any, stringifyObjects?: boolean, timeZone?: string): string;
@@ -137,17 +154,19 @@ declare class Pool extends EventEmitter {
     constructor(args: PoolConfig);
     end(done?: (err?: MysqlError) => void): void;
     getConnection(done: (err: MysqlError | null, connection?: PoolConnection) => void): void;
-    query(opts: string | QueryOptions, values?: any, done?: QueryCallback): void;
+    query(opts: string | QueryOptions, values?: any, done?: QueryCallback): Query;
 }
 
 declare function createSession$1(args?: SessionConfig): PoolConnection;
 
 declare const createConnection: typeof createSession$1;
 declare const createPool: typeof createPool$1;
+declare const createPoolCluster: typeof createPool$1;
 declare const createSession: typeof createSession$1;
 declare const escape: EscapeFunctions["escape"];
 declare const escapeId: EscapeFunctions["escapeId"];
 declare const format: EscapeFunctions["format"];
+declare const raw: any;
 
-export { SQLError, createConnection, createPool, createSession, escape, escapeId, format };
+export { SQLError, Types, createConnection, createPool, createPoolCluster, createSession, escape, escapeId, format, raw };
 export type { Connection, FieldInfo, MysqlError, OkPacket, PoolConfig, QueryCallback, QueryOptions, SessionConfig, QueryCallback as queryCallback };

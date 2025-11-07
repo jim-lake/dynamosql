@@ -5,38 +5,98 @@ import { addUnitTest } from '../unit_helper';
 addUnitTest('create connection', async (mod, config) => {
   const conn = mod.createConnection(config);
   expect(conn.query).to.not.equal(null);
-  conn.end();
+  conn.destroy();
+});
+
+addUnitTest('empty query', async (mod, config) => {
+  const conn = mod.createConnection(config);
+  let err;
+  try {
+    const result = await promisify(conn.query.bind(conn))('', []);
+  } catch (e) {
+    err = e;
+  } finally {
+    conn.destroy();
+  }
+  expect(err, 'should throw on empty query').to.not.be.undefined;
+});
+
+addUnitTest('empty query object', async (mod, config) => {
+  const conn = mod.createConnection(config);
+  let err;
+  try {
+    const q = conn.query('', []);
+  } finally {
+    conn.destroy();
+  }
+});
+
+addUnitTest('empty query object start', async (mod, config) => {
+  const conn = mod.createConnection(config);
+  let err;
+  const q = conn.query('', []);
+  expect(q, 'on should be an object').to.not.be.undefined;
+  expect(q.on, 'on should be a function').to.not.be.undefined;
+  expect(q.start, 'on should be a function').to.not.be.undefined;
+
+  try {
+    await new Promise<void>((resolve, reject) => {
+      q.on('error', (err) => {
+        console.log('error:', err);
+        reject(err);
+      });
+      q.on('end', () => {
+        console.log('end');
+        resolve();
+      });
+      //q.start();
+    });
+  } catch (e) {
+    console.log('err:', e);
+    err = e;
+  } finally {
+    conn.destroy();
+  }
+  expect(err, 'should throw on empty query after start').to.not.be.undefined;
 });
 
 addUnitTest('simple query', async (mod, config) => {
   const conn = mod.createConnection(config);
   try {
-    const result = await promisify(conn.query.bind(conn))('SELECT 1 + 1 AS result');
+    const result = await promisify(conn.query.bind(conn))(
+      'SELECT 1 + 1 AS result'
+    );
     expect(result.length).to.equal(1);
     expect(result[0].result).to.equal(2);
   } finally {
-    conn.end();
+    conn.destroy();
   }
 });
 
 addUnitTest('query with values', async (mod, config) => {
   const conn = mod.createConnection(config);
   try {
-    const result = await promisify(conn.query.bind(conn))('SELECT 1 + ? AS result', [2]);
+    const result = await promisify(conn.query.bind(conn))(
+      'SELECT 1 + ? AS result',
+      [2]
+    );
     expect(result.length).to.equal(1);
     expect(result[0].result).to.equal(3);
   } finally {
-    conn.end();
+    conn.destroy();
   }
 });
 
 addUnitTest('query with options object', async (mod, config) => {
   const conn = mod.createConnection(config);
   try {
-    const result = await promisify(conn.query.bind(conn))({ sql: 'SELECT ? AS value', values: [42] });
+    const result = await promisify(conn.query.bind(conn))({
+      sql: 'SELECT ? AS value',
+      values: [42],
+    });
     expect(result[0].value).to.equal(42);
   } finally {
-    conn.end();
+    conn.destroy();
   }
 });
 
@@ -83,7 +143,7 @@ addUnitTest('connection escape', async (mod, config) => {
     const escaped = conn.escape("test'value");
     expect(escaped).to.include("'test\\'value'");
   } finally {
-    conn.end();
+    conn.destroy();
   }
 });
 
@@ -93,7 +153,7 @@ addUnitTest('connection escapeId', async (mod, config) => {
     const escaped = conn.escapeId('column');
     expect(escaped).to.include('`');
   } finally {
-    conn.end();
+    conn.destroy();
   }
 });
 
@@ -103,7 +163,7 @@ addUnitTest('connection format', async (mod, config) => {
     const formatted = conn.format('SELECT ? AS value', [456]);
     expect(formatted).to.include('456');
   } finally {
-    conn.end();
+    conn.destroy();
   }
 });
 
@@ -132,7 +192,7 @@ addUnitTest('connection state', async (mod, config) => {
   try {
     expect(conn.state).to.be.a('string');
   } finally {
-    conn.end();
+    conn.destroy();
   }
 });
 
@@ -141,7 +201,7 @@ addUnitTest('connection threadId', async (mod, config) => {
   try {
     expect(conn.threadId).to.not.be.undefined;
   } finally {
-    conn.end();
+    conn.destroy();
   }
 });
 

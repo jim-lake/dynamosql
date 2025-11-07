@@ -28,10 +28,6 @@ var SqlString__namespace = /*#__PURE__*/_interopNamespaceDefault(SqlString);
 
 var commonjsGlobal = typeof globalThis !== 'undefined' ? globalThis : typeof window !== 'undefined' ? window : typeof global !== 'undefined' ? global : typeof self !== 'undefined' ? self : {};
 
-function getDefaultExportFromCjs (x) {
-	return x && x.__esModule && Object.prototype.hasOwnProperty.call(x, 'default') ? x['default'] : x;
-}
-
 var mysql_parser = {};
 
 var hasRequiredMysql_parser;
@@ -19457,6 +19453,7 @@ class SQLError extends Error {
     fatal = false;
     sqlMessage;
     sql;
+    index;
     constructor(err, sql) {
         const sql_err = ERROR_MAP[err] || ERROR_MAP[err.err];
         const code = err.code || sql_err?.code || DEFAULT_CODE;
@@ -19468,6 +19465,7 @@ class SQLError extends Error {
         if (typeof sqlMessage === 'function') {
             sqlMessage = sqlMessage(err.args);
         }
+        const index = typeof err === 'string' ? 0 : err.index ?? 0;
         const message = err.message ||
             sqlMessage ||
             (typeof err === 'string' ? err : undefined);
@@ -19482,6 +19480,7 @@ class SQLError extends Error {
         }
         this.code = code;
         this.errno = errno;
+        this.index = index;
         if (sqlMessage) {
             this.sqlMessage = sqlMessage;
         }
@@ -21289,30 +21288,37 @@ function convertError(err) {
     if (!err)
         return err;
     let ret;
-    if (err.name === 'ConditionalCheckFailedException' && err.Item) {
-        ret = new Error('cond_fail');
-    }
-    else if (err.Code === 'ConditionalCheckFailed') {
-        ret = new Error('cond_fail');
-    }
-    else if (err.name === 'ResourceNotFoundException' ||
-        err.Code === 'ResourceNotFound' ||
-        (err.message && err.message.includes('resource not found'))) {
-        ret = new Error('resource_not_found');
-    }
-    else if (err.name === 'ResourceInUseException' ||
-        (err.message && err.message.includes('resource in use'))) {
-        ret = new Error('resource_in_use');
-    }
-    else if (err.Code === 'ValidationError' || err.name === 'ValidationError') {
-        if (err.Message?.match?.(/expected: [^\s]* actual: NULL/)) {
-            ret = new Error('ER_BAD_NULL_ERROR');
+    if (err && typeof err === 'object') {
+        const error = err;
+        if (error.name === 'ConditionalCheckFailedException' && error.Item) {
+            ret = new Error('cond_fail');
         }
-        else if (err.Message?.match?.(/expected: [^\s]* actual:/)) {
-            ret = new Error('ER_TRUNCATED_WRONG_VALUE_FOR_FIELD');
+        else if (error.Code === 'ConditionalCheckFailed') {
+            ret = new Error('cond_fail');
+        }
+        else if (error.name === 'ResourceNotFoundException' ||
+            error.Code === 'ResourceNotFound' ||
+            (error.message && String(error.message).includes('resource not found'))) {
+            ret = new Error('resource_not_found');
+        }
+        else if (error.name === 'ResourceInUseException' ||
+            (error.message && String(error.message).includes('resource in use'))) {
+            ret = new Error('resource_in_use');
+        }
+        else if (error.Code === 'ValidationError' ||
+            error.name === 'ValidationError') {
+            if (error.Message?.match?.(/expected: [^\s]* actual: NULL/)) {
+                ret = new Error('ER_BAD_NULL_ERROR');
+            }
+            else if (error.Message?.match?.(/expected: [^\s]* actual:/)) {
+                ret = new Error('ER_TRUNCATED_WRONG_VALUE_FOR_FIELD');
+            }
+            else {
+                ret = new Error('validation');
+            }
         }
         else {
-            ret = new Error('validation');
+            ret = err;
         }
     }
     else {
@@ -21330,44 +21336,43 @@ function mapToObject(obj) {
 }
 function valueToNative(value) {
     let ret = value;
-    if (value) {
-        if (value.N) {
-            ret = parseFloat(value.N);
+    if (value && typeof value === 'object') {
+        const v = value;
+        if (v.N) {
+            ret = parseFloat(v.N);
         }
-        else if (value.L?.map) {
-            ret = value.L.map(valueToNative);
+        else if (Array.isArray(v.L)) {
+            ret = v.L.map(valueToNative);
         }
-        else if (value.M) {
-            ret = mapToObject(value.M);
+        else if (v.M) {
+            ret = mapToObject(v.M);
         }
         else {
-            ret = value.S ?? value.B ?? value.BOOL ?? value;
+            ret = v.S ?? v.B ?? v.BOOL ?? value;
         }
     }
     return ret;
 }
 function nativeToValue(obj) {
-    let ret;
     if (obj === null) {
-        ret = { NULL: true };
+        return { NULL: true };
     }
     else if (typeof obj === 'object') {
         const M = {};
         for (const key in obj) {
             M[key] = nativeToValue(obj[key]);
         }
-        ret = { M };
+        return { M };
     }
     else if (typeof obj === 'number') {
-        ret = { N: String(obj) };
+        return { N: String(obj) };
     }
     else if (typeof obj === 'boolean') {
-        ret = { BOOL: obj };
+        return { BOOL: obj };
     }
     else {
-        ret = { S: String(obj) };
+        return { S: String(obj) };
     }
-    return ret;
 }
 function toString() {
     return JSON.stringify(this);
@@ -21377,11 +21382,17 @@ function convertValueToPQL(value) {
     if (!value) {
         ret = 'NULL';
     }
-    else if (value.S !== undefined) {
-        ret = "'" + escapeString(value.S) + "'";
-    }
-    else if (value.N !== undefined) {
-        ret = value.N;
+    else if (typeof value === 'object' && value !== null) {
+        const v = value;
+        if (v.S !== undefined) {
+            ret = "'" + escapeString(v.S) + "'";
+        }
+        else if (v.N !== undefined) {
+            ret = String(v.N);
+        }
+        else {
+            ret = "'" + escapeString(String(value)) + "'";
+        }
     }
     else {
         ret = "'" + escapeString(String(value)) + "'";
@@ -21391,17 +21402,23 @@ function convertValueToPQL(value) {
 function convertSuccess(result) {
     let err = null;
     let ret;
-    if (result?.Responses) {
-        ret = [];
-        result.Responses.forEach((response, i) => {
-            if (response.Error) {
-                if (!err) {
-                    err = [];
+    if (result && typeof result === 'object') {
+        const res = result;
+        if (res.Responses && Array.isArray(res.Responses)) {
+            ret = [];
+            res.Responses.forEach((response, i) => {
+                if (response.Error) {
+                    if (!err) {
+                        err = [];
+                    }
+                    err[i] = convertError(response.Error);
                 }
-                err[i] = convertError(response.Error);
-            }
-            ret[i] = convertResult(response);
-        });
+                ret[i] = convertResult(response);
+            });
+        }
+        else {
+            ret = convertResult(result);
+        }
     }
     else {
         ret = convertResult(result);
@@ -21410,11 +21427,14 @@ function convertSuccess(result) {
 }
 function convertResult(result) {
     let ret;
-    if (result?.Items) {
-        ret = result.Items;
-    }
-    else if (result?.Item) {
-        ret = [result?.Item];
+    if (result && typeof result === 'object') {
+        const res = result;
+        if (res.Items) {
+            ret = res.Items;
+        }
+        else if (res.Item) {
+            ret = [res.Item];
+        }
     }
     return ret;
 }
@@ -24464,996 +24484,63 @@ function _jsonParse(obj) {
     }
 }
 
-var forever = {exports: {}};
-
-var onlyOnce = {exports: {}};
-
-var hasRequiredOnlyOnce;
-
-function requireOnlyOnce () {
-	if (hasRequiredOnlyOnce) return onlyOnce.exports;
-	hasRequiredOnlyOnce = 1;
-	(function (module, exports) {
-
-		Object.defineProperty(exports, "__esModule", {
-		    value: true
-		});
-		exports.default = onlyOnce;
-		function onlyOnce(fn) {
-		    return function (...args) {
-		        if (fn === null) throw new Error("Callback was already called.");
-		        var callFn = fn;
-		        fn = null;
-		        callFn.apply(this, args);
-		    };
-		}
-		module.exports = exports.default; 
-	} (onlyOnce, onlyOnce.exports));
-	return onlyOnce.exports;
+async function timesLimit(length, limit, iter) {
+    if (length <= 0) {
+        return;
+    }
+    let i = 0;
+    let running = 0;
+    let stop = false;
+    return new Promise((resolve, reject) => {
+        function _done() {
+            if (!stop) {
+                running--;
+                if (i >= length && running === 0) {
+                    resolve();
+                }
+                else {
+                    _loopLaunch();
+                }
+            }
+        }
+        function _catch(err) {
+            stop = true;
+            reject(err);
+        }
+        function _launch(index) {
+            iter(index).then(_done, _catch);
+        }
+        function _loopLaunch() {
+            while (!stop && i < length && running < limit) {
+                running++;
+                const index = i++;
+                _launch(index);
+            }
+        }
+        _loopLaunch();
+    });
+}
+async function parallelLimit(list, limit, iter) {
+    const results = [];
+    await timesLimit(list.length, limit, async (i) => {
+        results[i] = await iter(list[i], i);
+    });
+    return results;
 }
 
-var ensureAsync = {exports: {}};
-
-var setImmediate$1 = {};
-
-var hasRequiredSetImmediate;
-
-function requireSetImmediate () {
-	if (hasRequiredSetImmediate) return setImmediate$1;
-	hasRequiredSetImmediate = 1;
-
-	Object.defineProperty(setImmediate$1, "__esModule", {
-	    value: true
-	});
-	setImmediate$1.fallback = fallback;
-	setImmediate$1.wrap = wrap;
-	/* istanbul ignore file */
-
-	var hasQueueMicrotask = setImmediate$1.hasQueueMicrotask = typeof queueMicrotask === 'function' && queueMicrotask;
-	var hasSetImmediate = setImmediate$1.hasSetImmediate = typeof setImmediate === 'function' && setImmediate;
-	var hasNextTick = setImmediate$1.hasNextTick = typeof process === 'object' && typeof process.nextTick === 'function';
-
-	function fallback(fn) {
-	    setTimeout(fn, 0);
-	}
-
-	function wrap(defer) {
-	    return (fn, ...args) => defer(() => fn(...args));
-	}
-
-	var _defer;
-
-	if (hasQueueMicrotask) {
-	    _defer = queueMicrotask;
-	} else if (hasSetImmediate) {
-	    _defer = setImmediate;
-	} else if (hasNextTick) {
-	    _defer = process.nextTick;
-	} else {
-	    _defer = fallback;
-	}
-
-	setImmediate$1.default = wrap(_defer);
-	return setImmediate$1;
+async function parallelBatch(list, batchSize, limit, iter) {
+    const batch_count = Math.ceil(list.length / batchSize);
+    const results = [];
+    await timesLimit(batch_count, limit, async (i) => {
+        const start = i * batchSize;
+        const batch = list.slice(start, start + batchSize);
+        const batch_result = await iter(batch, i);
+        for (let j = 0; j < batch_result.length; j++) {
+            results[i + j] = batch_result[j];
+        }
+    });
+    return results;
 }
-
-var wrapAsync = {};
-
-var asyncify = {exports: {}};
-
-var initialParams = {exports: {}};
-
-var hasRequiredInitialParams;
-
-function requireInitialParams () {
-	if (hasRequiredInitialParams) return initialParams.exports;
-	hasRequiredInitialParams = 1;
-	(function (module, exports) {
-
-		Object.defineProperty(exports, "__esModule", {
-		    value: true
-		});
-
-		exports.default = function (fn) {
-		    return function (...args /*, callback*/) {
-		        var callback = args.pop();
-		        return fn.call(this, args, callback);
-		    };
-		};
-
-		module.exports = exports.default; 
-	} (initialParams, initialParams.exports));
-	return initialParams.exports;
-}
-
-var hasRequiredAsyncify;
-
-function requireAsyncify () {
-	if (hasRequiredAsyncify) return asyncify.exports;
-	hasRequiredAsyncify = 1;
-	(function (module, exports) {
-
-		Object.defineProperty(exports, "__esModule", {
-		    value: true
-		});
-		exports.default = asyncify;
-
-		var _initialParams = requireInitialParams();
-
-		var _initialParams2 = _interopRequireDefault(_initialParams);
-
-		var _setImmediate = requireSetImmediate();
-
-		var _setImmediate2 = _interopRequireDefault(_setImmediate);
-
-		var _wrapAsync = requireWrapAsync();
-
-		function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
-
-		/**
-		 * Take a sync function and make it async, passing its return value to a
-		 * callback. This is useful for plugging sync functions into a waterfall,
-		 * series, or other async functions. Any arguments passed to the generated
-		 * function will be passed to the wrapped function (except for the final
-		 * callback argument). Errors thrown will be passed to the callback.
-		 *
-		 * If the function passed to `asyncify` returns a Promise, that promises's
-		 * resolved/rejected state will be used to call the callback, rather than simply
-		 * the synchronous return value.
-		 *
-		 * This also means you can asyncify ES2017 `async` functions.
-		 *
-		 * @name asyncify
-		 * @static
-		 * @memberOf module:Utils
-		 * @method
-		 * @alias wrapSync
-		 * @category Util
-		 * @param {Function} func - The synchronous function, or Promise-returning
-		 * function to convert to an {@link AsyncFunction}.
-		 * @returns {AsyncFunction} An asynchronous wrapper of the `func`. To be
-		 * invoked with `(args..., callback)`.
-		 * @example
-		 *
-		 * // passing a regular synchronous function
-		 * async.waterfall([
-		 *     async.apply(fs.readFile, filename, "utf8"),
-		 *     async.asyncify(JSON.parse),
-		 *     function (data, next) {
-		 *         // data is the result of parsing the text.
-		 *         // If there was a parsing error, it would have been caught.
-		 *     }
-		 * ], callback);
-		 *
-		 * // passing a function returning a promise
-		 * async.waterfall([
-		 *     async.apply(fs.readFile, filename, "utf8"),
-		 *     async.asyncify(function (contents) {
-		 *         return db.model.create(contents);
-		 *     }),
-		 *     function (model, next) {
-		 *         // `model` is the instantiated model object.
-		 *         // If there was an error, this function would be skipped.
-		 *     }
-		 * ], callback);
-		 *
-		 * // es2017 example, though `asyncify` is not needed if your JS environment
-		 * // supports async functions out of the box
-		 * var q = async.queue(async.asyncify(async function(file) {
-		 *     var intermediateStep = await processFile(file);
-		 *     return await somePromise(intermediateStep)
-		 * }));
-		 *
-		 * q.push(files);
-		 */
-		function asyncify(func) {
-		    if ((0, _wrapAsync.isAsync)(func)) {
-		        return function (...args /*, callback*/) {
-		            const callback = args.pop();
-		            const promise = func.apply(this, args);
-		            return handlePromise(promise, callback);
-		        };
-		    }
-
-		    return (0, _initialParams2.default)(function (args, callback) {
-		        var result;
-		        try {
-		            result = func.apply(this, args);
-		        } catch (e) {
-		            return callback(e);
-		        }
-		        // if result is Promise object
-		        if (result && typeof result.then === 'function') {
-		            return handlePromise(result, callback);
-		        } else {
-		            callback(null, result);
-		        }
-		    });
-		}
-
-		function handlePromise(promise, callback) {
-		    return promise.then(value => {
-		        invokeCallback(callback, null, value);
-		    }, err => {
-		        invokeCallback(callback, err && (err instanceof Error || err.message) ? err : new Error(err));
-		    });
-		}
-
-		function invokeCallback(callback, error, value) {
-		    try {
-		        callback(error, value);
-		    } catch (err) {
-		        (0, _setImmediate2.default)(e => {
-		            throw e;
-		        }, err);
-		    }
-		}
-		module.exports = exports.default; 
-	} (asyncify, asyncify.exports));
-	return asyncify.exports;
-}
-
-var hasRequiredWrapAsync;
-
-function requireWrapAsync () {
-	if (hasRequiredWrapAsync) return wrapAsync;
-	hasRequiredWrapAsync = 1;
-
-	Object.defineProperty(wrapAsync, "__esModule", {
-	    value: true
-	});
-	wrapAsync.isAsyncIterable = wrapAsync.isAsyncGenerator = wrapAsync.isAsync = undefined;
-
-	var _asyncify = requireAsyncify();
-
-	var _asyncify2 = _interopRequireDefault(_asyncify);
-
-	function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
-
-	function isAsync(fn) {
-	    return fn[Symbol.toStringTag] === 'AsyncFunction';
-	}
-
-	function isAsyncGenerator(fn) {
-	    return fn[Symbol.toStringTag] === 'AsyncGenerator';
-	}
-
-	function isAsyncIterable(obj) {
-	    return typeof obj[Symbol.asyncIterator] === 'function';
-	}
-
-	function wrapAsync$1(asyncFn) {
-	    if (typeof asyncFn !== 'function') throw new Error('expected a function');
-	    return isAsync(asyncFn) ? (0, _asyncify2.default)(asyncFn) : asyncFn;
-	}
-
-	wrapAsync.default = wrapAsync$1;
-	wrapAsync.isAsync = isAsync;
-	wrapAsync.isAsyncGenerator = isAsyncGenerator;
-	wrapAsync.isAsyncIterable = isAsyncIterable;
-	return wrapAsync;
-}
-
-var hasRequiredEnsureAsync;
-
-function requireEnsureAsync () {
-	if (hasRequiredEnsureAsync) return ensureAsync.exports;
-	hasRequiredEnsureAsync = 1;
-	(function (module, exports) {
-
-		Object.defineProperty(exports, "__esModule", {
-		    value: true
-		});
-		exports.default = ensureAsync;
-
-		var _setImmediate = requireSetImmediate();
-
-		var _setImmediate2 = _interopRequireDefault(_setImmediate);
-
-		var _wrapAsync = requireWrapAsync();
-
-		function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
-
-		/**
-		 * Wrap an async function and ensure it calls its callback on a later tick of
-		 * the event loop.  If the function already calls its callback on a next tick,
-		 * no extra deferral is added. This is useful for preventing stack overflows
-		 * (`RangeError: Maximum call stack size exceeded`) and generally keeping
-		 * [Zalgo](http://blog.izs.me/post/59142742143/designing-apis-for-asynchrony)
-		 * contained. ES2017 `async` functions are returned as-is -- they are immune
-		 * to Zalgo's corrupting influences, as they always resolve on a later tick.
-		 *
-		 * @name ensureAsync
-		 * @static
-		 * @memberOf module:Utils
-		 * @method
-		 * @category Util
-		 * @param {AsyncFunction} fn - an async function, one that expects a node-style
-		 * callback as its last argument.
-		 * @returns {AsyncFunction} Returns a wrapped function with the exact same call
-		 * signature as the function passed in.
-		 * @example
-		 *
-		 * function sometimesAsync(arg, callback) {
-		 *     if (cache[arg]) {
-		 *         return callback(null, cache[arg]); // this would be synchronous!!
-		 *     } else {
-		 *         doSomeIO(arg, callback); // this IO would be asynchronous
-		 *     }
-		 * }
-		 *
-		 * // this has a risk of stack overflows if many results are cached in a row
-		 * async.mapSeries(args, sometimesAsync, done);
-		 *
-		 * // this will defer sometimesAsync's callback if necessary,
-		 * // preventing stack overflows
-		 * async.mapSeries(args, async.ensureAsync(sometimesAsync), done);
-		 */
-		function ensureAsync(fn) {
-		    if ((0, _wrapAsync.isAsync)(fn)) return fn;
-		    return function (...args /*, callback*/) {
-		        var callback = args.pop();
-		        var sync = true;
-		        args.push((...innerArgs) => {
-		            if (sync) {
-		                (0, _setImmediate2.default)(() => callback(...innerArgs));
-		            } else {
-		                callback(...innerArgs);
-		            }
-		        });
-		        fn.apply(this, args);
-		        sync = false;
-		    };
-		}
-		module.exports = exports.default; 
-	} (ensureAsync, ensureAsync.exports));
-	return ensureAsync.exports;
-}
-
-var awaitify = {exports: {}};
-
-var hasRequiredAwaitify;
-
-function requireAwaitify () {
-	if (hasRequiredAwaitify) return awaitify.exports;
-	hasRequiredAwaitify = 1;
-	(function (module, exports) {
-
-		Object.defineProperty(exports, "__esModule", {
-		    value: true
-		});
-		exports.default = awaitify;
-		// conditionally promisify a function.
-		// only return a promise if a callback is omitted
-		function awaitify(asyncFn, arity) {
-		    if (!arity) arity = asyncFn.length;
-		    if (!arity) throw new Error('arity is undefined');
-		    function awaitable(...args) {
-		        if (typeof args[arity - 1] === 'function') {
-		            return asyncFn.apply(this, args);
-		        }
-
-		        return new Promise((resolve, reject) => {
-		            args[arity - 1] = (err, ...cbArgs) => {
-		                if (err) return reject(err);
-		                resolve(cbArgs.length > 1 ? cbArgs : cbArgs[0]);
-		            };
-		            asyncFn.apply(this, args);
-		        });
-		    }
-
-		    return awaitable;
-		}
-		module.exports = exports.default; 
-	} (awaitify, awaitify.exports));
-	return awaitify.exports;
-}
-
-var hasRequiredForever;
-
-function requireForever () {
-	if (hasRequiredForever) return forever.exports;
-	hasRequiredForever = 1;
-	(function (module, exports) {
-
-		Object.defineProperty(exports, "__esModule", {
-		    value: true
-		});
-
-		var _onlyOnce = requireOnlyOnce();
-
-		var _onlyOnce2 = _interopRequireDefault(_onlyOnce);
-
-		var _ensureAsync = requireEnsureAsync();
-
-		var _ensureAsync2 = _interopRequireDefault(_ensureAsync);
-
-		var _wrapAsync = requireWrapAsync();
-
-		var _wrapAsync2 = _interopRequireDefault(_wrapAsync);
-
-		var _awaitify = requireAwaitify();
-
-		var _awaitify2 = _interopRequireDefault(_awaitify);
-
-		function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
-
-		/**
-		 * Calls the asynchronous function `fn` with a callback parameter that allows it
-		 * to call itself again, in series, indefinitely.
-
-		 * If an error is passed to the callback then `errback` is called with the
-		 * error, and execution stops, otherwise it will never be called.
-		 *
-		 * @name forever
-		 * @static
-		 * @memberOf module:ControlFlow
-		 * @method
-		 * @category Control Flow
-		 * @param {AsyncFunction} fn - an async function to call repeatedly.
-		 * Invoked with (next).
-		 * @param {Function} [errback] - when `fn` passes an error to it's callback,
-		 * this function will be called, and execution stops. Invoked with (err).
-		 * @returns {Promise} a promise that rejects if an error occurs and an errback
-		 * is not passed
-		 * @example
-		 *
-		 * async.forever(
-		 *     function(next) {
-		 *         // next is suitable for passing to things that need a callback(err [, whatever]);
-		 *         // it will result in this function being called again.
-		 *     },
-		 *     function(err) {
-		 *         // if next is called with a value in its first parameter, it will appear
-		 *         // in here as 'err', and execution will stop.
-		 *     }
-		 * );
-		 */
-		function forever(fn, errback) {
-		    var done = (0, _onlyOnce2.default)(errback);
-		    var task = (0, _wrapAsync2.default)((0, _ensureAsync2.default)(fn));
-
-		    function next(err) {
-		        if (err) return done(err);
-		        if (err === false) return;
-		        task(next);
-		    }
-		    return next();
-		}
-		exports.default = (0, _awaitify2.default)(forever, 2);
-		module.exports = exports.default; 
-	} (forever, forever.exports));
-	return forever.exports;
-}
-
-var foreverExports = requireForever();
-var asyncForever = /*@__PURE__*/getDefaultExportFromCjs(foreverExports);
-
-var timesLimit = {exports: {}};
-
-var mapLimit = {exports: {}};
-
-var map = {exports: {}};
-
-var hasRequiredMap;
-
-function requireMap () {
-	if (hasRequiredMap) return map.exports;
-	hasRequiredMap = 1;
-	(function (module, exports) {
-
-		Object.defineProperty(exports, "__esModule", {
-		    value: true
-		});
-		exports.default = _asyncMap;
-
-		var _wrapAsync = requireWrapAsync();
-
-		var _wrapAsync2 = _interopRequireDefault(_wrapAsync);
-
-		function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
-
-		function _asyncMap(eachfn, arr, iteratee, callback) {
-		    arr = arr || [];
-		    var results = [];
-		    var counter = 0;
-		    var _iteratee = (0, _wrapAsync2.default)(iteratee);
-
-		    return eachfn(arr, (value, _, iterCb) => {
-		        var index = counter++;
-		        _iteratee(value, (err, v) => {
-		            results[index] = v;
-		            iterCb(err);
-		        });
-		    }, err => {
-		        callback(err, results);
-		    });
-		}
-		module.exports = exports.default; 
-	} (map, map.exports));
-	return map.exports;
-}
-
-var eachOfLimit = {exports: {}};
-
-var once = {exports: {}};
-
-var hasRequiredOnce;
-
-function requireOnce () {
-	if (hasRequiredOnce) return once.exports;
-	hasRequiredOnce = 1;
-	(function (module, exports) {
-
-		Object.defineProperty(exports, "__esModule", {
-		    value: true
-		});
-		exports.default = once;
-		function once(fn) {
-		    function wrapper(...args) {
-		        if (fn === null) return;
-		        var callFn = fn;
-		        fn = null;
-		        callFn.apply(this, args);
-		    }
-		    Object.assign(wrapper, fn);
-		    return wrapper;
-		}
-		module.exports = exports.default; 
-	} (once, once.exports));
-	return once.exports;
-}
-
-var iterator = {exports: {}};
-
-var isArrayLike = {exports: {}};
-
-var hasRequiredIsArrayLike;
-
-function requireIsArrayLike () {
-	if (hasRequiredIsArrayLike) return isArrayLike.exports;
-	hasRequiredIsArrayLike = 1;
-	(function (module, exports) {
-
-		Object.defineProperty(exports, "__esModule", {
-		    value: true
-		});
-		exports.default = isArrayLike;
-		function isArrayLike(value) {
-		    return value && typeof value.length === 'number' && value.length >= 0 && value.length % 1 === 0;
-		}
-		module.exports = exports.default; 
-	} (isArrayLike, isArrayLike.exports));
-	return isArrayLike.exports;
-}
-
-var getIterator = {exports: {}};
-
-var hasRequiredGetIterator;
-
-function requireGetIterator () {
-	if (hasRequiredGetIterator) return getIterator.exports;
-	hasRequiredGetIterator = 1;
-	(function (module, exports) {
-
-		Object.defineProperty(exports, "__esModule", {
-		    value: true
-		});
-
-		exports.default = function (coll) {
-		    return coll[Symbol.iterator] && coll[Symbol.iterator]();
-		};
-
-		module.exports = exports.default; 
-	} (getIterator, getIterator.exports));
-	return getIterator.exports;
-}
-
-var hasRequiredIterator;
-
-function requireIterator () {
-	if (hasRequiredIterator) return iterator.exports;
-	hasRequiredIterator = 1;
-	(function (module, exports) {
-
-		Object.defineProperty(exports, "__esModule", {
-		    value: true
-		});
-		exports.default = createIterator;
-
-		var _isArrayLike = requireIsArrayLike();
-
-		var _isArrayLike2 = _interopRequireDefault(_isArrayLike);
-
-		var _getIterator = requireGetIterator();
-
-		var _getIterator2 = _interopRequireDefault(_getIterator);
-
-		function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
-
-		function createArrayIterator(coll) {
-		    var i = -1;
-		    var len = coll.length;
-		    return function next() {
-		        return ++i < len ? { value: coll[i], key: i } : null;
-		    };
-		}
-
-		function createES2015Iterator(iterator) {
-		    var i = -1;
-		    return function next() {
-		        var item = iterator.next();
-		        if (item.done) return null;
-		        i++;
-		        return { value: item.value, key: i };
-		    };
-		}
-
-		function createObjectIterator(obj) {
-		    var okeys = obj ? Object.keys(obj) : [];
-		    var i = -1;
-		    var len = okeys.length;
-		    return function next() {
-		        var key = okeys[++i];
-		        if (key === '__proto__') {
-		            return next();
-		        }
-		        return i < len ? { value: obj[key], key } : null;
-		    };
-		}
-
-		function createIterator(coll) {
-		    if ((0, _isArrayLike2.default)(coll)) {
-		        return createArrayIterator(coll);
-		    }
-
-		    var iterator = (0, _getIterator2.default)(coll);
-		    return iterator ? createES2015Iterator(iterator) : createObjectIterator(coll);
-		}
-		module.exports = exports.default; 
-	} (iterator, iterator.exports));
-	return iterator.exports;
-}
-
-var asyncEachOfLimit = {exports: {}};
-
-var breakLoop = {exports: {}};
-
-var hasRequiredBreakLoop;
-
-function requireBreakLoop () {
-	if (hasRequiredBreakLoop) return breakLoop.exports;
-	hasRequiredBreakLoop = 1;
-	(function (module, exports) {
-
-		Object.defineProperty(exports, "__esModule", {
-		    value: true
-		});
-		// A temporary value used to identify if the loop should be broken.
-		// See #1064, #1293
-		const breakLoop = {};
-		exports.default = breakLoop;
-		module.exports = exports.default; 
-	} (breakLoop, breakLoop.exports));
-	return breakLoop.exports;
-}
-
-var hasRequiredAsyncEachOfLimit;
-
-function requireAsyncEachOfLimit () {
-	if (hasRequiredAsyncEachOfLimit) return asyncEachOfLimit.exports;
-	hasRequiredAsyncEachOfLimit = 1;
-	(function (module, exports) {
-
-		Object.defineProperty(exports, "__esModule", {
-		    value: true
-		});
-		exports.default = asyncEachOfLimit;
-
-		var _breakLoop = requireBreakLoop();
-
-		var _breakLoop2 = _interopRequireDefault(_breakLoop);
-
-		function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
-
-		// for async generators
-		function asyncEachOfLimit(generator, limit, iteratee, callback) {
-		    let done = false;
-		    let canceled = false;
-		    let awaiting = false;
-		    let running = 0;
-		    let idx = 0;
-
-		    function replenish() {
-		        //console.log('replenish')
-		        if (running >= limit || awaiting || done) return;
-		        //console.log('replenish awaiting')
-		        awaiting = true;
-		        generator.next().then(({ value, done: iterDone }) => {
-		            //console.log('got value', value)
-		            if (canceled || done) return;
-		            awaiting = false;
-		            if (iterDone) {
-		                done = true;
-		                if (running <= 0) {
-		                    //console.log('done nextCb')
-		                    callback(null);
-		                }
-		                return;
-		            }
-		            running++;
-		            iteratee(value, idx, iterateeCallback);
-		            idx++;
-		            replenish();
-		        }).catch(handleError);
-		    }
-
-		    function iterateeCallback(err, result) {
-		        //console.log('iterateeCallback')
-		        running -= 1;
-		        if (canceled) return;
-		        if (err) return handleError(err);
-
-		        if (err === false) {
-		            done = true;
-		            canceled = true;
-		            return;
-		        }
-
-		        if (result === _breakLoop2.default || done && running <= 0) {
-		            done = true;
-		            //console.log('done iterCb')
-		            return callback(null);
-		        }
-		        replenish();
-		    }
-
-		    function handleError(err) {
-		        if (canceled) return;
-		        awaiting = false;
-		        done = true;
-		        callback(err);
-		    }
-
-		    replenish();
-		}
-		module.exports = exports.default; 
-	} (asyncEachOfLimit, asyncEachOfLimit.exports));
-	return asyncEachOfLimit.exports;
-}
-
-var hasRequiredEachOfLimit;
-
-function requireEachOfLimit () {
-	if (hasRequiredEachOfLimit) return eachOfLimit.exports;
-	hasRequiredEachOfLimit = 1;
-	(function (module, exports) {
-
-		Object.defineProperty(exports, "__esModule", {
-		    value: true
-		});
-
-		var _once = requireOnce();
-
-		var _once2 = _interopRequireDefault(_once);
-
-		var _iterator = requireIterator();
-
-		var _iterator2 = _interopRequireDefault(_iterator);
-
-		var _onlyOnce = requireOnlyOnce();
-
-		var _onlyOnce2 = _interopRequireDefault(_onlyOnce);
-
-		var _wrapAsync = requireWrapAsync();
-
-		var _asyncEachOfLimit = requireAsyncEachOfLimit();
-
-		var _asyncEachOfLimit2 = _interopRequireDefault(_asyncEachOfLimit);
-
-		var _breakLoop = requireBreakLoop();
-
-		var _breakLoop2 = _interopRequireDefault(_breakLoop);
-
-		function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
-
-		exports.default = limit => {
-		    return (obj, iteratee, callback) => {
-		        callback = (0, _once2.default)(callback);
-		        if (limit <= 0) {
-		            throw new RangeError('concurrency limit cannot be less than 1');
-		        }
-		        if (!obj) {
-		            return callback(null);
-		        }
-		        if ((0, _wrapAsync.isAsyncGenerator)(obj)) {
-		            return (0, _asyncEachOfLimit2.default)(obj, limit, iteratee, callback);
-		        }
-		        if ((0, _wrapAsync.isAsyncIterable)(obj)) {
-		            return (0, _asyncEachOfLimit2.default)(obj[Symbol.asyncIterator](), limit, iteratee, callback);
-		        }
-		        var nextElem = (0, _iterator2.default)(obj);
-		        var done = false;
-		        var canceled = false;
-		        var running = 0;
-		        var looping = false;
-
-		        function iterateeCallback(err, value) {
-		            if (canceled) return;
-		            running -= 1;
-		            if (err) {
-		                done = true;
-		                callback(err);
-		            } else if (err === false) {
-		                done = true;
-		                canceled = true;
-		            } else if (value === _breakLoop2.default || done && running <= 0) {
-		                done = true;
-		                return callback(null);
-		            } else if (!looping) {
-		                replenish();
-		            }
-		        }
-
-		        function replenish() {
-		            looping = true;
-		            while (running < limit && !done) {
-		                var elem = nextElem();
-		                if (elem === null) {
-		                    done = true;
-		                    if (running <= 0) {
-		                        callback(null);
-		                    }
-		                    return;
-		                }
-		                running += 1;
-		                iteratee(elem.value, elem.key, (0, _onlyOnce2.default)(iterateeCallback));
-		            }
-		            looping = false;
-		        }
-
-		        replenish();
-		    };
-		};
-
-		module.exports = exports.default; 
-	} (eachOfLimit, eachOfLimit.exports));
-	return eachOfLimit.exports;
-}
-
-var hasRequiredMapLimit;
-
-function requireMapLimit () {
-	if (hasRequiredMapLimit) return mapLimit.exports;
-	hasRequiredMapLimit = 1;
-	(function (module, exports) {
-
-		Object.defineProperty(exports, "__esModule", {
-		    value: true
-		});
-
-		var _map2 = requireMap();
-
-		var _map3 = _interopRequireDefault(_map2);
-
-		var _eachOfLimit = requireEachOfLimit();
-
-		var _eachOfLimit2 = _interopRequireDefault(_eachOfLimit);
-
-		var _awaitify = requireAwaitify();
-
-		var _awaitify2 = _interopRequireDefault(_awaitify);
-
-		function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
-
-		/**
-		 * The same as [`map`]{@link module:Collections.map} but runs a maximum of `limit` async operations at a time.
-		 *
-		 * @name mapLimit
-		 * @static
-		 * @memberOf module:Collections
-		 * @method
-		 * @see [async.map]{@link module:Collections.map}
-		 * @category Collection
-		 * @param {Array|Iterable|AsyncIterable|Object} coll - A collection to iterate over.
-		 * @param {number} limit - The maximum number of async operations at a time.
-		 * @param {AsyncFunction} iteratee - An async function to apply to each item in
-		 * `coll`.
-		 * The iteratee should complete with the transformed item.
-		 * Invoked with (item, callback).
-		 * @param {Function} [callback] - A callback which is called when all `iteratee`
-		 * functions have finished, or an error occurs. Results is an array of the
-		 * transformed items from the `coll`. Invoked with (err, results).
-		 * @returns {Promise} a promise, if no callback is passed
-		 */
-		function mapLimit(coll, limit, iteratee, callback) {
-		    return (0, _map3.default)((0, _eachOfLimit2.default)(limit), coll, iteratee, callback);
-		}
-		exports.default = (0, _awaitify2.default)(mapLimit, 4);
-		module.exports = exports.default; 
-	} (mapLimit, mapLimit.exports));
-	return mapLimit.exports;
-}
-
-var range = {exports: {}};
-
-var hasRequiredRange;
-
-function requireRange () {
-	if (hasRequiredRange) return range.exports;
-	hasRequiredRange = 1;
-	(function (module, exports) {
-
-		Object.defineProperty(exports, "__esModule", {
-		    value: true
-		});
-		exports.default = range;
-		function range(size) {
-		    var result = Array(size);
-		    while (size--) {
-		        result[size] = size;
-		    }
-		    return result;
-		}
-		module.exports = exports.default; 
-	} (range, range.exports));
-	return range.exports;
-}
-
-var hasRequiredTimesLimit;
-
-function requireTimesLimit () {
-	if (hasRequiredTimesLimit) return timesLimit.exports;
-	hasRequiredTimesLimit = 1;
-	(function (module, exports) {
-
-		Object.defineProperty(exports, "__esModule", {
-		    value: true
-		});
-		exports.default = timesLimit;
-
-		var _mapLimit = requireMapLimit();
-
-		var _mapLimit2 = _interopRequireDefault(_mapLimit);
-
-		var _range = requireRange();
-
-		var _range2 = _interopRequireDefault(_range);
-
-		var _wrapAsync = requireWrapAsync();
-
-		var _wrapAsync2 = _interopRequireDefault(_wrapAsync);
-
-		function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
-
-		/**
-		 * The same as [times]{@link module:ControlFlow.times} but runs a maximum of `limit` async operations at a
-		 * time.
-		 *
-		 * @name timesLimit
-		 * @static
-		 * @memberOf module:ControlFlow
-		 * @method
-		 * @see [async.times]{@link module:ControlFlow.times}
-		 * @category Control Flow
-		 * @param {number} count - The number of times to run the function.
-		 * @param {number} limit - The maximum number of async operations at a time.
-		 * @param {AsyncFunction} iteratee - The async function to call `n` times.
-		 * Invoked with the iteration index and a callback: (n, next).
-		 * @param {Function} callback - see [async.map]{@link module:Collections.map}.
-		 * @returns {Promise} a promise, if no callback is provided
-		 */
-		function timesLimit(count, limit, iteratee, callback) {
-		    var _iteratee = (0, _wrapAsync2.default)(iteratee);
-		    return (0, _mapLimit2.default)((0, _range2.default)(count), limit, _iteratee, callback);
-		}
-		module.exports = exports.default; 
-	} (timesLimit, timesLimit.exports));
-	return timesLimit.exports;
-}
-
-var timesLimitExports = requireTimesLimit();
-var asyncTimesLimit = /*@__PURE__*/getDefaultExportFromCjs(timesLimitExports);
 
 const QUERY_LIMIT = 5;
 class DynamoDB {
@@ -25474,39 +24561,30 @@ class DynamoDB {
             return this._queryQL(list);
         }
         else {
-            const err_list = [];
-            const result_list = [];
-            await new Promise((resolve, reject) => {
-                asyncTimesLimit(list.length, QUERY_LIMIT, (i, done) => {
-                    const item = list[i];
-                    this._queryQL(item).then((result) => {
-                        result_list[i] = result;
-                        done();
-                    }, (err) => {
-                        result_list[i] = undefined;
-                        err_list[i] = err;
-                        done(err);
-                    });
-                }, (err) => (err ? reject(err_list) : resolve(result_list)));
+            return parallelLimit(list, QUERY_LIMIT, async (item) => {
+                return this._queryQL(item);
             });
-            return result_list;
         }
     }
     async _queryQL(params) {
-        const sql = params?.sql ? params.sql : params;
+        const sql = typeof params === 'string' ? params : params.sql;
+        const returnVal = typeof params === 'string' ? 'NONE' : (params.return ?? 'NONE');
         const input = {
             Statement: sql,
-            ReturnValuesOnConditionCheckFailure: params?.return ?? 'NONE',
+            ReturnValuesOnConditionCheckFailure: returnVal,
         };
         const command = new clientDynamodb.ExecuteStatementCommand(input);
         return this._pagedSend(command);
     }
     async batchQL(params) {
         const list = Array.isArray(params) ? params : params.list;
+        const returnVal = Array.isArray(params)
+            ? 'NONE'
+            : (params.return ?? 'NONE');
         const input = {
             Statements: list.map((Statement) => ({
                 Statement,
-                ReturnValuesOnConditionCheckFailure: params?.return ?? 'NONE',
+                ReturnValuesOnConditionCheckFailure: returnVal,
             })),
         };
         const command = new clientDynamodb.BatchExecuteStatementCommand(input);
@@ -25516,7 +24594,7 @@ class DynamoDB {
             if (err) {
                 throw err;
             }
-            return ret;
+            return ret ?? [];
         }
         catch (err) {
             const converted = convertSuccess(err);
@@ -25531,10 +24609,13 @@ class DynamoDB {
     }
     async transactionQL(params) {
         const list = Array.isArray(params) ? params : params.list;
+        const returnVal = Array.isArray(params)
+            ? 'NONE'
+            : (params.return ?? 'NONE');
         const input = {
             TransactStatements: list.map((Statement) => ({
                 Statement,
-                ReturnValuesOnConditionCheckFailure: params?.return ?? 'NONE',
+                ReturnValuesOnConditionCheckFailure: returnVal,
             })),
         };
         const command = new clientDynamodb.ExecuteTransactionCommand(input);
@@ -25544,7 +24625,7 @@ class DynamoDB {
             if (err) {
                 throw err;
             }
-            return ret;
+            return ret ?? [];
         }
         catch (err) {
             const converted = convertSuccess(err);
@@ -25560,107 +24641,76 @@ class DynamoDB {
     async deleteItems(params) {
         const BATCH_LIMIT = 100;
         const { table, key_list, list } = params;
-        const batch_count = Math.ceil(list.length / BATCH_LIMIT);
         const prefix = `DELETE FROM ${escapeIdentifier(table)} WHERE `;
-        const err_list = [];
-        const result_list = [];
-        await new Promise((resolve, reject) => {
-            asyncTimesLimit(batch_count, QUERY_LIMIT, (batch_index, done) => {
-                const sql_list = [];
-                const start = BATCH_LIMIT * batch_index;
-                const end = Math.min(start + BATCH_LIMIT, list.length);
-                for (let i = start; i < end; i++) {
-                    const cond = key_list
-                        .map((key, j) => {
-                        const value = list[i][j];
-                        return `${escapeIdentifier(key)} = ${convertValueToPQL(value)}`;
-                    })
-                        .join(' AND ');
-                    sql_list.push(prefix + cond);
-                }
-                this.transactionQL(sql_list).then((result) => {
-                    for (let i = start; i < end; i++) {
-                        result_list[i] = result?.[i - start];
-                    }
-                    done();
-                }, (err) => {
-                    for (let i = start; i < end; i++) {
-                        err_list[i] = err?.[i - start];
-                    }
-                    done(err);
-                });
-            }, (err) => (err ? reject(err_list) : resolve(result_list)));
+        return parallelBatch(list, BATCH_LIMIT, QUERY_LIMIT, async (batch) => {
+            const sql_list = [];
+            for (const item of batch) {
+                const cond = key_list
+                    .map((key, j) => {
+                    const value = item[j];
+                    return `${escapeIdentifier(key)} = ${convertValueToPQL(value)}`;
+                })
+                    .join(' AND ');
+                sql_list.push(prefix + cond);
+            }
+            return this.transactionQL(sql_list);
         });
-        return result_list;
     }
     async updateItems(params) {
         const BATCH_LIMIT = 100;
         const { table, key_list, list } = params;
-        const batch_count = Math.ceil(list.length / BATCH_LIMIT);
         const prefix = `UPDATE ${escapeIdentifier(table)} SET `;
-        const err_list = [];
-        const result_list = [];
-        await new Promise((resolve, reject) => {
-            asyncTimesLimit(batch_count, QUERY_LIMIT, (batch_index, done) => {
-                const sql_list = [];
-                const start = BATCH_LIMIT * batch_index;
-                const end = Math.min(start + BATCH_LIMIT, list.length);
-                for (let i = start; i < end; i++) {
-                    const item = list[i];
-                    const sets = item.set_list
-                        .map((object) => {
-                        const { column, value } = object;
-                        return `${escapeIdentifier(column)} = ${escapeValue(value)}`;
+        return parallelBatch(list, BATCH_LIMIT, QUERY_LIMIT, async (batch) => {
+            const sql_list = [];
+            for (const item of batch) {
+                const sets = item.set_list
+                    .map((object) => {
+                    const { column, value } = object;
+                    return `${escapeIdentifier(column)} = ${escapeValue(value)}`;
+                })
+                    .join(', ');
+                const cond = ' WHERE ' +
+                    key_list
+                        .map((key, j) => {
+                        const value = item.key[j];
+                        return `${escapeIdentifier(key)} = ${convertValueToPQL(value)}`;
                     })
-                        .join(', ');
-                    const cond = ' WHERE ' +
-                        key_list
-                            .map((key, j) => {
-                            const value = item.key[j];
-                            return `${escapeIdentifier(key)} = ${convertValueToPQL(value)}`;
-                        })
-                            .join(' AND ');
-                    sql_list.push(prefix + sets + cond);
-                }
-                this.transactionQL(sql_list).then((result) => {
-                    for (let i = start; i < end; i++) {
-                        result_list[i] = result?.[i - start];
-                    }
-                    done();
-                }, (err) => {
-                    for (let i = start; i < end; i++) {
-                        err_list[i] = err?.[i - start];
-                    }
-                    done(err);
-                });
-            }, (err) => (err ? reject(err_list) : resolve(result_list)));
+                        .join(' AND ');
+                sql_list.push(prefix + sets + cond);
+            }
+            return this.transactionQL(sql_list);
         });
-        return result_list;
     }
     async putItems(params) {
         const BATCH_LIMIT = 100;
         const { table, list } = params;
-        const batch_count = Math.ceil(list.length / BATCH_LIMIT);
         const err_list = [];
-        await new Promise((resolve, reject) => {
-            asyncTimesLimit(batch_count, QUERY_LIMIT, (batch_index, done) => {
-                const start = BATCH_LIMIT * batch_index;
-                const end = start + BATCH_LIMIT;
-                const item_list = list.slice(start, end);
+        try {
+            await parallelBatch(list, BATCH_LIMIT, QUERY_LIMIT, async (batch, i) => {
                 const input = {
-                    TransactItems: item_list.map((item) => ({
-                        Put: {
-                            TableName: table,
-                            Item: nativeToValue(item).M,
-                        },
-                    })),
+                    TransactItems: batch.map((item) => {
+                        const value = nativeToValue(item);
+                        return {
+                            Put: {
+                                TableName: table,
+                                Item: 'M' in value
+                                    ? value.M
+                                    : {},
+                            },
+                        };
+                    }),
                 };
                 const command = new clientDynamodb.TransactWriteItemsCommand(input);
-                this.client.send(command).then(() => done(), (err) => {
+                try {
+                    await this.client.send(command);
+                    return batch.map(() => undefined);
+                }
+                catch (err) {
+                    const start = i * BATCH_LIMIT;
                     if (err?.name === 'TransactionCanceledException' &&
                         err.CancellationReasons?.length > 0) {
-                        err.CancellationReasons.forEach((cancel_err, i) => {
-                            err_list[start + i] = {
+                        err.CancellationReasons.forEach((cancel_err, j) => {
+                            err_list[start + j] = {
                                 err: convertError(cancel_err),
                                 parent: cancel_err,
                             };
@@ -25672,38 +24722,25 @@ class DynamoDB {
                             parent: err,
                         };
                     }
-                    done(err || 'unknown');
-                });
-            }, (err) => (err ? reject(err_list) : resolve(undefined)));
-        });
+                    throw err;
+                }
+            });
+        }
+        catch {
+            throw err_list;
+        }
     }
     async getTableList() {
         const command = new clientDynamodb.ListTablesCommand({ Limit: 100 });
-        let next_token;
         const results = [];
-        await new Promise((resolve, reject) => {
-            asyncForever((done) => {
-                if (next_token) {
-                    command.input.ExclusiveStartTableName = next_token;
-                }
-                this.client.send(command).then((result) => {
-                    let err;
-                    result.TableNames.forEach((table) => results.push(table));
-                    next_token = result?.LastEvaluatedTableName;
-                    if (!next_token) {
-                        err = 'stop';
-                    }
-                    done(err);
-                }, (err) => done(err));
-            }, (err) => {
-                if (err === 'stop') {
-                    resolve(results);
-                }
-                else {
-                    reject(err);
-                }
-            });
-        });
+        while (true) {
+            const result = await this.client.send(command);
+            result.TableNames?.forEach((table) => results.push(table));
+            if (!result.LastEvaluatedTableName) {
+                break;
+            }
+            command.input.ExclusiveStartTableName = result.LastEvaluatedTableName;
+        }
         return results;
     }
     async getTable(TableName) {
@@ -25735,7 +24772,7 @@ class DynamoDB {
         }
         const input = {
             TableName: table,
-            BillingMode: billing_mode || 'PAY_PER_REQUEST',
+            BillingMode: (billing_mode ?? 'PAY_PER_REQUEST'),
             AttributeDefinitions,
             KeySchema,
         };
@@ -25782,7 +24819,10 @@ class DynamoDB {
                     Create: {
                         IndexName: index_name,
                         KeySchema,
-                        Projection: { ProjectionType: projection_type || 'KEYS_ONLY' },
+                        Projection: {
+                            ProjectionType: (projection_type ||
+                                'KEYS_ONLY'),
+                        },
                     },
                 },
             ],
@@ -25810,66 +24850,54 @@ class DynamoDB {
         }
     }
     async _pagedSend(command) {
-        let next_token;
         const results = [];
-        await new Promise((resolve, reject) => {
-            asyncForever((done) => {
-                if (next_token) {
-                    command.input.NextToken = next_token;
-                }
-                this.client.send(command).then((result) => {
-                    let err;
-                    const list = convertSuccess(result)[1];
-                    list?.forEach?.((item) => {
-                        results.push(item);
-                    });
-                    next_token = result?.NextToken;
-                    if (!err && !next_token) {
-                        err = 'stop';
-                    }
-                    done(err);
-                }, (err) => {
-                    if (err.Item) {
-                        results.push(err.Item);
-                    }
-                    done(convertError(err));
+        while (true) {
+            try {
+                const result = await this.client.send(command);
+                const list = convertSuccess(result)[1];
+                list?.forEach((item) => {
+                    results.push(item);
                 });
-            }, (err) => {
-                if (err === 'stop') {
-                    resolve(results);
+                if (!result?.NextToken) {
+                    break;
                 }
-                else {
-                    reject(err);
+                command.input.NextToken = result.NextToken;
+            }
+            catch (err) {
+                if (err.Item) {
+                    results.push(err.Item);
                 }
-            });
-        });
+                throw convertError(err);
+            }
+        }
         return results;
     }
 }
 
 class DynamoDBWithCache extends DynamoDB {
-    tableCache = {};
+    _tableCache = new Map();
     async getTable(table_name) {
         try {
             const result = await super.getTable(table_name);
             if (result?.Table?.TableStatus === 'DELETING') {
-                delete this.tableCache[table_name];
+                this._tableCache.delete(table_name);
             }
             else {
-                this.tableCache[table_name] = { last_updated: Date.now(), result };
+                this._tableCache.set(table_name, { last_updated: Date.now(), result });
             }
             return result;
         }
         catch (err) {
             if (err?.message === 'resource_not_found') {
-                delete this.tableCache[table_name];
+                this._tableCache.delete(table_name);
             }
             throw err;
         }
     }
     async getTableCached(table_name) {
-        if (table_name in this.tableCache) {
-            return this.tableCache[table_name].result;
+        const result = this._tableCache.get(table_name)?.result;
+        if (result) {
+            return result;
         }
         else {
             return this.getTable(table_name);
@@ -25877,26 +24905,225 @@ class DynamoDBWithCache extends DynamoDB {
     }
     async createTable(opts) {
         const table_name = opts.table;
-        delete this.tableCache[table_name];
+        this._tableCache.delete(table_name);
         try {
             await super.createTable(opts);
         }
         finally {
-            delete this.tableCache[table_name];
+            this._tableCache.delete(table_name);
         }
     }
     async deleteTable(table_name) {
-        delete this.tableCache[table_name];
+        this._tableCache.delete(table_name);
         try {
             await super.deleteTable(table_name);
         }
         finally {
-            delete this.tableCache[table_name];
+            this._tableCache.delete(table_name);
         }
     }
 }
 function createDynamoDB(params) {
     return new DynamoDBWithCache(params);
+}
+
+const g_parser = new mysql_parserExports.Parser();
+const DEFAULT_RESULT$1 = {
+    fieldCount: 0,
+    affectedRows: 0,
+    insertId: 0,
+    message: '',
+    changedRows: 0,
+    protocol41: true,
+};
+class Query extends node_events.EventEmitter {
+    _session;
+    sql;
+    values;
+    typeCast;
+    nestedTables;
+    constructor(params) {
+        super();
+        this._session = params.session;
+        this.sql = params.sql;
+        this.values = params.values;
+        this.typeCast = params.typeCast ?? params.session.typeCast ?? true;
+        this.nestedTables = params.nestTables ?? false;
+    }
+    start() { }
+    stream(_options) {
+        throw new SQLError('NOT_IMPLEMENTED');
+    }
+    async run() {
+        console.log("run");
+        try {
+            const [result_list, schema_list] = await this._run();
+            this.emit('end');
+            return [result_list, schema_list];
+        }
+        catch (e) {
+            this.emit('error', e);
+            throw e;
+        }
+    }
+    async _run() {
+        const { err: parse_err, list } = _astify$1(this.sql);
+        if (parse_err) {
+            throw new SQLError(parse_err, this.sql);
+        }
+        if (list.length === 0) {
+            throw new SQLError('ER_EMPTY_QUERY', this.sql);
+        }
+        if (list.length > 1 && !this._session.multipleStatements) {
+            throw new SQLError('multiple_statements_disabled', this.sql);
+        }
+        const result_list = [];
+        const schema_list = [];
+        try {
+            for (let n = 0; n < list.length; n++) {
+                const ast = list[n];
+                if (ast) {
+                    const { result, columns } = await this._singleQuery(ast);
+                    if (result !== undefined) {
+                        this._transformResult(result, columns);
+                    }
+                    result_list[n] = result ?? DEFAULT_RESULT$1;
+                    schema_list[n] = columns;
+                }
+            }
+            if (list.length === 1) {
+                return [result_list[0], schema_list[0]];
+            }
+            else {
+                return [result_list, schema_list];
+            }
+        }
+        catch (err) {
+            const sql_err = new SQLError(err, this.sql);
+            sql_err.index = result_list.length;
+            throw sql_err;
+        }
+    }
+    async _singleQuery(ast) {
+        let handler;
+        switch (ast?.type) {
+            case 'alter':
+                handler = query$8;
+                break;
+            case 'create':
+                handler = query$6;
+                break;
+            case 'delete':
+                handler = query$5;
+                break;
+            case 'drop':
+                handler = query$4;
+                break;
+            case 'insert':
+            case 'replace':
+                handler = query$3;
+                break;
+            case 'show':
+                handler = query$1;
+                break;
+            case 'select':
+                handler = query$7;
+                break;
+            case 'set':
+                handler = query$2;
+                break;
+            case 'update':
+                handler = query;
+                break;
+            case 'use':
+                return await _useDatabase$1({ ast, session: this._session });
+            default:
+                shared.logger.error('unsupported statement type:', ast);
+                throw new SQLError({
+                    err: 'unsupported_type',
+                    args: [ast?.type],
+                });
+        }
+        if (!handler) {
+            throw new SQLError('unsupported_type');
+        }
+        const result = await handler({
+            ast,
+            dynamodb: this._session.dynamodb,
+            session: this._session,
+        });
+        // Handle different return types from handlers
+        if (result && typeof result === 'object') {
+            if ('rows' in result && 'columns' in result) {
+                // show handler
+                return { result: result.rows, columns: result.columns };
+            }
+            else if ('output_row_list' in result && 'column_list' in result) {
+                // select handler
+                return { result: result.output_row_list, columns: result.column_list };
+            }
+            else {
+                // mutation handlers (insert, update, delete, etc.)
+                return { result, columns: undefined };
+            }
+        }
+        // set handler returns void, drop handler may return undefined
+        return { result: undefined, columns: undefined };
+    }
+    _transformResult(list, columns) {
+        if (this._session.resultObjects && Array.isArray(list)) {
+            list.forEach((result, i) => {
+                const obj = {};
+                columns.forEach((column, j) => {
+                    const value = this._convertCell(result[j], column);
+                    if (this.nestedTables === false) {
+                        obj[column.name] = value;
+                    }
+                    else if (typeof this.nestedTables === 'string') {
+                        obj[`${column.table}${this.nestedTables}${column.name}`] = value;
+                    }
+                    else {
+                        if (!obj[column.table]) {
+                            obj[column.table] = {};
+                        }
+                        obj[column.table][column.name] = value;
+                    }
+                });
+                list[i] = obj;
+            });
+        }
+    }
+    _convertCell(value, column) {
+        if (typeof this.typeCast === 'function') {
+            return this.typeCast(column, () => typeCast(value, column, this._session.typeCastOptions));
+        }
+        return this.typeCast
+            ? typeCast(value, column, this._session.typeCastOptions)
+            : value;
+    }
+}
+function _astify$1(sql) {
+    let err;
+    let list = [];
+    try {
+        const result = g_parser.astify(sql);
+        if (Array.isArray(result)) {
+            list = result;
+        }
+        else {
+            list = [result];
+        }
+    }
+    catch (e) {
+        shared.logger.error('parse error:', e);
+        const start = e?.location?.start;
+        err = { err: 'parse', args: [start?.line, start?.column] };
+    }
+    return { err, list };
+}
+async function _useDatabase$1(params) {
+    params.session.setCurrentDatabase(params.ast.db);
+    return { result: undefined, columns: undefined };
 }
 
 const DEFAULT_RESULT = {
@@ -25913,39 +25140,37 @@ class Session extends node_events.EventEmitter {
     config;
     state = 'connected';
     threadId = g_threadId++;
-    _dynamodb;
-    _typeCastOptions = {};
+    dynamodb;
+    typeCastOptions = {};
+    typeCast = true;
+    resultObjects = true;
+    multipleStatements = false;
     _currentDatabase = null;
     _localVariables = {};
     _transaction = null;
     _isReleased = false;
-    _multipleStatements = false;
     _tempTableMap = {};
-    _typeCast = true;
-    _dateStrings = false;
-    _resultObjects = true;
     escape = SqlString__namespace.escape;
     escapeId = SqlString__namespace.escapeId;
     format = SqlString__namespace.format;
     constructor(args) {
         super();
         this.config = args || {};
-        this._dynamodb = createDynamoDB(args);
+        this.dynamodb = createDynamoDB(args);
         if (args?.database) {
             this.setCurrentDatabase(args.database);
         }
         if (args?.multipleStatements) {
-            this._multipleStatements = true;
+            this.multipleStatements = true;
         }
         if (args?.resultObjects === false) {
-            this._resultObjects = false;
+            this.resultObjects = false;
         }
         if (args?.typeCast !== undefined) {
-            this._typeCast = args.typeCast;
+            this.typeCast = args.typeCast;
         }
         if (args?.dateStrings) {
-            this._dateStrings = args.dateStrings;
-            this._typeCastOptions.dateStrings = true;
+            this.typeCastOptions.dateStrings = true;
         }
     }
     release(done) {
@@ -26006,6 +25231,10 @@ class Session extends node_events.EventEmitter {
         }
     }
     query(params, values, done) {
+        if (this._isReleased) {
+            done?.(new SQLError('released'));
+            return;
+        }
         const opts = typeof params === 'object' ? { ...params } : {};
         if (typeof params === 'string') {
             opts.sql = params;
@@ -26016,17 +25245,25 @@ class Session extends node_events.EventEmitter {
         else if (values !== undefined) {
             opts.values = values;
         }
-        if (!opts.sql) {
-            done?.(new SQLError('ER_EMPTY_QUERY'));
+        if (opts.values !== undefined) {
+            opts.sql = SqlString__namespace.format(opts.sql ?? '', opts.values);
         }
-        else {
-            if (opts.values !== undefined) {
-                opts.sql = SqlString__namespace.format(opts.sql, opts.values);
-            }
-            this._query(opts, done);
-        }
+        //this._query(opts, done);
+        const query = new Query({ ...opts, session: this });
+        void this._run(query, done);
+        return query;
     }
     createQuery = this.query;
+    async _run(query, done) {
+        try {
+            console.log("");
+            const result = await query.run();
+            done?.(null, ...result);
+        }
+        catch (e) {
+            done?.(e);
+        }
+    }
     async _query(opts, done) {
         if (this._isReleased) {
             done?.(new SQLError('released'));
@@ -26054,7 +25291,7 @@ class Session extends node_events.EventEmitter {
             }
             return;
         }
-        if (!this._multipleStatements) {
+        if (!this.multipleStatements) {
             done?.(new SQLError('multiple_statements_disabled', opts.sql));
             return;
         }
@@ -26126,7 +25363,7 @@ class Session extends node_events.EventEmitter {
         }
         const result = await handler({
             ast,
-            dynamodb: this._dynamodb,
+            dynamodb: this.dynamodb,
             session: this,
         });
         // Handle different return types from handlers
@@ -26148,7 +25385,7 @@ class Session extends node_events.EventEmitter {
         return { result: undefined, columns: undefined };
     }
     _transformResult(list, columns, opts) {
-        if (this._resultObjects && Array.isArray(list)) {
+        if (this.resultObjects && Array.isArray(list)) {
             list.forEach((result, i) => {
                 const obj = {};
                 columns.forEach((column, j) => {
@@ -26166,11 +25403,11 @@ class Session extends node_events.EventEmitter {
         }
     }
     _convertCell(value, column) {
-        if (typeof this._typeCast === 'function') {
-            return this._typeCast(column, () => typeCast(value, column, this._typeCastOptions));
+        if (typeof this.typeCast === 'function') {
+            return this.typeCast(column, () => typeCast(value, column, this.typeCastOptions));
         }
-        return this._typeCast
-            ? typeCast(value, column, this._typeCastOptions)
+        return this.typeCast
+            ? typeCast(value, column, this.typeCastOptions)
             : value;
     }
 }
@@ -26225,7 +25462,7 @@ class Pool extends node_events.EventEmitter {
             values = undefined;
         }
         const session = createSession$1(this.config);
-        session.query(opts, values, (error, results, fields) => {
+        return session.query(opts, values, (error, results, fields) => {
             session.release();
             done?.(error, results, fields);
         });
@@ -26234,16 +25471,20 @@ class Pool extends node_events.EventEmitter {
 
 const createConnection = createSession$1;
 const createPool = createPool$1;
+const createPoolCluster = createPool$1;
 const createSession = createSession$1;
 const escape = SqlString__namespace.escape;
 const escapeId = SqlString__namespace.escapeId;
 const format = SqlString__namespace.format;
+const raw = SqlString__namespace.raw;
 
 exports.SQLError = SQLError;
 exports.createConnection = createConnection;
 exports.createPool = createPool;
+exports.createPoolCluster = createPoolCluster;
 exports.createSession = createSession;
 exports.escape = escape;
 exports.escapeId = escapeId;
 exports.format = format;
+exports.raw = raw;
 //# sourceMappingURL=dynamosql.js.map

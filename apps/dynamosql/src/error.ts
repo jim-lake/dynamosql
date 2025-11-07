@@ -22,6 +22,7 @@ interface ErrorInput {
   message?: string;
   args?: any[];
   cause?: Error;
+  index?: number;
 }
 
 const ERROR_MAP: Record<string, ErrorMapEntry> = {
@@ -147,6 +148,7 @@ export class SQLError extends Error {
   fatal: boolean = false;
   sqlMessage?: string;
   sql?: string;
+  index: number;
 
   constructor(err: string | ErrorInput, sql?: string) {
     const sql_err =
@@ -161,6 +163,7 @@ export class SQLError extends Error {
     if (typeof sqlMessage === 'function') {
       sqlMessage = sqlMessage((err as ErrorInput).args);
     }
+    const index = typeof err === 'string' ? 0 : (err.index ?? 0);
     const message =
       (err as ErrorInput).message ||
       sqlMessage ||
@@ -174,6 +177,7 @@ export class SQLError extends Error {
     }
     this.code = code;
     this.errno = errno;
+    this.index = index;
     if (sqlMessage) {
       this.sqlMessage = sqlMessage as string;
     }
