@@ -1,10 +1,9 @@
 import * as SchemaManager from './schema_manager';
 import { convertType } from './helpers/column_type_helper';
 import { SQLError } from '../error';
+import type { HandlerParams, ShowResult } from './handler_types';
 
-export async function query(
-  params: any
-): Promise<{ rows: any[]; columns: any[] }> {
+export async function query(params: HandlerParams): Promise<ShowResult> {
   const { ast, session, dynamodb } = params;
 
   if (ast.keyword === 'databases') {

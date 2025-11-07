@@ -7,10 +7,9 @@ import { formGroup } from './helpers/group';
 import { sort } from './helpers/sort';
 import { logger } from '@dynamosql/shared';
 import { SQLError } from '../error';
+import type { HandlerParams, SelectResult } from './handler_types';
 
-export async function query(
-  params: any
-): Promise<{ output_row_list: any[]; column_list: any[] }> {
+export async function query(params: HandlerParams): Promise<SelectResult> {
   const { output_row_list, column_list } = await internalQuery(params);
 
   output_row_list?.forEach?.((row: any) => {
@@ -23,8 +22,8 @@ export async function query(
 }
 
 export async function internalQuery(
-  params: any
-): Promise<{ output_row_list: any[]; column_list: any[]; row_list: any[] }> {
+  params: HandlerParams & { skip_resolve?: boolean }
+): Promise<SelectResult & { row_list: any[] }> {
   const { ast, session, dynamodb } = params;
 
   const current_database = session.getCurrentDatabase();
@@ -52,11 +51,9 @@ export async function internalQuery(
   return _evaluateReturn({ ...params, source_map, column_map });
 }
 
-function _evaluateReturn(params: any): {
-  output_row_list: any[];
-  column_list: any[];
-  row_list: any[];
-} {
+function _evaluateReturn(
+  params: HandlerParams & { source_map: any; column_map: any }
+): SelectResult & { row_list: any[] } {
   const { session, source_map, ast } = params;
   const query_columns = _expandStarColumns(params);
 
@@ -165,7 +162,7 @@ function _evaluateReturn(params: any): {
   return { output_row_list, column_list, row_list };
 }
 
-function _expandStarColumns(params: any) {
+function _expandStarColumns(params: { ast: any; column_map: any }): any[] {
   const { ast, column_map } = params;
   const ret: any[] = [];
   ast?.columns?.forEach?.((column: any) => {
@@ -203,7 +200,7 @@ function _expandStarColumns(params: any) {
   return ret;
 }
 
-function _unionType(old_type: any, new_type: any) {
+function _unionType(old_type: any, new_type: any): any {
   let ret = new_type;
   if (!old_type || old_type === 'null') {
     // noop

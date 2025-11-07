@@ -4,8 +4,9 @@ import * as TransactionManager from './transaction_manager';
 import * as SelectHandler from './select_handler';
 import { logger } from '@dynamosql/shared';
 import { SQLError } from '../error';
+import type { HandlerParams, MutationResult } from './handler_types';
 
-export async function query(params: any): Promise<any> {
+export async function query(params: HandlerParams): Promise<MutationResult> {
   const { ast, session } = params;
   const duplicate_mode =
     ast.type === 'replace'
@@ -37,7 +38,9 @@ export async function query(params: any): Promise<any> {
   return await TransactionManager.run(opts);
 }
 
-async function _runInsert(params: any): Promise<any> {
+async function _runInsert(
+  params: HandlerParams & { database: string; engine: any; duplicate_mode: any }
+): Promise<MutationResult> {
   const { ast, session, engine, dynamodb, duplicate_mode } = params;
   const table = ast.table?.[0]?.table;
   let list: any;
@@ -113,11 +116,11 @@ async function _runInsert(params: any): Promise<any> {
       throw err;
     }
   } else {
-    return { affectedRows: 0 };
+    return { affectedRows: 0, changedRows: 0 };
   }
 }
 
-function _checkAst(ast: any) {
+function _checkAst(ast: any): any {
   let err: any;
   if (ast.values?.type === 'select') {
     if (ast.columns?.length !== ast.values.columns?.length) {

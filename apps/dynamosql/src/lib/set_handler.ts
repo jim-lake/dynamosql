@@ -1,8 +1,9 @@
 import * as Expression from './expression';
 import { logger } from '@dynamosql/shared';
 import { SQLError } from '../error';
+import type { HandlerParams } from './handler_types';
 
-export function query(params: any): void {
+export function query(params: HandlerParams): void {
   const { ast, session } = params;
 
   const expr = ast?.expr;

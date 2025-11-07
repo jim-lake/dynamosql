@@ -5,8 +5,9 @@ import { resolveReferences } from './helpers/column_ref_helper';
 import { runSelect } from './helpers/select_modify';
 import { logger } from '@dynamosql/shared';
 import { SQLError, NoSingleOperationError } from '../error';
+import type { HandlerParams, MutationResult } from './handler_types';
 
-export async function query(params: any): Promise<any> {
+export async function query(params: HandlerParams): Promise<MutationResult> {
   const { ast, session } = params;
   const current_database = session.getCurrentDatabase();
   const resolve_err = resolveReferences(ast, current_database);
@@ -23,7 +24,7 @@ export async function query(params: any): Promise<any> {
   return await TransactionManager.run(opts);
 }
 
-async function _runDelete(params: any): Promise<any> {
+async function _runDelete(params: HandlerParams): Promise<MutationResult> {
   const { ast, session, dynamodb } = params;
   const database = ast.from?.[0]?.db;
   const table = ast.from?.[0]?.table;
@@ -45,7 +46,7 @@ async function _runDelete(params: any): Promise<any> {
   }
 }
 
-async function _multipleDelete(params: any): Promise<any> {
+async function _multipleDelete(params: HandlerParams): Promise<MutationResult> {
   const { dynamodb, session, ast } = params;
   let affectedRows = 0;
 

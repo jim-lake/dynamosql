@@ -1,8 +1,11 @@
 import * as SchemaManager from './schema_manager';
 import * as TransactionManager from './transaction_manager';
 import { SQLError } from '../error';
+import type { HandlerParams, MutationResult } from './handler_types';
 
-export async function query(params: any): Promise<any> {
+export async function query(
+  params: HandlerParams
+): Promise<MutationResult | Record<string, never>> {
   const { ast, dynamodb, session } = params;
   const database = ast.table?.[0]?.db || session.getCurrentDatabase();
   const table = ast.table?.[0]?.table;
@@ -18,7 +21,9 @@ export async function query(params: any): Promise<any> {
   }
 }
 
-async function _runAlterTable(params: any): Promise<any> {
+async function _runAlterTable(
+  params: HandlerParams & { engine: any }
+): Promise<Record<string, never>> {
   const { ast, dynamodb, engine, session } = params;
   const table = ast.table?.[0]?.table;
   const column_list: any[] = [];

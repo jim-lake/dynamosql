@@ -18,6 +18,11 @@ import { SQLError } from './error';
 import type { Readable, ReadableOptions } from 'node:stream';
 import type { Session } from './session';
 import type { FieldInfo, OkPacket, QueryOptions, TypeCast } from './types';
+import type {
+  MutationResult,
+  SelectResult,
+  ShowResult,
+} from './lib/handler_types';
 
 const g_parser = new Parser();
 
@@ -33,6 +38,15 @@ const DEFAULT_RESULT: OkPacket = {
 export interface QueryConstructorParams extends QueryOptions {
   session: Session;
 }
+
+type HandlerResult =
+  | MutationResult
+  | SelectResult
+  | ShowResult
+  | Record<string, never>
+  | void
+  | undefined;
+
 export class Query extends EventEmitter {
   private _session: Session;
 
@@ -78,7 +92,7 @@ export class Query extends EventEmitter {
       throw new SQLError('multiple_statements_disabled', this.sql);
     }
 
-    const result_list: any[] = [];
+    const result_list: unknown[] = [];
     const schema_list: FieldInfo[][] = [];
     try {
       for (let n = 0; n < list.length; n++) {
@@ -104,78 +118,57 @@ export class Query extends EventEmitter {
     }
   }
 
-  private async _singleQuery(ast: any): Promise<{ result: any; columns: any }> {
-    let handler: any;
+  private async _singleQuery(
+    ast: any
+  ): Promise<{
+    result: HandlerResult | any[] | OkPacket;
+    columns: FieldInfo[];
+  }> {
+    const params = {
+      ast,
+      dynamodb: this._session.dynamodb,
+      session: this._session,
+    };
 
     switch (ast?.type) {
       case 'alter':
-        handler = AlterHandler.query;
-        break;
+        return { result: await AlterHandler.query(params), columns: [] };
       case 'create':
-        handler = CreateHandler.query;
-        break;
+        return { result: await CreateHandler.query(params), columns: [] };
       case 'delete':
-        handler = DeleteHandler.query;
-        break;
+        return { result: await DeleteHandler.query(params), columns: [] };
       case 'drop':
-        handler = DropHandler.query;
-        break;
+        return { result: await DropHandler.query(params), columns: [] };
       case 'insert':
       case 'replace':
-        handler = InsertHandler.query;
-        break;
-      case 'show':
-        handler = ShowHandler.query;
-        break;
-      case 'select':
-        handler = SelectHandler.query;
-        break;
+        return { result: await InsertHandler.query(params), columns: [] };
+      case 'show': {
+        const { rows, columns } = await ShowHandler.query(params);
+        return { result: rows, columns };
+      }
+      case 'select': {
+        const { output_row_list, column_list } =
+          await SelectHandler.query(params);
+        return { result: output_row_list, columns: column_list };
+      }
       case 'set':
-        handler = SetHandler.query;
-        break;
+        SetHandler.query(params);
+        return { result: undefined, columns: [] };
       case 'update':
-        handler = UpdateHandler.query;
-        break;
+        return { result: await UpdateHandler.query(params), columns: [] };
       case 'use':
         return await _useDatabase({ ast, session: this._session });
       default:
         logger.error('unsupported statement type:', ast);
         throw new SQLError({ err: 'unsupported_type', args: [ast?.type] });
     }
-
-    if (!handler) {
-      throw new SQLError('unsupported_type');
-    }
-
-    const result = await handler({
-      ast,
-      dynamodb: this._session.dynamodb,
-      session: this._session,
-    });
-
-    // Handle different return types from handlers
-    if (result && typeof result === 'object') {
-      if ('rows' in result && 'columns' in result) {
-        // show handler
-        return { result: result.rows, columns: result.columns };
-      } else if ('output_row_list' in result && 'column_list' in result) {
-        // select handler
-        return { result: result.output_row_list, columns: result.column_list };
-      } else {
-        // mutation handlers (insert, update, delete, etc.)
-        return { result, columns: undefined };
-      }
-    }
-
-    // set handler returns void, drop handler may return undefined
-    return { result: undefined, columns: undefined };
   }
 
-  private _transformResult(list: any, columns: any) {
+  private _transformResult(list: any, columns: FieldInfo[]): void {
     if (this._session.resultObjects && Array.isArray(list)) {
       list.forEach((result: any, i: number) => {
         const obj: any = {};
-        columns.forEach((column: any, j: number) => {
+        columns.forEach((column: FieldInfo, j: number) => {
           const value = this._convertCell(result[j], column);
           if (this.nestedTables === false) {
             obj[column.name] = value;
@@ -192,9 +185,9 @@ export class Query extends EventEmitter {
       });
     }
   }
-  private _convertCell(value: any, column: any) {
+  private _convertCell(value: any, column: FieldInfo): any {
     if (typeof this.typeCast === 'function') {
-      return this.typeCast(column, () =>
+      return this.typeCast(column as any, () =>
         typeCast(value, column, this._session.typeCastOptions)
       );
     }
@@ -204,7 +197,7 @@ export class Query extends EventEmitter {
   }
 }
 
-function _astify(sql: string) {
+function _astify(sql: string): { err: any; list: any[] } {
   let err: any;
   let list: any[] = [];
   try {
@@ -221,9 +214,11 @@ function _astify(sql: string) {
   }
   return { err, list };
 }
-async function _useDatabase(
-  params: any
-): Promise<{ result: any; columns: any }> {
+
+async function _useDatabase(params: {
+  ast: any;
+  session: Session;
+}): Promise<{ result: undefined; columns: FieldInfo[] }> {
   params.session.setCurrentDatabase(params.ast.db);
-  return { result: undefined, columns: undefined };
+  return { result: undefined, columns: [] };
 }

@@ -3,8 +3,11 @@ import * as SchemaManager from './schema_manager';
 import { trackFirstSeen } from '../tools/util';
 import { logger } from '@dynamosql/shared';
 import { SQLError } from '../error';
+import type { HandlerParams, MutationResult } from './handler_types';
 
-export async function query(params: any): Promise<any> {
+export async function query(
+  params: HandlerParams
+): Promise<MutationResult | undefined> {
   const { ast, session } = params;
   const database = ast.table?.[0]?.db || session.getCurrentDatabase();
 
@@ -20,7 +23,9 @@ export async function query(params: any): Promise<any> {
   }
 }
 
-async function _createDatabase(params: any): Promise<any> {
+async function _createDatabase(
+  params: HandlerParams
+): Promise<MutationResult | undefined> {
   const { ast } = params;
   try {
     SchemaManager.createDatabase(ast.database);
@@ -35,7 +40,9 @@ async function _createDatabase(params: any): Promise<any> {
   }
 }
 
-async function _createTable(params: any): Promise<any> {
+async function _createTable(
+  params: HandlerParams
+): Promise<MutationResult | undefined> {
   const { ast, session, dynamodb } = params;
   const database = ast.table?.[0]?.db || session.getCurrentDatabase();
   const table = ast.table?.[0]?.table;
@@ -62,7 +69,7 @@ async function _createTable(params: any): Promise<any> {
   });
 
   let list: any;
-  let result: any;
+  let result: MutationResult | undefined;
 
   // Handle CREATE TABLE AS SELECT
   if (ast.as && ast.query_expr) {
