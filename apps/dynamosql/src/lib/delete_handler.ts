@@ -19,10 +19,7 @@ export async function query(params: any): Promise<any> {
     throw new SQLError('no_current_database');
   }
 
-  const opts = {
-    ...params,
-    func: _runDelete,
-  };
+  const opts = { ...params, func: _runDelete };
   return await TransactionManager.run(opts);
 }
 
@@ -33,11 +30,7 @@ async function _runDelete(params: any): Promise<any> {
   const engine = SchemaManager.getEngine(database, table, session);
 
   if (ast.from.length === 1) {
-    const opts = {
-      dynamodb,
-      session,
-      ast,
-    };
+    const opts = { dynamodb, session, ast };
     try {
       const result = await engine.singleDelete(opts);
       return { affectedRows: result.affectedRows, changedRows: 0 };
@@ -82,11 +75,7 @@ async function _multipleDelete(params: any): Promise<any> {
     const groups = makeEngineGroups(session, from_list);
     for (const group of groups) {
       const { engine, list } = group;
-      const opts = {
-        dynamodb,
-        session,
-        list,
-      };
+      const opts = { dynamodb, session, list };
       const result = await engine.multipleDelete(opts);
       affectedRows += result.affectedRows;
     }

@@ -28,12 +28,7 @@ export async function runSelect(params: any): Promise<any[]> {
   }
 
   // Run the select query
-  const opts = {
-    dynamodb,
-    session,
-    ast,
-    skip_resolve: true,
-  };
+  const opts = { dynamodb, session, ast, skip_resolve: true };
 
   const { row_list } = await SelectHandler.internalQuery(opts);
 
@@ -47,18 +42,12 @@ export async function runSelect(params: any): Promise<any[]> {
         _addCollection(collection, keys, row);
       }
     });
-    const result = {
-      key: from_key,
-      list: [],
-    };
+    const result = { key: from_key, list: [] };
     result_list.push(result);
     collection.forEach((value0: any, key0: any) => {
       if (key_list.length > 1) {
         value0.forEach((value1: any, key1: any) => {
-          result.list.push({
-            key: [key0, key1],
-            row: value1,
-          });
+          result.list.push({ key: [key0, key1], row: value1 });
         });
       } else {
         result.list.push({ key: [key0], row: value0 });

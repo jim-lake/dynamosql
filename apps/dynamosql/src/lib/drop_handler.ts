@@ -16,12 +16,7 @@ export async function query(params: any): Promise<any> {
       throw new SQLError('no_current_database');
     }
 
-    const opts = {
-      dynamodb,
-      session,
-      database,
-      table,
-    };
+    const opts = { dynamodb, session, database, table };
 
     try {
       await SchemaManager.dropTable(opts);
@@ -30,10 +25,7 @@ export async function query(params: any): Promise<any> {
       if (err?.message === 'resource_not_found' && ast.prefix === 'if exists') {
         return undefined;
       } else if (err?.message === 'resource_not_found') {
-        throw new SQLError({
-          err: 'ER_BAD_TABLE_ERROR',
-          args: [table],
-        });
+        throw new SQLError({ err: 'ER_BAD_TABLE_ERROR', args: [table] });
       }
       throw err;
     }

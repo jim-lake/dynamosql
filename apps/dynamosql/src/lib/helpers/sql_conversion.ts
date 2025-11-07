@@ -292,10 +292,7 @@ function _partsToTime(
   const time = Date.parse(iso);
   let ret;
   if (!isNaN(time)) {
-    ret = {
-      time: time / 1000,
-      fraction,
-    };
+    ret = { time: time / 1000, fraction };
   }
   return ret;
 }

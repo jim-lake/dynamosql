@@ -132,10 +132,7 @@ export function createSQLDateTime(
     if (arg.getType() === type && arg.getDecimals() === decimals) {
       ret = arg;
     } else {
-      const opts = {
-        time: arg.getTime(),
-        fraction: arg.getFraction(),
-      };
+      const opts = { time: arg.getTime(), fraction: arg.getFraction() };
       ret = new SQLDateTime(
         opts,
         type ?? arg.getType(),

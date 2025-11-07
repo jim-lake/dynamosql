@@ -12,7 +12,7 @@ addUnitTest('empty query', async (mod, config) => {
   const conn = mod.createConnection(config);
   let err;
   try {
-    const result = await promisify(conn.query.bind(conn))('', []);
+    await promisify(conn.query.bind(conn))('', []);
   } catch (e) {
     err = e;
   } finally {
@@ -23,9 +23,9 @@ addUnitTest('empty query', async (mod, config) => {
 
 addUnitTest('empty query object', async (mod, config) => {
   const conn = mod.createConnection(config);
-  let err;
   try {
     const q = conn.query('', []);
+    expect(q).to.not.be.undefined;
   } finally {
     conn.destroy();
   }

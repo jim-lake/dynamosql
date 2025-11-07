@@ -78,7 +78,7 @@ export interface QueryOptions {
 export type QueryCallback = (
   err: MysqlError | null,
   results?: any,
-  fields?: FieldInfo[]
+  fields?: FieldInfo[] | FieldInfo[][]
 ) => void;
 export interface Query {
   sql: string;

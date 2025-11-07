@@ -77,10 +77,7 @@ async function _runInsert(params: any): Promise<any> {
         });
         list.push(obj);
       } else {
-        throw new SQLError({
-          err: 'ER_WRONG_VALUE_COUNT_ON_ROW',
-          args: [i],
-        });
+        throw new SQLError({ err: 'ER_WRONG_VALUE_COUNT_ON_ROW', args: [i] });
       }
     });
   } else {
@@ -124,10 +121,7 @@ function _checkAst(ast: any) {
   let err: any;
   if (ast.values?.type === 'select') {
     if (ast.columns?.length !== ast.values.columns?.length) {
-      err = {
-        err: 'ER_WRONG_VALUE_COUNT_ON_ROW',
-        args: [1],
-      };
+      err = { err: 'ER_WRONG_VALUE_COUNT_ON_ROW', args: [1] };
     }
   }
   return err;

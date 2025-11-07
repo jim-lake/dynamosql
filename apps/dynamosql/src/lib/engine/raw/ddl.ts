@@ -46,12 +46,7 @@ export async function getTableInfo(
     return { name: key.AttributeName, type };
   });
 
-  return {
-    table,
-    primary_key,
-    column_list,
-    is_open: true,
-  };
+  return { table, primary_key, column_list, is_open: true };
 }
 
 export async function getTableList(params: TableListParams): Promise<string[]> {

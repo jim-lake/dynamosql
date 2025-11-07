@@ -23,10 +23,7 @@ export async function query(params: any): Promise<any> {
     throw new SQLError('no_current_database');
   }
 
-  const opts = {
-    ...params,
-    func: _runUpdate,
-  };
+  const opts = { ...params, func: _runUpdate };
   return await TransactionManager.run(opts);
 }
 
@@ -37,11 +34,7 @@ async function _runUpdate(params: any): Promise<any> {
   const engine = SchemaManager.getEngine(database, table, session);
 
   if (ast.from.length === 1) {
-    const opts = {
-      dynamodb,
-      session,
-      ast,
-    };
+    const opts = { dynamodb, session, ast };
     try {
       return await engine.singleUpdate(opts);
     } catch (err) {
@@ -80,10 +73,7 @@ async function _multipleUpdate(params: any): Promise<any> {
           if (expr_result.err) {
             throw new SQLError(expr_result.err);
           }
-          return {
-            column: set_item.column,
-            value: expr_result,
-          };
+          return { column: set_item.column, value: expr_result };
         });
       if (set_list.length > 0) {
         object._updateList.push({ key, set_list });
@@ -105,11 +95,7 @@ async function _multipleUpdate(params: any): Promise<any> {
     const groups = makeEngineGroups(session, from_list);
     for (const group of groups) {
       const { engine, list } = group;
-      const opts = {
-        dynamodb,
-        session,
-        list,
-      };
+      const opts = { dynamodb, session, list };
       const result = await engine.multipleUpdate(opts);
       affectedRows += result.affectedRows;
       changedRows += result.changedRows;

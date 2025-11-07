@@ -107,7 +107,9 @@ export interface Engine {
   deleteIndex(params: IndexParams): Promise<void>;
   addColumn(params: AddColumnParams): Promise<void>;
   getTableInfo(params: TableInfoParams): Promise<TableInfo>;
-  getRowList(params: RowListParams): Promise<{
+  getRowList(
+    params: RowListParams
+  ): Promise<{
     source_map: Record<string, any[]>;
     column_map: Record<string, string[]>;
   }>;

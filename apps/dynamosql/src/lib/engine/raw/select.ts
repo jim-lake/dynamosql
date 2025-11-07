@@ -4,7 +4,9 @@ import { escapeIdentifier } from '../../../tools/dynamodb_helper';
 import { SQLError } from '../../../error';
 import type { RowListParams } from '../index';
 
-export async function getRowList(params: RowListParams): Promise<{
+export async function getRowList(
+  params: RowListParams
+): Promise<{
   source_map: Record<string, any[]>;
   column_map: Record<string, string[]>;
 }> {

@@ -9,9 +9,7 @@ if (!sql) {
 }
 console.log('sql:', sql);
 
-const opts = {
-  multipleStatements: true,
-};
+const opts = { multipleStatements: true };
 if (config.region) {
   opts.region = config.region;
 }

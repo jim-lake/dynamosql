@@ -43,12 +43,7 @@ export async function internalQuery(
     const db = ast.from?.[0]?.db;
     const table = ast.from?.[0]?.table;
     const engine = SchemaManager.getEngine(db, table, session);
-    const opts = {
-      session,
-      dynamodb,
-      list: ast.from,
-      where: ast.where,
-    };
+    const opts = { session, dynamodb, list: ast.from, where: ast.where };
     const result = await engine.getRowList(opts);
     source_map = result.source_map;
     column_map = result.column_map;

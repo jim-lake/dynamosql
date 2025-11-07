@@ -112,11 +112,7 @@ export const CLIENT_COMMAND_MAP = {
   30: 'BINLOG_DUMP_GTID',
   255: 'UNKNOWN',
 };
-export const SERVER_COMMAND_MAP = {
-  0: 'OK',
-  254: 'EOF',
-  255: 'ERROR',
-};
+export const SERVER_COMMAND_MAP = { 0: 'OK', 254: 'EOF', 255: 'ERROR' };
 
 export const FIELD_FLAGS = {
   NOT_NULL: 1,

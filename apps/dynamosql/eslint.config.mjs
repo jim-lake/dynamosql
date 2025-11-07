@@ -46,9 +46,8 @@ export default tseslint.config(
         afterEach: 'readonly',
       },
     },
-    linterOptions: {
-      reportUnusedDisableDirectives: 'warn',
-    },
+    linterOptions: { reportUnusedDisableDirectives: 'warn' },
+    rules: { '@typescript-eslint/no-unused-expressions': 0 },
   },
   {
     ignores: [

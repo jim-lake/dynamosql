@@ -30,10 +30,7 @@ const ERROR_MAP: Record<string, ErrorMapEntry> = {
     code: 'ER_DUP_ENTRY',
     sqlMessage: errStr`Duplicate entry for table '${0}' and item '${1}'`,
   },
-  dup: {
-    code: 'ER_DUP_ENTRY',
-    sqlMessage: 'Duplicate entry',
-  },
+  dup: { code: 'ER_DUP_ENTRY', sqlMessage: 'Duplicate entry' },
   dup_primary_key_entry: {
     code: 'ER_DUP_ENTRY',
     sqlMessage: errStr`Duplicate entry for value '${1}' for '${0}'`,
@@ -46,19 +43,13 @@ const ERROR_MAP: Record<string, ErrorMapEntry> = {
     code: 'ER_PARSE_ERROR',
     sqlMessage: errStr`You have an error in your SQL syntax; check your syntax near ${0}`,
   },
-  ER_EMPTY_QUERY: {
-    code: 'ER_EMPTY_QUERY',
-    sqlMessage: 'Query was empty',
-  },
+  ER_EMPTY_QUERY: { code: 'ER_EMPTY_QUERY', sqlMessage: 'Query was empty' },
   multiple_statements_disabled: {
     code: 'ER_PARSE_ERROR',
     sqlMessage:
       'Multiple statements are disabled.  See the "multipleStatements" session option.',
   },
-  unsupported: {
-    code: 'ER_NO',
-    sqlMessage: 'Unsupport sql feature.',
-  },
+  unsupported: { code: 'ER_NO', sqlMessage: 'Unsupport sql feature.' },
   unsupported_type: {
     code: 'ER_NO',
     sqlMessage: errStr`Unsupported query type: ${0}`,
@@ -111,9 +102,7 @@ const ERROR_MAP: Record<string, ErrorMapEntry> = {
     code: 'ER_WRONG_VALUE_COUNT_ON_ROW',
     sqlMessage: errStr`Column count doesn't match value count at row ${0}`,
   },
-  ER_BAD_NULL_ERROR: {
-    code: 'ER_BAD_NULL_ERROR',
-  },
+  ER_BAD_NULL_ERROR: { code: 'ER_BAD_NULL_ERROR' },
   ER_TRUNCATED_WRONG_VALUE_FOR_FIELD: {
     code: 'ER_TRUNCATED_WRONG_VALUE_FOR_FIELD',
   },

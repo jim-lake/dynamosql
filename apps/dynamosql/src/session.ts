@@ -1,5 +1,4 @@
 import { EventEmitter } from 'node:events';
-import { logger } from '@dynamosql/shared';
 import * as SqlString from 'sqlstring';
 
 import * as DynamoDB from './lib/dynamodb';
@@ -11,23 +10,11 @@ import type {
   TypeCast,
   PoolConnection,
   MysqlError,
-  FieldInfo,
   QueryOptions,
   QueryCallback,
-  OkPacket,
   Query as MysqlQuery,
 } from './types';
 
-const DEFAULT_RESULT: OkPacket = {
-  fieldCount: 0,
-  affectedRows: 0,
-  insertId: 0,
-  message: '',
-  changedRows: 0,
-  protocol41: true,
-};
-
-const parser = new Parser();
 let g_threadId = 1;
 
 export class Session extends EventEmitter implements PoolConnection {
@@ -173,8 +160,8 @@ export class Session extends EventEmitter implements PoolConnection {
 
   private async _run(query: Query, done?: QueryCallback) {
     try {
-      const result = await query.run();
-      done?.(null, ...result);
+      const [results, fields] = await query.run();
+      done?.(null, results, fields);
     } catch (e) {
       done?.(e);
     }

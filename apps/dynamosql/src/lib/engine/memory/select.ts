@@ -2,7 +2,9 @@ import * as Storage from './storage';
 import type { RowListParams } from '../index';
 import { SQLError } from '../../../error';
 
-export async function getRowList(params: RowListParams): Promise<{
+export async function getRowList(
+  params: RowListParams
+): Promise<{
   source_map: Record<string, any[]>;
   column_map: Record<string, string[]>;
 }> {

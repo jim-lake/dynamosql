@@ -9,13 +9,7 @@ export async function query(params: any): Promise<any> {
   const engine = SchemaManager.getEngine(database, table, session);
 
   if (ast.table && database) {
-    const opts = {
-      dynamodb,
-      ast,
-      engine,
-      session,
-      func: _runAlterTable,
-    };
+    const opts = { dynamodb, ast, engine, session, func: _runAlterTable };
     return await TransactionManager.run(opts);
   } else if (ast.table) {
     throw new SQLError('no_current_database');
@@ -35,19 +29,8 @@ async function _runAlterTable(params: any): Promise<any> {
       const column_name = def.column?.column;
       const type = def.definition?.dataType;
       const length = def.definition?.length;
-      column_list.push({
-        name: column_name,
-        type,
-        length,
-      });
-      const opts = {
-        dynamodb,
-        session,
-        table,
-        column_name,
-        type,
-        length,
-      };
+      column_list.push({ name: column_name, type, length });
+      const opts = { dynamodb, session, table, column_name, type, length };
       await engine.addColumn(opts);
     }
   }
@@ -88,20 +71,12 @@ async function _runAlterTable(params: any): Promise<any> {
         await engine.createIndex(opts);
       } catch (err: any) {
         if (err?.message === 'index_exists') {
-          throw new SQLError({
-            err: 'ER_DUP_KEYNAME',
-            args: [def.index],
-          });
+          throw new SQLError({ err: 'ER_DUP_KEYNAME', args: [def.index] });
         }
         throw err;
       }
     } else if (def.resource === 'index' && def.action === 'drop') {
-      const opts = {
-        dynamodb,
-        session,
-        table,
-        index_name: def.index,
-      };
+      const opts = { dynamodb, session, table, index_name: def.index };
 
       try {
         await engine.deleteIndex(opts);

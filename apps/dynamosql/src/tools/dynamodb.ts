@@ -66,10 +66,7 @@ interface DeleteItemsParams {
 interface UpdateItemsParams {
   table: string;
   key_list: string[];
-  list: Array<{
-    set_list: Array<{ column: string; value: any }>;
-    key: any[];
-  }>;
+  list: Array<{ set_list: Array<{ column: string; value: any }>; key: any[] }>;
 }
 
 interface PutItemsParams {
@@ -301,10 +298,7 @@ export class DynamoDB {
               };
             });
           } else {
-            err_list[start] = {
-              err: convertError(err),
-              parent: err,
-            };
+            err_list[start] = { err: convertError(err), parent: err };
           }
           throw err;
         }
@@ -344,10 +338,7 @@ export class DynamoDB {
       AttributeType: dynamoType(column.type),
     }));
     const KeySchema: KeySchemaElement[] = [
-      {
-        AttributeName: primary_key?.[0]?.name,
-        KeyType: KeyType.HASH,
-      },
+      { AttributeName: primary_key?.[0]?.name, KeyType: KeyType.HASH },
     ];
     if (primary_key?.[1]) {
       KeySchema.push({
@@ -386,10 +377,7 @@ export class DynamoDB {
       AttributeType: dynamoType(item.type),
     }));
     const KeySchema: KeySchemaElement[] = [
-      {
-        AttributeName: key_list?.[0]?.name,
-        KeyType: KeyType.HASH,
-      },
+      { AttributeName: key_list?.[0]?.name, KeyType: KeyType.HASH },
     ];
     if (key_list?.[1]) {
       KeySchema.push({

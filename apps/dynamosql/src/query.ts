@@ -1,6 +1,5 @@
 import { EventEmitter } from 'node:events';
 import { logger } from '@dynamosql/shared';
-import * as SqlString from 'sqlstring';
 
 import { Parser } from './vendor/mysql_parser';
 import * as AlterHandler from './lib/alter_handler';
@@ -55,17 +54,19 @@ export class Query extends EventEmitter {
     throw new SQLError('NOT_IMPLEMENTED');
   }
 
-  async run() {
+  async run(): Promise<[unknown | unknown[], FieldInfo[] | FieldInfo[][]]> {
     try {
-      const [result_list, schema_list] = await this._run();
+      const result = await this._run();
       this.emit('end');
-      return [result_list, schema_list];
+      return result;
     } catch (e) {
       this.emit('error', e);
       throw e;
     }
   }
-  private async _run(): Promise<[unknown[], unknown[]]> {
+  private async _run(): Promise<
+    [unknown | unknown[], FieldInfo[] | FieldInfo[][]]
+  > {
     const { err: parse_err, list } = _astify(this.sql);
     if (parse_err) {
       throw new SQLError(parse_err, this.sql);
@@ -139,10 +140,7 @@ export class Query extends EventEmitter {
         return await _useDatabase({ ast, session: this._session });
       default:
         logger.error('unsupported statement type:', ast);
-        throw new SQLError({
-          err: 'unsupported_type',
-          args: [ast?.type],
-        });
+        throw new SQLError({ err: 'unsupported_type', args: [ast?.type] });
     }
 
     if (!handler) {
