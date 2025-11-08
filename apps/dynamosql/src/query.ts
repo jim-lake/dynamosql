@@ -1,7 +1,6 @@
 import { EventEmitter } from 'node:events';
 import { logger } from '@dynamosql/shared';
-
-import { Parser } from './vendor/mysql_parser';
+import { Parser } from 'node-sql-parser/build/mysql';
 import * as AlterHandler from './lib/alter_handler';
 import * as CreateHandler from './lib/create_handler';
 import * as DeleteHandler from './lib/delete_handler';
@@ -201,7 +200,7 @@ function _astify(sql: string): { err: any; list: any[] } {
   let err: any;
   let list: any[] = [];
   try {
-    const result = g_parser.astify(sql);
+    const result = g_parser.astify(sql, { database: 'MySQL' });
     if (Array.isArray(result)) {
       list = result;
     } else {

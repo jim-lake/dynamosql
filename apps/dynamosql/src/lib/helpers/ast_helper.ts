@@ -1,3 +1,25 @@
+// Helper to extract function name from node-sql-parser AST format
+export function getFunctionName(nameObj: any): string {
+  if (typeof nameObj === 'string') {
+    return nameObj;
+  }
+  if (nameObj?.name && Array.isArray(nameObj.name)) {
+    return nameObj.name.map((n: any) => n.value).join('.');
+  }
+  return String(nameObj);
+}
+
+// Helper to extract database name from node-sql-parser AST format
+export function getDatabaseName(dbObj: any): string {
+  if (typeof dbObj === 'string') {
+    return dbObj;
+  }
+  if (dbObj?.schema && Array.isArray(dbObj.schema)) {
+    return dbObj.schema[0]?.value || '';
+  }
+  return String(dbObj);
+}
+
 export function walkColumnRefs(object: any, cb: (obj: any) => void): void {
   if (object?.type === 'column_ref') {
     cb(object);

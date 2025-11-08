@@ -1,6 +1,7 @@
 import * as ConvertExpression from './convert_expression';
 import * as Functions from './functions';
 import { getValue } from '../../expression';
+import { getFunctionName } from '../ast_helper';
 
 export function convertWhere(expr: any, state: any): any {
   const { from_key } = state;
@@ -18,7 +19,8 @@ export function convertWhere(expr: any, state: any): any {
     } else if (type === 'bool') {
       value = expr.value;
     } else if (type === 'function') {
-      const func = Functions[expr.name.toLowerCase()];
+      const funcName = getFunctionName(expr.name);
+      const func = Functions[funcName.toLowerCase()];
       if (func) {
         const result = func(expr, state);
         if (result.err) {

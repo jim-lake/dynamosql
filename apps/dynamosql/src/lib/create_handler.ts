@@ -4,6 +4,7 @@ import { trackFirstSeen } from '../tools/util';
 import { logger } from '@dynamosql/shared';
 import { SQLError } from '../error';
 import type { HandlerParams, MutationResult } from './handler_types';
+import { getDatabaseName } from './helpers/ast_helper';
 
 export async function query(
   params: HandlerParams
@@ -28,7 +29,7 @@ async function _createDatabase(
 ): Promise<MutationResult | undefined> {
   const { ast } = params;
   try {
-    SchemaManager.createDatabase(ast.database);
+    SchemaManager.createDatabase(getDatabaseName(ast.database));
     return { affectedRows: 1, changedRows: 0 };
   } catch (err) {
     if (err === 'database_exists' && ast.if_not_exists) {

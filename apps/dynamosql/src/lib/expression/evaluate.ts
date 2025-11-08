@@ -6,6 +6,7 @@ import * as UnaryExpression from './unary_expression';
 import * as SystemVariables from '../system_variables';
 import { mapToObject } from '../../tools/dynamodb_helper';
 import { logger } from '@dynamosql/shared';
+import { getFunctionName } from '../helpers/ast_helper';
 
 export function getValue(expr: any, state: any): any {
   const { session, row } = state;
@@ -15,7 +16,8 @@ export function getValue(expr: any, state: any): any {
   if (!expr) {
     // no expression results in undefined
   } else if (type === 'number') {
-    result.value = expr.value;
+    result.value =
+      typeof expr.value === 'string' ? Number(expr.value) : expr.value;
   } else if (type === 'double_quote_string') {
     result.value = expr.value;
     result.name = `"${result.value}"`;
@@ -31,26 +33,28 @@ export function getValue(expr: any, state: any): any {
   } else if (type === 'interval') {
     result = Cast.interval(expr, state);
   } else if (type === 'function') {
-    const func = Functions[expr.name.toLowerCase()];
+    const funcName = getFunctionName(expr.name);
+    const func = Functions[funcName.toLowerCase()];
     if (func) {
       result = func(expr, state);
       if (!result.name) {
-        result.name = expr.name + '()';
+        result.name = funcName + '()';
       }
     } else {
-      logger.trace('expression.getValue: unknown function:', expr.name);
-      result.err = { err: 'ER_SP_DOES_NOT_EXIST', args: [expr.name] };
+      logger.trace('expression.getValue: unknown function:', funcName);
+      result.err = { err: 'ER_SP_DOES_NOT_EXIST', args: [funcName] };
     }
   } else if (type === 'aggr_func') {
-    const func = AggregateFunctions[expr.name.toLowerCase()];
+    const funcName = getFunctionName(expr.name);
+    const func = AggregateFunctions[funcName.toLowerCase()];
     if (func) {
       result = func(expr, state);
       if (!result.name) {
-        result.name = expr.name + '()';
+        result.name = funcName + '()';
       }
     } else {
-      logger.trace('expression.getValue: unknown aggregate:', expr.name);
-      result.err = { err: 'ER_SP_DOES_NOT_EXIST', args: [expr.name] };
+      logger.trace('expression.getValue: unknown aggregate:', funcName);
+      result.err = { err: 'ER_SP_DOES_NOT_EXIST', args: [funcName] };
     }
   } else if (type === 'binary_expr') {
     const func = BinaryExpression[expr.operator.toLowerCase()];
@@ -81,21 +85,17 @@ export function getValue(expr: any, state: any): any {
       result.err = { err: 'ER_SP_DOES_NOT_EXIST', args: [expr.operator] };
     }
   } else if (type === 'cast') {
-    const func = Cast[expr.target.dataType.toLowerCase()];
+    const target = Array.isArray(expr.target) ? expr.target[0] : expr.target;
+    const dataType = target?.dataType;
+    const func = Cast[dataType?.toLowerCase()];
     if (func) {
       result = func(expr, state);
       if (!result.name) {
-        result.name = `CAST(? AS ${expr.target.dataType})`;
+        result.name = `CAST(? AS ${dataType})`;
       }
     } else {
-      logger.trace(
-        'expression.getValue: unknown cast type:',
-        expr.target.dataType
-      );
-      result.err = {
-        err: 'ER_SP_DOES_NOT_EXIST',
-        args: [expr.target.dataType],
-      };
+      logger.trace('expression.getValue: unknown cast type:', dataType);
+      result.err = { err: 'ER_SP_DOES_NOT_EXIST', args: [dataType] };
     }
   } else if (type === 'var') {
     const { prefix } = expr;

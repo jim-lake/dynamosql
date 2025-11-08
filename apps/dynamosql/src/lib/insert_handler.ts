@@ -68,7 +68,9 @@ async function _runInsert(
     });
   } else if (ast.columns?.length > 0) {
     list = [];
-    ast.values?.forEach?.((row: any, i: number) => {
+    const values =
+      ast.values?.type === 'values' ? ast.values.values : ast.values;
+    values?.forEach?.((row: any, i: number) => {
       const obj: any = {};
       if (row.value.length === ast.columns.length) {
         ast.columns.forEach((name: string, j: number) => {

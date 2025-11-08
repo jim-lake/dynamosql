@@ -89,7 +89,7 @@ interface QueryOptions {
     nestTables?: boolean | string;
     typeCast?: TypeCast | undefined;
 }
-type QueryCallback = (err: MysqlError | null, results?: any, fields?: FieldInfo[]) => void;
+type QueryCallback = (err: MysqlError | null, results?: any, fields?: FieldInfo[] | FieldInfo[][]) => void;
 interface Query {
     sql: string;
     values?: string[] | undefined;

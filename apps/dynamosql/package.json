@@ -19,8 +19,8 @@
   },
   "dependencies": {
     "@aws-sdk/client-dynamodb": "^3.922.0",
-    "big-integer": "^1.6.52",
-    "sqlstring": "^2.3.3"
+    "node-sql-parser": "5.3.13",
+    "sqlstring": "2.3.3"
   },
   "devDependencies": {
     "@eslint/js": "^9.20.0",
