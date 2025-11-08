@@ -10,7 +10,7 @@ interface TableCacheEntry {
   result: DescribeTableCommandOutput;
 }
 
-class DynamoDBWithCache extends DynamoDB {
+export class DynamoDBWithCache extends DynamoDB {
   private _tableCache = new Map<string, TableCacheEntry>();
 
   async getTable(table_name: string): Promise<DescribeTableCommandOutput> {
