@@ -4,6 +4,8 @@ import {
   convertDateTime,
 } from '../helpers/sql_conversion';
 import { getValue } from './evaluate';
+import type { Binary, ExpressionValue } from 'node-sql-parser/types';
+import type { EvaluationState, EvaluationResult } from './evaluate';
 
 function _isDateOrTimeLike(type: string): boolean {
   return type === 'date' || type === 'datetime' || type === 'time';
@@ -14,11 +16,11 @@ function _isDateLike(type: string): boolean {
 }
 
 function _numBothSides(
-  expr: any,
-  state: any,
+  expr: Binary,
+  state: EvaluationState,
   op: string,
   allow_interval?: boolean
-): any {
+): EvaluationResult {
   const left = getValue(expr.left, state);
   const right = getValue(expr.right, state);
   let err = left.err || right.err;
@@ -68,7 +70,7 @@ function _numBothSides(
   return { err, name, value, left_num, right_num, interval, datetime };
 }
 
-function plus(expr: any, state: any): any {
+function plus(expr: Binary, state: EvaluationState): EvaluationResult {
   const result = _numBothSides(expr, state, ' + ', true);
   const { err, name, left_num, right_num, interval, datetime } = result;
   let value = result.value;
@@ -86,7 +88,7 @@ function plus(expr: any, state: any): any {
   return { err, value, type, name };
 }
 
-function minus(expr: any, state: any): any {
+function minus(expr: Binary, state: EvaluationState): EvaluationResult {
   const result = _numBothSides(expr, state, ' - ', true);
   const { err, name, left_num, right_num, interval, datetime } = result;
   let value = result.value;
@@ -104,7 +106,7 @@ function minus(expr: any, state: any): any {
   return { err, value, type, name };
 }
 
-function mul(expr: any, state: any): any {
+function mul(expr: Binary, state: EvaluationState): EvaluationResult {
   const result = _numBothSides(expr, state, ' * ');
   const { err, name, left_num, right_num } = result;
   let value = result.value;
@@ -114,7 +116,7 @@ function mul(expr: any, state: any): any {
   return { err, value, name };
 }
 
-function div(expr: any, state: any): any {
+function div(expr: Binary, state: EvaluationState): EvaluationResult {
   const result = _numBothSides(expr, state, ' / ');
   const { err, name, left_num, right_num } = result;
   let value = result.value;
@@ -129,7 +131,10 @@ export { minus as '-' };
 export { mul as '*' };
 export { div as '/' };
 
-function _convertCompare(left: any, right: any): void {
+function _convertCompare(
+  left: EvaluationResult,
+  right: EvaluationResult
+): void {
   if (
     left.value !== null &&
     right.value !== null &&
@@ -164,7 +169,11 @@ function _convertCompare(left: any, right: any): void {
   }
 }
 
-function _equal(expr: any, state: any, op: string): any {
+function _equal(
+  expr: Binary,
+  state: EvaluationState,
+  op: string
+): EvaluationResult {
   const left = getValue(expr.left, state);
   const right = getValue(expr.right, state);
   const err = left.err || right.err;
@@ -183,11 +192,11 @@ function _equal(expr: any, state: any, op: string): any {
   return { err, value, name };
 }
 
-function equal(expr: any, state: any): any {
+function equal(expr: Binary, state: EvaluationState): EvaluationResult {
   return _equal(expr, state, ' = ');
 }
 
-function notEqual(expr: any, state: any): any {
+function notEqual(expr: Binary, state: EvaluationState): EvaluationResult {
   const ret = _equal(expr, state, ' != ');
   if (ret.value !== null) {
     ret.value = ret.value ? 0 : 1;
@@ -200,12 +209,12 @@ export { notEqual as '!=' };
 export { notEqual as '<>' };
 
 function _gt(
-  expr_left: any,
-  expr_right: any,
-  state: any,
+  expr_left: ExpressionValue,
+  expr_right: ExpressionValue,
+  state: EvaluationState,
   op: string,
   flip: boolean
-): any {
+): EvaluationResult {
   const left = getValue(expr_left, state);
   const right = getValue(expr_right, state);
   const err = left.err || right.err;
@@ -226,11 +235,11 @@ function _gt(
   return { err, value, name };
 }
 
-function gt(expr: any, state: any): any {
+function gt(expr: Binary, state: EvaluationState): EvaluationResult {
   return _gt(expr.left, expr.right, state, ' > ', false);
 }
 
-function lt(expr: any, state: any): any {
+function lt(expr: Binary, state: EvaluationState): EvaluationResult {
   return _gt(expr.right, expr.left, state, ' < ', true);
 }
 
@@ -238,12 +247,12 @@ export { gt as '>' };
 export { lt as '<' };
 
 function _gte(
-  expr_left: any,
-  expr_right: any,
-  state: any,
+  expr_left: ExpressionValue,
+  expr_right: ExpressionValue,
+  state: EvaluationState,
   op: string,
   flip: boolean
-): any {
+): EvaluationResult {
   const left = getValue(expr_left, state);
   const right = getValue(expr_right, state);
   const err = left.err || right.err;
@@ -264,18 +273,18 @@ function _gte(
   return { err, value, name };
 }
 
-function gte(expr: any, state: any): any {
+function gte(expr: Binary, state: EvaluationState): EvaluationResult {
   return _gte(expr.left, expr.right, state, ' >= ', false);
 }
 
-function lte(expr: any, state: any): any {
+function lte(expr: Binary, state: EvaluationState): EvaluationResult {
   return _gte(expr.right, expr.left, state, ' <= ', true);
 }
 
 export { gte as '>=' };
 export { lte as '<=' };
 
-export function and(expr: any, state: any): any {
+export function and(expr: Binary, state: EvaluationState): EvaluationResult {
   const left = getValue(expr.left, state);
   let err = left.err;
   let name = left.name + ' AND ';
@@ -292,7 +301,7 @@ export function and(expr: any, state: any): any {
   return { err, value, name };
 }
 
-export function or(expr: any, state: any): any {
+export function or(expr: Binary, state: EvaluationState): EvaluationResult {
   const left = getValue(expr.left, state);
   let err = left.err;
   let name = left.name + ' OR ';
@@ -314,7 +323,7 @@ export function or(expr: any, state: any): any {
   return { err, value, name };
 }
 
-export function xor(expr: any, state: any): any {
+export function xor(expr: Binary, state: EvaluationState): EvaluationResult {
   const left = getValue(expr.left, state);
   const right = getValue(expr.right, state);
   const err = left.err || right.err;
@@ -332,11 +341,11 @@ export function xor(expr: any, state: any): any {
   return { err, value, name };
 }
 
-export function is(expr: any, state: any): any {
+export function is(expr: Binary, state: EvaluationState): EvaluationResult {
   return _is(expr, state, 'IS');
 }
 
-function isNot(expr: any, state: any): any {
+function isNot(expr: Binary, state: EvaluationState): EvaluationResult {
   const result = _is(expr, state, 'IS NOT');
   result.value = result.value ? 0 : 1;
   return result;
@@ -344,19 +353,35 @@ function isNot(expr: any, state: any): any {
 
 export { isNot as 'is not' };
 
-function _is(expr: any, state: any, op: string): any {
+function _is(
+  expr: Binary,
+  state: EvaluationState,
+  op: string
+): EvaluationResult {
   const result = getValue(expr.left, state);
+  const rightExpr = expr.right;
   let right;
   let right_name;
-  if (expr.right.value === null) {
-    right = null;
-    right_name = 'NULL';
-  } else if (expr.right.value === true) {
-    right = true;
-    right_name = 'TRUE';
-  } else if (expr.right.value === false) {
-    right = false;
-    right_name = 'FALSE';
+
+  // Type guard: check if rightExpr is a Value type
+  if (
+    typeof rightExpr === 'object' &&
+    rightExpr &&
+    'value' in rightExpr &&
+    !('type' in rightExpr && rightExpr.type === 'expr_list')
+  ) {
+    if (rightExpr.value === null) {
+      right = null;
+      right_name = 'NULL';
+    } else if (rightExpr.value === true) {
+      right = true;
+      right_name = 'TRUE';
+    } else if (rightExpr.value === false) {
+      right = false;
+      right_name = 'FALSE';
+    } else if (!result.err) {
+      result.err = { err: 'syntax_err', args: [op] };
+    }
   } else if (!result.err) {
     result.err = { err: 'syntax_err', args: [op] };
   }

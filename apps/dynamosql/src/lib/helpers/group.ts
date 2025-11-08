@@ -1,6 +1,20 @@
 import { getValue } from '../expression';
+import type { Session } from '../../session';
+import type { Select } from 'node-sql-parser/types';
 
-export function formGroup(params: any): any {
+interface FormGroupParams {
+  groupby: any;
+  ast: Select;
+  row_list: any[];
+  session: Session;
+}
+
+interface FormGroupResult {
+  err: any;
+  row_list: any[];
+}
+
+export function formGroup(params: FormGroupParams): FormGroupResult {
   const { groupby, ast, row_list, session } = params;
   let err;
   const output_list: any[] = [];

@@ -1,7 +1,18 @@
 import { getValue } from '../expression';
 import { SQLError } from '../../error';
+import type { OrderBy } from 'node-sql-parser/types';
+import type { Session } from '../../session';
 
-export function sort(row_list: any[], orderby: any[], state: any): any {
+interface SortState {
+  session: Session;
+  column_list?: any[];
+}
+
+export function sort(
+  row_list: any[],
+  orderby: OrderBy[],
+  state: SortState
+): any {
   try {
     row_list.sort(_sort.bind(null, orderby, state));
   } catch (e) {
@@ -10,7 +21,7 @@ export function sort(row_list: any[], orderby: any[], state: any): any {
   return null;
 }
 
-function _sort(orderby: any[], state: any, a: any, b: any): number {
+function _sort(orderby: OrderBy[], state: SortState, a: any, b: any): number {
   const order_length = orderby.length;
   for (let i = 0; i < order_length; i++) {
     const order = orderby[i];

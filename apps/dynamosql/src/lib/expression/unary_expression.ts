@@ -1,11 +1,18 @@
 import { getValue } from './evaluate';
 import { convertNum } from '../helpers/sql_conversion';
+import type { EvaluationState, EvaluationResult } from './evaluate';
 
-function plus(expr: any, state: any): any {
+interface UnaryExpr {
+  type: 'unary_expr';
+  operator: string;
+  expr: any;
+}
+
+function plus(expr: UnaryExpr, state: EvaluationState): EvaluationResult {
   return getValue(expr.expr, state);
 }
 
-function not(expr: any, state: any): any {
+function not(expr: UnaryExpr, state: EvaluationState): EvaluationResult {
   const result = getValue(expr.expr, state);
   result.name = 'NOT ' + result.name;
   result.type = 'number';
@@ -15,7 +22,7 @@ function not(expr: any, state: any): any {
   return result;
 }
 
-function minus(expr: any, state: any): any {
+function minus(expr: UnaryExpr, state: EvaluationState): EvaluationResult {
   const result = getValue(expr.expr, state);
   result.name = '-' + result.name;
   result.type = 'number';

@@ -7,10 +7,41 @@ import * as SystemVariables from '../system_variables';
 import { mapToObject } from '../../tools/dynamodb_helper';
 import { logger } from '@dynamosql/shared';
 import { getFunctionName } from '../helpers/ast_helper';
+import type {
+  Function,
+  AggrFunc,
+  Binary,
+  Interval,
+  ColumnRef,
+  Cast as CastType,
+} from 'node-sql-parser/types';
+import type { ExtendedExpressionValue, VarExpr, UnaryExpr } from '../ast_types';
+import type { Session } from '../../session';
 
-export function getValue(expr: any, state: any): any {
+export interface EvaluationState {
+  session: Session;
+  row?: any;
+}
+
+export interface EvaluationResult {
+  err: any;
+  value: any;
+  name?: string;
+  type?: string;
+  sleep_ms?: number;
+  [key: string]: any;
+}
+
+export function getValue(
+  expr: ExtendedExpressionValue,
+  state: EvaluationState
+): EvaluationResult {
   const { session, row } = state;
-  let result: any = { err: null, value: undefined, name: undefined };
+  let result: EvaluationResult = {
+    err: null,
+    value: undefined,
+    name: undefined,
+  };
 
   const type = expr?.type;
   if (!expr) {
@@ -31,12 +62,13 @@ export function getValue(expr: any, state: any): any {
     result.name = 'x' + expr.value.slice(0, 10);
     result.type = 'buffer';
   } else if (type === 'interval') {
-    result = Cast.interval(expr, state);
+    result = Cast.interval(expr as Interval, state);
   } else if (type === 'function') {
-    const funcName = getFunctionName(expr.name);
+    const funcExpr = expr as Function;
+    const funcName = getFunctionName(funcExpr.name);
     const func = Functions[funcName.toLowerCase()];
     if (func) {
-      result = func(expr, state);
+      result = func(funcExpr, state);
       if (!result.name) {
         result.name = funcName + '()';
       }
@@ -45,10 +77,11 @@ export function getValue(expr: any, state: any): any {
       result.err = { err: 'ER_SP_DOES_NOT_EXIST', args: [funcName] };
     }
   } else if (type === 'aggr_func') {
-    const funcName = getFunctionName(expr.name);
+    const aggrExpr = expr as AggrFunc;
+    const funcName = getFunctionName(aggrExpr.name);
     const func = AggregateFunctions[funcName.toLowerCase()];
     if (func) {
-      result = func(expr, state);
+      result = func(aggrExpr, state);
       if (!result.name) {
         result.name = funcName + '()';
       }
@@ -57,39 +90,44 @@ export function getValue(expr: any, state: any): any {
       result.err = { err: 'ER_SP_DOES_NOT_EXIST', args: [funcName] };
     }
   } else if (type === 'binary_expr') {
-    const func = BinaryExpression[expr.operator.toLowerCase()];
+    const binExpr = expr as Binary;
+    const func = BinaryExpression[binExpr.operator.toLowerCase()];
     if (func) {
-      result = func(expr, state);
+      result = func(binExpr, state);
       if (!result.name) {
-        result.name = expr.operator;
+        result.name = binExpr.operator;
       }
     } else {
       logger.trace(
         'expression.getValue: unknown binary operator:',
-        expr.operator
+        binExpr.operator
       );
-      result.err = { err: 'ER_SP_DOES_NOT_EXIST', args: [expr.operator] };
+      result.err = { err: 'ER_SP_DOES_NOT_EXIST', args: [binExpr.operator] };
     }
   } else if (type === 'unary_expr') {
-    const func = UnaryExpression[expr.operator.toLowerCase()];
+    const unaryExpr = expr as UnaryExpr;
+    const func = UnaryExpression[unaryExpr.operator.toLowerCase()];
     if (func) {
-      result = func(expr, state);
+      result = func(unaryExpr, state);
       if (!result.name) {
-        result.name = expr.operator;
+        result.name = unaryExpr.operator;
       }
     } else {
       logger.trace(
         'expression.getValue: unknown unanary operator:',
-        expr.operator
+        unaryExpr.operator
       );
-      result.err = { err: 'ER_SP_DOES_NOT_EXIST', args: [expr.operator] };
+      result.err = { err: 'ER_SP_DOES_NOT_EXIST', args: [unaryExpr.operator] };
     }
   } else if (type === 'cast') {
-    const target = Array.isArray(expr.target) ? expr.target[0] : expr.target;
+    const castExpr = expr as CastType;
+    const target = Array.isArray(castExpr.target)
+      ? castExpr.target[0]
+      : castExpr.target;
     const dataType = target?.dataType;
     const func = Cast[dataType?.toLowerCase()];
     if (func) {
-      result = func(expr, state);
+      result = func(castExpr, state);
       if (!result.name) {
         result.name = `CAST(? AS ${dataType})`;
       }
@@ -98,38 +136,46 @@ export function getValue(expr: any, state: any): any {
       result.err = { err: 'ER_SP_DOES_NOT_EXIST', args: [dataType] };
     }
   } else if (type === 'var') {
-    const { prefix } = expr;
+    const varExpr = expr as VarExpr;
+    const { prefix } = varExpr;
     if (prefix === '@@') {
-      const func = SystemVariables[expr.name.toLowerCase()];
+      const func = SystemVariables[varExpr.name.toLowerCase()];
       if (func) {
         result.value = func(session);
       } else {
         logger.trace(
           'expression.getValue: unknown system variable:',
-          expr.name
+          varExpr.name
         );
-        result.err = { err: 'ER_UNKNOWN_SYSTEM_VARIABLE', args: [expr.name] };
+        result.err = {
+          err: 'ER_UNKNOWN_SYSTEM_VARIABLE',
+          args: [varExpr.name],
+        };
       }
     } else if (prefix === '@') {
-      result.value = session.getVariable(expr.name) ?? null;
+      result.value = session.getVariable(varExpr.name) ?? null;
     } else {
       result.err = 'unsupported';
     }
-    result.name = prefix + expr.name;
+    result.name = prefix + varExpr.name;
   } else if (type === 'column_ref') {
-    result.name = expr.column;
-    if (row && expr._resultIndex >= 0) {
-      const output_result = row['@@result']?.[expr._resultIndex];
+    const colRef = expr as ColumnRef;
+    const colRefItem =
+      colRef.type === 'column_ref' ? colRef : (colRef as any).expr;
+    result.name = colRefItem.column as string;
+    if (row && (colRefItem as any)._resultIndex >= 0) {
+      const output_result = row['@@result']?.[(colRefItem as any)._resultIndex];
       result.value = output_result?.value;
       result.type = output_result?.type;
     } else if (row) {
-      const cell = row[expr.from?.key]?.[expr.column];
+      const cell =
+        row[(colRefItem as any).from?.key]?.[colRefItem.column as string];
       const decode = _decodeCell(cell);
       result.type = decode?.type;
       result.value = decode?.value;
     } else {
       result.err = 'no_row_list';
-      result.value = expr.column;
+      result.value = colRefItem.column;
     }
   } else {
     logger.error('unsupported expr:', expr);
@@ -145,7 +191,7 @@ export function getValue(expr: any, state: any): any {
   return result;
 }
 
-function _decodeCell(cell: any): any {
+function _decodeCell(cell: any): { type: string; value: any } {
   let type;
   let value;
   if (!cell || cell.NULL) {

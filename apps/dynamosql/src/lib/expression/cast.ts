@@ -5,13 +5,17 @@ import {
 } from '../helpers/sql_conversion';
 import { createSQLInterval } from '../types/sql_interval';
 import { getValue } from './evaluate';
+import type { Cast, Interval } from 'node-sql-parser/types';
+import type { EvaluationState, EvaluationResult } from './evaluate';
 
-export function datetime(expr: any, state: any): any {
+export function datetime(expr: Cast, state: EvaluationState): EvaluationResult {
   const result = getValue(expr.expr, state);
   result.name = `CAST(${result.name} AS DATETIME)`;
   result.type = 'datetime';
   if (!result.err && result.value !== null) {
-    const target = Array.isArray(expr.target) ? expr.target[0] : expr.target;
+    const target: any = Array.isArray(expr.target)
+      ? expr.target[0]
+      : expr.target;
     const decimals = target?.length || 0;
     if (decimals > 6) {
       result.err = 'ER_TOO_BIG_PRECISION';
@@ -21,7 +25,7 @@ export function datetime(expr: any, state: any): any {
   return result;
 }
 
-export function date(expr: any, state: any): any {
+export function date(expr: Cast, state: EvaluationState): EvaluationResult {
   const result = getValue(expr.expr, state);
   result.name = `CAST(${result.name} AS DATE)`;
   result.type = 'date';
@@ -31,12 +35,14 @@ export function date(expr: any, state: any): any {
   return result;
 }
 
-export function time(expr: any, state: any): any {
+export function time(expr: Cast, state: EvaluationState): EvaluationResult {
   const result = getValue(expr.expr, state);
   result.name = `CAST(${result.name} AS TIME)`;
   result.type = 'time';
   if (!result.err && result.value !== null) {
-    const target = Array.isArray(expr.target) ? expr.target[0] : expr.target;
+    const target: any = Array.isArray(expr.target)
+      ? expr.target[0]
+      : expr.target;
     const decimals = target?.length || 0;
     if (decimals > 6) {
       result.err = 'ER_TOO_BIG_PRECISION';
@@ -46,7 +52,10 @@ export function time(expr: any, state: any): any {
   return result;
 }
 
-export function interval(expr: any, state: any): any {
+export function interval(
+  expr: Interval,
+  state: EvaluationState
+): EvaluationResult {
   const result = getValue(expr.expr, state);
   result.name = `INTERVAL ${result.name} ${expr.unit}`;
   result.type = 'interval';
@@ -56,7 +65,7 @@ export function interval(expr: any, state: any): any {
   return result;
 }
 
-export function signed(expr: any, state: any): any {
+export function signed(expr: Cast, state: EvaluationState): EvaluationResult {
   const result = getValue(expr.expr, state);
   result.name = `CAST(${result.name} AS SIGNED)`;
   result.type = 'bigint';
@@ -66,7 +75,7 @@ export function signed(expr: any, state: any): any {
   return result;
 }
 
-export function char(expr: any, state: any): any {
+export function char(expr: Cast, state: EvaluationState): EvaluationResult {
   const result = getValue(expr.expr, state);
   result.name = `CAST(${result.name} AS CHAR)`;
   if (!result.err && result.value !== null && result.type !== 'string') {

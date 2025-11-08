@@ -2,8 +2,9 @@ import * as SchemaManager from '../schema_manager';
 import * as SelectHandler from '../select_handler';
 import { logger } from '@dynamosql/shared';
 import { SQLError } from '../../error';
+import type { HandlerParams } from '../handler_types';
 
-export async function runSelect(params: any): Promise<any[]> {
+export async function runSelect(params: HandlerParams): Promise<any[]> {
   const { dynamodb, session, ast } = params;
   const result_list: any[] = [];
 

@@ -1,5 +1,7 @@
+import type { FunctionName } from 'node-sql-parser/types';
+
 // Helper to extract function name from node-sql-parser AST format
-export function getFunctionName(nameObj: any): string {
+export function getFunctionName(nameObj: string | FunctionName): string {
   if (typeof nameObj === 'string') {
     return nameObj;
   }

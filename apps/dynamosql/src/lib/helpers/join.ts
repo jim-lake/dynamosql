@@ -1,6 +1,20 @@
 import { getValue } from '../expression';
+import type { Session } from '../../session';
+import type { From, Binary, Function } from 'node-sql-parser/types';
 
-export function formJoin(params: any): any {
+interface FormJoinParams {
+  source_map: any;
+  from: From[];
+  where: Binary | Function | null;
+  session: Session;
+}
+
+interface FormJoinResult {
+  err: any;
+  row_list: any[];
+}
+
+export function formJoin(params: FormJoinParams): FormJoinResult {
   const { source_map, from, where, session } = params;
   const row_list: any[] = [];
   from.forEach((from_table: any) => {
@@ -17,13 +31,13 @@ export function formJoin(params: any): any {
 
 function _findRows(
   source_map: any,
-  list: any[],
-  where: any,
-  session: any,
+  list: any[], // From[] with extended properties
+  where: Binary | Function | null,
+  session: Session,
   row_list: any[],
   from_index: number,
   start_index: number
-): any {
+): { err: any; output_count: number } {
   let err;
   const from = list[from_index];
   const { key, on, is_left } = from;

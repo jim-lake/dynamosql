@@ -1,10 +1,15 @@
 import { walkColumnRefs } from './ast_helper';
+import type { Select, Update } from 'node-sql-parser/types';
 
-export function resolveReferences(ast: any, current_database?: string): any {
+export function resolveReferences(
+  ast: Select | Update,
+  current_database?: string
+): any {
   let err: any;
   const table_map: any = {};
   const db_map: any = {};
-  ast.from?.forEach?.((from: any) => {
+  const from = ast.type === 'select' ? ast.from : (ast as any).from;
+  from?.forEach?.((from: any) => {
     if (!from.db) {
       if (!current_database) {
         err = 'no_current_database';
@@ -29,7 +34,8 @@ export function resolveReferences(ast: any, current_database?: string): any {
       db_map[from.db][from.table] = from;
     }
   });
-  ast.table?.forEach?.((object: any) => {
+  const table = ast.type === 'update' ? ast.table : (ast as any).table;
+  table?.forEach?.((object: any) => {
     const from = object.db
       ? db_map[object.db]?.[object.table]
       : table_map[object.table];
@@ -42,7 +48,10 @@ export function resolveReferences(ast: any, current_database?: string): any {
 
   const name_cache: any = {};
   if (!err) {
-    [ast.from, ast.columns, ast.where, ast.set].forEach((item: any) => {
+    const columns = ast.type === 'select' ? ast.columns : undefined;
+    const set = ast.type === 'update' ? ast.set : undefined;
+    const where = ast.where;
+    [from, columns, where, set].forEach((item: any) => {
       walkColumnRefs(item, (object: any) => {
         const ret = _resolveObject(object, ast, db_map, table_map, name_cache);
         if (ret && !err) {
@@ -52,7 +61,8 @@ export function resolveReferences(ast: any, current_database?: string): any {
     });
   }
   if (!err) {
-    ast.set?.forEach?.((object: any) => {
+    const set = ast.type === 'update' ? ast.set : undefined;
+    set?.forEach?.((object: any) => {
       const ret = _resolveObject(object, ast, db_map, table_map, name_cache);
       if (ret && !err) {
         err = ret;
@@ -61,7 +71,8 @@ export function resolveReferences(ast: any, current_database?: string): any {
   }
 
   const result_map: any = {};
-  ast.columns?.forEach?.((column: any, i: number) => {
+  const columns = ast.type === 'select' ? ast.columns : undefined;
+  columns?.forEach?.((column: any, i: number) => {
     if (column.as) {
       result_map[column.as] = i;
     } else if (column.expr?.type === 'column_ref') {
@@ -70,7 +81,10 @@ export function resolveReferences(ast: any, current_database?: string): any {
   });
 
   if (!err) {
-    [ast.groupby, ast.orderby, ast.having].forEach((item: any) => {
+    const groupby = ast.type === 'select' ? ast.groupby : undefined;
+    const orderby = ast.type === 'select' ? ast.orderby : (ast as any).orderby;
+    const having = ast.type === 'select' ? ast.having : undefined;
+    [groupby, orderby, having].forEach((item: any) => {
       walkColumnRefs(item, (object: any) => {
         const ret = _resolveObject(
           object,

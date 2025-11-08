@@ -22,6 +22,8 @@ import type {
   SelectResult,
   ShowResult,
 } from './lib/handler_types';
+import type { Use } from 'node-sql-parser/types';
+import type { ExtendedAST } from './lib/ast_types';
 
 const g_parser = new Parser();
 
@@ -118,7 +120,7 @@ export class Query extends EventEmitter {
   }
 
   private async _singleQuery(
-    ast: any
+    ast: ExtendedAST
   ): Promise<{
     result: HandlerResult | any[] | OkPacket;
     columns: FieldInfo[];
@@ -159,7 +161,10 @@ export class Query extends EventEmitter {
         return await _useDatabase({ ast, session: this._session });
       default:
         logger.error('unsupported statement type:', ast);
-        throw new SQLError({ err: 'unsupported_type', args: [ast?.type] });
+        throw new SQLError({
+          err: 'unsupported_type',
+          args: [(ast as any)?.type],
+        });
     }
   }
 
@@ -196,9 +201,9 @@ export class Query extends EventEmitter {
   }
 }
 
-function _astify(sql: string): { err: any; list: any[] } {
+function _astify(sql: string): { err: any; list: ExtendedAST[] } {
   let err: any;
-  let list: any[] = [];
+  let list: ExtendedAST[] = [];
   try {
     const result = g_parser.astify(sql, { database: 'MySQL' });
     if (Array.isArray(result)) {
@@ -215,7 +220,7 @@ function _astify(sql: string): { err: any; list: any[] } {
 }
 
 async function _useDatabase(params: {
-  ast: any;
+  ast: Use;
   session: Session;
 }): Promise<{ result: undefined; columns: FieldInfo[] }> {
   params.session.setCurrentDatabase(params.ast.db);

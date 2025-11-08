@@ -3017,8 +3017,8 @@ function sum(expr, state) {
     let value = 0;
     let name = 'SUM(';
     group.forEach((group_row, i) => {
-        other.row = group_row;
-        const result = getValue(expr.args?.expr, other);
+        const groupState = { ...other, row: group_row };
+        const result = getValue(expr.args?.expr, groupState);
         if (i === 0) {
             name += result.name;
         }
@@ -3332,19 +3332,29 @@ function isNot$1(expr, state) {
 }
 function _is$1(expr, state, op) {
     const result = getValue(expr.left, state);
+    const rightExpr = expr.right;
     let right;
     let right_name;
-    if (expr.right.value === null) {
-        right = null;
-        right_name = 'NULL';
-    }
-    else if (expr.right.value === true) {
-        right = true;
-        right_name = 'TRUE';
-    }
-    else if (expr.right.value === false) {
-        right = false;
-        right_name = 'FALSE';
+    // Type guard: check if rightExpr is a Value type
+    if (typeof rightExpr === 'object' &&
+        rightExpr &&
+        'value' in rightExpr &&
+        !('type' in rightExpr && rightExpr.type === 'expr_list')) {
+        if (rightExpr.value === null) {
+            right = null;
+            right_name = 'NULL';
+        }
+        else if (rightExpr.value === true) {
+            right = true;
+            right_name = 'TRUE';
+        }
+        else if (rightExpr.value === false) {
+            right = false;
+            right_name = 'FALSE';
+        }
+        else if (!result.err) {
+            result.err = { err: 'syntax_err', args: [op] };
+        }
     }
     else if (!result.err) {
         result.err = { err: 'syntax_err', args: [op] };
@@ -3610,7 +3620,9 @@ function datetime(expr, state) {
     result.name = `CAST(${result.name} AS DATETIME)`;
     result.type = 'datetime';
     if (!result.err && result.value !== null) {
-        const target = Array.isArray(expr.target) ? expr.target[0] : expr.target;
+        const target = Array.isArray(expr.target)
+            ? expr.target[0]
+            : expr.target;
         const decimals = target?.length || 0;
         if (decimals > 6) {
             result.err = 'ER_TOO_BIG_PRECISION';
@@ -3633,7 +3645,9 @@ function time(expr, state) {
     result.name = `CAST(${result.name} AS TIME)`;
     result.type = 'time';
     if (!result.err && result.value !== null) {
-        const target = Array.isArray(expr.target) ? expr.target[0] : expr.target;
+        const target = Array.isArray(expr.target)
+            ? expr.target[0]
+            : expr.target;
         const decimals = target?.length || 0;
         if (decimals > 6) {
             result.err = 'ER_TOO_BIG_PRECISION';
@@ -3682,7 +3696,7 @@ var Cast = /*#__PURE__*/Object.freeze({
 
 const DAY = 24 * 60 * 60;
 function database(expr, state) {
-    return { value: state.session.getCurrentDatabase() };
+    return { err: null, value: state.session.getCurrentDatabase() };
 }
 function sleep(expr, state) {
     const result = getValue(expr.args.value?.[0], state);
@@ -3821,7 +3835,7 @@ function datediff(expr, state) {
 function curdate(expr) {
     const value = createSQLDateTime(Date.now() / 1000, 'date');
     const name = expr.args ? 'CURDATE()' : 'CURRENT_DATE';
-    return { value, name, type: 'date' };
+    return { err: null, value, name, type: 'date' };
 }
 const current_date = curdate;
 function curtime(expr, state) {
@@ -3940,7 +3954,11 @@ function walkColumnRefs(object, cb) {
 
 function getValue(expr, state) {
     const { session, row } = state;
-    let result = { err: null, value: undefined, name: undefined };
+    let result = {
+        err: null,
+        value: undefined,
+        name: undefined,
+    };
     const type = expr?.type;
     if (!expr) ;
     else if (type === 'number') {
@@ -3967,10 +3985,11 @@ function getValue(expr, state) {
         result = interval(expr, state);
     }
     else if (type === 'function') {
-        const funcName = getFunctionName(expr.name);
+        const funcExpr = expr;
+        const funcName = getFunctionName(funcExpr.name);
         const func = Functions$1[funcName.toLowerCase()];
         if (func) {
-            result = func(expr, state);
+            result = func(funcExpr, state);
             if (!result.name) {
                 result.name = funcName + '()';
             }
@@ -3981,10 +4000,11 @@ function getValue(expr, state) {
         }
     }
     else if (type === 'aggr_func') {
-        const funcName = getFunctionName(expr.name);
+        const aggrExpr = expr;
+        const funcName = getFunctionName(aggrExpr.name);
         const func = AggregateFunctions[funcName.toLowerCase()];
         if (func) {
-            result = func(expr, state);
+            result = func(aggrExpr, state);
             if (!result.name) {
                 result.name = funcName + '()';
             }
@@ -3995,37 +4015,42 @@ function getValue(expr, state) {
         }
     }
     else if (type === 'binary_expr') {
-        const func = BinaryExpression[expr.operator.toLowerCase()];
+        const binExpr = expr;
+        const func = BinaryExpression[binExpr.operator.toLowerCase()];
         if (func) {
-            result = func(expr, state);
+            result = func(binExpr, state);
             if (!result.name) {
-                result.name = expr.operator;
+                result.name = binExpr.operator;
             }
         }
         else {
-            shared.logger.trace('expression.getValue: unknown binary operator:', expr.operator);
-            result.err = { err: 'ER_SP_DOES_NOT_EXIST', args: [expr.operator] };
+            shared.logger.trace('expression.getValue: unknown binary operator:', binExpr.operator);
+            result.err = { err: 'ER_SP_DOES_NOT_EXIST', args: [binExpr.operator] };
         }
     }
     else if (type === 'unary_expr') {
-        const func = UnaryExpression[expr.operator.toLowerCase()];
+        const unaryExpr = expr;
+        const func = UnaryExpression[unaryExpr.operator.toLowerCase()];
         if (func) {
-            result = func(expr, state);
+            result = func(unaryExpr, state);
             if (!result.name) {
-                result.name = expr.operator;
+                result.name = unaryExpr.operator;
             }
         }
         else {
-            shared.logger.trace('expression.getValue: unknown unanary operator:', expr.operator);
-            result.err = { err: 'ER_SP_DOES_NOT_EXIST', args: [expr.operator] };
+            shared.logger.trace('expression.getValue: unknown unanary operator:', unaryExpr.operator);
+            result.err = { err: 'ER_SP_DOES_NOT_EXIST', args: [unaryExpr.operator] };
         }
     }
     else if (type === 'cast') {
-        const target = Array.isArray(expr.target) ? expr.target[0] : expr.target;
+        const castExpr = expr;
+        const target = Array.isArray(castExpr.target)
+            ? castExpr.target[0]
+            : castExpr.target;
         const dataType = target?.dataType;
         const func = Cast[dataType?.toLowerCase()];
         if (func) {
-            result = func(expr, state);
+            result = func(castExpr, state);
             if (!result.name) {
                 result.name = `CAST(? AS ${dataType})`;
             }
@@ -4036,41 +4061,47 @@ function getValue(expr, state) {
         }
     }
     else if (type === 'var') {
-        const { prefix } = expr;
+        const varExpr = expr;
+        const { prefix } = varExpr;
         if (prefix === '@@') {
-            const func = SystemVariables[expr.name.toLowerCase()];
+            const func = SystemVariables[varExpr.name.toLowerCase()];
             if (func) {
                 result.value = func(session);
             }
             else {
-                shared.logger.trace('expression.getValue: unknown system variable:', expr.name);
-                result.err = { err: 'ER_UNKNOWN_SYSTEM_VARIABLE', args: [expr.name] };
+                shared.logger.trace('expression.getValue: unknown system variable:', varExpr.name);
+                result.err = {
+                    err: 'ER_UNKNOWN_SYSTEM_VARIABLE',
+                    args: [varExpr.name],
+                };
             }
         }
         else if (prefix === '@') {
-            result.value = session.getVariable(expr.name) ?? null;
+            result.value = session.getVariable(varExpr.name) ?? null;
         }
         else {
             result.err = 'unsupported';
         }
-        result.name = prefix + expr.name;
+        result.name = prefix + varExpr.name;
     }
     else if (type === 'column_ref') {
-        result.name = expr.column;
-        if (row && expr._resultIndex >= 0) {
-            const output_result = row['@@result']?.[expr._resultIndex];
+        const colRef = expr;
+        const colRefItem = colRef.type === 'column_ref' ? colRef : colRef.expr;
+        result.name = colRefItem.column;
+        if (row && colRefItem._resultIndex >= 0) {
+            const output_result = row['@@result']?.[colRefItem._resultIndex];
             result.value = output_result?.value;
             result.type = output_result?.type;
         }
         else if (row) {
-            const cell = row[expr.from?.key]?.[expr.column];
+            const cell = row[colRefItem.from?.key]?.[colRefItem.column];
             const decode = _decodeCell(cell);
             result.type = decode?.type;
             result.value = decode?.value;
         }
         else {
             result.err = 'no_row_list';
-            result.value = expr.column;
+            result.value = colRefItem.column;
         }
     }
     else {
@@ -5635,7 +5666,8 @@ function resolveReferences(ast, current_database) {
     let err;
     const table_map = {};
     const db_map = {};
-    ast.from?.forEach?.((from) => {
+    const from = ast.type === 'select' ? ast.from : ast.from;
+    from?.forEach?.((from) => {
         if (!from.db) {
             if (!current_database) {
                 err = 'no_current_database';
@@ -5662,7 +5694,8 @@ function resolveReferences(ast, current_database) {
             db_map[from.db][from.table] = from;
         }
     });
-    ast.table?.forEach?.((object) => {
+    const table = ast.type === 'update' ? ast.table : ast.table;
+    table?.forEach?.((object) => {
         const from = object.db
             ? db_map[object.db]?.[object.table]
             : table_map[object.table];
@@ -5675,7 +5708,10 @@ function resolveReferences(ast, current_database) {
     });
     const name_cache = {};
     if (!err) {
-        [ast.from, ast.columns, ast.where, ast.set].forEach((item) => {
+        const columns = ast.type === 'select' ? ast.columns : undefined;
+        const set = ast.type === 'update' ? ast.set : undefined;
+        const where = ast.where;
+        [from, columns, where, set].forEach((item) => {
             walkColumnRefs(item, (object) => {
                 const ret = _resolveObject(object, ast, db_map, table_map, name_cache);
                 if (ret && !err) {
@@ -5685,7 +5721,8 @@ function resolveReferences(ast, current_database) {
         });
     }
     if (!err) {
-        ast.set?.forEach?.((object) => {
+        const set = ast.type === 'update' ? ast.set : undefined;
+        set?.forEach?.((object) => {
             const ret = _resolveObject(object, ast, db_map, table_map, name_cache);
             if (ret && !err) {
                 err = ret;
@@ -5693,7 +5730,8 @@ function resolveReferences(ast, current_database) {
         });
     }
     const result_map = {};
-    ast.columns?.forEach?.((column, i) => {
+    const columns = ast.type === 'select' ? ast.columns : undefined;
+    columns?.forEach?.((column, i) => {
         if (column.as) {
             result_map[column.as] = i;
         }
@@ -5702,7 +5740,10 @@ function resolveReferences(ast, current_database) {
         }
     });
     if (!err) {
-        [ast.groupby, ast.orderby, ast.having].forEach((item) => {
+        const groupby = ast.type === 'select' ? ast.groupby : undefined;
+        const orderby = ast.type === 'select' ? ast.orderby : ast.orderby;
+        const having = ast.type === 'select' ? ast.having : undefined;
+        [groupby, orderby, having].forEach((item) => {
             walkColumnRefs(item, (object) => {
                 const ret = _resolveObject(object, ast, db_map, table_map, name_cache, result_map);
                 if (ret && !err) {
@@ -5801,7 +5842,8 @@ function formJoin(params) {
     }
     return { err, row_list };
 }
-function _findRows(source_map, list, where, session, row_list, from_index, start_index) {
+function _findRows(source_map, list, // From[] with extended properties
+where, session, row_list, from_index, start_index) {
     let err;
     const from = list[from_index];
     const { key, on, is_left } = from;
@@ -6963,7 +7005,10 @@ class Query extends node_events.EventEmitter {
                 return await _useDatabase({ ast, session: this._session });
             default:
                 shared.logger.error('unsupported statement type:', ast);
-                throw new SQLError({ err: 'unsupported_type', args: [ast?.type] });
+                throw new SQLError({
+                    err: 'unsupported_type',
+                    args: [ast?.type],
+                });
         }
     }
     _transformResult(list, columns) {
