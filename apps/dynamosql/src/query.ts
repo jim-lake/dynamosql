@@ -113,7 +113,7 @@ export class Query extends EventEmitter {
         return [result_list, schema_list];
       }
     } catch (err) {
-      const sql_err = new SQLError(err, this.sql);
+      const sql_err = new SQLError(err as any, this.sql);
       sql_err.index = result_list.length;
       throw sql_err;
     }

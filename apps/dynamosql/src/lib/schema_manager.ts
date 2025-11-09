@@ -17,22 +17,24 @@ interface SchemaMap {
 const g_schemaMap: SchemaMap = {};
 
 export function getEngine(
-  database: string,
-  table: string,
+  database: string | undefined,
+  table: string | null | undefined,
   session: Session
 ): EngineType {
   let ret: EngineType;
-  const schema = g_schemaMap[database];
+  const schema = database ? g_schemaMap[database] : undefined;
   if (database === '_dynamodb') {
     ret = Engine.getEngineByName('raw');
+  } else if (!database) {
+    ret = Engine.getDatabaseError('');
   } else if (!schema) {
     ret = Engine.getDatabaseError(database);
-  } else if (session.getTempTable(database, table)) {
+  } else if (table && session.getTempTable(database, table)) {
     ret = Engine.getEngineByName('memory');
-  } else if (schema[table]) {
+  } else if (table && schema[table]) {
     ret = Engine.getEngineByName(schema[table].table_engine);
   } else {
-    ret = Engine.getTableError(table);
+    ret = Engine.getTableError(table ?? '');
   }
   return ret;
 }

@@ -136,7 +136,7 @@ export class Session extends EventEmitter implements PoolConnection {
   ): MysqlQuery {
     if (this._isReleased) {
       done?.(new SQLError('released') as MysqlError);
-      return;
+      return undefined as any;
     }
     const opts: QueryOptions =
       typeof params === 'object' ? { ...params } : { sql: '' };
@@ -164,7 +164,7 @@ export class Session extends EventEmitter implements PoolConnection {
       const [results, fields] = await query.run();
       done?.(null, results, fields);
     } catch (e) {
-      done?.(e);
+      done?.(e as MysqlError);
     }
   }
 }

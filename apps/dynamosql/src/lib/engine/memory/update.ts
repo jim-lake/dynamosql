@@ -14,6 +14,10 @@ export async function multipleUpdate(
 ): Promise<MutationResult> {
   const { session, list } = params;
 
+  if (!list) {
+    return { affectedRows: 0, changedRows: 0 };
+  }
+
   let affectedRows = 0;
   let changedRows = 0;
 
@@ -28,7 +32,7 @@ export async function multipleUpdate(
     const row_list = data.row_list.slice();
     const primary_map = new Map(data.primary_map);
 
-    for (const update of update_list) {
+    for (const update of update_list ?? []) {
       const { set_list } = update;
       const key_list = update.key.map((key: any) => key.value);
       const update_key = JSON.stringify(key_list);
@@ -39,12 +43,12 @@ export async function multipleUpdate(
         const new_row = Object.assign({}, old_row);
         let changed = false;
 
-        set_list.forEach((set: any) => {
+        for (const set of set_list) {
           new_row[set.column] = _transformCell(set.value);
           if (old_row[set.column].value !== new_row[set.column].value) {
             changed = true;
           }
-        });
+        }
 
         const new_key = _makePrimaryKey(data.primary_key, new_row);
         if (new_key !== update_key && primary_map.has(new_key)) {

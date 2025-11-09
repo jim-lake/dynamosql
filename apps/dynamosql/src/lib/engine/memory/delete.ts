@@ -14,6 +14,10 @@ export async function multipleDelete(
 ): Promise<MutationResult> {
   const { session, list } = params;
 
+  if (!list) {
+    return { affectedRows: 0 };
+  }
+
   let affectedRows = 0;
 
   for (const changes of list) {
@@ -25,18 +29,19 @@ export async function multipleDelete(
     }
 
     const row_list = data.row_list.slice();
-    const primary_map = new Map(data.primary_map);
+    const primary_map = new Map<string, number>(data.primary_map);
 
-    for (const object of delete_list) {
+    for (const object of delete_list ?? []) {
       const key_list = object.map((key: any) => key.value);
       const delete_key = JSON.stringify(key_list);
-      const index = primary_map.get(delete_key) as number | undefined;
+      const index = primary_map.get(delete_key);
 
       if (index !== undefined && index >= 0) {
         primary_map.delete(delete_key);
         row_list.splice(index, 1);
-        primary_map.forEach((value: number, key) => {
-          if (value > index) {
+        const deletedIndex = index;
+        primary_map.forEach((value, key) => {
+          if (value > deletedIndex) {
             primary_map.set(key, value - 1);
           }
         });

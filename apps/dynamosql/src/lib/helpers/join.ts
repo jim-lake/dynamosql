@@ -29,8 +29,10 @@ export function formJoin(params: FormJoinParams): FormJoinResult {
   const row_list: (RowMap & { [key: string]: unknown })[] = [];
   from.forEach(
     (from_table: From & { key?: string; is_left?: boolean; join?: string }) => {
-      (row_list as any)[from_table.key ?? ''] = [];
-      from_table.is_left = from_table.join?.indexOf?.('LEFT') >= 0;
+      if (from_table.key) {
+        (row_list as any)[from_table.key] = [];
+      }
+      from_table.is_left = (from_table.join?.indexOf?.('LEFT') ?? -1) >= 0;
     }
   );
   const result = _findRows(source_map, from, where, session, row_list, 0, 0);
@@ -53,7 +55,7 @@ function _findRows(
   let err: ErrorResult = null;
   const from = list[from_index];
   const { key, on, is_left } = from;
-  const rows = source_map[key];
+  const rows = key ? source_map[key] : undefined;
   const row_count = rows?.length || (is_left ? 1 : 0);
 
   let output_count = 0;
@@ -64,10 +66,14 @@ function _findRows(
     }
     const row = row_list[row_index];
 
-    row_list[row_index][key] = rows[i] ?? null;
+    if (key) {
+      row_list[row_index][key] = rows?.[i] ?? null;
+    }
     for (let j = 0; output_count > 0 && j < from_index; j++) {
       const from_key = list[j].key;
-      row_list[row_index][from_key] = row_list[start_index][from_key];
+      if (from_key) {
+        row_list[row_index][from_key] = row_list[start_index][from_key];
+      }
     }
 
     let skip = false;
@@ -83,7 +89,9 @@ function _findRows(
       }
     }
     if (skip && is_left && output_count === 0 && i + 1 === row_count) {
-      row_list[row_index][key] = null;
+      if (key) {
+        row_list[row_index][key] = null;
+      }
       skip = false;
     }
 

@@ -49,14 +49,18 @@ export async function multipleDelete(
 ): Promise<MutationResult> {
   const { dynamodb, list } = params;
 
+  if (!list) {
+    return { affectedRows: 0 };
+  }
+
   let affectedRows = 0;
 
   for (const object of list) {
     const { table, key_list, delete_list } = object;
 
     try {
-      await dynamodb.deleteItems({ table, key_list, list: delete_list });
-      affectedRows += delete_list.length;
+      await dynamodb.deleteItems({ table, key_list, list: delete_list ?? [] });
+      affectedRows += delete_list?.length ?? 0;
     } catch (err) {
       logger.error('multipleDelete: deleteItems: err:', err, table);
       throw err;

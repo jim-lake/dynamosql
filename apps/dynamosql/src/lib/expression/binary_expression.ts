@@ -50,10 +50,10 @@ function _numBothSides(
       value = null;
     } else if (allow_interval && left.type === 'interval') {
       interval = left.value as typeof interval;
-      if (_isDateOrTimeLike(right.type)) {
+      if (right.type && _isDateOrTimeLike(right.type)) {
         datetime = right.value;
-      } else if (typeof right.value === 'string') {
-        datetime = convertDateTime(left.value);
+      } else if (right.value !== undefined && typeof right.value === 'string') {
+        datetime = convertDateTime(right.value as string);
         if (!datetime) {
           value = null;
         }
@@ -62,10 +62,10 @@ function _numBothSides(
       }
     } else if (allow_interval && right.type === 'interval') {
       interval = right.value as typeof interval;
-      if (_isDateOrTimeLike(left.type)) {
+      if (left.type && _isDateOrTimeLike(left.type)) {
         datetime = left.value;
-      } else if (typeof left.value === 'string') {
-        datetime = convertDateTime(left.value);
+      } else if (left.value !== undefined && typeof left.value === 'string') {
+        datetime = convertDateTime(left.value as string);
         if (!datetime) {
           value = null;
         }
@@ -75,10 +75,13 @@ function _numBothSides(
     } else if (right.type === 'interval' || left.type === 'interval') {
       err = 'bad_interval_usage';
     } else {
-      left_num = convertNum(left.value);
-      right_num = convertNum(right.value);
-      if (left_num === null || right_num === null) {
+      const leftNum = convertNum(left.value);
+      const rightNum = convertNum(right.value);
+      if (leftNum === null || rightNum === null) {
         value = null;
+      } else {
+        left_num = leftNum;
+        right_num = rightNum;
       }
     }
   }
@@ -125,7 +128,12 @@ function mul(expr: Binary, state: EvaluationState): EvaluationResult {
   const result = _numBothSides(expr, state, ' * ');
   const { err, name, left_num, right_num } = result;
   let value = result.value;
-  if (!err && value !== null) {
+  if (
+    !err &&
+    value !== null &&
+    left_num !== undefined &&
+    right_num !== undefined
+  ) {
     value = left_num * right_num;
   }
   return { err, value, name };
@@ -135,7 +143,12 @@ function div(expr: Binary, state: EvaluationState): EvaluationResult {
   const result = _numBothSides(expr, state, ' / ');
   const { err, name, left_num, right_num } = result;
   let value = result.value;
-  if (!err && value !== null) {
+  if (
+    !err &&
+    value !== null &&
+    left_num !== undefined &&
+    right_num !== undefined
+  ) {
     value = left_num / right_num;
   }
   return { err, value, name };
@@ -284,7 +297,10 @@ function _gte(
       typeof left.value === 'number' &&
       typeof right.value === 'number'
     ) {
-      value = convertNum(left.value) >= convertNum(right.value) ? 1 : 0;
+      const leftNum = convertNum(left.value);
+      const rightNum = convertNum(right.value);
+      value =
+        leftNum !== null && rightNum !== null && leftNum >= rightNum ? 1 : 0;
     } else if (
       typeof left.value === 'string' &&
       typeof right.value === 'string'
@@ -307,13 +323,18 @@ export function and(expr: Binary, state: EvaluationState): EvaluationResult {
   const left = getValue(expr.left, state);
   let err = left.err;
   let name = left.name + ' AND ';
-  let value = 0;
+  let value: number | null = 0;
   if (!err) {
     value = convertBooleanValue(left.value);
     if (value !== 0) {
       const right = getValue(expr.right, state);
       err = right.err;
-      value = convertBooleanValue(right.value) && value;
+      const rightBool = convertBooleanValue(right.value);
+      if (value === null || rightBool === null) {
+        value = rightBool === 0 || value === 0 ? 0 : null;
+      } else {
+        value = rightBool && value;
+      }
       name = left.name + ' AND ' + right.name;
     }
   }
@@ -324,7 +345,7 @@ export function or(expr: Binary, state: EvaluationState): EvaluationResult {
   const left = getValue(expr.left, state);
   let err = left.err;
   let name = left.name + ' OR ';
-  let value = 1;
+  let value: number | null = 1;
   if (!err) {
     value = convertBooleanValue(left.value);
     if (!value) {
@@ -347,7 +368,7 @@ export function xor(expr: Binary, state: EvaluationState): EvaluationResult {
   const right = getValue(expr.right, state);
   const err = left.err || right.err;
   const name = left.name + ' XOR ' + right.name;
-  let value = 1;
+  let value: number | null = 1;
   if (!err) {
     const right_bool = convertBooleanValue(right.value);
     const left_bool = convertBooleanValue(left.value);

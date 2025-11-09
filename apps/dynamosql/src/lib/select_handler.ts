@@ -80,8 +80,8 @@ function _evaluateReturn(
 
   const { from, where, groupby } = ast;
   let err: { err: string; args?: unknown[] } | string | null = null;
-  let row_list: RowWithResult[];
-  let sleep_ms = 9;
+  let row_list: RowWithResult[] = [];
+  let sleep_ms = 0;
 
   if (from) {
     const result = formJoin({ source_map, from, where, session });
@@ -103,7 +103,7 @@ function _evaluateReturn(
     }
   }
 
-  const row_count = row_list?.length || 0;
+  const row_count = row_list.length;
   const column_count = query_columns?.length || 0;
 
   for (let i = 0; i < row_count && !err; i++) {
@@ -156,7 +156,7 @@ function _evaluateReturn(
     column_list.push(column_type);
   }
 
-  if (ast.orderby) {
+  if (ast.orderby && row_list) {
     const sort_err = sort(row_list as never, ast.orderby, {
       session,
       column_list: column_list as never,

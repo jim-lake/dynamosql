@@ -51,7 +51,11 @@ export class Pool extends EventEmitter {
     return session.query(
       opts,
       values,
-      (error: MysqlError | null, results?: any, fields?: FieldInfo[]) => {
+      (
+        error: MysqlError | null,
+        results?: any,
+        fields?: FieldInfo[] | FieldInfo[][]
+      ) => {
         session.release();
         done?.(error, results, fields);
       }

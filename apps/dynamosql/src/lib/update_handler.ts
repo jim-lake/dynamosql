@@ -10,12 +10,12 @@ import type { HandlerParams, MutationResult } from './handler_types';
 
 export async function query(params: HandlerParams): Promise<MutationResult> {
   const { ast, session } = params;
-  const current_database = session.getCurrentDatabase();
+  const current_database = session.getCurrentDatabase() ?? undefined;
 
   ast.from = ast.table;
   delete ast.table;
   const resolve_err = resolveReferences(ast, current_database);
-  const database = ast.from?.[0]?.db;
+  const database = ast.from?.[0]?.db ?? undefined;
 
   if (resolve_err) {
     logger.error('resolve_err:', resolve_err);
@@ -30,7 +30,7 @@ export async function query(params: HandlerParams): Promise<MutationResult> {
 
 async function _runUpdate(params: HandlerParams): Promise<MutationResult> {
   const { ast, session, dynamodb } = params;
-  const database = ast.from?.[0]?.db;
+  const database = ast.from?.[0]?.db ?? undefined;
   const table = ast.from?.[0]?.table;
   const engine = SchemaManager.getEngine(database, table, session);
 

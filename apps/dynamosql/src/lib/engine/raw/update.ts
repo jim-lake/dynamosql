@@ -79,19 +79,25 @@ export async function multipleUpdate(
 ): Promise<MutationResult> {
   const { dynamodb, list } = params;
 
+  if (!list) {
+    return { affectedRows: 0, changedRows: 0 };
+  }
+
   let affectedRows = 0;
   let changedRows = 0;
 
   for (const object of list) {
     const { table, key_list, update_list } = object;
-    update_list.forEach((item: any) =>
-      item.set_list.forEach((set: any) => (set.value = set.value.value))
-    );
+    for (const item of update_list ?? []) {
+      for (const set of item.set_list) {
+        set.value = set.value.value;
+      }
+    }
 
     try {
-      await dynamodb.updateItems({ table, key_list, list: update_list });
-      affectedRows += list.length;
-      changedRows += list.length;
+      await dynamodb.updateItems({ table, key_list, list: update_list ?? [] });
+      affectedRows += update_list?.length ?? 0;
+      changedRows += update_list?.length ?? 0;
     } catch (err) {
       logger.error('multipleUpdate: updateItems: err:', err, 'table:', table);
       throw err;

@@ -56,7 +56,10 @@ function signed(expr: Cast, state: EvaluationState): EvaluationResult {
   result.name = `CAST(${result.name} AS SIGNED)`;
   result.type = 'bigint';
   if (!result.err && result.value !== null) {
-    result.value = Math.trunc(convertNum(result.value));
+    const num = convertNum(result.value);
+    if (num !== null) {
+      result.value = Math.trunc(num);
+    }
   }
   return result;
 }

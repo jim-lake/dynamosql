@@ -12,17 +12,17 @@ function database(expr: Function, state: EvaluationState): EvaluationResult {
 }
 
 function sleep(expr: Function, state: EvaluationState): EvaluationResult {
-  const result = getValue(expr.args.value?.[0], state);
+  const result = getValue(expr.args?.value?.[0], state);
   result.name = `SLEEP(${result.name})`;
   const sleep_ms = convertNum(result.value);
-  if (sleep_ms > 0) {
+  if (sleep_ms !== null && sleep_ms > 0) {
     result.sleep_ms = sleep_ms * 1000;
   }
   return result;
 }
 
 function length(expr: Function, state: EvaluationState): EvaluationResult {
-  const result = getValue(expr.args.value?.[0], state);
+  const result = getValue(expr.args?.value?.[0], state);
   result.name = `LENGTH(${result.name})`;
   result.type = 'number';
   if (!result.err && result.value !== null) {
@@ -34,7 +34,7 @@ function length(expr: Function, state: EvaluationState): EvaluationResult {
 function concat(expr: Function, state: EvaluationState): EvaluationResult {
   let err: EvaluationResult['err'] = null;
   let value: string | null = '';
-  expr.args.value?.every?.((sub: any) => {
+  expr.args?.value?.every?.((sub: any) => {
     const result = getValue(sub, state);
     if (!err && result.err) {
       err = result.err;
@@ -58,7 +58,8 @@ function left(expr: Function, state: EvaluationState): EvaluationResult {
     result.value = null;
   } else if (!result.err) {
     const length = convertNum(len_result.value);
-    result.value = String(result.value).substring(0, length);
+    result.value =
+      length !== null ? String(result.value).substring(0, length) : null;
   }
   return result;
 }
@@ -67,7 +68,7 @@ function coalesce(expr: Function, state: EvaluationState): EvaluationResult {
   let err: EvaluationResult['err'] = null;
   let value = null;
   let type;
-  expr.args.value?.some?.((sub: any) => {
+  expr.args?.value?.some?.((sub: any) => {
     const result = getValue(sub, state);
     if (result.err) {
       err = result.err;
@@ -101,20 +102,22 @@ function from_unixtime(
   expr: Function,
   state: EvaluationState
 ): EvaluationResult {
-  const result = getValue(expr.args.value?.[0], state);
+  const result = getValue(expr.args?.value?.[0], state);
   result.name = `FROM_UNIXTIME(${result.name})`;
   result.type = 'datetime';
   if (!result.err && result.value !== null) {
     const time = convertNum(result.value);
-    const decimals = Math.min(6, String(time).split('.')?.[1]?.length || 0);
-    result.value =
-      time < 0 ? null : createSQLDateTime(time, 'datetime', decimals);
+    if (time !== null) {
+      const decimals = Math.min(6, String(time).split('.')?.[1]?.length || 0);
+      result.value =
+        time < 0 ? null : createSQLDateTime(time, 'datetime', decimals);
+    }
   }
   return result;
 }
 
 function date(expr: Function, state: EvaluationState): EvaluationResult {
-  const result = getValue(expr.args.value?.[0], state);
+  const result = getValue(expr.args?.value?.[0], state);
   result.name = `DATE(${result.name})`;
   result.type = 'date';
   if (!result.err && result.value !== null) {
@@ -133,8 +136,8 @@ function date(expr: Function, state: EvaluationState): EvaluationResult {
 }
 
 function date_format(expr: Function, state: EvaluationState): EvaluationResult {
-  const date = getValue(expr.args.value?.[0], state);
-  const format = getValue(expr.args.value?.[1], state);
+  const date = getValue(expr.args?.value?.[0], state);
+  const format = getValue(expr.args?.value?.[1], state);
   const err = date.err || format.err;
   let value;
   const name = `DATE_FORMAT(${date.name}, ${format.name})`;
@@ -148,8 +151,8 @@ function date_format(expr: Function, state: EvaluationState): EvaluationResult {
 }
 
 function datediff(expr: Function, state: EvaluationState): EvaluationResult {
-  const expr1 = getValue(expr.args.value?.[0], state);
-  const expr2 = getValue(expr.args.value?.[1], state);
+  const expr1 = getValue(expr.args?.value?.[0], state);
+  const expr2 = getValue(expr.args?.value?.[1], state);
   const err = expr1.err || expr2.err;
   let value;
   const name = `DATEDIFF(${expr1.name}, ${expr2.name})`;

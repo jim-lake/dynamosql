@@ -99,11 +99,11 @@ export class DynamoDB {
   constructor(params?: DynamoDBConstructorParams) {
     const opts: DynamoDBClientConfig = {
       region:
-        params.region ??
+        params?.region ??
         process.env.AWS_REGION ??
         process.env.AWS_DEFAULT_REGION,
     };
-    if (params.credentials) {
+    if (params?.credentials) {
       opts.credentials = params.credentials;
     }
     this.client = new DynamoDBClient(opts);

@@ -27,7 +27,8 @@ function minus(expr: UnaryExpr, state: EvaluationState): EvaluationResult {
   result.name = '-' + result.name;
   result.type = 'number';
   if (!result.err && result.value !== null) {
-    result.value = -convertNum(result.value);
+    const num = convertNum(result.value);
+    result.value = num !== null ? -num : null;
   }
   return result;
 }

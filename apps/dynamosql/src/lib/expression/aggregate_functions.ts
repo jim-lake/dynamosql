@@ -21,7 +21,10 @@ function sum(expr: AggrFunc, state: EvaluationState): EvaluationResult {
     } else if (result.value === null) {
       value = null;
     } else if (value !== null) {
-      value += convertNum(result.value);
+      const num = convertNum(result.value);
+      if (num !== null) {
+        value += num;
+      }
     }
   });
   name += ')';

@@ -111,7 +111,7 @@ async function _runInsert(
       database: params.database,
       table,
       list,
-      duplicate_mode,
+      duplicate_mode: duplicate_mode ?? undefined,
     };
     try {
       return await engine.insertRowList(opts);

@@ -62,12 +62,15 @@ export function getValue(
     result.name = 'x' + expr.value.slice(0, 10);
     result.type = 'buffer';
   } else if (type === 'interval') {
-    result = Interval.interval(expr as IntervalType, state);
+    const intervalFunc = Interval.interval;
+    if (typeof intervalFunc === 'function') {
+      result = intervalFunc(expr as IntervalType, state);
+    }
   } else if (type === 'function') {
     const funcExpr = expr as Function;
     const funcName = getFunctionName(funcExpr.name);
     const func = Functions[funcName.toLowerCase()];
-    if (func) {
+    if (typeof func === 'function') {
       result = func(funcExpr, state);
       if (!result.name) {
         result.name = funcName + '()';
