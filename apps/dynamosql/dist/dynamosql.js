@@ -3013,7 +3013,7 @@ function _partsToTime(year, month, day, hour, min, sec, fraction) {
 function sum(expr, state) {
     const { row, ...other } = state;
     const group = row?.['@@group'] || [{}];
-    let err;
+    let err = null;
     let value = 0;
     let name = 'SUM(';
     group.forEach((group_row, i) => {
@@ -3035,11 +3035,7 @@ function sum(expr, state) {
     name += ')';
     return { err, value, type: 'number', name };
 }
-
-var AggregateFunctions = /*#__PURE__*/Object.freeze({
-    __proto__: null,
-    sum: sum
-});
+const methods$6 = { sum };
 
 function _isDateOrTimeLike(type) {
     return type === 'date' || type === 'datetime' || type === 'time';
@@ -3110,7 +3106,7 @@ function plus$1(expr, state) {
     let value = result.value;
     let type;
     if (!err && value !== null) {
-        if (datetime) {
+        if (datetime && interval) {
             const result = interval.add(datetime);
             value = result.value;
             type = result.type;
@@ -3128,7 +3124,7 @@ function minus$2(expr, state) {
     let value = result.value;
     let type;
     if (!err && value !== null) {
-        if (datetime) {
+        if (datetime && interval) {
             const result = interval.sub(datetime);
             value = result.value;
             type = result.type;
@@ -3139,6 +3135,15 @@ function minus$2(expr, state) {
         }
     }
     return { err, value, type, name };
+}
+function mul(expr, state) {
+    const result = _numBothSides(expr, state, ' * ');
+    const { err, name, left_num, right_num } = result;
+    let value = result.value;
+    if (!err && value !== null) {
+        value = left_num * right_num;
+    }
+    return { err, value, name };
 }
 function div(expr, state) {
     const result = _numBothSides(expr, state, ' / ');
@@ -3401,25 +3406,270 @@ function _unionDateTime(type1, type2) {
     }
     return ret;
 }
-
-var BinaryExpression = /*#__PURE__*/Object.freeze({
-    __proto__: null,
-    "!=": notEqual$1,
-    "+": plus$1,
-    "-": minus$2,
-    "/": div,
-    "<": lt$1,
-    "<=": lte$1,
-    "<>": notEqual$1,
-    "=": equal$1,
-    ">": gt$1,
-    ">=": gte$1,
+const methods$5 = {
+    '+': plus$1,
+    '-': minus$2,
+    '*': mul,
+    '/': div,
+    '=': equal$1,
+    '!=': notEqual$1,
+    '<>': notEqual$1,
+    '>': gt$1,
+    '<': lt$1,
+    '>=': gte$1,
+    '<=': lte$1,
     and: and$1,
-    is: is$1,
-    "is not": isNot$1,
     or: or$1,
-    xor: xor
-});
+    xor,
+    is: is$1,
+    'is not': isNot$1,
+};
+
+function datetime(expr, state) {
+    const result = getValue(expr.expr, state);
+    result.name = `CAST(${result.name} AS DATETIME)`;
+    result.type = 'datetime';
+    if (!result.err && result.value !== null) {
+        const target = Array.isArray(expr.target)
+            ? expr.target[0]
+            : expr.target;
+        const decimals = target?.length || 0;
+        if (decimals > 6) {
+            result.err = 'ER_TOO_BIG_PRECISION';
+        }
+        result.value = convertDateTime(result.value, 'datetime', decimals);
+    }
+    return result;
+}
+function date$1(expr, state) {
+    const result = getValue(expr.expr, state);
+    result.name = `CAST(${result.name} AS DATE)`;
+    result.type = 'date';
+    if (!result.err && result.value !== null) {
+        result.value = convertDateTime(result.value, 'date');
+    }
+    return result;
+}
+function time(expr, state) {
+    const result = getValue(expr.expr, state);
+    result.name = `CAST(${result.name} AS TIME)`;
+    result.type = 'time';
+    if (!result.err && result.value !== null) {
+        const target = Array.isArray(expr.target)
+            ? expr.target[0]
+            : expr.target;
+        const decimals = target?.length || 0;
+        if (decimals > 6) {
+            result.err = 'ER_TOO_BIG_PRECISION';
+        }
+        result.value = convertTime(result.value, decimals);
+    }
+    return result;
+}
+function signed(expr, state) {
+    const result = getValue(expr.expr, state);
+    result.name = `CAST(${result.name} AS SIGNED)`;
+    result.type = 'bigint';
+    if (!result.err && result.value !== null) {
+        result.value = Math.trunc(convertNum(result.value));
+    }
+    return result;
+}
+function char(expr, state) {
+    const result = getValue(expr.expr, state);
+    result.name = `CAST(${result.name} AS CHAR)`;
+    if (!result.err && result.value !== null && result.type !== 'string') {
+        result.type = 'string';
+        result.value = String(result.value);
+    }
+    return result;
+}
+const methods$4 = { datetime, date: date$1, time, signed, char };
+
+const DAY = 24 * 60 * 60;
+function database(expr, state) {
+    return { err: null, value: state.session.getCurrentDatabase() };
+}
+function sleep(expr, state) {
+    const result = getValue(expr.args.value?.[0], state);
+    result.name = `SLEEP(${result.name})`;
+    const sleep_ms = convertNum(result.value);
+    if (sleep_ms > 0) {
+        result.sleep_ms = sleep_ms * 1000;
+    }
+    return result;
+}
+function length(expr, state) {
+    const result = getValue(expr.args.value?.[0], state);
+    result.name = `LENGTH(${result.name})`;
+    result.type = 'number';
+    if (!result.err && result.value !== null) {
+        result.value = String(result.value).length;
+    }
+    return result;
+}
+function concat(expr, state) {
+    let err = null;
+    let value = '';
+    expr.args.value?.every?.((sub) => {
+        const result = getValue(sub, state);
+        if (!err && result.err) {
+            err = result.err;
+        }
+        else if (result.value === null) {
+            value = null;
+        }
+        else {
+            value += String(result.value);
+        }
+        return value !== null;
+    });
+    return { err, value };
+}
+function left(expr, state) {
+    const result = getValue(expr.args?.value?.[0], state);
+    const len_result = getValue(expr.args?.value?.[1], state);
+    result.name = `LEFT(${result.name ?? ''}, ${len_result.name ?? ''})`;
+    result.err = result.err || len_result.err;
+    result.type = 'string';
+    if (!result.err && (result.value === null || len_result.value === null)) {
+        result.value = null;
+    }
+    else if (!result.err) {
+        const length = convertNum(len_result.value);
+        result.value = String(result.value).substring(0, length);
+    }
+    return result;
+}
+function coalesce(expr, state) {
+    let err = null;
+    let value = null;
+    let type;
+    expr.args.value?.some?.((sub) => {
+        const result = getValue(sub, state);
+        if (result.err) {
+            err = result.err;
+        }
+        value = result.value;
+        type = result.type;
+        return !err && value !== null;
+    });
+    return { err, value, type };
+}
+const ifnull = coalesce;
+function now(expr, state) {
+    const result = getValue(expr.args?.value?.[0], state);
+    result.name = expr.args ? `NOW(${result.name ?? ''})` : 'CURRENT_TIMESTAMP';
+    if (!result.err && result.type) {
+        const decimals = typeof result.value === 'number' ? result.value : 0;
+        if (decimals > 6) {
+            result.err = 'ER_TOO_BIG_PRECISION';
+        }
+        result.value = createSQLDateTime(Date.now() / 1000, 'datetime', decimals);
+        result.type = 'datetime';
+    }
+    return result;
+}
+const current_timestamp = now;
+function from_unixtime(expr, state) {
+    const result = getValue(expr.args.value?.[0], state);
+    result.name = `FROM_UNIXTIME(${result.name})`;
+    result.type = 'datetime';
+    if (!result.err && result.value !== null) {
+        const time = convertNum(result.value);
+        const decimals = Math.min(6, String(time).split('.')?.[1]?.length || 0);
+        result.value =
+            time < 0 ? null : createSQLDateTime(time, 'datetime', decimals);
+    }
+    return result;
+}
+function date(expr, state) {
+    const result = getValue(expr.args.value?.[0], state);
+    result.name = `DATE(${result.name})`;
+    result.type = 'date';
+    if (!result.err && result.value !== null) {
+        const dateValue = convertDateTime(result.value);
+        if (dateValue &&
+            typeof dateValue === 'object' &&
+            'setType' in dateValue &&
+            typeof dateValue.setType === 'function') {
+            dateValue.setType('date');
+        }
+        result.value = dateValue;
+    }
+    return result;
+}
+function date_format(expr, state) {
+    const date = getValue(expr.args.value?.[0], state);
+    const format = getValue(expr.args.value?.[1], state);
+    const err = date.err || format.err;
+    let value;
+    const name = `DATE_FORMAT(${date.name}, ${format.name})`;
+    if (!err && (date.value === null || format.value === null)) {
+        value = null;
+    }
+    else if (!err) {
+        value =
+            convertDateTime(date.value)?.dateFormat?.(String(format.value)) || null;
+    }
+    return { err, name, value, type: 'string' };
+}
+function datediff(expr, state) {
+    const expr1 = getValue(expr.args.value?.[0], state);
+    const expr2 = getValue(expr.args.value?.[1], state);
+    const err = expr1.err || expr2.err;
+    let value;
+    const name = `DATEDIFF(${expr1.name}, ${expr2.name})`;
+    if (!err && (expr1.value === null || expr2.value === null)) {
+        value = null;
+    }
+    else if (!err) {
+        value =
+            convertDateTime(expr1.value)?.diff?.(convertDateTime(expr2.value)) ||
+                null;
+    }
+    return { err, name, value, type: 'int' };
+}
+function curdate(expr) {
+    const value = createSQLDateTime(Date.now() / 1000, 'date');
+    const name = expr.args ? 'CURDATE()' : 'CURRENT_DATE';
+    return { err: null, value, name, type: 'date' };
+}
+const current_date = curdate;
+function curtime(expr, state) {
+    const result = getValue(expr.args?.value?.[0], state);
+    result.name = expr.args ? `CURTIME(${result.name ?? ''})` : 'CURRENT_TIME';
+    if (!result.err && result.type) {
+        const decimals = typeof result.value === 'number' ? result.value : 0;
+        if (decimals > 6) {
+            result.err = 'ER_TOO_BIG_PRECISION';
+        }
+        const time = (Date.now() / 1000) % DAY;
+        result.value = createSQLTime(time, decimals);
+        result.type = 'time';
+    }
+    return result;
+}
+const current_time = curtime;
+const methods$3 = {
+    database,
+    sleep,
+    length,
+    concat,
+    left,
+    coalesce,
+    ifnull,
+    now,
+    current_timestamp,
+    from_unixtime,
+    date,
+    date_format,
+    datediff,
+    curdate,
+    current_date,
+    curtime,
+    current_time,
+};
 
 const SINGLE_TIME = {
     microsecond: 0.000001,
@@ -3624,47 +3874,6 @@ function _addMonth(old_time, number) {
     return old_time + delta / 1000;
 }
 
-function datetime(expr, state) {
-    const result = getValue(expr.expr, state);
-    result.name = `CAST(${result.name} AS DATETIME)`;
-    result.type = 'datetime';
-    if (!result.err && result.value !== null) {
-        const target = Array.isArray(expr.target)
-            ? expr.target[0]
-            : expr.target;
-        const decimals = target?.length || 0;
-        if (decimals > 6) {
-            result.err = 'ER_TOO_BIG_PRECISION';
-        }
-        result.value = convertDateTime(result.value, 'datetime', decimals);
-    }
-    return result;
-}
-function date$1(expr, state) {
-    const result = getValue(expr.expr, state);
-    result.name = `CAST(${result.name} AS DATE)`;
-    result.type = 'date';
-    if (!result.err && result.value !== null) {
-        result.value = convertDateTime(result.value, 'date');
-    }
-    return result;
-}
-function time(expr, state) {
-    const result = getValue(expr.expr, state);
-    result.name = `CAST(${result.name} AS TIME)`;
-    result.type = 'time';
-    if (!result.err && result.value !== null) {
-        const target = Array.isArray(expr.target)
-            ? expr.target[0]
-            : expr.target;
-        const decimals = target?.length || 0;
-        if (decimals > 6) {
-            result.err = 'ER_TOO_BIG_PRECISION';
-        }
-        result.value = convertTime(result.value, decimals);
-    }
-    return result;
-}
 function interval(expr, state) {
     const result = getValue(expr.expr, state);
     result.name = `INTERVAL ${result.name} ${expr.unit}`;
@@ -3674,221 +3883,7 @@ function interval(expr, state) {
     }
     return result;
 }
-function signed(expr, state) {
-    const result = getValue(expr.expr, state);
-    result.name = `CAST(${result.name} AS SIGNED)`;
-    result.type = 'bigint';
-    if (!result.err && result.value !== null) {
-        result.value = Math.trunc(convertNum(result.value));
-    }
-    return result;
-}
-function char(expr, state) {
-    const result = getValue(expr.expr, state);
-    result.name = `CAST(${result.name} AS CHAR)`;
-    if (!result.err && result.value !== null && result.type !== 'string') {
-        result.type = 'string';
-        result.value = String(result.value);
-    }
-    return result;
-}
-
-var Cast = /*#__PURE__*/Object.freeze({
-    __proto__: null,
-    char: char,
-    date: date$1,
-    datetime: datetime,
-    interval: interval,
-    signed: signed,
-    time: time
-});
-
-const DAY = 24 * 60 * 60;
-function database(expr, state) {
-    return { err: null, value: state.session.getCurrentDatabase() };
-}
-function sleep(expr, state) {
-    const result = getValue(expr.args.value?.[0], state);
-    result.name = `SLEEP(${result.name})`;
-    const sleep_ms = convertNum(result.value);
-    if (sleep_ms > 0) {
-        result.sleep_ms = sleep_ms * 1000;
-    }
-    return result;
-}
-function length(expr, state) {
-    const result = getValue(expr.args.value?.[0], state);
-    result.name = `LENGTH(${result.name})`;
-    result.type = 'number';
-    if (!result.err && result.value !== null) {
-        result.value = String(result.value).length;
-    }
-    return result;
-}
-function concat(expr, state) {
-    let err;
-    let value = '';
-    expr.args.value?.every?.((sub) => {
-        const result = getValue(sub, state);
-        if (!err && result.err) {
-            err = result.err;
-        }
-        else if (result.value === null) {
-            value = null;
-        }
-        else {
-            value += String(result.value);
-        }
-        return value !== null;
-    });
-    return { err, value };
-}
-function left(expr, state) {
-    const result = getValue(expr.args?.value?.[0], state);
-    const len_result = getValue(expr.args?.value?.[1], state);
-    result.name = `LEFT(${result.name ?? ''}, ${len_result.name ?? ''})`;
-    result.err = result.err || len_result.err;
-    result.type = 'string';
-    if (!result.err && (result.value === null || len_result.value === null)) {
-        result.value = null;
-    }
-    else if (!result.err) {
-        const length = convertNum(len_result.value);
-        result.value = String(result.value).substring(0, length);
-    }
-    return result;
-}
-function coalesce(expr, state) {
-    let err;
-    let value = null;
-    let type;
-    expr.args.value?.some?.((sub) => {
-        const result = getValue(sub, state);
-        if (result.err) {
-            err = result.err;
-        }
-        value = result.value;
-        type = result.type;
-        return !err && value !== null;
-    });
-    return { err, value, type };
-}
-const ifnull = coalesce;
-function now(expr, state) {
-    const result = getValue(expr.args?.value?.[0], state);
-    result.name = expr.args ? `NOW(${result.name ?? ''})` : 'CURRENT_TIMESTAMP';
-    if (!result.err && result.type) {
-        const decimals = typeof result.value === 'number' ? result.value : 0;
-        if (decimals > 6) {
-            result.err = 'ER_TOO_BIG_PRECISION';
-        }
-        result.value = createSQLDateTime(Date.now() / 1000, 'datetime', decimals);
-        result.type = 'datetime';
-    }
-    return result;
-}
-const current_timestamp = now;
-function from_unixtime(expr, state) {
-    const result = getValue(expr.args.value?.[0], state);
-    result.name = `FROM_UNIXTIME(${result.name})`;
-    result.type = 'datetime';
-    if (!result.err && result.value !== null) {
-        const time = convertNum(result.value);
-        const decimals = Math.min(6, String(time).split('.')?.[1]?.length || 0);
-        result.value =
-            time < 0 ? null : createSQLDateTime(time, 'datetime', decimals);
-    }
-    return result;
-}
-function date(expr, state) {
-    const result = getValue(expr.args.value?.[0], state);
-    result.name = `DATE(${result.name})`;
-    result.type = 'date';
-    if (!result.err && result.value !== null) {
-        const dateValue = convertDateTime(result.value);
-        if (dateValue &&
-            typeof dateValue === 'object' &&
-            'setType' in dateValue &&
-            typeof dateValue.setType === 'function') {
-            dateValue.setType('date');
-        }
-        result.value = dateValue;
-    }
-    return result;
-}
-function date_format(expr, state) {
-    const date = getValue(expr.args.value?.[0], state);
-    const format = getValue(expr.args.value?.[1], state);
-    const err = date.err || format.err;
-    let value;
-    const name = `DATE_FORMAT(${date.name}, ${format.name})`;
-    if (!err && (date.value === null || format.value === null)) {
-        value = null;
-    }
-    else if (!err) {
-        value =
-            convertDateTime(date.value)?.dateFormat?.(String(format.value)) || null;
-    }
-    return { err, name, value, type: 'string' };
-}
-function datediff(expr, state) {
-    const expr1 = getValue(expr.args.value?.[0], state);
-    const expr2 = getValue(expr.args.value?.[1], state);
-    const err = expr1.err || expr2.err;
-    let value;
-    const name = `DATEDIFF(${expr1.name}, ${expr2.name})`;
-    if (!err && (expr1.value === null || expr2.value === null)) {
-        value = null;
-    }
-    else if (!err) {
-        value =
-            convertDateTime(expr1.value)?.diff?.(convertDateTime(expr2.value)) ||
-                null;
-    }
-    return { err, name, value, type: 'int' };
-}
-function curdate(expr) {
-    const value = createSQLDateTime(Date.now() / 1000, 'date');
-    const name = expr.args ? 'CURDATE()' : 'CURRENT_DATE';
-    return { err: null, value, name, type: 'date' };
-}
-const current_date = curdate;
-function curtime(expr, state) {
-    const result = getValue(expr.args?.value?.[0], state);
-    result.name = expr.args ? `CURTIME(${result.name ?? ''})` : 'CURRENT_TIME';
-    if (!result.err && result.type) {
-        const decimals = typeof result.value === 'number' ? result.value : 0;
-        if (decimals > 6) {
-            result.err = 'ER_TOO_BIG_PRECISION';
-        }
-        const time = (Date.now() / 1000) % DAY;
-        result.value = createSQLTime(time, decimals);
-        result.type = 'time';
-    }
-    return result;
-}
-const current_time = curtime;
-
-var Functions$1 = /*#__PURE__*/Object.freeze({
-    __proto__: null,
-    coalesce: coalesce,
-    concat: concat,
-    curdate: curdate,
-    current_date: current_date,
-    current_time: current_time,
-    current_timestamp: current_timestamp,
-    curtime: curtime,
-    database: database,
-    date: date,
-    date_format: date_format,
-    datediff: datediff,
-    from_unixtime: from_unixtime,
-    ifnull: ifnull,
-    left: left,
-    length: length,
-    now: now,
-    sleep: sleep
-});
+const methods$2 = { interval };
 
 function plus(expr, state) {
     return getValue(expr.expr, state);
@@ -3911,23 +3906,14 @@ function minus$1(expr, state) {
     }
     return result;
 }
-
-var UnaryExpression = /*#__PURE__*/Object.freeze({
-    __proto__: null,
-    "!": not$1,
-    "+": plus,
-    "-": minus$1,
-    not: not$1
-});
+const methods$1 = { '+': plus, '!': not$1, not: not$1, '-': minus$1 };
 
 function version_comment() {
     return 'dynamosql source version';
 }
-
-var SystemVariables = /*#__PURE__*/Object.freeze({
-    __proto__: null,
-    version_comment: version_comment
-});
+const methods = {
+    version_comment,
+};
 
 // Helper to extract function name from node-sql-parser AST format
 function getFunctionName(nameObj) {
@@ -3997,12 +3983,12 @@ function getValue(expr, state) {
         result.type = 'buffer';
     }
     else if (type === 'interval') {
-        result = interval(expr, state);
+        result = methods$2.interval(expr, state);
     }
     else if (type === 'function') {
         const funcExpr = expr;
         const funcName = getFunctionName(funcExpr.name);
-        const func = Functions$1[funcName.toLowerCase()];
+        const func = methods$3[funcName.toLowerCase()];
         if (func) {
             result = func(funcExpr, state);
             if (!result.name) {
@@ -4017,7 +4003,7 @@ function getValue(expr, state) {
     else if (type === 'aggr_func') {
         const aggrExpr = expr;
         const funcName = getFunctionName(aggrExpr.name);
-        const func = AggregateFunctions[funcName.toLowerCase()];
+        const func = methods$6[funcName.toLowerCase()];
         if (func) {
             result = func(aggrExpr, state);
             if (!result.name) {
@@ -4031,7 +4017,7 @@ function getValue(expr, state) {
     }
     else if (type === 'binary_expr') {
         const binExpr = expr;
-        const func = BinaryExpression[binExpr.operator.toLowerCase()];
+        const func = methods$5[binExpr.operator.toLowerCase()];
         if (func) {
             result = func(binExpr, state);
             if (!result.name) {
@@ -4045,7 +4031,7 @@ function getValue(expr, state) {
     }
     else if (type === 'unary_expr') {
         const unaryExpr = expr;
-        const func = UnaryExpression[unaryExpr.operator.toLowerCase()];
+        const func = methods$1[unaryExpr.operator.toLowerCase()];
         if (func) {
             result = func(unaryExpr, state);
             if (!result.name) {
@@ -4063,7 +4049,7 @@ function getValue(expr, state) {
             ? castExpr.target[0]
             : castExpr.target;
         const dataType = target?.dataType;
-        const func = Cast[dataType?.toLowerCase()];
+        const func = methods$4[dataType?.toLowerCase() ?? ''];
         if (func) {
             result = func(castExpr, state);
             if (!result.name) {
@@ -4079,9 +4065,9 @@ function getValue(expr, state) {
         const varExpr = expr;
         const { prefix } = varExpr;
         if (prefix === '@@') {
-            const func = SystemVariables[varExpr.name.toLowerCase()];
+            const func = methods[varExpr.name.toLowerCase()];
             if (func) {
-                result.value = func(session);
+                result.value = func();
             }
             else {
                 shared.logger.trace('expression.getValue: unknown system variable:', varExpr.name);
@@ -4387,7 +4373,7 @@ function convertWhere(expr, state) {
         else if (type === 'function') {
             const funcName = getFunctionName(expr.name);
             const func = Functions[funcName.toLowerCase()];
-            if (func) {
+            if (func && typeof func === 'function') {
                 const result = func(expr, state);
                 if (result.err) {
                     err = result.err;
@@ -4839,12 +4825,7 @@ async function createTable$1(params) {
             message: 'primary key is required',
         });
     }
-    const data = {
-        column_list,
-        primary_key,
-        row_list: [],
-        primary_map: new Map(),
-    };
+    const data = { column_list, primary_key, row_list: [], primary_map: new Map() };
     if (is_temp) {
         session.saveTempTable(database, table, data);
     }
@@ -6407,7 +6388,10 @@ async function runSelect(params) {
                 _addCollection(collection, keys, row);
             }
         });
-        const result = { key: from_key, list: [] };
+        const result = {
+            key: from_key,
+            list: [],
+        };
         result_list.push(result);
         collection.forEach((value0, key0) => {
             if (key_list.length > 1) {

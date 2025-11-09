@@ -1,3 +1,4 @@
+import * as SqlString from 'sqlstring';
 import { EventEmitter } from 'node:events';
 import { ReadableOptions, Readable } from 'node:stream';
 
@@ -148,9 +149,9 @@ type PoolConfig = SessionConfig;
 declare function createPool$1(args?: PoolConfig): Pool;
 declare class Pool extends EventEmitter {
     config: SessionConfig;
-    escape: any;
-    escapeId: any;
-    format: any;
+    escape: typeof SqlString.escape;
+    escapeId: typeof SqlString.escapeId;
+    format: typeof SqlString.format;
     constructor(args: PoolConfig);
     end(done?: (err?: MysqlError) => void): void;
     getConnection(done: (err: MysqlError | null, connection?: PoolConnection) => void): void;
@@ -166,7 +167,7 @@ declare const createSession: typeof createSession$1;
 declare const escape: EscapeFunctions["escape"];
 declare const escapeId: EscapeFunctions["escapeId"];
 declare const format: EscapeFunctions["format"];
-declare const raw: any;
+declare const raw: typeof SqlString.raw;
 
 export { SQLError, Types, createConnection, createPool, createPoolCluster, createSession, escape, escapeId, format, raw };
 export type { Connection, FieldInfo, MysqlError, OkPacket, PoolConfig, QueryCallback, QueryOptions, SessionConfig, QueryCallback as queryCallback };

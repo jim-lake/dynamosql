@@ -33,7 +33,7 @@ export interface EvaluationResult {
 }
 
 export function getValue(
-  expr: ExtendedExpressionValue,
+  expr: ExtendedExpressionValue | undefined,
   state: EvaluationState
 ): EvaluationResult {
   const { session, row } = state;
