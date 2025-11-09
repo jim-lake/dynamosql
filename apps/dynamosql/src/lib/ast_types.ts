@@ -5,14 +5,14 @@ import type { AST, From, ExpressionValue } from 'node-sql-parser/types';
 export interface Show {
   type: 'show';
   keyword: string;
-  expr?: any;
+  expr?: ExpressionValue;
   from?: From[];
 }
 
 export interface VarExpr {
   type: 'var';
   name: string;
-  members: any[];
+  members: ExpressionValue[];
   prefix: string | null;
 }
 

@@ -52,8 +52,8 @@ function _sort(
         return result;
       }
     } else {
-      const a_value = getValue(expr as never, { ...state, row: a });
-      const b_value = getValue(expr as never, { ...state, row: b });
+      const a_value = getValue(expr, { ...state, row: a });
+      const b_value = getValue(expr, { ...state, row: b });
       const err = a_value.err || b_value.err;
       if (err) {
         throw new SQLError(err);

@@ -3192,7 +3192,8 @@ function _equal$1(expr, state, op) {
         else if (left.value === right.value) {
             value = 1;
         }
-        else if (typeof left.value === 'string' && typeof right.value === 'string') {
+        else if (typeof left.value === 'string' &&
+            typeof right.value === 'string') {
             value = left.value.localeCompare(right.value) === 0 ? 1 : 0;
         }
     }
@@ -3212,7 +3213,9 @@ function _gt$1(expr_left, expr_right, state, op, flip) {
     const left = getValue(expr_left, state);
     const right = getValue(expr_right, state);
     const err = left.err || right.err;
-    const name = flip ? (right.name ?? '') + op + (left.name ?? '') : (left.name ?? '') + op + (right.name ?? '');
+    const name = flip
+        ? (right.name ?? '') + op + (left.name ?? '')
+        : (left.name ?? '') + op + (right.name ?? '');
     let value = 0;
     if (!err) {
         _convertCompare(left, right);
@@ -3222,10 +3225,12 @@ function _gt$1(expr_left, expr_right, state, op, flip) {
         else if (left.value === right.value) {
             value = 0;
         }
-        else if (typeof left.value === 'number' && typeof right.value === 'number') {
+        else if (typeof left.value === 'number' &&
+            typeof right.value === 'number') {
             value = left.value > right.value ? 1 : 0;
         }
-        else if (typeof left.value === 'string' && typeof right.value === 'string') {
+        else if (typeof left.value === 'string' &&
+            typeof right.value === 'string') {
             value = left.value.localeCompare(right.value) > 0 ? 1 : 0;
         }
     }
@@ -3241,7 +3246,9 @@ function _gte$1(expr_left, expr_right, state, op, flip) {
     const left = getValue(expr_left, state);
     const right = getValue(expr_right, state);
     const err = left.err || right.err;
-    const name = flip ? (right.name ?? '') + op + (left.name ?? '') : (left.name ?? '') + op + (right.name ?? '');
+    const name = flip
+        ? (right.name ?? '') + op + (left.name ?? '')
+        : (left.name ?? '') + op + (right.name ?? '');
     let value = 0;
     if (!err) {
         _convertCompare(left, right);
@@ -3251,10 +3258,12 @@ function _gte$1(expr_left, expr_right, state, op, flip) {
         else if (left.value === right.value) {
             value = 1;
         }
-        else if (typeof left.value === 'number' && typeof right.value === 'number') {
+        else if (typeof left.value === 'number' &&
+            typeof right.value === 'number') {
             value = convertNum(left.value) >= convertNum(right.value) ? 1 : 0;
         }
-        else if (typeof left.value === 'string' && typeof right.value === 'string') {
+        else if (typeof left.value === 'string' &&
+            typeof right.value === 'string') {
             value = left.value.localeCompare(right.value) >= 0 ? 1 : 0;
         }
     }
@@ -3797,7 +3806,10 @@ function date(expr, state) {
     result.type = 'date';
     if (!result.err && result.value !== null) {
         const dateValue = convertDateTime(result.value);
-        if (dateValue && typeof dateValue === 'object' && 'setType' in dateValue && typeof dateValue.setType === 'function') {
+        if (dateValue &&
+            typeof dateValue === 'object' &&
+            'setType' in dateValue &&
+            typeof dateValue.setType === 'function') {
             dateValue.setType('date');
         }
         result.value = dateValue;
@@ -4120,42 +4132,26 @@ function getValue(expr, state) {
     return result;
 }
 function _decodeCell(cell) {
-    let type;
-    let value;
-    const cellObj = cell;
-    if (!cellObj || cellObj.NULL) {
-        type = 'null';
-        value = null;
+    if (!cell || cell.NULL) {
+        return { type: 'null', value: null };
     }
-    else if (cellObj.value !== undefined) {
-        const typedCell = cellObj;
-        type = typedCell.type ?? typeof typedCell.value;
-        value = typedCell.value;
+    if (cell.value !== undefined) {
+        return { type: cell.type ?? typeof cell.value, value: cell.value };
     }
-    else if (cellObj.S !== undefined) {
-        type = 'string';
-        value = cellObj.S;
+    if (cell.S !== undefined) {
+        return { type: 'string', value: cell.S };
     }
-    else if (cellObj.N !== undefined) {
-        type = 'number';
-        value = cellObj.N;
+    if (cell.N !== undefined) {
+        return { type: 'number', value: cell.N };
     }
-    else if (cellObj.BOOL !== undefined) {
-        type = 'boolean';
-        value = cellObj.BOOL;
+    if (cell.BOOL !== undefined) {
+        return { type: 'boolean', value: cell.BOOL };
     }
-    else if (cellObj.M !== undefined) {
-        type = 'json';
-        value = mapToObject(cellObj.M);
+    if (cell.M !== undefined) {
+        return { type: 'json', value: mapToObject(cell.M) };
     }
-    else {
-        type = typeof cell;
-        value = cell;
-        if (type === 'object') {
-            type = 'json';
-        }
-    }
-    return { type, value };
+    const type = typeof cell;
+    return { type: type === 'object' ? 'json' : type, value: cell };
 }
 
 function constantFixup(func) {
@@ -5747,7 +5743,9 @@ function resolveReferences(ast, current_database) {
     });
     if (!err) {
         const groupby = ast.type === 'select' ? ast.groupby : undefined;
-        const orderby = ast.type === 'select' ? ast.orderby : ast.orderby;
+        const orderby = ast.type === 'select'
+            ? ast.orderby
+            : ast.orderby;
         const having = ast.type === 'select' ? ast.having : undefined;
         [groupby, orderby, having].forEach((item) => {
             walkColumnRefs(item, (object) => {
@@ -5777,8 +5775,7 @@ function _resolveObject(object, ast, db_map, table_map, name_cache, result_map) 
             let found = false;
             const astFrom = ast.from;
             astFrom?.forEach?.((from) => {
-                if (from.as === obj.table ||
-                    (!from.as && from.table === obj.table)) {
+                if (from.as === obj.table || (!from.as && from.table === obj.table)) {
                     from._requestAll = true;
                     found = true;
                 }
@@ -6018,7 +6015,8 @@ function _asc(a, b, column) {
     else if (typeof a === 'number' && typeof b === 'number') {
         return a - b;
     }
-    else if ((typeof column === 'object' && column.columnType === 246) ||
+    else if ((typeof column === 'object' &&
+        column.columnType === 246) ||
         column === 'number') {
         return _convertNum(a) - _convertNum(b);
     }
@@ -6113,7 +6111,10 @@ function _evaluateReturn(params) {
         const row = row_list[i];
         for (let j = 0; j < column_count; j++) {
             const column = query_columns[j];
-            const result = getValue(column.expr, { session, row });
+            const result = getValue(column.expr, {
+                session,
+                row,
+            });
             if (result.err) {
                 err = result.err;
                 break;
@@ -6152,7 +6153,10 @@ function _evaluateReturn(params) {
         column_list.push(column_type);
     }
     if (ast.orderby) {
-        const sort_err = sort(row_list, ast.orderby, { session, column_list: column_list });
+        const sort_err = sort(row_list, ast.orderby, {
+            session,
+            column_list: column_list,
+        });
         if (sort_err) {
             throw new SQLError(sort_err);
         }
@@ -6594,7 +6598,9 @@ async function _runInsert(params) {
             const obj = {};
             if (row.value.length === ast.columns.length) {
                 ast.columns.forEach((name, j) => {
-                    const expr_result = getValue(row.value[j], { session });
+                    const expr_result = getValue(row.value[j], {
+                        session,
+                    });
                     if (expr_result.err) {
                         throw new SQLError(expr_result.err);
                     }

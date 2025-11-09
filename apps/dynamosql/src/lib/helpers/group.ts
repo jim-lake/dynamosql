@@ -43,7 +43,10 @@ export function formGroup(params: FormGroupParams): FormGroupResult {
   const group_map: Record<string, unknown> = {};
   row_list.forEach((row: RowMap) => {
     const key_list = groupby.map((group: unknown) => {
-      const result = getValue(group as never, { session, row });
+      const result = getValue(
+        group as import('../ast_types').ExtendedExpressionValue,
+        { session, row }
+      );
       if (result.err && !err) {
         err = result.err;
       }

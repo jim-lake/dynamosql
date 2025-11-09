@@ -190,35 +190,38 @@ export function getValue(
   return result;
 }
 
-function _decodeCell(cell: unknown): { type: string; value: unknown } {
-  let type: string;
-  let value: unknown;
-  const cellObj = cell as Record<string, unknown> | null | undefined;
-  if (!cellObj || (cellObj as { NULL?: boolean }).NULL) {
-    type = 'null';
-    value = null;
-  } else if ((cellObj as { value?: unknown }).value !== undefined) {
-    const typedCell = cellObj as { type?: string; value: unknown };
-    type = typedCell.type ?? typeof typedCell.value;
-    value = typedCell.value;
-  } else if ((cellObj as { S?: string }).S !== undefined) {
-    type = 'string';
-    value = (cellObj as { S: string }).S;
-  } else if ((cellObj as { N?: string }).N !== undefined) {
-    type = 'number';
-    value = (cellObj as { N: string }).N;
-  } else if ((cellObj as { BOOL?: boolean }).BOOL !== undefined) {
-    type = 'boolean';
-    value = (cellObj as { BOOL: boolean }).BOOL;
-  } else if ((cellObj as { M?: Record<string, unknown> }).M !== undefined) {
-    type = 'json';
-    value = mapToObject((cellObj as { M: Record<string, unknown> }).M);
-  } else {
-    type = typeof cell;
-    value = cell;
-    if (type === 'object') {
-      type = 'json';
-    }
+interface DynamoDBAttributeValue {
+  NULL?: boolean;
+  S?: string;
+  N?: string;
+  BOOL?: boolean;
+  M?: Record<string, unknown>;
+  value?: unknown;
+  type?: string;
+}
+
+function _decodeCell(cell: DynamoDBAttributeValue | null | undefined): {
+  type: string;
+  value: unknown;
+} {
+  if (!cell || cell.NULL) {
+    return { type: 'null', value: null };
   }
-  return { type, value };
+  if (cell.value !== undefined) {
+    return { type: cell.type ?? typeof cell.value, value: cell.value };
+  }
+  if (cell.S !== undefined) {
+    return { type: 'string', value: cell.S };
+  }
+  if (cell.N !== undefined) {
+    return { type: 'number', value: cell.N };
+  }
+  if (cell.BOOL !== undefined) {
+    return { type: 'boolean', value: cell.BOOL };
+  }
+  if (cell.M !== undefined) {
+    return { type: 'json', value: mapToObject(cell.M) };
+  }
+  const type = typeof cell;
+  return { type: type === 'object' ? 'json' : type, value: cell };
 }

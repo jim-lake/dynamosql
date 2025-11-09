@@ -72,7 +72,10 @@ function _findRows(
 
     let skip = false;
     if (on) {
-      const result = getValue(on as never, { session, row });
+      const result = getValue(
+        on as import('../ast_types').ExtendedExpressionValue,
+        { session, row }
+      );
       if (result.err) {
         err = result.err;
       } else if (!result.value) {
