@@ -2,25 +2,37 @@ import { getValue } from '../expression';
 import type { Session } from '../../session';
 import type { From, Binary, Function } from 'node-sql-parser/types';
 
+interface SourceMap {
+  [key: string]: unknown[];
+}
+
+interface RowMap {
+  [key: string]: unknown;
+}
+
 interface FormJoinParams {
-  source_map: any;
+  source_map: SourceMap;
   from: From[];
   where: Binary | Function | null;
   session: Session;
 }
 
+type ErrorResult = { err: string; args?: unknown[] } | string | null;
+
 interface FormJoinResult {
-  err: any;
-  row_list: any[];
+  err: ErrorResult;
+  row_list: RowMap[];
 }
 
 export function formJoin(params: FormJoinParams): FormJoinResult {
   const { source_map, from, where, session } = params;
-  const row_list: any[] = [];
-  from.forEach((from_table: any) => {
-    row_list[from_table.key] = [];
-    from_table.is_left = from_table.join?.indexOf?.('LEFT') >= 0;
-  });
+  const row_list: RowMap[] = [];
+  from.forEach(
+    (from_table: From & { key?: string; is_left?: boolean; join?: string }) => {
+      row_list[from_table.key ?? ''] = [];
+      from_table.is_left = from_table.join?.indexOf?.('LEFT') >= 0;
+    }
+  );
   const result = _findRows(source_map, from, where, session, row_list, 0, 0);
   const { err, output_count } = result;
   if (!err) {
@@ -30,15 +42,15 @@ export function formJoin(params: FormJoinParams): FormJoinResult {
 }
 
 function _findRows(
-  source_map: any,
-  list: any[], // From[] with extended properties
+  source_map: SourceMap,
+  list: (From & { key?: string; on?: unknown; is_left?: boolean })[],
   where: Binary | Function | null,
   session: Session,
-  row_list: any[],
+  row_list: RowMap[],
   from_index: number,
   start_index: number
-): { err: any; output_count: number } {
-  let err;
+): { err: ErrorResult; output_count: number } {
+  let err: ErrorResult = null;
   const from = list[from_index];
   const { key, on, is_left } = from;
   const rows = source_map[key];
@@ -60,7 +72,7 @@ function _findRows(
 
     let skip = false;
     if (on) {
-      const result = getValue(on, { session, row });
+      const result = getValue(on as never, { session, row });
       if (result.err) {
         err = result.err;
       } else if (!result.value) {

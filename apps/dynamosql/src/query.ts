@@ -122,7 +122,7 @@ export class Query extends EventEmitter {
   private async _singleQuery(
     ast: ExtendedAST
   ): Promise<{
-    result: HandlerResult | any[] | OkPacket;
+    result: HandlerResult | unknown[] | OkPacket;
     columns: FieldInfo[];
   }> {
     const params = {
@@ -159,40 +159,52 @@ export class Query extends EventEmitter {
         return { result: await UpdateHandler.query(params), columns: [] };
       case 'use':
         return await _useDatabase({ ast, session: this._session });
-      default:
-        logger.error('unsupported statement type:', ast);
+      default: {
+        const unknownAst = ast as { type?: string };
+        logger.error('unsupported statement type:', unknownAst);
         throw new SQLError({
           err: 'unsupported_type',
-          args: [(ast as any)?.type],
+          args: [unknownAst?.type ?? 'unknown'],
         });
+      }
     }
   }
 
-  private _transformResult(list: any, columns: FieldInfo[]): void {
+  private _transformResult(list: unknown, columns: FieldInfo[]): void {
     if (this._session.resultObjects && Array.isArray(list)) {
-      list.forEach((result: any, i: number) => {
-        const obj: any = {};
+      list.forEach((result: unknown, i: number) => {
+        const obj: Record<string, unknown> = {};
         columns.forEach((column: FieldInfo, j: number) => {
-          const value = this._convertCell(result[j], column);
+          const resultArray = result as unknown[];
+          const value = this._convertCell(resultArray[j], column);
           if (this.nestedTables === false) {
             obj[column.name] = value;
           } else if (typeof this.nestedTables === 'string') {
             obj[`${column.table}${this.nestedTables}${column.name}`] = value;
           } else {
-            if (!obj[column.table]) {
+            const tableObj = obj[column.table] as Record<string, unknown>;
+            if (!tableObj) {
               obj[column.table] = {};
             }
-            obj[column.table][column.name] = value;
+            (obj[column.table] as Record<string, unknown>)[column.name] = value;
           }
         });
         list[i] = obj;
       });
     }
   }
-  private _convertCell(value: any, column: FieldInfo): any {
+  private _convertCell(value: unknown, column: FieldInfo): unknown {
     if (typeof this.typeCast === 'function') {
-      return this.typeCast(column as any, () =>
-        typeCast(value, column, this._session.typeCastOptions)
+      const { type, ...untypedColumn } = column;
+      return this.typeCast(
+        {
+          ...untypedColumn,
+          type: String(type),
+          length: column.length,
+          string: () => (value === null ? null : String(value)),
+          buffer: () => (value === null ? null : Buffer.from(String(value))),
+        },
+        () => typeCast(value, column, this._session.typeCastOptions)
       );
     }
     return this.typeCast
@@ -201,8 +213,11 @@ export class Query extends EventEmitter {
   }
 }
 
-function _astify(sql: string): { err: any; list: ExtendedAST[] } {
-  let err: any;
+function _astify(sql: string): {
+  err: { err: string; args: [number, number] } | null;
+  list: ExtendedAST[];
+} {
+  let err: { err: string; args: [number, number] } | null = null;
   let list: ExtendedAST[] = [];
   try {
     const result = g_parser.astify(sql, { database: 'MySQL' });
@@ -211,10 +226,12 @@ function _astify(sql: string): { err: any; list: ExtendedAST[] } {
     } else {
       list = [result];
     }
-  } catch (e: any) {
+  } catch (e: unknown) {
     logger.error('parse error:', e);
-    const start = e?.location?.start;
-    err = { err: 'parse', args: [start?.line, start?.column] };
+    const start = (
+      e as { location?: { start?: { line: number; column: number } } }
+    )?.location?.start;
+    err = { err: 'parse', args: [start?.line ?? 0, start?.column ?? 0] };
   }
   return { err, list };
 }

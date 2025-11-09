@@ -24,12 +24,11 @@ export interface EvaluationState {
 }
 
 export interface EvaluationResult {
-  err: any;
-  value: any;
+  err: { err: string; args?: unknown[] } | string | null;
+  value: unknown;
   name?: string;
   type?: string;
   sleep_ms?: number;
-  [key: string]: any;
 }
 
 export function getValue(
@@ -191,27 +190,29 @@ export function getValue(
   return result;
 }
 
-function _decodeCell(cell: any): { type: string; value: any } {
-  let type;
-  let value;
-  if (!cell || cell.NULL) {
+function _decodeCell(cell: unknown): { type: string; value: unknown } {
+  let type: string;
+  let value: unknown;
+  const cellObj = cell as Record<string, unknown> | null | undefined;
+  if (!cellObj || (cellObj as { NULL?: boolean }).NULL) {
     type = 'null';
     value = null;
-  } else if (cell.value) {
-    type = cell.type ?? typeof cell.value;
-    value = cell.value;
-  } else if (cell.S) {
+  } else if ((cellObj as { value?: unknown }).value !== undefined) {
+    const typedCell = cellObj as { type?: string; value: unknown };
+    type = typedCell.type ?? typeof typedCell.value;
+    value = typedCell.value;
+  } else if ((cellObj as { S?: string }).S !== undefined) {
     type = 'string';
-    value = cell.S;
-  } else if (cell.N) {
+    value = (cellObj as { S: string }).S;
+  } else if ((cellObj as { N?: string }).N !== undefined) {
     type = 'number';
-    value = cell.N;
-  } else if (cell.BOOL) {
+    value = (cellObj as { N: string }).N;
+  } else if ((cellObj as { BOOL?: boolean }).BOOL !== undefined) {
     type = 'boolean';
-    value = cell.BOOL;
-  } else if (cell.M) {
+    value = (cellObj as { BOOL: boolean }).BOOL;
+  } else if ((cellObj as { M?: Record<string, unknown> }).M !== undefined) {
     type = 'json';
-    value = mapToObject(cell.M);
+    value = mapToObject((cellObj as { M: Record<string, unknown> }).M);
   } else {
     type = typeof cell;
     value = cell;

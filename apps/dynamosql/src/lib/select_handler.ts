@@ -9,6 +9,27 @@ import { logger } from '@dynamosql/shared';
 import { SQLError } from '../error';
 import type { HandlerParams, SelectResult } from './handler_types';
 
+interface SourceMap {
+  [key: string]: unknown[];
+}
+
+interface ColumnMap {
+  [key: string]: string[];
+}
+
+interface QueryColumn {
+  expr: unknown;
+  as: string | null;
+  result_type?: string;
+  result_name?: string;
+  result_nullable?: boolean;
+}
+
+interface RowWithResult {
+  [key: string]: unknown;
+  '@@result'?: unknown[];
+}
+
 export async function query(params: HandlerParams): Promise<SelectResult> {
   const { output_row_list, column_list } = await internalQuery(params);
 
@@ -23,20 +44,20 @@ export async function query(params: HandlerParams): Promise<SelectResult> {
 
 export async function internalQuery(
   params: HandlerParams & { skip_resolve?: boolean }
-): Promise<SelectResult & { row_list: any[] }> {
+): Promise<SelectResult & { row_list: RowWithResult[] }> {
   const { ast, session, dynamodb } = params;
 
   const current_database = session.getCurrentDatabase();
   if (!params.skip_resolve) {
-    const resolve_err = resolveReferences(ast, current_database);
+    const resolve_err = resolveReferences(ast, current_database ?? undefined);
     if (resolve_err) {
       logger.error('select: resolve err:', resolve_err);
       throw new SQLError(resolve_err);
     }
   }
 
-  let source_map: any = null;
-  let column_map: any = {};
+  let source_map: SourceMap = {};
+  let column_map: ColumnMap = {};
 
   if (ast?.from?.length) {
     const db = ast.from?.[0]?.db;
@@ -52,14 +73,14 @@ export async function internalQuery(
 }
 
 function _evaluateReturn(
-  params: HandlerParams & { source_map: any; column_map: any }
-): SelectResult & { row_list: any[] } {
+  params: HandlerParams & { source_map: SourceMap; column_map: ColumnMap }
+): SelectResult & { row_list: RowWithResult[] } {
   const { session, source_map, ast } = params;
   const query_columns = _expandStarColumns(params);
 
   const { from, where, groupby } = ast;
-  let err: any;
-  let row_list: any;
+  let err: { err: string; args?: unknown[] } | string | null = null;
+  let row_list: RowWithResult[];
   let sleep_ms = 9;
 
   if (from) {
@@ -86,11 +107,14 @@ function _evaluateReturn(
   const column_count = query_columns?.length || 0;
 
   for (let i = 0; i < row_count && !err; i++) {
-    const output_row: any[] = [];
+    const output_row: unknown[] = [];
     const row = row_list[i];
     for (let j = 0; j < column_count; j++) {
       const column = query_columns[j];
-      const result = Expression.getValue(column.expr, { session, row });
+      const result = Expression.getValue(column.expr as never, {
+        session,
+        row,
+      });
       if (result.err) {
         err = result.err;
         break;
@@ -117,20 +141,26 @@ function _evaluateReturn(
     throw new SQLError(err);
   }
 
-  const column_list: any[] = [];
+  const column_list: unknown[] = [];
   for (let i = 0; i < column_count; i++) {
     const column = query_columns[i];
     const column_type = convertType(column.result_type, column.result_nullable);
+    const exprObj = column.expr as {
+      from?: { table?: string; as?: string; db?: string };
+    };
     column_type.orgName = column.result_name || '';
     column_type.name = column.as || column_type.orgName;
-    column_type.orgTable = column?.expr?.from?.table || '';
-    column_type.table = column?.expr?.from?.as || column_type.orgTable;
-    column_type.schema = column.expr?.from?.db || '';
+    column_type.orgTable = exprObj?.from?.table || '';
+    column_type.table = exprObj?.from?.as || column_type.orgTable;
+    column_type.schema = exprObj?.from?.db || '';
     column_list.push(column_type);
   }
 
   if (ast.orderby) {
-    const sort_err = sort(row_list, ast.orderby, { session, column_list });
+    const sort_err = sort(row_list as never, ast.orderby, {
+      session,
+      column_list: column_list as never,
+    });
     if (sort_err) {
       throw new SQLError(sort_err);
     }
@@ -162,24 +192,41 @@ function _evaluateReturn(
   return { output_row_list, column_list, row_list };
 }
 
-function _expandStarColumns(params: { ast: any; column_map: any }): any[] {
+function _expandStarColumns(params: {
+  ast: unknown;
+  column_map: ColumnMap;
+}): QueryColumn[] {
   const { ast, column_map } = params;
-  const ret: any[] = [];
-  ast?.columns?.forEach?.((column: any) => {
-    if (column?.expr?.type === 'column_ref' && column.expr.column === '*') {
-      const { db, table } = column.expr;
-      ast.from.forEach((from: any) => {
+  const astObj = ast as { columns?: unknown[]; from?: unknown[] };
+  const ret: QueryColumn[] = [];
+  astObj?.columns?.forEach?.((column: unknown) => {
+    const col = column as {
+      expr?: { type?: string; column?: string; db?: string; table?: string };
+      as?: string | null;
+    };
+    if (col?.expr?.type === 'column_ref' && col.expr.column === '*') {
+      const { db, table } = col.expr;
+      const fromList = astObj.from as
+        | Array<{
+            db?: string;
+            table?: string;
+            as?: string;
+            key?: string;
+            _requestSet?: Set<string>;
+          }>
+        | undefined;
+      fromList?.forEach((from) => {
         if (
           (!db && !table) ||
           (db && from.db === db && from.table === table && !from.as) ||
           (!db && from.table === table && !from.as) ||
           (!db && from.as === table)
         ) {
-          const column_list = column_map[from.key];
-          if (!column_list.length) {
-            from._requestSet.forEach((name: string) => column_list.push(name));
+          const column_list = column_map[from.key ?? ''];
+          if (!column_list?.length) {
+            from._requestSet?.forEach((name: string) => column_list.push(name));
           }
-          column_list.forEach((name: string) => {
+          column_list?.forEach((name: string) => {
             ret.push({
               expr: {
                 type: 'column_ref',
@@ -194,14 +241,17 @@ function _expandStarColumns(params: { ast: any; column_map: any }): any[] {
         }
       });
     } else {
-      ret.push(column);
+      ret.push(col as QueryColumn);
     }
   });
   return ret;
 }
 
-function _unionType(old_type: any, new_type: any): any {
-  let ret = new_type;
+function _unionType(
+  old_type: string | undefined,
+  new_type: string | undefined
+): string {
+  let ret = new_type ?? 'string';
   if (!old_type || old_type === 'null') {
     // noop
   } else if (new_type === 'null') {

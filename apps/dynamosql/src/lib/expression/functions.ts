@@ -100,7 +100,7 @@ export function now(expr: Function, state: EvaluationState): EvaluationResult {
   const result = getValue(expr.args?.value?.[0], state);
   result.name = expr.args ? `NOW(${result.name ?? ''})` : 'CURRENT_TIMESTAMP';
   if (!result.err && result.type) {
-    const decimals = result.value || 0;
+    const decimals = typeof result.value === 'number' ? result.value : 0;
     if (decimals > 6) {
       result.err = 'ER_TOO_BIG_PRECISION';
     }
@@ -133,8 +133,16 @@ export function date(expr: Function, state: EvaluationState): EvaluationResult {
   result.name = `DATE(${result.name})`;
   result.type = 'date';
   if (!result.err && result.value !== null) {
-    result.value = convertDateTime(result.value);
-    result.value?.setType?.('date');
+    const dateValue = convertDateTime(result.value);
+    if (
+      dateValue &&
+      typeof dateValue === 'object' &&
+      'setType' in dateValue &&
+      typeof dateValue.setType === 'function'
+    ) {
+      dateValue.setType('date');
+    }
+    result.value = dateValue;
   }
   return result;
 }
@@ -191,7 +199,7 @@ export function curtime(
   const result = getValue(expr.args?.value?.[0], state);
   result.name = expr.args ? `CURTIME(${result.name ?? ''})` : 'CURRENT_TIME';
   if (!result.err && result.type) {
-    const decimals = result.value || 0;
+    const decimals = typeof result.value === 'number' ? result.value : 0;
     if (decimals > 6) {
       result.err = 'ER_TOO_BIG_PRECISION';
     }

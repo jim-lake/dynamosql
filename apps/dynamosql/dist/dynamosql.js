@@ -3153,9 +3153,9 @@ function _convertCompare(left, right) {
     if (left.value !== null &&
         right.value !== null &&
         left.value !== right.value) {
-        if ((_isDateLike(left.type) || _isDateLike(right.type)) &&
+        if ((_isDateLike(left.type ?? '') || _isDateLike(right.type ?? '')) &&
             left.type !== right.type) {
-            const union = _unionDateTime(left.type, right.type);
+            const union = _unionDateTime(left.type ?? '', right.type ?? '');
             if (union === 'date' || union === 'datetime') {
                 left.value = convertDateTime(left.value, union, 6) ?? left.value;
                 right.value = convertDateTime(right.value, union, 6) ?? right.value;
@@ -3182,7 +3182,7 @@ function _equal$1(expr, state, op) {
     const left = getValue(expr.left, state);
     const right = getValue(expr.right, state);
     const err = left.err || right.err;
-    const name = left.name + op + right.name;
+    const name = (left.name ?? '') + op + (right.name ?? '');
     let value = 0;
     if (!err) {
         _convertCompare(left, right);
@@ -3192,7 +3192,7 @@ function _equal$1(expr, state, op) {
         else if (left.value === right.value) {
             value = 1;
         }
-        else if (typeof left.value === 'string') {
+        else if (typeof left.value === 'string' && typeof right.value === 'string') {
             value = left.value.localeCompare(right.value) === 0 ? 1 : 0;
         }
     }
@@ -3212,7 +3212,7 @@ function _gt$1(expr_left, expr_right, state, op, flip) {
     const left = getValue(expr_left, state);
     const right = getValue(expr_right, state);
     const err = left.err || right.err;
-    const name = flip ? right.name + op + left.name : left.name + op + right.name;
+    const name = flip ? (right.name ?? '') + op + (left.name ?? '') : (left.name ?? '') + op + (right.name ?? '');
     let value = 0;
     if (!err) {
         _convertCompare(left, right);
@@ -3222,10 +3222,10 @@ function _gt$1(expr_left, expr_right, state, op, flip) {
         else if (left.value === right.value) {
             value = 0;
         }
-        else if (typeof left.value === 'number') {
+        else if (typeof left.value === 'number' && typeof right.value === 'number') {
             value = left.value > right.value ? 1 : 0;
         }
-        else {
+        else if (typeof left.value === 'string' && typeof right.value === 'string') {
             value = left.value.localeCompare(right.value) > 0 ? 1 : 0;
         }
     }
@@ -3241,7 +3241,7 @@ function _gte$1(expr_left, expr_right, state, op, flip) {
     const left = getValue(expr_left, state);
     const right = getValue(expr_right, state);
     const err = left.err || right.err;
-    const name = flip ? right.name + op + left.name : left.name + op + right.name;
+    const name = flip ? (right.name ?? '') + op + (left.name ?? '') : (left.name ?? '') + op + (right.name ?? '');
     let value = 0;
     if (!err) {
         _convertCompare(left, right);
@@ -3251,10 +3251,10 @@ function _gte$1(expr_left, expr_right, state, op, flip) {
         else if (left.value === right.value) {
             value = 1;
         }
-        else if (typeof left.value === 'number') {
+        else if (typeof left.value === 'number' && typeof right.value === 'number') {
             value = convertNum(left.value) >= convertNum(right.value) ? 1 : 0;
         }
-        else {
+        else if (typeof left.value === 'string' && typeof right.value === 'string') {
             value = left.value.localeCompare(right.value) >= 0 ? 1 : 0;
         }
     }
@@ -3769,7 +3769,7 @@ function now(expr, state) {
     const result = getValue(expr.args?.value?.[0], state);
     result.name = expr.args ? `NOW(${result.name ?? ''})` : 'CURRENT_TIMESTAMP';
     if (!result.err && result.type) {
-        const decimals = result.value || 0;
+        const decimals = typeof result.value === 'number' ? result.value : 0;
         if (decimals > 6) {
             result.err = 'ER_TOO_BIG_PRECISION';
         }
@@ -3796,8 +3796,11 @@ function date(expr, state) {
     result.name = `DATE(${result.name})`;
     result.type = 'date';
     if (!result.err && result.value !== null) {
-        result.value = convertDateTime(result.value);
-        result.value?.setType?.('date');
+        const dateValue = convertDateTime(result.value);
+        if (dateValue && typeof dateValue === 'object' && 'setType' in dateValue && typeof dateValue.setType === 'function') {
+            dateValue.setType('date');
+        }
+        result.value = dateValue;
     }
     return result;
 }
@@ -3842,7 +3845,7 @@ function curtime(expr, state) {
     const result = getValue(expr.args?.value?.[0], state);
     result.name = expr.args ? `CURTIME(${result.name ?? ''})` : 'CURRENT_TIME';
     if (!result.err && result.type) {
-        const decimals = result.value || 0;
+        const decimals = typeof result.value === 'number' ? result.value : 0;
         if (decimals > 6) {
             result.err = 'ER_TOO_BIG_PRECISION';
         }
@@ -4119,29 +4122,31 @@ function getValue(expr, state) {
 function _decodeCell(cell) {
     let type;
     let value;
-    if (!cell || cell.NULL) {
+    const cellObj = cell;
+    if (!cellObj || cellObj.NULL) {
         type = 'null';
         value = null;
     }
-    else if (cell.value) {
-        type = cell.type ?? typeof cell.value;
-        value = cell.value;
+    else if (cellObj.value !== undefined) {
+        const typedCell = cellObj;
+        type = typedCell.type ?? typeof typedCell.value;
+        value = typedCell.value;
     }
-    else if (cell.S) {
+    else if (cellObj.S !== undefined) {
         type = 'string';
-        value = cell.S;
+        value = cellObj.S;
     }
-    else if (cell.N) {
+    else if (cellObj.N !== undefined) {
         type = 'number';
-        value = cell.N;
+        value = cellObj.N;
     }
-    else if (cell.BOOL) {
+    else if (cellObj.BOOL !== undefined) {
         type = 'boolean';
-        value = cell.BOOL;
+        value = cellObj.BOOL;
     }
-    else if (cell.M) {
+    else if (cellObj.M !== undefined) {
         type = 'json';
-        value = mapToObject(cell.M);
+        value = mapToObject(cellObj.M);
     }
     else {
         type = typeof cell;
@@ -5663,7 +5668,7 @@ function convertType(type, nullable) {
 }
 
 function resolveReferences(ast, current_database) {
-    let err;
+    let err = null;
     const table_map = {};
     const db_map = {};
     const from = ast.type === 'select' ? ast.from : ast.from;
@@ -5732,11 +5737,12 @@ function resolveReferences(ast, current_database) {
     const result_map = {};
     const columns = ast.type === 'select' ? ast.columns : undefined;
     columns?.forEach?.((column, i) => {
-        if (column.as) {
-            result_map[column.as] = i;
+        const col = column;
+        if (col.as) {
+            result_map[col.as] = i;
         }
-        else if (column.expr?.type === 'column_ref') {
-            result_map[column.expr.column] = i;
+        else if (col.expr?.type === 'column_ref') {
+            result_map[col.expr.column ?? ''] = i;
         }
     });
     if (!err) {
@@ -5755,32 +5761,35 @@ function resolveReferences(ast, current_database) {
     return err;
 }
 function _resolveObject(object, ast, db_map, table_map, name_cache, result_map) {
-    let err;
-    if (object.column === '*') {
-        if (object.db) {
-            const from = db_map[object.db]?.[object.table];
+    let err = null;
+    const obj = object;
+    if (obj.column === '*') {
+        if (obj.db) {
+            const from = db_map[obj.db]?.[obj.table ?? ''];
             if (from) {
                 from._requestAll = true;
             }
             else {
-                err = { err: 'table_not_found', args: [object.table] };
+                err = { err: 'table_not_found', args: [obj.table] };
             }
         }
-        else if (object.table) {
+        else if (obj.table) {
             let found = false;
-            ast.from?.forEach?.((from) => {
-                if (from.as === object.table ||
-                    (!from.as && from.table === object.table)) {
+            const astFrom = ast.from;
+            astFrom?.forEach?.((from) => {
+                if (from.as === obj.table ||
+                    (!from.as && from.table === obj.table)) {
                     from._requestAll = true;
                     found = true;
                 }
             });
             if (!found) {
-                err = { err: 'table_not_found', args: [object.table] };
+                err = { err: 'table_not_found', args: [obj.table] };
             }
         }
         else {
-            ast.from?.forEach?.((from) => {
+            const astFrom = ast.from;
+            astFrom?.forEach?.((from) => {
                 from._requestAll = true;
             });
         }
@@ -5788,40 +5797,41 @@ function _resolveObject(object, ast, db_map, table_map, name_cache, result_map) 
     else {
         let add_cache = false;
         let from;
-        if (object.db) {
-            from = db_map[object.db]?.[object.table];
+        if (obj.db) {
+            from = db_map[obj.db]?.[obj.table ?? ''];
             add_cache = true;
         }
-        else if (object.table) {
-            from = table_map[object.table];
+        else if (obj.table) {
+            from = table_map[obj.table];
             add_cache = true;
         }
         else {
-            const index = result_map?.[object.column];
-            if (index >= 0) {
-                object._resultIndex = index;
+            const index = result_map?.[obj.column ?? ''];
+            if (index !== undefined && index >= 0) {
+                obj._resultIndex = index;
             }
             else {
-                const cached = name_cache[object.column];
-                from = cached ?? ast.from?.[0];
+                const cached = name_cache[obj.column ?? ''];
+                const astFrom = ast.from;
+                from = cached ?? astFrom?.[0];
             }
         }
         if (from) {
-            object.from = from;
-            from._requestSet.add(object.column);
-            if (add_cache) {
-                name_cache[object.column] = from;
+            obj.from = from;
+            from._requestSet?.add(obj.column ?? '');
+            if (add_cache && obj.column) {
+                name_cache[obj.column] = from;
             }
         }
-        else if (object._resultIndex === undefined) {
-            if (object.db && !db_map[object.db]) {
-                err = { err: 'db_not_found', args: [object.db] };
+        else if (obj._resultIndex === undefined) {
+            if (obj.db && !db_map[obj.db]) {
+                err = { err: 'db_not_found', args: [obj.db] };
             }
-            else if (object.table) {
-                err = { err: 'table_not_found', args: [object.table] };
+            else if (obj.table) {
+                err = { err: 'table_not_found', args: [obj.table] };
             }
             else {
-                err = { err: 'column_not_found', args: [object.column] };
+                err = { err: 'column_not_found', args: [obj.column] };
             }
         }
     }
@@ -5832,7 +5842,7 @@ function formJoin(params) {
     const { source_map, from, where, session } = params;
     const row_list = [];
     from.forEach((from_table) => {
-        row_list[from_table.key] = [];
+        row_list[from_table.key ?? ''] = [];
         from_table.is_left = from_table.join?.indexOf?.('LEFT') >= 0;
     });
     const result = _findRows(source_map, from, where, session, row_list, 0, 0);
@@ -5842,9 +5852,8 @@ function formJoin(params) {
     }
     return { err, row_list };
 }
-function _findRows(source_map, list, // From[] with extended properties
-where, session, row_list, from_index, start_index) {
-    let err;
+function _findRows(source_map, list, where, session, row_list, from_index, start_index) {
+    let err = null;
     const from = list[from_index];
     const { key, on, is_left } = from;
     const rows = source_map[key];
@@ -5905,7 +5914,7 @@ where, session, row_list, from_index, start_index) {
 
 function formGroup(params) {
     const { groupby, ast, row_list, session } = params;
-    let err;
+    let err = null;
     const output_list = [];
     const count = groupby.length;
     for (let i = 0; i < count; i++) {
@@ -5914,7 +5923,7 @@ function formGroup(params) {
             groupby[i] = ast.columns[group._resultIndex]?.expr;
         }
         else if (group.type === 'number') {
-            groupby[i] = ast.columns[group.value - 1]?.expr;
+            groupby[i] = ast.columns[(group.value ?? 1) - 1]?.expr;
         }
     }
     const group_map = {};
@@ -5929,7 +5938,7 @@ function formGroup(params) {
         if (!err) {
             let obj = group_map;
             for (let i = 0; i < count; i++) {
-                const key = key_list[i];
+                const key = String(key_list[i]);
                 if (i + 1 === count && !obj[key]) {
                     obj[key] = [];
                 }
@@ -5951,8 +5960,9 @@ function _unroll(list, obj) {
         list.push({ ...obj[0], '@@group': obj });
     }
     else {
-        for (const key in obj) {
-            _unroll(list, obj[key]);
+        const objMap = obj;
+        for (const key in objMap) {
+            _unroll(list, objMap[key]);
         }
     }
 }
@@ -5972,9 +5982,10 @@ function _sort(orderby, state, a, b) {
         const order = orderby[i];
         const { expr } = order;
         const func = order.type !== 'DESC' ? _asc : _desc;
-        if (expr?.type === 'number') {
-            const index = expr.value - 1;
-            const result = func(a['@@result']?.[index]?.value, b['@@result']?.[index]?.value, state.column_list[index]);
+        const exprObj = expr;
+        if (exprObj?.type === 'number') {
+            const index = (exprObj.value ?? 1) - 1;
+            const result = func(a['@@result']?.[index]?.value, b['@@result']?.[index]?.value, state.column_list?.[index]);
             if (result !== 0) {
                 return result;
             }
@@ -6007,7 +6018,8 @@ function _asc(a, b, column) {
     else if (typeof a === 'number' && typeof b === 'number') {
         return a - b;
     }
-    else if (column?.columnType === 246 || column === 'number') {
+    else if ((typeof column === 'object' && column.columnType === 246) ||
+        column === 'number') {
         return _convertNum(a) - _convertNum(b);
     }
     else if (typeof a === 'string' && typeof b === 'string') {
@@ -6047,13 +6059,13 @@ async function internalQuery(params) {
     const { ast, session, dynamodb } = params;
     const current_database = session.getCurrentDatabase();
     if (!params.skip_resolve) {
-        const resolve_err = resolveReferences(ast, current_database);
+        const resolve_err = resolveReferences(ast, current_database ?? undefined);
         if (resolve_err) {
             shared.logger.error('select: resolve err:', resolve_err);
             throw new SQLError(resolve_err);
         }
     }
-    let source_map = null;
+    let source_map = {};
     let column_map = {};
     if (ast?.from?.length) {
         const db = ast.from?.[0]?.db;
@@ -6070,7 +6082,7 @@ function _evaluateReturn(params) {
     const { session, source_map, ast } = params;
     const query_columns = _expandStarColumns(params);
     const { from, where, groupby } = ast;
-    let err;
+    let err = null;
     let row_list;
     let sleep_ms = 9;
     if (from) {
@@ -6131,15 +6143,16 @@ function _evaluateReturn(params) {
     for (let i = 0; i < column_count; i++) {
         const column = query_columns[i];
         const column_type = convertType(column.result_type, column.result_nullable);
+        const exprObj = column.expr;
         column_type.orgName = column.result_name || '';
         column_type.name = column.as || column_type.orgName;
-        column_type.orgTable = column?.expr?.from?.table || '';
-        column_type.table = column?.expr?.from?.as || column_type.orgTable;
-        column_type.schema = column.expr?.from?.db || '';
+        column_type.orgTable = exprObj?.from?.table || '';
+        column_type.table = exprObj?.from?.as || column_type.orgTable;
+        column_type.schema = exprObj?.from?.db || '';
         column_list.push(column_type);
     }
     if (ast.orderby) {
-        const sort_err = sort(row_list, ast.orderby, { session, column_list });
+        const sort_err = sort(row_list, ast.orderby, { session, column_list: column_list });
         if (sort_err) {
             throw new SQLError(sort_err);
         }
@@ -6170,20 +6183,23 @@ function _evaluateReturn(params) {
 }
 function _expandStarColumns(params) {
     const { ast, column_map } = params;
+    const astObj = ast;
     const ret = [];
-    ast?.columns?.forEach?.((column) => {
-        if (column?.expr?.type === 'column_ref' && column.expr.column === '*') {
-            const { db, table } = column.expr;
-            ast.from.forEach((from) => {
+    astObj?.columns?.forEach?.((column) => {
+        const col = column;
+        if (col?.expr?.type === 'column_ref' && col.expr.column === '*') {
+            const { db, table } = col.expr;
+            const fromList = astObj.from;
+            fromList?.forEach((from) => {
                 if ((!db && !table) ||
                     (db && from.db === db && from.table === table && !from.as) ||
                     (!db && from.table === table && !from.as) ||
                     (!db && from.as === table)) {
-                    const column_list = column_map[from.key];
-                    if (!column_list.length) {
-                        from._requestSet.forEach((name) => column_list.push(name));
+                    const column_list = column_map[from.key ?? ''];
+                    if (!column_list?.length) {
+                        from._requestSet?.forEach((name) => column_list.push(name));
                     }
-                    column_list.forEach((name) => {
+                    column_list?.forEach((name) => {
                         ret.push({
                             expr: {
                                 type: 'column_ref',
@@ -6199,13 +6215,13 @@ function _expandStarColumns(params) {
             });
         }
         else {
-            ret.push(column);
+            ret.push(col);
         }
     });
     return ret;
 }
 function _unionType(old_type, new_type) {
-    let ret = new_type;
+    let ret = new_type ?? 'string';
     if (!old_type || old_type === 'null') ;
     else if (new_type === 'null') {
         ret = old_type;
@@ -6627,9 +6643,10 @@ async function _runInsert(params) {
     }
 }
 function _checkAst(ast) {
-    let err;
-    if (ast.values?.type === 'select') {
-        if (ast.columns?.length !== ast.values.columns?.length) {
+    const astObj = ast;
+    let err = null;
+    if (astObj.values?.type === 'select') {
+        if (astObj.columns?.length !== astObj.values.columns?.length) {
             err = { err: 'ER_WRONG_VALUE_COUNT_ON_ROW', args: [1] };
         }
     }
@@ -7003,12 +7020,14 @@ class Query extends node_events.EventEmitter {
                 return { result: await query(params), columns: [] };
             case 'use':
                 return await _useDatabase({ ast, session: this._session });
-            default:
-                shared.logger.error('unsupported statement type:', ast);
+            default: {
+                const unknownAst = ast;
+                shared.logger.error('unsupported statement type:', unknownAst);
                 throw new SQLError({
                     err: 'unsupported_type',
-                    args: [ast?.type],
+                    args: [unknownAst?.type ?? 'unknown'],
                 });
+            }
         }
     }
     _transformResult(list, columns) {
@@ -7016,7 +7035,8 @@ class Query extends node_events.EventEmitter {
             list.forEach((result, i) => {
                 const obj = {};
                 columns.forEach((column, j) => {
-                    const value = this._convertCell(result[j], column);
+                    const resultArray = result;
+                    const value = this._convertCell(resultArray[j], column);
                     if (this.nestedTables === false) {
                         obj[column.name] = value;
                     }
@@ -7024,7 +7044,8 @@ class Query extends node_events.EventEmitter {
                         obj[`${column.table}${this.nestedTables}${column.name}`] = value;
                     }
                     else {
-                        if (!obj[column.table]) {
+                        const tableObj = obj[column.table];
+                        if (!tableObj) {
                             obj[column.table] = {};
                         }
                         obj[column.table][column.name] = value;
@@ -7036,7 +7057,14 @@ class Query extends node_events.EventEmitter {
     }
     _convertCell(value, column) {
         if (typeof this.typeCast === 'function') {
-            return this.typeCast(column, () => typeCast(value, column, this._session.typeCastOptions));
+            const { type, ...untypedColumn } = column;
+            return this.typeCast({
+                ...untypedColumn,
+                type: String(type),
+                length: column.length,
+                string: () => (value === null ? null : String(value)),
+                buffer: () => (value === null ? null : Buffer.from(String(value))),
+            }, () => typeCast(value, column, this._session.typeCastOptions));
         }
         return this.typeCast
             ? typeCast(value, column, this._session.typeCastOptions)
@@ -7044,7 +7072,7 @@ class Query extends node_events.EventEmitter {
     }
 }
 function _astify(sql) {
-    let err;
+    let err = null;
     let list = [];
     try {
         const result = g_parser.astify(sql, { database: 'MySQL' });
@@ -7058,7 +7086,7 @@ function _astify(sql) {
     catch (e) {
         shared.logger.error('parse error:', e);
         const start = e?.location?.start;
-        err = { err: 'parse', args: [start?.line, start?.column] };
+        err = { err: 'parse', args: [start?.line ?? 0, start?.column ?? 0] };
     }
     return { err, list };
 }
@@ -7167,7 +7195,7 @@ class Session extends node_events.EventEmitter {
             done?.(new SQLError('released'));
             return;
         }
-        const opts = typeof params === 'object' ? { ...params } : {};
+        const opts = typeof params === 'object' ? { ...params } : { sql: '' };
         if (typeof params === 'string') {
             opts.sql = params;
         }

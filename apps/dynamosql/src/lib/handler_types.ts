@@ -12,7 +12,7 @@ export interface HandlerParams {
 
 export interface MutationResult {
   affectedRows: number;
-  changedRows: number;
+  changedRows?: number;
 }
 
 export interface SelectResult {

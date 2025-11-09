@@ -1,13 +1,36 @@
 import { walkColumnRefs } from './ast_helper';
 import type { Select, Update } from 'node-sql-parser/types';
 
+type ErrorResult = { err: string; args?: unknown[] } | string | null;
+
+interface TableMapEntry {
+  db?: string;
+  table?: string;
+  as?: string;
+  key?: string;
+  _requestSet?: Set<string>;
+  _requestAll?: boolean;
+}
+
+interface TableMap {
+  [key: string]: TableMapEntry;
+}
+
+interface DbMap {
+  [db: string]: { [table: string]: TableMapEntry };
+}
+
+interface ResultMap {
+  [key: string]: number;
+}
+
 export function resolveReferences(
   ast: Select | Update,
   current_database?: string
-): any {
-  let err: any;
-  const table_map: any = {};
-  const db_map: any = {};
+): ErrorResult {
+  let err: ErrorResult = null;
+  const table_map: TableMap = {};
+  const db_map: DbMap = {};
   const from = ast.type === 'select' ? ast.from : (ast as any).from;
   from?.forEach?.((from: any) => {
     if (!from.db) {
@@ -46,13 +69,13 @@ export function resolveReferences(
     }
   });
 
-  const name_cache: any = {};
+  const name_cache: TableMap = {};
   if (!err) {
     const columns = ast.type === 'select' ? ast.columns : undefined;
     const set = ast.type === 'update' ? ast.set : undefined;
     const where = ast.where;
-    [from, columns, where, set].forEach((item: any) => {
-      walkColumnRefs(item, (object: any) => {
+    [from, columns, where, set].forEach((item: unknown) => {
+      walkColumnRefs(item, (object: unknown) => {
         const ret = _resolveObject(object, ast, db_map, table_map, name_cache);
         if (ret && !err) {
           err = ret;
@@ -62,7 +85,7 @@ export function resolveReferences(
   }
   if (!err) {
     const set = ast.type === 'update' ? ast.set : undefined;
-    set?.forEach?.((object: any) => {
+    set?.forEach?.((object: unknown) => {
       const ret = _resolveObject(object, ast, db_map, table_map, name_cache);
       if (ret && !err) {
         err = ret;
@@ -70,22 +93,29 @@ export function resolveReferences(
     });
   }
 
-  const result_map: any = {};
+  const result_map: ResultMap = {};
   const columns = ast.type === 'select' ? ast.columns : undefined;
-  columns?.forEach?.((column: any, i: number) => {
-    if (column.as) {
-      result_map[column.as] = i;
-    } else if (column.expr?.type === 'column_ref') {
-      result_map[column.expr.column] = i;
+  columns?.forEach?.((column: unknown, i: number) => {
+    const col = column as {
+      as?: string;
+      expr?: { type?: string; column?: string };
+    };
+    if (col.as) {
+      result_map[col.as] = i;
+    } else if (col.expr?.type === 'column_ref') {
+      result_map[col.expr.column ?? ''] = i;
     }
   });
 
   if (!err) {
     const groupby = ast.type === 'select' ? ast.groupby : undefined;
-    const orderby = ast.type === 'select' ? ast.orderby : (ast as any).orderby;
+    const orderby =
+      ast.type === 'select'
+        ? ast.orderby
+        : (ast as { orderby?: unknown }).orderby;
     const having = ast.type === 'select' ? ast.having : undefined;
-    [groupby, orderby, having].forEach((item: any) => {
-      walkColumnRefs(item, (object: any) => {
+    [groupby, orderby, having].forEach((item: unknown) => {
+      walkColumnRefs(item, (object: unknown) => {
         const ret = _resolveObject(
           object,
           ast,
@@ -104,72 +134,79 @@ export function resolveReferences(
 }
 
 function _resolveObject(
-  object: any,
-  ast: any,
-  db_map: any,
-  table_map: any,
-  name_cache: any,
-  result_map?: any
-): any {
-  let err: any;
-  if (object.column === '*') {
-    if (object.db) {
-      const from = db_map[object.db]?.[object.table];
+  object: unknown,
+  ast: Select | Update,
+  db_map: DbMap,
+  table_map: TableMap,
+  name_cache: TableMap,
+  result_map?: ResultMap
+): ErrorResult {
+  let err: ErrorResult = null;
+  const obj = object as {
+    column?: string;
+    db?: string;
+    table?: string;
+    from?: TableMapEntry;
+    _resultIndex?: number;
+  };
+  if (obj.column === '*') {
+    if (obj.db) {
+      const from = db_map[obj.db]?.[obj.table ?? ''];
       if (from) {
         from._requestAll = true;
       } else {
-        err = { err: 'table_not_found', args: [object.table] };
+        err = { err: 'table_not_found', args: [obj.table] };
       }
-    } else if (object.table) {
+    } else if (obj.table) {
       let found = false;
-      ast.from?.forEach?.((from: any) => {
-        if (
-          from.as === object.table ||
-          (!from.as && from.table === object.table)
-        ) {
+      const astFrom = (ast as { from?: TableMapEntry[] }).from;
+      astFrom?.forEach?.((from: TableMapEntry) => {
+        if (from.as === obj.table || (!from.as && from.table === obj.table)) {
           from._requestAll = true;
           found = true;
         }
       });
       if (!found) {
-        err = { err: 'table_not_found', args: [object.table] };
+        err = { err: 'table_not_found', args: [obj.table] };
       }
     } else {
-      ast.from?.forEach?.((from: any) => {
+      const astFrom = (ast as { from?: TableMapEntry[] }).from;
+      astFrom?.forEach?.((from: TableMapEntry) => {
         from._requestAll = true;
       });
     }
   } else {
     let add_cache = false;
-    let from;
-    if (object.db) {
-      from = db_map[object.db]?.[object.table];
+    let from: TableMapEntry | undefined;
+    if (obj.db) {
+      from = db_map[obj.db]?.[obj.table ?? ''];
       add_cache = true;
-    } else if (object.table) {
-      from = table_map[object.table];
+    } else if (obj.table) {
+      from = table_map[obj.table];
       add_cache = true;
     } else {
-      const index = result_map?.[object.column];
-      if (index >= 0) {
-        object._resultIndex = index;
+      const index = result_map?.[obj.column ?? ''];
+      if (index !== undefined && index >= 0) {
+        obj._resultIndex = index;
       } else {
-        const cached = name_cache[object.column];
-        from = cached ?? ast.from?.[0];
+        const cached = name_cache[obj.column ?? ''];
+        const astFrom = (ast as { from?: TableMapEntry[] }).from;
+        from = cached ?? astFrom?.[0];
       }
     }
     if (from) {
-      object.from = from;
-      from._requestSet.add(object.column);
-      if (add_cache) {
-        name_cache[object.column] = from;
+      obj.from = from;
+      from._requestSet?.add(obj.column ?? '');
+      if (add_cache && obj.column) {
+        name_cache[obj.column] = from;
       }
-    } else if (object._resultIndex === undefined) {
-      if (object.db && !db_map[object.db]) {
-        err = { err: 'db_not_found', args: [object.db] };
-      } else if (object.table) {
-        err = { err: 'table_not_found', args: [object.table] };
+    } else if (obj._resultIndex === undefined) {
+      if (obj.db && !db_map[obj.db]) {
+        err = { err: 'db_not_found', args: [obj.db] };
+      } else if (obj.table) {
+        err = { err: 'table_not_found', args: [obj.table] };
       } else {
-        err = { err: 'column_not_found', args: [object.column] };
+        err = { err: 'column_not_found', args: [obj.column] };
       }
     }
   }

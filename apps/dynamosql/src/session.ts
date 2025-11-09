@@ -23,16 +23,16 @@ export class Session extends EventEmitter implements PoolConnection {
   threadId: number | null = g_threadId++;
 
   dynamodb: ReturnType<typeof DynamoDB.createDynamoDB>;
-  typeCastOptions: any = {};
+  typeCastOptions: { dateStrings?: boolean } = {};
   typeCast: TypeCast = true;
   resultObjects = true;
   multipleStatements = false;
 
   private _currentDatabase: string | null = null;
-  private _localVariables: any = {};
-  private _transaction: any = null;
+  private _localVariables: Record<string, unknown> = {};
+  private _transaction: unknown = null;
   private _isReleased = false;
-  private _tempTableMap: any = {};
+  private _tempTableMap: Record<string, unknown> = {};
 
   escape = SqlString.escape;
   escapeId = SqlString.escapeId;
@@ -81,7 +81,7 @@ export class Session extends EventEmitter implements PoolConnection {
     return this._currentDatabase;
   }
 
-  setVariable(name: string, value: any) {
+  setVariable(name: string, value: unknown) {
     this._localVariables[name] = value;
   }
 
@@ -93,7 +93,7 @@ export class Session extends EventEmitter implements PoolConnection {
     return this._transaction;
   }
 
-  setTransaction(tx: any) {
+  setTransaction(tx: unknown) {
     this._transaction = tx;
   }
 
@@ -106,7 +106,7 @@ export class Session extends EventEmitter implements PoolConnection {
     return this._tempTableMap[key];
   }
 
-  saveTempTable(database: string, table: string, contents: any) {
+  saveTempTable(database: string, table: string, contents: unknown) {
     const key = database + '.' + table;
     this._tempTableMap[key] = contents;
   }
@@ -131,19 +131,20 @@ export class Session extends EventEmitter implements PoolConnection {
 
   query(
     params: string | QueryOptions,
-    values?: any,
+    values?: unknown,
     done?: QueryCallback
   ): MysqlQuery {
     if (this._isReleased) {
       done?.(new SQLError('released') as MysqlError);
       return;
     }
-    const opts: any = typeof params === 'object' ? { ...params } : {};
+    const opts: QueryOptions =
+      typeof params === 'object' ? { ...params } : { sql: '' };
     if (typeof params === 'string') {
       opts.sql = params;
     }
     if (typeof values === 'function') {
-      done = values;
+      done = values as QueryCallback;
     } else if (values !== undefined) {
       opts.values = values;
     }

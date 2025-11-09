@@ -15,12 +15,22 @@ function _isDateLike(type: string): boolean {
   return type === 'date' || type === 'datetime';
 }
 
+interface NumBothSidesResult extends EvaluationResult {
+  left_num?: number;
+  right_num?: number;
+  interval?: {
+    add: (dt: unknown) => { value: unknown; type: string };
+    sub: (dt: unknown) => { value: unknown; type: string };
+  };
+  datetime?: unknown;
+}
+
 function _numBothSides(
   expr: Binary,
   state: EvaluationState,
   op: string,
   allow_interval?: boolean
-): EvaluationResult {
+): NumBothSidesResult {
   const left = getValue(expr.left, state);
   const right = getValue(expr.right, state);
   let err = left.err || right.err;
@@ -141,10 +151,10 @@ function _convertCompare(
     left.value !== right.value
   ) {
     if (
-      (_isDateLike(left.type) || _isDateLike(right.type)) &&
+      (_isDateLike(left.type ?? '') || _isDateLike(right.type ?? '')) &&
       left.type !== right.type
     ) {
-      const union = _unionDateTime(left.type, right.type);
+      const union = _unionDateTime(left.type ?? '', right.type ?? '');
       if (union === 'date' || union === 'datetime') {
         left.value = convertDateTime(left.value, union, 6) ?? left.value;
         right.value = convertDateTime(right.value, union, 6) ?? right.value;
@@ -177,15 +187,18 @@ function _equal(
   const left = getValue(expr.left, state);
   const right = getValue(expr.right, state);
   const err = left.err || right.err;
-  const name = left.name + op + right.name;
-  let value = 0;
+  const name = (left.name ?? '') + op + (right.name ?? '');
+  let value: unknown = 0;
   if (!err) {
     _convertCompare(left, right);
     if (left.value === null || right.value === null) {
       value = null;
     } else if (left.value === right.value) {
       value = 1;
-    } else if (typeof left.value === 'string') {
+    } else if (
+      typeof left.value === 'string' &&
+      typeof right.value === 'string'
+    ) {
       value = left.value.localeCompare(right.value) === 0 ? 1 : 0;
     }
   }
@@ -218,17 +231,25 @@ function _gt(
   const left = getValue(expr_left, state);
   const right = getValue(expr_right, state);
   const err = left.err || right.err;
-  const name = flip ? right.name + op + left.name : left.name + op + right.name;
-  let value = 0;
+  const name = flip
+    ? (right.name ?? '') + op + (left.name ?? '')
+    : (left.name ?? '') + op + (right.name ?? '');
+  let value: unknown = 0;
   if (!err) {
     _convertCompare(left, right);
     if (left.value === null || right.value === null) {
       value = null;
     } else if (left.value === right.value) {
       value = 0;
-    } else if (typeof left.value === 'number') {
+    } else if (
+      typeof left.value === 'number' &&
+      typeof right.value === 'number'
+    ) {
       value = left.value > right.value ? 1 : 0;
-    } else {
+    } else if (
+      typeof left.value === 'string' &&
+      typeof right.value === 'string'
+    ) {
       value = left.value.localeCompare(right.value) > 0 ? 1 : 0;
     }
   }
@@ -256,17 +277,25 @@ function _gte(
   const left = getValue(expr_left, state);
   const right = getValue(expr_right, state);
   const err = left.err || right.err;
-  const name = flip ? right.name + op + left.name : left.name + op + right.name;
-  let value = 0;
+  const name = flip
+    ? (right.name ?? '') + op + (left.name ?? '')
+    : (left.name ?? '') + op + (right.name ?? '');
+  let value: unknown = 0;
   if (!err) {
     _convertCompare(left, right);
     if (left.value === null || right.value === null) {
       value = null;
     } else if (left.value === right.value) {
       value = 1;
-    } else if (typeof left.value === 'number') {
+    } else if (
+      typeof left.value === 'number' &&
+      typeof right.value === 'number'
+    ) {
       value = convertNum(left.value) >= convertNum(right.value) ? 1 : 0;
-    } else {
+    } else if (
+      typeof left.value === 'string' &&
+      typeof right.value === 'string'
+    ) {
       value = left.value.localeCompare(right.value) >= 0 ? 1 : 0;
     }
   }

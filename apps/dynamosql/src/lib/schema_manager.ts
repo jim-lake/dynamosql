@@ -1,12 +1,27 @@
 import * as Engine from './engine';
 import { logger } from '@dynamosql/shared';
 import { SQLError } from '../error';
+import type { Session } from '../session';
+import type { Engine as EngineType } from './engine';
 
 const BUILT_IN = ['_dynamodb'];
-const g_schemaMap: any = {};
 
-export function getEngine(database: string, table: string, session: any) {
-  let ret: any;
+interface SchemaEntry {
+  table_engine: string;
+}
+
+interface SchemaMap {
+  [database: string]: { [table: string]: SchemaEntry };
+}
+
+const g_schemaMap: SchemaMap = {};
+
+export function getEngine(
+  database: string,
+  table: string,
+  session: Session
+): EngineType {
+  let ret: EngineType;
   const schema = g_schemaMap[database];
   if (database === '_dynamodb') {
     ret = Engine.getEngineByName('raw');
@@ -22,7 +37,11 @@ export function getEngine(database: string, table: string, session: any) {
   return ret;
 }
 
-function _findTable(database: string, table: string, session: any) {
+function _findTable(
+  database: string,
+  table: string,
+  session: Session
+): SchemaEntry | unknown {
   return (
     session.getTempTable(database, table) || g_schemaMap[database]?.[table]
   );
@@ -32,11 +51,14 @@ export function getDatabaseList() {
   return [...BUILT_IN, ...Object.keys(g_schemaMap)];
 }
 
-export async function getTableList(params: any): Promise<string[]> {
+export async function getTableList(params: {
+  dynamodb: unknown;
+  database: string;
+}): Promise<string[]> {
   const { dynamodb, database } = params;
   if (database === '_dynamodb') {
     const engine = Engine.getEngineByName('raw');
-    return await engine.getTableList({ dynamodb });
+    return await engine.getTableList({ dynamodb } as never);
   } else if (database in g_schemaMap) {
     return [];
   } else {
@@ -51,7 +73,11 @@ export function createDatabase(database: string): void {
   g_schemaMap[database] = {};
 }
 
-export async function dropDatabase(params: any): Promise<void> {
+export async function dropDatabase(params: {
+  session: Session;
+  database: string;
+  dynamodb: unknown;
+}): Promise<void> {
   const { session, database } = params;
   if (BUILT_IN.includes(database)) {
     throw new SQLError('database_no_drop_builtin');
@@ -62,7 +88,7 @@ export async function dropDatabase(params: any): Promise<void> {
     for (const table of table_list) {
       const engine = getEngine(database, table, session);
       try {
-        await engine.dropTable({ ...params, table });
+        await engine.dropTable({ ...params, table } as never);
         delete g_schemaMap[database][table];
       } catch (err) {
         logger.error('dropDatabase: table:', table, 'drop err:', err);
@@ -75,7 +101,14 @@ export async function dropDatabase(params: any): Promise<void> {
   }
 }
 
-export async function createTable(params: any): Promise<void> {
+export async function createTable(params: {
+  session: Session;
+  database: string;
+  table: string;
+  is_temp?: boolean;
+  table_engine?: string;
+  dynamodb: unknown;
+}): Promise<void> {
   const { session, database, table, is_temp } = params;
   const table_engine = is_temp
     ? 'memory'
@@ -85,7 +118,7 @@ export async function createTable(params: any): Promise<void> {
     throw new SQLError('access_denied');
   } else if (database === '_dynamodb') {
     const engine = Engine.getEngineByName('raw');
-    await engine.createTable(params);
+    await engine.createTable(params as never);
   } else if (_findTable(database, table, session)) {
     throw new SQLError({ err: 'table_exists', args: [table] });
   } else if (!(database in g_schemaMap)) {
@@ -93,7 +126,7 @@ export async function createTable(params: any): Promise<void> {
   } else {
     const engine = Engine.getEngineByName(table_engine);
     if (engine) {
-      await engine.createTable(params);
+      await engine.createTable(params as never);
       if (!is_temp) {
         g_schemaMap[database][table] = { table_engine };
       }
@@ -106,15 +139,20 @@ export async function createTable(params: any): Promise<void> {
   }
 }
 
-export async function dropTable(params: any): Promise<void> {
+export async function dropTable(params: {
+  session: Session;
+  database: string;
+  table: string;
+  dynamodb: unknown;
+}): Promise<void> {
   const { session, database, table } = params;
   if (database === '_dynamodb') {
     const engine = Engine.getEngineByName('raw');
-    await engine.dropTable(params);
+    await engine.dropTable(params as never);
   } else if (_findTable(database, table, session)) {
     const engine = getEngine(database, table, session);
     try {
-      await engine.dropTable(params);
+      await engine.dropTable(params as never);
       delete g_schemaMap[database][table];
     } catch (err) {
       logger.error(
