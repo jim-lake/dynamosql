@@ -12,7 +12,7 @@ export async function parallelBatch<S, T>(
     throw RangeError('batchSize must be >= 0');
   }
   const batch_count = Math.ceil(list.length / batchSize);
-  const results: T[] = [];
+  const results: (T | undefined)[] = [];
   await timesLimit(batch_count, limit, async (i: number) => {
     const start = i * batchSize;
     const batch = list.slice(start, start + batchSize);
@@ -21,5 +21,5 @@ export async function parallelBatch<S, T>(
       results[i + j] = batch_result[j];
     }
   });
-  return results;
+  return results as T[];
 }

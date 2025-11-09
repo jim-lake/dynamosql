@@ -47,7 +47,7 @@ export async function parallelLimit<S, T>(
 ): Promise<T[]> {
   const results: T[] = [];
   await timesLimit(list.length, limit, async (i: number) => {
-    results[i] = await iter(list[i], i);
+    results[i] = await iter(list[i] as S, i);
   });
   return results;
 }

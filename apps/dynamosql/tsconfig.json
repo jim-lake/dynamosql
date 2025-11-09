@@ -12,7 +12,10 @@
     "skipLibCheck": true,
     "declaration": true,
     "outDir": "./dist",
-    "noEmit": true
+    "noEmit": true,
+    "strictFunctionTypes": true,
+    "isolatedModules": true,
+    "noUncheckedIndexedAccess": true
   },
   "include": ["src/**/*"],
   "exclude": ["node_modules", "dist", "test"]
