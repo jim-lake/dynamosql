@@ -20,9 +20,9 @@ export function convertWhere(expr: any, state: any): any {
       value = expr.value;
     } else if (type === 'function') {
       const funcName = getFunctionName(expr.name);
-      const func = Functions[funcName.toLowerCase()];
-      if (func) {
-        const result = func(expr, state);
+      const func = Functions[funcName.toLowerCase() as keyof typeof Functions];
+      if (func && typeof func === 'function') {
+        const result = (func as (expr: any, state: any) => any)(expr, state);
         if (result.err) {
           err = result.err;
         } else {
@@ -32,7 +32,10 @@ export function convertWhere(expr: any, state: any): any {
         err = 'unsupported';
       }
     } else if (type === 'binary_expr' || type === 'unary_expr') {
-      const func = ConvertExpression[expr.operator.toLowerCase()];
+      const func =
+        ConvertExpression[
+          expr.operator.toLowerCase() as keyof typeof ConvertExpression
+        ];
       if (func) {
         const result = func(expr, state);
         if (result.err) {

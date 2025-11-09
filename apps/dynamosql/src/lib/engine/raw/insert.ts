@@ -68,7 +68,7 @@ async function _insertIgnoreReplace(
         throw new SQLError({ err: 'table_not_found', args: [table] });
       }
       if (Array.isArray(err)) {
-        let error;
+        let error: Error | undefined;
         err.forEach((item_err: any) => {
           if (item_err?.Code === 'DuplicateItem') {
             affectedRows--;

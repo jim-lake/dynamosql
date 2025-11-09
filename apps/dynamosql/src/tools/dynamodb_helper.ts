@@ -53,7 +53,10 @@ export function escapeValue(value: unknown, type?: string): string {
   } else if (typeof value === 'object') {
     s = '{ ';
     s += Object.keys(value)
-      .map((key) => `'${key}': ${escapeValue(value[key])}`)
+      .map(
+        (key) =>
+          `'${key}': ${escapeValue((value as Record<string, unknown>)[key])}`
+      )
       .join(', ');
     s += ' }';
   } else if (typeof value === 'number') {

@@ -65,7 +65,7 @@ export function getValue(
   } else if (type === 'function') {
     const funcExpr = expr as Function;
     const funcName = getFunctionName(funcExpr.name);
-    const func = Functions[funcName.toLowerCase()];
+    const func = Functions[funcName.toLowerCase() as keyof typeof Functions];
     if (func) {
       result = func(funcExpr, state);
       if (!result.name) {
@@ -78,7 +78,10 @@ export function getValue(
   } else if (type === 'aggr_func') {
     const aggrExpr = expr as AggrFunc;
     const funcName = getFunctionName(aggrExpr.name);
-    const func = AggregateFunctions[funcName.toLowerCase()];
+    const func =
+      AggregateFunctions[
+        funcName.toLowerCase() as keyof typeof AggregateFunctions
+      ];
     if (func) {
       result = func(aggrExpr, state);
       if (!result.name) {
@@ -90,7 +93,10 @@ export function getValue(
     }
   } else if (type === 'binary_expr') {
     const binExpr = expr as Binary;
-    const func = BinaryExpression[binExpr.operator.toLowerCase()];
+    const func =
+      BinaryExpression[
+        binExpr.operator.toLowerCase() as keyof typeof BinaryExpression
+      ];
     if (func) {
       result = func(binExpr, state);
       if (!result.name) {
@@ -105,7 +111,10 @@ export function getValue(
     }
   } else if (type === 'unary_expr') {
     const unaryExpr = expr as UnaryExpr;
-    const func = UnaryExpression[unaryExpr.operator.toLowerCase()];
+    const func =
+      UnaryExpression[
+        unaryExpr.operator.toLowerCase() as keyof typeof UnaryExpression
+      ];
     if (func) {
       result = func(unaryExpr, state);
       if (!result.name) {
@@ -124,9 +133,10 @@ export function getValue(
       ? castExpr.target[0]
       : castExpr.target;
     const dataType = target?.dataType;
-    const func = Cast[dataType?.toLowerCase()];
+    const funcKey = dataType?.toLowerCase() as keyof typeof Cast;
+    const func = Cast[funcKey];
     if (func) {
-      result = func(castExpr, state);
+      result = (func as (expr: CastType, state: EvaluationState) => EvaluationResult)(castExpr, state);
       if (!result.name) {
         result.name = `CAST(? AS ${dataType})`;
       }
@@ -138,9 +148,12 @@ export function getValue(
     const varExpr = expr as VarExpr;
     const { prefix } = varExpr;
     if (prefix === '@@') {
-      const func = SystemVariables[varExpr.name.toLowerCase()];
+      const func =
+        SystemVariables[
+          varExpr.name.toLowerCase() as keyof typeof SystemVariables
+        ];
       if (func) {
-        result.value = func(session);
+        result.value = func();
       } else {
         logger.trace(
           'expression.getValue: unknown system variable:',

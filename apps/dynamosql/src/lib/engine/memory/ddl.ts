@@ -41,7 +41,12 @@ export async function createTable(params: CreateTableParams): Promise<void> {
       message: 'primary key is required',
     });
   }
-  const data = {
+  const data: {
+    column_list: any[];
+    primary_key: any[];
+    row_list: any[];
+    primary_map: Map<any, any>;
+  } = {
     column_list,
     primary_key,
     row_list: [],

@@ -38,13 +38,16 @@ function _numBothSides(
   let value;
   let left_num;
   let right_num;
-  let interval;
+  let interval: {
+    add: (dt: unknown) => { value: unknown; type: string };
+    sub: (dt: unknown) => { value: unknown; type: string };
+  } | undefined;
   let datetime;
   if (!err) {
     if (left.value === null || right.value === null) {
       value = null;
     } else if (allow_interval && left.type === 'interval') {
-      interval = left.value;
+      interval = left.value as typeof interval;
       if (_isDateOrTimeLike(right.type)) {
         datetime = right.value;
       } else if (typeof right.value === 'string') {
@@ -56,7 +59,7 @@ function _numBothSides(
         value = null;
       }
     } else if (allow_interval && right.type === 'interval') {
-      interval = right.value;
+      interval = right.value as typeof interval;
       if (_isDateOrTimeLike(left.type)) {
         datetime = left.value;
       } else if (typeof left.value === 'string') {
@@ -86,12 +89,12 @@ function plus(expr: Binary, state: EvaluationState): EvaluationResult {
   let value = result.value;
   let type;
   if (!err && value !== null) {
-    if (datetime) {
+    if (datetime && interval) {
       const result = interval.add(datetime);
       value = result.value;
       type = result.type;
     } else {
-      value = left_num + right_num;
+      value = left_num! + right_num!;
       type = 'number';
     }
   }
@@ -104,12 +107,12 @@ function minus(expr: Binary, state: EvaluationState): EvaluationResult {
   let value = result.value;
   let type;
   if (!err && value !== null) {
-    if (datetime) {
+    if (datetime && interval) {
       const result = interval.sub(datetime);
       value = result.value;
       type = result.type;
     } else {
-      value = left_num - right_num;
+      value = left_num! - right_num!;
       type = 'number';
     }
   }

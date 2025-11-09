@@ -43,7 +43,10 @@ export async function runSelect(params: HandlerParams): Promise<any[]> {
         _addCollection(collection, keys, row);
       }
     });
-    const result = { key: from_key, list: [] };
+    const result: { key: string; list: Array<{ key: any[]; row: any }> } = {
+      key: from_key,
+      list: [],
+    };
     result_list.push(result);
     collection.forEach((value0: any, key0: any) => {
       if (key_list.length > 1) {

@@ -146,7 +146,7 @@ export class SQLError extends Error {
     const errno =
       (err as ErrorInput).errno ||
       sql_err?.errno ||
-      CODE_ERRNO[code] ||
+      CODE_ERRNO[code as keyof typeof CODE_ERRNO] ||
       DEFAULT_ERRNO;
     let sqlMessage = (err as ErrorInput).sqlMessage || sql_err?.sqlMessage;
     if (typeof sqlMessage === 'function') {

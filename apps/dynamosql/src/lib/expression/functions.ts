@@ -44,8 +44,8 @@ export function concat(
   expr: Function,
   state: EvaluationState
 ): EvaluationResult {
-  let err;
-  let value = '';
+  let err: EvaluationResult['err'] = null;
+  let value: string | null = '';
   expr.args.value?.every?.((sub: any) => {
     const result = getValue(sub, state);
     if (!err && result.err) {
@@ -79,7 +79,7 @@ export function coalesce(
   expr: Function,
   state: EvaluationState
 ): EvaluationResult {
-  let err;
+  let err: EvaluationResult['err'] = null;
   let value = null;
   let type;
   expr.args.value?.some?.((sub: any) => {

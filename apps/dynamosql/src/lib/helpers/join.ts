@@ -26,10 +26,10 @@ interface FormJoinResult {
 
 export function formJoin(params: FormJoinParams): FormJoinResult {
   const { source_map, from, where, session } = params;
-  const row_list: RowMap[] = [];
+  const row_list: (RowMap & { [key: string]: unknown })[] = [];
   from.forEach(
     (from_table: From & { key?: string; is_left?: boolean; join?: string }) => {
-      row_list[from_table.key ?? ''] = [];
+      (row_list as any)[from_table.key ?? ''] = [];
       from_table.is_left = from_table.join?.indexOf?.('LEFT') >= 0;
     }
   );

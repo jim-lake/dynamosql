@@ -284,7 +284,7 @@ export class DynamoDB {
         const command = new TransactWriteItemsCommand(input);
         try {
           await this.client.send(command);
-          return batch.map(() => undefined);
+          return batch.map((): undefined => undefined);
         } catch (err: any) {
           const start = i * BATCH_LIMIT;
           if (
