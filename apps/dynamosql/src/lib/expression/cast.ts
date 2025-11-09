@@ -3,12 +3,11 @@ import {
   convertTime,
   convertNum,
 } from '../helpers/sql_conversion';
-import { createSQLInterval } from '../types/sql_interval';
 import { getValue } from './evaluate';
-import type { Cast, Interval } from 'node-sql-parser/types';
+import type { Cast } from 'node-sql-parser/types';
 import type { EvaluationState, EvaluationResult } from './evaluate';
 
-export function datetime(expr: Cast, state: EvaluationState): EvaluationResult {
+function datetime(expr: Cast, state: EvaluationState): EvaluationResult {
   const result = getValue(expr.expr, state);
   result.name = `CAST(${result.name} AS DATETIME)`;
   result.type = 'datetime';
@@ -25,7 +24,7 @@ export function datetime(expr: Cast, state: EvaluationState): EvaluationResult {
   return result;
 }
 
-export function date(expr: Cast, state: EvaluationState): EvaluationResult {
+function date(expr: Cast, state: EvaluationState): EvaluationResult {
   const result = getValue(expr.expr, state);
   result.name = `CAST(${result.name} AS DATE)`;
   result.type = 'date';
@@ -35,7 +34,7 @@ export function date(expr: Cast, state: EvaluationState): EvaluationResult {
   return result;
 }
 
-export function time(expr: Cast, state: EvaluationState): EvaluationResult {
+function time(expr: Cast, state: EvaluationState): EvaluationResult {
   const result = getValue(expr.expr, state);
   result.name = `CAST(${result.name} AS TIME)`;
   result.type = 'time';
@@ -52,20 +51,7 @@ export function time(expr: Cast, state: EvaluationState): EvaluationResult {
   return result;
 }
 
-export function interval(
-  expr: Interval,
-  state: EvaluationState
-): EvaluationResult {
-  const result = getValue(expr.expr, state);
-  result.name = `INTERVAL ${result.name} ${expr.unit}`;
-  result.type = 'interval';
-  if (!result.err && result.value !== null) {
-    result.value = createSQLInterval(result.value, expr.unit);
-  }
-  return result;
-}
-
-export function signed(expr: Cast, state: EvaluationState): EvaluationResult {
+function signed(expr: Cast, state: EvaluationState): EvaluationResult {
   const result = getValue(expr.expr, state);
   result.name = `CAST(${result.name} AS SIGNED)`;
   result.type = 'bigint';
@@ -75,7 +61,7 @@ export function signed(expr: Cast, state: EvaluationState): EvaluationResult {
   return result;
 }
 
-export function char(expr: Cast, state: EvaluationState): EvaluationResult {
+function char(expr: Cast, state: EvaluationState): EvaluationResult {
   const result = getValue(expr.expr, state);
   result.name = `CAST(${result.name} AS CHAR)`;
   if (!result.err && result.value !== null && result.type !== 'string') {
@@ -84,3 +70,8 @@ export function char(expr: Cast, state: EvaluationState): EvaluationResult {
   }
   return result;
 }
+
+export const methods: Record<
+  string,
+  undefined | ((expr: Cast, state: EvaluationState) => EvaluationResult)
+> = { datetime, date, time, signed, char };

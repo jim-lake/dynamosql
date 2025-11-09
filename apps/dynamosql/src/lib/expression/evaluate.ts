@@ -1,9 +1,10 @@
-import * as AggregateFunctions from './aggregate_functions';
-import * as BinaryExpression from './binary_expression';
-import * as Cast from './cast';
-import * as Functions from './functions';
-import * as UnaryExpression from './unary_expression';
-import * as SystemVariables from '../system_variables';
+import { methods as AggregateFunctions } from './aggregate_functions';
+import { methods as BinaryExpression } from './binary_expression';
+import { methods as Cast } from './cast';
+import { methods as Functions } from './functions';
+import { methods as Interval } from './interval';
+import { methods as UnaryExpression } from './unary_expression';
+import { methods as SystemVariables } from '../system_variables';
 import { mapToObject } from '../../tools/dynamodb_helper';
 import { logger } from '@dynamosql/shared';
 import { getFunctionName } from '../helpers/ast_helper';
@@ -11,7 +12,7 @@ import type {
   Function,
   AggrFunc,
   Binary,
-  Interval,
+  Interval as IntervalType,
   ColumnRef,
   Cast as CastType,
 } from 'node-sql-parser/types';
@@ -61,11 +62,11 @@ export function getValue(
     result.name = 'x' + expr.value.slice(0, 10);
     result.type = 'buffer';
   } else if (type === 'interval') {
-    result = Cast.interval(expr as Interval, state);
+    result = Interval.interval(expr as IntervalType, state);
   } else if (type === 'function') {
     const funcExpr = expr as Function;
     const funcName = getFunctionName(funcExpr.name);
-    const func = Functions[funcName.toLowerCase() as keyof typeof Functions];
+    const func = Functions[funcName.toLowerCase()];
     if (func) {
       result = func(funcExpr, state);
       if (!result.name) {
@@ -78,10 +79,7 @@ export function getValue(
   } else if (type === 'aggr_func') {
     const aggrExpr = expr as AggrFunc;
     const funcName = getFunctionName(aggrExpr.name);
-    const func =
-      AggregateFunctions[
-        funcName.toLowerCase() as keyof typeof AggregateFunctions
-      ];
+    const func = AggregateFunctions[funcName.toLowerCase()];
     if (func) {
       result = func(aggrExpr, state);
       if (!result.name) {
@@ -93,10 +91,7 @@ export function getValue(
     }
   } else if (type === 'binary_expr') {
     const binExpr = expr as Binary;
-    const func =
-      BinaryExpression[
-        binExpr.operator.toLowerCase() as keyof typeof BinaryExpression
-      ];
+    const func = BinaryExpression[binExpr.operator.toLowerCase()];
     if (func) {
       result = func(binExpr, state);
       if (!result.name) {
@@ -111,10 +106,7 @@ export function getValue(
     }
   } else if (type === 'unary_expr') {
     const unaryExpr = expr as UnaryExpr;
-    const func =
-      UnaryExpression[
-        unaryExpr.operator.toLowerCase() as keyof typeof UnaryExpression
-      ];
+    const func = UnaryExpression[unaryExpr.operator.toLowerCase()];
     if (func) {
       result = func(unaryExpr, state);
       if (!result.name) {
@@ -133,10 +125,9 @@ export function getValue(
       ? castExpr.target[0]
       : castExpr.target;
     const dataType = target?.dataType;
-    const funcKey = dataType?.toLowerCase() as keyof typeof Cast;
-    const func = Cast[funcKey];
+    const func = Cast[dataType?.toLowerCase() ?? ''];
     if (func) {
-      result = (func as (expr: CastType, state: EvaluationState) => EvaluationResult)(castExpr, state);
+      result = func(castExpr, state);
       if (!result.name) {
         result.name = `CAST(? AS ${dataType})`;
       }
@@ -148,10 +139,7 @@ export function getValue(
     const varExpr = expr as VarExpr;
     const { prefix } = varExpr;
     if (prefix === '@@') {
-      const func =
-        SystemVariables[
-          varExpr.name.toLowerCase() as keyof typeof SystemVariables
-        ];
+      const func = SystemVariables[varExpr.name.toLowerCase()];
       if (func) {
         result.value = func();
       } else {

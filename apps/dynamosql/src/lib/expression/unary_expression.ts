@@ -32,7 +32,7 @@ function minus(expr: UnaryExpr, state: EvaluationState): EvaluationResult {
   return result;
 }
 
-export { plus as '+' };
-export { not as '!' };
-export { not as 'not' };
-export { minus as '-' };
+export const methods: Record<
+  string,
+  undefined | ((expr: UnaryExpr, state: EvaluationState) => EvaluationResult)
+> = { '+': plus, '!': not, not, '-': minus };

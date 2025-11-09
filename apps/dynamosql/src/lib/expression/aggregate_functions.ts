@@ -3,7 +3,7 @@ import { convertNum } from '../helpers/sql_conversion';
 import type { AggrFunc } from 'node-sql-parser/types';
 import type { EvaluationState, EvaluationResult } from './evaluate';
 
-export function sum(expr: AggrFunc, state: EvaluationState): EvaluationResult {
+function sum(expr: AggrFunc, state: EvaluationState): EvaluationResult {
   const { row, ...other } = state;
   const group = row?.['@@group'] || [{}];
   let err: EvaluationResult['err'] = null;
@@ -27,3 +27,8 @@ export function sum(expr: AggrFunc, state: EvaluationState): EvaluationResult {
   name += ')';
   return { err, value, type: 'number', name };
 }
+
+export const methods: Record<
+  string,
+  undefined | ((expr: AggrFunc, state: EvaluationState) => EvaluationResult)
+> = { sum };

@@ -7,17 +7,11 @@ import type { EvaluationState, EvaluationResult } from './evaluate';
 
 const DAY = 24 * 60 * 60;
 
-export function database(
-  expr: Function,
-  state: EvaluationState
-): EvaluationResult {
+function database(expr: Function, state: EvaluationState): EvaluationResult {
   return { err: null, value: state.session.getCurrentDatabase() };
 }
 
-export function sleep(
-  expr: Function,
-  state: EvaluationState
-): EvaluationResult {
+function sleep(expr: Function, state: EvaluationState): EvaluationResult {
   const result = getValue(expr.args.value?.[0], state);
   result.name = `SLEEP(${result.name})`;
   const sleep_ms = convertNum(result.value);
@@ -27,10 +21,7 @@ export function sleep(
   return result;
 }
 
-export function length(
-  expr: Function,
-  state: EvaluationState
-): EvaluationResult {
+function length(expr: Function, state: EvaluationState): EvaluationResult {
   const result = getValue(expr.args.value?.[0], state);
   result.name = `LENGTH(${result.name})`;
   result.type = 'number';
@@ -40,10 +31,7 @@ export function length(
   return result;
 }
 
-export function concat(
-  expr: Function,
-  state: EvaluationState
-): EvaluationResult {
+function concat(expr: Function, state: EvaluationState): EvaluationResult {
   let err: EvaluationResult['err'] = null;
   let value: string | null = '';
   expr.args.value?.every?.((sub: any) => {
@@ -60,7 +48,7 @@ export function concat(
   return { err, value };
 }
 
-export function left(expr: Function, state: EvaluationState): EvaluationResult {
+function left(expr: Function, state: EvaluationState): EvaluationResult {
   const result = getValue(expr.args?.value?.[0], state);
   const len_result = getValue(expr.args?.value?.[1], state);
   result.name = `LEFT(${result.name ?? ''}, ${len_result.name ?? ''})`;
@@ -75,10 +63,7 @@ export function left(expr: Function, state: EvaluationState): EvaluationResult {
   return result;
 }
 
-export function coalesce(
-  expr: Function,
-  state: EvaluationState
-): EvaluationResult {
+function coalesce(expr: Function, state: EvaluationState): EvaluationResult {
   let err: EvaluationResult['err'] = null;
   let value = null;
   let type;
@@ -94,9 +79,9 @@ export function coalesce(
   return { err, value, type };
 }
 
-export const ifnull = coalesce;
+const ifnull = coalesce;
 
-export function now(expr: Function, state: EvaluationState): EvaluationResult {
+function now(expr: Function, state: EvaluationState): EvaluationResult {
   const result = getValue(expr.args?.value?.[0], state);
   result.name = expr.args ? `NOW(${result.name ?? ''})` : 'CURRENT_TIMESTAMP';
   if (!result.err && result.type) {
@@ -110,9 +95,9 @@ export function now(expr: Function, state: EvaluationState): EvaluationResult {
   return result;
 }
 
-export const current_timestamp = now;
+const current_timestamp = now;
 
-export function from_unixtime(
+function from_unixtime(
   expr: Function,
   state: EvaluationState
 ): EvaluationResult {
@@ -128,7 +113,7 @@ export function from_unixtime(
   return result;
 }
 
-export function date(expr: Function, state: EvaluationState): EvaluationResult {
+function date(expr: Function, state: EvaluationState): EvaluationResult {
   const result = getValue(expr.args.value?.[0], state);
   result.name = `DATE(${result.name})`;
   result.type = 'date';
@@ -147,10 +132,7 @@ export function date(expr: Function, state: EvaluationState): EvaluationResult {
   return result;
 }
 
-export function date_format(
-  expr: Function,
-  state: EvaluationState
-): EvaluationResult {
+function date_format(expr: Function, state: EvaluationState): EvaluationResult {
   const date = getValue(expr.args.value?.[0], state);
   const format = getValue(expr.args.value?.[1], state);
   const err = date.err || format.err;
@@ -165,10 +147,7 @@ export function date_format(
   return { err, name, value, type: 'string' };
 }
 
-export function datediff(
-  expr: Function,
-  state: EvaluationState
-): EvaluationResult {
+function datediff(expr: Function, state: EvaluationState): EvaluationResult {
   const expr1 = getValue(expr.args.value?.[0], state);
   const expr2 = getValue(expr.args.value?.[1], state);
   const err = expr1.err || expr2.err;
@@ -184,18 +163,15 @@ export function datediff(
   return { err, name, value, type: 'int' };
 }
 
-export function curdate(expr: Function): EvaluationResult {
+function curdate(expr: Function): EvaluationResult {
   const value = createSQLDateTime(Date.now() / 1000, 'date');
   const name = expr.args ? 'CURDATE()' : 'CURRENT_DATE';
   return { err: null, value, name, type: 'date' };
 }
 
-export const current_date = curdate;
+const current_date = curdate;
 
-export function curtime(
-  expr: Function,
-  state: EvaluationState
-): EvaluationResult {
+function curtime(expr: Function, state: EvaluationState): EvaluationResult {
   const result = getValue(expr.args?.value?.[0], state);
   result.name = expr.args ? `CURTIME(${result.name ?? ''})` : 'CURRENT_TIME';
   if (!result.err && result.type) {
@@ -210,4 +186,27 @@ export function curtime(
   return result;
 }
 
-export const current_time = curtime;
+const current_time = curtime;
+
+export const methods: Record<
+  string,
+  undefined | ((expr: Function, state: EvaluationState) => EvaluationResult)
+> = {
+  database,
+  sleep,
+  length,
+  concat,
+  left,
+  coalesce,
+  ifnull,
+  now,
+  current_timestamp,
+  from_unixtime,
+  date,
+  date_format,
+  datediff,
+  curdate,
+  current_date,
+  curtime,
+  current_time,
+};

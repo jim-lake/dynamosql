@@ -38,10 +38,12 @@ function _numBothSides(
   let value;
   let left_num;
   let right_num;
-  let interval: {
-    add: (dt: unknown) => { value: unknown; type: string };
-    sub: (dt: unknown) => { value: unknown; type: string };
-  } | undefined;
+  let interval:
+    | {
+        add: (dt: unknown) => { value: unknown; type: string };
+        sub: (dt: unknown) => { value: unknown; type: string };
+      }
+    | undefined;
   let datetime;
   if (!err) {
     if (left.value === null || right.value === null) {
@@ -139,11 +141,6 @@ function div(expr: Binary, state: EvaluationState): EvaluationResult {
   return { err, value, name };
 }
 
-export { plus as '+' };
-export { minus as '-' };
-export { mul as '*' };
-export { div as '/' };
-
 function _convertCompare(
   left: EvaluationResult,
   right: EvaluationResult
@@ -220,10 +217,6 @@ function notEqual(expr: Binary, state: EvaluationState): EvaluationResult {
   return ret;
 }
 
-export { equal as '=' };
-export { notEqual as '!=' };
-export { notEqual as '<>' };
-
 function _gt(
   expr_left: ExpressionValue,
   expr_right: ExpressionValue,
@@ -267,9 +260,6 @@ function lt(expr: Binary, state: EvaluationState): EvaluationResult {
   return _gt(expr.right, expr.left, state, ' < ', true);
 }
 
-export { gt as '>' };
-export { lt as '<' };
-
 function _gte(
   expr_left: ExpressionValue,
   expr_right: ExpressionValue,
@@ -312,9 +302,6 @@ function gte(expr: Binary, state: EvaluationState): EvaluationResult {
 function lte(expr: Binary, state: EvaluationState): EvaluationResult {
   return _gte(expr.right, expr.left, state, ' <= ', true);
 }
-
-export { gte as '>=' };
-export { lte as '<=' };
 
 export function and(expr: Binary, state: EvaluationState): EvaluationResult {
   const left = getValue(expr.left, state);
@@ -383,8 +370,6 @@ function isNot(expr: Binary, state: EvaluationState): EvaluationResult {
   return result;
 }
 
-export { isNot as 'is not' };
-
 function _is(
   expr: Binary,
   state: EvaluationState,
@@ -445,3 +430,25 @@ function _unionDateTime(type1: string, type2: string): string | undefined {
   }
   return ret;
 }
+
+export const methods: Record<
+  string,
+  undefined | ((expr: Binary, state: EvaluationState) => EvaluationResult)
+> = {
+  '+': plus,
+  '-': minus,
+  '*': mul,
+  '/': div,
+  '=': equal,
+  '!=': notEqual,
+  '<>': notEqual,
+  '>': gt,
+  '<': lt,
+  '>=': gte,
+  '<=': lte,
+  and,
+  or,
+  xor,
+  is,
+  'is not': isNot,
+};

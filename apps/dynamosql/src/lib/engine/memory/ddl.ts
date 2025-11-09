@@ -46,12 +46,7 @@ export async function createTable(params: CreateTableParams): Promise<void> {
     primary_key: any[];
     row_list: any[];
     primary_map: Map<any, any>;
-  } = {
-    column_list,
-    primary_key,
-    row_list: [],
-    primary_map: new Map(),
-  };
+  } = { column_list, primary_key, row_list: [], primary_map: new Map() };
   if (is_temp) {
     session!.saveTempTable(database!, table, data);
   } else {
