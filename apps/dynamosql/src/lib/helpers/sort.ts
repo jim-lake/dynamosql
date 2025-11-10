@@ -38,6 +38,9 @@ function _sort(
   const order_length = orderby.length;
   for (let i = 0; i < order_length; i++) {
     const order = orderby[i];
+    if (!order) {
+      continue;
+    }
     const { expr } = order;
     const func = order.type !== 'DESC' ? _asc : _desc;
     const exprObj = expr as { type?: string; value?: number };

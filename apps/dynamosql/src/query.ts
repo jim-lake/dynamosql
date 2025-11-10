@@ -94,7 +94,7 @@ export class Query extends EventEmitter {
     }
 
     const result_list: unknown[] = [];
-    const schema_list: FieldInfo[][] = [];
+    const schema_list: (FieldInfo[] | undefined)[] = [];
     try {
       for (let n = 0; n < list.length; n++) {
         const ast = list[n];
@@ -108,9 +108,9 @@ export class Query extends EventEmitter {
         }
       }
       if (list.length === 1) {
-        return [result_list[0], schema_list[0]];
+        return [result_list[0], schema_list[0] ?? []];
       } else {
-        return [result_list, schema_list];
+        return [result_list, schema_list as FieldInfo[][]];
       }
     } catch (err) {
       const sql_err = new SQLError(err as any, this.sql);

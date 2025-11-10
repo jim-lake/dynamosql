@@ -109,8 +109,14 @@ function _evaluateReturn(
   for (let i = 0; i < row_count && !err; i++) {
     const output_row: unknown[] = [];
     const row = row_list[i];
+    if (!row) {
+      continue;
+    }
     for (let j = 0; j < column_count; j++) {
       const column = query_columns[j];
+      if (!column) {
+        continue;
+      }
       const result = Expression.getValue(column.expr as never, {
         session,
         row,
@@ -144,6 +150,9 @@ function _evaluateReturn(
   const column_list: unknown[] = [];
   for (let i = 0; i < column_count; i++) {
     const column = query_columns[i];
+    if (!column) {
+      continue;
+    }
     const column_type = convertType(column.result_type, column.result_nullable);
     const exprObj = column.expr as {
       from?: { table?: string; as?: string; db?: string };
@@ -223,7 +232,7 @@ function _expandStarColumns(params: {
           (!db && from.as === table)
         ) {
           const column_list = column_map[from.key ?? ''];
-          if (!column_list?.length) {
+          if (column_list && !column_list.length) {
             from._requestSet?.forEach((name: string) => column_list.push(name));
           }
           column_list?.forEach((name: string) => {

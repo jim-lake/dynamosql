@@ -54,6 +54,9 @@ function _findRows(
 ): { err: ErrorResult; output_count: number } {
   let err: ErrorResult = null;
   const from = list[from_index];
+  if (!from) {
+    return { err: 'Invalid from index', output_count: 0 };
+  }
   const { key, on, is_left } = from;
   const rows = key ? source_map[key] : undefined;
   const row_count = rows?.length || (is_left ? 1 : 0);
@@ -65,14 +68,18 @@ function _findRows(
       row_list[row_index] = {};
     }
     const row = row_list[row_index];
+    if (!row) {
+      continue;
+    }
 
     if (key) {
       row_list[row_index][key] = rows?.[i] ?? null;
     }
     for (let j = 0; output_count > 0 && j < from_index; j++) {
-      const from_key = list[j].key;
-      if (from_key) {
-        row_list[row_index][from_key] = row_list[start_index][from_key];
+      const from_key = list[j]?.key;
+      const startRow = row_list[start_index];
+      if (from_key && startRow) {
+        row_list[row_index][from_key] = startRow[from_key];
       }
     }
 

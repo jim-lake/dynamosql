@@ -179,12 +179,27 @@ function _convertNumber(
   let ret: number | null = null;
   if (Array.isArray(unit)) {
     if (typeof value === 'number') {
-      ret = value * unit[1];
+      const unitValue = unit[1];
+      if (unitValue !== undefined) {
+        ret = value * unitValue;
+      }
     } else {
       const match = String(value).match(/\d+/g);
-      if (match && match.length === 2) {
+      if (
+        match &&
+        match.length === 2 &&
+        match[0] &&
+        match[1] &&
+        unit[0] !== undefined &&
+        unit[2] !== undefined
+      ) {
         ret = parseInt(match[0]) * unit[0] + parseInt(match[1]) * unit[2];
-      } else if (match && match.length === 1) {
+      } else if (
+        match &&
+        match.length === 1 &&
+        match[0] &&
+        unit[1] !== undefined
+      ) {
         ret = parseInt(match[0]) * unit[1];
       } else if (match && match.length === 0) {
         ret = 0;

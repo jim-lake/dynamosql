@@ -184,7 +184,8 @@ function errStr(
     let s = '';
     for (let i = 0; i < strings.length; i++) {
       s += strings[i];
-      s += _stringify(arg_list?.[index_list?.[i]]);
+      const idx = index_list[i];
+      s += _stringify(idx !== undefined ? arg_list?.[idx] : undefined);
     }
     return s;
   };

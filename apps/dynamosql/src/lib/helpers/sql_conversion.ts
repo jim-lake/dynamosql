@@ -130,13 +130,13 @@ function _stringToTime(value: string): number | undefined {
   let ret;
   value = value.trim();
   let match = value.match(DAY_TIME_REGEX);
-  if (match) {
+  if (match && match[2] && match[3]) {
     const negative = match[1];
     const days = parseInt(match[2]);
     const hours = parseInt(match[3]);
     const mins = parseInt(match[5] || '0');
     const secs = parseInt(match[7] || '0');
-    const fraction = parseFloat('0' + match[8]);
+    const fraction = parseFloat('0' + (match[8] || ''));
     ret = days * DAY + hours * HOUR + mins * MINUTE + secs + fraction;
     if (negative) {
       ret = -ret;
@@ -144,12 +144,12 @@ function _stringToTime(value: string): number | undefined {
   }
   if (ret === undefined) {
     match = value.match(TIME_REGEX);
-    if (match) {
+    if (match && match[2] && match[3]) {
       const negative = match[1];
       const hours = parseInt(match[2]);
-      const mins = parseInt(match[3] || '0');
+      const mins = parseInt(match[3]);
       const secs = parseInt(match[5] || '0');
-      const fraction = parseFloat('0' + match[6]);
+      const fraction = parseFloat('0' + (match[6] || ''));
       ret = hours * HOUR + mins * MINUTE + secs + fraction;
       if (negative) {
         ret = -ret;
@@ -162,7 +162,7 @@ function _stringToTime(value: string): number | undefined {
 function _stringToDate(value: string): any {
   let ret;
   const match = value.trim().match(DATE_REGEX);
-  if (match) {
+  if (match && match[1] && match[2] && match[3]) {
     const year = _fix2year(match[1]);
     const month = match[2];
     const day = match[3];
@@ -174,7 +174,7 @@ function _stringToDate(value: string): any {
 function _stringToDateTime(value: string): any {
   let ret;
   const match = value.trim().match(DATETIME_REGEX);
-  if (match) {
+  if (match && match[1] && match[2] && match[3] && match[5]) {
     const year = _fix2year(match[1]);
     const month = match[2];
     const day = match[3];
@@ -191,7 +191,7 @@ function _numToDateTime(number: any): any {
   let ret;
   const s = String(number);
   let match = s.match(DATETIME4_REGEX);
-  if (match) {
+  if (match && match[1] && match[2] && match[3] && match[4] && match[5]) {
     const year = match[1];
     const month = match[2];
     const day = match[3];
@@ -203,7 +203,7 @@ function _numToDateTime(number: any): any {
   }
   if (ret === undefined) {
     match = s.match(DATETIME2_REGEX);
-    if (match) {
+    if (match && match[1] && match[2] && match[3] && match[4] && match[5]) {
       const year = _fix2year(match[1]);
       const month = match[2];
       const day = match[3];
@@ -216,7 +216,7 @@ function _numToDateTime(number: any): any {
   }
   if (ret === undefined) {
     match = s.match(DATE4_REGEX);
-    if (match) {
+    if (match && match[1] && match[2] && match[3]) {
       const year = match[1];
       const month = match[2];
       const day = match[3];
@@ -225,7 +225,7 @@ function _numToDateTime(number: any): any {
   }
   if (ret === undefined) {
     match = s.match(DATE2_REGEX);
-    if (match) {
+    if (match && match[1] && match[2] && match[3]) {
       const year = _fix2year(match[1]);
       const month = match[2];
       const day = match[3];
@@ -278,12 +278,12 @@ function _fix2year(num: any): any {
 }
 
 function _partsToTime(
-  year: any,
-  month: any,
-  day: any,
-  hour: any,
-  min: any,
-  sec: any,
+  year: string | number,
+  month: string | number,
+  day: string | number,
+  hour: string | number,
+  min: string | number,
+  sec: string | number,
   fraction?: number
 ): any {
   const iso = `${_pad4(year)}-${_pad2(month)}-${_pad2(day)}T${_pad2(

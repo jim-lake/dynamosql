@@ -85,13 +85,19 @@ export async function dropDatabase(params: {
     throw new SQLError('database_no_drop_builtin');
   } else if (database in g_schemaMap) {
     session.dropTempTable(database);
-    const table_list = Object.keys(g_schemaMap[database]);
+    const schemaEntry = g_schemaMap[database];
+    if (!schemaEntry) {
+      return;
+    }
+    const table_list = Object.keys(schemaEntry);
 
     for (const table of table_list) {
       const engine = getEngine(database, table, session);
       try {
         await engine.dropTable({ ...params, table } as never);
-        delete g_schemaMap[database][table];
+        if (schemaEntry) {
+          delete schemaEntry[table];
+        }
       } catch (err) {
         logger.error('dropDatabase: table:', table, 'drop err:', err);
         throw err;
@@ -130,7 +136,10 @@ export async function createTable(params: {
     if (engine) {
       await engine.createTable(params as never);
       if (!is_temp) {
-        g_schemaMap[database][table] = { table_engine };
+        const schemaEntry = g_schemaMap[database];
+        if (schemaEntry) {
+          schemaEntry[table] = { table_engine };
+        }
       }
     } else {
       throw new SQLError({
@@ -155,7 +164,10 @@ export async function dropTable(params: {
     const engine = getEngine(database, table, session);
     try {
       await engine.dropTable(params as never);
-      delete g_schemaMap[database][table];
+      const schemaEntry = g_schemaMap[database];
+      if (schemaEntry) {
+        delete schemaEntry[table];
+      }
     } catch (err) {
       logger.error(
         'SchemaManager.dropTable: drop error but deleting table anyway: err:',
@@ -163,7 +175,10 @@ export async function dropTable(params: {
         database,
         table
       );
-      delete g_schemaMap[database][table];
+      const schemaEntry = g_schemaMap[database];
+      if (schemaEntry) {
+        delete schemaEntry[table];
+      }
       throw err;
     }
   } else {

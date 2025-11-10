@@ -54,7 +54,10 @@ export function resolveReferences(
       if (!db_map[from.db]) {
         db_map[from.db] = {};
       }
-      db_map[from.db][from.table] = from;
+      const dbEntry = db_map[from.db];
+      if (dbEntry) {
+        dbEntry[from.table] = from;
+      }
     }
   });
   const table = ast.type === 'update' ? ast.table : (ast as any).table;
