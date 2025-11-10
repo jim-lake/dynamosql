@@ -246,6 +246,15 @@ function dynamoType(type) {
     }
     return ret;
 }
+const NAMESPACE_REGEX = /\b(FROM|UPDATE|INTO|DELETE\s+FROM)\s+(["`]?)([A-Za-z0-9_.-]+)(\2)/gi;
+function namespacePartiQL(sql, namespace) {
+    if (namespace) {
+        return sql.replaceAll(NAMESPACE_REGEX, (_, kw, quote, name) => `${kw} "${namespace}${name}"`);
+    }
+    else {
+        return sql;
+    }
+}
 
 async function timesLimit(length, limit, iter) {
     if (length <= 0) {
@@ -308,16 +317,18 @@ async function parallelBatch(list, batchSize, limit, iter) {
 const QUERY_LIMIT = 5;
 class DynamoDB {
     client;
+    namespace;
     constructor(params) {
         const opts = {
-            region: params.region ??
+            region: params?.region ??
                 process.env.AWS_REGION ??
                 process.env.AWS_DEFAULT_REGION,
         };
-        if (params.credentials) {
+        if (params?.credentials) {
             opts.credentials = params.credentials;
         }
         this.client = new clientDynamodb.DynamoDBClient(opts);
+        this.namespace = params?.namespace ?? '';
     }
     async queryQL(list) {
         if (!Array.isArray(list)) {
@@ -330,7 +341,7 @@ class DynamoDB {
         }
     }
     async _queryQL(params) {
-        const sql = typeof params === 'string' ? params : params.sql;
+        const sql = namespacePartiQL(typeof params === 'string' ? params : params.sql, this.namespace);
         const returnVal = typeof params === 'string' ? 'NONE' : (params.return ?? 'NONE');
         const input = {
             Statement: sql,
@@ -345,8 +356,8 @@ class DynamoDB {
             ? 'NONE'
             : (params.return ?? 'NONE');
         const input = {
-            Statements: list.map((Statement) => ({
-                Statement,
+            Statements: list.map((sql) => ({
+                Statement: namespacePartiQL(sql, this.namespace),
                 ReturnValuesOnConditionCheckFailure: returnVal,
             })),
         };
@@ -376,8 +387,8 @@ class DynamoDB {
             ? 'NONE'
             : (params.return ?? 'NONE');
         const input = {
-            TransactStatements: list.map((Statement) => ({
-                Statement,
+            TransactStatements: list.map((sql) => ({
+                Statement: namespacePartiQL(sql, this.namespace),
                 ReturnValuesOnConditionCheckFailure: returnVal,
             })),
         };
@@ -446,7 +457,8 @@ class DynamoDB {
     }
     async putItems(params) {
         const BATCH_LIMIT = 100;
-        const { table, list } = params;
+        const { list } = params;
+        const table = `${this.namespace}${params.table}`;
         const err_list = [];
         try {
             await parallelBatch(list, BATCH_LIMIT, QUERY_LIMIT, async (batch, i) => {
@@ -491,11 +503,21 @@ class DynamoDB {
         }
     }
     async getTableList() {
+        const namespace_len = this.namespace.length;
         const command = new clientDynamodb.ListTablesCommand({ Limit: 100 });
         const results = [];
-        while (true) {
+        for (;;) {
             const result = await this.client.send(command);
-            result.TableNames?.forEach((table) => results.push(table));
+            if (result.TableNames) {
+                for (const table of result.TableNames) {
+                    if (namespace_len === 0) {
+                        results.push(table);
+                    }
+                    else if (table.startsWith(this.namespace)) {
+                        results.push(table.substring(namespace_len));
+                    }
+                }
+            }
             if (!result.LastEvaluatedTableName) {
                 break;
             }
@@ -503,8 +525,9 @@ class DynamoDB {
         }
         return results;
     }
-    async getTable(TableName) {
-        const command = new clientDynamodb.DescribeTableCommand({ TableName });
+    async getTable(raw_table) {
+        const table = `${this.namespace}${raw_table}`;
+        const command = new clientDynamodb.DescribeTableCommand({ TableName: table });
         try {
             return await this.client.send(command);
         }
@@ -513,7 +536,8 @@ class DynamoDB {
         }
     }
     async createTable(params) {
-        const { table, billing_mode, column_list, primary_key } = params;
+        const { billing_mode, column_list, primary_key } = params;
+        const table = `${this.namespace}${params.table}`;
         const AttributeDefinitions = column_list.map((column) => ({
             AttributeName: column.name,
             AttributeType: dynamoType(column.type),
@@ -541,8 +565,9 @@ class DynamoDB {
             throw convertError(err);
         }
     }
-    async deleteTable(TableName) {
-        const command = new clientDynamodb.DeleteTableCommand({ TableName });
+    async deleteTable(raw_table) {
+        const table = `${this.namespace}${raw_table}`;
+        const command = new clientDynamodb.DeleteTableCommand({ TableName: table });
         try {
             await this.client.send(command);
         }
@@ -551,7 +576,8 @@ class DynamoDB {
         }
     }
     async createIndex(params) {
-        const { table, index_name, key_list, projection_type } = params;
+        const { index_name, key_list, projection_type } = params;
+        const table = `${this.namespace}${params.table}`;
         const AttributeDefinitions = key_list.map((item) => ({
             AttributeName: item.name,
             AttributeType: dynamoType(item.type),
@@ -590,7 +616,8 @@ class DynamoDB {
         }
     }
     async deleteIndex(params) {
-        const { table, index_name } = params;
+        const { index_name } = params;
+        const table = `${this.namespace}${params.table}`;
         const input = {
             TableName: table,
             GlobalSecondaryIndexUpdates: [{ Delete: { IndexName: index_name } }],
@@ -605,7 +632,7 @@ class DynamoDB {
     }
     async _pagedSend(command) {
         const results = [];
-        while (true) {
+        for (;;) {
             try {
                 const result = await this.client.send(command);
                 const list = convertSuccess(result)[1];
@@ -630,50 +657,49 @@ class DynamoDB {
 
 class DynamoDBWithCache extends DynamoDB {
     _tableCache = new Map();
-    async getTable(table_name) {
+    async getTable(table) {
         try {
-            const result = await super.getTable(table_name);
+            const result = await super.getTable(table);
             if (result?.Table?.TableStatus === 'DELETING') {
-                this._tableCache.delete(table_name);
+                this._tableCache.delete(table);
             }
             else {
-                this._tableCache.set(table_name, { last_updated: Date.now(), result });
+                this._tableCache.set(table, { last_updated: Date.now(), result });
             }
             return result;
         }
         catch (err) {
             if (err?.message === 'resource_not_found') {
-                this._tableCache.delete(table_name);
+                this._tableCache.delete(table);
             }
             throw err;
         }
     }
-    async getTableCached(table_name) {
-        const result = this._tableCache.get(table_name)?.result;
+    async getTableCached(table) {
+        const result = this._tableCache.get(table)?.result;
         if (result) {
             return result;
         }
         else {
-            return this.getTable(table_name);
+            return this.getTable(table);
         }
     }
-    async createTable(opts) {
-        const table_name = opts.table;
-        this._tableCache.delete(table_name);
+    async createTable(params) {
+        this._tableCache.delete(params.table);
         try {
-            await super.createTable(opts);
+            await super.createTable(params);
         }
         finally {
-            this._tableCache.delete(table_name);
+            this._tableCache.delete(params.table);
         }
     }
-    async deleteTable(table_name) {
-        this._tableCache.delete(table_name);
+    async deleteTable(table) {
+        this._tableCache.delete(table);
         try {
-            await super.deleteTable(table_name);
+            await super.deleteTable(table);
         }
         finally {
-            this._tableCache.delete(table_name);
+            this._tableCache.delete(table);
         }
     }
 }
@@ -2148,7 +2174,8 @@ function errStr(strings, ...index_list) {
         let s = '';
         for (let i = 0; i < strings.length; i++) {
             s += strings[i];
-            s += _stringify(arg_list?.[index_list?.[i]]);
+            const idx = index_list[i];
+            s += _stringify(idx !== undefined ? arg_list?.[idx] : undefined);
         }
         return s;
     };
@@ -2208,15 +2235,16 @@ async function getTableInfo$1(params) {
         shared.logger.error('getTableInfo: err:', err, table);
         throw err;
     }
-    if (!data || !data.Table) {
+    if (!data?.Table?.AttributeDefinitions || !data?.Table?.KeySchema) {
         throw new Error('bad_data');
     }
     const column_list = data.Table.AttributeDefinitions.map((def) => ({
         name: def.AttributeName,
-        type: TYPE_MAP[def.AttributeType],
+        type: TYPE_MAP[def.AttributeType] || 'string',
     }));
     const primary_key = data.Table.KeySchema.map((key) => {
-        const type = column_list.find((col) => col.name === key.AttributeName).type;
+        const type = column_list.find((col) => col.name === key.AttributeName)?.type ||
+            'string';
         return { name: key.AttributeName, type };
     });
     return { table, primary_key, column_list, is_open: true };
@@ -2240,7 +2268,7 @@ async function createTable$2(params) {
         await _waitForTable({ dynamodb, table });
     }
     catch (err) {
-        if (err?.message === 'resource_in_use') {
+        if (err instanceof Error && err.message === 'resource_in_use') {
             throw new SQLError('table_exists');
         }
         shared.logger.error('raw_engine.createTable: err:', err);
@@ -2253,7 +2281,8 @@ async function dropTable$2(params) {
         await dynamodb.deleteTable(table);
     }
     catch (delete_err) {
-        if (delete_err?.code === 'ResourceNotFoundException') {
+        if (delete_err instanceof Error &&
+            delete_err.name === 'ResourceNotFoundException') {
             throw new SQLError('table_not_found');
         }
         shared.logger.error('raw_engine.dropTable: deleteTable err:', delete_err);
@@ -2263,7 +2292,8 @@ async function dropTable$2(params) {
         await _waitForTable({ dynamodb, table });
     }
     catch (wait_err) {
-        if (wait_err?.message === 'resource_not_found') {
+        if (wait_err instanceof Error &&
+            wait_err.message === 'resource_not_found') {
             return;
         }
         shared.logger.error('raw_engine.dropTable: waitForTable err:', wait_err);
@@ -2273,15 +2303,20 @@ async function dropTable$2(params) {
 async function addColumn$1(_params) { }
 async function createIndex$1(params) {
     const { dynamodb, table, index_name, key_list } = params;
+    if (!key_list) {
+        throw new Error('key_list is required');
+    }
     const opts = { table, index_name, key_list };
     try {
         await dynamodb.createIndex(opts);
         await _waitForTable({ dynamodb, table, index_name });
     }
     catch (err) {
-        if (err?.message === 'resource_in_use' ||
-            err?.message?.indexOf?.('already exists') >= 0) {
-            throw new Error('index_exists');
+        if (err instanceof Error) {
+            if (err.message === 'resource_in_use' ||
+                err.message.indexOf('already exists') >= 0) {
+                throw new Error('index_exists');
+            }
         }
         shared.logger.error('raw_engine.createIndex: err:', err);
         throw err;
@@ -2294,7 +2329,7 @@ async function deleteIndex$1(params) {
         await _waitForTable({ dynamodb, table, index_name });
     }
     catch (err) {
-        if (err?.message === 'resource_not_found') {
+        if (err instanceof Error && err.message === 'resource_not_found') {
             throw new Error('index_not_found');
         }
         shared.logger.error('raw_engine.deleteIndex: err:', err);
@@ -2314,7 +2349,7 @@ async function _waitForTable(params) {
             continue;
         }
         if (index_name) {
-            const index = result?.Table?.GlobalSecondaryIndexes?.find?.((item) => item.IndexName === index_name);
+            const index = result?.Table?.GlobalSecondaryIndexes?.find((item) => item.IndexName === index_name);
             if (index && index.IndexStatus !== 'ACTIVE') {
                 await sleep$1(LOOP_MS);
                 continue;
@@ -2860,13 +2895,13 @@ function _stringToTime(value) {
     let ret;
     value = value.trim();
     let match = value.match(DAY_TIME_REGEX);
-    if (match) {
+    if (match && match[2] && match[3]) {
         const negative = match[1];
         const days = parseInt(match[2]);
         const hours = parseInt(match[3]);
         const mins = parseInt(match[5] || '0');
         const secs = parseInt(match[7] || '0');
-        const fraction = parseFloat('0' + match[8]);
+        const fraction = parseFloat('0' + (match[8] || ''));
         ret = days * DAY$1 + hours * HOUR + mins * MINUTE + secs + fraction;
         if (negative) {
             ret = -ret;
@@ -2874,12 +2909,12 @@ function _stringToTime(value) {
     }
     if (ret === undefined) {
         match = value.match(TIME_REGEX);
-        if (match) {
+        if (match && match[2] && match[3]) {
             const negative = match[1];
             const hours = parseInt(match[2]);
-            const mins = parseInt(match[3] || '0');
+            const mins = parseInt(match[3]);
             const secs = parseInt(match[5] || '0');
-            const fraction = parseFloat('0' + match[6]);
+            const fraction = parseFloat('0' + (match[6] || ''));
             ret = hours * HOUR + mins * MINUTE + secs + fraction;
             if (negative) {
                 ret = -ret;
@@ -2891,7 +2926,7 @@ function _stringToTime(value) {
 function _stringToDate(value) {
     let ret;
     const match = value.trim().match(DATE_REGEX);
-    if (match) {
+    if (match && match[1] && match[2] && match[3]) {
         const year = _fix2year(match[1]);
         const month = match[2];
         const day = match[3];
@@ -2902,7 +2937,7 @@ function _stringToDate(value) {
 function _stringToDateTime(value) {
     let ret;
     const match = value.trim().match(DATETIME_REGEX);
-    if (match) {
+    if (match && match[1] && match[2] && match[3] && match[5]) {
         const year = _fix2year(match[1]);
         const month = match[2];
         const day = match[3];
@@ -2918,7 +2953,7 @@ function _numToDateTime(number) {
     let ret;
     const s = String(number);
     let match = s.match(DATETIME4_REGEX);
-    if (match) {
+    if (match && match[1] && match[2] && match[3] && match[4] && match[5]) {
         const year = match[1];
         const month = match[2];
         const day = match[3];
@@ -2930,7 +2965,7 @@ function _numToDateTime(number) {
     }
     if (ret === undefined) {
         match = s.match(DATETIME2_REGEX);
-        if (match) {
+        if (match && match[1] && match[2] && match[3] && match[4] && match[5]) {
             const year = _fix2year(match[1]);
             const month = match[2];
             const day = match[3];
@@ -2943,7 +2978,7 @@ function _numToDateTime(number) {
     }
     if (ret === undefined) {
         match = s.match(DATE4_REGEX);
-        if (match) {
+        if (match && match[1] && match[2] && match[3]) {
             const year = match[1];
             const month = match[2];
             const day = match[3];
@@ -2952,7 +2987,7 @@ function _numToDateTime(number) {
     }
     if (ret === undefined) {
         match = s.match(DATE2_REGEX);
-        if (match) {
+        if (match && match[1] && match[2] && match[3]) {
             const year = _fix2year(match[1]);
             const month = match[2];
             const day = match[3];
@@ -3029,7 +3064,10 @@ function sum(expr, state) {
             value = null;
         }
         else if (value !== null) {
-            value += convertNum(result.value);
+            const num = convertNum(result.value);
+            if (num !== null) {
+                value += num;
+            }
         }
     });
     name += ')';
@@ -3059,11 +3097,11 @@ function _numBothSides(expr, state, op, allow_interval) {
         }
         else if (allow_interval && left.type === 'interval') {
             interval = left.value;
-            if (_isDateOrTimeLike(right.type)) {
+            if (right.type && _isDateOrTimeLike(right.type)) {
                 datetime = right.value;
             }
-            else if (typeof right.value === 'string') {
-                datetime = convertDateTime(left.value);
+            else if (right.value !== undefined && typeof right.value === 'string') {
+                datetime = convertDateTime(right.value);
                 if (!datetime) {
                     value = null;
                 }
@@ -3074,10 +3112,10 @@ function _numBothSides(expr, state, op, allow_interval) {
         }
         else if (allow_interval && right.type === 'interval') {
             interval = right.value;
-            if (_isDateOrTimeLike(left.type)) {
+            if (left.type && _isDateOrTimeLike(left.type)) {
                 datetime = left.value;
             }
-            else if (typeof left.value === 'string') {
+            else if (left.value !== undefined && typeof left.value === 'string') {
                 datetime = convertDateTime(left.value);
                 if (!datetime) {
                     value = null;
@@ -3091,10 +3129,14 @@ function _numBothSides(expr, state, op, allow_interval) {
             err = 'bad_interval_usage';
         }
         else {
-            left_num = convertNum(left.value);
-            right_num = convertNum(right.value);
-            if (left_num === null || right_num === null) {
+            const leftNum = convertNum(left.value);
+            const rightNum = convertNum(right.value);
+            if (leftNum === null || rightNum === null) {
                 value = null;
+            }
+            else {
+                left_num = leftNum;
+                right_num = rightNum;
             }
         }
     }
@@ -3140,7 +3182,10 @@ function mul(expr, state) {
     const result = _numBothSides(expr, state, ' * ');
     const { err, name, left_num, right_num } = result;
     let value = result.value;
-    if (!err && value !== null) {
+    if (!err &&
+        value !== null &&
+        left_num !== undefined &&
+        right_num !== undefined) {
         value = left_num * right_num;
     }
     return { err, value, name };
@@ -3149,7 +3194,10 @@ function div(expr, state) {
     const result = _numBothSides(expr, state, ' / ');
     const { err, name, left_num, right_num } = result;
     let value = result.value;
-    if (!err && value !== null) {
+    if (!err &&
+        value !== null &&
+        left_num !== undefined &&
+        right_num !== undefined) {
         value = left_num / right_num;
     }
     return { err, value, name };
@@ -3265,7 +3313,10 @@ function _gte$1(expr_left, expr_right, state, op, flip) {
         }
         else if (typeof left.value === 'number' &&
             typeof right.value === 'number') {
-            value = convertNum(left.value) >= convertNum(right.value) ? 1 : 0;
+            const leftNum = convertNum(left.value);
+            const rightNum = convertNum(right.value);
+            value =
+                leftNum !== null && rightNum !== null && leftNum >= rightNum ? 1 : 0;
         }
         else if (typeof left.value === 'string' &&
             typeof right.value === 'string') {
@@ -3290,7 +3341,13 @@ function and$1(expr, state) {
         if (value !== 0) {
             const right = getValue(expr.right, state);
             err = right.err;
-            value = convertBooleanValue(right.value) && value;
+            const rightBool = convertBooleanValue(right.value);
+            if (value === null || rightBool === null) {
+                value = rightBool === 0 || value === 0 ? 0 : null;
+            }
+            else {
+                value = rightBool && value;
+            }
             name = left.name + ' AND ' + right.name;
         }
     }
@@ -3471,7 +3528,10 @@ function signed(expr, state) {
     result.name = `CAST(${result.name} AS SIGNED)`;
     result.type = 'bigint';
     if (!result.err && result.value !== null) {
-        result.value = Math.trunc(convertNum(result.value));
+        const num = convertNum(result.value);
+        if (num !== null) {
+            result.value = Math.trunc(num);
+        }
     }
     return result;
 }
@@ -3491,16 +3551,16 @@ function database(expr, state) {
     return { err: null, value: state.session.getCurrentDatabase() };
 }
 function sleep(expr, state) {
-    const result = getValue(expr.args.value?.[0], state);
+    const result = getValue(expr.args?.value?.[0], state);
     result.name = `SLEEP(${result.name})`;
     const sleep_ms = convertNum(result.value);
-    if (sleep_ms > 0) {
+    if (sleep_ms !== null && sleep_ms > 0) {
         result.sleep_ms = sleep_ms * 1000;
     }
     return result;
 }
 function length(expr, state) {
-    const result = getValue(expr.args.value?.[0], state);
+    const result = getValue(expr.args?.value?.[0], state);
     result.name = `LENGTH(${result.name})`;
     result.type = 'number';
     if (!result.err && result.value !== null) {
@@ -3511,7 +3571,7 @@ function length(expr, state) {
 function concat(expr, state) {
     let err = null;
     let value = '';
-    expr.args.value?.every?.((sub) => {
+    expr.args?.value?.every?.((sub) => {
         const result = getValue(sub, state);
         if (!err && result.err) {
             err = result.err;
@@ -3537,7 +3597,8 @@ function left(expr, state) {
     }
     else if (!result.err) {
         const length = convertNum(len_result.value);
-        result.value = String(result.value).substring(0, length);
+        result.value =
+            length !== null ? String(result.value).substring(0, length) : null;
     }
     return result;
 }
@@ -3545,7 +3606,7 @@ function coalesce(expr, state) {
     let err = null;
     let value = null;
     let type;
-    expr.args.value?.some?.((sub) => {
+    expr.args?.value?.some?.((sub) => {
         const result = getValue(sub, state);
         if (result.err) {
             err = result.err;
@@ -3556,7 +3617,6 @@ function coalesce(expr, state) {
     });
     return { err, value, type };
 }
-const ifnull = coalesce;
 function now(expr, state) {
     const result = getValue(expr.args?.value?.[0], state);
     result.name = expr.args ? `NOW(${result.name ?? ''})` : 'CURRENT_TIMESTAMP';
@@ -3570,21 +3630,22 @@ function now(expr, state) {
     }
     return result;
 }
-const current_timestamp = now;
 function from_unixtime(expr, state) {
-    const result = getValue(expr.args.value?.[0], state);
+    const result = getValue(expr.args?.value?.[0], state);
     result.name = `FROM_UNIXTIME(${result.name})`;
     result.type = 'datetime';
     if (!result.err && result.value !== null) {
         const time = convertNum(result.value);
-        const decimals = Math.min(6, String(time).split('.')?.[1]?.length || 0);
-        result.value =
-            time < 0 ? null : createSQLDateTime(time, 'datetime', decimals);
+        if (time !== null) {
+            const decimals = Math.min(6, String(time).split('.')?.[1]?.length || 0);
+            result.value =
+                time < 0 ? null : createSQLDateTime(time, 'datetime', decimals);
+        }
     }
     return result;
 }
 function date(expr, state) {
-    const result = getValue(expr.args.value?.[0], state);
+    const result = getValue(expr.args?.value?.[0], state);
     result.name = `DATE(${result.name})`;
     result.type = 'date';
     if (!result.err && result.value !== null) {
@@ -3600,8 +3661,8 @@ function date(expr, state) {
     return result;
 }
 function date_format(expr, state) {
-    const date = getValue(expr.args.value?.[0], state);
-    const format = getValue(expr.args.value?.[1], state);
+    const date = getValue(expr.args?.value?.[0], state);
+    const format = getValue(expr.args?.value?.[1], state);
     const err = date.err || format.err;
     let value;
     const name = `DATE_FORMAT(${date.name}, ${format.name})`;
@@ -3615,8 +3676,8 @@ function date_format(expr, state) {
     return { err, name, value, type: 'string' };
 }
 function datediff(expr, state) {
-    const expr1 = getValue(expr.args.value?.[0], state);
-    const expr2 = getValue(expr.args.value?.[1], state);
+    const expr1 = getValue(expr.args?.value?.[0], state);
+    const expr2 = getValue(expr.args?.value?.[1], state);
     const err = expr1.err || expr2.err;
     let value;
     const name = `DATEDIFF(${expr1.name}, ${expr2.name})`;
@@ -3635,7 +3696,6 @@ function curdate(expr) {
     const name = expr.args ? 'CURDATE()' : 'CURRENT_DATE';
     return { err: null, value, name, type: 'date' };
 }
-const current_date = curdate;
 function curtime(expr, state) {
     const result = getValue(expr.args?.value?.[0], state);
     result.name = expr.args ? `CURTIME(${result.name ?? ''})` : 'CURRENT_TIME';
@@ -3650,7 +3710,6 @@ function curtime(expr, state) {
     }
     return result;
 }
-const current_time = curtime;
 const methods$3 = {
     database,
     sleep,
@@ -3658,17 +3717,17 @@ const methods$3 = {
     concat,
     left,
     coalesce,
-    ifnull,
+    ifnull: coalesce,
     now,
-    current_timestamp,
+    current_timestamp: now,
     from_unixtime,
     date,
     date_format,
     datediff,
     curdate,
-    current_date,
+    current_date: curdate,
     curtime,
-    current_time,
+    current_time: curtime,
 };
 
 const SINGLE_TIME = {
@@ -3827,14 +3886,25 @@ function _convertNumber(value, unit, unit_name) {
     let ret = null;
     if (Array.isArray(unit)) {
         if (typeof value === 'number') {
-            ret = value * unit[1];
+            const unitValue = unit[1];
+            if (unitValue !== undefined) {
+                ret = value * unitValue;
+            }
         }
         else {
             const match = String(value).match(/\d+/g);
-            if (match && match.length === 2) {
+            if (match &&
+                match.length === 2 &&
+                match[0] &&
+                match[1] &&
+                unit[0] !== undefined &&
+                unit[2] !== undefined) {
                 ret = parseInt(match[0]) * unit[0] + parseInt(match[1]) * unit[2];
             }
-            else if (match && match.length === 1) {
+            else if (match &&
+                match.length === 1 &&
+                match[0] &&
+                unit[1] !== undefined) {
                 ret = parseInt(match[0]) * unit[1];
             }
             else if (match && match.length === 0) {
@@ -3902,7 +3972,8 @@ function minus$1(expr, state) {
     result.name = '-' + result.name;
     result.type = 'number';
     if (!result.err && result.value !== null) {
-        result.value = -convertNum(result.value);
+        const num = convertNum(result.value);
+        result.value = num !== null ? -num : null;
     }
     return result;
 }
@@ -3983,13 +4054,16 @@ function getValue(expr, state) {
         result.type = 'buffer';
     }
     else if (type === 'interval') {
-        result = methods$2.interval(expr, state);
+        const intervalFunc = methods$2.interval;
+        if (typeof intervalFunc === 'function') {
+            result = intervalFunc(expr, state);
+        }
     }
     else if (type === 'function') {
         const funcExpr = expr;
         const funcName = getFunctionName(funcExpr.name);
         const func = methods$3[funcName.toLowerCase()];
-        if (func) {
+        if (typeof func === 'function') {
             result = func(funcExpr, state);
             if (!result.name) {
                 result.name = funcName + '()';
@@ -4419,8 +4493,8 @@ function convertWhere(expr, state) {
 }
 
 async function singleDelete$1(params) {
-    const { dynamodb, session } = params;
-    const { from, where } = params.ast;
+    const { dynamodb, session, ast } = params;
+    const { from, where } = ast;
     let no_single = false;
     const result = convertWhere(where, { session, from_key: from?.[0]?.key });
     if (result.err) {
@@ -4436,20 +4510,23 @@ async function singleDelete$1(params) {
         throw new NoSingleOperationError();
     }
     const sql = `
-DELETE FROM ${escapeIdentifier(from[0].table)}
+DELETE FROM ${escapeIdentifier(from[0]?.table ?? '')}
 WHERE ${result.value}
 RETURNING ALL OLD *
 `;
     try {
         const results = await dynamodb.queryQL(sql);
-        return { affectedRows: results?.length || 0 };
+        const resultArray = Array.isArray(results[0]) ? results[0] : results;
+        return { affectedRows: resultArray?.length || 0 };
     }
     catch (err) {
-        if (err?.name === 'ValidationException') {
-            throw new NoSingleOperationError();
-        }
-        else if (err?.name === 'ConditionalCheckFailedException') {
-            return { affectedRows: 0 };
+        if (err instanceof Error) {
+            if (err.name === 'ValidationException') {
+                throw new NoSingleOperationError();
+            }
+            else if (err.name === 'ConditionalCheckFailedException') {
+                return { affectedRows: 0 };
+            }
         }
         shared.logger.error('singleDelete: query err:', err);
         throw err;
@@ -4457,6 +4534,9 @@ RETURNING ALL OLD *
 }
 async function multipleDelete$1(params) {
     const { dynamodb, list } = params;
+    if (!list) {
+        return { affectedRows: 0 };
+    }
     let affectedRows = 0;
     for (const object of list) {
         const { table, key_list, delete_list } = object;
@@ -4490,19 +4570,25 @@ async function _insertIgnoreReplace(params) {
     if (list.length > 1) {
         try {
             const result = await dynamodb.getTableCached(table);
+            if (!result.Table?.KeySchema) {
+                throw new Error('Invalid table schema');
+            }
             const key_list = result.Table.KeySchema.map((k) => k.AttributeName);
             const track = new Map();
             if (duplicate_mode === 'replace') {
                 list.reverse();
             }
-            list = list.filter((row) => trackFirstSeen(track, key_list.map((key) => row[key].value)));
+            list = list.filter((row) => trackFirstSeen(track, key_list.map((key) => row[key]?.value)));
             if (duplicate_mode === 'replace') {
                 list.reverse();
             }
         }
         catch (err) {
-            if (err?.message === 'resource_not_found') {
-                throw new SQLError({ err: 'table_not_found', args: [table] });
+            if (err instanceof Error) {
+                if (err.name === 'ResourceNotFoundException' ||
+                    err.message.toLowerCase().includes('resource not found')) {
+                    throw new SQLError({ err: 'table_not_found', args: [table] });
+                }
             }
             throw err;
         }
@@ -4514,30 +4600,32 @@ async function _insertIgnoreReplace(params) {
             await dynamodb.batchQL(sql_list);
         }
         catch (err) {
-            if (err?.name === 'ResourceNotFoundException' ||
-                err?.message?.toLowerCase().includes('resource not found')) {
-                throw new SQLError({ err: 'table_not_found', args: [table] });
+            if (err instanceof Error) {
+                if (err.name === 'ResourceNotFoundException' ||
+                    err.message.toLowerCase().includes('resource not found')) {
+                    throw new SQLError({ err: 'table_not_found', args: [table] });
+                }
+                if (err.name === 'ValidationException') {
+                    throw new SQLError({
+                        err: 'dup_table_insert',
+                        sqlMessage: err.message,
+                        cause: err,
+                    });
+                }
             }
             if (Array.isArray(err)) {
-                let error;
+                let thrownError = null;
                 err.forEach((item_err) => {
                     if (item_err?.Code === 'DuplicateItem') {
                         affectedRows--;
                     }
-                    else if (!error && item_err) {
+                    else if (!thrownError && item_err) {
                         affectedRows--;
-                        error = convertError(item_err);
+                        thrownError = convertError(item_err);
                     }
                 });
-                if (error)
-                    throw error;
-            }
-            else if (err?.name === 'ValidationException') {
-                throw new SQLError({
-                    err: 'dup_table_insert',
-                    sqlMessage: err.message,
-                    cause: err,
-                });
+                if (thrownError)
+                    throw thrownError;
             }
             else {
                 throw err;
@@ -4565,50 +4653,58 @@ async function _insertNoIgnore(params) {
         return { affectedRows: list.length };
     }
     catch (err) {
-        if (err?.name === 'TransactionCanceledException' &&
-            err.CancellationReasons) {
-            for (let i = 0; i < err.CancellationReasons.length; i++) {
-                if (err.CancellationReasons[i].Code === 'DuplicateItem') {
-                    throw new SQLError({
-                        err: 'dup_table_insert',
-                        args: [table, _fixupItem(list[i])],
-                    });
-                }
-                else if (err.CancellationReasons[i].Code !== 'None') {
-                    throw new SQLError({
-                        err: convertError(err.CancellationReasons[i]),
-                        message: err.CancellationReasons[i].Message,
-                    });
+        if (err instanceof Error) {
+            const cancellationReasons = err.CancellationReasons;
+            if (err.name === 'TransactionCanceledException' && cancellationReasons) {
+                for (let i = 0; i < cancellationReasons.length; i++) {
+                    const reason = cancellationReasons[i];
+                    if (reason?.Code === 'DuplicateItem') {
+                        const item = list[i];
+                        if (item) {
+                            throw new SQLError({
+                                err: 'dup_table_insert',
+                                args: [table, _fixupItem(item)],
+                            });
+                        }
+                    }
+                    else if (reason?.Code !== 'None') {
+                        throw new SQLError({
+                            err: 'unsupported',
+                            message: reason?.Message,
+                        });
+                    }
                 }
             }
-        }
-        else if (err?.name === 'ValidationException') {
-            throw new SQLError({
-                err: 'dup_table_insert',
-                sqlMessage: err.message,
-                cause: err,
-            });
-        }
-        // Check for resource not found errors
-        const errStr = String(err?.message || err || '').toLowerCase();
-        if (err?.name === 'ResourceNotFoundException' ||
-            errStr.includes('resource not found') ||
-            errStr.includes('requested resource not found')) {
-            throw new SQLError({ err: 'table_not_found', args: [table] });
+            else if (err.name === 'ValidationException') {
+                throw new SQLError({
+                    err: 'dup_table_insert',
+                    sqlMessage: err.message,
+                    cause: err,
+                });
+            }
+            const errStr = err.message.toLowerCase();
+            if (err.name === 'ResourceNotFoundException' ||
+                errStr.includes('resource not found') ||
+                errStr.includes('requested resource not found')) {
+                throw new SQLError({ err: 'table_not_found', args: [table] });
+            }
         }
         throw err;
     }
 }
 function _fixupItem(item) {
     for (const key in item) {
-        item[key] = item[key].value;
+        const cell = item[key];
+        if (cell) {
+            item[key] = cell.value;
+        }
     }
     return item;
 }
 function _escapeItem(item) {
     let s = '{ ';
     s += Object.keys(item)
-        .map((key) => `'${key}': ${escapeValue(item[key].value)}`)
+        .map((key) => `'${key}': ${escapeValue(item[key]?.value)}`)
         .join(', ');
     s += ' }';
     return s;
@@ -4627,7 +4723,7 @@ async function getRowList$1(params) {
 }
 async function _getFromTable$1(params) {
     const { dynamodb, session, from, where } = params;
-    const { table, _requestSet, _requestAll } = params.from;
+    const { table, _requestSet, _requestAll } = from;
     const request_columns = [..._requestSet];
     const columns = _requestAll || request_columns.length === 0
         ? '*'
@@ -4641,10 +4737,11 @@ async function _getFromTable$1(params) {
     }
     try {
         const results = await dynamodb.queryQL(sql);
+        const resultArray = Array.isArray(results[0]) ? results[0] : results;
         let column_list;
         if (_requestAll) {
             const response_set = new Set();
-            results.forEach((result) => {
+            resultArray.forEach((result) => {
                 for (const key in result) {
                     response_set.add(key);
                 }
@@ -4654,10 +4751,10 @@ async function _getFromTable$1(params) {
         else {
             column_list = request_columns;
         }
-        return { results, column_list };
+        return { results: resultArray, column_list };
     }
     catch (err) {
-        if (err?.message === 'resource_not_found') {
+        if (err instanceof Error && err.message === 'resource_not_found') {
             throw new SQLError({ err: 'table_not_found', args: [table] });
         }
         shared.logger.error('raw_engine.getRowList err:', err, sql);
@@ -4666,8 +4763,8 @@ async function _getFromTable$1(params) {
 }
 
 async function singleUpdate$1(params) {
-    const { dynamodb, session } = params;
-    const { set, from, where } = params.ast;
+    const { dynamodb, session, ast } = params;
+    const { set, from, where } = ast;
     const where_result = convertWhere(where, {
         session,
         from_key: from?.[0]?.key,
@@ -4695,29 +4792,32 @@ async function singleUpdate$1(params) {
         .map((object, i) => escapeIdentifier(object.column) + ' = ' + value_list[i])
         .join(', ');
     const sql = `
-UPDATE ${escapeIdentifier(from[0].table)}
+UPDATE ${escapeIdentifier(from[0]?.table ?? '')}
 SET ${sets}
 WHERE ${where_result.value}
 RETURNING MODIFIED OLD *
 `;
     try {
         const results = await dynamodb.queryQL(sql);
+        const resultArray = (Array.isArray(results[0]) ? results[0] : results);
         const result = { affectedRows: 1, changedRows: 0 };
         set.forEach((object, i) => {
             const { column } = object;
             const value = value_list[i];
-            if (value !== escapeValue(valueToNative(results?.[0]?.[column]))) {
+            if (value !== escapeValue(valueToNative(resultArray?.[0]?.[column]))) {
                 result.changedRows = 1;
             }
         });
         return result;
     }
     catch (err) {
-        if (err?.name === 'ValidationException') {
-            throw new NoSingleOperationError();
-        }
-        else if (err?.name === 'ConditionalCheckFailedException') {
-            return { affectedRows: 0, changedRows: 0 };
+        if (err instanceof Error) {
+            if (err.name === 'ValidationException') {
+                throw new NoSingleOperationError();
+            }
+            else if (err.name === 'ConditionalCheckFailedException') {
+                return { affectedRows: 0, changedRows: 0 };
+            }
         }
         shared.logger.error('singleUpdate: err:', err);
         throw err;
@@ -4725,15 +4825,22 @@ RETURNING MODIFIED OLD *
 }
 async function multipleUpdate$1(params) {
     const { dynamodb, list } = params;
+    if (!list) {
+        return { affectedRows: 0, changedRows: 0 };
+    }
     let affectedRows = 0;
     let changedRows = 0;
     for (const object of list) {
         const { table, key_list, update_list } = object;
-        update_list.forEach((item) => item.set_list.forEach((set) => (set.value = set.value.value)));
+        for (const item of update_list) {
+            for (const set of item.set_list) {
+                set.value = set.value.value;
+            }
+        }
         try {
             await dynamodb.updateItems({ table, key_list, list: update_list });
-            affectedRows += list.length;
-            changedRows += list.length;
+            affectedRows += update_list.length;
+            changedRows += update_list.length;
         }
         catch (err) {
             shared.logger.error('multipleUpdate: updateItems: err:', err, 'table:', table);
@@ -4768,29 +4875,36 @@ var RawEngine = /*#__PURE__*/Object.freeze({
 const g_tableMap = {};
 function getTable(database, table, session) {
     const key = database + '.' + table;
-    let data = session.getTempTable(database, table) || g_tableMap[key];
+    const tempTable = session.getTempTable(database, table);
+    const globalTable = g_tableMap[key];
+    let data = tempTable || globalTable;
     const updates = txGetData(database, table, session)?.data;
     if (data && updates) {
         data = Object.assign({}, data, updates);
     }
-    return data;
+    return data || null;
 }
 function updateTableData(database, table, session, updates) {
     const key = database + '.' + table;
-    const data = session.getTempTable(database, table) || g_tableMap[key];
-    Object.assign(data, updates);
+    const tempTable = session.getTempTable(database, table);
+    const globalTable = g_tableMap[key];
+    const data = tempTable || globalTable;
+    if (data) {
+        Object.assign(data, updates);
+    }
 }
 function txSaveData(database, table, session, data) {
     const tx = session.getTransaction();
     const key = database + '.' + table;
-    const existing = tx.getData('memory') || {};
+    const existing = tx?.getData('memory') || {};
     existing[key] = { database, table, data };
-    tx.setData('memory', existing);
+    tx?.setData('memory', existing);
 }
 function txGetData(database, table, session) {
     const key = database + '.' + table;
     const tx = session.getTransaction();
-    return tx?.getData?.('memory')?.[key];
+    const memoryData = tx?.getData?.('memory');
+    return memoryData?.[key];
 }
 function saveTable(database, table, data) {
     const key = database + '.' + table;
@@ -4825,7 +4939,12 @@ async function createTable$1(params) {
             message: 'primary key is required',
         });
     }
-    const data = { column_list, primary_key, row_list: [], primary_map: new Map() };
+    const data = {
+        column_list,
+        primary_key,
+        row_list: [],
+        primary_map: new Map(),
+    };
     if (is_temp) {
         session.saveTempTable(database, table, data);
     }
@@ -4851,6 +4970,9 @@ async function singleDelete(_params) {
 }
 async function multipleDelete(params) {
     const { session, list } = params;
+    if (!list) {
+        return { affectedRows: 0 };
+    }
     let affectedRows = 0;
     for (const changes of list) {
         const { database, table, delete_list } = changes;
@@ -4867,8 +4989,9 @@ async function multipleDelete(params) {
             if (index !== undefined && index >= 0) {
                 primary_map.delete(delete_key);
                 row_list.splice(index, 1);
+                const deletedIndex = index;
                 primary_map.forEach((value, key) => {
-                    if (value > index) {
+                    if (value > deletedIndex) {
                         primary_map.set(key, value - 1);
                     }
                 });
@@ -4898,7 +5021,7 @@ async function insertRowList(params) {
     let affectedRows = 0;
     for (const row of list) {
         _transformRow(row);
-        const key_values = primary_key.map((key) => row[key.name].value);
+        const key_values = primary_key.map((key) => row[key.name]?.value);
         const key = JSON.stringify(key_values);
         const index = primary_map.get(key);
         if (index === undefined) {
@@ -4906,7 +5029,8 @@ async function insertRowList(params) {
             affectedRows++;
         }
         else if (duplicate_mode === 'replace') {
-            if (!_rowEqual(row_list[index], row)) {
+            const existingRow = row_list[index];
+            if (existingRow && !_rowEqual(existingRow, row)) {
                 affectedRows++;
             }
             row_list[index] = row;
@@ -4924,13 +5048,16 @@ async function insertRowList(params) {
 }
 function _transformRow(row) {
     for (const key in row) {
-        row[key] = { type: row[key].type, value: row[key].value };
+        const cell = row[key];
+        if (cell) {
+            row[key] = { type: cell.type, value: cell.value };
+        }
     }
 }
 function _rowEqual(a, b) {
     const keys_a = Object.keys(a);
     return keys_a.every((key) => {
-        return a[key].value === b[key].value;
+        return a[key]?.value === b[key]?.value;
     });
 }
 
@@ -4949,13 +5076,13 @@ async function getRowList(params) {
     return { source_map, column_map };
 }
 function _getFromTable(params) {
-    const { session } = params;
-    const { db, table } = params.from;
+    const { session, from } = params;
+    const { db, table } = from;
     const data = getTable(db, table, session);
     return {
         err: data ? null : 'table_not_found',
-        row_list: data?.row_list,
-        column_list: data?.column_list?.map?.((column) => column.name) || [],
+        row_list: data?.row_list || [],
+        column_list: data?.column_list?.map((column) => column.name) || [],
     };
 }
 
@@ -4964,6 +5091,9 @@ async function singleUpdate(_params) {
 }
 async function multipleUpdate(params) {
     const { session, list } = params;
+    if (!list) {
+        return { affectedRows: 0, changedRows: 0 };
+    }
     let affectedRows = 0;
     let changedRows = 0;
     for (const changes of list) {
@@ -4981,14 +5111,16 @@ async function multipleUpdate(params) {
             const index = primary_map.get(update_key);
             if (index !== undefined && index >= 0) {
                 const old_row = row_list[index];
+                if (!old_row)
+                    continue;
                 const new_row = Object.assign({}, old_row);
                 let changed = false;
-                set_list.forEach((set) => {
+                for (const set of set_list) {
                     new_row[set.column] = _transformCell(set.value);
-                    if (old_row[set.column].value !== new_row[set.column].value) {
+                    if (old_row[set.column]?.value !== new_row[set.column]?.value) {
                         changed = true;
                     }
-                });
+                }
                 const new_key = _makePrimaryKey(data.primary_key, new_row);
                 if (new_key !== update_key && primary_map.has(new_key)) {
                     throw new SQLError({
@@ -5018,15 +5150,17 @@ function _transformCell(cell) {
     return { value: cell.value, type: cell.type };
 }
 function _makePrimaryKey(primary_key, row) {
-    const key_values = primary_key.map((key) => row[key.name].value);
+    const key_values = primary_key.map((key) => row[key.name]?.value);
     return JSON.stringify(key_values);
 }
 
 async function commit$1(params) {
     const { session, data } = params;
     for (const key in data) {
-        const { database, table, data: tx_data } = data[key];
-        updateTableData(database, table, session, tx_data);
+        const entry = data[key];
+        if (entry) {
+            updateTableData(entry.database, entry.table, session, entry.data);
+        }
     }
 }
 async function rollback$1(_params) { }
@@ -5217,21 +5351,24 @@ const BUILT_IN = ['_dynamodb'];
 const g_schemaMap = {};
 function getEngine(database, table, session) {
     let ret;
-    const schema = g_schemaMap[database];
+    const schema = database ? g_schemaMap[database] : undefined;
     if (database === '_dynamodb') {
         ret = getEngineByName('raw');
+    }
+    else if (!database) {
+        ret = getDatabaseError('');
     }
     else if (!schema) {
         ret = getDatabaseError(database);
     }
-    else if (session.getTempTable(database, table)) {
+    else if (table && session.getTempTable(database, table)) {
         ret = getEngineByName('memory');
     }
-    else if (schema[table]) {
+    else if (table && schema[table]) {
         ret = getEngineByName(schema[table].table_engine);
     }
     else {
-        ret = getTableError(table);
+        ret = getTableError(table ?? '');
     }
     return ret;
 }
@@ -5267,12 +5404,18 @@ async function dropDatabase(params) {
     }
     else if (database in g_schemaMap) {
         session.dropTempTable(database);
-        const table_list = Object.keys(g_schemaMap[database]);
+        const schemaEntry = g_schemaMap[database];
+        if (!schemaEntry) {
+            return;
+        }
+        const table_list = Object.keys(schemaEntry);
         for (const table of table_list) {
             const engine = getEngine(database, table, session);
             try {
                 await engine.dropTable({ ...params, table });
-                delete g_schemaMap[database][table];
+                if (schemaEntry) {
+                    delete schemaEntry[table];
+                }
             }
             catch (err) {
                 shared.logger.error('dropDatabase: table:', table, 'drop err:', err);
@@ -5308,7 +5451,10 @@ async function createTable(params) {
         if (engine) {
             await engine.createTable(params);
             if (!is_temp) {
-                g_schemaMap[database][table] = { table_engine };
+                const schemaEntry = g_schemaMap[database];
+                if (schemaEntry) {
+                    schemaEntry[table] = { table_engine };
+                }
             }
         }
         else {
@@ -5329,11 +5475,17 @@ async function dropTable(params) {
         const engine = getEngine(database, table, session);
         try {
             await engine.dropTable(params);
-            delete g_schemaMap[database][table];
+            const schemaEntry = g_schemaMap[database];
+            if (schemaEntry) {
+                delete schemaEntry[table];
+            }
         }
         catch (err) {
             shared.logger.error('SchemaManager.dropTable: drop error but deleting table anyway: err:', err, database, table);
-            delete g_schemaMap[database][table];
+            const schemaEntry = g_schemaMap[database];
+            if (schemaEntry) {
+                delete schemaEntry[table];
+            }
             throw err;
         }
     }
@@ -5673,7 +5825,10 @@ function resolveReferences(ast, current_database) {
             if (!db_map[from.db]) {
                 db_map[from.db] = {};
             }
-            db_map[from.db][from.table] = from;
+            const dbEntry = db_map[from.db];
+            if (dbEntry) {
+                dbEntry[from.table] = from;
+            }
         }
     });
     const table = ast.type === 'update' ? ast.table : ast.table;
@@ -5820,8 +5975,10 @@ function formJoin(params) {
     const { source_map, from, where, session } = params;
     const row_list = [];
     from.forEach((from_table) => {
-        row_list[from_table.key ?? ''] = [];
-        from_table.is_left = from_table.join?.indexOf?.('LEFT') >= 0;
+        if (from_table.key) {
+            row_list[from_table.key] = [];
+        }
+        from_table.is_left = (from_table.join?.indexOf?.('LEFT') ?? -1) >= 0;
     });
     const result = _findRows(source_map, from, where, session, row_list, 0, 0);
     const { err, output_count } = result;
@@ -5833,8 +5990,11 @@ function formJoin(params) {
 function _findRows(source_map, list, where, session, row_list, from_index, start_index) {
     let err = null;
     const from = list[from_index];
+    if (!from) {
+        return { err: 'Invalid from index', output_count: 0 };
+    }
     const { key, on, is_left } = from;
-    const rows = source_map[key];
+    const rows = key ? source_map[key] : undefined;
     const row_count = rows?.length || (is_left ? 1 : 0);
     let output_count = 0;
     for (let i = 0; i < row_count && !err; i++) {
@@ -5843,10 +6003,18 @@ function _findRows(source_map, list, where, session, row_list, from_index, start
             row_list[row_index] = {};
         }
         const row = row_list[row_index];
-        row_list[row_index][key] = rows[i] ?? null;
+        if (!row) {
+            continue;
+        }
+        if (key) {
+            row_list[row_index][key] = rows?.[i] ?? null;
+        }
         for (let j = 0; output_count > 0 && j < from_index; j++) {
-            const from_key = list[j].key;
-            row_list[row_index][from_key] = row_list[start_index][from_key];
+            const from_key = list[j]?.key;
+            const startRow = row_list[start_index];
+            if (from_key && startRow) {
+                row_list[row_index][from_key] = startRow[from_key];
+            }
         }
         let skip = false;
         if (on) {
@@ -5859,7 +6027,9 @@ function _findRows(source_map, list, where, session, row_list, from_index, start
             }
         }
         if (skip && is_left && output_count === 0 && i + 1 === row_count) {
-            row_list[row_index][key] = null;
+            if (key) {
+                row_list[row_index][key] = null;
+            }
             skip = false;
         }
         if (!skip) {
@@ -5958,6 +6128,9 @@ function _sort(orderby, state, a, b) {
     const order_length = orderby.length;
     for (let i = 0; i < order_length; i++) {
         const order = orderby[i];
+        if (!order) {
+            continue;
+        }
         const { expr } = order;
         const func = order.type !== 'DESC' ? _asc : _desc;
         const exprObj = expr;
@@ -6027,11 +6200,11 @@ function _convertNum(value) {
 
 async function query$7(params) {
     const { output_row_list, column_list } = await internalQuery(params);
-    output_row_list?.forEach?.((row) => {
+    for (const row of output_row_list ?? []) {
         for (const key in row) {
             row[key] = row[key].value;
         }
-    });
+    }
     return { output_row_list, column_list };
 }
 async function internalQuery(params) {
@@ -6062,8 +6235,8 @@ function _evaluateReturn(params) {
     const query_columns = _expandStarColumns(params);
     const { from, where, groupby } = ast;
     let err = null;
-    let row_list;
-    let sleep_ms = 9;
+    let row_list = [];
+    let sleep_ms = 0;
     if (from) {
         const result = formJoin({ source_map, from, where, session });
         if (result.err) {
@@ -6085,13 +6258,9 @@ function _evaluateReturn(params) {
             row_list = result.row_list;
         }
     }
-    const row_count = row_list?.length || 0;
-    const column_count = query_columns?.length || 0;
-    for (let i = 0; i < row_count && !err; i++) {
+    for (const row of row_list) {
         const output_row = [];
-        const row = row_list[i];
-        for (let j = 0; j < column_count; j++) {
-            const column = query_columns[j];
+        for (const column of query_columns) {
             const result = getValue(column.expr, {
                 session,
                 row,
@@ -6101,7 +6270,7 @@ function _evaluateReturn(params) {
                 break;
             }
             else {
-                output_row[j] = result;
+                output_row.push(result);
                 if (result.type !== column.result_type) {
                     column.result_type = _unionType(column.result_type, result.type);
                 }
@@ -6122,8 +6291,7 @@ function _evaluateReturn(params) {
         throw new SQLError(err);
     }
     const column_list = [];
-    for (let i = 0; i < column_count; i++) {
-        const column = query_columns[i];
+    for (const column of query_columns) {
         const column_type = convertType(column.result_type, column.result_nullable);
         const exprObj = column.expr;
         column_type.orgName = column.result_name || '';
@@ -6133,7 +6301,7 @@ function _evaluateReturn(params) {
         column_type.schema = exprObj?.from?.db || '';
         column_list.push(column_type);
     }
-    if (ast.orderby) {
+    if (ast.orderby && row_list) {
         const sort_err = sort(row_list, ast.orderby, {
             session,
             column_list: column_list,
@@ -6181,7 +6349,7 @@ function _expandStarColumns(params) {
                     (!db && from.table === table && !from.as) ||
                     (!db && from.as === table)) {
                     const column_list = column_map[from.key ?? ''];
-                    if (!column_list?.length) {
+                    if (column_list && !column_list.length) {
                         from._requestSet?.forEach((name) => column_list.push(name));
                     }
                     column_list?.forEach((name) => {
@@ -6241,10 +6409,15 @@ async function _createDatabase(params) {
         return { affectedRows: 1, changedRows: 0 };
     }
     catch (err) {
-        if (err === 'database_exists' && ast.if_not_exists) {
-            return undefined;
+        if (err instanceof SQLError && err.code === 'ER_DB_CREATE_EXISTS') {
+            if (ast.if_not_exists) {
+                return undefined;
+            }
+            else {
+                throw err;
+            }
         }
-        else if (err && err !== 'database_exists') {
+        else {
             shared.logger.error('createDatabase: err:', err);
         }
         throw err;
@@ -6422,9 +6595,9 @@ function _addCollection(collection, keys, value) {
 
 async function query$5(params) {
     const { ast, session } = params;
-    const current_database = session.getCurrentDatabase();
+    const current_database = session.getCurrentDatabase() ?? undefined;
     const resolve_err = resolveReferences(ast, current_database);
-    const database = ast.from?.[0]?.db;
+    const database = ast.from?.[0]?.db ?? undefined;
     if (resolve_err) {
         shared.logger.error('resolve_err:', resolve_err);
         throw new SQLError(resolve_err);
@@ -6437,7 +6610,7 @@ async function query$5(params) {
 }
 async function _runDelete(params) {
     const { ast, session, dynamodb } = params;
-    const database = ast.from?.[0]?.db;
+    const database = ast.from?.[0]?.db ?? undefined;
     const table = ast.from?.[0]?.table;
     const engine = getEngine(database, table, session);
     if (ast.from.length === 1) {
@@ -6609,7 +6782,7 @@ async function _runInsert(params) {
             database: params.database,
             table,
             list,
-            duplicate_mode,
+            duplicate_mode: duplicate_mode ?? undefined,
         };
         try {
             return await engine.insertRowList(opts);
@@ -6698,11 +6871,11 @@ async function query$1(params) {
 
 async function query(params) {
     const { ast, session } = params;
-    const current_database = session.getCurrentDatabase();
+    const current_database = session.getCurrentDatabase() ?? undefined;
     ast.from = ast.table;
     delete ast.table;
     const resolve_err = resolveReferences(ast, current_database);
-    const database = ast.from?.[0]?.db;
+    const database = ast.from?.[0]?.db ?? undefined;
     if (resolve_err) {
         shared.logger.error('resolve_err:', resolve_err);
         throw new SQLError(resolve_err);
@@ -6715,7 +6888,7 @@ async function query(params) {
 }
 async function _runUpdate(params) {
     const { ast, session, dynamodb } = params;
-    const database = ast.from?.[0]?.db;
+    const database = ast.from?.[0]?.db ?? undefined;
     const table = ast.from?.[0]?.table;
     const engine = getEngine(database, table, session);
     if (ast.from.length === 1) {
@@ -6965,7 +7138,7 @@ class Query extends node_events.EventEmitter {
                 }
             }
             if (list.length === 1) {
-                return [result_list[0], schema_list[0]];
+                return [result_list[0], schema_list[0] ?? []];
             }
             else {
                 return [result_list, schema_list];
@@ -7092,9 +7265,9 @@ class Session extends node_events.EventEmitter {
     threadId = g_threadId++;
     dynamodb;
     typeCastOptions = {};
-    typeCast = true;
-    resultObjects = true;
-    multipleStatements = false;
+    typeCast;
+    resultObjects;
+    multipleStatements;
     _currentDatabase = null;
     _localVariables = {};
     _transaction = null;
@@ -7103,24 +7276,18 @@ class Session extends node_events.EventEmitter {
     escape = SqlString__namespace.escape;
     escapeId = SqlString__namespace.escapeId;
     format = SqlString__namespace.format;
-    constructor(args) {
+    constructor(params) {
         super();
-        this.config = args || {};
-        this.dynamodb = createDynamoDB(args);
-        if (args?.database) {
-            this.setCurrentDatabase(args.database);
-        }
-        if (args?.multipleStatements) {
-            this.multipleStatements = true;
-        }
-        if (args?.resultObjects === false) {
-            this.resultObjects = false;
-        }
-        if (args?.typeCast !== undefined) {
-            this.typeCast = args.typeCast;
-        }
-        if (args?.dateStrings) {
+        this.config = params || {};
+        this.dynamodb = createDynamoDB(params);
+        this.multipleStatements = Boolean(params?.multipleStatements ?? false);
+        this.resultObjects = Boolean(params?.resultObjects ?? true);
+        this.typeCast = params?.typeCast ?? true;
+        if (params?.dateStrings) {
             this.typeCastOptions.dateStrings = true;
+        }
+        if (params?.database) {
+            this.setCurrentDatabase(params.database);
         }
     }
     release(done) {
@@ -7183,7 +7350,7 @@ class Session extends node_events.EventEmitter {
     query(params, values, done) {
         if (this._isReleased) {
             done?.(new SQLError('released'));
-            return;
+            return undefined;
         }
         const opts = typeof params === 'object' ? { ...params } : { sql: '' };
         if (typeof params === 'string') {
@@ -7248,6 +7415,41 @@ class Pool extends node_events.EventEmitter {
         });
     }
 }
+
+exports.Types = void 0;
+(function (Types) {
+    Types[Types["DECIMAL"] = 0] = "DECIMAL";
+    Types[Types["TINY"] = 1] = "TINY";
+    Types[Types["SHORT"] = 2] = "SHORT";
+    Types[Types["LONG"] = 3] = "LONG";
+    Types[Types["FLOAT"] = 4] = "FLOAT";
+    Types[Types["DOUBLE"] = 5] = "DOUBLE";
+    Types[Types["NULL"] = 6] = "NULL";
+    Types[Types["TIMESTAMP"] = 7] = "TIMESTAMP";
+    Types[Types["LONGLONG"] = 8] = "LONGLONG";
+    Types[Types["INT24"] = 9] = "INT24";
+    Types[Types["DATE"] = 10] = "DATE";
+    Types[Types["TIME"] = 11] = "TIME";
+    Types[Types["DATETIME"] = 12] = "DATETIME";
+    Types[Types["YEAR"] = 13] = "YEAR";
+    Types[Types["NEWDATE"] = 14] = "NEWDATE";
+    Types[Types["VARCHAR"] = 15] = "VARCHAR";
+    Types[Types["BIT"] = 16] = "BIT";
+    Types[Types["TIMESTAMP2"] = 17] = "TIMESTAMP2";
+    Types[Types["DATETIME2"] = 18] = "DATETIME2";
+    Types[Types["TIME2"] = 19] = "TIME2";
+    Types[Types["JSON"] = 245] = "JSON";
+    Types[Types["NEWDECIMAL"] = 246] = "NEWDECIMAL";
+    Types[Types["ENUM"] = 247] = "ENUM";
+    Types[Types["SET"] = 248] = "SET";
+    Types[Types["TINY_BLOB"] = 249] = "TINY_BLOB";
+    Types[Types["MEDIUM_BLOB"] = 250] = "MEDIUM_BLOB";
+    Types[Types["LONG_BLOB"] = 251] = "LONG_BLOB";
+    Types[Types["BLOB"] = 252] = "BLOB";
+    Types[Types["VAR_STRING"] = 253] = "VAR_STRING";
+    Types[Types["STRING"] = 254] = "STRING";
+    Types[Types["GEOMETRY"] = 255] = "GEOMETRY";
+})(exports.Types || (exports.Types = {}));
 
 const createConnection = createSession$1;
 const createPool = createPool$1;

@@ -13,6 +13,7 @@ if (!sql) {
 console.log('sql:', sql);
 
 const opts = {
+  namespace: process.env.DYNAMO_NAMESPACE ?? '',
   multipleStatements: true,
   dateStrings: true,
   resultObjects: true,

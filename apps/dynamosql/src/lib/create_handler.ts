@@ -32,9 +32,13 @@ async function _createDatabase(
     SchemaManager.createDatabase(getDatabaseName(ast.database));
     return { affectedRows: 1, changedRows: 0 };
   } catch (err) {
-    if (err === 'database_exists' && ast.if_not_exists) {
-      return undefined;
-    } else if (err && err !== 'database_exists') {
+    if (err instanceof SQLError && err.code === 'ER_DB_CREATE_EXISTS') {
+      if (ast.if_not_exists) {
+        return undefined;
+      } else {
+        throw err;
+      }
+    } else {
       logger.error('createDatabase: err:', err);
     }
     throw err;

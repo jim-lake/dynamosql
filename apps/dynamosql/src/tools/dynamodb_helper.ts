@@ -239,3 +239,15 @@ export function dynamoType(type: string): ScalarAttributeType {
   }
   return ret;
 }
+const NAMESPACE_REGEX =
+  /\b(FROM|UPDATE|INTO|DELETE\s+FROM)\s+(["`]?)([A-Za-z0-9_.-]+)(\2)/gi;
+export function namespacePartiQL(sql: string, namespace: string): string {
+  if (namespace) {
+    return sql.replaceAll(
+      NAMESPACE_REGEX,
+      (_, kw, quote, name) => `${kw} "${namespace}${name}"`
+    );
+  } else {
+    return sql;
+  }
+}

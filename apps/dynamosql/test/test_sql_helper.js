@@ -26,7 +26,14 @@ function runTests(test_name, file_path, extra) {
   );
   const mysql_conn = mysql.createConnection(mysql_opts);
 
-  const session_opts = Object.assign({ resultObjects: false }, extra?.session);
+  const session_opts = Object.assign(
+    {
+      namespace: process.env.DYNAMO_NAMESPACE ?? '',
+      region: process.env.AWS_REGION,
+      resultObjects: false,
+    },
+    extra?.session
+  );
   const ddb_session = Session.createSession(session_opts);
   after(() => {
     mysql_conn.destroy();

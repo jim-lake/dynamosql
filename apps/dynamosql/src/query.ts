@@ -49,12 +49,12 @@ type HandlerResult =
   | undefined;
 
 export class Query extends EventEmitter {
-  private _session: Session;
+  private readonly _session: Session;
 
-  sql: string;
-  values: string[] | undefined;
-  typeCast: TypeCast | undefined;
-  nestedTables: boolean | string;
+  readonly sql: string;
+  readonly values: string[] | undefined;
+  readonly typeCast: TypeCast | undefined;
+  readonly nestedTables: boolean | string;
 
   constructor(params: QueryConstructorParams) {
     super();

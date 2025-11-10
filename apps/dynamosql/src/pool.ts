@@ -5,23 +5,23 @@ import * as Session from './session';
 
 import type {
   Query,
-  SessionConfig,
   PoolConnection,
   MysqlError,
   FieldInfo,
   QueryOptions,
   QueryCallback,
 } from './types';
+import type { SessionConfig } from './session';
 
 export type PoolConfig = SessionConfig;
 export function createPool(args?: PoolConfig) {
   return new Pool(args ?? {});
 }
 export class Pool extends EventEmitter {
-  config: SessionConfig;
-  escape = SqlString.escape;
-  escapeId = SqlString.escapeId;
-  format = SqlString.format;
+  public readonly config: SessionConfig;
+  public readonly escape = SqlString.escape;
+  public readonly escapeId = SqlString.escapeId;
+  public readonly format = SqlString.format;
 
   constructor(args: PoolConfig) {
     super();

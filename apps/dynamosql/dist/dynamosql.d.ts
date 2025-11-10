@@ -1,6 +1,7 @@
 import * as SqlString from 'sqlstring';
 import { EventEmitter } from 'node:events';
 import { ReadableOptions, Readable } from 'node:stream';
+import { AwsCredentialIdentity } from '@aws-sdk/types';
 
 interface ErrorInput {
     err?: string;
@@ -114,14 +115,6 @@ interface EscapeFunctions {
     escapeId(value: string, forbidQualified?: boolean): string;
     format(sql: string, values?: any[], stringifyObjects?: boolean, timeZone?: string): string;
 }
-interface SessionConfig {
-    region?: string | undefined;
-    database?: string | undefined;
-    multipleStatements?: boolean | undefined;
-    resultObjects?: boolean | undefined;
-    typeCast?: TypeCast | undefined;
-    dateStrings?: boolean | Array<'TIMESTAMP' | 'DATETIME' | 'DATE'> | undefined;
-}
 interface PoolConnection extends Connection {
     release(): void;
 }
@@ -145,28 +138,43 @@ interface OkPacket {
     protocol41: boolean;
 }
 
+interface DynamoDBConstructorParams {
+    namespace?: string;
+    region?: string;
+    credentials?: AwsCredentialIdentity;
+}
+
+type DynamoDBWithCacheConstructorParams = DynamoDBConstructorParams;
+
+interface SessionConfig extends DynamoDBWithCacheConstructorParams {
+    database?: string | undefined;
+    multipleStatements?: boolean | undefined;
+    resultObjects?: boolean | undefined;
+    typeCast?: TypeCast | undefined;
+    dateStrings?: boolean | Array<'TIMESTAMP' | 'DATETIME' | 'DATE'> | undefined;
+}
+declare function createSession$1(args?: SessionConfig): PoolConnection;
+
 type PoolConfig = SessionConfig;
 declare function createPool$1(args?: PoolConfig): Pool;
 declare class Pool extends EventEmitter {
-    config: SessionConfig;
-    escape: typeof SqlString.escape;
-    escapeId: typeof SqlString.escapeId;
-    format: typeof SqlString.format;
+    readonly config: SessionConfig;
+    readonly escape: typeof SqlString.escape;
+    readonly escapeId: typeof SqlString.escapeId;
+    readonly format: typeof SqlString.format;
     constructor(args: PoolConfig);
     end(done?: (err?: MysqlError) => void): void;
     getConnection(done: (err: MysqlError | null, connection?: PoolConnection) => void): void;
     query(opts: string | QueryOptions, values?: any, done?: QueryCallback): Query;
 }
 
-declare function createSession$1(args?: SessionConfig): PoolConnection;
-
 declare const createConnection: typeof createSession$1;
 declare const createPool: typeof createPool$1;
 declare const createPoolCluster: typeof createPool$1;
 declare const createSession: typeof createSession$1;
-declare const escape: EscapeFunctions["escape"];
-declare const escapeId: EscapeFunctions["escapeId"];
-declare const format: EscapeFunctions["format"];
+declare const escape: typeof SqlString.escape;
+declare const escapeId: typeof SqlString.escapeId;
+declare const format: typeof SqlString.format;
 declare const raw: typeof SqlString.raw;
 
 export { SQLError, Types, createConnection, createPool, createPoolCluster, createSession, escape, escapeId, format, raw };

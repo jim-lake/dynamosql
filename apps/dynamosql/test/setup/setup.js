@@ -16,7 +16,12 @@ const mysql_conn = mysql.createConnection({
   dateStrings: true,
 });
 
-const ddb_session = Session.createSession({ region: process.env.AWS_REGION });
+const namespace = process.env.DYNAMO_NAMESPACE ?? '';
+const region = process.env.AWS_REGION;
+console.log('namespace:', namespace);
+console.log('region:', region);
+
+const ddb_session = Session.createSession({ namespace, region });
 
 after(() => {
   mysql_conn.destroy();
@@ -58,11 +63,15 @@ function _runTest(sql) {
         },
       ],
       () => {
-        expect(ddb_result.err, 'err equality').to.equal(mysql_result.err);
-        expect(ddb_result.results.length, 'results length').to.equal(
-          mysql_result.results.length
-        );
-        done();
+        try {
+          expect(ddb_result.err, 'err equality').to.equal(mysql_result.err);
+          expect(ddb_result.results.length, 'results length').to.equal(
+            mysql_result.results.length
+          );
+          done();
+        } catch (e) {
+          done(e);
+        }
       }
     );
   });

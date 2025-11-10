@@ -26,6 +26,7 @@ import {
   convertValueToPQL,
   convertSuccess,
   dynamoType,
+  namespacePartiQL,
 } from './dynamodb_helper';
 import { parallelBatch } from './parallel_batch';
 import { parallelLimit } from './parallel_limit';
@@ -38,63 +39,56 @@ export type { DescribeTableCommandOutput } from '@aws-sdk/client-dynamodb';
 const QUERY_LIMIT = 5;
 
 export interface DynamoDBConstructorParams {
+  namespace?: string;
   region?: string;
   credentials?: AwsCredentialIdentity;
 }
-
-interface QueryQLParams {
+export interface QueryQLParams {
   sql: string;
   return?: string;
 }
-
-interface BatchQLParams {
+export interface BatchQLParams {
   list: string[];
   return?: string;
 }
-
-interface TransactionQLParams {
+export interface TransactionQLParams {
   list: string[];
   return?: string;
 }
-
-interface DeleteItemsParams {
+export interface DeleteItemsParams {
   table: string;
   key_list: string[];
   list: any[][];
 }
-
-interface UpdateItemsParams {
+export interface UpdateItemsParams {
   table: string;
   key_list: string[];
   list: Array<{ set_list: Array<{ column: string; value: any }>; key: any[] }>;
 }
-
-interface PutItemsParams {
+export interface PutItemsParams {
   table: string;
   list: any[];
 }
-
-interface CreateTableParams {
+export interface CreateTableParams {
   table: string;
   billing_mode?: string;
   column_list: Array<{ name: string; type: string }>;
   primary_key: Array<{ name: string }>;
 }
-
-interface CreateIndexParams {
+export interface CreateIndexParams {
   table: string;
   index_name: string;
   key_list: Array<{ name: string; type: string }>;
   projection_type?: string;
 }
-
-interface DeleteIndexParams {
+export interface DeleteIndexParams {
   table: string;
   index_name: string;
 }
 
 export class DynamoDB {
-  protected client: DynamoDBClient;
+  protected readonly client: DynamoDBClient;
+  protected readonly namespace: string;
 
   constructor(params?: DynamoDBConstructorParams) {
     const opts: DynamoDBClientConfig = {
@@ -107,6 +101,7 @@ export class DynamoDB {
       opts.credentials = params.credentials;
     }
     this.client = new DynamoDBClient(opts);
+    this.namespace = params?.namespace ?? '';
   }
 
   async queryQL(
@@ -126,7 +121,10 @@ export class DynamoDB {
   private async _queryQL(
     params: string | QueryQLParams
   ): Promise<Record<string, AttributeValue>[]> {
-    const sql = typeof params === 'string' ? params : params.sql;
+    const sql = namespacePartiQL(
+      typeof params === 'string' ? params : params.sql,
+      this.namespace
+    );
     const returnVal =
       typeof params === 'string' ? 'NONE' : (params.return ?? 'NONE');
     const input = {
@@ -146,8 +144,8 @@ export class DynamoDB {
       ? 'NONE'
       : (params.return ?? 'NONE');
     const input = {
-      Statements: list.map((Statement: string) => ({
-        Statement,
+      Statements: list.map((sql: string) => ({
+        Statement: namespacePartiQL(sql, this.namespace),
         ReturnValuesOnConditionCheckFailure:
           returnVal as ReturnValuesOnConditionCheckFailure,
       })),
@@ -180,8 +178,8 @@ export class DynamoDB {
       ? 'NONE'
       : (params.return ?? 'NONE');
     const input = {
-      TransactStatements: list.map((Statement: string) => ({
-        Statement,
+      TransactStatements: list.map((sql: string) => ({
+        Statement: namespacePartiQL(sql, this.namespace),
         ReturnValuesOnConditionCheckFailure:
           returnVal as ReturnValuesOnConditionCheckFailure,
       })),
@@ -263,7 +261,8 @@ export class DynamoDB {
 
   async putItems(params: PutItemsParams): Promise<void> {
     const BATCH_LIMIT = 100;
-    const { table, list } = params;
+    const { list } = params;
+    const table = `${this.namespace}${params.table}`;
     const err_list: any[] = [];
     try {
       await parallelBatch(list, BATCH_LIMIT, QUERY_LIMIT, async (batch, i) => {
@@ -309,11 +308,20 @@ export class DynamoDB {
   }
 
   async getTableList(): Promise<string[]> {
+    const namespace_len = this.namespace.length;
     const command = new ListTablesCommand({ Limit: 100 });
     const results: string[] = [];
-    while (true) {
+    for (;;) {
       const result = await this.client.send(command);
-      result.TableNames?.forEach((table: string) => results.push(table));
+      if (result.TableNames) {
+        for (const table of result.TableNames) {
+          if (namespace_len === 0) {
+            results.push(table);
+          } else if (table.startsWith(this.namespace)) {
+            results.push(table.substring(namespace_len));
+          }
+        }
+      }
       if (!result.LastEvaluatedTableName) {
         break;
       }
@@ -322,8 +330,9 @@ export class DynamoDB {
     return results;
   }
 
-  async getTable(TableName: string): Promise<DescribeTableCommandOutput> {
-    const command = new DescribeTableCommand({ TableName });
+  async getTable(raw_table: string): Promise<DescribeTableCommandOutput> {
+    const table = `${this.namespace}${raw_table}`;
+    const command = new DescribeTableCommand({ TableName: table });
     try {
       return await this.client.send(command);
     } catch (err) {
@@ -332,7 +341,8 @@ export class DynamoDB {
   }
 
   async createTable(params: CreateTableParams): Promise<void> {
-    const { table, billing_mode, column_list, primary_key } = params;
+    const { billing_mode, column_list, primary_key } = params;
+    const table = `${this.namespace}${params.table}`;
     const AttributeDefinitions = column_list.map((column: any) => ({
       AttributeName: column.name,
       AttributeType: dynamoType(column.type),
@@ -361,8 +371,9 @@ export class DynamoDB {
     }
   }
 
-  async deleteTable(TableName: string): Promise<void> {
-    const command = new DeleteTableCommand({ TableName });
+  async deleteTable(raw_table: string): Promise<void> {
+    const table = `${this.namespace}${raw_table}`;
+    const command = new DeleteTableCommand({ TableName: table });
     try {
       await this.client.send(command);
     } catch (err) {
@@ -371,7 +382,8 @@ export class DynamoDB {
   }
 
   async createIndex(params: CreateIndexParams): Promise<void> {
-    const { table, index_name, key_list, projection_type } = params;
+    const { index_name, key_list, projection_type } = params;
+    const table = `${this.namespace}${params.table}`;
     const AttributeDefinitions = key_list.map((item: any) => ({
       AttributeName: item.name,
       AttributeType: dynamoType(item.type),
@@ -410,7 +422,8 @@ export class DynamoDB {
   }
 
   async deleteIndex(params: DeleteIndexParams): Promise<void> {
-    const { table, index_name } = params;
+    const { index_name } = params;
+    const table = `${this.namespace}${params.table}`;
     const input = {
       TableName: table,
       GlobalSecondaryIndexUpdates: [{ Delete: { IndexName: index_name } }],
@@ -427,7 +440,7 @@ export class DynamoDB {
     command: ExecuteStatementCommand
   ): Promise<Record<string, AttributeValue>[]> {
     const results: Record<string, AttributeValue>[] = [];
-    while (true) {
+    for (;;) {
       try {
         const result = await this.client.send(command);
         const list = convertSuccess(result)[1];

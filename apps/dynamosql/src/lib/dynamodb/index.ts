@@ -3,6 +3,7 @@ import { DynamoDB } from '../../tools/dynamodb';
 import type {
   DynamoDBConstructorParams,
   DescribeTableCommandOutput,
+  CreateTableParams,
 } from '../../tools/dynamodb';
 
 interface TableCacheEntry {
@@ -10,50 +11,48 @@ interface TableCacheEntry {
   result: DescribeTableCommandOutput;
 }
 
+export type DynamoDBWithCacheConstructorParams = DynamoDBConstructorParams;
 export class DynamoDBWithCache extends DynamoDB {
-  private _tableCache = new Map<string, TableCacheEntry>();
+  private readonly _tableCache = new Map<string, TableCacheEntry>();
 
-  async getTable(table_name: string): Promise<DescribeTableCommandOutput> {
+  override async getTable(table: string): Promise<DescribeTableCommandOutput> {
     try {
-      const result = await super.getTable(table_name);
+      const result = await super.getTable(table);
       if (result?.Table?.TableStatus === 'DELETING') {
-        this._tableCache.delete(table_name);
+        this._tableCache.delete(table);
       } else {
-        this._tableCache.set(table_name, { last_updated: Date.now(), result });
+        this._tableCache.set(table, { last_updated: Date.now(), result });
       }
       return result;
     } catch (err: any) {
       if (err?.message === 'resource_not_found') {
-        this._tableCache.delete(table_name);
+        this._tableCache.delete(table);
       }
       throw err;
     }
   }
-  async getTableCached(
-    table_name: string
-  ): Promise<DescribeTableCommandOutput> {
-    const result = this._tableCache.get(table_name)?.result;
+  async getTableCached(table: string): Promise<DescribeTableCommandOutput> {
+    const result = this._tableCache.get(table)?.result;
     if (result) {
       return result;
     } else {
-      return this.getTable(table_name);
+      return this.getTable(table);
     }
   }
-  async createTable(opts: any): Promise<void> {
-    const table_name = opts.table;
-    this._tableCache.delete(table_name);
+  override async createTable(params: CreateTableParams): Promise<void> {
+    this._tableCache.delete(params.table);
     try {
-      await super.createTable(opts);
+      await super.createTable(params);
     } finally {
-      this._tableCache.delete(table_name);
+      this._tableCache.delete(params.table);
     }
   }
-  async deleteTable(table_name: string): Promise<void> {
-    this._tableCache.delete(table_name);
+  override async deleteTable(table: string): Promise<void> {
+    this._tableCache.delete(table);
     try {
-      await super.deleteTable(table_name);
+      await super.deleteTable(table);
     } finally {
-      this._tableCache.delete(table_name);
+      this._tableCache.delete(table);
     }
   }
 }

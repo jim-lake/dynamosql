@@ -117,14 +117,6 @@ export interface EscapeFunctions {
     timeZone?: string
   ): string;
 }
-export interface SessionConfig {
-  region?: string | undefined;
-  database?: string | undefined;
-  multipleStatements?: boolean | undefined;
-  resultObjects?: boolean | undefined;
-  typeCast?: TypeCast | undefined;
-  dateStrings?: boolean | Array<'TIMESTAMP' | 'DATETIME' | 'DATE'> | undefined;
-}
 export interface PoolConnection extends Connection {
   release(): void;
 }

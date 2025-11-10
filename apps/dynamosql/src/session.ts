@@ -6,7 +6,6 @@ import { SQLError } from './error';
 import { Query } from './query';
 
 import type {
-  SessionConfig,
   TypeCast,
   PoolConnection,
   MysqlError,
@@ -14,19 +13,28 @@ import type {
   QueryCallback,
   Query as MysqlQuery,
 } from './types';
+import type { DynamoDBWithCacheConstructorParams } from './lib/dynamodb';
 
 let g_threadId = 1;
 
-export class Session extends EventEmitter implements PoolConnection {
-  config: SessionConfig;
-  state: string = 'connected';
-  threadId: number | null = g_threadId++;
+export interface SessionConfig extends DynamoDBWithCacheConstructorParams {
+  database?: string | undefined;
+  multipleStatements?: boolean | undefined;
+  resultObjects?: boolean | undefined;
+  typeCast?: TypeCast | undefined;
+  dateStrings?: boolean | Array<'TIMESTAMP' | 'DATETIME' | 'DATE'> | undefined;
+}
 
-  dynamodb: ReturnType<typeof DynamoDB.createDynamoDB>;
-  typeCastOptions: { dateStrings?: boolean } = {};
-  typeCast: TypeCast = true;
-  resultObjects = true;
-  multipleStatements = false;
+export class Session extends EventEmitter implements PoolConnection {
+  public readonly config: SessionConfig;
+  public readonly state: string = 'connected';
+  public readonly threadId: number | null = g_threadId++;
+
+  public readonly dynamodb: ReturnType<typeof DynamoDB.createDynamoDB>;
+  public readonly typeCastOptions: { dateStrings?: boolean } = {};
+  public readonly typeCast: TypeCast;
+  public readonly resultObjects: boolean;
+  public readonly multipleStatements: boolean;
 
   private _currentDatabase: string | null = null;
   private _localVariables: Record<string, unknown> = {};
@@ -34,28 +42,22 @@ export class Session extends EventEmitter implements PoolConnection {
   private _isReleased = false;
   private _tempTableMap: Record<string, unknown> = {};
 
-  escape = SqlString.escape;
-  escapeId = SqlString.escapeId;
-  format = SqlString.format;
+  public readonly escape = SqlString.escape;
+  public readonly escapeId = SqlString.escapeId;
+  public readonly format = SqlString.format;
 
-  constructor(args?: SessionConfig) {
+  constructor(params?: SessionConfig) {
     super();
-    this.config = args || {};
-    this.dynamodb = DynamoDB.createDynamoDB(args);
-    if (args?.database) {
-      this.setCurrentDatabase(args.database);
-    }
-    if (args?.multipleStatements) {
-      this.multipleStatements = true;
-    }
-    if (args?.resultObjects === false) {
-      this.resultObjects = false;
-    }
-    if (args?.typeCast !== undefined) {
-      this.typeCast = args.typeCast;
-    }
-    if (args?.dateStrings) {
+    this.config = params || {};
+    this.dynamodb = DynamoDB.createDynamoDB(params);
+    this.multipleStatements = Boolean(params?.multipleStatements ?? false);
+    this.resultObjects = Boolean(params?.resultObjects ?? true);
+    this.typeCast = params?.typeCast ?? true;
+    if (params?.dateStrings) {
       this.typeCastOptions.dateStrings = true;
+    }
+    if (params?.database) {
+      this.setCurrentDatabase(params.database);
     }
   }
 

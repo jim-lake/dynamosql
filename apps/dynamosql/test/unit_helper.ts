@@ -25,6 +25,8 @@ export function addUnitTest(
     await testFunction(mysql, mysql_opts);
   });
   it(`${name} => dynamosql`, async () => {
-    await testFunction(DynamoSQL as unknown as typeof mysql, {});
+    await testFunction(DynamoSQL as unknown as typeof mysql, {
+      namespace: process.env.DYNAMO_NAMESPACE ?? '',
+    });
   });
 }
