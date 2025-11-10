@@ -33,11 +33,11 @@ interface RowWithResult {
 export async function query(params: HandlerParams): Promise<SelectResult> {
   const { output_row_list, column_list } = await internalQuery(params);
 
-  output_row_list?.forEach?.((row: any) => {
+  for (const row of output_row_list ?? []) {
     for (const key in row) {
       row[key] = row[key].value;
     }
-  });
+  }
 
   return { output_row_list, column_list };
 }
