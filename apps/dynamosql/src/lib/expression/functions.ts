@@ -10,7 +10,6 @@ const DAY = 24 * 60 * 60;
 function database(expr: Function, state: EvaluationState): EvaluationResult {
   return { err: null, value: state.session.getCurrentDatabase() };
 }
-
 function sleep(expr: Function, state: EvaluationState): EvaluationResult {
   const result = getValue(expr.args?.value?.[0], state);
   result.name = `SLEEP(${result.name})`;
@@ -20,7 +19,6 @@ function sleep(expr: Function, state: EvaluationState): EvaluationResult {
   }
   return result;
 }
-
 function length(expr: Function, state: EvaluationState): EvaluationResult {
   const result = getValue(expr.args?.value?.[0], state);
   result.name = `LENGTH(${result.name})`;
@@ -30,7 +28,6 @@ function length(expr: Function, state: EvaluationState): EvaluationResult {
   }
   return result;
 }
-
 function concat(expr: Function, state: EvaluationState): EvaluationResult {
   let err: EvaluationResult['err'] = null;
   let value: string | null = '';
@@ -47,7 +44,6 @@ function concat(expr: Function, state: EvaluationState): EvaluationResult {
   });
   return { err, value };
 }
-
 function left(expr: Function, state: EvaluationState): EvaluationResult {
   const result = getValue(expr.args?.value?.[0], state);
   const len_result = getValue(expr.args?.value?.[1], state);
@@ -63,7 +59,6 @@ function left(expr: Function, state: EvaluationState): EvaluationResult {
   }
   return result;
 }
-
 function coalesce(expr: Function, state: EvaluationState): EvaluationResult {
   let err: EvaluationResult['err'] = null;
   let value = null;
@@ -79,9 +74,6 @@ function coalesce(expr: Function, state: EvaluationState): EvaluationResult {
   });
   return { err, value, type };
 }
-
-const ifnull = coalesce;
-
 function now(expr: Function, state: EvaluationState): EvaluationResult {
   const result = getValue(expr.args?.value?.[0], state);
   result.name = expr.args ? `NOW(${result.name ?? ''})` : 'CURRENT_TIMESTAMP';
@@ -95,9 +87,6 @@ function now(expr: Function, state: EvaluationState): EvaluationResult {
   }
   return result;
 }
-
-const current_timestamp = now;
-
 function from_unixtime(
   expr: Function,
   state: EvaluationState
@@ -115,7 +104,6 @@ function from_unixtime(
   }
   return result;
 }
-
 function date(expr: Function, state: EvaluationState): EvaluationResult {
   const result = getValue(expr.args?.value?.[0], state);
   result.name = `DATE(${result.name})`;
@@ -134,7 +122,6 @@ function date(expr: Function, state: EvaluationState): EvaluationResult {
   }
   return result;
 }
-
 function date_format(expr: Function, state: EvaluationState): EvaluationResult {
   const date = getValue(expr.args?.value?.[0], state);
   const format = getValue(expr.args?.value?.[1], state);
@@ -149,7 +136,6 @@ function date_format(expr: Function, state: EvaluationState): EvaluationResult {
   }
   return { err, name, value, type: 'string' };
 }
-
 function datediff(expr: Function, state: EvaluationState): EvaluationResult {
   const expr1 = getValue(expr.args?.value?.[0], state);
   const expr2 = getValue(expr.args?.value?.[1], state);
@@ -165,15 +151,11 @@ function datediff(expr: Function, state: EvaluationState): EvaluationResult {
   }
   return { err, name, value, type: 'int' };
 }
-
 function curdate(expr: Function): EvaluationResult {
   const value = createSQLDateTime(Date.now() / 1000, 'date');
   const name = expr.args ? 'CURDATE()' : 'CURRENT_DATE';
   return { err: null, value, name, type: 'date' };
 }
-
-const current_date = curdate;
-
 function curtime(expr: Function, state: EvaluationState): EvaluationResult {
   const result = getValue(expr.args?.value?.[0], state);
   result.name = expr.args ? `CURTIME(${result.name ?? ''})` : 'CURRENT_TIME';
@@ -188,9 +170,6 @@ function curtime(expr: Function, state: EvaluationState): EvaluationResult {
   }
   return result;
 }
-
-const current_time = curtime;
-
 export const methods: Record<
   string,
   undefined | ((expr: Function, state: EvaluationState) => EvaluationResult)
@@ -201,15 +180,15 @@ export const methods: Record<
   concat,
   left,
   coalesce,
-  ifnull,
+  ifnull: coalesce,
   now,
-  current_timestamp,
+  current_timestamp: now,
   from_unixtime,
   date,
   date_format,
   datediff,
   curdate,
-  current_date,
+  current_date: curdate,
   curtime,
-  current_time,
+  current_time: curtime,
 };

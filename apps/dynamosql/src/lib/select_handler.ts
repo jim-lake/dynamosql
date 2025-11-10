@@ -103,20 +103,9 @@ function _evaluateReturn(
     }
   }
 
-  const row_count = row_list.length;
-  const column_count = query_columns?.length || 0;
-
-  for (let i = 0; i < row_count && !err; i++) {
+  for (const row of row_list) {
     const output_row: unknown[] = [];
-    const row = row_list[i];
-    if (!row) {
-      continue;
-    }
-    for (let j = 0; j < column_count; j++) {
-      const column = query_columns[j];
-      if (!column) {
-        continue;
-      }
+    for (const column of query_columns) {
       const result = Expression.getValue(column.expr as never, {
         session,
         row,
@@ -125,7 +114,7 @@ function _evaluateReturn(
         err = result.err;
         break;
       } else {
-        output_row[j] = result;
+        output_row.push(result);
         if (result.type !== column.result_type) {
           column.result_type = _unionType(column.result_type, result.type);
         }
@@ -148,11 +137,7 @@ function _evaluateReturn(
   }
 
   const column_list: unknown[] = [];
-  for (let i = 0; i < column_count; i++) {
-    const column = query_columns[i];
-    if (!column) {
-      continue;
-    }
+  for (const column of query_columns) {
     const column_type = convertType(column.result_type, column.result_nullable);
     const exprObj = column.expr as {
       from?: { table?: string; as?: string; db?: string };
