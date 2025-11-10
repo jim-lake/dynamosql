@@ -10,8 +10,10 @@ export * from './update';
 export async function commit(params: CommitParams): Promise<void> {
   const { session, data } = params;
   for (const key in data) {
-    const { database, table, data: tx_data } = data[key];
-    Storage.updateTableData(database, table, session, tx_data);
+    const entry = data[key];
+    if (entry) {
+      Storage.updateTableData(entry.database, entry.table, session, entry.data);
+    }
   }
 }
 

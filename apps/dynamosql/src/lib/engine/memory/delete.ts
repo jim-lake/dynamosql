@@ -1,6 +1,6 @@
 import * as Storage from './storage';
 import { logger } from '@dynamosql/shared';
-import type { DeleteParams, MutationResult } from '../index';
+import type { DeleteParams, MutationResult, CellValue } from '../index';
 import { SQLError, NoSingleOperationError } from '../../../error';
 
 export async function singleDelete(
@@ -31,8 +31,8 @@ export async function multipleDelete(
     const row_list = data.row_list.slice();
     const primary_map = new Map<string, number>(data.primary_map);
 
-    for (const object of delete_list ?? []) {
-      const key_list = object.map((key: any) => key.value);
+    for (const object of delete_list) {
+      const key_list = object.map((key: CellValue) => key.value);
       const delete_key = JSON.stringify(key_list);
       const index = primary_map.get(delete_key);
 

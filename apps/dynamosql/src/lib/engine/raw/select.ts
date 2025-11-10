@@ -2,17 +2,18 @@ import { logger } from '@dynamosql/shared';
 import { convertWhere } from '../../helpers/convert_where';
 import { escapeIdentifier } from '../../../tools/dynamodb_helper';
 import { SQLError } from '../../../error';
-import type { RowListParams } from '../index';
+import type { RowListParams, FromClause, Row } from '../index';
+import type { AttributeValue } from '@aws-sdk/client-dynamodb';
 
 export async function getRowList(
   params: RowListParams
 ): Promise<{
-  source_map: Record<string, any[]>;
+  source_map: Record<string, Row[]>;
   column_map: Record<string, string[]>;
 }> {
   const { list } = params;
 
-  const source_map: Record<string, any[]> = {};
+  const source_map: Record<string, Row[]> = {};
   const column_map: Record<string, string[]> = {};
 
   for (const from of list) {
@@ -25,10 +26,10 @@ export async function getRowList(
 }
 
 async function _getFromTable(
-  params: any
-): Promise<{ results: any[]; column_list: string[] }> {
+  params: RowListParams & { from: FromClause }
+): Promise<{ results: Row[]; column_list: string[] }> {
   const { dynamodb, session, from, where } = params;
-  const { table, _requestSet, _requestAll } = params.from;
+  const { table, _requestSet, _requestAll } = from;
   const request_columns = [..._requestSet];
   const columns =
     _requestAll || request_columns.length === 0
@@ -44,11 +45,12 @@ async function _getFromTable(
 
   try {
     const results = await dynamodb.queryQL(sql);
+    const resultArray = Array.isArray(results[0]) ? results[0] : results;
     let column_list: string[];
 
     if (_requestAll) {
       const response_set = new Set<string>();
-      results.forEach((result: any) => {
+      (resultArray as Record<string, AttributeValue>[]).forEach((result) => {
         for (const key in result) {
           response_set.add(key);
         }
@@ -58,9 +60,9 @@ async function _getFromTable(
       column_list = request_columns;
     }
 
-    return { results, column_list };
-  } catch (err: any) {
-    if (err?.message === 'resource_not_found') {
+    return { results: resultArray as unknown as Row[], column_list };
+  } catch (err: unknown) {
+    if (err instanceof Error && err.message === 'resource_not_found') {
       throw new SQLError({ err: 'table_not_found', args: [table] });
     }
     logger.error('raw_engine.getRowList err:', err, sql);

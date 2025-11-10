@@ -1,16 +1,16 @@
 import * as Storage from './storage';
-import type { RowListParams } from '../index';
+import type { RowListParams, FromClause, Row } from '../index';
 import { SQLError } from '../../../error';
 
 export async function getRowList(
   params: RowListParams
 ): Promise<{
-  source_map: Record<string, any[]>;
+  source_map: Record<string, Row[]>;
   column_map: Record<string, string[]>;
 }> {
   const { list } = params;
 
-  const source_map: Record<string, any[]> = {};
+  const source_map: Record<string, Row[]> = {};
   const column_map: Record<string, string[]> = {};
 
   for (const from of list) {
@@ -25,13 +25,21 @@ export async function getRowList(
   return { source_map, column_map };
 }
 
-function _getFromTable(params: any): any {
-  const { session } = params;
-  const { db, table } = params.from;
+interface GetFromTableResult {
+  err: string | null;
+  row_list: Row[];
+  column_list: string[];
+}
+
+function _getFromTable(
+  params: RowListParams & { from: FromClause }
+): GetFromTableResult {
+  const { session, from } = params;
+  const { db, table } = from;
   const data = Storage.getTable(db, table, session);
   return {
     err: data ? null : 'table_not_found',
-    row_list: data?.row_list,
-    column_list: data?.column_list?.map?.((column: any) => column.name) || [],
+    row_list: data?.row_list || [],
+    column_list: data?.column_list?.map((column) => column.name) || [],
   };
 }

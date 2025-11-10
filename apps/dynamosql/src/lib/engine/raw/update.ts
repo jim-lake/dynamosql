@@ -5,14 +5,15 @@ import {
   valueToNative,
 } from '../../../tools/dynamodb_helper';
 import { logger } from '@dynamosql/shared';
-import type { UpdateParams, MutationResult } from '../index';
+import type { UpdateParams, MutationResult, CellValue } from '../index';
 import { NoSingleOperationError } from '../../../error';
+import type { AttributeValue } from '@aws-sdk/client-dynamodb';
 
 export async function singleUpdate(
   params: UpdateParams
 ): Promise<MutationResult> {
-  const { dynamodb, session } = params;
-  const { set, from, where } = params.ast;
+  const { dynamodb, session, ast } = params;
+  const { set, from, where } = ast;
 
   const where_result = convertWhere(where, {
     session,
@@ -22,9 +23,9 @@ export async function singleUpdate(
   if (from.length > 1 || !where_result.value) {
     no_single = true;
   }
-  const value_list = set.map((object: any) => {
+  const value_list = set.map((object) => {
     const { value } = object;
-    let ret;
+    let ret: string | undefined;
     const result = convertWhere(value, { session, from_key: from?.[0]?.key });
     if (result.err) {
       no_single = true;
@@ -39,14 +40,11 @@ export async function singleUpdate(
   }
 
   const sets = set
-    .map(
-      (object: any, i: number) =>
-        escapeIdentifier(object.column) + ' = ' + value_list[i]
-    )
+    .map((object, i) => escapeIdentifier(object.column) + ' = ' + value_list[i])
     .join(', ');
 
   const sql = `
-UPDATE ${escapeIdentifier(from[0].table)}
+UPDATE ${escapeIdentifier(from[0]?.table ?? '')}
 SET ${sets}
 WHERE ${where_result.value}
 RETURNING MODIFIED OLD *
@@ -54,20 +52,25 @@ RETURNING MODIFIED OLD *
 
   try {
     const results = await dynamodb.queryQL(sql);
+    const resultArray = (
+      Array.isArray(results[0]) ? results[0] : results
+    ) as Record<string, AttributeValue>[];
     const result = { affectedRows: 1, changedRows: 0 };
-    set.forEach((object: any, i: number) => {
+    set.forEach((object, i) => {
       const { column } = object;
       const value = value_list[i];
-      if (value !== escapeValue(valueToNative(results?.[0]?.[column]))) {
+      if (value !== escapeValue(valueToNative(resultArray?.[0]?.[column]))) {
         result.changedRows = 1;
       }
     });
     return result;
-  } catch (err: any) {
-    if (err?.name === 'ValidationException') {
-      throw new NoSingleOperationError();
-    } else if (err?.name === 'ConditionalCheckFailedException') {
-      return { affectedRows: 0, changedRows: 0 };
+  } catch (err: unknown) {
+    if (err instanceof Error) {
+      if (err.name === 'ValidationException') {
+        throw new NoSingleOperationError();
+      } else if (err.name === 'ConditionalCheckFailedException') {
+        return { affectedRows: 0, changedRows: 0 };
+      }
     }
     logger.error('singleUpdate: err:', err);
     throw err;
@@ -88,16 +91,16 @@ export async function multipleUpdate(
 
   for (const object of list) {
     const { table, key_list, update_list } = object;
-    for (const item of update_list ?? []) {
+    for (const item of update_list) {
       for (const set of item.set_list) {
-        set.value = set.value.value;
+        (set.value as CellValue) = (set.value as CellValue).value as CellValue;
       }
     }
 
     try {
-      await dynamodb.updateItems({ table, key_list, list: update_list ?? [] });
-      affectedRows += update_list?.length ?? 0;
-      changedRows += update_list?.length ?? 0;
+      await dynamodb.updateItems({ table, key_list, list: update_list });
+      affectedRows += update_list.length;
+      changedRows += update_list.length;
     } catch (err) {
       logger.error('multipleUpdate: updateItems: err:', err, 'table:', table);
       throw err;

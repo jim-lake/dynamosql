@@ -1,6 +1,12 @@
 import * as Storage from './storage';
 import { logger } from '@dynamosql/shared';
-import type { UpdateParams, MutationResult } from '../index';
+import type {
+  UpdateParams,
+  MutationResult,
+  CellValue,
+  Row,
+  ColumnDef,
+} from '../index';
 import { SQLError, NoSingleOperationError } from '../../../error';
 
 export async function singleUpdate(
@@ -32,20 +38,21 @@ export async function multipleUpdate(
     const row_list = data.row_list.slice();
     const primary_map = new Map(data.primary_map);
 
-    for (const update of update_list ?? []) {
+    for (const update of update_list) {
       const { set_list } = update;
-      const key_list = update.key.map((key: any) => key.value);
+      const key_list = update.key.map((key) => key.value);
       const update_key = JSON.stringify(key_list);
-      const index = primary_map.get(update_key) as number | undefined;
+      const index = primary_map.get(update_key);
 
       if (index !== undefined && index >= 0) {
-        const old_row = row_list[index as number];
+        const old_row = row_list[index];
+        if (!old_row) continue;
         const new_row = Object.assign({}, old_row);
         let changed = false;
 
         for (const set of set_list) {
-          new_row[set.column] = _transformCell(set.value);
-          if (old_row[set.column].value !== new_row[set.column].value) {
+          new_row[set.column] = _transformCell(set.value as CellValue);
+          if (old_row[set.column]?.value !== new_row[set.column]?.value) {
             changed = true;
           }
         }
@@ -61,7 +68,7 @@ export async function multipleUpdate(
           primary_map.set(new_key, index);
         }
 
-        row_list[index as number] = new_row;
+        row_list[index] = new_row;
         affectedRows++;
         if (changed) {
           changedRows++;
@@ -82,11 +89,11 @@ export async function multipleUpdate(
   return { affectedRows, changedRows };
 }
 
-function _transformCell(cell: any): any {
+function _transformCell(cell: CellValue): CellValue {
   return { value: cell.value, type: cell.type };
 }
 
-function _makePrimaryKey(primary_key: any[], row: any): string {
-  const key_values = primary_key.map((key: any) => row[key.name].value);
+function _makePrimaryKey(primary_key: ColumnDef[], row: Row): string {
+  const key_values = primary_key.map((key) => row[key.name]?.value);
   return JSON.stringify(key_values);
 }

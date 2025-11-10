@@ -41,12 +41,12 @@ export async function createTable(params: CreateTableParams): Promise<void> {
       message: 'primary key is required',
     });
   }
-  const data: {
-    column_list: any[];
-    primary_key: any[];
-    row_list: any[];
-    primary_map: Map<any, any>;
-  } = { column_list, primary_key, row_list: [], primary_map: new Map() };
+  const data = {
+    column_list,
+    primary_key,
+    row_list: [],
+    primary_map: new Map(),
+  };
   if (is_temp) {
     session!.saveTempTable(database!, table, data);
   } else {

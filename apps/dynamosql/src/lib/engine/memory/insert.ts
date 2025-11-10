@@ -1,5 +1,5 @@
 import * as Storage from './storage';
-import type { InsertParams, MutationResult } from '../index';
+import type { InsertParams, MutationResult, Row, ColumnDef } from '../index';
 import { SQLError } from '../../../error';
 
 export async function insertRowList(
@@ -23,7 +23,9 @@ export async function insertRowList(
 
   for (const row of list) {
     _transformRow(row);
-    const key_values = primary_key.map((key: any) => row[key.name].value);
+    const key_values = primary_key.map(
+      (key: ColumnDef) => row[key.name]?.value
+    );
     const key = JSON.stringify(key_values);
     const index = primary_map.get(key);
 
@@ -31,10 +33,11 @@ export async function insertRowList(
       primary_map.set(key, row_list.push(row) - 1);
       affectedRows++;
     } else if (duplicate_mode === 'replace') {
-      if (!_rowEqual(row_list[index as number], row)) {
+      const existingRow = row_list[index];
+      if (existingRow && !_rowEqual(existingRow, row)) {
         affectedRows++;
       }
-      row_list[index as number] = row;
+      row_list[index] = row;
       affectedRows++;
     } else if (!duplicate_mode) {
       throw new SQLError({
@@ -48,15 +51,18 @@ export async function insertRowList(
   return { affectedRows, changedRows: 0 };
 }
 
-function _transformRow(row: any): void {
+function _transformRow(row: Row): void {
   for (const key in row) {
-    row[key] = { type: row[key].type, value: row[key].value };
+    const cell = row[key];
+    if (cell) {
+      row[key] = { type: cell.type, value: cell.value };
+    }
   }
 }
 
-function _rowEqual(a: any, b: any): boolean {
+function _rowEqual(a: Row, b: Row): boolean {
   const keys_a = Object.keys(a);
   return keys_a.every((key) => {
-    return a[key].value === b[key].value;
+    return a[key]?.value === b[key]?.value;
   });
 }

@@ -5,7 +5,8 @@ import {
 } from '../../../tools/dynamodb_helper';
 import { trackFirstSeen } from '../../../tools/util';
 import { SQLError } from '../../../error';
-import type { InsertParams, MutationResult } from '../index';
+import type { InsertParams, MutationResult, Row } from '../index';
+import type { DescribeTableCommandOutput } from '@aws-sdk/client-dynamodb';
 
 export async function insertRowList(
   params: InsertParams
@@ -28,24 +29,33 @@ async function _insertIgnoreReplace(
 
   if (list.length > 1) {
     try {
-      const result = await dynamodb.getTableCached(table);
-      const key_list = result.Table.KeySchema.map((k: any) => k.AttributeName);
+      const result: DescribeTableCommandOutput =
+        await dynamodb.getTableCached(table);
+      if (!result.Table?.KeySchema) {
+        throw new Error('Invalid table schema');
+      }
+      const key_list = result.Table.KeySchema.map((k) => k.AttributeName!);
       const track = new Map();
       if (duplicate_mode === 'replace') {
         list.reverse();
       }
-      list = list.filter((row: any) =>
+      list = list.filter((row) =>
         trackFirstSeen(
           track,
-          key_list.map((key: string) => row[key].value)
+          key_list.map((key) => row[key]?.value)
         )
       );
       if (duplicate_mode === 'replace') {
         list.reverse();
       }
-    } catch (err: any) {
-      if (err?.message === 'resource_not_found') {
-        throw new SQLError({ err: 'table_not_found', args: [table] });
+    } catch (err: unknown) {
+      if (err instanceof Error) {
+        if (
+          err.name === 'ResourceNotFoundException' ||
+          err.message.toLowerCase().includes('resource not found')
+        ) {
+          throw new SQLError({ err: 'table_not_found', args: [table] });
+        }
       }
       throw err;
     }
@@ -54,38 +64,41 @@ async function _insertIgnoreReplace(
   if (duplicate_mode === 'ignore') {
     affectedRows = list.length;
     const sql_list = list.map(
-      (item: any) =>
+      (item) =>
         `INSERT INTO ${escapeIdentifier(table)} VALUE ${_escapeItem(item)}`
     );
 
     try {
       await dynamodb.batchQL(sql_list);
-    } catch (err: any) {
-      if (
-        err?.name === 'ResourceNotFoundException' ||
-        err?.message?.toLowerCase().includes('resource not found')
-      ) {
-        throw new SQLError({ err: 'table_not_found', args: [table] });
+    } catch (err: unknown) {
+      if (err instanceof Error) {
+        if (
+          err.name === 'ResourceNotFoundException' ||
+          err.message.toLowerCase().includes('resource not found')
+        ) {
+          throw new SQLError({ err: 'table_not_found', args: [table] });
+        }
+        if (err.name === 'ValidationException') {
+          throw new SQLError({
+            err: 'dup_table_insert',
+            sqlMessage: err.message,
+            cause: err,
+          });
+        }
       }
       if (Array.isArray(err)) {
-        let error: Error | undefined;
-        err.forEach((item_err: any) => {
+        let thrownError: Error | null = null;
+        (err as Array<{ Code?: string }>).forEach((item_err) => {
           if (item_err?.Code === 'DuplicateItem') {
             affectedRows--;
-          } else if (!error && item_err) {
+          } else if (!thrownError && item_err) {
             affectedRows--;
-            error = convertError(item_err);
+            thrownError = convertError(item_err) as Error;
           }
         });
-        if (error) throw error;
-      } else if (err?.name === 'ValidationException') {
-        throw new SQLError({
-          err: 'dup_table_insert',
-          sqlMessage: err.message,
-          cause: err,
-        });
+        if (thrownError) throw thrownError;
       } else {
-        throw err;
+        throw err as Error;
       }
     }
   } else {
@@ -95,7 +108,7 @@ async function _insertIgnoreReplace(
     try {
       await dynamodb.putItems(opts);
       affectedRows = list.length;
-    } catch (err) {
+    } catch (err: unknown) {
       throw convertError(err);
     }
   }
@@ -103,67 +116,80 @@ async function _insertIgnoreReplace(
   return { affectedRows };
 }
 
+interface CancellationReason {
+  Code?: string;
+  Message?: string;
+}
+
 async function _insertNoIgnore(params: InsertParams): Promise<MutationResult> {
   const { dynamodb, table, list } = params;
   const sql_list = list.map(
-    (item: any) =>
+    (item) =>
       `INSERT INTO ${escapeIdentifier(table)} VALUE ${_escapeItem(item)}`
   );
 
   try {
     await dynamodb.transactionQL(sql_list);
     return { affectedRows: list.length };
-  } catch (err: any) {
-    if (
-      err?.name === 'TransactionCanceledException' &&
-      err.CancellationReasons
-    ) {
-      for (let i = 0; i < err.CancellationReasons.length; i++) {
-        if (err.CancellationReasons[i].Code === 'DuplicateItem') {
-          throw new SQLError({
-            err: 'dup_table_insert',
-            args: [table, _fixupItem(list[i])],
-          });
-        } else if (err.CancellationReasons[i].Code !== 'None') {
-          throw new SQLError({
-            err: convertError(err.CancellationReasons[i]),
-            message: err.CancellationReasons[i].Message,
-          });
+  } catch (err: unknown) {
+    if (err instanceof Error) {
+      const cancellationReasons = (
+        err as { CancellationReasons?: CancellationReason[] }
+      ).CancellationReasons;
+      if (err.name === 'TransactionCanceledException' && cancellationReasons) {
+        for (let i = 0; i < cancellationReasons.length; i++) {
+          const reason = cancellationReasons[i];
+          if (reason?.Code === 'DuplicateItem') {
+            const item = list[i];
+            if (item) {
+              throw new SQLError({
+                err: 'dup_table_insert',
+                args: [table, _fixupItem(item)],
+              });
+            }
+          } else if (reason?.Code !== 'None') {
+            throw new SQLError({
+              err: 'unsupported',
+              message: reason?.Message,
+            });
+          }
         }
+      } else if (err.name === 'ValidationException') {
+        throw new SQLError({
+          err: 'dup_table_insert',
+          sqlMessage: err.message,
+          cause: err,
+        });
       }
-    } else if (err?.name === 'ValidationException') {
-      throw new SQLError({
-        err: 'dup_table_insert',
-        sqlMessage: err.message,
-        cause: err,
-      });
+
+      const errStr = err.message.toLowerCase();
+      if (
+        err.name === 'ResourceNotFoundException' ||
+        errStr.includes('resource not found') ||
+        errStr.includes('requested resource not found')
+      ) {
+        throw new SQLError({ err: 'table_not_found', args: [table] });
+      }
     }
 
-    // Check for resource not found errors
-    const errStr = String(err?.message || err || '').toLowerCase();
-    if (
-      err?.name === 'ResourceNotFoundException' ||
-      errStr.includes('resource not found') ||
-      errStr.includes('requested resource not found')
-    ) {
-      throw new SQLError({ err: 'table_not_found', args: [table] });
-    }
-
-    throw err;
+    throw err as Error;
   }
 }
 
-function _fixupItem(item: any): any {
+function _fixupItem(item: Row): Row {
   for (const key in item) {
-    item[key] = item[key].value;
+    const cell = item[key];
+    if (cell) {
+      item[key] = cell.value as never;
+    }
   }
   return item;
 }
 
-function _escapeItem(item: any): string {
+function _escapeItem(item: Row): string {
   let s = '{ ';
   s += Object.keys(item)
-    .map((key) => `'${key}': ${escapeValue(item[key].value)}`)
+    .map((key) => `'${key}': ${escapeValue(item[key]?.value)}`)
     .join(', ');
   s += ' }';
   return s;

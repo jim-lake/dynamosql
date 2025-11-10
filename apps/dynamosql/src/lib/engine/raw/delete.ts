@@ -7,8 +7,8 @@ import { NoSingleOperationError } from '../../../error';
 export async function singleDelete(
   params: DeleteParams
 ): Promise<MutationResult> {
-  const { dynamodb, session } = params;
-  const { from, where } = params.ast;
+  const { dynamodb, session, ast } = params;
+  const { from, where } = ast;
 
   let no_single = false;
   const result = convertWhere(where, { session, from_key: from?.[0]?.key });
@@ -25,19 +25,22 @@ export async function singleDelete(
   }
 
   const sql = `
-DELETE FROM ${escapeIdentifier(from[0].table)}
+DELETE FROM ${escapeIdentifier(from[0]?.table ?? '')}
 WHERE ${result.value}
 RETURNING ALL OLD *
 `;
 
   try {
     const results = await dynamodb.queryQL(sql);
-    return { affectedRows: results?.length || 0 };
-  } catch (err: any) {
-    if (err?.name === 'ValidationException') {
-      throw new NoSingleOperationError();
-    } else if (err?.name === 'ConditionalCheckFailedException') {
-      return { affectedRows: 0 };
+    const resultArray = Array.isArray(results[0]) ? results[0] : results;
+    return { affectedRows: resultArray?.length || 0 };
+  } catch (err: unknown) {
+    if (err instanceof Error) {
+      if (err.name === 'ValidationException') {
+        throw new NoSingleOperationError();
+      } else if (err.name === 'ConditionalCheckFailedException') {
+        return { affectedRows: 0 };
+      }
     }
     logger.error('singleDelete: query err:', err);
     throw err;
@@ -59,8 +62,8 @@ export async function multipleDelete(
     const { table, key_list, delete_list } = object;
 
     try {
-      await dynamodb.deleteItems({ table, key_list, list: delete_list ?? [] });
-      affectedRows += delete_list?.length ?? 0;
+      await dynamodb.deleteItems({ table, key_list, list: delete_list });
+      affectedRows += delete_list.length;
     } catch (err) {
       logger.error('multipleDelete: deleteItems: err:', err, table);
       throw err;
