@@ -4,10 +4,89 @@ import type {
 } from '@aws-sdk/client-dynamodb';
 
 export type KeyValue = AttributeValue | null | string;
-interface NativeObject {
-  [key: string]: NativeType;
+export interface NativeObject {
+  [key: string]: NativeType | undefined;
 }
-export type NativeType = string | number | boolean | null | NativeObject;
+export type NativeType =
+  | string
+  | number
+  | boolean
+  | null
+  | NativeObject
+  | Uint8Array
+  | NativeType[];
+
+export class NativeObjectClass {
+  toString(): string {
+    return JSON.stringify(this);
+  }
+}
+export function mapToObject(obj: Record<string, AttributeValue>): NativeObject {
+  const ret = new NativeObjectClass() as unknown as NativeObject;
+  for (const [key, value] of Object.entries(obj)) {
+    ret[key] = valueToNative(value);
+  }
+  return ret;
+}
+export function valueToNative(value: AttributeValue | null): NativeType {
+  if (value === null) {
+    return null;
+  } else if (typeof value === 'object') {
+    if (value.NULL) {
+      return null;
+    } else if (value.N) {
+      return parseFloat(value.N);
+    } else if (Array.isArray(value.L)) {
+      return value.L.map(valueToNative);
+    } else if (value.M) {
+      return mapToObject(value.M);
+    } else {
+      return value.S ?? value.B ?? value.BOOL ?? null;
+    }
+  }
+  return null;
+}
+export function nativeToValue(obj: NativeType): AttributeValue {
+  if (obj === null) {
+    return { NULL: true };
+  } else if (obj instanceof Uint8Array) {
+    return { B: obj };
+  } else if (Array.isArray(obj)) {
+    return { L: obj.map(nativeToValue) };
+  } else if (typeof obj === 'object') {
+    const M: Record<string, AttributeValue> = {};
+    for (const key in obj) {
+      if (obj[key]) {
+        M[key] = nativeToValue(obj[key]);
+      }
+    }
+    return { M };
+  } else if (typeof obj === 'number') {
+    return { N: String(obj) };
+  } else if (typeof obj === 'boolean') {
+    return { BOOL: obj };
+  } else {
+    return { S: String(obj) };
+  }
+}
+
+export function convertValueToPQL(value: KeyValue): string {
+  let ret: string;
+  if (value === null) {
+    ret = 'NULL';
+  } else if (typeof value === 'object') {
+    if (value.S !== undefined) {
+      ret = "'" + escapeString(value.S) + "'";
+    } else if (value.N !== undefined) {
+      ret = String(value.N);
+    } else {
+      ret = "'" + escapeString(String(value)) + "'";
+    }
+  } else {
+    ret = "'" + escapeString(String(value)) + "'";
+  }
+  return ret;
+}
 
 export function pql(
   strings: TemplateStringsArray,
@@ -118,75 +197,6 @@ export function convertError(err: DynamoDBError): ConvertErrorResult {
     return new Error('validation');
   }
   return err;
-}
-
-export function mapToObject(
-  obj: Record<string, unknown>
-): Record<string, unknown> {
-  const ret: Record<string, unknown> = {};
-  (ret as any).toString = toString;
-  Object.keys(obj).forEach((key) => {
-    ret[key] = valueToNative(obj[key]);
-  });
-  return ret;
-}
-
-export function valueToNative(value: unknown): unknown {
-  let ret = value;
-  if (value && typeof value === 'object') {
-    const v = value as Record<string, unknown>;
-    if (v.N) {
-      ret = parseFloat(v.N as string);
-    } else if (Array.isArray(v.L)) {
-      ret = v.L.map(valueToNative);
-    } else if (v.M) {
-      ret = mapToObject(v.M as Record<string, unknown>);
-    } else {
-      ret = v.S ?? v.B ?? v.BOOL ?? value;
-    }
-  }
-  return ret;
-}
-export function nativeToValue(obj: NativeType): AttributeValue {
-  if (obj === null) {
-    return { NULL: true };
-  } else if (typeof obj === 'object') {
-    const M: Record<string, AttributeValue> = {};
-    for (const key in obj) {
-      if (obj[key]) {
-        M[key] = nativeToValue(obj[key]);
-      }
-    }
-    return { M };
-  } else if (typeof obj === 'number') {
-    return { N: String(obj) };
-  } else if (typeof obj === 'boolean') {
-    return { BOOL: obj };
-  } else {
-    return { S: String(obj) };
-  }
-}
-
-function toString(this: Record<string, unknown>): string {
-  return JSON.stringify(this);
-}
-
-export function convertValueToPQL(value: KeyValue): string {
-  let ret: string;
-  if (value === null) {
-    ret = 'NULL';
-  } else if (typeof value === 'object') {
-    if (value.S !== undefined) {
-      ret = "'" + escapeString(value.S) + "'";
-    } else if (value.N !== undefined) {
-      ret = String(value.N);
-    } else {
-      ret = "'" + escapeString(String(value)) + "'";
-    }
-  } else {
-    ret = "'" + escapeString(String(value)) + "'";
-  }
-  return ret;
 }
 
 interface DynamoDBResponseItem {
