@@ -311,12 +311,14 @@ export class DynamoDB {
             'CancellationReasons' in err &&
             Array.isArray(err.CancellationReasons)
           ) {
-            err.CancellationReasons.forEach((cancel_err: unknown, j: number) => {
-              err_list[start + j] = {
-                err: safeConvertError(cancel_err),
-                parent: cancel_err,
-              };
-            });
+            err.CancellationReasons.forEach(
+              (cancel_err: unknown, j: number) => {
+                err_list[start + j] = {
+                  err: safeConvertError(cancel_err),
+                  parent: cancel_err,
+                };
+              }
+            );
           } else {
             err_list[start] = { err: safeConvertError(err), parent: err };
           }
