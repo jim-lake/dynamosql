@@ -44,7 +44,7 @@ export function escapeString(string: string): string {
 }
 
 function escapeNumber(value: unknown): string {
-  return String(value).replace(/[^0-9.]/g, '');
+  return String(value).replaceAll(/[^0-9.]/g, '');
 }
 
 export function escapeValue(value: unknown, type?: string): string {

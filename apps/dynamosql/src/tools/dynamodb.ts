@@ -44,6 +44,9 @@ export interface ColumnDefinition {
   name: string;
   type: string;
 }
+export interface KeyDefinition {
+  name: string;
+}
 export interface DynamoDBConstructorParams {
   namespace?: string;
   region?: string;
@@ -87,7 +90,7 @@ export interface CreateTableParams {
   table: string;
   billing_mode?: string;
   column_list: ColumnDefinition[];
-  primary_key: { name: string }[];
+  primary_key: KeyDefinition[];
 }
 export interface CreateIndexParams {
   table: string;
