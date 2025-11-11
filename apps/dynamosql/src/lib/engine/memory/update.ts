@@ -46,7 +46,9 @@ export async function multipleUpdate(
 
       if (index !== undefined && index >= 0) {
         const old_row = row_list[index];
-        if (!old_row) continue;
+        if (!old_row) {
+          continue;
+        }
         const new_row = Object.assign({}, old_row);
         let changed = false;
 

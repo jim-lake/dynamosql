@@ -1,4 +1,13 @@
-import type { ScalarAttributeType } from '@aws-sdk/client-dynamodb';
+import type {
+  AttributeValue,
+  ScalarAttributeType,
+} from '@aws-sdk/client-dynamodb';
+
+export type KeyValue = AttributeValue | null | string;
+interface NativeObject {
+  [key: string]: NativeType;
+}
+export type NativeType = string | number | boolean | null | NativeObject;
 
 export function pql(
   strings: TemplateStringsArray,
@@ -70,7 +79,9 @@ export function escapeValue(value: unknown, type?: string): string {
 }
 
 export function convertError(err: unknown): any {
-  if (!err) return err;
+  if (!err) {
+    return err;
+  }
 
   let ret: any;
   if (err && typeof err === 'object') {
@@ -137,21 +148,15 @@ export function valueToNative(value: unknown): unknown {
   }
   return ret;
 }
-
-export function nativeToValue(
-  obj: unknown
-):
-  | { M: Record<string, unknown> }
-  | { N: string }
-  | { BOOL: boolean }
-  | { S: string }
-  | { NULL: true } {
+export function nativeToValue(obj: NativeType): AttributeValue {
   if (obj === null) {
     return { NULL: true };
   } else if (typeof obj === 'object') {
-    const M: Record<string, unknown> = {};
-    for (const key in obj as Record<string, unknown>) {
-      M[key] = nativeToValue((obj as Record<string, unknown>)[key]);
+    const M: Record<string, AttributeValue> = {};
+    for (const key in obj) {
+      if (obj[key]) {
+        M[key] = nativeToValue(obj[key]);
+      }
     }
     return { M };
   } else if (typeof obj === 'number') {
@@ -167,16 +172,15 @@ function toString(this: Record<string, unknown>): string {
   return JSON.stringify(this);
 }
 
-export function convertValueToPQL(value: unknown): string {
+export function convertValueToPQL(value: KeyValue): string {
   let ret: string;
-  if (!value) {
+  if (value === null) {
     ret = 'NULL';
-  } else if (typeof value === 'object' && value !== null) {
-    const v = value as Record<string, unknown>;
-    if (v.S !== undefined) {
-      ret = "'" + escapeString(v.S as string) + "'";
-    } else if (v.N !== undefined) {
-      ret = String(v.N);
+  } else if (typeof value === 'object') {
+    if (value.S !== undefined) {
+      ret = "'" + escapeString(value.S) + "'";
+    } else if (value.N !== undefined) {
+      ret = String(value.N);
     } else {
       ret = "'" + escapeString(String(value)) + "'";
     }

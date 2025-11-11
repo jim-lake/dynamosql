@@ -1,13 +1,15 @@
+import { logger } from '@dynamosql/shared';
 import { convertWhere } from '../../helpers/convert_where';
 import {
   escapeIdentifier,
   escapeValue,
   valueToNative,
 } from '../../../tools/dynamodb_helper';
-import { logger } from '@dynamosql/shared';
-import type { UpdateParams, MutationResult, CellValue } from '../index';
 import { NoSingleOperationError } from '../../../error';
+
+import type { UpdateParams, MutationResult, CellValue } from '../index';
 import type { AttributeValue } from '@aws-sdk/client-dynamodb';
+import type { SetRowByKeys } from '../../../tools/dynamodb';
 
 export async function singleUpdate(
   params: UpdateParams
@@ -98,7 +100,11 @@ export async function multipleUpdate(
     }
 
     try {
-      await dynamodb.updateItems({ table, key_list, list: update_list });
+      await dynamodb.updateItems({
+        table,
+        key_list,
+        list: update_list as unknown as SetRowByKeys[],
+      });
       affectedRows += update_list.length;
       changedRows += update_list.length;
     } catch (err) {

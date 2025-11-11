@@ -1,17 +1,23 @@
-import * as SchemaManager from '../schema_manager';
-import * as SelectHandler from '../select_handler';
+import { getEngine } from '../schema_manager';
+import { internalQuery } from '../select_handler';
 import { logger } from '@dynamosql/shared';
 import { SQLError } from '../../error';
 import type { HandlerParams } from '../handler_types';
 
-export async function runSelect(params: HandlerParams): Promise<any[]> {
+export interface SelectResultItem {
+  key: string;
+  list: Array<{ key: any[]; row: any }>;
+}
+export async function runSelect(
+  params: HandlerParams
+): Promise<SelectResultItem[]> {
   const { dynamodb, session, ast } = params;
-  const result_list: any[] = [];
+  const result_list: SelectResultItem[] = [];
 
   // Get table info for all tables
   for (const object of ast.from) {
     const { db, table } = object;
-    const engine = SchemaManager.getEngine(db, table, session);
+    const engine = getEngine(db, table, session);
     const opts = { dynamodb, session, database: db, table };
 
     try {
@@ -31,22 +37,19 @@ export async function runSelect(params: HandlerParams): Promise<any[]> {
   // Run the select query
   const opts = { dynamodb, session, ast, skip_resolve: true };
 
-  const { row_list } = await SelectHandler.internalQuery(opts);
+  const { row_list } = await internalQuery(opts);
 
-  ast.from.forEach((object: any) => {
+  for (const object of ast.from) {
     const from_key = object.key;
     const key_list = object._keyList;
     const collection = new Map();
-    row_list.forEach((row: any) => {
+    for (const row of row_list) {
       const keys = key_list.map((key: string) => row[from_key]?.[key]);
       if (!keys.includes(undefined)) {
         _addCollection(collection, keys, row);
       }
-    });
-    const result: { key: string; list: Array<{ key: any[]; row: any }> } = {
-      key: from_key,
-      list: [],
-    };
+    }
+    const result: SelectResultItem = { key: from_key, list: [] };
     result_list.push(result);
     collection.forEach((value0: any, key0: any) => {
       if (key_list.length > 1) {
@@ -57,7 +60,7 @@ export async function runSelect(params: HandlerParams): Promise<any[]> {
         result.list.push({ key: [key0], row: value0 });
       }
     });
-  });
+  }
 
   return result_list;
 }

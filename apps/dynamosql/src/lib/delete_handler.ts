@@ -53,24 +53,28 @@ async function _multipleDelete(params: HandlerParams): Promise<MutationResult> {
   // Get rows to delete
   const result_list = await runSelect(params);
 
-  ast.table.forEach((object: any) => {
+  const from_list: {
+    database: string;
+    table: string;
+    key_list: string[];
+    delete_list: any[];
+  }[] = [];
+
+  for (const object of ast.table) {
     const from_key = object.from.key;
     const list = result_list.find(
       (result: any) => result.key === from_key
     )?.list;
-    object._deleteList = [];
-    list?.forEach?.((item: any) => object._deleteList.push(item.key));
-  });
 
-  // Delete rows
-  const from_list = ast.table
-    .map((obj: any) => ({
-      database: obj.from.db,
-      table: obj.from.table,
-      key_list: obj.from._keyList,
-      delete_list: obj._deleteList,
-    }))
-    .filter((obj: any) => obj.delete_list.length > 0);
+    if (list && list.length > 0) {
+      from_list.push({
+        database: object.from.db,
+        table: object.from.table,
+        key_list: object.from._keyList,
+        delete_list: list.map((i) => i.key),
+      });
+    }
+  }
 
   if (from_list.length > 0) {
     const groups = makeEngineGroups(session, from_list);

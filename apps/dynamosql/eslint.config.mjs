@@ -27,11 +27,12 @@ export default tseslint.config(
     rules: {
       '@typescript-eslint/no-explicit-any': 'off',
       '@typescript-eslint/no-unused-vars': [
-        'warn',
+        'error',
         { argsIgnorePattern: '^_', varsIgnorePattern: '^_' },
       ],
-      '@typescript-eslint/no-require-imports': 'off',
-      'no-unused-vars': 'off',
+      '@typescript-eslint/no-require-imports': 'error',
+      'no-unused-vars': 0,
+      curly: ['error', 'all'],
     },
   },
   {
@@ -47,7 +48,25 @@ export default tseslint.config(
       },
     },
     linterOptions: { reportUnusedDisableDirectives: 'warn' },
-    rules: { '@typescript-eslint/no-unused-expressions': 0 },
+    rules: {
+      '@typescript-eslint/no-unused-expressions': 0,
+      '@typescript-eslint/no-require-imports': 0,
+    },
+  },
+  {
+    files: ['examples/**/*.js'],
+    languageOptions: {
+      globals: {
+        describe: 'readonly',
+        it: 'readonly',
+        before: 'readonly',
+        beforeEach: 'readonly',
+        after: 'readonly',
+        afterEach: 'readonly',
+      },
+    },
+    linterOptions: { reportUnusedDisableDirectives: 'warn' },
+    rules: { '@typescript-eslint/no-require-imports': 0 },
   },
   {
     ignores: [

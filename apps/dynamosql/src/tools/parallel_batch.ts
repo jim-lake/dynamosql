@@ -1,13 +1,27 @@
 import { timesLimit } from './parallel_limit';
 
-export type BatchIter<S, T> = (list: S[], i: number) => Promise<T[]>;
+export type BatchIter<S, T> = (list: S[], i: number) => Promise<T[] | void>;
+
+export async function parallelBatch<S>(
+  list: S[],
+  batchSize: number,
+  limit: number,
+  iter: BatchIter<S, void>
+): Promise<void>;
 
 export async function parallelBatch<S, T>(
   list: S[],
   batchSize: number,
   limit: number,
   iter: BatchIter<S, T>
-): Promise<T[]> {
+): Promise<T[]>;
+
+export async function parallelBatch<S, T>(
+  list: S[],
+  batchSize: number,
+  limit: number,
+  iter: BatchIter<S, T>
+): Promise<T[] | void> {
   if (batchSize <= 0) {
     throw RangeError('batchSize must be >= 0');
   }
@@ -17,8 +31,10 @@ export async function parallelBatch<S, T>(
     const start = i * batchSize;
     const batch = list.slice(start, start + batchSize);
     const batch_result = await iter(batch, i);
-    for (let j = 0; j < batch_result.length; j++) {
-      results[i + j] = batch_result[j];
+    if (batch_result) {
+      for (let j = 0; j < batch_result.length; j++) {
+        results[i + j] = batch_result[j];
+      }
     }
   });
   return results as T[];

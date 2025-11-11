@@ -1,8 +1,10 @@
 import { convertWhere } from '../../helpers/convert_where';
 import { escapeIdentifier } from '../../../tools/dynamodb_helper';
 import { logger } from '@dynamosql/shared';
-import type { DeleteParams, MutationResult } from '../index';
 import { NoSingleOperationError } from '../../../error';
+
+import type { DeleteParams, MutationResult } from '../index';
+import type { KeyValue } from '../../../tools/dynamodb';
 
 export async function singleDelete(
   params: DeleteParams
@@ -51,24 +53,23 @@ export async function multipleDelete(
   params: DeleteParams
 ): Promise<MutationResult> {
   const { dynamodb, list } = params;
-
   if (!list) {
     return { affectedRows: 0 };
   }
-
   let affectedRows = 0;
-
   for (const object of list) {
     const { table, key_list, delete_list } = object;
-
     try {
-      await dynamodb.deleteItems({ table, key_list, list: delete_list });
+      await dynamodb.deleteItems({
+        table,
+        key_list,
+        list: delete_list as unknown as KeyValue[][],
+      });
       affectedRows += delete_list.length;
     } catch (err) {
       logger.error('multipleDelete: deleteItems: err:', err, table);
       throw err;
     }
   }
-
   return { affectedRows };
 }

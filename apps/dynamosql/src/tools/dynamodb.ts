@@ -33,11 +33,17 @@ import { parallelLimit } from './parallel_limit';
 
 import type { DynamoDBClientConfig } from '@aws-sdk/client-dynamodb';
 import type { AwsCredentialIdentity } from '@aws-sdk/types';
+import type { KeyValue, NativeType } from './dynamodb_helper';
 
 export type { DescribeTableCommandOutput } from '@aws-sdk/client-dynamodb';
+export type { KeyValue, NativeType } from './dynamodb_helper';
 
 const QUERY_LIMIT = 5;
 
+export interface ColumnDefinition {
+  name: string;
+  type: string;
+}
 export interface DynamoDBConstructorParams {
   namespace?: string;
   region?: string;
@@ -58,27 +64,35 @@ export interface TransactionQLParams {
 export interface DeleteItemsParams {
   table: string;
   key_list: string[];
-  list: any[][];
+  list: KeyValue[][];
+}
+export interface SetColumnValue {
+  column: string;
+  value: KeyValue;
+}
+export interface SetRowByKeys {
+  key: string[];
+  set_list: SetColumnValue[];
 }
 export interface UpdateItemsParams {
   table: string;
   key_list: string[];
-  list: Array<{ set_list: Array<{ column: string; value: any }>; key: any[] }>;
+  list: SetRowByKeys[];
 }
 export interface PutItemsParams {
   table: string;
-  list: any[];
+  list: NativeType[];
 }
 export interface CreateTableParams {
   table: string;
   billing_mode?: string;
-  column_list: Array<{ name: string; type: string }>;
-  primary_key: Array<{ name: string }>;
+  column_list: ColumnDefinition[];
+  primary_key: { name: string }[];
 }
 export interface CreateIndexParams {
   table: string;
   index_name: string;
-  key_list: Array<{ name: string; type: string }>;
+  key_list: ColumnDefinition[];
   projection_type?: string;
 }
 export interface DeleteIndexParams {
@@ -216,6 +230,9 @@ export class DynamoDB {
         const cond = key_list
           .map((key: string, j: number) => {
             const value = item[j];
+            if (value === undefined) {
+              throw TypeError('missing value for key ' + key);
+            }
             return `${escapeIdentifier(key)} = ${convertValueToPQL(value)}`;
           })
           .join(' AND ');
@@ -231,63 +248,55 @@ export class DynamoDB {
     const BATCH_LIMIT = 100;
     const { table, key_list, list } = params;
     const prefix = `UPDATE ${escapeIdentifier(table)} SET `;
-    return parallelBatch(
-      list,
-      BATCH_LIMIT,
-      QUERY_LIMIT,
-      async (batch: any[]) => {
-        const sql_list: string[] = [];
-        for (const item of batch) {
-          const sets = item.set_list
-            .map((object: any) => {
-              const { column, value } = object;
-              return `${escapeIdentifier(column)} = ${escapeValue(value)}`;
+    return parallelBatch(list, BATCH_LIMIT, QUERY_LIMIT, async (batch) => {
+      const sql_list: string[] = [];
+      for (const item of batch) {
+        const sets = item.set_list
+          .map((object) => {
+            const { column, value } = object;
+            return `${escapeIdentifier(column)} = ${escapeValue(value)}`;
+          })
+          .join(', ');
+        const cond =
+          ' WHERE ' +
+          key_list
+            .map((key: string, j: number) => {
+              const value = item.key[j];
+              if (value === undefined) {
+                throw TypeError('missing value for key ' + key);
+              }
+              return `${escapeIdentifier(key)} = ${convertValueToPQL(value)}`;
             })
-            .join(', ');
-          const cond =
-            ' WHERE ' +
-            key_list
-              .map((key: string, j: number) => {
-                const value = item.key[j];
-                return `${escapeIdentifier(key)} = ${convertValueToPQL(value)}`;
-              })
-              .join(' AND ');
-          sql_list.push(prefix + sets + cond);
-        }
-        return this.transactionQL(sql_list);
+            .join(' AND ');
+        sql_list.push(prefix + sets + cond);
       }
-    );
+      return this.transactionQL(sql_list);
+    });
   }
 
   async putItems(params: PutItemsParams): Promise<void> {
     const BATCH_LIMIT = 100;
     const { list } = params;
     const table = `${this.namespace}${params.table}`;
-    const err_list: any[] = [];
+    const err_list: Error[] = [];
     try {
       await parallelBatch(list, BATCH_LIMIT, QUERY_LIMIT, async (batch, i) => {
         const input = {
-          TransactItems: batch.map((item: any) => {
+          TransactItems: batch.map((item) => {
             const value = nativeToValue(item);
             return {
-              Put: {
-                TableName: table,
-                Item:
-                  'M' in value
-                    ? (value.M as Record<string, AttributeValue>)
-                    : {},
-              },
+              Put: { TableName: table, Item: 'M' in value ? value.M : {} },
             };
           }),
         };
         const command = new TransactWriteItemsCommand(input);
         try {
           await this.client.send(command);
-          return batch.map((): undefined => undefined);
-        } catch (err: any) {
+        } catch (err: unknown) {
           const start = i * BATCH_LIMIT;
           if (
-            err?.name === 'TransactionCanceledException' &&
+            err instanceof Error &&
+            err.name === 'TransactionCanceledException' &&
             err.CancellationReasons?.length > 0
           ) {
             err.CancellationReasons.forEach((cancel_err: any, j: number) => {
@@ -343,7 +352,7 @@ export class DynamoDB {
   async createTable(params: CreateTableParams): Promise<void> {
     const { billing_mode, column_list, primary_key } = params;
     const table = `${this.namespace}${params.table}`;
-    const AttributeDefinitions = column_list.map((column: any) => ({
+    const AttributeDefinitions = column_list.map((column) => ({
       AttributeName: column.name,
       AttributeType: dynamoType(column.type),
     }));
@@ -384,7 +393,7 @@ export class DynamoDB {
   async createIndex(params: CreateIndexParams): Promise<void> {
     const { index_name, key_list, projection_type } = params;
     const table = `${this.namespace}${params.table}`;
-    const AttributeDefinitions = key_list.map((item: any) => ({
+    const AttributeDefinitions = key_list.map((item) => ({
       AttributeName: item.name,
       AttributeType: dynamoType(item.type),
     }));
@@ -444,14 +453,14 @@ export class DynamoDB {
       try {
         const result = await this.client.send(command);
         const list = convertSuccess(result)[1];
-        list?.forEach((item: any) => {
+        list?.forEach((item) => {
           results.push(item);
         });
         if (!result?.NextToken) {
           break;
         }
         command.input.NextToken = result.NextToken;
-      } catch (err: any) {
+      } catch (err: unknown) {
         if (err.Item) {
           results.push(err.Item);
         }

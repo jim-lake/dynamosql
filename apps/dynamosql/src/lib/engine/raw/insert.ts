@@ -5,8 +5,10 @@ import {
 } from '../../../tools/dynamodb_helper';
 import { trackFirstSeen } from '../../../tools/util';
 import { SQLError } from '../../../error';
+
 import type { InsertParams, MutationResult, Row } from '../index';
 import type { DescribeTableCommandOutput } from '@aws-sdk/client-dynamodb';
+import type { NativeType } from '../../../tools/dynamodb';
 
 export async function insertRowList(
   params: InsertParams
@@ -96,23 +98,19 @@ async function _insertIgnoreReplace(
             thrownError = convertError(item_err) as Error;
           }
         });
-        if (thrownError) throw thrownError;
+        if (thrownError) {
+          throw thrownError;
+        }
       } else {
         throw err as Error;
       }
     }
   } else {
     list.forEach(_fixupItem);
-    const opts = { table, list };
-
-    try {
-      await dynamodb.putItems(opts);
-      affectedRows = list.length;
-    } catch (err: unknown) {
-      throw convertError(err);
-    }
+    const opts = { table, list: list as unknown as NativeType[] };
+    await dynamodb.putItems(opts);
+    affectedRows = list.length;
   }
-
   return { affectedRows };
 }
 
@@ -120,7 +118,6 @@ interface CancellationReason {
   Code?: string;
   Message?: string;
 }
-
 async function _insertNoIgnore(params: InsertParams): Promise<MutationResult> {
   const { dynamodb, table, list } = params;
   const sql_list = list.map(
