@@ -44,7 +44,13 @@ export async function runSelect(
     const key_list = object._keyList;
     const collection = new Map();
     for (const row of row_list) {
-      const keys = key_list.map((key: string) => row[from_key]?.[key]);
+      const rowValue = row[from_key];
+      const keys = key_list.map((key: string) => {
+        if (rowValue && typeof rowValue === 'object' && key in rowValue) {
+          return (rowValue as Record<string, unknown>)[key];
+        }
+        return undefined;
+      });
       if (!keys.includes(undefined)) {
         _addCollection(collection, keys, row);
       }

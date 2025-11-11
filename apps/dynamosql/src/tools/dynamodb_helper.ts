@@ -78,47 +78,46 @@ export function escapeValue(value: unknown, type?: string): string {
   return s;
 }
 
-export function convertError(err: unknown): any {
-  if (!err) {
-    return err;
-  }
+interface DynamoDBError {
+  name?: string;
+  Code?: string;
+  message?: string;
+  Message?: string;
+  Item?: ItemRecord;
+}
 
-  let ret: any;
-  if (err && typeof err === 'object') {
-    const error = err as any;
-    if (error.name === 'ConditionalCheckFailedException' && error.Item) {
-      ret = new Error('cond_fail');
-    } else if (error.Code === 'ConditionalCheckFailed') {
-      ret = new Error('cond_fail');
-    } else if (
-      error.name === 'ResourceNotFoundException' ||
-      error.Code === 'ResourceNotFound' ||
-      (error.message && String(error.message).includes('resource not found'))
-    ) {
-      ret = new Error('resource_not_found');
-    } else if (
-      error.name === 'ResourceInUseException' ||
-      (error.message && String(error.message).includes('resource in use'))
-    ) {
-      ret = new Error('resource_in_use');
-    } else if (
-      error.Code === 'ValidationError' ||
-      error.name === 'ValidationError'
-    ) {
-      if (error.Message?.match?.(/expected: [^\s]* actual: NULL/)) {
-        ret = new Error('ER_BAD_NULL_ERROR');
-      } else if (error.Message?.match?.(/expected: [^\s]* actual:/)) {
-        ret = new Error('ER_TRUNCATED_WRONG_VALUE_FOR_FIELD');
-      } else {
-        ret = new Error('validation');
-      }
-    } else {
-      ret = err;
-    }
-  } else {
-    ret = err;
+type ConvertErrorResult = Error | DynamoDBError;
+
+export function convertError(err: DynamoDBError): ConvertErrorResult {
+  if (err.name === 'ConditionalCheckFailedException' && err.Item) {
+    return new Error('cond_fail');
   }
-  return ret;
+  if (err.Code === 'ConditionalCheckFailed') {
+    return new Error('cond_fail');
+  }
+  if (
+    err.name === 'ResourceNotFoundException' ||
+    err.Code === 'ResourceNotFound' ||
+    (err.message && String(err.message).includes('resource not found'))
+  ) {
+    return new Error('resource_not_found');
+  }
+  if (
+    err.name === 'ResourceInUseException' ||
+    (err.message && String(err.message).includes('resource in use'))
+  ) {
+    return new Error('resource_in_use');
+  }
+  if (err.Code === 'ValidationError' || err.name === 'ValidationError') {
+    if (err.Message?.match?.(/expected: [^\s]* actual: NULL/)) {
+      return new Error('ER_BAD_NULL_ERROR');
+    }
+    if (err.Message?.match?.(/expected: [^\s]* actual:/)) {
+      return new Error('ER_TRUNCATED_WRONG_VALUE_FOR_FIELD');
+    }
+    return new Error('validation');
+  }
+  return err;
 }
 
 export function mapToObject(
@@ -190,42 +189,78 @@ export function convertValueToPQL(value: KeyValue): string {
   return ret;
 }
 
-export function convertSuccess(result: unknown): [any, any] {
-  let err: any = null;
-  let ret: any;
-  if (result && typeof result === 'object') {
-    const res = result as any;
-    if (res.Responses && Array.isArray(res.Responses)) {
-      ret = [];
-      res.Responses.forEach((response: any, i: number) => {
-        if (response.Error) {
-          if (!err) {
-            err = [];
-          }
-          err[i] = convertError(response.Error);
+interface DynamoDBResponseItem {
+  Error?: DynamoDBError;
+  Item?: ItemRecord;
+  Items?: ItemRecord[];
+}
+
+interface DynamoDBResponse {
+  Responses?: DynamoDBResponseItem[];
+  Items?: ItemRecord[];
+  Item?: ItemRecord;
+}
+
+type ItemRecord = Record<string, AttributeValue>;
+type ItemList = ItemRecord[] | null;
+type ErrorList = Error[] | null;
+type ConvertSuccessResult = [ErrorList, ItemList];
+
+function isDynamoDBResponse(value: unknown): value is DynamoDBResponse {
+  return value !== null && typeof value === 'object';
+}
+
+function isDynamoDBError(value: unknown): value is DynamoDBError {
+  return value !== null && typeof value === 'object';
+}
+
+export function safeConvertSuccess(result: unknown): ConvertSuccessResult {
+  if (!isDynamoDBResponse(result)) {
+    return [null, null];
+  }
+  return convertSuccess(result);
+}
+
+export function safeConvertError(err: unknown): ConvertErrorResult {
+  if (!isDynamoDBError(err)) {
+    return err as Error;
+  }
+  return convertError(err);
+}
+
+export function convertSuccess(result: DynamoDBResponse): ConvertSuccessResult {
+  let err: ErrorList = null;
+  let ret: ItemList = null;
+
+  if (result.Responses && Array.isArray(result.Responses)) {
+    ret = [];
+    result.Responses.forEach((item, i) => {
+      if (item.Error) {
+        if (!err) {
+          err = [];
         }
-        ret[i] = convertResult(response);
-      });
-    } else {
-      ret = convertResult(result);
-    }
+        err[i] = convertError(item.Error) as Error;
+      }
+      const converted = convertResult(item);
+      if (converted?.[0]) {
+        ret![i] = converted[0];
+      }
+    });
   } else {
     ret = convertResult(result);
   }
+
   return [err, ret];
 }
 
-export function convertResult(result: unknown): any {
-  let ret: any;
-  if (result && typeof result === 'object') {
-    const res = result as any;
-    if (res.Items) {
-      ret = res.Items;
-    } else if (res.Item) {
-      ret = [res.Item];
-    }
+export function convertResult(result: DynamoDBResponseItem): ItemList {
+  if (result.Items) {
+    return result.Items;
   }
-  return ret;
+  if (result.Item) {
+    return [result.Item];
+  }
+  return null;
 }
 
 export function dynamoType(type: string): ScalarAttributeType {

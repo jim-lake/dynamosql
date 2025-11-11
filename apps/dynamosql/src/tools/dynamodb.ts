@@ -19,12 +19,13 @@ import {
 } from '@aws-sdk/client-dynamodb';
 
 import {
-  convertError,
   escapeIdentifier,
   escapeValue,
   nativeToValue,
   convertValueToPQL,
   convertSuccess,
+  safeConvertSuccess,
+  safeConvertError,
   dynamoType,
   namespacePartiQL,
 } from './dynamodb_helper';
@@ -39,6 +40,11 @@ export type { DescribeTableCommandOutput } from '@aws-sdk/client-dynamodb';
 export type { KeyValue, NativeType } from './dynamodb_helper';
 
 const QUERY_LIMIT = 5;
+
+interface ErrorEntry {
+  err: Error | unknown;
+  parent: unknown;
+}
 
 export interface ColumnDefinition {
   name: string;
@@ -176,14 +182,14 @@ export class DynamoDB {
       }
       return ret ?? [];
     } catch (err) {
-      const converted = convertSuccess(err);
+      const converted = safeConvertSuccess(err);
       if (converted[0]) {
         throw converted[0];
       }
       if (converted[1]) {
         return converted[1];
       }
-      throw convertError(err);
+      throw safeConvertError(err);
     }
   }
 
@@ -210,14 +216,14 @@ export class DynamoDB {
       }
       return ret ?? [];
     } catch (err) {
-      const converted = convertSuccess(err);
+      const converted = safeConvertSuccess(err);
       if (converted[0]) {
         throw converted[0];
       }
       if (converted[1]) {
         return converted[1];
       }
-      throw convertError(err);
+      throw safeConvertError(err);
     }
   }
 
@@ -281,7 +287,7 @@ export class DynamoDB {
     const BATCH_LIMIT = 100;
     const { list } = params;
     const table = `${this.namespace}${params.table}`;
-    const err_list: Error[] = [];
+    const err_list: ErrorEntry[] = [];
     try {
       await parallelBatch(list, BATCH_LIMIT, QUERY_LIMIT, async (batch, i) => {
         const input = {
@@ -298,18 +304,21 @@ export class DynamoDB {
         } catch (err: unknown) {
           const start = i * BATCH_LIMIT;
           if (
-            err instanceof Error &&
+            err &&
+            typeof err === 'object' &&
+            'name' in err &&
             err.name === 'TransactionCanceledException' &&
-            err.CancellationReasons?.length > 0
+            'CancellationReasons' in err &&
+            Array.isArray(err.CancellationReasons)
           ) {
-            err.CancellationReasons.forEach((cancel_err: any, j: number) => {
+            err.CancellationReasons.forEach((cancel_err: unknown, j: number) => {
               err_list[start + j] = {
-                err: convertError(cancel_err),
+                err: safeConvertError(cancel_err),
                 parent: cancel_err,
               };
             });
           } else {
-            err_list[start] = { err: convertError(err), parent: err };
+            err_list[start] = { err: safeConvertError(err), parent: err };
           }
           throw err;
         }
@@ -348,7 +357,7 @@ export class DynamoDB {
     try {
       return await this.client.send(command);
     } catch (err) {
-      throw convertError(err);
+      throw safeConvertError(err);
     }
   }
 
@@ -379,7 +388,7 @@ export class DynamoDB {
     try {
       await this.client.send(command);
     } catch (err) {
-      throw convertError(err);
+      throw safeConvertError(err);
     }
   }
 
@@ -389,7 +398,7 @@ export class DynamoDB {
     try {
       await this.client.send(command);
     } catch (err) {
-      throw convertError(err);
+      throw safeConvertError(err);
     }
   }
 
@@ -429,7 +438,7 @@ export class DynamoDB {
     try {
       await this.client.send(command);
     } catch (err) {
-      throw convertError(err);
+      throw safeConvertError(err);
     }
   }
 
@@ -444,7 +453,7 @@ export class DynamoDB {
     try {
       await this.client.send(command);
     } catch (err) {
-      throw convertError(err);
+      throw safeConvertError(err);
     }
   }
 
@@ -464,10 +473,10 @@ export class DynamoDB {
         }
         command.input.NextToken = result.NextToken;
       } catch (err: unknown) {
-        if (err.Item) {
-          results.push(err.Item);
+        if (err && typeof err === 'object' && 'Item' in err && err.Item) {
+          results.push(err.Item as Record<string, AttributeValue>);
         }
-        throw convertError(err);
+        throw safeConvertError(err);
       }
     }
     return results;
