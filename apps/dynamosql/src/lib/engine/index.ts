@@ -2,49 +2,55 @@ import * as RawEngine from './raw';
 import * as MemoryEngine from './memory';
 import { SQLError } from '../../error';
 
-import type { Session } from '../../session';
-import type { DynamoDBClient } from '../handler_types';
 import type { ExpressionValue } from 'node-sql-parser/types';
+import type { DynamoDBClient } from '../handler_types';
+import type { Session } from '../../session';
+import type { ItemRecord } from '../../tools/dynamodb';
 
 export interface ColumnDef {
   name: string;
   type: string;
 }
-
 export interface TableInfo {
   table: string;
   primary_key: ColumnDef[];
   column_list: ColumnDef[];
   is_open: boolean;
 }
-
 export interface MutationResult {
   affectedRows: number;
   changedRows?: number;
 }
-
+export interface CellValue {
+  type?: string;
+  value: unknown;
+}
+export interface CellRow {
+  [column: string]: CellValue;
+}
+export type Row = CellRow | ItemRecord;
+export interface RowListResult {
+  source_map: Record<string, Row[]>;
+  column_map: Record<string, string[]>;
+}
 export interface TableData {
   database: string;
   table: string;
   data: { row_list: Row[]; primary_map: Map<string, number> };
 }
-
 export interface CommitParams {
   session: Session;
   data: Record<string, TableData>;
 }
-
 export interface TableListParams {
   dynamodb: DynamoDBClient;
 }
-
 export interface TableInfoParams {
   dynamodb: DynamoDBClient;
   table: string;
   session?: Session;
   database?: string;
 }
-
 export interface CreateTableParams {
   dynamodb: DynamoDBClient;
   table: string;
@@ -54,32 +60,27 @@ export interface CreateTableParams {
   database?: string;
   is_temp?: boolean;
 }
-
 export interface DropTableParams {
   dynamodb: DynamoDBClient;
   table: string;
   session?: Session;
   database?: string;
 }
-
 export interface KeyDef {
   name: string;
   type: string;
 }
-
 export interface IndexParams {
   dynamodb: DynamoDBClient;
   table: string;
   index_name: string;
   key_list?: KeyDef[];
 }
-
 export interface AddColumnParams {
   dynamodb: DynamoDBClient;
   table: string;
   column: ColumnDef;
 }
-
 export interface FromClause {
   db: string;
   table: string;
@@ -87,74 +88,55 @@ export interface FromClause {
   _requestSet: Set<string>;
   _requestAll: boolean;
 }
-
 export interface RowListParams {
   dynamodb: DynamoDBClient;
   session: Session;
   list: FromClause[];
   where?: ExpressionValue;
 }
-
 export interface DeleteAST {
   type: 'delete';
   from: FromClause[];
   where?: ExpressionValue;
 }
-
 export interface DeleteChange {
   database: string;
   table: string;
   key_list: string[];
   delete_list: CellValue[][];
 }
-
 export interface DeleteParams {
   dynamodb: DynamoDBClient;
   session: Session;
   ast: DeleteAST;
   list?: DeleteChange[];
 }
-
 export interface SetClause {
   column: string;
   value: ExpressionValue;
 }
-
 export interface UpdateAST {
   type: 'update';
   from: FromClause[];
   set: SetClause[];
   where?: ExpressionValue;
 }
-
-export interface CellValue {
-  type?: string;
-  value: unknown;
-}
-
 export interface UpdateItem {
   key: CellValue[];
   set_list: SetClause[];
 }
-
 export interface UpdateChange {
   database: string;
   table: string;
   key_list: string[];
   update_list: UpdateItem[];
 }
-
 export interface UpdateParams {
   dynamodb: DynamoDBClient;
   session: Session;
   ast: UpdateAST;
   list?: UpdateChange[];
 }
-
-export interface Row {
-  [column: string]: CellValue;
-}
-
 export interface InsertParams {
   dynamodb: DynamoDBClient;
   table: string;
@@ -174,12 +156,7 @@ export interface Engine {
   deleteIndex(params: IndexParams): Promise<void>;
   addColumn(params: AddColumnParams): Promise<void>;
   getTableInfo(params: TableInfoParams): Promise<TableInfo>;
-  getRowList(
-    params: RowListParams
-  ): Promise<{
-    source_map: Record<string, Row[]>;
-    column_map: Record<string, string[]>;
-  }>;
+  getRowList(params: RowListParams): Promise<RowListResult>;
   singleDelete(params: DeleteParams): Promise<MutationResult>;
   multipleDelete(params: DeleteParams): Promise<MutationResult>;
   singleUpdate(params: UpdateParams): Promise<MutationResult>;

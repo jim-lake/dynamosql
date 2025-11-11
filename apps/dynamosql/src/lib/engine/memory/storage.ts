@@ -1,94 +1,87 @@
+import { Transaction } from '../../transaction_manager';
+
 import type { Session } from '../../../session';
-import type { ColumnDef, Row } from '../index';
+import type { ColumnDef, CellRow } from '../index';
 
 export interface TableData {
   column_list: ColumnDef[];
   primary_key: ColumnDef[];
-  row_list: Row[];
+  row_list: CellRow[];
   primary_map: Map<string, number>;
 }
+export interface TxData {
+  database: string;
+  table: string;
+  data: Partial<TableData>;
+}
+export interface TxMap {
+  [key: string]: TxData;
+}
 
-const g_tableMap: Record<string, TableData> = {};
+const g_tableMap = new Map<string, TableData>();
 
 export function getTable(
   database: string,
   table: string,
   session: Session
 ): TableData | null {
-  const key = database + '.' + table;
-  const tempTable = session.getTempTable(database, table) as
-    | TableData
-    | undefined;
-  const globalTable = g_tableMap[key];
-  let data: TableData | undefined = tempTable || globalTable;
-  const updates = txGetData(database, table, session)?.data;
-  if (data && updates) {
-    data = Object.assign({}, data, updates) as TableData;
+  const data =
+    session.getTempTable<TableData>(database, table) ??
+    g_tableMap.get(`${database}.${table}`);
+  if (data) {
+    const updates = txGetData(database, table, session)?.data;
+    if (updates) {
+      return Object.assign({}, data, updates);
+    } else {
+      return data;
+    }
   }
-  return data || null;
+  return null;
 }
-
 export function updateTableData(
   database: string,
   table: string,
   session: Session,
   updates: Partial<TableData>
 ): void {
-  const key = database + '.' + table;
-  const tempTable = session.getTempTable(database, table) as
-    | TableData
-    | undefined;
-  const globalTable = g_tableMap[key];
-  const data: TableData | undefined = tempTable || globalTable;
+  const data =
+    session.getTempTable<TableData>(database, table) ??
+    g_tableMap.get(`${database}.${table}`);
   if (data) {
     Object.assign(data, updates);
   }
 }
-
 export function txSaveData(
   database: string,
   table: string,
   session: Session,
   data: Partial<TableData>
 ): void {
-  const tx = session.getTransaction() as Transaction | null;
-  const key = database + '.' + table;
-  const existing = tx?.getData('memory') || {};
-  existing[key] = { database, table, data };
-  tx?.setData('memory', existing);
+  const tx = session.getTransaction<Transaction>();
+  if (tx) {
+    const existing = tx.getData<TxMap>('memory') ?? {};
+    existing[`${database}.${table}`] = { database, table, data };
+    tx.setData('memory', existing);
+  }
 }
-
 export function txGetData(
   database: string,
   table: string,
   session: Session
-): { database: string; table: string; data: Partial<TableData> } | undefined {
-  const key = database + '.' + table;
-  const tx = session.getTransaction() as Transaction | null;
-  const memoryData = tx?.getData?.('memory') as
-    | Record<
-        string,
-        { database: string; table: string; data: Partial<TableData> }
-      >
-    | undefined;
-  return memoryData?.[key];
+): TxData | undefined {
+  const tx = session.getTransaction<Transaction>();
+  if (tx) {
+    return tx.getData<TxMap>('memory')?.[`${database}.${table}`];
+  }
+  return undefined;
 }
-
 export function saveTable(
   database: string,
   table: string,
   data: TableData
 ): void {
-  const key = database + '.' + table;
-  g_tableMap[key] = data;
+  g_tableMap.set(`${database}.${table}`, data);
 }
-
 export function deleteTable(database: string, table: string): void {
-  const key = database + '.' + table;
-  delete g_tableMap[key];
-}
-
-interface Transaction {
-  getData(name: string): Record<string, unknown>;
-  setData(name: string, data: Record<string, unknown>): void;
+  g_tableMap.delete(`${database}.${table}`);
 }

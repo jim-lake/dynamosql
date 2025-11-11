@@ -40,7 +40,7 @@ export class Session extends EventEmitter implements PoolConnection {
   private _localVariables: Record<string, unknown> = {};
   private _transaction: unknown = null;
   private _isReleased = false;
-  private _tempTableMap: Record<string, unknown> = {};
+  private readonly _tempTableMap = new Map<string, unknown>();
 
   public readonly escape = SqlString.escape;
   public readonly escapeId = SqlString.escapeId;
@@ -91,8 +91,8 @@ export class Session extends EventEmitter implements PoolConnection {
     return this._localVariables[name];
   }
 
-  getTransaction() {
-    return this._transaction;
+  getTransaction<T>(): T | null {
+    return this._transaction as T | null;
   }
 
   setTransaction(tx: unknown) {
@@ -100,17 +100,15 @@ export class Session extends EventEmitter implements PoolConnection {
   }
 
   getTempTableList() {
-    return Object.entries(this._tempTableMap);
+    return this._tempTableMap.keys();
   }
 
-  getTempTable(database: string, table: string) {
-    const key = database + '.' + table;
-    return this._tempTableMap[key];
+  getTempTable<T>(database: string, table: string): T | undefined {
+    return this._tempTableMap.get(`${database}.${table}`) as T | undefined;
   }
 
   saveTempTable(database: string, table: string, contents: unknown) {
-    const key = database + '.' + table;
-    this._tempTableMap[key] = contents;
+    this._tempTableMap.set(`${database}.${table}`, contents);
   }
 
   deleteTempTable(database: string, table: string) {
@@ -120,14 +118,13 @@ export class Session extends EventEmitter implements PoolConnection {
   dropTempTable(database: string, table?: string) {
     const prefix = database + '.';
     if (table) {
-      const key = prefix + table;
-      delete this._tempTableMap[key];
+      this._tempTableMap.delete(`${database}.${table}`);
     } else {
-      Object.keys(this._tempTableMap).forEach((key) => {
+      for (const key of this._tempTableMap.keys()) {
         if (key.startsWith(prefix)) {
-          delete this._tempTableMap[key];
+          this._tempTableMap.delete(key);
         }
-      });
+      }
     }
   }
 

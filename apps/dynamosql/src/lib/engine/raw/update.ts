@@ -61,7 +61,9 @@ RETURNING MODIFIED OLD *
     set.forEach((object, i) => {
       const { column } = object;
       const value = value_list[i];
-      if (value !== escapeValue(valueToNative(resultArray?.[0]?.[column]))) {
+      if (
+        value !== escapeValue(valueToNative(resultArray?.[0]?.[column] ?? null))
+      ) {
         result.changedRows = 1;
       }
     });

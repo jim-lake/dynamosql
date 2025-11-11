@@ -3,6 +3,9 @@ import type {
   ScalarAttributeType,
 } from '@aws-sdk/client-dynamodb';
 
+export type ItemRecord = Record<string, AttributeValue>;
+export type ItemList = ItemRecord[] | null;
+
 export type KeyValue = AttributeValue | null | string;
 export interface NativeObject {
   [key: string]: NativeType | undefined;
@@ -21,7 +24,7 @@ export class NativeObjectClass {
     return JSON.stringify(this);
   }
 }
-export function mapToObject(obj: Record<string, AttributeValue>): NativeObject {
+export function mapToObject(obj: ItemRecord): NativeObject {
   const ret = new NativeObjectClass() as unknown as NativeObject;
   for (const [key, value] of Object.entries(obj)) {
     ret[key] = valueToNative(value);
@@ -54,7 +57,7 @@ export function nativeToValue(obj: NativeType): AttributeValue {
   } else if (Array.isArray(obj)) {
     return { L: obj.map(nativeToValue) };
   } else if (typeof obj === 'object') {
-    const M: Record<string, AttributeValue> = {};
+    const M: ItemRecord = {};
     for (const key in obj) {
       if (obj[key]) {
         M[key] = nativeToValue(obj[key]);
@@ -211,8 +214,6 @@ interface DynamoDBResponse {
   Item?: ItemRecord;
 }
 
-type ItemRecord = Record<string, AttributeValue>;
-type ItemList = ItemRecord[] | null;
 type ErrorList = Error[] | null;
 type ConvertSuccessResult = [ErrorList, ItemList];
 

@@ -1,25 +1,21 @@
 import * as Engine from './engine';
 
-class Transaction {
+export class Transaction {
   _dataMap = new Map();
   _isAutoCommit: boolean;
 
   constructor(auto_commit: any) {
     this._isAutoCommit = Boolean(auto_commit);
   }
-
   isAutoCommit() {
     return this._isAutoCommit;
   }
-
   getEngineNameList() {
     return this._dataMap.keys();
   }
-
-  getData(name: string) {
+  getData<T>(name: string): T | undefined {
     return this._dataMap.get(name);
   }
-
   setData(name: string, data: any) {
     this._dataMap.set(name, data);
   }

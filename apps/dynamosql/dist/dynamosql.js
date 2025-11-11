@@ -26,6 +26,91 @@ function _interopNamespaceDefault(e) {
 
 var SqlString__namespace = /*#__PURE__*/_interopNamespaceDefault(SqlString);
 
+class NativeObjectClass {
+    toString() {
+        return JSON.stringify(this);
+    }
+}
+function mapToObject(obj) {
+    const ret = new NativeObjectClass();
+    for (const [key, value] of Object.entries(obj)) {
+        ret[key] = valueToNative(value);
+    }
+    return ret;
+}
+function valueToNative(value) {
+    if (value === null) {
+        return null;
+    }
+    else if (typeof value === 'object') {
+        if (value.NULL) {
+            return null;
+        }
+        else if (value.N) {
+            return parseFloat(value.N);
+        }
+        else if (Array.isArray(value.L)) {
+            return value.L.map(valueToNative);
+        }
+        else if (value.M) {
+            return mapToObject(value.M);
+        }
+        else {
+            return value.S ?? value.B ?? value.BOOL ?? null;
+        }
+    }
+    return null;
+}
+function nativeToValue(obj) {
+    if (obj === null) {
+        return { NULL: true };
+    }
+    else if (obj instanceof Uint8Array) {
+        return { B: obj };
+    }
+    else if (Array.isArray(obj)) {
+        return { L: obj.map(nativeToValue) };
+    }
+    else if (typeof obj === 'object') {
+        const M = {};
+        for (const key in obj) {
+            if (obj[key]) {
+                M[key] = nativeToValue(obj[key]);
+            }
+        }
+        return { M };
+    }
+    else if (typeof obj === 'number') {
+        return { N: String(obj) };
+    }
+    else if (typeof obj === 'boolean') {
+        return { BOOL: obj };
+    }
+    else {
+        return { S: String(obj) };
+    }
+}
+function convertValueToPQL(value) {
+    let ret;
+    if (value === null) {
+        ret = 'NULL';
+    }
+    else if (typeof value === 'object') {
+        if (value.S !== undefined) {
+            ret = "'" + escapeString(value.S) + "'";
+        }
+        else if (value.N !== undefined) {
+            ret = String(value.N);
+        }
+        else {
+            ret = "'" + escapeString(String(value)) + "'";
+        }
+    }
+    else {
+        ret = "'" + escapeString(String(value)) + "'";
+    }
+    return ret;
+}
 function escapeIdentifier(string) {
     return '"' + string.replace('"', '""') + '"';
 }
@@ -74,140 +159,67 @@ function escapeValue(value, type) {
     return s;
 }
 function convertError(err) {
-    if (!err)
+    if (err.name === 'ConditionalCheckFailedException' && err.Item) {
+        return new Error('cond_fail');
+    }
+    if (err.Code === 'ConditionalCheckFailed') {
+        return new Error('cond_fail');
+    }
+    if (err.name === 'ResourceNotFoundException' ||
+        err.Code === 'ResourceNotFound' ||
+        (err.message && String(err.message).includes('resource not found'))) {
+        return new Error('resource_not_found');
+    }
+    if (err.name === 'ResourceInUseException' ||
+        (err.message && String(err.message).includes('resource in use'))) {
+        return new Error('resource_in_use');
+    }
+    if (err.Code === 'ValidationError' || err.name === 'ValidationError') {
+        if (err.Message?.match?.(/expected: [^\s]* actual: NULL/)) {
+            return new Error('ER_BAD_NULL_ERROR');
+        }
+        if (err.Message?.match?.(/expected: [^\s]* actual:/)) {
+            return new Error('ER_TRUNCATED_WRONG_VALUE_FOR_FIELD');
+        }
+        return new Error('validation');
+    }
+    return err;
+}
+function isDynamoDBResponse(value) {
+    return value !== null && typeof value === 'object';
+}
+function isDynamoDBError(value) {
+    return value !== null && typeof value === 'object';
+}
+function safeConvertSuccess(result) {
+    if (!isDynamoDBResponse(result)) {
+        return [null, null];
+    }
+    return convertSuccess(result);
+}
+function safeConvertError(err) {
+    if (!isDynamoDBError(err)) {
         return err;
-    let ret;
-    if (err && typeof err === 'object') {
-        const error = err;
-        if (error.name === 'ConditionalCheckFailedException' && error.Item) {
-            ret = new Error('cond_fail');
-        }
-        else if (error.Code === 'ConditionalCheckFailed') {
-            ret = new Error('cond_fail');
-        }
-        else if (error.name === 'ResourceNotFoundException' ||
-            error.Code === 'ResourceNotFound' ||
-            (error.message && String(error.message).includes('resource not found'))) {
-            ret = new Error('resource_not_found');
-        }
-        else if (error.name === 'ResourceInUseException' ||
-            (error.message && String(error.message).includes('resource in use'))) {
-            ret = new Error('resource_in_use');
-        }
-        else if (error.Code === 'ValidationError' ||
-            error.name === 'ValidationError') {
-            if (error.Message?.match?.(/expected: [^\s]* actual: NULL/)) {
-                ret = new Error('ER_BAD_NULL_ERROR');
-            }
-            else if (error.Message?.match?.(/expected: [^\s]* actual:/)) {
-                ret = new Error('ER_TRUNCATED_WRONG_VALUE_FOR_FIELD');
-            }
-            else {
-                ret = new Error('validation');
-            }
-        }
-        else {
-            ret = err;
-        }
     }
-    else {
-        ret = err;
-    }
-    return ret;
-}
-function mapToObject(obj) {
-    const ret = {};
-    ret.toString = toString;
-    Object.keys(obj).forEach((key) => {
-        ret[key] = valueToNative(obj[key]);
-    });
-    return ret;
-}
-function valueToNative(value) {
-    let ret = value;
-    if (value && typeof value === 'object') {
-        const v = value;
-        if (v.N) {
-            ret = parseFloat(v.N);
-        }
-        else if (Array.isArray(v.L)) {
-            ret = v.L.map(valueToNative);
-        }
-        else if (v.M) {
-            ret = mapToObject(v.M);
-        }
-        else {
-            ret = v.S ?? v.B ?? v.BOOL ?? value;
-        }
-    }
-    return ret;
-}
-function nativeToValue(obj) {
-    if (obj === null) {
-        return { NULL: true };
-    }
-    else if (typeof obj === 'object') {
-        const M = {};
-        for (const key in obj) {
-            M[key] = nativeToValue(obj[key]);
-        }
-        return { M };
-    }
-    else if (typeof obj === 'number') {
-        return { N: String(obj) };
-    }
-    else if (typeof obj === 'boolean') {
-        return { BOOL: obj };
-    }
-    else {
-        return { S: String(obj) };
-    }
-}
-function toString() {
-    return JSON.stringify(this);
-}
-function convertValueToPQL(value) {
-    let ret;
-    if (!value) {
-        ret = 'NULL';
-    }
-    else if (typeof value === 'object' && value !== null) {
-        const v = value;
-        if (v.S !== undefined) {
-            ret = "'" + escapeString(v.S) + "'";
-        }
-        else if (v.N !== undefined) {
-            ret = String(v.N);
-        }
-        else {
-            ret = "'" + escapeString(String(value)) + "'";
-        }
-    }
-    else {
-        ret = "'" + escapeString(String(value)) + "'";
-    }
-    return ret;
+    return convertError(err);
 }
 function convertSuccess(result) {
     let err = null;
-    let ret;
-    if (result && typeof result === 'object') {
-        const res = result;
-        if (res.Responses && Array.isArray(res.Responses)) {
-            ret = [];
-            res.Responses.forEach((response, i) => {
-                if (response.Error) {
-                    if (!err) {
-                        err = [];
-                    }
-                    err[i] = convertError(response.Error);
+    let ret = null;
+    if (result.Responses && Array.isArray(result.Responses)) {
+        ret = [];
+        result.Responses.forEach((item, i) => {
+            if (item.Error) {
+                if (!err) {
+                    err = [];
                 }
-                ret[i] = convertResult(response);
-            });
-        }
-        else {
-            ret = convertResult(result);
-        }
+                err[i] = convertError(item.Error);
+            }
+            const converted = convertResult(item);
+            if (converted?.[0]) {
+                ret[i] = converted[0];
+            }
+        });
     }
     else {
         ret = convertResult(result);
@@ -215,17 +227,13 @@ function convertSuccess(result) {
     return [err, ret];
 }
 function convertResult(result) {
-    let ret;
-    if (result && typeof result === 'object') {
-        const res = result;
-        if (res.Items) {
-            ret = res.Items;
-        }
-        else if (res.Item) {
-            ret = [res.Item];
-        }
+    if (result.Items) {
+        return result.Items;
     }
-    return ret;
+    if (result.Item) {
+        return [result.Item];
+    }
+    return null;
 }
 function dynamoType(type) {
     let ret = type;
@@ -307,8 +315,10 @@ async function parallelBatch(list, batchSize, limit, iter) {
         const start = i * batchSize;
         const batch = list.slice(start, start + batchSize);
         const batch_result = await iter(batch, i);
-        for (let j = 0; j < batch_result.length; j++) {
-            results[i + j] = batch_result[j];
+        if (batch_result) {
+            for (let j = 0; j < batch_result.length; j++) {
+                results[i + j] = batch_result[j];
+            }
         }
     });
     return results;
@@ -371,14 +381,14 @@ class DynamoDB {
             return ret ?? [];
         }
         catch (err) {
-            const converted = convertSuccess(err);
+            const converted = safeConvertSuccess(err);
             if (converted[0]) {
                 throw converted[0];
             }
             if (converted[1]) {
                 return converted[1];
             }
-            throw convertError(err);
+            throw safeConvertError(err);
         }
     }
     async transactionQL(params) {
@@ -402,14 +412,14 @@ class DynamoDB {
             return ret ?? [];
         }
         catch (err) {
-            const converted = convertSuccess(err);
+            const converted = safeConvertSuccess(err);
             if (converted[0]) {
                 throw converted[0];
             }
             if (converted[1]) {
                 return converted[1];
             }
-            throw convertError(err);
+            throw safeConvertError(err);
         }
     }
     async deleteItems(params) {
@@ -422,6 +432,9 @@ class DynamoDB {
                 const cond = key_list
                     .map((key, j) => {
                     const value = item[j];
+                    if (value === undefined) {
+                        throw TypeError('missing value for key ' + key);
+                    }
                     return `${escapeIdentifier(key)} = ${convertValueToPQL(value)}`;
                 })
                     .join(' AND ');
@@ -447,6 +460,9 @@ class DynamoDB {
                     key_list
                         .map((key, j) => {
                         const value = item.key[j];
+                        if (value === undefined) {
+                            throw TypeError('missing value for key ' + key);
+                        }
                         return `${escapeIdentifier(key)} = ${convertValueToPQL(value)}`;
                     })
                         .join(' AND ');
@@ -466,33 +482,31 @@ class DynamoDB {
                     TransactItems: batch.map((item) => {
                         const value = nativeToValue(item);
                         return {
-                            Put: {
-                                TableName: table,
-                                Item: 'M' in value
-                                    ? value.M
-                                    : {},
-                            },
+                            Put: { TableName: table, Item: 'M' in value ? value.M : {} },
                         };
                     }),
                 };
                 const command = new clientDynamodb.TransactWriteItemsCommand(input);
                 try {
                     await this.client.send(command);
-                    return batch.map(() => undefined);
                 }
                 catch (err) {
                     const start = i * BATCH_LIMIT;
-                    if (err?.name === 'TransactionCanceledException' &&
-                        err.CancellationReasons?.length > 0) {
+                    if (err &&
+                        typeof err === 'object' &&
+                        'name' in err &&
+                        err.name === 'TransactionCanceledException' &&
+                        'CancellationReasons' in err &&
+                        Array.isArray(err.CancellationReasons)) {
                         err.CancellationReasons.forEach((cancel_err, j) => {
                             err_list[start + j] = {
-                                err: convertError(cancel_err),
+                                err: safeConvertError(cancel_err),
                                 parent: cancel_err,
                             };
                         });
                     }
                     else {
-                        err_list[start] = { err: convertError(err), parent: err };
+                        err_list[start] = { err: safeConvertError(err), parent: err };
                     }
                     throw err;
                 }
@@ -532,7 +546,7 @@ class DynamoDB {
             return await this.client.send(command);
         }
         catch (err) {
-            throw convertError(err);
+            throw safeConvertError(err);
         }
     }
     async createTable(params) {
@@ -562,7 +576,7 @@ class DynamoDB {
             await this.client.send(command);
         }
         catch (err) {
-            throw convertError(err);
+            throw safeConvertError(err);
         }
     }
     async deleteTable(raw_table) {
@@ -572,7 +586,7 @@ class DynamoDB {
             await this.client.send(command);
         }
         catch (err) {
-            throw convertError(err);
+            throw safeConvertError(err);
         }
     }
     async createIndex(params) {
@@ -612,7 +626,7 @@ class DynamoDB {
             await this.client.send(command);
         }
         catch (err) {
-            throw convertError(err);
+            throw safeConvertError(err);
         }
     }
     async deleteIndex(params) {
@@ -627,7 +641,7 @@ class DynamoDB {
             await this.client.send(command);
         }
         catch (err) {
-            throw convertError(err);
+            throw safeConvertError(err);
         }
     }
     async _pagedSend(command) {
@@ -645,10 +659,10 @@ class DynamoDB {
                 command.input.NextToken = result.NextToken;
             }
             catch (err) {
-                if (err.Item) {
+                if (err && typeof err === 'object' && 'Item' in err && err.Item) {
                     results.push(err.Item);
                 }
-                throw convertError(err);
+                throw safeConvertError(err);
             }
         }
         return results;
@@ -669,7 +683,7 @@ class DynamoDBWithCache extends DynamoDB {
             return result;
         }
         catch (err) {
-            if (err?.message === 'resource_not_found') {
+            if (err instanceof Error && err.message === 'resource_not_found') {
                 this._tableCache.delete(table);
             }
             throw err;
@@ -1995,27 +2009,29 @@ function jsonStringify(value, replacer, space) {
 }
 function trackFirstSeen(map, keys) {
     let ret = true;
-    if (keys.length > 1) {
-        let sub = map.get(keys[0]);
-        if (sub) {
-            if (sub.has(keys[1])) {
+    const key0 = keys[0];
+    const key1 = keys[1];
+    if (key1 !== undefined) {
+        let sub = map.get(key0);
+        if (sub && typeof sub === 'object') {
+            if (sub.has(key1)) {
                 ret = false;
             }
             else {
-                sub.set(keys[1], true);
+                sub.set(key1, true);
             }
         }
         else {
             sub = new Map();
-            sub.set(keys[1], true);
-            map.set(keys[0], sub);
+            sub.set(key1, true);
+            map.set(key0, sub);
         }
     }
-    else if (map.has(keys[0])) {
+    else if (map.has(key0)) {
         ret = false;
     }
     else {
-        map.set(keys[0], true);
+        map.set(key0, true);
     }
     return ret;
 }
@@ -4541,7 +4557,11 @@ async function multipleDelete$1(params) {
     for (const object of list) {
         const { table, key_list, delete_list } = object;
         try {
-            await dynamodb.deleteItems({ table, key_list, list: delete_list });
+            await dynamodb.deleteItems({
+                table,
+                key_list,
+                list: delete_list,
+            });
             affectedRows += delete_list.length;
         }
         catch (err) {
@@ -4624,8 +4644,9 @@ async function _insertIgnoreReplace(params) {
                         thrownError = convertError(item_err);
                     }
                 });
-                if (thrownError)
+                if (thrownError) {
                     throw thrownError;
+                }
             }
             else {
                 throw err;
@@ -4634,14 +4655,9 @@ async function _insertIgnoreReplace(params) {
     }
     else {
         list.forEach(_fixupItem);
-        const opts = { table, list };
-        try {
-            await dynamodb.putItems(opts);
-            affectedRows = list.length;
-        }
-        catch (err) {
-            throw convertError(err);
-        }
+        const opts = { table, list: list };
+        await dynamodb.putItems(opts);
+        affectedRows = list.length;
     }
     return { affectedRows };
 }
@@ -4737,21 +4753,23 @@ async function _getFromTable$1(params) {
     }
     try {
         const results = await dynamodb.queryQL(sql);
-        const resultArray = Array.isArray(results[0]) ? results[0] : results;
+        const result_array = Array.isArray(results[0])
+            ? results[0]
+            : results;
         let column_list;
         if (_requestAll) {
             const response_set = new Set();
-            resultArray.forEach((result) => {
+            for (const result of result_array) {
                 for (const key in result) {
                     response_set.add(key);
                 }
-            });
+            }
             column_list = [...response_set.keys()];
         }
         else {
             column_list = request_columns;
         }
-        return { results: resultArray, column_list };
+        return { results: result_array, column_list };
     }
     catch (err) {
         if (err instanceof Error && err.message === 'resource_not_found') {
@@ -4804,7 +4822,7 @@ RETURNING MODIFIED OLD *
         set.forEach((object, i) => {
             const { column } = object;
             const value = value_list[i];
-            if (value !== escapeValue(valueToNative(resultArray?.[0]?.[column]))) {
+            if (value !== escapeValue(valueToNative(resultArray?.[0]?.[column] ?? null))) {
                 result.changedRows = 1;
             }
         });
@@ -4838,7 +4856,11 @@ async function multipleUpdate$1(params) {
             }
         }
         try {
-            await dynamodb.updateItems({ table, key_list, list: update_list });
+            await dynamodb.updateItems({
+                table,
+                key_list,
+                list: update_list,
+            });
             affectedRows += update_list.length;
             changedRows += update_list.length;
         }
@@ -4872,47 +4894,48 @@ var RawEngine = /*#__PURE__*/Object.freeze({
     singleUpdate: singleUpdate$1
 });
 
-const g_tableMap = {};
+const g_tableMap = new Map();
 function getTable(database, table, session) {
-    const key = database + '.' + table;
-    const tempTable = session.getTempTable(database, table);
-    const globalTable = g_tableMap[key];
-    let data = tempTable || globalTable;
-    const updates = txGetData(database, table, session)?.data;
-    if (data && updates) {
-        data = Object.assign({}, data, updates);
+    const data = session.getTempTable(database, table) ??
+        g_tableMap.get(`${database}.${table}`);
+    if (data) {
+        const updates = txGetData(database, table, session)?.data;
+        if (updates) {
+            return Object.assign({}, data, updates);
+        }
+        else {
+            return data;
+        }
     }
-    return data || null;
+    return null;
 }
 function updateTableData(database, table, session, updates) {
-    const key = database + '.' + table;
-    const tempTable = session.getTempTable(database, table);
-    const globalTable = g_tableMap[key];
-    const data = tempTable || globalTable;
+    const data = session.getTempTable(database, table) ??
+        g_tableMap.get(`${database}.${table}`);
     if (data) {
         Object.assign(data, updates);
     }
 }
 function txSaveData(database, table, session, data) {
     const tx = session.getTransaction();
-    const key = database + '.' + table;
-    const existing = tx?.getData('memory') || {};
-    existing[key] = { database, table, data };
-    tx?.setData('memory', existing);
+    if (tx) {
+        const existing = tx.getData('memory') ?? {};
+        existing[`${database}.${table}`] = { database, table, data };
+        tx.setData('memory', existing);
+    }
 }
 function txGetData(database, table, session) {
-    const key = database + '.' + table;
     const tx = session.getTransaction();
-    const memoryData = tx?.getData?.('memory');
-    return memoryData?.[key];
+    if (tx) {
+        return tx.getData('memory')?.[`${database}.${table}`];
+    }
+    return undefined;
 }
 function saveTable(database, table, data) {
-    const key = database + '.' + table;
-    g_tableMap[key] = data;
+    g_tableMap.set(`${database}.${table}`, data);
 }
 function deleteTable(database, table) {
-    const key = database + '.' + table;
-    delete g_tableMap[key];
+    g_tableMap.delete(`${database}.${table}`);
 }
 
 async function getTableInfo(params) {
@@ -5111,8 +5134,9 @@ async function multipleUpdate(params) {
             const index = primary_map.get(update_key);
             if (index !== undefined && index >= 0) {
                 const old_row = row_list[index];
-                if (!old_row)
+                if (!old_row) {
                     continue;
+                }
                 const new_row = Object.assign({}, old_row);
                 let changed = false;
                 for (const set of set_list) {
@@ -6551,20 +6575,23 @@ async function runSelect(params) {
     // Run the select query
     const opts = { dynamodb, session, ast, skip_resolve: true };
     const { row_list } = await internalQuery(opts);
-    ast.from.forEach((object) => {
+    for (const object of ast.from) {
         const from_key = object.key;
         const key_list = object._keyList;
         const collection = new Map();
-        row_list.forEach((row) => {
-            const keys = key_list.map((key) => row[from_key]?.[key]);
+        for (const row of row_list) {
+            const rowValue = row[from_key];
+            const keys = key_list.map((key) => {
+                if (rowValue && typeof rowValue === 'object' && key in rowValue) {
+                    return rowValue[key];
+                }
+                return undefined;
+            });
             if (!keys.includes(undefined)) {
                 _addCollection(collection, keys, row);
             }
-        });
-        const result = {
-            key: from_key,
-            list: [],
-        };
+        }
+        const result = { key: from_key, list: [] };
         result_list.push(result);
         collection.forEach((value0, key0) => {
             if (key_list.length > 1) {
@@ -6576,7 +6603,7 @@ async function runSelect(params) {
                 result.list.push({ key: [key0], row: value0 });
             }
         });
-    });
+    }
     return result_list;
 }
 function _addCollection(collection, keys, value) {
@@ -6635,21 +6662,19 @@ async function _multipleDelete(params) {
     let affectedRows = 0;
     // Get rows to delete
     const result_list = await runSelect(params);
-    ast.table.forEach((object) => {
+    const from_list = [];
+    for (const object of ast.table) {
         const from_key = object.from.key;
         const list = result_list.find((result) => result.key === from_key)?.list;
-        object._deleteList = [];
-        list?.forEach?.((item) => object._deleteList.push(item.key));
-    });
-    // Delete rows
-    const from_list = ast.table
-        .map((obj) => ({
-        database: obj.from.db,
-        table: obj.from.table,
-        key_list: obj.from._keyList,
-        delete_list: obj._deleteList,
-    }))
-        .filter((obj) => obj.delete_list.length > 0);
+        if (list && list.length > 0) {
+            from_list.push({
+                database: object.from.db,
+                table: object.from.table,
+                key_list: object.from._keyList,
+                delete_list: list.map((i) => i.key),
+            });
+        }
+    }
     if (from_list.length > 0) {
         const groups = makeEngineGroups(session, from_list);
         for (const group of groups) {
@@ -7272,7 +7297,7 @@ class Session extends node_events.EventEmitter {
     _localVariables = {};
     _transaction = null;
     _isReleased = false;
-    _tempTableMap = {};
+    _tempTableMap = new Map();
     escape = SqlString__namespace.escape;
     escapeId = SqlString__namespace.escapeId;
     format = SqlString__namespace.format;
@@ -7320,15 +7345,13 @@ class Session extends node_events.EventEmitter {
         this._transaction = tx;
     }
     getTempTableList() {
-        return Object.entries(this._tempTableMap);
+        return this._tempTableMap.keys();
     }
     getTempTable(database, table) {
-        const key = database + '.' + table;
-        return this._tempTableMap[key];
+        return this._tempTableMap.get(`${database}.${table}`);
     }
     saveTempTable(database, table, contents) {
-        const key = database + '.' + table;
-        this._tempTableMap[key] = contents;
+        this._tempTableMap.set(`${database}.${table}`, contents);
     }
     deleteTempTable(database, table) {
         this.dropTempTable(database, table);
@@ -7336,15 +7359,14 @@ class Session extends node_events.EventEmitter {
     dropTempTable(database, table) {
         const prefix = database + '.';
         if (table) {
-            const key = prefix + table;
-            delete this._tempTableMap[key];
+            this._tempTableMap.delete(`${database}.${table}`);
         }
         else {
-            Object.keys(this._tempTableMap).forEach((key) => {
+            for (const key of this._tempTableMap.keys()) {
                 if (key.startsWith(prefix)) {
-                    delete this._tempTableMap[key];
+                    this._tempTableMap.delete(key);
                 }
-            });
+            }
         }
     }
     query(params, values, done) {

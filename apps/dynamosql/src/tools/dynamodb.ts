@@ -34,10 +34,10 @@ import { parallelLimit } from './parallel_limit';
 
 import type { DynamoDBClientConfig } from '@aws-sdk/client-dynamodb';
 import type { AwsCredentialIdentity } from '@aws-sdk/types';
-import type { KeyValue, NativeType } from './dynamodb_helper';
+import type { KeyValue, ItemRecord, NativeType } from './dynamodb_helper';
 
 export type { DescribeTableCommandOutput } from '@aws-sdk/client-dynamodb';
-export type { KeyValue, NativeType } from './dynamodb_helper';
+export type { KeyValue, ItemRecord, NativeType } from './dynamodb_helper';
 
 const QUERY_LIMIT = 5;
 
@@ -129,9 +129,7 @@ export class DynamoDB {
 
   async queryQL(
     list: string | QueryQLParams | Array<string | QueryQLParams>
-  ): Promise<
-    Record<string, AttributeValue>[] | Record<string, AttributeValue>[][]
-  > {
+  ): Promise<ItemRecord[] | ItemRecord[][]> {
     if (!Array.isArray(list)) {
       return this._queryQL(list);
     } else {
@@ -140,10 +138,9 @@ export class DynamoDB {
       });
     }
   }
-
   private async _queryQL(
     params: string | QueryQLParams
-  ): Promise<Record<string, AttributeValue>[]> {
+  ): Promise<ItemRecord[]> {
     const sql = namespacePartiQL(
       typeof params === 'string' ? params : params.sql,
       this.namespace
@@ -158,10 +155,7 @@ export class DynamoDB {
     const command = new ExecuteStatementCommand(input);
     return this._pagedSend(command);
   }
-
-  async batchQL(
-    params: string[] | BatchQLParams
-  ): Promise<Record<string, AttributeValue>[]> {
+  async batchQL(params: string[] | BatchQLParams): Promise<ItemRecord[]> {
     const list = Array.isArray(params) ? params : params.list;
     const returnVal = Array.isArray(params)
       ? 'NONE'
@@ -195,7 +189,7 @@ export class DynamoDB {
 
   async transactionQL(
     params: string[] | TransactionQLParams
-  ): Promise<Record<string, AttributeValue>[]> {
+  ): Promise<ItemRecord[]> {
     const list = Array.isArray(params) ? params : params.list;
     const returnVal = Array.isArray(params)
       ? 'NONE'
@@ -227,9 +221,7 @@ export class DynamoDB {
     }
   }
 
-  async deleteItems(
-    params: DeleteItemsParams
-  ): Promise<Record<string, AttributeValue>[]> {
+  async deleteItems(params: DeleteItemsParams): Promise<ItemRecord[]> {
     const BATCH_LIMIT = 100;
     const { table, key_list, list } = params;
     const prefix = `DELETE FROM ${escapeIdentifier(table)} WHERE `;
@@ -251,9 +243,7 @@ export class DynamoDB {
     });
   }
 
-  async updateItems(
-    params: UpdateItemsParams
-  ): Promise<Record<string, AttributeValue>[]> {
+  async updateItems(params: UpdateItemsParams): Promise<ItemRecord[]> {
     const BATCH_LIMIT = 100;
     const { table, key_list, list } = params;
     const prefix = `UPDATE ${escapeIdentifier(table)} SET `;
@@ -461,8 +451,8 @@ export class DynamoDB {
 
   private async _pagedSend(
     command: ExecuteStatementCommand
-  ): Promise<Record<string, AttributeValue>[]> {
-    const results: Record<string, AttributeValue>[] = [];
+  ): Promise<ItemRecord[]> {
+    const results: ItemRecord[] = [];
     for (;;) {
       try {
         const result = await this.client.send(command);
@@ -476,7 +466,7 @@ export class DynamoDB {
         command.input.NextToken = result.NextToken;
       } catch (err: unknown) {
         if (err && typeof err === 'object' && 'Item' in err && err.Item) {
-          results.push(err.Item as Record<string, AttributeValue>);
+          results.push(err.Item as ItemRecord);
         }
         throw safeConvertError(err);
       }

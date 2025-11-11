@@ -2,32 +2,27 @@ import { logger } from '@dynamosql/shared';
 import { convertWhere } from '../../helpers/convert_where';
 import { escapeIdentifier } from '../../../tools/dynamodb_helper';
 import { SQLError } from '../../../error';
-import type { RowListParams, FromClause, Row } from '../index';
+
 import type { AttributeValue } from '@aws-sdk/client-dynamodb';
+import type { RowListParams, RowListResult, FromClause, Row } from '../index';
+import type { ItemRecord } from '../../../tools/dynamodb';
 
 export async function getRowList(
   params: RowListParams
-): Promise<{
-  source_map: Record<string, Row[]>;
-  column_map: Record<string, string[]>;
-}> {
+): Promise<RowListResult> {
   const { list } = params;
-
-  const source_map: Record<string, Row[]> = {};
-  const column_map: Record<string, string[]> = {};
-
+  const source_map: RowListResult['source_map'] = {};
+  const column_map: RowListResult['column_map'] = {};
   for (const from of list) {
     const { results, column_list } = await _getFromTable({ ...params, from });
     source_map[from.key] = results;
     column_map[from.key] = column_list;
   }
-
   return { source_map, column_map };
 }
-
 async function _getFromTable(
   params: RowListParams & { from: FromClause }
-): Promise<{ results: Row[]; column_list: string[] }> {
+): Promise<{ results: ItemRecord[]; column_list: string[] }> {
   const { dynamodb, session, from, where } = params;
   const { table, _requestSet, _requestAll } = from;
   const request_columns = [..._requestSet];
@@ -45,22 +40,24 @@ async function _getFromTable(
 
   try {
     const results = await dynamodb.queryQL(sql);
-    const resultArray = Array.isArray(results[0]) ? results[0] : results;
+    const result_array = Array.isArray(results[0])
+      ? results[0]
+      : (results as ItemRecord[]);
     let column_list: string[];
 
     if (_requestAll) {
       const response_set = new Set<string>();
-      (resultArray as Record<string, AttributeValue>[]).forEach((result) => {
+      for (const result of result_array) {
         for (const key in result) {
           response_set.add(key);
         }
-      });
+      }
       column_list = [...response_set.keys()];
     } else {
       column_list = request_columns;
     }
 
-    return { results: resultArray as unknown as Row[], column_list };
+    return { results: result_array, column_list };
   } catch (err: unknown) {
     if (err instanceof Error && err.message === 'resource_not_found') {
       throw new SQLError({ err: 'table_not_found', args: [table] });
