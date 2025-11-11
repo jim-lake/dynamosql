@@ -1,7 +1,7 @@
 export function jsonStringify(
-  value: any,
-  replacer?: any,
-  space?: string | number
+  value: unknown,
+  replacer?: Parameters<typeof JSON.stringify>[1],
+  space?: Parameters<typeof JSON.stringify>[2]
 ) {
   try {
     return JSON.stringify(value, replacer, space);
@@ -9,7 +9,6 @@ export function jsonStringify(
     return '';
   }
 }
-
 export function hex(s: string) {
   let ret = '';
   for (let i = 0; i < s.length; i++) {
@@ -18,26 +17,28 @@ export function hex(s: string) {
   }
   return ret;
 }
-
-export function trackFirstSeen(map: Map<any, any>, keys: any[]) {
+type TrackMap<K> = Map<K | undefined, boolean | TrackMap<K>>;
+export function trackFirstSeen<K>(map: TrackMap<K>, keys: K[]) {
   let ret = true;
-  if (keys.length > 1) {
-    let sub = map.get(keys[0]);
-    if (sub) {
-      if (sub.has(keys[1])) {
+  const key0 = keys[0];
+  const key1 = keys[1];
+  if (key1 !== undefined) {
+    let sub = map.get(key0);
+    if (sub && typeof sub === 'object') {
+      if (sub.has(key1)) {
         ret = false;
       } else {
-        sub.set(keys[1], true);
+        sub.set(key1, true);
       }
     } else {
       sub = new Map();
-      sub.set(keys[1], true);
-      map.set(keys[0], sub);
+      sub.set(key1, true);
+      map.set(key0, sub);
     }
-  } else if (map.has(keys[0])) {
+  } else if (map.has(key0)) {
     ret = false;
   } else {
-    map.set(keys[0], true);
+    map.set(key0, true);
   }
   return ret;
 }

@@ -24,8 +24,8 @@ export class DynamoDBWithCache extends DynamoDB {
         this._tableCache.set(table, { last_updated: Date.now(), result });
       }
       return result;
-    } catch (err: any) {
-      if (err?.message === 'resource_not_found') {
+    } catch (err: unknown) {
+      if (err instanceof Error && err.message === 'resource_not_found') {
         this._tableCache.delete(table);
       }
       throw err;
