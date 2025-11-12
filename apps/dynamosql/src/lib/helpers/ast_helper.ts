@@ -1,4 +1,4 @@
-import type { FunctionName } from 'node-sql-parser/types';
+import type { FunctionName } from 'node-sql-parser';
 
 // Helper to extract function name from node-sql-parser AST format
 export function getFunctionName(nameObj: string | FunctionName): string {

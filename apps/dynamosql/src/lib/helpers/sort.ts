@@ -1,6 +1,6 @@
 import { getValue } from '../expression';
 import { SQLError } from '../../error';
-import type { OrderBy } from 'node-sql-parser/types';
+import type { OrderBy } from 'node-sql-parser';
 import type { Session } from '../../session';
 import type { FieldInfo } from '../../types';
 

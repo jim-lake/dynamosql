@@ -1,6 +1,7 @@
 import { getValue } from '../expression';
 import type { Session } from '../../session';
-import type { From, Binary, Function } from 'node-sql-parser/types';
+import type { From, Binary, Function } from 'node-sql-parser';
+import type { ExtendedExpressionValue } from '../ast_types';
 
 interface SourceMap {
   [key: string]: unknown[];
@@ -85,10 +86,7 @@ function _findRows(
 
     let skip = false;
     if (on) {
-      const result = getValue(
-        on as import('../ast_types').ExtendedExpressionValue,
-        { session, row }
-      );
+      const result = getValue(on as ExtendedExpressionValue, { session, row });
       if (result.err) {
         err = result.err;
       } else if (!result.value) {

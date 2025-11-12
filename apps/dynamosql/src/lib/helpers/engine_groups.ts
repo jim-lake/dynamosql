@@ -1,16 +1,29 @@
 import * as SchemaManager from '../schema_manager';
+import Session from '../../session';
+import type { Engine } from '../engine';
 
-export function makeEngineGroups(session: any, list: any[]): any[] {
-  const ret: any[] = [];
-  list.forEach((object) => {
-    const { database, table } = object;
+interface DatabaseTableObject {
+  database: string;
+  table: string;
+}
+interface EngineGroup<T> {
+  engine: Engine;
+  list: T[];
+}
+export function makeEngineGroups<T extends DatabaseTableObject>(
+  session: Session,
+  list: T[]
+): EngineGroup<T>[] {
+  const ret: EngineGroup<T>[] = [];
+  for (const obj of list) {
+    const { database, table } = obj;
     const engine = SchemaManager.getEngine(database, table, session);
     const found = ret.find((group) => group.engine === engine);
     if (found) {
-      found.list.push(object);
+      found.list.push(obj);
     } else {
-      ret.push({ engine, list: [object] });
+      ret.push({ engine, list: [obj] });
     }
-  });
+  }
   return ret;
 }

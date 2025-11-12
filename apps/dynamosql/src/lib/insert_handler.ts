@@ -5,7 +5,7 @@ import * as SelectHandler from './select_handler';
 import { logger } from '@dynamosql/shared';
 import { SQLError } from '../error';
 import type { HandlerParams, MutationResult } from './handler_types';
-import type { Engine } from './engine';
+import type { Engine, EvaluationResultRow } from './engine';
 
 type DuplicateMode = 'replace' | 'ignore' | null;
 
@@ -24,15 +24,10 @@ export async function query(params: HandlerParams): Promise<MutationResult> {
 
   const database = ast.table?.[0]?.db || session.getCurrentDatabase();
   const table = ast.table?.[0]?.table;
-
   if (!database) {
     throw new SQLError('no_current_database');
   }
-
-  const err = _checkAst(ast);
-  if (err) {
-    throw new SQLError(err);
-  }
+  _checkAst(ast);
 
   const engine = SchemaManager.getEngine(database, table, session);
   const opts = {
@@ -54,26 +49,26 @@ async function _runInsert(
 ): Promise<MutationResult> {
   const { ast, session, engine, dynamodb, duplicate_mode } = params;
   const table = ast.table?.[0]?.table;
-  let list: RowObject[];
+  let list: EvaluationResultRow[];
 
   // Build the list of rows to insert
   if (ast.set?.length > 0) {
-    const obj: RowObject = {};
-    ast.set.forEach((item: { column: string; value: unknown }) => {
-      const expr_result = Expression.getValue(item.value as never, { session });
+    const obj: EvaluationResultRow = {};
+    for (const item of ast.set) {
+      const expr_result = Expression.getValue(item.value, { session });
       if (expr_result.err) {
         throw new SQLError(expr_result.err);
       }
-      obj[item.column] = expr_result as { value: unknown; type?: string };
-    });
+      obj[item.column] = expr_result;
+    }
     list = [obj];
   } else if (ast.columns?.length > 0 && ast.values.type === 'select') {
     const opts = { ast: ast.values, session, dynamodb };
     const { rows } = await SelectHandler.internalQuery(opts);
     list = rows.map((row) => {
-      const obj: RowObject = {};
+      const obj: EvaluationResultRow = {};
       ast.columns.forEach((name: string, i: number) => {
-        obj[name] = row[i] as { value: unknown; type?: string };
+        obj[name] = row[i];
       });
       return obj;
     });
@@ -82,7 +77,7 @@ async function _runInsert(
     const values =
       ast.values?.type === 'values' ? ast.values.values : ast.values;
     values?.forEach?.((row: { value: unknown[] }, i: number) => {
-      const obj: RowObject = {};
+      const obj: EvaluationResultRow = {};
       if (row.value.length === ast.columns.length) {
         ast.columns.forEach((name: string, j: number) => {
           const expr_result = Expression.getValue(row.value[j] as never, {
@@ -91,7 +86,7 @@ async function _runInsert(
           if (expr_result.err) {
             throw new SQLError(expr_result.err);
           }
-          obj[name] = expr_result as { value: unknown; type?: string };
+          obj[name] = expr_result;
         });
         list.push(obj);
       } else {
@@ -134,17 +129,14 @@ async function _runInsert(
     return { affectedRows: 0, changedRows: 0 };
   }
 }
-
-function _checkAst(ast: unknown): { err: string; args: number[] } | null {
+function _checkAst(ast: unknown) {
   const astObj = ast as {
     values?: { type?: string; columns?: unknown[] };
     columns?: unknown[];
   };
-  let err: { err: string; args: number[] } | null = null;
   if (astObj.values?.type === 'select') {
     if (astObj.columns?.length !== astObj.values.columns?.length) {
-      err = { err: 'ER_WRONG_VALUE_COUNT_ON_ROW', args: [1] };
+      throw new SQLError({ err: 'ER_WRONG_VALUE_COUNT_ON_ROW', args: [1] });
     }
   }
-  return err;
 }

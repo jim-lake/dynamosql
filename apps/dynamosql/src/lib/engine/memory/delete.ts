@@ -1,6 +1,11 @@
 import * as Storage from './storage';
 import { logger } from '@dynamosql/shared';
-import type { DeleteParams, MutationResult, CellValue } from '../index';
+import type {
+  DeleteParams,
+  MultiDeleteParams,
+  MutationResult,
+  CellValue,
+} from '../index';
 import { SQLError, NoSingleOperationError } from '../../../error';
 
 export async function singleDelete(
@@ -10,7 +15,7 @@ export async function singleDelete(
 }
 
 export async function multipleDelete(
-  params: DeleteParams
+  params: MultiDeleteParams
 ): Promise<MutationResult> {
   const { session, list } = params;
 

@@ -1,5 +1,5 @@
 import { walkColumnRefs } from './ast_helper';
-import type { Select, Update } from 'node-sql-parser/types';
+import type { Select, Update } from 'node-sql-parser';
 
 type ErrorResult = { err: string; args?: unknown[] } | string | null;
 

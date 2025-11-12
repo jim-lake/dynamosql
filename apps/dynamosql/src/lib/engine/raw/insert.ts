@@ -6,7 +6,11 @@ import {
 import { trackFirstSeen } from '../../../tools/util';
 import { SQLError } from '../../../error';
 
-import type { InsertParams, MutationResult, Row } from '../index';
+import type {
+  EvaluationResultRow,
+  InsertParams,
+  MutationResult,
+} from '../index';
 import type { DescribeTableCommandOutput } from '@aws-sdk/client-dynamodb';
 import type { NativeType } from '../../../tools/dynamodb';
 
@@ -173,17 +177,17 @@ async function _insertNoIgnore(params: InsertParams): Promise<MutationResult> {
   }
 }
 
-function _fixupItem(item: Row): Row {
-  for (const key in item) {
-    const cell = item[key];
-    if (cell) {
-      item[key] = cell.value as never;
+function _fixupItem(obj: EvaluationResultRow): NativeType {
+  for (const key in obj) {
+    const cell = obj[key];
+    if (cell !== undefined) {
+      obj[key] = cell.value as never;
     }
   }
-  return item;
+  return obj as unknown as NativeType;
 }
 
-function _escapeItem(item: Row): string {
+function _escapeItem(item: EvaluationResultRow): string {
   let s = '{ ';
   s += Object.keys(item)
     .map((key) => `'${key}': ${escapeValue(item[key]?.value)}`)

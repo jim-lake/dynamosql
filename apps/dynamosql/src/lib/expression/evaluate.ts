@@ -15,10 +15,10 @@ import type {
   Interval as IntervalType,
   ColumnRef,
   Cast as CastType,
-} from 'node-sql-parser/types';
+} from 'node-sql-parser';
 import type { ExtendedExpressionValue, VarExpr, UnaryExpr } from '../ast_types';
 import type { Session } from '../../session';
-import type { Row, EngineValue, CellValue, AttributeValue } from '../engine';
+import type { Row, EngineValue, CellValue } from '../engine';
 
 export interface EvaluationState {
   session: Session;

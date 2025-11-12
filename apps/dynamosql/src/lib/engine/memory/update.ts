@@ -1,13 +1,15 @@
-import * as Storage from './storage';
 import { logger } from '@dynamosql/shared';
+import * as Storage from './storage';
+import { SQLError, NoSingleOperationError } from '../../../error';
+
 import type {
   UpdateParams,
   MutationResult,
   CellValue,
-  Row,
+  CellRow,
   ColumnDef,
 } from '../index';
-import { SQLError, NoSingleOperationError } from '../../../error';
+import type { EvaluationResult } from '../../expression';
 
 export async function singleUpdate(
   _params: UpdateParams
@@ -30,7 +32,6 @@ export async function multipleUpdate(
   for (const changes of list) {
     const { database, table, update_list } = changes;
     const data = Storage.getTable(database, table, session);
-
     if (!data) {
       throw new SQLError('table_not_found');
     }
@@ -40,7 +41,7 @@ export async function multipleUpdate(
 
     for (const update of update_list) {
       const { set_list } = update;
-      const key_list = update.key.map((key) => key.value);
+      const key_list = update.key.map((key) => (key as CellValue).value);
       const update_key = JSON.stringify(key_list);
       const index = primary_map.get(update_key);
 
@@ -53,7 +54,7 @@ export async function multipleUpdate(
         let changed = false;
 
         for (const set of set_list) {
-          new_row[set.column] = _transformCell(set.value as CellValue);
+          new_row[set.column] = _transformCell(set.value);
           if (old_row[set.column]?.value !== new_row[set.column]?.value) {
             changed = true;
           }
@@ -90,12 +91,10 @@ export async function multipleUpdate(
 
   return { affectedRows, changedRows };
 }
-
-function _transformCell(cell: CellValue): CellValue {
+function _transformCell(cell: EvaluationResult): CellValue {
   return { value: cell.value, type: cell.type };
 }
-
-function _makePrimaryKey(primary_key: ColumnDef[], row: Row): string {
+function _makePrimaryKey(primary_key: ColumnDef[], row: CellRow): string {
   const key_values = primary_key.map((key) => row[key.name]?.value);
   return JSON.stringify(key_values);
 }

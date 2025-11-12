@@ -2,7 +2,7 @@ import { getValue } from './evaluate';
 import { convertNum, convertDateTime } from '../helpers/sql_conversion';
 import { createSQLDateTime } from '../types/sql_datetime';
 import { createSQLTime } from '../types/sql_time';
-import type { Function } from 'node-sql-parser/types';
+import type { Function } from 'node-sql-parser';
 import type { EvaluationState, EvaluationResult } from './evaluate';
 
 const DAY = 24 * 60 * 60;

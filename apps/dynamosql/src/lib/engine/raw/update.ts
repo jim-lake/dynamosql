@@ -21,25 +21,23 @@ export async function singleUpdate(
     session,
     from_key: from?.[0]?.key,
   });
-  let no_single = where_result.err;
+  if (where_result.err) {
+    throw new NoSingleOperationError();
+  }
   if (from.length > 1 || !where_result.value) {
-    no_single = true;
+    throw new NoSingleOperationError();
   }
   const value_list = set.map((object) => {
     const { value } = object;
     let ret: string | undefined;
     const result = convertWhere(value, { session, from_key: from?.[0]?.key });
     if (result.err) {
-      no_single = true;
+      throw new NoSingleOperationError();
     } else {
       ret = result.value;
     }
     return ret;
   });
-
-  if (no_single) {
-    throw new NoSingleOperationError();
-  }
 
   const sets = set
     .map((object, i) => escapeIdentifier(object.column) + ' = ' + value_list[i])

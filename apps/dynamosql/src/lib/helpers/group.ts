@@ -1,6 +1,7 @@
 import { getValue } from '../expression';
 import type { Session } from '../../session';
-import type { Select } from 'node-sql-parser/types';
+import type { Select } from 'node-sql-parser';
+import type { ExtendedExpressionValue } from '../ast_types';
 
 interface RowMap {
   [key: string]: unknown;
@@ -43,10 +44,10 @@ export function formGroup(params: FormGroupParams): FormGroupResult {
   const group_map: Record<string, unknown> = {};
   row_list.forEach((row: RowMap) => {
     const key_list = groupby.map((group: unknown) => {
-      const result = getValue(
-        group as import('../ast_types').ExtendedExpressionValue,
-        { session, row }
-      );
+      const result = getValue(group as ExtendedExpressionValue, {
+        session,
+        row,
+      });
       if (result.err && !err) {
         err = result.err;
       }

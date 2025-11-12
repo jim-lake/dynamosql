@@ -3,7 +3,7 @@ import { escapeIdentifier } from '../../../tools/dynamodb_helper';
 import { logger } from '@dynamosql/shared';
 import { NoSingleOperationError } from '../../../error';
 
-import type { DeleteParams, MutationResult } from '../index';
+import type { DeleteParams, MultiDeleteParams, MutationResult } from '../index';
 import type { KeyValue } from '../../../tools/dynamodb';
 
 export async function singleDelete(
@@ -50,7 +50,7 @@ RETURNING ALL OLD *
 }
 
 export async function multipleDelete(
-  params: DeleteParams
+  params: MultiDeleteParams
 ): Promise<MutationResult> {
   const { dynamodb, list } = params;
   if (!list) {

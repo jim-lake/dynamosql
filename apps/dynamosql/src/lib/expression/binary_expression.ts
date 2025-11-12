@@ -4,7 +4,7 @@ import {
   convertDateTime,
 } from '../helpers/sql_conversion';
 import { getValue } from './evaluate';
-import type { Binary, ExpressionValue } from 'node-sql-parser/types';
+import type { Binary, ExpressionValue } from 'node-sql-parser';
 import type { EvaluationState, EvaluationResult } from './evaluate';
 
 function _isDateOrTimeLike(type: string): boolean {

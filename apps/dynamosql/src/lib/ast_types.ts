@@ -1,4 +1,4 @@
-import type { AST, From, ExpressionValue } from 'node-sql-parser/types';
+import type { AST, From, ExpressionValue } from 'node-sql-parser';
 
 // Missing statement types that node-sql-parser returns but doesn't type
 

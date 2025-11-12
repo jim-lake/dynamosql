@@ -1,6 +1,13 @@
 import * as Storage from './storage';
-import type { InsertParams, MutationResult, Row, ColumnDef } from '../index';
 import { SQLError } from '../../../error';
+
+import type {
+  EvaluationResultRow,
+  InsertParams,
+  MutationResult,
+  CellRow,
+  ColumnDef,
+} from '../index';
 
 export async function insertRowList(
   params: InsertParams
@@ -50,17 +57,15 @@ export async function insertRowList(
   Storage.txSaveData(database!, table, session!, { row_list, primary_map });
   return { affectedRows, changedRows: 0 };
 }
-
-function _transformRow(row: Row): void {
+function _transformRow(row: EvaluationResultRow) {
   for (const key in row) {
     const cell = row[key];
     if (cell) {
-      row[key] = { type: cell.type, value: cell.value };
+      row[key] = { type: cell.type, value: cell.value } as never;
     }
   }
 }
-
-function _rowEqual(a: Row, b: Row): boolean {
+function _rowEqual(a: CellRow, b: CellRow): boolean {
   const keys_a = Object.keys(a);
   return keys_a.every((key) => {
     return a[key]?.value === b[key]?.value;

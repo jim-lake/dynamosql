@@ -33,6 +33,18 @@ export default tseslint.config(
       '@typescript-eslint/no-require-imports': 'error',
       'no-unused-vars': 0,
       curly: ['error', 'all'],
+      'no-restricted-syntax': [
+        'error',
+        {
+          selector: 'ImportExpression',
+          message: 'Dynamic import() is not allowed.',
+        },
+        {
+          selector: 'TSImportType',
+          message:
+            'Type import() syntax is not allowed — use an explicit import type instead.',
+        },
+      ],
     },
   },
   {

@@ -2,10 +2,11 @@ import * as RawEngine from './raw';
 import * as MemoryEngine from './memory';
 import { SQLError } from '../../error';
 
-import type { ExpressionValue } from 'node-sql-parser/types';
+import type { ExpressionValue } from 'node-sql-parser';
 import type { DynamoDBClient } from '../handler_types';
 import type { Session } from '../../session';
 import type { AttributeValue, ItemRecord } from '../../tools/dynamodb';
+import type { EvaluationResult } from '../expression';
 
 export type { AttributeValue } from '../../tools/dynamodb';
 
@@ -18,6 +19,9 @@ export interface TableInfo {
   primary_key: ColumnDef[];
   column_list: ColumnDef[];
   is_open: boolean;
+}
+export interface EvaluationResultRow {
+  [key: string]: EvaluationResult;
 }
 export interface MutationResult {
   affectedRows: number;
@@ -112,11 +116,13 @@ export interface DeleteParams {
   dynamodb: DynamoDBClient;
   session: Session;
   ast: DeleteAST;
+}
+export interface MultiDeleteParams extends DeleteParams {
   list?: DeleteChange[];
 }
 export interface SetClause {
   column: string;
-  value: ExpressionValue;
+  value: EvaluationResult;
 }
 export interface UpdateAST {
   type: 'update';
@@ -143,7 +149,7 @@ export interface UpdateParams {
 export interface InsertParams {
   dynamodb: DynamoDBClient;
   table: string;
-  list: Row[];
+  list: EvaluationResultRow[];
   duplicate_mode?: 'ignore' | 'replace';
   session?: Session;
   database?: string;
@@ -161,7 +167,7 @@ export interface Engine {
   getTableInfo(params: TableInfoParams): Promise<TableInfo>;
   getRowList(params: RowListParams): Promise<RowListResult>;
   singleDelete(params: DeleteParams): Promise<MutationResult>;
-  multipleDelete(params: DeleteParams): Promise<MutationResult>;
+  multipleDelete(params: MultiDeleteParams): Promise<MutationResult>;
   singleUpdate(params: UpdateParams): Promise<MutationResult>;
   multipleUpdate(params: UpdateParams): Promise<MutationResult>;
   insertRowList(params: InsertParams): Promise<MutationResult>;

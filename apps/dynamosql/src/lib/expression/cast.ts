@@ -4,7 +4,7 @@ import {
   convertNum,
 } from '../helpers/sql_conversion';
 import { getValue } from './evaluate';
-import type { Cast } from 'node-sql-parser/types';
+import type { Cast } from 'node-sql-parser';
 import type { EvaluationState, EvaluationResult } from './evaluate';
 
 function datetime(expr: Cast, state: EvaluationState): EvaluationResult {
