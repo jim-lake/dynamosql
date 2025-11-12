@@ -22,7 +22,7 @@ import type {
   SelectResult,
   ShowResult,
 } from './lib/handler_types';
-import type { Use } from 'node-sql-parser/types';
+import type { Use, Select } from 'node-sql-parser';
 import type { ExtendedAST } from './lib/ast_types';
 
 const g_parser = new Parser();
@@ -125,46 +125,62 @@ export class Query extends EventEmitter {
     result: HandlerResult | unknown[] | OkPacket;
     columns: FieldInfo[];
   }> {
-    const params = {
-      ast,
-      dynamodb: this._session.dynamodb,
-      session: this._session,
-    };
+    const params = { dynamodb: this._session.dynamodb, session: this._session };
 
-    switch (ast?.type) {
+    const type = ast?.type;
+    switch (type) {
       case 'alter':
-        return { result: await AlterHandler.query(params), columns: [] };
+        return {
+          result: await AlterHandler.query({ ...params, ast }),
+          columns: [],
+        };
       case 'create':
-        return { result: await CreateHandler.query(params), columns: [] };
+        return {
+          result: await CreateHandler.query({ ...params, ast }),
+          columns: [],
+        };
       case 'delete':
-        return { result: await DeleteHandler.query(params), columns: [] };
+        return {
+          result: await DeleteHandler.query({ ...params, ast }),
+          columns: [],
+        };
       case 'drop':
-        return { result: await DropHandler.query(params), columns: [] };
+        return {
+          result: await DropHandler.query({ ...params, ast }),
+          columns: [],
+        };
       case 'insert':
       case 'replace':
-        return { result: await InsertHandler.query(params), columns: [] };
+        return {
+          result: await InsertHandler.query({ ...params, ast }),
+          columns: [],
+        };
       case 'show': {
-        const { rows, columns } = await ShowHandler.query(params);
+        const { rows, columns } = await ShowHandler.query({ ...params, ast });
         return { result: rows, columns };
       }
       case 'select': {
-        const { output_row_list, column_list } =
-          await SelectHandler.query(params);
-        return { result: output_row_list, columns: column_list };
+        const { rows, columns } = await SelectHandler.query({
+          ...params,
+          ast: ast as Select,
+        });
+        return { result: rows, columns };
       }
       case 'set':
-        SetHandler.query(params);
+        SetHandler.query({ ...params, ast });
         return { result: undefined, columns: [] };
       case 'update':
-        return { result: await UpdateHandler.query(params), columns: [] };
+        return {
+          result: await UpdateHandler.query({ ...params, ast }),
+          columns: [],
+        };
       case 'use':
         return await _useDatabase({ ast, session: this._session });
       default: {
-        const unknownAst = ast as { type?: string };
-        logger.error('unsupported statement type:', unknownAst);
+        logger.error('unsupported statement type:', type);
         throw new SQLError({
           err: 'unsupported_type',
-          args: [unknownAst?.type ?? 'unknown'],
+          args: [type ?? 'unknown'],
         });
       }
     }

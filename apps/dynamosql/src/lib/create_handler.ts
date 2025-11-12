@@ -79,11 +79,10 @@ async function _createTable(
   // Handle CREATE TABLE AS SELECT
   if (ast.as && ast.query_expr) {
     const opts = { ast: ast.query_expr, session, dynamodb };
-    const { output_row_list, column_list: columns } =
-      await SelectHandler.internalQuery(opts);
+    const { rows, columns } = await SelectHandler.internalQuery(opts);
 
     const track = new Map();
-    list = output_row_list.map((row: any) => {
+    list = rows.map((row: any) => {
       const obj: any = {};
       columns.forEach((column: any, i: number) => {
         obj[column.name] = row[i];

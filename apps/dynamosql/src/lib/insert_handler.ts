@@ -69,8 +69,8 @@ async function _runInsert(
     list = [obj];
   } else if (ast.columns?.length > 0 && ast.values.type === 'select') {
     const opts = { ast: ast.values, session, dynamodb };
-    const { output_row_list } = await SelectHandler.internalQuery(opts);
-    list = (output_row_list as unknown[][]).map((row: unknown[]) => {
+    const { rows } = await SelectHandler.internalQuery(opts);
+    list = rows.map((row) => {
       const obj: RowObject = {};
       ast.columns.forEach((name: string, i: number) => {
         obj[name] = row[i] as { value: unknown; type?: string };

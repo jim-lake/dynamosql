@@ -11,7 +11,7 @@ interface RowMap {
 
 interface SortState {
   session: Session;
-  column_list?: FieldInfo[];
+  columns?: FieldInfo[];
 }
 
 type ErrorResult = { err: string; args?: unknown[] } | string | null;
@@ -49,7 +49,7 @@ function _sort(
       const result = func(
         a['@@result']?.[index]?.value,
         b['@@result']?.[index]?.value,
-        state.column_list?.[index]
+        state.columns?.[index]
       );
       if (result !== 0) {
         return result;

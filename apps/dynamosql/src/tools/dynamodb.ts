@@ -36,7 +36,10 @@ import type { DynamoDBClientConfig } from '@aws-sdk/client-dynamodb';
 import type { AwsCredentialIdentity } from '@aws-sdk/types';
 import type { KeyValue, ItemRecord, NativeType } from './dynamodb_helper';
 
-export type { DescribeTableCommandOutput } from '@aws-sdk/client-dynamodb';
+export type {
+  AttributeValue,
+  DescribeTableCommandOutput,
+} from '@aws-sdk/client-dynamodb';
 export type { KeyValue, ItemRecord, NativeType } from './dynamodb_helper';
 
 const QUERY_LIMIT = 5;

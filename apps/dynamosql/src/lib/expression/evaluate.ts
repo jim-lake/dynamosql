@@ -18,10 +18,11 @@ import type {
 } from 'node-sql-parser/types';
 import type { ExtendedExpressionValue, VarExpr, UnaryExpr } from '../ast_types';
 import type { Session } from '../../session';
+import type { Row, EngineValue, CellValue, AttributeValue } from '../engine';
 
 export interface EvaluationState {
   session: Session;
-  row?: any;
+  row?: Row;
 }
 
 export interface EvaluationResult {
@@ -163,22 +164,19 @@ export function getValue(
     result.name = prefix + varExpr.name;
   } else if (type === 'column_ref') {
     const colRef = expr as ColumnRef;
-    const colRefItem =
-      colRef.type === 'column_ref' ? colRef : (colRef as any).expr;
-    result.name = colRefItem.column as string;
-    if (row && (colRefItem as any)._resultIndex >= 0) {
-      const output_result = row['@@result']?.[(colRefItem as any)._resultIndex];
+    result.name = colRef.column as string;
+    if (row && colRef._resultIndex >= 0) {
+      const output_result = row['@@result']?.[colRef._resultIndex];
       result.value = output_result?.value;
       result.type = output_result?.type;
     } else if (row) {
-      const cell =
-        row[(colRefItem as any).from?.key]?.[colRefItem.column as string];
+      const cell = row[colRef.from?.key]?.[colRef.column];
       const decode = _decodeCell(cell);
       result.type = decode?.type;
       result.value = decode?.value;
     } else {
       result.err = 'no_row_list';
-      result.value = colRefItem.column;
+      result.value = colRef.column;
     }
   } else {
     logger.error('unsupported expr:', expr);
@@ -193,39 +191,36 @@ export function getValue(
   }
   return result;
 }
-
-interface DynamoDBAttributeValue {
-  NULL?: boolean;
-  S?: string;
-  N?: string;
-  BOOL?: boolean;
-  M?: Record<string, unknown>;
-  value?: unknown;
-  type?: string;
-}
-
-function _decodeCell(cell: DynamoDBAttributeValue | null | undefined): {
+function _decodeCell(cell: EngineValue | null | undefined): {
   type: string;
   value: unknown;
 } {
-  if (!cell || cell.NULL) {
+  if (!cell) {
     return { type: 'null', value: null };
-  }
-  if (cell.value !== undefined) {
+  } else if (_isCellValue(cell)) {
     return { type: cell.type ?? typeof cell.value, value: cell.value };
+  } else {
+    if (cell.NULL) {
+      return { type: 'null', value: null };
+    }
+    if (cell.S !== undefined) {
+      return { type: 'string', value: cell.S };
+    }
+    if (cell.N !== undefined) {
+      return { type: 'number', value: cell.N };
+    }
+    if (cell.BOOL !== undefined) {
+      return { type: 'boolean', value: cell.BOOL };
+    }
+    if (cell.M !== undefined) {
+      return { type: 'json', value: mapToObject(cell.M) };
+    }
+    const type = typeof cell;
+    return { type: type === 'object' ? 'json' : type, value: cell };
   }
-  if (cell.S !== undefined) {
-    return { type: 'string', value: cell.S };
-  }
-  if (cell.N !== undefined) {
-    return { type: 'number', value: cell.N };
-  }
-  if (cell.BOOL !== undefined) {
-    return { type: 'boolean', value: cell.BOOL };
-  }
-  if (cell.M !== undefined) {
-    return { type: 'json', value: mapToObject(cell.M) };
-  }
-  const type = typeof cell;
-  return { type: type === 'object' ? 'json' : type, value: cell };
+}
+function _isCellValue(cell: EngineValue): cell is CellValue {
+  return (
+    typeof cell === 'object' && 'value' in cell && cell.value !== undefined
+  );
 }

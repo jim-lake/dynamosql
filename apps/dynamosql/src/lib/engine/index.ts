@@ -5,7 +5,9 @@ import { SQLError } from '../../error';
 import type { ExpressionValue } from 'node-sql-parser/types';
 import type { DynamoDBClient } from '../handler_types';
 import type { Session } from '../../session';
-import type { ItemRecord } from '../../tools/dynamodb';
+import type { AttributeValue, ItemRecord } from '../../tools/dynamodb';
+
+export type { AttributeValue } from '../../tools/dynamodb';
 
 export interface ColumnDef {
   name: string;
@@ -29,6 +31,7 @@ export interface CellRow {
   [column: string]: CellValue;
 }
 export type Row = CellRow | ItemRecord;
+export type EngineValue = CellValue | AttributeValue;
 export interface RowListResult {
   source_map: Record<string, Row[]>;
   column_map: Record<string, string[]>;
@@ -103,7 +106,7 @@ export interface DeleteChange {
   database: string;
   table: string;
   key_list: string[];
-  delete_list: CellValue[][];
+  delete_list: EngineValue[][];
 }
 export interface DeleteParams {
   dynamodb: DynamoDBClient;
@@ -122,7 +125,7 @@ export interface UpdateAST {
   where?: ExpressionValue;
 }
 export interface UpdateItem {
-  key: CellValue[];
+  key: EngineValue[];
   set_list: SetClause[];
 }
 export interface UpdateChange {

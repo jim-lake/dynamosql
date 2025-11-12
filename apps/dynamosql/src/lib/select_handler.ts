@@ -1,3 +1,5 @@
+import { setTimeout } from 'node:timers/promises';
+
 import * as Expression from './expression';
 import * as SchemaManager from './schema_manager';
 import { convertType } from './helpers/column_type_helper';
@@ -7,7 +9,11 @@ import { formGroup } from './helpers/group';
 import { sort } from './helpers/sort';
 import { logger } from '@dynamosql/shared';
 import { SQLError } from '../error';
+
+import type { Select } from 'node-sql-parser';
 import type { HandlerParams, SelectResult } from './handler_types';
+import type { ExtendedAST } from './ast_types';
+import type { FieldInfo } from '../types';
 
 interface SourceMap {
   [key: string]: unknown[];
@@ -30,21 +36,26 @@ interface RowWithResult {
   '@@result'?: unknown[];
 }
 
-export async function query(params: HandlerParams): Promise<SelectResult> {
-  const { output_row_list, column_list } = await internalQuery(params);
-
-  for (const row of output_row_list ?? []) {
+export async function query(
+  params: HandlerParams<Select>
+): Promise<SelectResult> {
+  const { rows, columns } = await internalQuery(params);
+  for (const row of rows ?? []) {
     for (const key in row) {
       row[key] = row[key].value;
     }
   }
-
-  return { output_row_list, column_list };
+  return { rows, columns };
 }
-
+export interface InternalQueryParams extends HandlerParams<Select> {
+  skip_resolve?: boolean;
+}
+export interface SelectResultWithRowList extends SelectResult {
+  row_list: RowWithResult[];
+}
 export async function internalQuery(
-  params: HandlerParams & { skip_resolve?: boolean }
-): Promise<SelectResult & { row_list: RowWithResult[] }> {
+  params: InternalQueryParams
+): Promise<SelectResultWithRowList> {
   const { ast, session, dynamodb } = params;
 
   const current_database = session.getCurrentDatabase();
@@ -55,10 +66,8 @@ export async function internalQuery(
       throw new SQLError(resolve_err);
     }
   }
-
   let source_map: SourceMap = {};
   let column_map: ColumnMap = {};
-
   if (ast?.from?.length) {
     const db = ast.from?.[0]?.db;
     const table = ast.from?.[0]?.table;
@@ -68,13 +77,15 @@ export async function internalQuery(
     source_map = result.source_map;
     column_map = result.column_map;
   }
-
   return _evaluateReturn({ ...params, source_map, column_map });
 }
-
-function _evaluateReturn(
-  params: HandlerParams & { source_map: SourceMap; column_map: ColumnMap }
-): SelectResult & { row_list: RowWithResult[] } {
+interface EvaluateReturnParams extends HandlerParams<Select> {
+  source_map: SourceMap;
+  column_map: ColumnMap;
+}
+async function _evaluateReturn(
+  params: EvaluateReturnParams
+): Promise<SelectResultWithRowList> {
   const { session, source_map, ast } = params;
   const query_columns = _expandStarColumns(params);
 
@@ -136,7 +147,7 @@ function _evaluateReturn(
     throw new SQLError(err);
   }
 
-  const column_list: unknown[] = [];
+  const columns: FieldInfo[] = [];
   for (const column of query_columns) {
     const column_type = convertType(column.result_type, column.result_nullable);
     const exprObj = column.expr as {
@@ -147,14 +158,11 @@ function _evaluateReturn(
     column_type.orgTable = exprObj?.from?.table || '';
     column_type.table = exprObj?.from?.as || column_type.orgTable;
     column_type.schema = exprObj?.from?.db || '';
-    column_list.push(column_type);
+    columns.push(column_type);
   }
 
   if (ast.orderby && row_list) {
-    const sort_err = sort(row_list as never, ast.orderby, {
-      session,
-      column_list: column_list as never,
-    });
+    const sort_err = sort(row_list as never, ast.orderby, { session, columns });
     if (sort_err) {
       throw new SQLError(sort_err);
     }
@@ -173,23 +181,18 @@ function _evaluateReturn(
   }
 
   row_list = row_list.slice(start, end);
-  const output_row_list = row_list.map((row: any) => row['@@result']);
+  const rows = row_list.map((row: any) => row['@@result']);
 
   if (sleep_ms) {
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        resolve({ output_row_list, column_list, row_list });
-      }, sleep_ms);
-    }) as any;
+    await setTimeout(sleep_ms);
   }
-
-  return { output_row_list, column_list, row_list };
+  return { rows, columns, row_list };
 }
-
-function _expandStarColumns(params: {
-  ast: unknown;
+interface ExpandStarColumnsParams {
+  ast: Select;
   column_map: ColumnMap;
-}): QueryColumn[] {
+}
+function _expandStarColumns(params: ExpandStarColumnsParams): QueryColumn[] {
   const { ast, column_map } = params;
   const astObj = ast as { columns?: unknown[]; from?: unknown[] };
   const ret: QueryColumn[] = [];
@@ -240,7 +243,6 @@ function _expandStarColumns(params: {
   });
   return ret;
 }
-
 function _unionType(
   old_type: string | undefined,
   new_type: string | undefined

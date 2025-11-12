@@ -1,8 +1,10 @@
 import * as Engine from './engine';
 import { logger } from '@dynamosql/shared';
 import { SQLError } from '../error';
+
 import type { Session } from '../session';
 import type { Engine as EngineType } from './engine';
+import type { DynamoDBClient } from './handler_types';
 
 const BUILT_IN = ['_dynamodb'];
 
@@ -109,14 +111,15 @@ export async function dropDatabase(params: {
   }
 }
 
-export async function createTable(params: {
+interface CreateTableParams {
   session: Session;
   database: string;
   table: string;
   is_temp?: boolean;
   table_engine?: string;
-  dynamodb: unknown;
-}): Promise<void> {
+  dynamodb: DynamoDBClient;
+}
+export async function createTable(params: CreateTableParams): Promise<void> {
   const { session, database, table, is_temp } = params;
   const table_engine = is_temp
     ? 'memory'
@@ -126,7 +129,7 @@ export async function createTable(params: {
     throw new SQLError('access_denied');
   } else if (database === '_dynamodb') {
     const engine = Engine.getEngineByName('raw');
-    await engine.createTable(params as never);
+    await engine.createTable(params);
   } else if (_findTable(database, table, session)) {
     throw new SQLError({ err: 'table_exists', args: [table] });
   } else if (!(database in g_schemaMap)) {
@@ -134,7 +137,7 @@ export async function createTable(params: {
   } else {
     const engine = Engine.getEngineByName(table_engine);
     if (engine) {
-      await engine.createTable(params as never);
+      await engine.createTable(params);
       if (!is_temp) {
         const schemaEntry = g_schemaMap[database];
         if (schemaEntry) {
