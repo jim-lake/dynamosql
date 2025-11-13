@@ -11,11 +11,14 @@ import { logger } from '@dynamosql/shared';
 import { SQLError } from '../error';
 
 import type { Select } from 'node-sql-parser';
+import type { ExtendedFrom } from './ast_types';
 import type { HandlerParams } from './handler_types';
 import type { FieldInfo } from '../types';
 import type { EvaluationResult } from './expression';
 
-interface SourceMap {
+type ErrorResult = { err: string; args?: unknown[] } | string | null;
+
+export interface SourceMap {
   [key: string]: unknown[];
 }
 
@@ -36,7 +39,7 @@ export interface RowWithResult {
   '@@result': EvaluationResult[];
 }
 export interface SelectResult {
-  rows: EvaluationResult[][];
+  rows: unknown[][];
   columns: FieldInfo[];
 }
 
@@ -46,20 +49,22 @@ export async function query(
   const { rows, columns } = await internalQuery(params);
   for (const row of rows ?? []) {
     for (const key in row) {
-      row[key] = row[key].value;
+      row[key] = row[key]?.value as never;
     }
   }
-  return { rows, columns };
+  return { rows: rows as unknown[][], columns };
 }
 export interface InternalQueryParams extends HandlerParams<Select> {
   skip_resolve?: boolean;
 }
-export interface SelectResultWithRowList extends SelectResult {
+export interface InternalQueryResult {
+  rows: EvaluationResult[][];
+  columns: FieldInfo[];
   row_list: RowWithResult[];
 }
 export async function internalQuery(
   params: InternalQueryParams
-): Promise<SelectResultWithRowList> {
+): Promise<InternalQueryResult> {
   const { ast, session, dynamodb } = params;
 
   const current_database = session.getCurrentDatabase();
@@ -73,10 +78,11 @@ export async function internalQuery(
   let source_map: SourceMap = {};
   let column_map: ColumnMap = {};
   if (ast?.from?.length) {
-    const db = ast.from?.[0]?.db;
-    const table = ast.from?.[0]?.table;
+    const from = ast.from as unknown as ExtendedFrom[];
+    const db = from[0]?.db;
+    const table = from[0]?.table;
     const engine = SchemaManager.getEngine(db, table, session);
-    const opts = { session, dynamodb, list: ast.from, where: ast.where };
+    const opts = { session, dynamodb, list: from, where: ast.where };
     const result = await engine.getRowList(opts);
     source_map = result.source_map;
     column_map = result.column_map;
@@ -89,12 +95,12 @@ interface EvaluateReturnParams extends HandlerParams<Select> {
 }
 async function _evaluateReturn(
   params: EvaluateReturnParams
-): Promise<SelectResultWithRowList> {
+): Promise<InternalQueryResult> {
   const { session, source_map, ast } = params;
   const query_columns = _expandStarColumns(params);
 
   const { from, where, groupby } = ast;
-  let err: { err: string; args?: unknown[] } | string | null = null;
+  let err: ErrorResult = null;
   let row_list: RowWithResult[] = [];
   let sleep_ms = 0;
 
@@ -169,14 +175,16 @@ async function _evaluateReturn(
 
   let start = 0;
   let end = row_list.length;
-  if (ast.limit?.seperator === 'offset') {
-    start = ast.limit.value[1].value;
-    end = Math.min(end, start + ast.limit.value[0].value);
-  } else if (ast.limit?.value?.length > 1) {
-    start = ast.limit.value[0].value;
-    end = Math.min(end, start + ast.limit.value[1].value);
-  } else if (ast.limit) {
-    end = Math.min(end, ast.limit.value[0].value);
+  if (ast.limit) {
+    if (ast.limit?.seperator === 'offset') {
+      start = ast.limit.value[1]?.value ?? 0;
+      end = Math.min(end, start + (ast.limit.value[0]?.value ?? 0));
+    } else if (ast.limit?.value?.length > 1) {
+      start = ast.limit.value[0]?.value ?? 0;
+      end = Math.min(end, start + (ast.limit.value[1]?.value ?? 0));
+    } else if (ast.limit) {
+      end = Math.min(end, ast.limit.value[0]?.value ?? 0);
+    }
   }
 
   row_list = row_list.slice(start, end);

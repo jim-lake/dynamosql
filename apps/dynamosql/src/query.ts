@@ -40,7 +40,7 @@ export interface QueryConstructorParams extends QueryOptions {
 type HandlerResult =
   | AffectedResult
   | ChangedResult
-  | EvaluationResult[][]
+  | unknown[][]
   | string[][]
   | OkPacket;
 
@@ -179,7 +179,7 @@ export class Query extends EventEmitter {
   }
 
   private _transformResult(
-    result: EvaluationResult[][] | string[][],
+    result: unknown[][] | string[][],
     columns: FieldInfo[]
   ): Record<string, unknown>[] {
     const ret: Record<string, unknown>[] = [];
@@ -204,7 +204,7 @@ export class Query extends EventEmitter {
     return ret;
   }
   private _convertCell(
-    value: string | EvaluationResult | undefined,
+    value: string | unknown | undefined,
     column: FieldInfo
   ): unknown {
     if (typeof this.typeCast === 'function') {

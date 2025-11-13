@@ -16,14 +16,16 @@ export interface VarExpr {
   prefix: string | null;
 }
 
-export type ExtendedColumnRef = (ColumnRef & {
-  _resultIndex?: number;
-}) | {
-  type: 'number';
-  value: number;
-  _resultIndex?: number;
-}
-
+export type ExtendedColumnRef =
+  | (ColumnRef & { _resultIndex?: number })
+  | { type: 'number'; value: number; _resultIndex?: number };
+export type ExtendedFrom = From & {
+  db: string;
+  table: string;
+  key: string;
+  _requestSet: Set<string>;
+  _requestAll: boolean;
+};
 export interface AssignExpr {
   type: 'assign';
   left: VarExpr;
@@ -31,7 +33,7 @@ export interface AssignExpr {
   right: ExpressionValue;
 }
 
-export interface Set {
+export interface SetStatement {
   type: 'set';
   keyword: string | null;
   expr: AssignExpr[];
@@ -44,7 +46,7 @@ export interface UnaryExpr {
 }
 
 // Extended AST type that includes the missing types
-export type ExtendedAST = AST | Show | Set;
+export type ExtendedAST = AST | Show | SetStatement;
 
 // Extended ExpressionValue that includes missing expression types
 export type ExtendedExpressionValue = ExpressionValue | VarExpr | UnaryExpr;

@@ -1,5 +1,5 @@
 import * as Storage from './storage';
-import type { RowListParams, FromClause, Row } from '../index';
+import type { RowListParams, ExtendedFrom, Row } from '../index';
 import { SQLError } from '../../../error';
 
 export async function getRowList(
@@ -32,7 +32,7 @@ interface GetFromTableResult {
 }
 
 function _getFromTable(
-  params: RowListParams & { from: FromClause }
+  params: RowListParams & { from: ExtendedFrom }
 ): GetFromTableResult {
   const { session, from } = params;
   const { db, table } = from;

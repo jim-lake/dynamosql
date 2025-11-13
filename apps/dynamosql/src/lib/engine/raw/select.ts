@@ -3,7 +3,7 @@ import { convertWhere } from '../../helpers/convert_where';
 import { escapeIdentifier } from '../../../tools/dynamodb_helper';
 import { SQLError } from '../../../error';
 
-import type { RowListParams, RowListResult, FromClause } from '../index';
+import type { RowListParams, RowListResult, ExtendedFrom } from '../index';
 import type { ItemRecord } from '../../../tools/dynamodb';
 
 export async function getRowList(
@@ -20,7 +20,7 @@ export async function getRowList(
   return { source_map, column_map };
 }
 async function _getFromTable(
-  params: RowListParams & { from: FromClause }
+  params: RowListParams & { from: ExtendedFrom }
 ): Promise<{ results: ItemRecord[]; column_list: string[] }> {
   const { dynamodb, session, from, where } = params;
   const { table, _requestSet, _requestAll } = from;

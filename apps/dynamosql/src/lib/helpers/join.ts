@@ -3,28 +3,24 @@ import type { Session } from '../../session';
 import type { From, Binary, Function } from 'node-sql-parser';
 import type { ExtendedExpressionValue } from '../ast_types';
 
+type ErrorResult = { err: string; args?: unknown[] } | string | null;
+
 interface SourceMap {
   [key: string]: unknown[];
 }
-
 interface RowMap {
   [key: string]: unknown;
 }
-
-interface FormJoinParams {
+export interface FormJoinParams {
   source_map: SourceMap;
   from: From[];
   where: Binary | Function | null;
   session: Session;
 }
-
-type ErrorResult = { err: string; args?: unknown[] } | string | null;
-
-interface FormJoinResult {
+export interface FormJoinResult {
   err: ErrorResult;
   row_list: RowMap[];
 }
-
 export function formJoin(params: FormJoinParams): FormJoinResult {
   const { source_map, from, where, session } = params;
   const row_list: (RowMap & { [key: string]: unknown })[] = [];
@@ -36,14 +32,20 @@ export function formJoin(params: FormJoinParams): FormJoinResult {
       from_table.is_left = (from_table.join?.indexOf?.('LEFT') ?? -1) >= 0;
     }
   );
-  const result = _findRows(source_map, from, where, session, row_list, 0, 0);
-  const { err, output_count } = result;
+  const { err, output_count } = _findRows(
+    source_map,
+    from,
+    where,
+    session,
+    row_list,
+    0,
+    0
+  );
   if (!err) {
     row_list.length = output_count;
   }
   return { err, row_list };
 }
-
 function _findRows(
   source_map: SourceMap,
   list: (From & { key?: string; on?: unknown; is_left?: boolean })[],

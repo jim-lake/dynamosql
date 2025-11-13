@@ -2,7 +2,8 @@ import * as RawEngine from './raw';
 import * as MemoryEngine from './memory';
 import { SQLError } from '../../error';
 
-import type { ExpressionValue } from 'node-sql-parser';
+import type { ExpressionValue, Binary, Function } from 'node-sql-parser';
+import type { ExtendedFrom } from '../ast_types';
 import type {
   DynamoDBClient,
   ChangedResult,
@@ -12,12 +13,13 @@ import type { Session } from '../../session';
 import type { AttributeValue, ItemRecord } from '../../tools/dynamodb';
 import type { EvaluationResult } from '../expression';
 
-export type { AttributeValue } from '../../tools/dynamodb';
+export type { ExtendedFrom } from '../ast_types';
 export type {
   DynamoDBClient,
   ChangedResult,
   AffectedResult,
 } from '../handler_types';
+export type { AttributeValue } from '../../tools/dynamodb';
 
 export interface ColumnDef {
   name: string;
@@ -93,23 +95,16 @@ export interface AddColumnParams {
   table: string;
   column: ColumnDef;
 }
-export interface FromClause {
-  db: string;
-  table: string;
-  key: string;
-  _requestSet: Set<string>;
-  _requestAll: boolean;
-}
 export interface RowListParams {
   dynamodb: DynamoDBClient;
   session: Session;
-  list: FromClause[];
-  where?: ExpressionValue;
+  list: ExtendedFrom[];
+  where?: Binary | Function | null;
 }
 export interface DeleteAST {
   type: 'delete';
-  from: FromClause[];
-  where?: ExpressionValue;
+  from: ExtendedFrom[];
+  where?: Binary | Function | null;
 }
 export interface DeleteChange {
   database: string;
@@ -133,9 +128,9 @@ export interface SetClause {
 }
 export interface UpdateAST {
   type: 'update';
-  from: FromClause[];
+  from: ExtendedFrom[];
   set: SetClause[];
-  where?: ExpressionValue;
+  where?: Binary | Function | null;
 }
 export interface UpdateItem {
   key: EngineValue[];

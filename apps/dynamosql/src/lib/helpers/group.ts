@@ -51,7 +51,7 @@ export function formGroup(params: FormGroupParams): FormGroupResult {
       return result.value;
     });
     if (!err) {
-      let obj: Record<string, unknown|unknown[]> = group_map;
+      let obj: Record<string, unknown | unknown[]> = group_map;
       for (let i = 0; i < count; i++) {
         const key = String(key_list[i]);
         if (i + 1 === count) {
