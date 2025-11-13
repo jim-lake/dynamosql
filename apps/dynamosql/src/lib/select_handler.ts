@@ -16,8 +16,6 @@ import type { HandlerParams } from './handler_types';
 import type { FieldInfo } from '../types';
 import type { EvaluationResult } from './expression';
 
-type ErrorResult = { err: string; args?: unknown[] } | string | null;
-
 export interface SourceMap {
   [key: string]: unknown[];
 }
@@ -101,23 +99,13 @@ async function _evaluateReturn(
   let sleep_ms = 0;
 
   if (from) {
-    const result = formJoin({ source_map, from, where, session });
-    if (result.err) {
-      throw result.err;
-    } else {
-      row_list = result.row_list;
-    }
+    row_list = formJoin({ source_map, from, where, session });
   } else {
     row_list = [{ 0: {} }] as unknown as RowWithResult[];
   }
 
   if (groupby) {
-    const result = formGroup({ groupby, ast, row_list, session });
-    if (result.err) {
-      throw result.err;
-    } else {
-      row_list = result.row_list;
-    }
+    row_list = formGroup({ groupby, ast, row_list, session });
   }
 
   for (const row of row_list) {
@@ -163,10 +151,7 @@ async function _evaluateReturn(
   }
 
   if (ast.orderby && row_list) {
-    const sort_err = sort(row_list, ast.orderby, { session, columns });
-    if (sort_err) {
-      throw new SQLError(sort_err);
-    }
+    sort(row_list, ast.orderby, { session, columns });
   }
 
   let start = 0;

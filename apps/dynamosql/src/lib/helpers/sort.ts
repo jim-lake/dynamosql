@@ -11,19 +11,12 @@ export interface SortState {
   columns?: FieldInfo[];
 }
 
-type ErrorResult = { err: string; args?: unknown[] } | string | null;
-
 export function sort(
   row_list: RowWithResult[],
   orderby: OrderBy[],
   state: SortState
-): ErrorResult {
-  try {
-    row_list.sort(_sort.bind(null, orderby, state));
-  } catch (e) {
-    return e as ErrorResult;
-  }
-  return null;
+): void {
+  row_list.sort(_sort.bind(null, orderby, state));
 }
 
 function _sort(
@@ -32,7 +25,6 @@ function _sort(
   a: RowWithResult,
   b: RowWithResult
 ): number {
-  const order_length = orderby.length;
   for (const order of orderby) {
     const { expr } = order;
     const func = order.type !== 'DESC' ? _asc : _desc;

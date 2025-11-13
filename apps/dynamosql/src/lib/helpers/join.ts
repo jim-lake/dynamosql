@@ -1,25 +1,17 @@
 import { getValue } from '../expression';
+import { SQLError } from '../../error';
 import type { Session } from '../../session';
 import type { From, Binary, Function } from 'node-sql-parser';
 import type { ExtendedExpressionValue } from '../ast_types';
 import type { SourceMap, RowWithResult } from '../select_handler';
 
-type ErrorResult = { err: string; args?: unknown[] } | string | null;
-
-interface RowMap {
-  [key: string]: unknown;
-}
 export interface FormJoinParams {
   source_map: SourceMap;
   from: From[];
   where: Binary | Function | null;
   session: Session;
 }
-export interface FormJoinResult {
-  err: ErrorResult;
-  row_list: RowWithResult[];
-}
-export function formJoin(params: FormJoinParams): FormJoinResult {
+export function formJoin(params: FormJoinParams): RowWithResult[] {
   const { source_map, from, where, session } = params;
   const row_list: RowWithResult[] = [];
   from.forEach(
@@ -30,7 +22,7 @@ export function formJoin(params: FormJoinParams): FormJoinResult {
       from_table.is_left = (from_table.join?.indexOf?.('LEFT') ?? -1) >= 0;
     }
   );
-  const { err, output_count } = _findRows(
+  const output_count = _findRows(
     source_map,
     from,
     where,
@@ -39,10 +31,8 @@ export function formJoin(params: FormJoinParams): FormJoinResult {
     0,
     0
   );
-  if (!err) {
-    row_list.length = output_count;
-  }
-  return { err, row_list };
+  row_list.length = output_count;
+  return row_list;
 }
 function _findRows(
   source_map: SourceMap,
@@ -52,18 +42,17 @@ function _findRows(
   row_list: RowWithResult[],
   from_index: number,
   start_index: number
-): { err: ErrorResult; output_count: number } {
-  let err: ErrorResult = null;
+): number {
   const from = list[from_index];
   if (!from) {
-    return { err: 'Invalid from index', output_count: 0 };
+    throw new SQLError('Invalid from index');
   }
   const { key, on, is_left } = from;
   const rows = key ? source_map[key] : undefined;
   const row_count = rows?.length || (is_left ? 1 : 0);
 
   let output_count = 0;
-  for (let i = 0; i < row_count && !err; i++) {
+  for (let i = 0; i < row_count; i++) {
     const row_index = start_index + output_count;
     if (!row_list[row_index]) {
       row_list[row_index] = {} as RowWithResult;
@@ -88,7 +77,7 @@ function _findRows(
     if (on) {
       const result = getValue(on as ExtendedExpressionValue, { session, row });
       if (result.err) {
-        err = result.err;
+        throw new SQLError(result.err);
       } else if (!result.value) {
         skip = true;
       }
@@ -103,7 +92,7 @@ function _findRows(
     if (!skip) {
       const next_from = from_index + 1;
       if (next_from < list.length) {
-        const result = _findRows(
+        const result_count = _findRows(
           source_map,
           list,
           where,
@@ -112,15 +101,11 @@ function _findRows(
           next_from,
           start_index + output_count
         );
-        if (result.err) {
-          err = result.err;
-        } else {
-          output_count += result.output_count;
-        }
+        output_count += result_count;
       } else if (where) {
         const result = getValue(where, { session, row });
         if (result.err) {
-          err = result.err;
+          throw new SQLError(result.err);
         } else if (result.value) {
           output_count++;
         }
@@ -129,5 +114,5 @@ function _findRows(
       }
     }
   }
-  return { err, output_count };
+  return output_count;
 }

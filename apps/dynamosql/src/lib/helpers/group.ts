@@ -1,11 +1,10 @@
 import { getValue } from '../expression';
+import { SQLError } from '../../error';
 
 import type { Select, ValueExpr } from 'node-sql-parser';
 import type { Session } from '../../session';
 import type { ExtendedColumnRef, ExtendedExpressionValue } from '../ast_types';
 import type { RowWithResult } from '../handler_types';
-
-type ErrorResult = { err: string; args?: unknown[] } | string | null;
 
 export interface RowWithResultAndGroup extends RowWithResult {
   '@@group': Record<string, unknown>;
@@ -20,14 +19,9 @@ export interface FormGroupParams {
   row_list: RowWithResult[];
   session: Session;
 }
-export interface FormGroupResult {
-  err: ErrorResult;
-  row_list: RowWithResult[];
-}
 
-export function formGroup(params: FormGroupParams): FormGroupResult {
+export function formGroup(params: FormGroupParams): RowWithResult[] {
   const { groupby, ast, row_list, session } = params;
-  let err: ErrorResult = null;
 
   const group_exprs: ExtendedExpressionValue[] = [];
   for (const column of groupby.columns ?? []) {
@@ -43,33 +37,29 @@ export function formGroup(params: FormGroupParams): FormGroupResult {
   for (const row of row_list) {
     const key_list = group_exprs.map((group) => {
       const result = getValue(group, { session, row });
-      if (result.err && !err) {
-        err = result.err;
+      if (result.err) {
+        throw new SQLError(result.err);
       }
       return result.value;
     });
-    if (!err) {
-      let obj: Record<string, unknown | unknown[]> = group_map;
-      for (let i = 0; i < count; i++) {
-        const key = String(key_list[i]);
-        if (i + 1 === count) {
-          if (!(obj as Record<string, unknown[]>)[key]) {
-            (obj as Record<string, unknown[]>)[key] = [];
-          }
-        } else if (!obj[key]) {
-          obj[key] = {};
+    let obj: Record<string, unknown | unknown[]> = group_map;
+    for (let i = 0; i < count; i++) {
+      const key = String(key_list[i]);
+      if (i + 1 === count) {
+        if (!(obj as Record<string, unknown[]>)[key]) {
+          (obj as Record<string, unknown[]>)[key] = [];
         }
-        obj = obj[key] as Record<string, unknown>;
+      } else if (!obj[key]) {
+        obj[key] = {};
       }
-      (obj as unknown as unknown[]).push(row);
+      obj = obj[key] as Record<string, unknown>;
     }
+    (obj as unknown as unknown[]).push(row);
   }
 
   const output_list: RowWithResult[] = [];
-  if (!err) {
-    _unroll(output_list, group_map);
-  }
-  return { err, row_list: output_list };
+  _unroll(output_list, group_map);
+  return output_list;
 }
 function _unroll(list: RowWithResult[], obj: unknown): void {
   if (Array.isArray(obj)) {
