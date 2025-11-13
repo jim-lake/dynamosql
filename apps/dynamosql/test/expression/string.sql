@@ -66,3 +66,8 @@ SELECT LEFT("abcdefg", LENGTH("abcdefg") + 2) AS foo;
 SELECT LEFT("abcdefg", LENGTH("abcdefg") + 3) AS foo;
 SELECT LEFT("abcdefg", LENGTH("abcdefg") + 4) AS foo;
 SELECT LEFT("abcdefg", LENGTH("abcdefg") + 5) AS foo;
+
+SELECT LOWER("abc") AS foo;
+SELECT LOWER("ABC") AS foo;
+SELECT LOWER(1) AS foo;
+SELECT LOWER(NULL) AS foo;

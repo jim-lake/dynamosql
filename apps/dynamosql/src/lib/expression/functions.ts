@@ -170,6 +170,15 @@ function curtime(expr: Function, state: EvaluationState): EvaluationResult {
   }
   return result;
 }
+function lower(expr: Function, state: EvaluationState): EvaluationResult {
+  const result = getValue(expr.args?.value?.[0], state);
+  if (!result.err && result.value !== null) {
+    result.name = `LOWER(${result.name})`;
+    result.type = 'string';
+    result.value = String(result.value).toLowerCase();
+  }
+  return result;
+}
 export const methods: Record<
   string,
   undefined | ((expr: Function, state: EvaluationState) => EvaluationResult)
@@ -179,6 +188,7 @@ export const methods: Record<
   length,
   concat,
   left,
+  lower,
   coalesce,
   ifnull: coalesce,
   now,
