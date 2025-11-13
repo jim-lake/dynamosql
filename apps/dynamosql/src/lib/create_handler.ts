@@ -3,12 +3,11 @@ import * as SchemaManager from './schema_manager';
 import { trackFirstSeen } from '../tools/util';
 import { logger } from '@dynamosql/shared';
 import { SQLError } from '../error';
-import type { HandlerParams, MutationResult } from './handler_types';
 import { getDatabaseName } from './helpers/ast_helper';
 
-export async function query(
-  params: HandlerParams
-): Promise<MutationResult | undefined> {
+import type { HandlerParams, AffectedResult } from './handler_types';
+
+export async function query(params: HandlerParams): Promise<AffectedResult> {
   const { ast, session } = params;
   const database = ast.table?.[0]?.db || session.getCurrentDatabase();
 
@@ -24,17 +23,15 @@ export async function query(
   }
 }
 
-async function _createDatabase(
-  params: HandlerParams
-): Promise<MutationResult | undefined> {
+async function _createDatabase(params: HandlerParams): Promise<AffectedResult> {
   const { ast } = params;
   try {
     SchemaManager.createDatabase(getDatabaseName(ast.database));
-    return { affectedRows: 1, changedRows: 0 };
+    return { affectedRows: 1 };
   } catch (err) {
     if (err instanceof SQLError && err.code === 'ER_DB_CREATE_EXISTS') {
       if (ast.if_not_exists) {
-        return undefined;
+        return { affectedRows: 0 };
       } else {
         throw err;
       }
@@ -45,9 +42,7 @@ async function _createDatabase(
   }
 }
 
-async function _createTable(
-  params: HandlerParams
-): Promise<MutationResult | undefined> {
+async function _createTable(params: HandlerParams): Promise<AffectedResult> {
   const { ast, session, dynamodb } = params;
   const database = ast.table?.[0]?.db || session.getCurrentDatabase();
   const table = ast.table?.[0]?.table;
@@ -74,7 +69,6 @@ async function _createTable(
   });
 
   let list: any;
-  let result: MutationResult | undefined;
 
   // Handle CREATE TABLE AS SELECT
   if (ast.as && ast.query_expr) {
@@ -100,31 +94,30 @@ async function _createTable(
     });
   }
 
-  // Create the table
-  const options = Object.fromEntries(
-    ast.table_options?.map?.((item: any) => [item.keyword, item.value]) || []
-  );
-  const opts = {
-    dynamodb,
-    session,
-    database,
-    table,
-    column_list,
-    primary_key,
-    is_temp: Boolean(ast.temporary),
-    table_engine: options['engine'],
-  };
-
+  let table_engine: string | undefined;
+  for (const opt of ast.table_options ?? []) {
+    if (opt.keyword === 'engine') {
+      table_engine = opt.value;
+    }
+  }
   try {
+    const opts = {
+      dynamodb,
+      session,
+      database,
+      table,
+      column_list,
+      primary_key,
+      is_temp: Boolean(ast.temporary),
+      table_engine,
+    };
     await SchemaManager.createTable(opts);
   } catch (err: any) {
     if (err?.code === 'ER_TABLE_EXISTS_ERROR' && ast.if_not_exists) {
-      return undefined;
+      return { affectedRows: 0 };
     }
     throw err;
   }
-
-  // Insert data if any
   if (list?.length > 0) {
     const engine = SchemaManager.getEngine(database, table, session);
     const insertOpts = {
@@ -135,8 +128,7 @@ async function _createTable(
       list,
       duplicate_mode,
     };
-    result = await engine.insertRowList(insertOpts);
+    return await engine.insertRowList(insertOpts);
   }
-
-  return result;
+  return { affectedRows: 0 };
 }

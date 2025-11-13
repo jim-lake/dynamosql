@@ -138,8 +138,8 @@ export interface OkPacket {
   fieldCount: number;
   affectedRows: number;
   insertId: number;
-  serverStatus?: number;
-  warningCount?: number;
+  serverStatus?: number | undefined;
+  warningCount?: number | undefined;
   message: string;
   changedRows: number;
   protocol41: boolean;

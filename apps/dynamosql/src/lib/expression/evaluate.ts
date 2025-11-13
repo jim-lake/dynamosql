@@ -19,10 +19,11 @@ import type {
 import type { ExtendedExpressionValue, VarExpr, UnaryExpr } from '../ast_types';
 import type { Session } from '../../session';
 import type { Row, EngineValue, CellValue } from '../engine';
+import type { RowWithResult } from '../handler_types';
 
 export interface EvaluationState {
   session: Session;
-  row?: Row;
+  row?: Row | RowWithResult;
 }
 
 export interface EvaluationResult {

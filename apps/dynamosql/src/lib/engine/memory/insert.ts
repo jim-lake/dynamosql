@@ -4,16 +4,16 @@ import { SQLError } from '../../../error';
 import type {
   EvaluationResultRow,
   InsertParams,
-  MutationResult,
+  AffectedResult,
   CellRow,
   ColumnDef,
 } from '../index';
 
 export async function insertRowList(
   params: InsertParams
-): Promise<MutationResult> {
+): Promise<AffectedResult> {
   const { session, database, table, list, duplicate_mode } = params;
-  const data = Storage.getTable(database!, table, session!);
+  const data = Storage.getTable(database, table, session);
 
   if (list.length === 0) {
     return { affectedRows: 0 };
@@ -55,7 +55,7 @@ export async function insertRowList(
   }
 
   Storage.txSaveData(database!, table, session!, { row_list, primary_map });
-  return { affectedRows, changedRows: 0 };
+  return { affectedRows };
 }
 function _transformRow(row: EvaluationResultRow) {
   for (const key in row) {

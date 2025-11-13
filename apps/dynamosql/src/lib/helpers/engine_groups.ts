@@ -1,5 +1,5 @@
 import * as SchemaManager from '../schema_manager';
-import Session from '../../session';
+import { Session } from '../../session';
 import type { Engine } from '../engine';
 
 interface DatabaseTableObject {

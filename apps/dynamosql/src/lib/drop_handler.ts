@@ -3,14 +3,12 @@ import { logger } from '@dynamosql/shared';
 import { SQLError } from '../error';
 import type { HandlerParams } from './handler_types';
 
-export async function query(
-  params: HandlerParams
-): Promise<Record<string, never> | undefined> {
+export async function query(params: HandlerParams): Promise<void> {
   const { ast, session, dynamodb } = params;
 
   if (ast.keyword === 'database') {
     await SchemaManager.dropDatabase({ ...params, database: ast.name });
-    return undefined;
+    return;
   } else if (ast.keyword === 'table') {
     const database = ast.name?.[0]?.db || session.getCurrentDatabase();
     const table = ast.name?.[0]?.table;
@@ -23,10 +21,9 @@ export async function query(
 
     try {
       await SchemaManager.dropTable(opts);
-      return {};
     } catch (err: any) {
       if (err?.message === 'resource_not_found' && ast.prefix === 'if exists') {
-        return undefined;
+        return;
       } else if (err?.message === 'resource_not_found') {
         throw new SQLError({ err: 'ER_BAD_TABLE_ERROR', args: [table] });
       }

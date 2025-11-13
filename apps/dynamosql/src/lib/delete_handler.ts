@@ -5,9 +5,11 @@ import { resolveReferences } from './helpers/column_ref_helper';
 import { runSelect } from './helpers/select_modify';
 import { logger } from '@dynamosql/shared';
 import { SQLError, NoSingleOperationError } from '../error';
-import type { HandlerParams, MutationResult } from './handler_types';
 
-export async function query(params: HandlerParams): Promise<MutationResult> {
+import type { HandlerParams, AffectedResult } from './handler_types';
+import type { EngineValue } from './engine';
+
+export async function query(params: HandlerParams): Promise<AffectedResult> {
   const { ast, session } = params;
   const current_database = session.getCurrentDatabase() ?? undefined;
   const resolve_err = resolveReferences(ast, current_database);
@@ -24,7 +26,7 @@ export async function query(params: HandlerParams): Promise<MutationResult> {
   return await TransactionManager.run(opts);
 }
 
-async function _runDelete(params: HandlerParams): Promise<MutationResult> {
+async function _runDelete(params: HandlerParams): Promise<AffectedResult> {
   const { ast, session, dynamodb } = params;
   const database = ast.from?.[0]?.db ?? undefined;
   const table = ast.from?.[0]?.table;
@@ -34,7 +36,7 @@ async function _runDelete(params: HandlerParams): Promise<MutationResult> {
     const opts = { dynamodb, session, ast };
     try {
       const result = await engine.singleDelete(opts);
-      return { affectedRows: result.affectedRows, changedRows: 0 };
+      return { affectedRows: result.affectedRows };
     } catch (err) {
       if (err instanceof NoSingleOperationError) {
         return await _multipleDelete(params);
@@ -46,7 +48,7 @@ async function _runDelete(params: HandlerParams): Promise<MutationResult> {
   }
 }
 
-async function _multipleDelete(params: HandlerParams): Promise<MutationResult> {
+async function _multipleDelete(params: HandlerParams): Promise<AffectedResult> {
   const { dynamodb, session, ast } = params;
   let affectedRows = 0;
 
@@ -57,7 +59,7 @@ async function _multipleDelete(params: HandlerParams): Promise<MutationResult> {
     database: string;
     table: string;
     key_list: string[];
-    delete_list: any[];
+    delete_list: EngineValue[][];
   }[] = [];
 
   for (const object of ast.table) {
@@ -86,5 +88,5 @@ async function _multipleDelete(params: HandlerParams): Promise<MutationResult> {
     }
   }
 
-  return { affectedRows, changedRows: 0 };
+  return { affectedRows };
 }

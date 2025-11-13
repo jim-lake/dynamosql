@@ -3,12 +3,12 @@ import { escapeIdentifier } from '../../../tools/dynamodb_helper';
 import { logger } from '@dynamosql/shared';
 import { NoSingleOperationError } from '../../../error';
 
-import type { DeleteParams, MultiDeleteParams, MutationResult } from '../index';
+import type { DeleteParams, MultiDeleteParams, AffectedResult } from '../index';
 import type { KeyValue } from '../../../tools/dynamodb';
 
 export async function singleDelete(
   params: DeleteParams
-): Promise<MutationResult> {
+): Promise<AffectedResult> {
   const { dynamodb, session, ast } = params;
   const { from, where } = ast;
 
@@ -51,7 +51,7 @@ RETURNING ALL OLD *
 
 export async function multipleDelete(
   params: MultiDeleteParams
-): Promise<MutationResult> {
+): Promise<AffectedResult> {
   const { dynamodb, list } = params;
   if (!list) {
     return { affectedRows: 0 };

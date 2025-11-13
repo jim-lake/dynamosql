@@ -17,13 +17,10 @@ import { SQLError } from './error';
 import type { Readable, ReadableOptions } from 'node:stream';
 import type { Session } from './session';
 import type { FieldInfo, OkPacket, QueryOptions, TypeCast } from './types';
-import type {
-  MutationResult,
-  SelectResult,
-  ShowResult,
-} from './lib/handler_types';
+import type { AffectedResult, ChangedResult } from './lib/handler_types';
 import type { Use, Select } from 'node-sql-parser';
 import type { ExtendedAST } from './lib/ast_types';
+import type { EvaluationResult } from './lib/expression';
 
 const g_parser = new Parser();
 
@@ -41,12 +38,17 @@ export interface QueryConstructorParams extends QueryOptions {
 }
 
 type HandlerResult =
-  | MutationResult
-  | SelectResult
-  | ShowResult
-  | Record<string, never>
-  | void
-  | undefined;
+  | AffectedResult
+  | ChangedResult
+  | EvaluationResult[][]
+  | string[][]
+  | OkPacket;
+
+type QueryResult = [any, FieldInfo[] | FieldInfo[][]];
+interface SingleQueryResult {
+  result: HandlerResult;
+  columns: FieldInfo[];
+}
 
 export class Query extends EventEmitter {
   private readonly _session: Session;
@@ -69,7 +71,7 @@ export class Query extends EventEmitter {
     throw new SQLError('NOT_IMPLEMENTED');
   }
 
-  async run(): Promise<[unknown | unknown[], FieldInfo[] | FieldInfo[][]]> {
+  async run(): Promise<QueryResult> {
     try {
       const result = await this._run();
       this.emit('end');
@@ -79,9 +81,7 @@ export class Query extends EventEmitter {
       throw e;
     }
   }
-  private async _run(): Promise<
-    [unknown | unknown[], FieldInfo[] | FieldInfo[][]]
-  > {
+  private async _run(): Promise<QueryResult> {
     const { err: parse_err, list } = _astify(this.sql);
     if (parse_err) {
       throw new SQLError(parse_err, this.sql);
@@ -93,47 +93,40 @@ export class Query extends EventEmitter {
       throw new SQLError('multiple_statements_disabled', this.sql);
     }
 
-    const result_list: unknown[] = [];
-    const schema_list: (FieldInfo[] | undefined)[] = [];
+    const result_list: any[] = [];
+    const schema_list: FieldInfo[][] = [];
     try {
-      for (let n = 0; n < list.length; n++) {
-        const ast = list[n];
-        if (ast) {
-          const { result, columns } = await this._singleQuery(ast);
-          if (result !== undefined) {
-            this._transformResult(result, columns);
-          }
-          result_list[n] = result ?? DEFAULT_RESULT;
-          schema_list[n] = columns;
+      for (const ast of list) {
+        const { result, columns } = await this._singleQuery(ast);
+        if (!Array.isArray(result)) {
+          result_list.push(Object.assign({}, DEFAULT_RESULT, result));
+        } else if (this._session.resultObjects) {
+          result_list.push(this._transformResult(result, columns));
+        } else {
+          result_list.push(result);
         }
+        schema_list.push(columns);
       }
       if (list.length === 1) {
         return [result_list[0], schema_list[0] ?? []];
       } else {
-        return [result_list, schema_list as FieldInfo[][]];
+        return [result_list, schema_list];
       }
-    } catch (err) {
-      const sql_err = new SQLError(err as any, this.sql);
+    } catch (err: unknown) {
+      const sql_err = new SQLError(err as Error, this.sql);
       sql_err.index = result_list.length;
       throw sql_err;
     }
   }
 
-  private async _singleQuery(
-    ast: ExtendedAST
-  ): Promise<{
-    result: HandlerResult | unknown[] | OkPacket;
-    columns: FieldInfo[];
-  }> {
+  private async _singleQuery(ast: ExtendedAST): Promise<SingleQueryResult> {
     const params = { dynamodb: this._session.dynamodb, session: this._session };
 
     const type = ast?.type;
     switch (type) {
       case 'alter':
-        return {
-          result: await AlterHandler.query({ ...params, ast }),
-          columns: [],
-        };
+        await AlterHandler.query({ ...params, ast });
+        return { result: DEFAULT_RESULT, columns: [] };
       case 'create':
         return {
           result: await CreateHandler.query({ ...params, ast }),
@@ -145,10 +138,8 @@ export class Query extends EventEmitter {
           columns: [],
         };
       case 'drop':
-        return {
-          result: await DropHandler.query({ ...params, ast }),
-          columns: [],
-        };
+        await DropHandler.query({ ...params, ast });
+        return { result: DEFAULT_RESULT, columns: [] };
       case 'insert':
       case 'replace':
         return {
@@ -168,14 +159,15 @@ export class Query extends EventEmitter {
       }
       case 'set':
         SetHandler.query({ ...params, ast });
-        return { result: undefined, columns: [] };
+        return { result: DEFAULT_RESULT, columns: [] };
       case 'update':
         return {
           result: await UpdateHandler.query({ ...params, ast }),
           columns: [],
         };
       case 'use':
-        return await _useDatabase({ ast, session: this._session });
+        await _useDatabase({ ast, session: this._session });
+        return { result: DEFAULT_RESULT, columns: [] };
       default: {
         logger.error('unsupported statement type:', type);
         throw new SQLError({
@@ -186,30 +178,35 @@ export class Query extends EventEmitter {
     }
   }
 
-  private _transformResult(list: unknown, columns: FieldInfo[]): void {
-    if (this._session.resultObjects && Array.isArray(list)) {
-      list.forEach((result: unknown, i: number) => {
-        const obj: Record<string, unknown> = {};
-        columns.forEach((column: FieldInfo, j: number) => {
-          const resultArray = result as unknown[];
-          const value = this._convertCell(resultArray[j], column);
-          if (this.nestedTables === false) {
-            obj[column.name] = value;
-          } else if (typeof this.nestedTables === 'string') {
-            obj[`${column.table}${this.nestedTables}${column.name}`] = value;
-          } else {
-            const tableObj = obj[column.table] as Record<string, unknown>;
-            if (!tableObj) {
-              obj[column.table] = {};
-            }
-            (obj[column.table] as Record<string, unknown>)[column.name] = value;
+  private _transformResult(
+    result: EvaluationResult[][] | string[][],
+    columns: FieldInfo[]
+  ): Record<string, unknown>[] {
+    const ret: Record<string, unknown>[] = [];
+    for (const row of result) {
+      const obj: Record<string, unknown> = {};
+      columns.forEach((column, j: number) => {
+        const value = this._convertCell(row[j], column);
+        if (this.nestedTables === false) {
+          obj[column.name] = value;
+        } else if (typeof this.nestedTables === 'string') {
+          obj[`${column.table}${this.nestedTables}${column.name}`] = value;
+        } else {
+          const tableObj = obj[column.table] as Record<string, unknown>;
+          if (!tableObj) {
+            obj[column.table] = {};
           }
-        });
-        list[i] = obj;
+          (obj[column.table] as Record<string, unknown>)[column.name] = value;
+        }
       });
+      ret.push(obj);
     }
+    return ret;
   }
-  private _convertCell(value: unknown, column: FieldInfo): unknown {
+  private _convertCell(
+    value: string | EvaluationResult | undefined,
+    column: FieldInfo
+  ): unknown {
     if (typeof this.typeCast === 'function') {
       const { type, ...untypedColumn } = column;
       return this.typeCast(
@@ -252,10 +249,10 @@ function _astify(sql: string): {
   return { err, list };
 }
 
-async function _useDatabase(params: {
+interface UseDatabaseParams {
   ast: Use;
   session: Session;
-}): Promise<{ result: undefined; columns: FieldInfo[] }> {
+}
+async function _useDatabase(params: UseDatabaseParams): Promise<void> {
   params.session.setCurrentDatabase(params.ast.db);
-  return { result: undefined, columns: [] };
 }

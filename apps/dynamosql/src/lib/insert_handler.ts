@@ -4,16 +4,14 @@ import * as TransactionManager from './transaction_manager';
 import * as SelectHandler from './select_handler';
 import { logger } from '@dynamosql/shared';
 import { SQLError } from '../error';
-import type { HandlerParams, MutationResult } from './handler_types';
+
+import type { HandlerParams, AffectedResult } from './handler_types';
 import type { Engine, EvaluationResultRow } from './engine';
+import type { EvaluationResult } from './expression';
 
 type DuplicateMode = 'replace' | 'ignore' | null;
 
-interface RowObject {
-  [key: string]: { value: unknown; type?: string };
-}
-
-export async function query(params: HandlerParams): Promise<MutationResult> {
+export async function query(params: HandlerParams): Promise<AffectedResult> {
   const { ast, session } = params;
   const duplicate_mode: DuplicateMode =
     ast.type === 'replace'
@@ -46,7 +44,7 @@ async function _runInsert(
     engine: Engine;
     duplicate_mode: DuplicateMode;
   }
-): Promise<MutationResult> {
+): Promise<AffectedResult> {
   const { ast, session, engine, dynamodb, duplicate_mode } = params;
   const table = ast.table?.[0]?.table;
   let list: EvaluationResultRow[];
@@ -68,7 +66,7 @@ async function _runInsert(
     list = rows.map((row) => {
       const obj: EvaluationResultRow = {};
       ast.columns.forEach((name: string, i: number) => {
-        obj[name] = row[i];
+        obj[name] = row[i] as EvaluationResult;
       });
       return obj;
     });
@@ -126,7 +124,7 @@ async function _runInsert(
       throw err;
     }
   } else {
-    return { affectedRows: 0, changedRows: 0 };
+    return { affectedRows: 0 };
   }
 }
 function _checkAst(ast: unknown) {

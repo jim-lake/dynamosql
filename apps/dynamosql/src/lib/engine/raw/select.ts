@@ -3,8 +3,7 @@ import { convertWhere } from '../../helpers/convert_where';
 import { escapeIdentifier } from '../../../tools/dynamodb_helper';
 import { SQLError } from '../../../error';
 
-import type { AttributeValue } from '@aws-sdk/client-dynamodb';
-import type { RowListParams, RowListResult, FromClause, Row } from '../index';
+import type { RowListParams, RowListResult, FromClause } from '../index';
 import type { ItemRecord } from '../../../tools/dynamodb';
 
 export async function getRowList(

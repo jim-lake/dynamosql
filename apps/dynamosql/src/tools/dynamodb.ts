@@ -15,7 +15,6 @@ import {
   ReturnValuesOnConditionCheckFailure,
   BillingMode,
   ProjectionType,
-  AttributeValue,
 } from '@aws-sdk/client-dynamodb';
 
 import {

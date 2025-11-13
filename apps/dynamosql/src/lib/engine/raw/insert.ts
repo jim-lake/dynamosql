@@ -9,14 +9,14 @@ import { SQLError } from '../../../error';
 import type {
   EvaluationResultRow,
   InsertParams,
-  MutationResult,
+  AffectedResult,
 } from '../index';
 import type { DescribeTableCommandOutput } from '@aws-sdk/client-dynamodb';
 import type { NativeType } from '../../../tools/dynamodb';
 
 export async function insertRowList(
   params: InsertParams
-): Promise<MutationResult> {
+): Promise<AffectedResult> {
   if (params.list.length === 0) {
     return { affectedRows: 0 };
   } else if (params.duplicate_mode) {
@@ -28,7 +28,7 @@ export async function insertRowList(
 
 async function _insertIgnoreReplace(
   params: InsertParams
-): Promise<MutationResult> {
+): Promise<AffectedResult> {
   const { dynamodb, duplicate_mode, table } = params;
   let list = params.list;
   let affectedRows: number;
@@ -122,7 +122,7 @@ interface CancellationReason {
   Code?: string;
   Message?: string;
 }
-async function _insertNoIgnore(params: InsertParams): Promise<MutationResult> {
+async function _insertNoIgnore(params: InsertParams): Promise<AffectedResult> {
   const { dynamodb, table, list } = params;
   const sql_list = list.map(
     (item) =>

@@ -1,15 +1,12 @@
 import { getValue } from '../expression';
 import { SQLError } from '../../error';
+
 import type { OrderBy } from 'node-sql-parser';
 import type { Session } from '../../session';
+import type { RowWithResult } from '../handler_types';
 import type { FieldInfo } from '../../types';
 
-interface RowMap {
-  [key: string]: unknown;
-  '@@result'?: Array<{ value: unknown }>;
-}
-
-interface SortState {
+export interface SortState {
   session: Session;
   columns?: FieldInfo[];
 }
@@ -17,7 +14,7 @@ interface SortState {
 type ErrorResult = { err: string; args?: unknown[] } | string | null;
 
 export function sort(
-  row_list: RowMap[],
+  row_list: RowWithResult[],
   orderby: OrderBy[],
   state: SortState
 ): ErrorResult {
@@ -32,15 +29,11 @@ export function sort(
 function _sort(
   orderby: OrderBy[],
   state: SortState,
-  a: RowMap,
-  b: RowMap
+  a: RowWithResult,
+  b: RowWithResult
 ): number {
   const order_length = orderby.length;
-  for (let i = 0; i < order_length; i++) {
-    const order = orderby[i];
-    if (!order) {
-      continue;
-    }
+  for (const order of orderby) {
     const { expr } = order;
     const func = order.type !== 'DESC' ? _asc : _desc;
     const exprObj = expr as { type?: string; value?: number };
@@ -57,7 +50,7 @@ function _sort(
     } else {
       const a_value = getValue(expr, { ...state, row: a });
       const b_value = getValue(expr, { ...state, row: b });
-      const err = a_value.err || b_value.err;
+      const err = a_value.err ?? b_value.err;
       if (err) {
         throw new SQLError(err);
       }
@@ -95,7 +88,6 @@ function _asc(
     return String(a).localeCompare(String(b));
   }
 }
-
 function _desc(
   a: unknown,
   b: unknown,

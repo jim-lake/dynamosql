@@ -3,20 +3,20 @@ import { logger } from '@dynamosql/shared';
 import type {
   DeleteParams,
   MultiDeleteParams,
-  MutationResult,
+  AffectedResult,
   CellValue,
 } from '../index';
 import { SQLError, NoSingleOperationError } from '../../../error';
 
 export async function singleDelete(
   _params: DeleteParams
-): Promise<MutationResult> {
+): Promise<AffectedResult> {
   throw new NoSingleOperationError();
 }
 
 export async function multipleDelete(
   params: MultiDeleteParams
-): Promise<MutationResult> {
+): Promise<AffectedResult> {
   const { session, list } = params;
 
   if (!list) {
@@ -37,7 +37,7 @@ export async function multipleDelete(
     const primary_map = new Map<string, number>(data.primary_map);
 
     for (const object of delete_list) {
-      const key_list = object.map((key: CellValue) => key.value);
+      const key_list = object.map((key) => (key as CellValue).value);
       const delete_key = JSON.stringify(key_list);
       const index = primary_map.get(delete_key);
 

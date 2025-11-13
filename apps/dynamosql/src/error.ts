@@ -14,14 +14,18 @@ interface ErrorMapEntry {
   errno?: number;
 }
 
-interface ErrorInput {
+export interface IndexError extends Error {
+  index?: number;
+}
+
+export interface ErrorInput {
   err?: string;
   code?: string;
   errno?: number;
   sqlMessage?: string;
   message?: string;
   args?: any[];
-  cause?: Error;
+  cause?: unknown;
   index?: number;
 }
 
@@ -139,7 +143,7 @@ export class SQLError extends Error {
   sql?: string;
   index: number;
 
-  constructor(err: string | ErrorInput, sql?: string) {
+  constructor(err: string | ErrorInput | IndexError, sql?: string) {
     const sql_err =
       ERROR_MAP[err as string] || ERROR_MAP[(err as ErrorInput).err!];
     const code = (err as ErrorInput).code || sql_err?.code || DEFAULT_CODE;

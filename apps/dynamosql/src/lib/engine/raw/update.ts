@@ -7,13 +7,18 @@ import {
 } from '../../../tools/dynamodb_helper';
 import { NoSingleOperationError } from '../../../error';
 
-import type { UpdateParams, MutationResult, CellValue } from '../index';
+import type {
+  MultiUpdateParams,
+  UpdateParams,
+  ChangedResult,
+  CellValue,
+} from '../index';
 import type { AttributeValue } from '@aws-sdk/client-dynamodb';
 import type { SetRowByKeys } from '../../../tools/dynamodb';
 
 export async function singleUpdate(
   params: UpdateParams
-): Promise<MutationResult> {
+): Promise<ChangedResult> {
   const { dynamodb, session, ast } = params;
   const { set, from, where } = ast;
 
@@ -80,8 +85,8 @@ RETURNING MODIFIED OLD *
 }
 
 export async function multipleUpdate(
-  params: UpdateParams
-): Promise<MutationResult> {
+  params: MultiUpdateParams
+): Promise<ChangedResult> {
   const { dynamodb, list } = params;
 
   if (!list) {

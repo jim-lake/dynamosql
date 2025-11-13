@@ -3,8 +3,9 @@ import * as Storage from './storage';
 import { SQLError, NoSingleOperationError } from '../../../error';
 
 import type {
+  MultiUpdateParams,
   UpdateParams,
-  MutationResult,
+  ChangedResult,
   CellValue,
   CellRow,
   ColumnDef,
@@ -13,13 +14,13 @@ import type { EvaluationResult } from '../../expression';
 
 export async function singleUpdate(
   _params: UpdateParams
-): Promise<MutationResult> {
+): Promise<ChangedResult> {
   throw new NoSingleOperationError();
 }
 
 export async function multipleUpdate(
-  params: UpdateParams
-): Promise<MutationResult> {
+  params: MultiUpdateParams
+): Promise<ChangedResult> {
   const { session, list } = params;
 
   if (!list) {

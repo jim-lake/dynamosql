@@ -3,7 +3,7 @@ import { logger } from '@dynamosql/shared';
 import { SQLError } from '../error';
 import type { HandlerParams } from './handler_types';
 
-export function query(params: HandlerParams): void {
+export async function query(params: HandlerParams): Promise<void> {
   const { ast, session } = params;
 
   const expr = ast?.expr;

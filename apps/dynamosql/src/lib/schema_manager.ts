@@ -3,7 +3,10 @@ import { logger } from '@dynamosql/shared';
 import { SQLError } from '../error';
 
 import type { Session } from '../session';
-import type { Engine as EngineType } from './engine';
+import type {
+  Engine as EngineType,
+  CreateTableParams as EngineCreateTableParams,
+} from './engine';
 import type { DynamoDBClient } from './handler_types';
 
 const BUILT_IN = ['_dynamodb'];
@@ -12,11 +15,7 @@ interface SchemaEntry {
   table_engine: string;
 }
 
-interface SchemaMap {
-  [database: string]: { [table: string]: SchemaEntry };
-}
-
-const g_schemaMap: SchemaMap = {};
+const g_schemaMap = new Map<string, Map<string, SchemaEntry>>();
 
 export function getEngine(
   database: string | undefined,
@@ -24,7 +23,8 @@ export function getEngine(
   session: Session
 ): EngineType {
   let ret: EngineType;
-  const schema = database ? g_schemaMap[database] : undefined;
+  const schema = database ? g_schemaMap.get(database) : undefined;
+  const schema_table = table ? schema?.get(table) : undefined;
   if (database === '_dynamodb') {
     ret = Engine.getEngineByName('raw');
   } else if (!database) {
@@ -33,32 +33,33 @@ export function getEngine(
     ret = Engine.getDatabaseError(database);
   } else if (table && session.getTempTable(database, table)) {
     ret = Engine.getEngineByName('memory');
-  } else if (table && schema[table]) {
-    ret = Engine.getEngineByName(schema[table].table_engine);
+  } else if (schema_table) {
+    ret = Engine.getEngineByName(schema_table.table_engine);
   } else {
     ret = Engine.getTableError(table ?? '');
   }
   return ret;
 }
-
 function _findTable(
   database: string,
   table: string,
   session: Session
-): SchemaEntry | unknown {
+): SchemaEntry | undefined {
   return (
-    session.getTempTable(database, table) || g_schemaMap[database]?.[table]
+    session.getTempTable(database, table) ??
+    g_schemaMap.get(database)?.get(table)
   );
 }
-
 export function getDatabaseList() {
   return [...BUILT_IN, ...Object.keys(g_schemaMap)];
 }
-
-export async function getTableList(params: {
-  dynamodb: unknown;
+interface GetTableListParams {
+  dynamodb: DynamoDBClient;
   database: string;
-}): Promise<string[]> {
+}
+export async function getTableList(
+  params: GetTableListParams
+): Promise<string[]> {
   const { dynamodb, database } = params;
   if (database === '_dynamodb') {
     const engine = Engine.getEngineByName('raw');
@@ -71,53 +72,46 @@ export async function getTableList(params: {
 }
 
 export function createDatabase(database: string): void {
-  if (BUILT_IN.includes(database) || database in g_schemaMap) {
+  if (BUILT_IN.includes(database) || g_schemaMap.has(database)) {
     throw new SQLError('database_exists');
   }
-  g_schemaMap[database] = {};
+  g_schemaMap.set(database, new Map());
 }
 
-export async function dropDatabase(params: {
+interface DropDatabaseParams {
   session: Session;
   database: string;
-  dynamodb: unknown;
-}): Promise<void> {
+  dynamodb: DynamoDBClient;
+}
+export async function dropDatabase(params: DropDatabaseParams): Promise<void> {
   const { session, database } = params;
   if (BUILT_IN.includes(database)) {
     throw new SQLError('database_no_drop_builtin');
   } else if (database in g_schemaMap) {
     session.dropTempTable(database);
-    const schemaEntry = g_schemaMap[database];
-    if (!schemaEntry) {
+    const schema = g_schemaMap.get(database);
+    if (!schema) {
       return;
     }
-    const table_list = Object.keys(schemaEntry);
-
-    for (const table of table_list) {
+    for (const table of schema.keys()) {
       const engine = getEngine(database, table, session);
       try {
         await engine.dropTable({ ...params, table } as never);
-        if (schemaEntry) {
-          delete schemaEntry[table];
-        }
+        schema.delete(table);
       } catch (err) {
         logger.error('dropDatabase: table:', table, 'drop err:', err);
         throw err;
       }
     }
-    delete g_schemaMap[database];
+    g_schemaMap.delete(database);
   } else {
     throw new SQLError({ err: 'db_not_found', args: [database] });
   }
 }
-
-interface CreateTableParams {
-  session: Session;
+export interface CreateTableParams extends EngineCreateTableParams {
   database: string;
-  table: string;
-  is_temp?: boolean;
   table_engine?: string;
-  dynamodb: DynamoDBClient;
+  session: Session;
 }
 export async function createTable(params: CreateTableParams): Promise<void> {
   const { session, database, table, is_temp } = params;
@@ -132,16 +126,16 @@ export async function createTable(params: CreateTableParams): Promise<void> {
     await engine.createTable(params);
   } else if (_findTable(database, table, session)) {
     throw new SQLError({ err: 'table_exists', args: [table] });
-  } else if (!(database in g_schemaMap)) {
+  } else if (!g_schemaMap.has(database)) {
     throw new SQLError({ err: 'db_not_found', args: [database] });
   } else {
     const engine = Engine.getEngineByName(table_engine);
     if (engine) {
       await engine.createTable(params);
       if (!is_temp) {
-        const schemaEntry = g_schemaMap[database];
-        if (schemaEntry) {
-          schemaEntry[table] = { table_engine };
+        const schema = g_schemaMap.get(database);
+        if (schema) {
+          schema.set(table, { table_engine });
         }
       }
     } else {
@@ -152,13 +146,13 @@ export async function createTable(params: CreateTableParams): Promise<void> {
     }
   }
 }
-
-export async function dropTable(params: {
+interface DropTableParams {
   session: Session;
   database: string;
   table: string;
-  dynamodb: unknown;
-}): Promise<void> {
+  dynamodb: DynamoDBClient;
+}
+export async function dropTable(params: DropTableParams): Promise<void> {
   const { session, database, table } = params;
   if (database === '_dynamodb') {
     const engine = Engine.getEngineByName('raw');
@@ -167,10 +161,8 @@ export async function dropTable(params: {
     const engine = getEngine(database, table, session);
     try {
       await engine.dropTable(params as never);
-      const schemaEntry = g_schemaMap[database];
-      if (schemaEntry) {
-        delete schemaEntry[table];
-      }
+      const schema = g_schemaMap.get(database);
+      schema?.delete(table);
     } catch (err) {
       logger.error(
         'SchemaManager.dropTable: drop error but deleting table anyway: err:',
@@ -178,10 +170,8 @@ export async function dropTable(params: {
         database,
         table
       );
-      const schemaEntry = g_schemaMap[database];
-      if (schemaEntry) {
-        delete schemaEntry[table];
-      }
+      const schema = g_schemaMap.get(database);
+      schema?.delete(table);
       throw err;
     }
   } else {

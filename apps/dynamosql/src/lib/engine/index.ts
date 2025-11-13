@@ -3,12 +3,21 @@ import * as MemoryEngine from './memory';
 import { SQLError } from '../../error';
 
 import type { ExpressionValue } from 'node-sql-parser';
-import type { DynamoDBClient } from '../handler_types';
+import type {
+  DynamoDBClient,
+  ChangedResult,
+  AffectedResult,
+} from '../handler_types';
 import type { Session } from '../../session';
 import type { AttributeValue, ItemRecord } from '../../tools/dynamodb';
 import type { EvaluationResult } from '../expression';
 
 export type { AttributeValue } from '../../tools/dynamodb';
+export type {
+  DynamoDBClient,
+  ChangedResult,
+  AffectedResult,
+} from '../handler_types';
 
 export interface ColumnDef {
   name: string;
@@ -23,10 +32,6 @@ export interface TableInfo {
 export interface EvaluationResultRow {
   [key: string]: EvaluationResult;
 }
-export interface MutationResult {
-  affectedRows: number;
-  changedRows?: number;
-}
 export interface CellValue {
   type?: string;
   value: unknown;
@@ -40,14 +45,14 @@ export interface RowListResult {
   source_map: Record<string, Row[]>;
   column_map: Record<string, string[]>;
 }
-export interface TableData {
+export interface TableData<T = Row> {
   database: string;
   table: string;
-  data: { row_list: Row[]; primary_map: Map<string, number> };
+  data: { row_list: T[]; primary_map: Map<string, number> };
 }
-export interface CommitParams {
+export interface CommitParams<T = Row> {
   session: Session;
-  data: Record<string, TableData>;
+  data: Record<string, TableData<T>>;
 }
 export interface TableListParams {
   dynamodb: DynamoDBClient;
@@ -117,8 +122,10 @@ export interface DeleteParams {
   session: Session;
   ast: DeleteAST;
 }
-export interface MultiDeleteParams extends DeleteParams {
-  list?: DeleteChange[];
+export interface MultiDeleteParams {
+  dynamodb: DynamoDBClient;
+  session: Session;
+  list: DeleteChange[];
 }
 export interface SetClause {
   column: string;
@@ -144,15 +151,19 @@ export interface UpdateParams {
   dynamodb: DynamoDBClient;
   session: Session;
   ast: UpdateAST;
-  list?: UpdateChange[];
+}
+export interface MultiUpdateParams {
+  dynamodb: DynamoDBClient;
+  session: Session;
+  list: UpdateChange[];
 }
 export interface InsertParams {
   dynamodb: DynamoDBClient;
+  database: string;
   table: string;
+  session: Session;
   list: EvaluationResultRow[];
   duplicate_mode?: 'ignore' | 'replace';
-  session?: Session;
-  database?: string;
 }
 
 export interface Engine {
@@ -166,11 +177,11 @@ export interface Engine {
   addColumn(params: AddColumnParams): Promise<void>;
   getTableInfo(params: TableInfoParams): Promise<TableInfo>;
   getRowList(params: RowListParams): Promise<RowListResult>;
-  singleDelete(params: DeleteParams): Promise<MutationResult>;
-  multipleDelete(params: MultiDeleteParams): Promise<MutationResult>;
-  singleUpdate(params: UpdateParams): Promise<MutationResult>;
-  multipleUpdate(params: UpdateParams): Promise<MutationResult>;
-  insertRowList(params: InsertParams): Promise<MutationResult>;
+  singleDelete(params: DeleteParams): Promise<AffectedResult>;
+  multipleDelete(params: MultiDeleteParams): Promise<AffectedResult>;
+  singleUpdate(params: UpdateParams): Promise<ChangedResult>;
+  multipleUpdate(params: MultiUpdateParams): Promise<ChangedResult>;
+  insertRowList(params: InsertParams): Promise<AffectedResult>;
 }
 
 const NullEngine: Engine = {

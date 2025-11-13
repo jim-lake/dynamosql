@@ -12,8 +12,8 @@ import { SQLError } from '../error';
 
 import type { Select } from 'node-sql-parser';
 import type { HandlerParams, SelectResult } from './handler_types';
-import type { ExtendedAST } from './ast_types';
 import type { FieldInfo } from '../types';
+import type { EvaluationResult } from './expression';
 
 interface SourceMap {
   [key: string]: unknown[];
@@ -31,9 +31,13 @@ interface QueryColumn {
   result_nullable?: boolean;
 }
 
-interface RowWithResult {
+export interface RowWithResult {
   [key: string]: unknown;
-  '@@result'?: unknown[];
+  '@@result': EvaluationResult[];
+}
+export interface SelectResult {
+  rows: EvaluationResult[][];
+  columns: FieldInfo[];
 }
 
 export async function query(
@@ -99,10 +103,10 @@ async function _evaluateReturn(
     if (result.err) {
       err = result.err;
     } else {
-      row_list = result.row_list;
+      row_list = result.row_list as RowWithResult[];
     }
   } else {
-    row_list = [{ 0: {} }];
+    row_list = [{ 0: {} }] as unknown as RowWithResult[];
   }
 
   if (!err && groupby) {
@@ -110,20 +114,19 @@ async function _evaluateReturn(
     if (result.err) {
       err = result.err;
     } else {
-      row_list = result.row_list;
+      row_list = result.row_list as RowWithResult[];
     }
   }
 
   for (const row of row_list) {
-    const output_row: unknown[] = [];
+    const output_row: EvaluationResult[] = [];
     for (const column of query_columns) {
       const result = Expression.getValue(column.expr as never, {
         session,
         row,
       });
       if (result.err) {
-        err = result.err;
-        break;
+        throw new SQLError(result.err);
       } else {
         output_row.push(result);
         if (result.type !== column.result_type) {
@@ -143,10 +146,6 @@ async function _evaluateReturn(
     row['@@result'] = output_row;
   }
 
-  if (err) {
-    throw new SQLError(err);
-  }
-
   const columns: FieldInfo[] = [];
   for (const column of query_columns) {
     const column_type = convertType(column.result_type, column.result_nullable);
@@ -162,7 +161,7 @@ async function _evaluateReturn(
   }
 
   if (ast.orderby && row_list) {
-    const sort_err = sort(row_list as never, ast.orderby, { session, columns });
+    const sort_err = sort(row_list, ast.orderby, { session, columns });
     if (sort_err) {
       throw new SQLError(sort_err);
     }
@@ -181,7 +180,7 @@ async function _evaluateReturn(
   }
 
   row_list = row_list.slice(start, end);
-  const rows = row_list.map((row: any) => row['@@result']);
+  const rows = row_list.map((row) => row['@@result']);
 
   if (sleep_ms) {
     await setTimeout(sleep_ms);

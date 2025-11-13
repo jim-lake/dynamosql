@@ -6,9 +6,11 @@ import { resolveReferences } from './helpers/column_ref_helper';
 import { runSelect } from './helpers/select_modify';
 import { logger } from '@dynamosql/shared';
 import { SQLError, NoSingleOperationError } from '../error';
-import type { HandlerParams, MutationResult } from './handler_types';
 
-export async function query(params: HandlerParams): Promise<MutationResult> {
+import type { HandlerParams, ChangedResult } from './handler_types';
+import type { UpdateChange } from './engine';
+
+export async function query(params: HandlerParams): Promise<ChangedResult> {
   const { ast, session } = params;
   const current_database = session.getCurrentDatabase() ?? undefined;
 
@@ -28,7 +30,7 @@ export async function query(params: HandlerParams): Promise<MutationResult> {
   return await TransactionManager.run(opts);
 }
 
-async function _runUpdate(params: HandlerParams): Promise<MutationResult> {
+async function _runUpdate(params: HandlerParams): Promise<ChangedResult> {
   const { ast, session, dynamodb } = params;
   const database = ast.from?.[0]?.db ?? undefined;
   const table = ast.from?.[0]?.table;
@@ -49,7 +51,7 @@ async function _runUpdate(params: HandlerParams): Promise<MutationResult> {
   }
 }
 
-async function _multipleUpdate(params: HandlerParams): Promise<MutationResult> {
+async function _multipleUpdate(params: HandlerParams): Promise<ChangedResult> {
   const { dynamodb, session, ast } = params;
   let affectedRows = 0;
   let changedRows = 0;
@@ -93,7 +95,7 @@ async function _multipleUpdate(params: HandlerParams): Promise<MutationResult> {
     .filter((obj: any) => obj.update_list.length > 0);
 
   if (from_list.length > 0) {
-    const groups = makeEngineGroups(session, from_list);
+    const groups = makeEngineGroups<UpdateChange>(session, from_list);
     for (const group of groups) {
       const { engine, list } = group;
       const opts = { dynamodb, session, list };
