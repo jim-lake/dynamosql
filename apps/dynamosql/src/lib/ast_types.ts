@@ -1,4 +1,4 @@
-import type { AST, From, ExpressionValue } from 'node-sql-parser';
+import type { AST, From, ExpressionValue, ColumnRef } from 'node-sql-parser';
 
 // Missing statement types that node-sql-parser returns but doesn't type
 
@@ -14,6 +14,14 @@ export interface VarExpr {
   name: string;
   members: ExpressionValue[];
   prefix: string | null;
+}
+
+export type ExtendedColumnRef = (ColumnRef & {
+  _resultIndex?: number;
+}) | {
+  type: 'number';
+  value: number;
+  _resultIndex?: number;
 }
 
 export interface AssignExpr {

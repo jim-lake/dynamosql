@@ -11,7 +11,7 @@ import { logger } from '@dynamosql/shared';
 import { SQLError } from '../error';
 
 import type { Select } from 'node-sql-parser';
-import type { HandlerParams, SelectResult } from './handler_types';
+import type { HandlerParams } from './handler_types';
 import type { FieldInfo } from '../types';
 import type { EvaluationResult } from './expression';
 
@@ -114,7 +114,7 @@ async function _evaluateReturn(
     if (result.err) {
       err = result.err;
     } else {
-      row_list = result.row_list as RowWithResult[];
+      row_list = result.row_list;
     }
   }
 
