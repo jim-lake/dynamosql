@@ -16,13 +16,10 @@ export async function query(params: HandlerParams): Promise<ChangedResult> {
 
   ast.from = ast.table;
   delete ast.table;
-  const resolve_err = resolveReferences(ast, current_database);
+  resolveReferences(ast, current_database);
   const database = ast.from?.[0]?.db ?? undefined;
 
-  if (resolve_err) {
-    logger.error('resolve_err:', resolve_err);
-    throw new SQLError(resolve_err);
-  } else if (!database) {
+  if (!database) {
     throw new SQLError('no_current_database');
   }
 

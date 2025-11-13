@@ -2,12 +2,10 @@ import { getValue } from '../expression';
 import type { Session } from '../../session';
 import type { From, Binary, Function } from 'node-sql-parser';
 import type { ExtendedExpressionValue } from '../ast_types';
+import type { SourceMap, RowWithResult } from '../select_handler';
 
 type ErrorResult = { err: string; args?: unknown[] } | string | null;
 
-interface SourceMap {
-  [key: string]: unknown[];
-}
 interface RowMap {
   [key: string]: unknown;
 }
@@ -19,11 +17,11 @@ export interface FormJoinParams {
 }
 export interface FormJoinResult {
   err: ErrorResult;
-  row_list: RowMap[];
+  row_list: RowWithResult[];
 }
 export function formJoin(params: FormJoinParams): FormJoinResult {
   const { source_map, from, where, session } = params;
-  const row_list: (RowMap & { [key: string]: unknown })[] = [];
+  const row_list: RowWithResult[] = [];
   from.forEach(
     (from_table: From & { key?: string; is_left?: boolean; join?: string }) => {
       if (from_table.key) {
@@ -51,7 +49,7 @@ function _findRows(
   list: (From & { key?: string; on?: unknown; is_left?: boolean })[],
   where: Binary | Function | null,
   session: Session,
-  row_list: RowMap[],
+  row_list: RowWithResult[],
   from_index: number,
   start_index: number
 ): { err: ErrorResult; output_count: number } {
@@ -68,7 +66,7 @@ function _findRows(
   for (let i = 0; i < row_count && !err; i++) {
     const row_index = start_index + output_count;
     if (!row_list[row_index]) {
-      row_list[row_index] = {};
+      row_list[row_index] = {} as RowWithResult;
     }
     const row = row_list[row_index];
     if (!row) {
@@ -76,13 +74,13 @@ function _findRows(
     }
 
     if (key) {
-      row_list[row_index][key] = rows?.[i] ?? null;
+      row[key] = rows?.[i] ?? null;
     }
     for (let j = 0; output_count > 0 && j < from_index; j++) {
       const from_key = list[j]?.key;
       const startRow = row_list[start_index];
       if (from_key && startRow) {
-        row_list[row_index][from_key] = startRow[from_key];
+        row[from_key] = startRow[from_key];
       }
     }
 
@@ -97,7 +95,7 @@ function _findRows(
     }
     if (skip && is_left && output_count === 0 && i + 1 === row_count) {
       if (key) {
-        row_list[row_index][key] = null;
+        row[key] = null;
       }
       skip = false;
     }

@@ -16,4 +16,5 @@ DELETE FROM _dynamodb.foo WHERE id = "333";
 DELETE FROM _dynamodb.foo WHERE id = "667";
 DELETE FROM _dynamodb.foo WHERE id = "777";
 DELETE FROM _dynamodb.foo WHERE id = "999";
+DELETE FROM _dynamodb.foo WHERE id = "667";
 SELECT id, other, comment FROM _dynamodb.foo ORDER BY id;

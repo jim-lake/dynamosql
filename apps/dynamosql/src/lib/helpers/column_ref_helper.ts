@@ -1,7 +1,7 @@
 import { walkColumnRefs } from './ast_helper';
-import type { Select, Update } from 'node-sql-parser';
+import { SQLError } from '../../error';
 
-type ErrorResult = { err: string; args?: unknown[] } | string | null;
+import type { Select, Update } from 'node-sql-parser';
 
 interface TableMapEntry {
   db?: string;
@@ -27,15 +27,14 @@ interface ResultMap {
 export function resolveReferences(
   ast: Select | Update,
   current_database?: string
-): ErrorResult {
-  let err: ErrorResult = null;
+) {
   const table_map: TableMap = {};
   const db_map: DbMap = {};
   const from = ast.type === 'select' ? ast.from : (ast as any).from;
   from?.forEach?.((from: any) => {
     if (!from.db) {
       if (!current_database) {
-        err = 'no_current_database';
+        throw new SQLError('no_current_database');
       } else {
         from.db = current_database;
       }
@@ -66,38 +65,30 @@ export function resolveReferences(
       ? db_map[object.db]?.[object.table]
       : table_map[object.table];
     if (!from) {
-      err = { err: 'table_not_found', args: [object.table] };
+      throw new SQLError({ err: 'table_not_found', args: [object.table] });
     } else {
       object.from = from;
     }
   });
 
   const name_cache: TableMap = {};
-  if (!err) {
-    const columns = ast.type === 'select' ? ast.columns : undefined;
-    const set = ast.type === 'update' ? ast.set : undefined;
-    const where = ast.where;
-    [from, columns, where, set].forEach((item: unknown) => {
-      walkColumnRefs(item, (object: unknown) => {
-        const ret = _resolveObject(object, ast, db_map, table_map, name_cache);
-        if (ret && !err) {
-          err = ret;
-        }
-      });
+  const columns = ast.type === 'select' ? ast.columns : undefined;
+  const set = ast.type === 'update' ? ast.set : undefined;
+  const where = ast.where;
+  [from, columns, where].forEach((item: unknown) => {
+    walkColumnRefs(item, (object: unknown) => {
+      _resolveObject(object, ast, db_map, table_map, name_cache);
     });
-  }
-  if (!err) {
-    const set = ast.type === 'update' ? ast.set : undefined;
-    set?.forEach?.((object: unknown) => {
-      const ret = _resolveObject(object, ast, db_map, table_map, name_cache);
-      if (ret && !err) {
-        err = ret;
-      }
+  });
+
+  set?.forEach((item) => {
+    walkColumnRefs(item, (object: unknown) => {
+      _resolveObject(object, ast, db_map, table_map, name_cache);
     });
-  }
+    _resolveObject(item, ast, db_map, table_map, name_cache);
+  });
 
   const result_map: ResultMap = {};
-  const columns = ast.type === 'select' ? ast.columns : undefined;
   columns?.forEach?.((column: unknown, i: number) => {
     const col = column as {
       as?: string;
@@ -110,30 +101,22 @@ export function resolveReferences(
     }
   });
 
-  if (!err) {
-    const groupby = ast.type === 'select' ? ast.groupby : undefined;
-    const orderby =
-      ast.type === 'select'
-        ? ast.orderby
-        : (ast as { orderby?: unknown }).orderby;
-    const having = ast.type === 'select' ? ast.having : undefined;
-    [groupby, orderby, having].forEach((item: unknown) => {
-      walkColumnRefs(item, (object: unknown) => {
-        const ret = _resolveObject(
-          object,
-          ast,
-          db_map,
-          table_map,
-          name_cache,
-          result_map
-        );
-        if (ret && !err) {
-          err = ret;
-        }
-      });
+  const groupby = ast.type === 'select' ? ast.groupby?.columns : undefined;
+  if (groupby) {
+    walkColumnRefs(groupby, (object: unknown) => {
+      _resolveObject(object, ast, db_map, table_map, name_cache);
     });
   }
-  return err;
+  const orderby =
+    ast.type === 'select'
+      ? ast.orderby
+      : (ast as { orderby?: unknown }).orderby;
+  const having = ast.type === 'select' ? ast.having : undefined;
+  [orderby, having].forEach((item: unknown) => {
+    walkColumnRefs(item, (object: unknown) => {
+      _resolveObject(object, ast, db_map, table_map, name_cache, result_map);
+    });
+  });
 }
 
 function _resolveObject(
@@ -143,8 +126,7 @@ function _resolveObject(
   table_map: TableMap,
   name_cache: TableMap,
   result_map?: ResultMap
-): ErrorResult {
-  let err: ErrorResult = null;
+) {
   const obj = object as {
     column?: string;
     db?: string;
@@ -158,7 +140,7 @@ function _resolveObject(
       if (from) {
         from._requestAll = true;
       } else {
-        err = { err: 'table_not_found', args: [obj.table] };
+        throw new SQLError({ err: 'table_not_found', args: [obj.table] });
       }
     } else if (obj.table) {
       let found = false;
@@ -170,7 +152,7 @@ function _resolveObject(
         }
       });
       if (!found) {
-        err = { err: 'table_not_found', args: [obj.table] };
+        throw new SQLError({ err: 'table_not_found', args: [obj.table] });
       }
     } else {
       const astFrom = (ast as { from?: TableMapEntry[] }).from;
@@ -205,13 +187,12 @@ function _resolveObject(
       }
     } else if (obj._resultIndex === undefined) {
       if (obj.db && !db_map[obj.db]) {
-        err = { err: 'db_not_found', args: [obj.db] };
+        throw new SQLError({ err: 'db_not_found', args: [obj.db] });
       } else if (obj.table) {
-        err = { err: 'table_not_found', args: [obj.table] };
+        throw new SQLError({ err: 'table_not_found', args: [obj.table] });
       } else {
-        err = { err: 'column_not_found', args: [obj.column] };
+        throw new SQLError({ err: 'column_not_found', args: [obj.column] });
       }
     }
   }
-  return err;
 }

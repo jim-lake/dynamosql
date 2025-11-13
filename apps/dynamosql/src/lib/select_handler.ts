@@ -69,16 +69,12 @@ export async function internalQuery(
 
   const current_database = session.getCurrentDatabase();
   if (!params.skip_resolve) {
-    const resolve_err = resolveReferences(ast, current_database ?? undefined);
-    if (resolve_err) {
-      logger.error('select: resolve err:', resolve_err);
-      throw new SQLError(resolve_err);
-    }
+    resolveReferences(ast, current_database ?? undefined);
   }
+  const from = ast?.from as unknown as ExtendedFrom[] | undefined;
   let source_map: SourceMap = {};
   let column_map: ColumnMap = {};
-  if (ast?.from?.length) {
-    const from = ast.from as unknown as ExtendedFrom[];
+  if (from?.length) {
     const db = from[0]?.db;
     const table = from[0]?.table;
     const engine = SchemaManager.getEngine(db, table, session);
@@ -99,26 +95,26 @@ async function _evaluateReturn(
   const { session, source_map, ast } = params;
   const query_columns = _expandStarColumns(params);
 
-  const { from, where, groupby } = ast;
-  let err: ErrorResult = null;
+  const { where, groupby } = ast;
+  const from = ast.from as ExtendedFrom[];
   let row_list: RowWithResult[] = [];
   let sleep_ms = 0;
 
   if (from) {
     const result = formJoin({ source_map, from, where, session });
     if (result.err) {
-      err = result.err;
+      throw result.err;
     } else {
-      row_list = result.row_list as RowWithResult[];
+      row_list = result.row_list;
     }
   } else {
     row_list = [{ 0: {} }] as unknown as RowWithResult[];
   }
 
-  if (!err && groupby) {
+  if (groupby) {
     const result = formGroup({ groupby, ast, row_list, session });
     if (result.err) {
-      err = result.err;
+      throw result.err;
     } else {
       row_list = result.row_list;
     }

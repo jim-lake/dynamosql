@@ -5,13 +5,13 @@ import type { EvaluationState, EvaluationResult } from './evaluate';
 
 function sum(expr: AggrFunc, state: EvaluationState): EvaluationResult {
   const { row, ...other } = state;
-  const group = row?.['@@group'] || [{}];
+  const group = (row?.['@@group'] ?? [{}]) as EvaluationState['row'][];
   let err: EvaluationResult['err'] = null;
   let value: number | null = 0;
   let name = 'SUM(';
-  group.forEach((group_row: any, i: number) => {
-    const groupState: EvaluationState = { ...other, row: group_row };
-    const result = getValue(expr.args?.expr, groupState);
+  group.forEach((group_row, i: number) => {
+    const group_state: EvaluationState = { ...other, row: group_row };
+    const result = getValue(expr.args?.expr, group_state);
     if (i === 0) {
       name += result.name;
     }
