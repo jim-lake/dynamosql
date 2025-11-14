@@ -73,14 +73,16 @@ See above.
 
 When creating a session, the following options are available.
 
+- `namespace`: Namespace for dynamodb tables. Useful to seperate
+  applications and environments.
 - `database`: Name of the database to use for this session (Optional).
 - `region`: The AWS region to connect to DynamoDB.
   If not provided, will use the defaults of the AWS SDK (v3) which
   may fail. (Optional)
-- `accessKeyId`: Access key for the credential object handed to the
+- `credentials.accessKeyId`: Access key for the credential object handed to the
   AWS SDK (v3). If not provided, will use the default crdential chain of
   the AWS SDK (v3). (Optional)
-- `secretAccessKey`: Secret key for the credentials. (Optional)
+- `crdentials.secretAccessKey`: Secret key for the credentials. (Optional)
 - `resultObjects`: Determines if rows should be converted to a
   javascript object. (Default: `true`)
 - `typeCast`: Determines if column values should be converted to native
@@ -343,5 +345,5 @@ subdirectory. `setup` makes tables for the test run, then test runs over them.
 Then run
 
 ```sh
-cd test ; npm run setup ; npm run test
+cd apps/dynamosql ; npm run test:setup ; npm run test
 ```
