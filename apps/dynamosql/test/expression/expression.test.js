@@ -16,4 +16,10 @@ describe('Expression', function () {
   runTests('interval.sql', path.join(__dirname, 'interval.sql'));
   runTests('string.sql', path.join(__dirname, 'string.sql'));
   runTests('precedence.sql', path.join(__dirname, 'precedence.sql'));
+  runTests('functions.sql', path.join(__dirname, 'functions.sql'));
+  runTests('cast.sql', path.join(__dirname, 'cast.sql'));
+  runTests('datetime.sql', path.join(__dirname, 'datetime.sql'));
+  runTests('variables.sql', path.join(__dirname, 'variables.sql'));
+  runTests('operators.sql', path.join(__dirname, 'operators.sql'));
+  runTests('null_handling.sql', path.join(__dirname, 'null_handling.sql'));
 });

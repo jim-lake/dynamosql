@@ -31,23 +31,125 @@ session.query('SELECT * FROM _dynamodb.table', (err, results) => {
 
 Your DynamoDB tables show up in the `_dynamodb` database.
 
-## Working Feaures
+## Supported MySQL Features
 
-- show databases
-- show tables
-- select
-  - simple expressions
-  - joins
-  - group by
-  - order by
-  - limit
-- insert
-- delete
-- update
-- replace
-- insert select
-- create table
-- delete table
+### Data Query Language (DQL)
+
+- **SELECT**
+  - Column selection (*, specific columns, aliases)
+  - WHERE clause with complex expressions
+  - JOIN (INNER JOIN, LEFT JOIN, comma-separated tables)
+  - GROUP BY (with column names, positions, or expressions)
+  - ORDER BY (ASC/DESC, by column name, position, or expression)
+  - LIMIT (with OFFSET support)
+  - Aggregate functions: SUM()
+  - Subqueries in INSERT SELECT
+
+### Data Manipulation Language (DML)
+
+- **INSERT**
+  - INSERT with SET syntax
+  - INSERT with column list and VALUES
+  - INSERT SELECT (insert from query results)
+  - INSERT IGNORE (duplicate handling)
+
+- **UPDATE**
+  - Single table updates
+  - Multi-table updates
+  - WHERE clause support
+  - Expression-based value assignments
+
+- **DELETE**
+  - Single table deletes
+  - Multi-table deletes
+  - WHERE clause support
+
+- **REPLACE**
+  - Full REPLACE support (delete + insert on duplicate key)
+
+### Data Definition Language (DDL)
+
+- **CREATE**
+  - CREATE DATABASE [IF NOT EXISTS]
+  - CREATE TABLE [IF NOT EXISTS]
+  - CREATE TABLE with column definitions
+  - CREATE TABLE AS SELECT (CTAS)
+  - CREATE TEMPORARY TABLE
+  - PRIMARY KEY constraints
+  - ENGINE specification (MEMORY, RAW)
+
+- **DROP**
+  - DROP DATABASE
+  - DROP TABLE [IF EXISTS]
+
+- **ALTER TABLE**
+  - ADD COLUMN
+  - ADD INDEX
+  - DROP INDEX
+
+### Utility Commands
+
+- **SHOW**
+  - SHOW DATABASES
+  - SHOW TABLES
+
+- **USE**
+  - USE database
+
+- **SET**
+  - SET user variables (@variable)
+
+### Expressions & Operators
+
+- **Arithmetic Operators**: +, -, *, /
+- **Comparison Operators**: =, !=, <>, <, >, <=, >=
+- **Logical Operators**: AND, OR, XOR, NOT, !
+- **Unary Operators**: +, -, NOT, !
+- **IS / IS NOT**: NULL, TRUE, FALSE
+
+### Functions
+
+- **String Functions**
+  - CONCAT()
+  - LENGTH()
+  - LEFT()
+  - LOWER()
+
+- **Date/Time Functions**
+  - NOW() / CURRENT_TIMESTAMP
+  - CURDATE() / CURRENT_DATE
+  - CURTIME() / CURRENT_TIME
+  - DATE()
+  - DATE_FORMAT()
+  - DATEDIFF()
+  - FROM_UNIXTIME()
+  - INTERVAL expressions (with DATE_ADD/DATE_SUB via +/-)
+
+- **Aggregate Functions**
+  - SUM()
+
+- **Other Functions**
+  - DATABASE()
+  - COALESCE() / IFNULL()
+  - SLEEP()
+
+### Type Casting
+
+- **CAST() Support**
+  - CAST AS DATETIME
+  - CAST AS DATE
+  - CAST AS TIME
+  - CAST AS SIGNED
+  - CAST AS CHAR
+
+### Advanced Features
+
+- **Transactions**: BEGIN, COMMIT, ROLLBACK support via transaction manager
+- **Multiple Statements**: Optional support (disabled by default for security)
+- **Temporary Tables**: In-memory tables with MEMORY engine
+- **User Variables**: @variable assignment and retrieval
+- **System Variables**: @@variable support
+- **Expression Evaluation**: Complex nested expressions with proper precedence
 
 ## Why?
 

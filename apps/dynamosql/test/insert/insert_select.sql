@@ -1,3 +1,6 @@
+-- Cleanup first
+DELETE FROM _dynamodb.foo WHERE id IN ("comment", "333", "123", "123456", "999", "667", "777");
+
 SELECT id, other, comment FROM _dynamodb.foo ORDER BY id;
 
 INSERT INTO _dynamodb.foo (id, other, comment) SELECT "333", 333, "comment 333"

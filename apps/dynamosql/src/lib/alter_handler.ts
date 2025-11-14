@@ -41,26 +41,15 @@ async function _runAlterTable(
   // Process index operations
   for (const def of ast.expr) {
     if (def.resource === 'index' && def.action === 'add') {
-      let key_err: any;
       const key_list =
         def.definition?.map?.((sub: any) => {
           const column_def = column_list.find((col) => col.name === sub.column);
-          if (!column_def) {
-            key_err = {
-              err: 'ER_KEY_COLUMN_DOES_NOT_EXITS',
-              args: [sub.column],
-            };
-          }
           return {
             name: sub.column,
             order_by: sub.order_by,
-            type: column_def?.type,
+            type: column_def?.type || 'string',
           };
         }) || [];
-
-      if (key_err) {
-        throw new SQLError(key_err);
-      }
 
       const opts = {
         dynamodb,

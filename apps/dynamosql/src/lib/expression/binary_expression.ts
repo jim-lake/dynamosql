@@ -149,7 +149,12 @@ function div(expr: Binary, state: EvaluationState): EvaluationResult {
     left_num !== undefined &&
     right_num !== undefined
   ) {
-    value = left_num / right_num;
+    // Division by zero returns NULL in MySQL
+    if (right_num === 0) {
+      value = null;
+    } else {
+      value = left_num / right_num;
+    }
   }
   return { err, value, name };
 }
@@ -427,10 +432,14 @@ function _is(
   if (!result.err) {
     if (right === null) {
       result.value = right === result.value ? 1 : 0;
-    } else if (right && result.value) {
-      result.value = 1;
-    } else if (!right && !result.value) {
-      result.value = 1;
+    } else if (right === true) {
+      // IS TRUE: check if left side is truthy (non-zero, non-null)
+      const leftBool = convertBooleanValue(result.value);
+      result.value = leftBool === 1 ? 1 : 0;
+    } else if (right === false) {
+      // IS FALSE: check if left side is falsy (zero, but not null)
+      const leftBool = convertBooleanValue(result.value);
+      result.value = leftBool === 0 ? 1 : 0;
     } else {
       result.value = 0;
     }
@@ -450,6 +459,79 @@ function _unionDateTime(type1: string, type2: string): string | undefined {
     ret = 'datetime';
   }
   return ret;
+}
+
+function like(expr: Binary, state: EvaluationState): EvaluationResult {
+  const left = getValue(expr.left, state);
+  const right = getValue(expr.right, state);
+  const err = left.err || right.err;
+  const name = (left.name ?? '') + ' LIKE ' + (right.name ?? '');
+  let value: number | null = 0;
+  if (!err) {
+    if (left.value === null || right.value === null) {
+      value = null;
+    } else {
+      const str = String(left.value);
+      const pattern = String(right.value)
+        .replace(/[.+^${}()|[\]\\]/g, '\\$&')
+        .replace(/%/g, '.*')
+        .replace(/_/g, '.');
+      const regex = new RegExp('^' + pattern + '$', 'i');
+      value = regex.test(str) ? 1 : 0;
+    }
+  }
+  return { err, value, name };
+}
+
+function notLike(expr: Binary, state: EvaluationState): EvaluationResult {
+  const result = like(expr, state);
+  result.name = result.name?.replace(' LIKE ', ' NOT LIKE ') ?? '';
+  if (result.value !== null) {
+    result.value = result.value ? 0 : 1;
+  }
+  return result;
+}
+
+function inOp(expr: Binary, state: EvaluationState): EvaluationResult {
+  const left = getValue(expr.left, state);
+  const err = left.err;
+  let value: number | null = 0;
+  const rightExpr = expr.right;
+
+  if (!err) {
+    if (left.value === null) {
+      value = null;
+    } else if (
+      typeof rightExpr === 'object' &&
+      rightExpr &&
+      'type' in rightExpr &&
+      rightExpr.type === 'expr_list'
+    ) {
+      const list = rightExpr.value || [];
+      for (const item of list) {
+        const right = getValue(item, state);
+        if (right.err) {
+          return { err: right.err, value: null };
+        }
+        if (right.value === null) {
+          value = null;
+        } else if (left.value === right.value) {
+          value = 1;
+          break;
+        }
+      }
+    }
+  }
+  return { err, value, name: `${left.name} IN (...)` };
+}
+
+function notIn(expr: Binary, state: EvaluationState): EvaluationResult {
+  const result = inOp(expr, state);
+  result.name = result.name?.replace(' IN ', ' NOT IN ') ?? '';
+  if (result.value !== null) {
+    result.value = result.value ? 0 : 1;
+  }
+  return result;
 }
 
 export const methods: Record<
@@ -472,4 +554,8 @@ export const methods: Record<
   xor,
   is,
   'is not': isNot,
+  like,
+  'not like': notLike,
+  in: inOp,
+  'not in': notIn,
 };

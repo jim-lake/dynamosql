@@ -10,6 +10,7 @@ import * as SelectHandler from './lib/select_handler';
 import * as SetHandler from './lib/set_handler';
 import * as ShowHandler from './lib/show_handler';
 import * as UpdateHandler from './lib/update_handler';
+import * as TransactionManager from './lib/transaction_manager';
 import { typeCast } from './lib/helpers/type_cast_helper';
 
 import { SQLError } from './error';
@@ -157,13 +158,33 @@ export class Query extends EventEmitter {
         return { result: rows, columns };
       }
       case 'set':
-        SetHandler.query({ ...params, ast });
+        await SetHandler.query({ ...params, ast });
         return { result: DEFAULT_RESULT, columns: [] };
       case 'update':
         return {
           result: await UpdateHandler.query({ ...params, ast }),
           columns: [],
         };
+      case 'transaction': {
+        const action = (ast as any)?.expr?.action?.value?.toLowerCase();
+        if (action === 'begin' || action === 'start') {
+          TransactionManager.startTransaction({
+            session: this._session,
+            auto_commit: false,
+          });
+        } else if (action === 'commit') {
+          await TransactionManager.commit({
+            dynamodb: this._session.dynamodb,
+            session: this._session,
+          });
+        } else if (action === 'rollback') {
+          await TransactionManager.rollback({
+            dynamodb: this._session.dynamodb,
+            session: this._session,
+          });
+        }
+        return { result: DEFAULT_RESULT, columns: [] };
+      }
       case 'use':
         await _useDatabase({ ast, session: this._session });
         return { result: DEFAULT_RESULT, columns: [] };

@@ -6,4 +6,8 @@ describe('Join', function () {
     session: { resultObjects: true },
     nestTables: true,
   });
+  runTests('edge_cases.sql', path.join(__dirname, 'edge_cases.sql'), {
+    session: { resultObjects: true },
+    nestTables: true,
+  });
 });

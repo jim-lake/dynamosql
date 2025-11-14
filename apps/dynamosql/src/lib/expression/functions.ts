@@ -17,6 +17,9 @@ function sleep(expr: Function, state: EvaluationState): EvaluationResult {
   if (sleep_ms !== null && sleep_ms > 0) {
     result.sleep_ms = sleep_ms * 1000;
   }
+  // SLEEP returns 0 on success in MySQL
+  result.value = 0;
+  result.type = 'number';
   return result;
 }
 function length(expr: Function, state: EvaluationState): EvaluationResult {
@@ -179,6 +182,16 @@ function lower(expr: Function, state: EvaluationState): EvaluationResult {
   }
   return result;
 }
+function not(expr: Function, state: EvaluationState): EvaluationResult {
+  const result = getValue(expr.args?.value?.[0], state);
+  result.name = `NOT(${result.name})`;
+  result.type = 'number';
+  if (!result.err && result.value !== null) {
+    const num = convertNum(result.value);
+    result.value = num ? 0 : 1;
+  }
+  return result;
+}
 export const methods: Record<
   string,
   undefined | ((expr: Function, state: EvaluationState) => EvaluationResult)
@@ -189,6 +202,7 @@ export const methods: Record<
   concat,
   left,
   lower,
+  not,
   coalesce,
   ifnull: coalesce,
   now,

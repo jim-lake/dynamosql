@@ -68,6 +68,29 @@ export class SQLDateTime {
     return this._decimals;
   }
 
+  setType(type: string): void {
+    if (type === 'date' && this._type !== 'date') {
+      this._type = 'date';
+      this._decimals = 0;
+      this._time -= this._time % (24 * 60 * 60);
+      this._fraction = 0;
+      this._fractionText = '';
+      this._date = null; // Reset cached date
+    } else if (type !== 'date') {
+      this._type = type;
+    }
+  }
+
+  diff(other: SQLDateTime | null | undefined): number | null {
+    if (!other) {
+      return null;
+    }
+    // DATEDIFF returns the difference in days
+    const thisDate = Math.floor(this._time / (24 * 60 * 60));
+    const otherDate = Math.floor(other.getTime() / (24 * 60 * 60));
+    return thisDate - otherDate;
+  }
+
   toString(): string {
     let ret;
     this._makeDate();
@@ -269,7 +292,7 @@ function _dateFormat(date: Date, format: string): string {
         ret = _getPart(FORMAT_LONG_NUMBER_12H, 'hour');
         break;
       case 'i':
-        ret = _getPart(FORMAT_LONG_NUMBER, 'minutes');
+        ret = _getPart(FORMAT_LONG_NUMBER, 'minute');
         break;
       case 'j':
         //ret = _getPart(, 'dayOfYear');
@@ -295,10 +318,10 @@ function _dateFormat(date: Date, format: string): string {
           _getPart(FORMAT_LONG_NUMBER_12H, 'dayPeriod');
         break;
       case 'S':
-        ret = _getPart(FORMAT_LONG_NUMBER, 'seconds');
+        ret = _getPart(FORMAT_LONG_NUMBER, 'second');
         break;
       case 's':
-        ret = _getPart(FORMAT_LONG_NUMBER, 'seconds');
+        ret = _getPart(FORMAT_LONG_NUMBER, 'second');
         break;
       case 'T':
         ret = _time(FORMAT_LONG_NUMBER);

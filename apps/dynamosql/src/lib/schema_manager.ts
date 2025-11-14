@@ -51,7 +51,7 @@ function _findTable(
   );
 }
 export function getDatabaseList() {
-  return [...BUILT_IN, ...Object.keys(g_schemaMap)];
+  return [...BUILT_IN, ...Array.from(g_schemaMap.keys())];
 }
 interface GetTableListParams {
   dynamodb: DynamoDBClient;
@@ -64,8 +64,9 @@ export async function getTableList(
   if (database === '_dynamodb') {
     const engine = Engine.getEngineByName('raw');
     return await engine.getTableList({ dynamodb } as never);
-  } else if (database in g_schemaMap) {
-    return [];
+  } else if (g_schemaMap.has(database)) {
+    const schema = g_schemaMap.get(database);
+    return schema ? Array.from(schema.keys()) : [];
   } else {
     throw new SQLError({ err: 'db_not_found', args: [database] });
   }
@@ -87,7 +88,7 @@ export async function dropDatabase(params: DropDatabaseParams): Promise<void> {
   const { session, database } = params;
   if (BUILT_IN.includes(database)) {
     throw new SQLError('database_no_drop_builtin');
-  } else if (database in g_schemaMap) {
+  } else if (g_schemaMap.has(database)) {
     session.dropTempTable(database);
     const schema = g_schemaMap.get(database);
     if (!schema) {

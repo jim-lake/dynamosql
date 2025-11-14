@@ -1,0 +1,2 @@
+-- Multi-table UPDATE is not yet fully supported with JOIN conditions
+-- These tests are placeholders for future implementation

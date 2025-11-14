@@ -1,0 +1,2 @@
+-- Subqueries are not yet supported in DynamoSQL
+-- These tests are placeholders for future implementation

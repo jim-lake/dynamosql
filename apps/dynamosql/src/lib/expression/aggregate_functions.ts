@@ -31,7 +31,33 @@ function sum(expr: AggrFunc, state: EvaluationState): EvaluationResult {
   return { err, value, type: 'number', name };
 }
 
+function count(expr: AggrFunc, state: EvaluationState): EvaluationResult {
+  const { row, ...other } = state;
+  const group = (row?.['@@group'] ?? [{}]) as EvaluationState['row'][];
+  let value = 0;
+  let name = 'COUNT(';
+
+  if (expr.args?.expr?.column === '*') {
+    value = group.length;
+    name += '*';
+  } else {
+    group.forEach((group_row, i: number) => {
+      const group_state: EvaluationState = { ...other, row: group_row };
+      const result = getValue(expr.args?.expr, group_state);
+      if (i === 0) {
+        name += result.name;
+      }
+      if (result.value !== null) {
+        value++;
+      }
+    });
+  }
+
+  name += ')';
+  return { err: null, value, type: 'number', name };
+}
+
 export const methods: Record<
   string,
   undefined | ((expr: AggrFunc, state: EvaluationState) => EvaluationResult)
-> = { sum };
+> = { sum, count };
