@@ -3,7 +3,6 @@ import * as TransactionManager from './transaction_manager';
 import { makeEngineGroups } from './helpers/engine_groups';
 import { resolveReferences } from './helpers/column_ref_helper';
 import { runSelect } from './helpers/select_modify';
-import { logger } from '@dynamosql/shared';
 import { SQLError, NoSingleOperationError } from '../error';
 
 import type { HandlerParams, AffectedResult } from './handler_types';

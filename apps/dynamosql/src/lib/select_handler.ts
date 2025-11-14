@@ -7,7 +7,6 @@ import { resolveReferences } from './helpers/column_ref_helper';
 import { formJoin } from './helpers/join';
 import { formGroup } from './helpers/group';
 import { sort } from './helpers/sort';
-import { logger } from '@dynamosql/shared';
 import { SQLError } from '../error';
 
 import type { Select } from 'node-sql-parser';

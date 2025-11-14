@@ -2,7 +2,7 @@ import * as RawEngine from './raw';
 import * as MemoryEngine from './memory';
 import { SQLError } from '../../error';
 
-import type { ExpressionValue, Binary, Function } from 'node-sql-parser';
+import type { Binary, Function } from 'node-sql-parser';
 import type { ExtendedFrom } from '../ast_types';
 import type {
   DynamoDBClient,

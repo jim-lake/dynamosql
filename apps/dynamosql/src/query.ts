@@ -20,7 +20,6 @@ import type { FieldInfo, OkPacket, QueryOptions, TypeCast } from './types';
 import type { AffectedResult, ChangedResult } from './lib/handler_types';
 import type { Use, Select } from 'node-sql-parser';
 import type { ExtendedAST } from './lib/ast_types';
-import type { EvaluationResult } from './lib/expression';
 
 const g_parser = new Parser();
 
