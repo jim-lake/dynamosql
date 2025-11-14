@@ -166,7 +166,7 @@ export function getValue(
   } else if (type === 'column_ref') {
     const colRef = expr as ColumnRef;
     result.name = colRef.column as string;
-    if (row && colRef._resultIndex >= 0) {
+    if (row && colRef._resultIndex !== undefined && colRef._resultIndex >= 0) {
       const output_result = row['@@result']?.[colRef._resultIndex];
       result.value = output_result?.value;
       result.type = output_result?.type;
