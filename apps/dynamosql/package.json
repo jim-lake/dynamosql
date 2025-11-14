@@ -15,7 +15,9 @@
     "test:setup": "dotenv -- node --require tsx/cjs ../../node_modules/mocha/bin/mocha.js test/setup/setup.js",
     "test:single": "dotenv -- node --require tsx/cjs ../../node_modules/mocha/bin/mocha.js",
     "test": "dotenv -- node --require tsx/cjs ../../node_modules/mocha/bin/mocha.js 'test/**/*.test.js'",
-    "test:quiet": "dotenv -- npx tsx --no-warnings ../../node_modules/.bin/mocha --no-clean --reporter test/silent_reporter.js 'test/**/*.test.js'"
+    "test:quiet": "dotenv -- npx tsx --no-warnings ../../node_modules/.bin/mocha --no-clean --reporter test/silent_reporter.js 'test/**/*.test.js'",
+    "query:mysql": "dotenv -- npx tsx test/test_client.js",
+    "query:session": "dotenv -- npx tsx test/test_session.js"
   },
   "dependencies": {
     "@aws-sdk/client-dynamodb": "^3.922.0",

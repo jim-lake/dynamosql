@@ -15,7 +15,7 @@ function runTests(test_name, file_path, extra) {
   const mysql_opts = Object.assign(
     {
       host: config.db.host,
-      port: config.db.port || 3306,
+      port: config.db.port ?? 3306,
       user: config.db.user,
       password: config.db.password,
       //database: config.db.database,

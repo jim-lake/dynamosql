@@ -30,6 +30,7 @@ export async function query(params: HandlerParams): Promise<ShowResult> {
 
     const name = 'Tables_in_' + database;
     const column = Object.assign(convertType('string'), {
+      db: database,
       table: 'TABLES',
       orgTable: 'tables',
       name,

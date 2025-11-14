@@ -22,9 +22,10 @@ export async function getRowList(
   return { source_map, column_map };
 }
 
-function _getFromTable(
-  params: RowListParams & { from: ExtendedFrom }
-): { row_list: Row[]; column_list: string[] } {
+function _getFromTable(params: RowListParams & { from: ExtendedFrom }): {
+  row_list: Row[];
+  column_list: string[];
+} {
   const { session, from } = params;
   const { db, table } = from;
   const data = Storage.getTable(db, table, session);
@@ -32,7 +33,7 @@ function _getFromTable(
     throw new SQLError('table_not_found');
   }
   return {
-    row_list: data.row_list || [],
+    row_list: data.row_list ?? [],
     column_list: data.column_list?.map((column) => column.name) || [],
   };
 }

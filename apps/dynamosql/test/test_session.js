@@ -1,7 +1,6 @@
 process.env.TZ = 'UTC';
 
 const path = require('node:path');
-const util = require('node:util');
 const config = tryRequire('../config');
 const dynamosql = require('../src');
 
@@ -33,7 +32,7 @@ if (!session) {
   console.error('failed to init session');
   process.exit(-2);
 }
-session.query({ sql, nestTables: true }, (err, results, fields) => {
+session.query({ sql }, (err, results, fields) => {
   if (err) {
     console.log('err:', err);
   }
@@ -41,7 +40,7 @@ session.query({ sql, nestTables: true }, (err, results, fields) => {
     console.log('fields:', fields);
   }
   if (results) {
-    console.log('results:', util.inspect(results, { depth: 99 }));
+    console.log('results:', results);
   }
   process.exit(err ? 1 : 0);
 });

@@ -19,10 +19,12 @@ export interface VarExpr {
 export type ExtendedColumnRef =
   | (ColumnRef & { _resultIndex?: number })
   | { type: 'number'; value: number; _resultIndex?: number };
+
 export type ExtendedFrom = From & {
   db: string;
   table: string;
   key: string;
+  as?: string;
   _requestSet: Set<string>;
   _requestAll: boolean;
 };

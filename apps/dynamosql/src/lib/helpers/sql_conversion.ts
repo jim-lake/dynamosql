@@ -5,7 +5,7 @@ const MINUTE = 60;
 const HOUR = 60 * MINUTE;
 const DAY = 24 * HOUR;
 
-export function convertNum(value: any): number | null {
+export function convertNum(value: unknown): number | null {
   let ret = value;
   if (value === null) {
     ret = null;
@@ -22,7 +22,7 @@ export function convertNum(value: any): number | null {
   return ret;
 }
 
-export function convertBooleanValue(value: any): number | null {
+export function convertBooleanValue(value: unknown): number | null {
   let ret;
   if (value === null) {
     ret = null;
@@ -52,7 +52,7 @@ const DATE2_REGEX = new RegExp(DATE2_RS);
 const DATETIME2_REGEX = new RegExp(DATETIME2_RS);
 
 export function convertDateTime(
-  value: any,
+  value: unknown,
   type?: string,
   decimals?: number
 ): any {
@@ -243,7 +243,7 @@ function _numToTime(number: number): number {
   return hours * HOUR + minutes * MINUTE + number;
 }
 
-export function getDecimals(value: any, max?: number): number {
+export function getDecimals(value: unknown, max?: number): number {
   let ret = 0;
   if (typeof value === 'number') {
     ret = String(value).split('.')?.[1]?.length || 0;
@@ -256,15 +256,15 @@ export function getDecimals(value: any, max?: number): number {
   return ret;
 }
 
-function _pad2(num: any): string {
+function _pad2(num: unknown): string {
   return String(num).padStart(2, '0');
 }
 
-function _pad4(num: any): string {
+function _pad4(num: unknown): string {
   return String(num).padStart(4, '0');
 }
 
-function _fix2year(num: any): any {
+function _fix2year(num: unknown): unknown {
   let ret = num;
   if (num?.length <= 2) {
     ret = parseInt(num);

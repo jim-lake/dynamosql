@@ -10,7 +10,7 @@ import { sort } from './helpers/sort';
 import { SQLError } from '../error';
 
 import type { Select } from 'node-sql-parser';
-import type { ExtendedFrom } from './ast_types';
+import type { ExtendedExpressionValue, ExtendedFrom } from './ast_types';
 import type { HandlerParams } from './handler_types';
 import type { FieldInfo } from '../types';
 import type { EvaluationResult } from './expression';
@@ -24,11 +24,15 @@ interface ColumnMap {
 }
 
 interface QueryColumn {
-  expr: unknown;
+  expr: ExtendedExpressionValue & {
+    db?: string | null;
+    from?: { db?: string; table?: string; as?: string };
+  };
   as: string | null;
   result_type?: string;
   result_name?: string;
   result_nullable?: boolean;
+  db?: string;
 }
 
 export interface RowWithResult {
@@ -116,17 +120,16 @@ async function _evaluateReturn(
       });
       if (result.err) {
         throw new SQLError(result.err);
-      } else {
-        output_row.push(result);
-        if (result.type !== column.result_type) {
-          column.result_type = _unionType(column.result_type, result.type);
-        }
-        if (!column.result_name) {
-          column.result_name = result.name;
-        }
-        if (result.value === null) {
-          column.result_nullable = true;
-        }
+      }
+      output_row.push(result);
+      if (result.type !== column.result_type) {
+        column.result_type = _unionType(column.result_type, result.type);
+      }
+      if (!column.result_name) {
+        column.result_name = result.name;
+      }
+      if (result.value === null) {
+        column.result_nullable = true;
       }
       if (result.sleep_ms) {
         sleep_ms = result.sleep_ms;
@@ -138,14 +141,11 @@ async function _evaluateReturn(
   const columns: FieldInfo[] = [];
   for (const column of query_columns) {
     const column_type = convertType(column.result_type, column.result_nullable);
-    const exprObj = column.expr as {
-      from?: { table?: string; as?: string; db?: string };
-    };
-    column_type.orgName = column.result_name || '';
-    column_type.name = column.as || column_type.orgName;
-    column_type.orgTable = exprObj?.from?.table || '';
-    column_type.table = exprObj?.from?.as || column_type.orgTable;
-    column_type.schema = exprObj?.from?.db || '';
+    column_type.db = column.expr?.from?.db ?? column.expr.db ?? column.db ?? '';
+    column_type.orgName = column.result_name ?? '';
+    column_type.name = column.as ?? column_type.orgName;
+    column_type.orgTable = column.expr?.from?.table ?? '';
+    column_type.table = column.expr?.from?.as ?? column_type.orgTable;
     columns.push(column_type);
   }
 
@@ -181,25 +181,14 @@ interface ExpandStarColumnsParams {
 }
 function _expandStarColumns(params: ExpandStarColumnsParams): QueryColumn[] {
   const { ast, column_map } = params;
-  const astObj = ast as { columns?: unknown[]; from?: unknown[] };
   const ret: QueryColumn[] = [];
-  astObj?.columns?.forEach?.((column: unknown) => {
-    const col = column as {
-      expr?: { type?: string; column?: string; db?: string; table?: string };
-      as?: string | null;
-    };
-    if (col?.expr?.type === 'column_ref' && col.expr.column === '*') {
-      const { db, table } = col.expr;
-      const fromList = astObj.from as
-        | Array<{
-            db?: string;
-            table?: string;
-            as?: string;
-            key?: string;
-            _requestSet?: Set<string>;
-          }>
-        | undefined;
-      fromList?.forEach((from) => {
+  for (const column of ast?.columns ?? []) {
+    if (column?.expr?.type === 'column_ref' && column.expr.column === '*') {
+      const { db, table } = column.expr;
+      const from_list = Array.isArray(ast.from)
+        ? (ast.from as ExtendedFrom[])
+        : [];
+      for (const from of from_list) {
         if (
           (!db && !table) ||
           (db && from.db === db && from.table === table && !from.as) ||
@@ -223,11 +212,11 @@ function _expandStarColumns(params: ExpandStarColumnsParams): QueryColumn[] {
             });
           });
         }
-      });
+      }
     } else {
-      ret.push(col as QueryColumn);
+      ret.push(column as QueryColumn);
     }
-  });
+  }
   return ret;
 }
 function _unionType(

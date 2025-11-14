@@ -17,6 +17,10 @@ import type { DynamoDBWithCacheConstructorParams } from './lib/dynamodb';
 
 let g_threadId = 1;
 
+export interface TypeCastOptions {
+  dateStrings?: boolean;
+}
+
 export interface SessionConfig extends DynamoDBWithCacheConstructorParams {
   database?: string | undefined;
   multipleStatements?: boolean | undefined;
@@ -31,7 +35,7 @@ export class Session extends EventEmitter implements PoolConnection {
   public readonly threadId: number | null = g_threadId++;
 
   public readonly dynamodb: ReturnType<typeof DynamoDB.createDynamoDB>;
-  public readonly typeCastOptions: { dateStrings?: boolean } = {};
+  public readonly typeCastOptions: TypeCastOptions = {};
   public readonly typeCast: TypeCast;
   public readonly resultObjects: boolean;
   public readonly multipleStatements: boolean;

@@ -1,5 +1,6 @@
 import { getValue } from '../expression';
 import { SQLError } from '../../error';
+import { Types } from '../../types';
 
 import type { OrderBy } from 'node-sql-parser';
 import type { Session } from '../../session';
@@ -69,8 +70,7 @@ function _asc(
   } else if (typeof a === 'number' && typeof b === 'number') {
     return a - b;
   } else if (
-    (typeof column === 'object' &&
-      (column as { columnType?: number }).columnType === 246) ||
+    (typeof column === 'object' && column.type === Types.NEWDECIMAL) ||
     column === 'number'
   ) {
     return _convertNum(a) - _convertNum(b);
