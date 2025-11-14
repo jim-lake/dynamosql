@@ -23,16 +23,20 @@ async function _getFromTable(
   params: RowListParams & { from: ExtendedFrom }
 ): Promise<{ results: ItemRecord[]; column_list: string[] }> {
   const { dynamodb, session, from, where } = params;
-  const { table, _requestSet, _requestAll } = from;
+  const { table, _requestSet, _requestAll, join } = from;
   const request_columns = [..._requestSet];
   const columns =
     _requestAll || request_columns.length === 0
       ? '*'
       : request_columns.map(escapeIdentifier).join(',');
   let sql = `SELECT ${columns} FROM ${escapeIdentifier(table)}`;
-  const where_result = where
-    ? convertWhere(where, { session, from_key: from.key, default_true: true })
-    : null;
+  // Don't push down WHERE clause for LEFT JOIN tables (right side of join)
+  // The WHERE clause must be applied after the join
+  const is_left_join = join?.indexOf?.('LEFT') >= 0;
+  const where_result =
+    where && !is_left_join
+      ? convertWhere(where, { session, from_key: from.key, default_true: true })
+      : null;
   if (!where_result?.err && where_result?.value) {
     sql += ' WHERE ' + where_result.value;
   }
