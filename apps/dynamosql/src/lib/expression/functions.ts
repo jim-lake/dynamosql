@@ -148,9 +148,8 @@ function datediff(expr: Function, state: EvaluationState): EvaluationResult {
   if (!err && (expr1.value === null || expr2.value === null)) {
     value = null;
   } else if (!err) {
-    value =
-      convertDateTime(expr1.value)?.diff?.(convertDateTime(expr2.value)) ||
-      null;
+    const result = convertDateTime(expr1.value)?.diff?.(convertDateTime(expr2.value));
+    value = result !== undefined ? result : null;
   }
   return { err, name, value, type: 'int' };
 }
