@@ -11,7 +11,9 @@ const Session = require('../src/session');
 
 const SECONDS_REGEX = /:[0-9]{2}(\.[0-9]*)?$/g;
 
-function runTests(test_name, file_path, extra) {
+function runTests(test_name, file_path, extra, maybe_skip) {
+  const skip = maybe_skip && !process.env.TEST_RUN_SLOW;
+
   const mysql_opts = Object.assign(
     {
       host: config.db.host,
@@ -53,6 +55,9 @@ function runTests(test_name, file_path, extra) {
   });
   function _runTest(sql) {
     it(sql, function (done) {
+      if (skip) {
+        return this.skip();
+      }
       const mysql_result = {};
       const ddb_result = {};
 
