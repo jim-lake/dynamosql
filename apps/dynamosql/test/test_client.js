@@ -37,8 +37,8 @@ conn.connect((err) => {
     console.log('connect: success');
     conn.query(sql, [], (err, result, fields) => {
       console.log('err:', err);
-      console.log('result:', result);
       console.log('fields:', fields);
+      console.log('result:', result);
       conn.destroy();
     });
   }

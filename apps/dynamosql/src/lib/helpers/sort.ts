@@ -61,15 +61,12 @@ function _asc(
   b: unknown,
   column: FieldInfo | string | undefined
 ): number {
-  // MySQL sorts NULL values first in both ASC and DESC
-  if (a === null && b === null) {
+  if (a === b) {
     return 0;
   } else if (a === null) {
     return -1;
   } else if (b === null) {
     return 1;
-  } else if (a === b) {
-    return 0;
   } else if (typeof a === 'number' && typeof b === 'number') {
     return a - b;
   } else if (
@@ -88,14 +85,6 @@ function _desc(
   b: unknown,
   column: FieldInfo | string | undefined
 ): number {
-  // MySQL sorts NULL values first in both ASC and DESC
-  if (a === null && b === null) {
-    return 0;
-  } else if (a === null) {
-    return -1;
-  } else if (b === null) {
-    return 1;
-  }
   return _asc(b, a, column);
 }
 

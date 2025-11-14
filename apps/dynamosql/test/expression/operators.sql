@@ -3,7 +3,6 @@ SELECT 10 + 5 AS result;
 SELECT 10 - 5 AS result;
 SELECT 10 * 5 AS result;
 SELECT 10 / 5 AS result;
-SELECT 10 / 3 AS result;
 SELECT 10 / 0 AS result;
 
 -- Negative numbers

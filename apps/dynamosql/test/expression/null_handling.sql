@@ -72,6 +72,6 @@ SELECT id, other, other + 10 AS plus_ten FROM _dynamodb.foo ORDER BY id;
 SELECT id, comment, CONCAT("prefix:", comment) AS prefixed FROM _dynamodb.foo ORDER BY id;
 
 -- NULL in ORDER BY
-SELECT id, other FROM _dynamodb.foo ORDER BY other;
-SELECT id, other FROM _dynamodb.foo ORDER BY other DESC;
-SELECT id, other FROM _dynamodb.foo ORDER BY other ASC;
+SELECT id, other FROM _dynamodb.foo ORDER BY other, id;
+SELECT id, other FROM _dynamodb.foo ORDER BY other DESC, id;
+SELECT id, other FROM _dynamodb.foo ORDER BY other ASC, id;

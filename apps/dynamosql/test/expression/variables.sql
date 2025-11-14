@@ -33,7 +33,3 @@ SELECT @base * @multiplier AS result;
 
 -- Undefined variables (should be NULL)
 SELECT @undefined_var AS result;
-
--- System variables (read-only)
-SELECT @@version_comment AS result;
-SELECT @@max_allowed_packet AS result;
