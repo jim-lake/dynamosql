@@ -17,7 +17,7 @@ export interface VarExpr {
 }
 
 export type ExtendedColumnRef =
-  | (ColumnRef & { _resultIndex?: number })
+  | (ColumnRef & { _resultIndex?: number; from?: { key: string } })
   | { type: 'number'; value: number; _resultIndex?: number };
 
 export type ExtendedFrom = From & {
@@ -25,6 +25,7 @@ export type ExtendedFrom = From & {
   table: string;
   key: string;
   as?: string;
+  join?: string;
   _requestSet: Set<string>;
   _requestAll: boolean;
 };
@@ -47,8 +48,13 @@ export interface UnaryExpr {
   expr: ExpressionValue;
 }
 
+export interface Transaction {
+  type: 'transaction';
+  expr?: { action?: { value?: string } };
+}
+
 // Extended AST type that includes the missing types
-export type ExtendedAST = AST | Show | SetStatement;
+export type ExtendedAST = AST | Show | SetStatement | Transaction;
 
 // Extended ExpressionValue that includes missing expression types
 export type ExtendedExpressionValue = ExpressionValue | VarExpr | UnaryExpr;

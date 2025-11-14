@@ -32,7 +32,7 @@ async function _getFromTable(
   let sql = `SELECT ${columns} FROM ${escapeIdentifier(table)}`;
   // Don't push down WHERE clause for LEFT JOIN tables (right side of join)
   // The WHERE clause must be applied after the join
-  const is_left_join = join?.indexOf?.('LEFT') >= 0;
+  const is_left_join = join ? join.indexOf('LEFT') >= 0 : false;
   const where_result =
     where && !is_left_join
       ? convertWhere(where, { session, from_key: from.key, default_true: true })

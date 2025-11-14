@@ -155,5 +155,5 @@ export function convertType(type: unknown, nullable?: boolean): FieldInfo {
   if (ret && nullable === true) {
     ret.flags &= ~MYSQL.FIELD_FLAGS.NOT_NULL;
   }
-  return ret;
+  return ret!;
 }

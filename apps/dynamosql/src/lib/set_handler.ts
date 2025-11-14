@@ -6,7 +6,7 @@ import type { HandlerParams } from './handler_types';
 import type { Select } from 'node-sql-parser';
 
 export async function query(params: HandlerParams): Promise<void> {
-  const { ast, session } = params;
+  const { ast } = params;
 
   const expr = ast?.expr;
 
@@ -47,9 +47,9 @@ async function _handleAssignment(
     });
     // Get the first column of the first row
     if (rows && rows.length > 0 && rows[0]) {
-      const firstRow = rows[0];
+      const firstRow = rows[0] as Record<string, any>;
       const firstKey = Object.keys(firstRow)[0];
-      value = firstRow[firstKey];
+      value = firstKey !== undefined ? firstRow[firstKey] : null;
     } else {
       value = null;
     }

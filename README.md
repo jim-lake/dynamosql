@@ -36,7 +36,7 @@ Your DynamoDB tables show up in the `_dynamodb` database.
 ### Data Query Language (DQL)
 
 - **SELECT**
-  - Column selection (*, specific columns, aliases)
+  - Column selection (\*, specific columns, aliases)
   - WHERE clause with complex expressions
   - JOIN (INNER JOIN, LEFT JOIN, comma-separated tables)
   - GROUP BY (with column names, positions, or expressions)
@@ -101,7 +101,7 @@ Your DynamoDB tables show up in the `_dynamodb` database.
 
 ### Expressions & Operators
 
-- **Arithmetic Operators**: +, -, *, /
+- **Arithmetic Operators**: +, -, \*, /
 - **Comparison Operators**: =, !=, <>, <, >, <=, >=
 - **Logical Operators**: AND, OR, XOR, NOT, !
 - **Unary Operators**: +, -, NOT, !

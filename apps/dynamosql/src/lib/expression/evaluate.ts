@@ -164,20 +164,47 @@ export function getValue(
     }
     result.name = prefix + varExpr.name;
   } else if (type === 'column_ref') {
-    const colRef = expr as ColumnRef;
-    result.name = colRef.column as string;
+    const colRef = expr as ColumnRef & {
+      _resultIndex?: number;
+      from?: { key: string };
+    };
+
+    // Handle both ColumnRefItem and ColumnRefExpr
+    let columnName: string;
+    let columnValue: string | { expr: any };
+
+    if ('column' in colRef) {
+      // ColumnRefItem
+      columnValue = colRef.column;
+      columnName =
+        typeof columnValue === 'string' ? columnValue : String(columnValue);
+    } else if ('expr' in colRef && colRef.expr && 'column' in colRef.expr) {
+      // ColumnRefExpr
+      columnValue = colRef.expr.column;
+      columnName =
+        typeof columnValue === 'string' ? columnValue : String(columnValue);
+    } else {
+      columnName = String(colRef);
+    }
+
+    result.name = columnName;
     if (row && colRef._resultIndex !== undefined && colRef._resultIndex >= 0) {
-      const output_result = row['@@result']?.[colRef._resultIndex];
+      const output_result = (
+        row['@@result'] as EvaluationResult[] | undefined
+      )?.[colRef._resultIndex];
       result.value = output_result?.value;
       result.type = output_result?.type;
     } else if (row) {
-      const cell = row[colRef.from?.key]?.[colRef.column];
+      const fromKey = colRef.from?.key;
+      const cell = fromKey
+        ? (row as Record<string, any>)[fromKey]?.[columnName]
+        : undefined;
       const decode = _decodeCell(cell);
       result.type = decode?.type;
       result.value = decode?.value;
     } else {
       result.err = 'no_row_list';
-      result.value = colRef.column;
+      result.value = columnName;
     }
   } else {
     logger.error('unsupported expr:', expr);

@@ -37,7 +37,12 @@ function count(expr: AggrFunc, state: EvaluationState): EvaluationResult {
   let value = 0;
   let name = 'COUNT(';
 
-  if (expr.args?.expr?.column === '*') {
+  const argExpr = expr.args?.expr;
+  if (
+    argExpr?.type === 'column_ref' &&
+    'column' in argExpr &&
+    argExpr.column === '*'
+  ) {
     value = group.length;
     name += '*';
   } else {

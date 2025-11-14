@@ -40,8 +40,13 @@ export function typeCast(
           ret = String(value);
         } else if (value instanceof Date) {
           ret = value;
-        } else if (value.toDate) {
-          ret = value.toDate();
+        } else if (
+          typeof value === 'object' &&
+          value !== null &&
+          'toDate' in value &&
+          typeof (value as { toDate: () => Date }).toDate === 'function'
+        ) {
+          ret = (value as { toDate: () => Date }).toDate();
         } else {
           ret = new Date(String(value));
         }

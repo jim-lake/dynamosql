@@ -6,7 +6,7 @@ const HOUR = 60 * MINUTE;
 const DAY = 24 * HOUR;
 
 export function convertNum(value: unknown): number | null {
-  let ret = value;
+  let ret: number | null = null;
   if (value === null) {
     ret = null;
   } else if (value === '') {
@@ -16,8 +16,15 @@ export function convertNum(value: unknown): number | null {
     if (isNaN(ret)) {
       ret = 0;
     }
-  } else if (value?.toNumber) {
-    ret = value.toNumber();
+  } else if (
+    typeof value === 'object' &&
+    value !== null &&
+    'toNumber' in value &&
+    typeof (value as { toNumber: () => number }).toNumber === 'function'
+  ) {
+    ret = (value as { toNumber: () => number }).toNumber();
+  } else if (typeof value === 'number') {
+    ret = value;
   }
   return ret;
 }
@@ -163,7 +170,7 @@ function _stringToDate(value: string): any {
   let ret;
   const match = value.trim().match(DATE_REGEX);
   if (match && match[1] && match[2] && match[3]) {
-    const year = _fix2year(match[1]);
+    const year = _fix2year(match[1]) as string | number;
     const month = match[2];
     const day = match[3];
     ret = _partsToTime(year, month, day, 0, 0, 0);
@@ -175,7 +182,7 @@ function _stringToDateTime(value: string): any {
   let ret;
   const match = value.trim().match(DATETIME_REGEX);
   if (match && match[1] && match[2] && match[3] && match[5]) {
-    const year = _fix2year(match[1]);
+    const year = _fix2year(match[1]) as string | number;
     const month = match[2];
     const day = match[3];
     const hour = match[5];
@@ -204,7 +211,7 @@ function _numToDateTime(number: any): any {
   if (ret === undefined) {
     match = s.match(DATETIME2_REGEX);
     if (match && match[1] && match[2] && match[3] && match[4] && match[5]) {
-      const year = _fix2year(match[1]);
+      const year = _fix2year(match[1]) as string | number;
       const month = match[2];
       const day = match[3];
       const hour = match[4];
@@ -226,7 +233,7 @@ function _numToDateTime(number: any): any {
   if (ret === undefined) {
     match = s.match(DATE2_REGEX);
     if (match && match[1] && match[2] && match[3]) {
-      const year = _fix2year(match[1]);
+      const year = _fix2year(match[1]) as string | number;
       const month = match[2];
       const day = match[3];
       ret = _partsToTime(year, month, day, 0, 0, 0);
@@ -264,14 +271,14 @@ function _pad4(num: unknown): string {
   return String(num).padStart(4, '0');
 }
 
-function _fix2year(num: unknown): unknown {
-  let ret = num;
-  if (num?.length <= 2) {
-    ret = parseInt(num);
-    if (num >= 0 && num <= 69) {
-      ret += 2000;
-    } else if (num >= 70 && num <= 99) {
-      ret += 1900;
+function _fix2year(num: unknown): string | number {
+  let ret: string | number = num as string | number;
+  if (typeof num === 'string' && num.length <= 2) {
+    const parsed = parseInt(num, 10);
+    if (parsed >= 0 && parsed <= 69) {
+      ret = parsed + 2000;
+    } else if (parsed >= 70 && parsed <= 99) {
+      ret = parsed + 1900;
     }
   }
   return ret;
