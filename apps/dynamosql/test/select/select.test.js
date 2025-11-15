@@ -13,4 +13,5 @@ describe('Select', function () {
     path.join(__dirname, 'group_edge_cases.sql')
   );
   runTests('subquery.sql', path.join(__dirname, 'subquery.sql'));
+  runTests('advanced.sql', path.join(__dirname, 'advanced.sql'));
 });
