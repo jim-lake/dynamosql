@@ -1,159 +1,176 @@
-import * as MYSQL from '../../constants/mysql';
+import { CHARSETS, FIELD_FLAGS } from '../../constants/mysql';
 import { Types } from '../../types';
 import type { FieldInfo } from '../../types';
 
-export function convertType(type: unknown, nullable?: boolean): FieldInfo {
+export function convertType(type?: string, nullable?: boolean): FieldInfo {
   let ret: FieldInfo | undefined;
-  if (type === 'number') {
-    ret = {
+  const flags = nullable !== true ? FIELD_FLAGS.NOT_NULL : 0;
+  const find_type = typeof type === 'string' ? type.toLowerCase() : typeof type;
+  switch (type?.toLowerCase()) {
+  case 'double':
+    return {
       catalog: 'def',
       db: '',
       table: '',
       orgTable: '',
       name: '',
       orgName: '',
-      charsetNr: MYSQL.CHARSETS.BINARY,
+      charsetNr: CHARSETS.BINARY,
+      length: 23,
+      type: Types.DOUBLE,
+      flags: flags | FIELD_FLAGS.BINARY,
+      decimals: 6,
+      zeroFill: false,
+      protocol41: true,
+    };
+  case 'number':
+    return {
+      catalog: 'def',
+      db: '',
+      table: '',
+      orgTable: '',
+      name: '',
+      orgName: '',
+      charsetNr: CHARSETS.BINARY,
       length: 66,
       type: Types.NEWDECIMAL,
-      flags: MYSQL.FIELD_FLAGS.BINARY | MYSQL.FIELD_FLAGS.NOT_NULL,
+      flags: flags | FIELD_FLAGS.BINARY,
       decimals: 31,
       zeroFill: false,
       protocol41: true,
     };
-  } else if (type === 'bigint') {
-    ret = {
+  case 'bigint':
+  case 'longlong':
+    return {
       catalog: 'def',
       db: '',
       table: '',
       orgTable: '',
       name: '',
       orgName: '',
-      charsetNr: MYSQL.CHARSETS.BINARY,
+      charsetNr: CHARSETS.BINARY,
       length: 66,
       type: Types.LONGLONG,
-      flags: MYSQL.FIELD_FLAGS.BINARY | MYSQL.FIELD_FLAGS.NOT_NULL,
+      flags: flags | FIELD_FLAGS.BINARY,
       decimals: 0,
       zeroFill: false,
       protocol41: true,
     };
-  } else if (type === 'null') {
-    ret = {
+  case 'null':
+    return {
       catalog: 'def',
       db: '',
       table: '',
       orgTable: '',
       name: '',
       orgName: '',
-      charsetNr: MYSQL.CHARSETS.BINARY,
+      charsetNr: CHARSETS.BINARY,
       length: 0,
       type: Types.NULL,
-      flags: MYSQL.FIELD_FLAGS.BINARY,
+      flags: FIELD_FLAGS.BINARY,
       decimals: 0,
       zeroFill: false,
       protocol41: true,
     };
-  } else if (type === 'json') {
-    ret = {
+  case 'json':
+    return {
       catalog: 'def',
       db: '',
       table: '',
       orgTable: '',
       name: '',
       orgName: '',
-      charsetNr: MYSQL.CHARSETS.UTF8_GENERAL_CI,
+      charsetNr: CHARSETS.UTF8_GENERAL_CI,
       length: 4294967295,
       type: Types.JSON,
-      flags: 0,
+      flags,
       decimals: 0,
       zeroFill: false,
       protocol41: true,
     };
-  } else if (type === 'datetime') {
-    ret = {
+  case 'datetime':
+    return {
       catalog: 'def',
       db: '',
       table: '',
       orgTable: '',
       name: '',
       orgName: '',
-      charsetNr: MYSQL.CHARSETS.BINARY,
+      charsetNr: CHARSETS.BINARY,
       length: 26,
       type: Types.DATETIME,
-      flags: MYSQL.FIELD_FLAGS.BINARY | MYSQL.FIELD_FLAGS.NOT_NULL,
+      flags: flags | FIELD_FLAGS.BINARY,
       decimals: 0,
       zeroFill: false,
       protocol41: true,
     };
-  } else if (type === 'date') {
-    ret = {
+  case 'date':
+    return {
       catalog: 'def',
       db: '',
       table: '',
       orgTable: '',
       name: '',
       orgName: '',
-      charsetNr: MYSQL.CHARSETS.BINARY,
+      charsetNr: CHARSETS.BINARY,
       length: 10,
       type: Types.DATE,
-      flags: MYSQL.FIELD_FLAGS.BINARY | MYSQL.FIELD_FLAGS.NOT_NULL,
+      flags: flags | FIELD_FLAGS.BINARY,
       decimals: 0,
       zeroFill: false,
       protocol41: true,
     };
-  } else if (type === 'time') {
-    ret = {
+  case 'time':
+    return {
       catalog: 'def',
       db: '',
       table: '',
       orgTable: '',
       name: '',
       orgName: '',
-      charsetNr: MYSQL.CHARSETS.BINARY,
+      charsetNr: CHARSETS.BINARY,
       length: 15,
       type: Types.TIME,
-      flags: MYSQL.FIELD_FLAGS.BINARY | MYSQL.FIELD_FLAGS.NOT_NULL,
+      flags: flags | FIELD_FLAGS.BINARY,
       decimals: 0,
       zeroFill: false,
       protocol41: true,
     };
-  } else if (type === 'buffer') {
-    ret = {
+  case 'buffer':
+    return {
       catalog: 'def',
       db: '',
       table: '',
       orgTable: '',
       name: '',
       orgName: '',
-      charsetNr: MYSQL.CHARSETS.BINARY,
+      charsetNr: CHARSETS.BINARY,
       length: 255,
       type: Types.VAR_STRING,
       flags:
-        MYSQL.FIELD_FLAGS.NOT_NULL |
-        MYSQL.FIELD_FLAGS.BINARY |
-        MYSQL.FIELD_FLAGS.UNSIGNED,
+        flags |
+        FIELD_FLAGS.BINARY |
+        FIELD_FLAGS.UNSIGNED,
       decimals: 0,
       zeroFill: false,
       protocol41: true,
     };
-  } else if (type === 'string' || typeof type !== 'object') {
-    ret = {
+  case 'string':
+  default:
+    return {
       catalog: 'def',
       db: '',
       table: '',
       orgTable: '',
       name: '',
       orgName: '',
-      charsetNr: MYSQL.CHARSETS.UTF8_GENERAL_CI,
+      charsetNr: CHARSETS.UTF8_GENERAL_CI,
       length: 255,
       type: Types.VAR_STRING,
-      flags: MYSQL.FIELD_FLAGS.NOT_NULL,
+      flags,
       decimals: 0,
       zeroFill: false,
       protocol41: true,
     };
   }
-  if (ret && nullable === true) {
-    ret.flags &= ~MYSQL.FIELD_FLAGS.NOT_NULL;
-  }
-  return ret!;
 }

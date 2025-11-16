@@ -2,8 +2,10 @@ import * as Expression from './expression';
 import * as SelectHandler from './select_handler';
 import { logger } from '@dynamosql/shared';
 import { SQLError } from '../error';
-import type { HandlerParams } from './handler_types';
+
 import type { Select } from 'node-sql-parser';
+import type { HandlerParams } from './handler_types';
+import type { ExpressionValue } from './expression';
 
 export async function query(params: HandlerParams): Promise<void> {
   const { ast } = params;
@@ -37,32 +39,27 @@ async function _handleAssignment(
   const { session } = params;
   const { left, right } = expr;
 
-  let value: unknown;
+  let result: ExpressionValue|undefined;
 
-  // Check if right side is a subquery
   if (right?.type === 'select') {
-    const { rows } = await SelectHandler.query({
+    const { rows, columns } = await SelectHandler.internalQuery({
       ...params,
       ast: right as Select,
     });
-    // Get the first column of the first row
-    if (rows && rows.length > 0 && rows[0]) {
-      const firstRow = rows[0] as Record<string, any>;
-      const firstKey = Object.keys(firstRow)[0];
-      value = firstKey !== undefined ? firstRow[firstKey] : null;
+    if (rows && rows[0]?.[0]) {
+      result = rows[0][0];
     } else {
-      value = null;
+      result = { value: null, type: 'null' };
     }
   } else {
-    const result = Expression.getValue(right, { session });
+    result = Expression.getValue(right, { session });
     if (result.err) {
       throw new SQLError(result.err);
     }
-    value = result.value;
   }
 
-  if (left?.type === 'var' && left.prefix === '@') {
-    session.setVariable(left.name, value);
+  if (result && left?.type === 'var' && left.prefix === '@') {
+    session.setVariable(left.name, result);
   } else {
     logger.error('set_handler._handleAssignment: unsupported left:', left);
     throw new SQLError('unsupported');

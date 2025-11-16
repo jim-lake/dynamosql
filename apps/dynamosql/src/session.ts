@@ -4,6 +4,8 @@ import * as SqlString from 'sqlstring';
 import * as DynamoDB from './lib/dynamodb';
 import { SQLError } from './error';
 import { Query } from './query';
+import GlobalSettings from './global_settings';
+import { SYSTEM_VARIABLE_TYPES } from './constants/system_variables';
 
 import type {
   TypeCast,
@@ -14,6 +16,7 @@ import type {
   Query as MysqlQuery,
 } from './types';
 import type { DynamoDBWithCacheConstructorParams } from './lib/dynamodb';
+import type { EvaluationValue } from './lib/expression';
 
 let g_threadId = 1;
 
@@ -29,6 +32,11 @@ export interface SessionConfig extends DynamoDBWithCacheConstructorParams {
   dateStrings?: boolean | Array<'TIMESTAMP' | 'DATETIME' | 'DATE'> | undefined;
 }
 
+export interface SqlValue {
+  type: string;
+  value: unknown;
+}
+
 export class Session extends EventEmitter implements PoolConnection {
   public readonly config: SessionConfig;
   public readonly state: string = 'connected';
@@ -41,14 +49,35 @@ export class Session extends EventEmitter implements PoolConnection {
   public readonly multipleStatements: boolean;
 
   private _currentDatabase: string | null = null;
-  private _localVariables: Record<string, unknown> = {};
+  private readonly _localVariables = new Map<string, EvaluationValue>();
   private _transaction: unknown = null;
   private _isReleased = false;
   private readonly _tempTableMap = new Map<string, unknown>();
 
-  public readonly escape = SqlString.escape;
-  public readonly escapeId = SqlString.escapeId;
-  public readonly format = SqlString.format;
+  private _collationConnect: string | undefined;
+  private _divPrecisionIncrement: number | undefined;
+  private _timeZone: string | undefined;
+  private _sqlMode: string | undefined;
+  private _timestamp = 0;
+  private _insertId = 0n;
+  private _lastInsertId = 0n;
+
+  public get collationConnection() {
+    return this._collationConnect ?? GlobalSettings.collationConnection;
+  }
+  public get divPrecisionIncrement() {
+    return this._divPrecisionIncrement ?? GlobalSettings.divPrecisionIncrement;
+  }
+  public get sqlMode() {
+    return this._sqlMode ?? GlobalSettings.sqlMode;
+  };
+  public get timeZone() {
+    return this._timeZone ?? GlobalSettings.timeZone;
+  };
+
+  public get lastInsertId() { return this._lastInsertId; };
+  public get insertId() { return this._insertId; };
+  public get timestamp() { return this._timestamp; }
 
   constructor(params?: SessionConfig) {
     super();
@@ -64,61 +93,98 @@ export class Session extends EventEmitter implements PoolConnection {
       this.setCurrentDatabase(params.database);
     }
   }
-
   release(done?: () => void) {
     this._isReleased = true;
     done?.();
   }
-
   end(done?: () => void) {
     this.release(done);
   }
-
   destroy() {
     this.release();
   }
-
   setCurrentDatabase(database: string, done?: () => void) {
     this._currentDatabase = database;
     done?.();
   }
-
   getCurrentDatabase() {
     return this._currentDatabase;
   }
-
-  setVariable(name: string, value: unknown) {
-    this._localVariables[name] = value;
+  getVariable(name: string): EvaluationValue|undefined {
+    return _cloneVar(this._localVariables.get(name));
   }
-
-  getVariable(name: string) {
-    return this._localVariables[name];
+  setVariable(name: string, value: EvaluationValue) {
+    this._localVariables.set(name, value);
   }
-
+  public getSessionVariable(name: string): EvaluationValue|undefined {
+    const name_uc = name.toUpperCase();
+    const type = SYSTEM_VARIABLE_TYPES[name_uc];
+    switch (name_uc) {
+    case 'COLLATION_CONNECTION':
+      return { value: this.collationConnection, type };
+    case 'DIV_PRECISION_INCREMENT':
+      return { value: this.divPrecisionIncrement, type };
+    case 'TIME_ZONE':
+      return { value: this.timeZone, type };
+    case 'SQL_MODE':
+      return { value: this.sqlMode, type };
+    case 'INSERT_ID':
+      return { value: this.insertId, type };
+    case 'LAST_INSERT_ID':
+      return { value: this.lastInsertId, type };
+    case 'TIMESTAMP':
+      return { value: this.timestamp, type };
+    }
+    return undefined;
+  }
+  public setSessionVariable(name: string, value: unknown) {
+    const name_uc = name.toUpperCase();
+    switch (name_uc) {
+    case 'COLLATION_CONNECTION':
+      this._collationConnection = String(value);
+      return;
+    case 'DIV_PRECISION_INCREMENT':
+      this._divPrecisionIncrement = Number(value)
+      return;
+    case 'TIME_ZONE':
+      this._timeZone = String(value);
+      return;
+    case 'SQL_MODE':
+      this._sqlMode = String(value);
+      return;
+    case 'TIMESTAMP':
+      this._timestamp = Number(value);
+      return;
+    case 'LAST_INSERT_ID':
+      this._lastInsertId = BigInt(value);
+      return;
+    case 'INSERT_ID':
+      this._insertId = BigInt(value);
+      return;
+    case 'TIMESTAMP':
+      this._timestamp = Number(value);
+      return;
+    }
+    throw new SQLError({ err:'ER_UNKNOWN_SYSTEM_VARIABLE', args: [name]});
+  }
   getTransaction<T>(): T | null {
     return this._transaction as T | null;
   }
-
   setTransaction(tx: unknown) {
     this._transaction = tx;
   }
-
   getTempTableList() {
     return this._tempTableMap.keys();
   }
-
   getTempTable<T>(database: string, table: string): T | undefined {
     return this._tempTableMap.get(`${database}.${table}`) as T | undefined;
   }
-
   saveTempTable(database: string, table: string, contents: unknown) {
     this._tempTableMap.set(`${database}.${table}`, contents);
   }
-
   deleteTempTable(database: string, table: string) {
     this.dropTempTable(database, table);
   }
-
   dropTempTable(database: string, table?: string) {
     const prefix = database + '.';
     if (table) {
@@ -131,7 +197,6 @@ export class Session extends EventEmitter implements PoolConnection {
       }
     }
   }
-
   query(
     params: string | QueryOptions,
     values?: unknown,
@@ -160,7 +225,10 @@ export class Session extends EventEmitter implements PoolConnection {
     void this._run(query, done);
     return query;
   }
-  createQuery = this.query;
+  public readonly createQuery = this.query;
+  public readonly escape = SqlString.escape;
+  public readonly escapeId = SqlString.escapeId;
+  public readonly format = SqlString.format;
 
   private async _run(query: Query, done?: QueryCallback) {
     try {
@@ -173,4 +241,10 @@ export class Session extends EventEmitter implements PoolConnection {
 }
 export function createSession(args?: SessionConfig): PoolConnection {
   return new Session(args);
+}
+function _cloneVar(value: EvaluationValue|undefined): EvaluationValue|undefned {
+  if (value !== undefined) {
+    return Object.assign({}, value);
+  }
+  return undefined;
 }

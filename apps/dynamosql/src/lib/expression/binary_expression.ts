@@ -313,7 +313,7 @@ function _gte(
       value = left.value.localeCompare(right.value) >= 0 ? 1 : 0;
     }
   }
-  return { err, value, name };
+  return { err, value, type: 'longlong', name };
 }
 
 function gte(expr: Binary, state: EvaluationState): EvaluationResult {

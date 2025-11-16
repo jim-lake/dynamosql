@@ -130,12 +130,15 @@ const ERROR_MAP: Record<string, ErrorMapEntry> = {
     code: 'ER_DBACCESS_DENIED_ERROR',
     sqlMessage: 'Access denied',
   },
+  ER_UNKNOWN_SYSTEM_VARIABLE: {
+    code: 'ER_UNKNOWN_SYSTEM_VARIABLE',
+    sqlMessage: errStr`Unknown system variable '${0}'`,
+  }
 };
 
 export class SQLError extends Error {
   code: string;
   errno: number;
-  sqlStateMarker?: string;
   sqlState?: string;
   fieldCount?: number;
   fatal: boolean = false;

@@ -4,7 +4,7 @@ import { methods as Cast } from './cast';
 import { methods as Functions } from './functions';
 import { methods as Interval } from './interval';
 import { methods as UnaryExpression } from './unary_expression';
-import { methods as SystemVariables } from '../system_variables';
+import GlobalSettings from '../../global_settings';
 import { mapToObject } from '../../tools/dynamodb_helper';
 import { logger } from '@dynamosql/shared';
 import { getFunctionName } from '../helpers/ast_helper';
@@ -25,12 +25,13 @@ export interface EvaluationState {
   session: Session;
   row?: Row | RowWithResult;
 }
-
-export interface EvaluationResult {
-  err: { err: string; args?: unknown[] } | string | null;
+export interface EvaluationValue {
+  type: string;
   value: unknown;
+}
+export interface EvaluationResult extends EvaluationValue {
+  err: { err: string; args?: unknown[] } | string | null;
   name?: string;
-  type?: string;
   sleep_ms?: number;
 }
 
@@ -41,6 +42,7 @@ export function getValue(
   const { session, row } = state;
   let result: EvaluationResult = {
     err: null,
+    type: 'undefined',
     value: undefined,
     name: undefined,
   };
@@ -142,27 +144,44 @@ export function getValue(
     }
   } else if (type === 'var') {
     const varExpr = expr as VarExpr;
-    const { prefix } = varExpr;
+    const { prefix, members } = varExpr;
+    const scope = members.length > 0 ? varExpr.name.toLowerCase() : '';
+    const name = members.length > 0 ? varExpr.members[0] : varExpr.name;
     if (prefix === '@@') {
-      const func = SystemVariables[varExpr.name.toLowerCase()];
-      if (func) {
-        result.value = func();
+      let val: ExpressionValue|undefined;
+      if (scope === 'session') {
+        val = session.getSessionVariable(name);
+      } else if (scope === 'global') {
+        val = GlobalSettings.getGlobalVariable(name);
+      } else if (scope === '') {
+        val = session.getSessionVariable(name) ?? GlobalSettings.getGlobalVariable(name);
+      }
+      if (val !== undefined) {
+        result.value = val.value;
+        result.type = val.type;
       } else {
         logger.trace(
           'expression.getValue: unknown system variable:',
-          varExpr.name
+          varExpr.name, varExpr.members
         );
         result.err = {
           err: 'ER_UNKNOWN_SYSTEM_VARIABLE',
-          args: [varExpr.name],
+          args: [name],
         };
       }
     } else if (prefix === '@') {
-      result.value = session.getVariable(varExpr.name) ?? null;
+      const val = session.getVariable(name);
+      if (val === undefined) {
+        result.value = null;
+        result.type = 'null';
+      } else {
+        result.value = val.value;
+        result.type = val.type;
+      }
     } else {
       result.err = 'unsupported';
     }
-    result.name = prefix + varExpr.name;
+    result.name = prefix + (scope ? scope + '.' : '') + name;
   } else if (type === 'column_ref') {
     const colRef = expr as ColumnRef & {
       _resultIndex?: number;
@@ -211,7 +230,7 @@ export function getValue(
     result.err = 'unsupported';
   }
 
-  if (!result.type) {
+  if (result.type === 'undefined' || result.type === undefined) {
     result.type = result.value === null ? 'null' : typeof result.value;
   }
   if (result.name === undefined && result.value !== undefined) {
