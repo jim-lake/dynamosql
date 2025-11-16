@@ -1,8 +1,10 @@
 process.env.TZ = 'UTC';
 
 const path = require('node:path');
-const config = tryRequire('../config');
+const config = tryRequire('../../../config');
 const dynamosql = require('../src');
+const { Types } = require('../src/types');
+const { CHARSETS, FIELD_FLAGS } = require('../src/constants/mysql');
 
 const sql = process.argv.slice(2).join(' ');
 if (!sql) {
@@ -37,6 +39,18 @@ session.query({ sql }, (err, results, fields) => {
     console.log('err:', err);
   }
   if (fields) {
+    for (let field_list of fields ?? []) {
+      if (!Array.isArray(field_list)) {
+        field_list = [field_list];
+      }
+      for (const field of field_list) {
+        if (typeof field === 'object') {
+          field.charsetNr = `${field.charsetNr} (${CHARSETS[field.charsetNr]})`;
+          field.type = `${field.type} (${Types[field.type]})`;
+          field.flags = `0x${field.flags.toString(16)} (${flagsToString(FIELD_FLAGS, field.flags)})`;
+        }
+      }
+    }
     console.log('fields:', fields);
   }
   if (results) {
@@ -51,4 +65,15 @@ function tryRequire(path) {
   } catch {
     return {};
   }
+}
+function flagsToString<T extends Record<string, number>>(
+  enumObj: T,
+  value: number
+): string[] {
+  return Object.keys(enumObj)
+    .filter(k => typeof enumObj[k] === "number")           // filter out reverse mapping (for numeric enums)
+    .filter(k => {
+      const flag = enumObj[k] as unknown as number;
+      return flag !== 0 && (value & flag) === flag;
+    });
 }

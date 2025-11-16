@@ -1,7 +1,9 @@
 process.env.TZ = 'UTC';
 
 const mysql = require('mysql');
-const config = require('../../../config');
+const config = require('../../../config.json');
+const { Types } = require('../src/types');
+const { CHARSETS, FIELD_FLAGS } = require('../src/constants/mysql');
 
 const sql = process.argv.pop();
 const arg_len = process.argv.length;
@@ -26,7 +28,7 @@ const conn = mysql.createConnection({
   password: config.db.password,
   //database: config.db.database,
   //debug: true,
-  //multipleStatements: true,
+  multipleStatements: true,
   dateStrings: true,
 });
 conn.connect((err) => {
@@ -36,6 +38,18 @@ conn.connect((err) => {
   } else {
     console.log('connect: success');
     conn.query(sql, [], (err, result, fields) => {
+      for (let field_list of fields ?? []) {
+        if (!Array.isArray(field_list)) {
+          field_list = [field_list];
+        }
+        for (const field of field_list) {
+          if (typeof field === 'object') {
+            field.charsetNr = `${field.charsetNr} (${CHARSETS[field.charsetNr]})`;
+            field.type = `${field.type} (${Types[field.type]})`;
+            field.flags = `0x${field.flags.toString(16)} (${flagsToString(FIELD_FLAGS, field.flags)})`;
+          }
+        }
+      }
       console.log('err:', err);
       console.log('fields:', fields);
       console.log('result:', result);
@@ -46,3 +60,15 @@ conn.connect((err) => {
 conn.on('handshake', (handshake) => {
   console.log('handshake:', handshake);
 });
+
+function flagsToString<T extends Record<string, number>>(
+  enumObj: T,
+  value: number
+): string[] {
+  return Object.keys(enumObj)
+    .filter(k => typeof enumObj[k] === "number")           // filter out reverse mapping (for numeric enums)
+    .filter(k => {
+      const flag = enumObj[k] as unknown as number;
+      return flag !== 0 && (value & flag) === flag;
+    });
+}
