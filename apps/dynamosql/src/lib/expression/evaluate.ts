@@ -8,6 +8,8 @@ import GlobalSettings from '../../global_settings';
 import { mapToObject } from '../../tools/dynamodb_helper';
 import { logger } from '@dynamosql/shared';
 import { getFunctionName } from '../helpers/ast_helper';
+import { toBigInt } from '../../tools/safe_convert';
+
 import type {
   Function,
   AggrFunc,
@@ -53,6 +55,15 @@ export function getValue(
   } else if (type === 'number') {
     result.value =
       typeof expr.value === 'string' ? Number(expr.value) : expr.value;
+    result.type = 'number';
+  } else if (type === 'bigint') {
+    const val = toBigInt(expr.value);
+    if (val === null) {
+      result.err = { err: 'ER_ILLEGAL_VALUE_FOR_TYPE', args: [expr.value] };
+    } else {
+      result.value = val;
+      result.type = 'bigint';
+    }
   } else if (type === 'double_quote_string') {
     result.value = expr.value;
     result.name = `"${result.value}"`;

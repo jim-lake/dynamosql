@@ -25,6 +25,7 @@ export default tseslint.config(
       },
     },
     rules: {
+      'no-console': 'error',
       '@typescript-eslint/no-explicit-any': 'off',
       '@typescript-eslint/no-unused-vars': [
         'error',
@@ -61,6 +62,7 @@ export default tseslint.config(
     },
     linterOptions: { reportUnusedDisableDirectives: 'warn' },
     rules: {
+      'no-console': 0,
       '@typescript-eslint/no-unused-expressions': 0,
       '@typescript-eslint/no-require-imports': 0,
     },
@@ -78,7 +80,7 @@ export default tseslint.config(
       },
     },
     linterOptions: { reportUnusedDisableDirectives: 'warn' },
-    rules: { '@typescript-eslint/no-require-imports': 0 },
+    rules: { 'no-console': 0, '@typescript-eslint/no-require-imports': 0 },
   },
   {
     ignores: [
