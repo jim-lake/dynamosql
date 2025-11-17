@@ -5,7 +5,7 @@ import type { SQLError } from './error';
 
 export type MysqlError = SQLError;
 
-export const enum Types {
+export enum Types {
   DECIMAL = 0x00, // aka DECIMAL (http://dev.mysql.com/doc/refman/5.0/en/precision-math-decimal-changes.html)
   TINY = 0x01,
   SHORT = 0x02,

@@ -24,6 +24,9 @@ SELECT @x - 3 AS result;
 SET @name = "test";
 SELECT CONCAT(@name, " value") AS result;
 
+SET @bigname = 222222222222222222;
+SELECT @bigname AS result;
+
 -- Variables with queries (removed - requires subquery support)
 
 -- Variables in calculations

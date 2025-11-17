@@ -18,6 +18,17 @@ const opts = {
   multipleStatements: true,
   dateStrings: true,
   resultObjects: true,
+  typeCast(field, next) {
+    console.log('typecast:', field);
+    if (field.type === 'LONGLONG') {
+      const val = field.string();
+      if (val === null) {
+        return null;
+      }
+      return BigInt(val);
+    }
+    return next();
+  },
 };
 if (config.region) {
   opts.region = config.region;

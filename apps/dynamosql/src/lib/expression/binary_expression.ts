@@ -453,6 +453,7 @@ function _is(
       result.value = 0;
     }
   }
+  result.type = 'longlong';
   return result;
 }
 

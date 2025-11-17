@@ -12,8 +12,8 @@ import * as ShowHandler from './lib/show_handler';
 import * as UpdateHandler from './lib/update_handler';
 import * as TransactionManager from './lib/transaction_manager';
 import { typeCast } from './lib/helpers/type_cast_helper';
-
 import { SQLError } from './error';
+import { Types } from './types';
 
 import type { Readable, ReadableOptions } from 'node:stream';
 import type { Session } from './session';
@@ -98,9 +98,9 @@ export class Query extends EventEmitter {
         if (!Array.isArray(result)) {
           result_list.push(Object.assign({}, DEFAULT_RESULT, result));
         } else if (this._session.resultObjects) {
-          result_list.push(this._transformResult(result, columns));
+          result_list.push(this._transformResultObject(result, columns));
         } else {
-          result_list.push(result);
+          result_list.push(this._transformResultArray(result, columns));
         }
         schema_list.push(columns);
       }
@@ -197,7 +197,7 @@ export class Query extends EventEmitter {
     }
   }
 
-  private _transformResult(
+  private _transformResultObject(
     result: unknown[][] | string[][],
     columns: FieldInfo[]
   ): Record<string, unknown>[] {
@@ -222,16 +222,27 @@ export class Query extends EventEmitter {
     }
     return ret;
   }
+  private _transformResultArray(
+    result: unknown[][] | string[][],
+    columns: FieldInfo[]
+  ): unknown[][] {
+    for (const row of result) {
+      for (let i = 0; i < columns.length; i++) {
+        row[i] = this._convertCell(row[i], columns[i]!);
+      }
+    }
+    return result;
+  }
   private _convertCell(
     value: string | unknown | undefined,
     column: FieldInfo
   ): unknown {
     if (typeof this.typeCast === 'function') {
-      const { type, ...untypedColumn } = column;
+      const { type, ...other } = column;
       return this.typeCast(
         {
-          ...untypedColumn,
-          type: String(type),
+          ...other,
+          type: Types[type],
           length: column.length,
           string: () => (value === null ? null : String(value)),
           buffer: () => (value === null ? null : Buffer.from(String(value))),

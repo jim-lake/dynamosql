@@ -30,6 +30,16 @@ const conn = mysql.createConnection({
   //debug: true,
   multipleStatements: true,
   dateStrings: true,
+  typeCast(field, next) {
+    if (field.type === 'LONGLONG') {
+      const val = field.string();
+      if (val === null) {
+        return null;
+      }
+      return BigInt(val);
+    }
+    return next();
+  },
 });
 conn.connect((err) => {
   if (err) {

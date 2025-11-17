@@ -21,7 +21,6 @@ function runTests(test_name, file_path, extra, maybe_skip) {
       user: config.db.user,
       password: config.db.password,
       //database: config.db.database,
-      multipleStatements: true,
       dateStrings: true,
     },
     extra?.mysql
@@ -33,6 +32,7 @@ function runTests(test_name, file_path, extra, maybe_skip) {
       namespace: process.env.DYNAMO_NAMESPACE ?? '',
       region: process.env.AWS_REGION,
       resultObjects: false,
+      dateStrings: true,
     },
     extra?.session
   );
