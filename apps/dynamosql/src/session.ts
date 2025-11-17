@@ -54,30 +54,35 @@ export class Session extends EventEmitter implements PoolConnection {
   private _isReleased = false;
   private readonly _tempTableMap = new Map<string, unknown>();
 
-  private _collationConnect: string | undefined;
-  private _divPrecisionIncrement: number | undefined;
-  private _timeZone: string | undefined;
-  private _sqlMode: string | undefined;
+  private _collationConnection: string;
+  private _divPrecisionIncrement: number;
+  private _timeZone: string;
+  private _sqlMode: string;
   private _timestamp = 0;
   private _insertId = 0n;
   private _lastInsertId = 0n;
 
   public get collationConnection() {
-    return this._collationConnect ?? GlobalSettings.collationConnection;
+    return this._collationConnection;
   }
   public get divPrecisionIncrement() {
-    return this._divPrecisionIncrement ?? GlobalSettings.divPrecisionIncrement;
+    return this._divPrecisionIncrement;
   }
   public get sqlMode() {
-    return this._sqlMode ?? GlobalSettings.sqlMode;
-  };
+    return this._sqlMode;
+  }
   public get timeZone() {
-    return this._timeZone ?? GlobalSettings.timeZone;
-  };
-
-  public get lastInsertId() { return this._lastInsertId; };
-  public get insertId() { return this._insertId; };
-  public get timestamp() { return this._timestamp; }
+    return this._timeZone;
+  }
+  public get lastInsertId() {
+    return this._lastInsertId;
+  }
+  public get insertId() {
+    return this._insertId;
+  }
+  public get timestamp() {
+    return this._timestamp;
+  }
 
   constructor(params?: SessionConfig) {
     super();
@@ -86,6 +91,10 @@ export class Session extends EventEmitter implements PoolConnection {
     this.multipleStatements = Boolean(params?.multipleStatements ?? false);
     this.resultObjects = Boolean(params?.resultObjects ?? true);
     this.typeCast = params?.typeCast ?? true;
+    this._collationConnection = GlobalSettings.collationConnection;
+    this._divPrecisionIncrement = GlobalSettings.divPrecisionIncrement;
+    this._sqlMode = GlobalSettings.sqlMode;
+    this._timeZone = GlobalSettings.timeZone;
     if (params?.dateStrings) {
       this.typeCastOptions.dateStrings = true;
     }
@@ -110,62 +119,60 @@ export class Session extends EventEmitter implements PoolConnection {
   getCurrentDatabase() {
     return this._currentDatabase;
   }
-  getVariable(name: string): EvaluationValue|undefined {
+  getVariable(name: string): EvaluationValue | undefined {
     return _cloneVar(this._localVariables.get(name));
   }
   setVariable(name: string, value: EvaluationValue) {
     this._localVariables.set(name, value);
   }
-  public getSessionVariable(name: string): EvaluationValue|undefined {
+  public getSessionVariable(name: string): EvaluationValue | undefined {
     const name_uc = name.toUpperCase();
-    const type = SYSTEM_VARIABLE_TYPES[name_uc];
+    const type =
+      SYSTEM_VARIABLE_TYPES[name_uc as keyof typeof SYSTEM_VARIABLE_TYPES];
     switch (name_uc) {
-    case 'COLLATION_CONNECTION':
-      return { value: this.collationConnection, type };
-    case 'DIV_PRECISION_INCREMENT':
-      return { value: this.divPrecisionIncrement, type };
-    case 'TIME_ZONE':
-      return { value: this.timeZone, type };
-    case 'SQL_MODE':
-      return { value: this.sqlMode, type };
-    case 'INSERT_ID':
-      return { value: this.insertId, type };
-    case 'LAST_INSERT_ID':
-      return { value: this.lastInsertId, type };
-    case 'TIMESTAMP':
-      return { value: this.timestamp, type };
+      case 'COLLATION_CONNECTION':
+        return { value: this.collationConnection, type };
+      case 'DIV_PRECISION_INCREMENT':
+        return { value: this.divPrecisionIncrement, type };
+      case 'TIME_ZONE':
+        return { value: this.timeZone, type };
+      case 'SQL_MODE':
+        return { value: this.sqlMode, type };
+      case 'TIMESTAMP':
+        return { value: this.timestamp, type };
+      case 'LAST_INSERT_ID':
+        return { value: this.lastInsertId, type };
+      case 'INSERT_ID':
+        return { value: this.insertId, type };
     }
     return undefined;
   }
   public setSessionVariable(name: string, value: unknown) {
     const name_uc = name.toUpperCase();
     switch (name_uc) {
-    case 'COLLATION_CONNECTION':
-      this._collationConnection = String(value);
-      return;
-    case 'DIV_PRECISION_INCREMENT':
-      this._divPrecisionIncrement = Number(value)
-      return;
-    case 'TIME_ZONE':
-      this._timeZone = String(value);
-      return;
-    case 'SQL_MODE':
-      this._sqlMode = String(value);
-      return;
-    case 'TIMESTAMP':
-      this._timestamp = Number(value);
-      return;
-    case 'LAST_INSERT_ID':
-      this._lastInsertId = BigInt(value);
-      return;
-    case 'INSERT_ID':
-      this._insertId = BigInt(value);
-      return;
-    case 'TIMESTAMP':
-      this._timestamp = Number(value);
-      return;
+      case 'COLLATION_CONNECTION':
+        this._collationConnection = String(value);
+        return;
+      case 'DIV_PRECISION_INCREMENT':
+        this._divPrecisionIncrement = Number(value);
+        return;
+      case 'TIME_ZONE':
+        this._timeZone = String(value);
+        return;
+      case 'SQL_MODE':
+        this._sqlMode = String(value);
+        return;
+      case 'TIMESTAMP':
+        this._timestamp = Number(value);
+        return;
+      case 'LAST_INSERT_ID':
+        this._lastInsertId = BigInt(value);
+        return;
+      case 'INSERT_ID':
+        this._insertId = BigInt(value);
+        return;
     }
-    throw new SQLError({ err:'ER_UNKNOWN_SYSTEM_VARIABLE', args: [name]});
+    throw new SQLError({ err: 'ER_UNKNOWN_SYSTEM_VARIABLE', args: [name] });
   }
   getTransaction<T>(): T | null {
     return this._transaction as T | null;
@@ -242,7 +249,9 @@ export class Session extends EventEmitter implements PoolConnection {
 export function createSession(args?: SessionConfig): PoolConnection {
   return new Session(args);
 }
-function _cloneVar(value: EvaluationValue|undefined): EvaluationValue|undefned {
+function _cloneVar(
+  value: EvaluationValue | undefined
+): EvaluationValue | undefined {
   if (value !== undefined) {
     return Object.assign({}, value);
   }

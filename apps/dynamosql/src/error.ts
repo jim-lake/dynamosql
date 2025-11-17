@@ -133,7 +133,7 @@ const ERROR_MAP: Record<string, ErrorMapEntry> = {
   ER_UNKNOWN_SYSTEM_VARIABLE: {
     code: 'ER_UNKNOWN_SYSTEM_VARIABLE',
     sqlMessage: errStr`Unknown system variable '${0}'`,
-  }
+  },
 };
 
 export class SQLError extends Error {

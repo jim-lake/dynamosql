@@ -1,35 +1,29 @@
+import { logger } from '@dynamosql/shared';
 import * as Expression from './expression';
 import * as SelectHandler from './select_handler';
-import { logger } from '@dynamosql/shared';
+import GlobalSettings from '../global_settings';
 import { SQLError } from '../error';
 
 import type { Select } from 'node-sql-parser';
 import type { HandlerParams } from './handler_types';
-import type { ExpressionValue } from './expression';
+import type { EvaluationResult } from './expression';
 
 export async function query(params: HandlerParams): Promise<void> {
   const { ast } = params;
-
   const expr = ast?.expr;
-
-  // Handle single assignment
-  if (expr?.type === 'assign') {
-    await _handleAssignment(expr, params);
-    return;
-  }
-
-  // Handle multiple assignments (expr is an array)
   if (Array.isArray(expr)) {
     for (const e of expr) {
       if (e?.type === 'assign') {
         await _handleAssignment(e, params);
+      } else {
+        throw new SQLError('unsupported');
       }
     }
-    return;
+  } else if (expr?.type === 'assign') {
+    await _handleAssignment(expr, params);
+  } else {
+    throw new SQLError('unsupported');
   }
-
-  logger.error('set_handler.query: unsupported expr:', expr);
-  throw new SQLError('unsupported');
 }
 
 async function _handleAssignment(
@@ -38,18 +32,20 @@ async function _handleAssignment(
 ): Promise<void> {
   const { session } = params;
   const { left, right } = expr;
+  if (left?.type !== 'var') {
+    throw new SQLError('unsupported');
+  }
 
-  let result: ExpressionValue|undefined;
-
+  let result: EvaluationResult;
   if (right?.type === 'select') {
-    const { rows, columns } = await SelectHandler.internalQuery({
+    const { rows } = await SelectHandler.internalQuery({
       ...params,
       ast: right as Select,
     });
     if (rows && rows[0]?.[0]) {
       result = rows[0][0];
     } else {
-      result = { value: null, type: 'null' };
+      result = { err: null, value: null, type: 'null' };
     }
   } else {
     result = Expression.getValue(right, { session });
@@ -57,9 +53,18 @@ async function _handleAssignment(
       throw new SQLError(result.err);
     }
   }
+  const { prefix, members } = left;
+  const scope = members.length > 0 ? left.name.toLowerCase() : '';
+  const name = members.length > 0 ? left.members[0] : left.name;
 
-  if (result && left?.type === 'var' && left.prefix === '@') {
+  if (prefix === '@') {
     session.setVariable(left.name, result);
+  } else if (prefix === '@@') {
+    if (scope === 'global') {
+      GlobalSettings.setGlobalVariable(name, result.value);
+    } else if (scope === 'session' || !scope) {
+      session.setSessionVariable(name, result.value);
+    }
   } else {
     logger.error('set_handler._handleAssignment: unsupported left:', left);
     throw new SQLError('unsupported');

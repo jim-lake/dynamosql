@@ -1,4 +1,6 @@
 import { SYSTEM_VARIABLE_TYPES } from './constants/system_variables';
+import { SQLError } from './error';
+
 import type { EvaluationValue } from './lib/expression';
 
 const SYSTEM_TIME_ZONE = _getSystemTimezone();
@@ -25,51 +27,56 @@ class GlobalSettings {
     return SYSTEM_TIME_ZONE;
   }
 
-  public getGlobalVariable(name: string): EvaluationValue|undefined {
+  public getGlobalVariable(name: string): EvaluationValue | undefined {
     const name_uc = name.toUpperCase();
-    const type = SYSTEM_VARIABLE_TYPES[name_uc];
+    const type =
+      SYSTEM_VARIABLE_TYPES[name_uc as keyof typeof SYSTEM_VARIABLE_TYPES];
     switch (name_uc) {
-    case 'COLLATION_CONNECTION':
-      return { value: this.collationConnection, type };
-    case 'DIV_PRECISION_INCREMENT':
-      return { value: this.divPrecisionIncrement, type };
-    case 'TIME_ZONE':
-      return { value: this.timeZone, type };
-    case 'SQL_MODE':
-      return { value: this.sqlMode, type };
-    case 'SYSTEM_TIME_ZONE':
-      return { value: this.systemTimeZone, type };
+      case 'COLLATION_CONNECTION':
+        return { value: this.collationConnection, type };
+      case 'DIV_PRECISION_INCREMENT':
+        return { value: this.divPrecisionIncrement, type };
+      case 'TIME_ZONE':
+        return { value: this.timeZone, type };
+      case 'SQL_MODE':
+        return { value: this.sqlMode, type };
+      case 'SYSTEM_TIME_ZONE':
+        return { value: this.systemTimeZone, type };
     }
     return undefined;
   }
   public setGlobalVariable(name: string, value: unknown) {
     const name_uc = name.toUpperCase();
     switch (name_uc) {
-    case 'COLLATION_CONNECTION':
-      this._collationConnection = String(value);
-      return;
-    case 'DIV_PRECISION_INCREMENT':
-      this._divPrecisionIncrement = Number(value)
-      return;
-    case 'TIME_ZONE':
-      this._timeZone = String(value);
-      return;
-    case 'SQL_MODE':
-      this._sqlMode = String(value);
-      return;
+      case 'COLLATION_CONNECTION':
+        this._collationConnection = String(value);
+        return;
+      case 'DIV_PRECISION_INCREMENT':
+        this._divPrecisionIncrement = Number(value);
+        return;
+      case 'TIME_ZONE':
+        this._timeZone = String(value);
+        return;
+      case 'SQL_MODE':
+        this._sqlMode = String(value);
+        return;
     }
-    throw new SQLError({ err:'ER_UNKNOWN_SYSTEM_VARIABLE', args: [name]});
+    throw new SQLError({ err: 'ER_UNKNOWN_SYSTEM_VARIABLE', args: [name] });
   }
 }
 export default new GlobalSettings();
 
 function _getSystemTimezone(): string {
   try {
-    const local = new Date().toLocaleString('en-US', { timeZoneName: 'short' }).split(' ').pop().trim();
+    const local = new Date()
+      .toLocaleString('en-US', { timeZoneName: 'short' })
+      .split(' ')
+      ?.pop()
+      ?.trim();
     if (local && local.length === 3) {
       return local;
     }
-  } catch  {
+  } catch {
     // noop
   }
   return Intl.DateTimeFormat().resolvedOptions().timeZone;

@@ -65,7 +65,7 @@ function left(expr: Function, state: EvaluationState): EvaluationResult {
 function coalesce(expr: Function, state: EvaluationState): EvaluationResult {
   let err: EvaluationResult['err'] = null;
   let value = null;
-  let type;
+  let type = 'null';
   expr.args?.value?.some?.((sub: any) => {
     const result = getValue(sub, state);
     if (result.err) {

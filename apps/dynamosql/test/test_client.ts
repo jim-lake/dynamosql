@@ -66,8 +66,8 @@ function flagsToString<T extends Record<string, number>>(
   value: number
 ): string[] {
   return Object.keys(enumObj)
-    .filter(k => typeof enumObj[k] === "number")           // filter out reverse mapping (for numeric enums)
-    .filter(k => {
+    .filter((k) => typeof enumObj[k] === 'number') // filter out reverse mapping (for numeric enums)
+    .filter((k) => {
       const flag = enumObj[k] as unknown as number;
       return flag !== 0 && (value & flag) === flag;
     });

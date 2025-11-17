@@ -147,14 +147,17 @@ export function getValue(
     const { prefix, members } = varExpr;
     const scope = members.length > 0 ? varExpr.name.toLowerCase() : '';
     const name = members.length > 0 ? varExpr.members[0] : varExpr.name;
+    result.name = prefix + (scope ? scope + '.' : '') + name;
     if (prefix === '@@') {
-      let val: ExpressionValue|undefined;
+      let val: ExpressionValue | undefined;
       if (scope === 'session') {
         val = session.getSessionVariable(name);
       } else if (scope === 'global') {
         val = GlobalSettings.getGlobalVariable(name);
       } else if (scope === '') {
-        val = session.getSessionVariable(name) ?? GlobalSettings.getGlobalVariable(name);
+        val =
+          session.getSessionVariable(name) ??
+          GlobalSettings.getGlobalVariable(name);
       }
       if (val !== undefined) {
         result.value = val.value;
@@ -162,12 +165,10 @@ export function getValue(
       } else {
         logger.trace(
           'expression.getValue: unknown system variable:',
-          varExpr.name, varExpr.members
+          varExpr.name,
+          varExpr.members
         );
-        result.err = {
-          err: 'ER_UNKNOWN_SYSTEM_VARIABLE',
-          args: [name],
-        };
+        result.err = { err: 'ER_UNKNOWN_SYSTEM_VARIABLE', args: [name] };
       }
     } else if (prefix === '@') {
       const val = session.getVariable(name);
@@ -181,7 +182,6 @@ export function getValue(
     } else {
       result.err = 'unsupported';
     }
-    result.name = prefix + (scope ? scope + '.' : '') + name;
   } else if (type === 'column_ref') {
     const colRef = expr as ColumnRef & {
       _resultIndex?: number;
