@@ -8,7 +8,11 @@ import type { EvaluationState, EvaluationResult } from './evaluate';
 const DAY = 24 * 60 * 60;
 
 function database(expr: Function, state: EvaluationState): EvaluationResult {
-  return { err: null, value: state.session.getCurrentDatabase() };
+  return {
+    err: null,
+    value: state.session.getCurrentDatabase(),
+    type: 'string',
+  };
 }
 function sleep(expr: Function, state: EvaluationState): EvaluationResult {
   const result = getValue(expr.args?.value?.[0], state);
@@ -45,7 +49,7 @@ function concat(expr: Function, state: EvaluationState): EvaluationResult {
     }
     return value !== null;
   });
-  return { err, value };
+  return { err, value, type: 'string' };
 }
 function left(expr: Function, state: EvaluationState): EvaluationResult {
   const result = getValue(expr.args?.value?.[0], state);

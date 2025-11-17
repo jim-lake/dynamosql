@@ -166,10 +166,12 @@ export class Session extends EventEmitter implements PoolConnection {
         this._timestamp = Number(value);
         return;
       case 'LAST_INSERT_ID':
-        this._lastInsertId = BigInt(value);
+        this._lastInsertId = BigInt(
+          value as string | number | bigint | boolean
+        );
         return;
       case 'INSERT_ID':
-        this._insertId = BigInt(value);
+        this._insertId = BigInt(value as string | number | bigint | boolean);
         return;
     }
     throw new SQLError({ err: 'ER_UNKNOWN_SYSTEM_VARIABLE', args: [name] });

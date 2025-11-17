@@ -85,14 +85,23 @@ function _numBothSides(
       }
     }
   }
-  return { err, name, value, left_num, right_num, interval, datetime };
+  return {
+    err,
+    name,
+    value,
+    left_num,
+    right_num,
+    interval,
+    datetime,
+    type: 'number',
+  };
 }
 
 function plus(expr: Binary, state: EvaluationState): EvaluationResult {
   const result = _numBothSides(expr, state, ' + ', true);
   const { err, name, left_num, right_num, interval, datetime } = result;
   let value = result.value;
-  let type;
+  let type: string = 'number';
   if (!err && value !== null) {
     if (datetime && interval) {
       const result = interval.add(datetime);
@@ -110,7 +119,7 @@ function minus(expr: Binary, state: EvaluationState): EvaluationResult {
   const result = _numBothSides(expr, state, ' - ', true);
   const { err, name, left_num, right_num, interval, datetime } = result;
   let value = result.value;
-  let type;
+  let type: string = 'number';
   if (!err && value !== null) {
     if (datetime && interval) {
       const result = interval.sub(datetime);
@@ -136,7 +145,7 @@ function mul(expr: Binary, state: EvaluationState): EvaluationResult {
   ) {
     value = left_num * right_num;
   }
-  return { err, value, name };
+  return { err, value, name, type: 'number' };
 }
 
 function div(expr: Binary, state: EvaluationState): EvaluationResult {
@@ -156,7 +165,7 @@ function div(expr: Binary, state: EvaluationState): EvaluationResult {
       value = left_num / right_num;
     }
   }
-  return { err, value, name };
+  return { err, value, name, type: 'number' };
 }
 
 function _convertCompare(
@@ -220,7 +229,7 @@ function _equal(
       value = left.value.localeCompare(right.value) === 0 ? 1 : 0;
     }
   }
-  return { err, value, name };
+  return { err, value, name, type: 'longlong' };
 }
 
 function equal(expr: Binary, state: EvaluationState): EvaluationResult {
@@ -267,7 +276,7 @@ function _gt(
       value = left.value.localeCompare(right.value) > 0 ? 1 : 0;
     }
   }
-  return { err, value, name };
+  return { err, value, name, type: 'longlong' };
 }
 
 function gt(expr: Binary, state: EvaluationState): EvaluationResult {
@@ -343,7 +352,7 @@ export function and(expr: Binary, state: EvaluationState): EvaluationResult {
       name = left.name + ' AND ' + right.name;
     }
   }
-  return { err, value, name };
+  return { err, value, name, type: 'longlong' };
 }
 
 export function or(expr: Binary, state: EvaluationState): EvaluationResult {
@@ -365,7 +374,7 @@ export function or(expr: Binary, state: EvaluationState): EvaluationResult {
       name = left.name + ' OR ' + right.name;
     }
   }
-  return { err, value, name };
+  return { err, value, name, type: 'longlong' };
 }
 
 export function xor(expr: Binary, state: EvaluationState): EvaluationResult {
@@ -383,7 +392,7 @@ export function xor(expr: Binary, state: EvaluationState): EvaluationResult {
       value = right_bool ^ left_bool;
     }
   }
-  return { err, value, name };
+  return { err, value, name, type: 'longlong' };
 }
 
 export function is(expr: Binary, state: EvaluationState): EvaluationResult {
@@ -480,7 +489,7 @@ function like(expr: Binary, state: EvaluationState): EvaluationResult {
       value = regex.test(str) ? 1 : 0;
     }
   }
-  return { err, value, name };
+  return { err, value, name, type: 'longlong' };
 }
 
 function notLike(expr: Binary, state: EvaluationState): EvaluationResult {
@@ -511,7 +520,7 @@ function inOp(expr: Binary, state: EvaluationState): EvaluationResult {
       for (const item of list) {
         const right = getValue(item, state);
         if (right.err) {
-          return { err: right.err, value: null };
+          return { err: right.err, value: null, type: 'longlong' };
         }
         if (right.value === null) {
           value = null;
@@ -522,7 +531,7 @@ function inOp(expr: Binary, state: EvaluationState): EvaluationResult {
       }
     }
   }
-  return { err, value, name: `${left.name} IN (...)` };
+  return { err, value, name: `${left.name} IN (...)`, type: 'longlong' };
 }
 
 function notIn(expr: Binary, state: EvaluationState): EvaluationResult {

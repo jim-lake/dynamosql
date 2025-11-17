@@ -131,8 +131,8 @@ export function getValue(
     const target = Array.isArray(castExpr.target)
       ? castExpr.target[0]
       : castExpr.target;
-    const dataType = target?.dataType;
-    const func = Cast[dataType?.toLowerCase() ?? ''];
+    const dataType = target?.dataType ?? '';
+    const func = Cast[dataType.toLowerCase()];
     if (func) {
       result = func(castExpr, state);
       if (!result.name) {
@@ -146,10 +146,14 @@ export function getValue(
     const varExpr = expr as VarExpr;
     const { prefix, members } = varExpr;
     const scope = members.length > 0 ? varExpr.name.toLowerCase() : '';
-    const name = members.length > 0 ? varExpr.members[0] : varExpr.name;
+    const firstMember = members.length > 0 ? members[0] : null;
+    const name =
+      firstMember && typeof firstMember === 'object' && 'value' in firstMember
+        ? String(firstMember.value)
+        : varExpr.name;
     result.name = prefix + (scope ? scope + '.' : '') + name;
     if (prefix === '@@') {
-      let val: ExpressionValue | undefined;
+      let val: EvaluationValue | undefined;
       if (scope === 'session') {
         val = session.getSessionVariable(name);
       } else if (scope === 'global') {
@@ -212,14 +216,14 @@ export function getValue(
         row['@@result'] as EvaluationResult[] | undefined
       )?.[colRef._resultIndex];
       result.value = output_result?.value;
-      result.type = output_result?.type;
+      result.type = output_result?.type ?? 'string';
     } else if (row) {
       const fromKey = colRef.from?.key;
       const cell = fromKey
         ? (row as Record<string, any>)[fromKey]?.[columnName]
         : undefined;
       const decode = _decodeCell(cell);
-      result.type = decode?.type;
+      result.type = decode?.type ?? 'string';
       result.value = decode?.value;
     } else {
       result.err = 'no_row_list';
