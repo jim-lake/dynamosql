@@ -32,4 +32,10 @@ describe('DDL', function () {
     { skipAffected: true, timeout: 15000 },
     true
   );
+  runTests(
+    'drop.sql',
+    path.join(__dirname, 'drop.sql'),
+    { skipAffected: true, timeout: 15000 },
+    true
+  );
 });

@@ -5,4 +5,7 @@ describe('Temp', function () {
   runTests('temp.sql', path.join(__dirname, 'temp.sql'), {
     checkChanged: true,
   });
+  runTests('memory_edge_cases.sql', path.join(__dirname, 'memory_edge_cases.sql'), {
+    checkChanged: true,
+  });
 });

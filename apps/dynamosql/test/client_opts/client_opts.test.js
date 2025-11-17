@@ -17,4 +17,14 @@ describe('Client Opts', function () {
     session: { resultObjects: true, dateStrings: true },
     nestTables: true,
   });
+
+  runTests('multiple_statements.sql', path.join(__dirname, 'multiple_statements.sql'), {
+    mysql: { multipleStatements: true },
+    session: { multipleStatements: true },
+  });
+
+  runTests('result_objects.sql', path.join(__dirname, 'result_objects.sql'), {
+    mysql: { dateStrings: false },
+    session: { resultObjects: false, dateStrings: false },
+  });
 });

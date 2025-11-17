@@ -18,6 +18,7 @@ describe('Expression', function () {
   runTests('precedence.sql', path.join(__dirname, 'precedence.sql'));
   runTests('functions.sql', path.join(__dirname, 'functions.sql'));
   runTests('cast.sql', path.join(__dirname, 'cast.sql'));
+  runTests('cast_edge_cases.sql', path.join(__dirname, 'cast_edge_cases.sql'));
   runTests('datetime.sql', path.join(__dirname, 'datetime.sql'));
   runTests('variables.sql', path.join(__dirname, 'variables.sql'));
   runTests('operators.sql', path.join(__dirname, 'operators.sql'));
