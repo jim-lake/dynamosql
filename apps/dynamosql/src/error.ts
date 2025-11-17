@@ -1,9 +1,6 @@
-import { types } from 'node:util';
 import { CODE_ERRNO } from './constants/mysql';
 import { jsonStringify } from './tools/util';
 
-const { isNativeError } = types;
-const DEFAULT_ERRNO = 1002;
 const DEFAULT_CODE = 'ER_NO';
 
 type ErrorTemplate = (args?: any[]) => string;
@@ -134,49 +131,76 @@ const ERROR_MAP: Record<string, ErrorMapEntry> = {
     code: 'ER_UNKNOWN_SYSTEM_VARIABLE',
     sqlMessage: errStr`Unknown system variable '${0}'`,
   },
+  ER_WRONG_TYPE_FOR_VAR: {
+    code: 'ER_WRONG_TYPE_FOR_VAR',
+    sqlMessage: errStr`Incorrect argument type to variable '${0}'`,
+  },
 };
 
 export class SQLError extends Error {
-  code: string;
-  errno: number;
-  sqlState?: string;
-  fieldCount?: number;
-  fatal: boolean = false;
-  sqlMessage?: string;
-  sql?: string;
-  index: number;
+  public readonly code: string;
+  public readonly errno: number;
+  public sqlState?: string;
+  public fieldCount?: number;
+  public fatal: boolean = false;
+  public sqlMessage?: string;
+  public sql?: string;
+  public index = 0;
 
-  constructor(err: string | ErrorInput | IndexError, sql?: string) {
-    const sql_err =
-      ERROR_MAP[err as string] || ERROR_MAP[(err as ErrorInput).err!];
-    const code = (err as ErrorInput).code || sql_err?.code || DEFAULT_CODE;
-    const errno =
-      (err as ErrorInput).errno ||
-      sql_err?.errno ||
-      CODE_ERRNO[code as keyof typeof CODE_ERRNO] ||
-      DEFAULT_ERRNO;
-    let sqlMessage = (err as ErrorInput).sqlMessage || sql_err?.sqlMessage;
-    if (typeof sqlMessage === 'function') {
-      sqlMessage = sqlMessage((err as ErrorInput).args);
-    }
-    const index = typeof err === 'string' ? 0 : (err.index ?? 0);
-    const message =
-      (err as ErrorInput).message ||
-      sqlMessage ||
-      (typeof err === 'string' ? err : undefined);
-    if ((err as ErrorInput).cause) {
-      super(message, { cause: (err as ErrorInput).cause });
-    } else if (isNativeError(err) || code === DEFAULT_CODE) {
-      super(message, { cause: err });
+  constructor(arg: string | ErrorInput | IndexError, sql?: string) {
+    if (typeof arg === 'string') {
+      const found = ERROR_MAP[arg];
+      if (found !== undefined) {
+        const msg = _makeMessage(found, []);
+        super(`${found.code}: ${msg}`);
+        this.code = found.code;
+        this.sqlMessage = msg;
+      } else {
+        super(arg);
+        this.code = DEFAULT_CODE;
+      }
+      this.errno = CODE_ERRNO[this.code];
+    } else if (arg instanceof SQLError) {
+      super(arg.message, { cause: arg });
+      this.code = arg.code;
+      this.errno = arg.errno;
+      this.sql = arg.sql;
+      this.sqlMessage = arg.sqlMessage;
+      this.index = arg.index;
+    } else if (arg instanceof Error) {
+      super(arg.message, { cause: arg });
+      this.code = DEFAULT_CODE;
+      this.errno = CODE_ERRNO[this.code];
+    } else if (typeof arg === 'object') {
+      const found = ERROR_MAP[arg.code ?? ''] ?? ERROR_MAP[arg.err ?? ''];
+      if (found !== undefined) {
+        const msg = _makeMessage(found, arg.args ?? []);
+        super(`${found.code}: ${msg}`);
+        this.sqlMessage = msg;
+        this.code = found.code;
+      } else if (arg.code && arg.sqlMessage) {
+        super(`${arg.code}: ${arg.sqlMessage}`);
+        this.sqlMessage = arg.sqlMessage;
+        this.code = arg.code;
+      } else {
+        super(arg.message ?? arg.err ?? arg.code ?? String(arg));
+        this.code = arg.code ?? DEFAULT_CODE;
+      }
+
+      if (arg.cause !== undefined) {
+        this.cause = arg.cause;
+      }
+      if (arg.errno !== undefined) {
+        this.errno = arg.errno;
+      } else {
+        this.errno = CODE_ERRNO[this.code];
+      }
     } else {
-      super(message);
+      super('unknown error');
+      this.code = DEFAULT_CODE;
+      this.errno = CODE_ERRNO[this.code];
     }
-    this.code = code;
-    this.errno = errno;
-    this.index = index;
-    if (sqlMessage) {
-      this.sqlMessage = sqlMessage as string;
-    }
+
     if (sql) {
       this.sql = sql;
     }
@@ -197,7 +221,6 @@ function errStr(
     return s;
   };
 }
-
 function _stringify(arg: any): string {
   let ret = arg || '';
   if (arg === null) {
@@ -211,6 +234,12 @@ function _stringify(arg: any): string {
     ret = jsonStringify(arg);
   }
   return ret;
+}
+function _makeMessage(entry: ErrorMapEntry, args: any[]) {
+  if (typeof entry.sqlMessage === 'function') {
+    return entry.sqlMessage(args);
+  }
+  return entry.sqlMessage;
 }
 
 export class NoSingleOperationError extends Error {

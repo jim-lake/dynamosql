@@ -140,7 +140,9 @@ async function _insertNoIgnore(params: InsertParams): Promise<AffectedResult> {
       if (err.name === 'TransactionCanceledException' && cancellationReasons) {
         for (let i = 0; i < cancellationReasons.length; i++) {
           const reason = cancellationReasons[i];
-          if (reason?.Code === 'DuplicateItem') {
+          if (reason?.Code === 'ResourceNotFound') {
+            throw new SQLError({ err: 'table_not_found', args: [table] });
+          } else if (reason?.Code === 'DuplicateItem') {
             const item = list[i];
             if (item) {
               throw new SQLError({

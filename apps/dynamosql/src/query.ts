@@ -82,10 +82,7 @@ export class Query extends EventEmitter {
     }
   }
   private async _run(): Promise<QueryResult> {
-    const { err: parse_err, list } = _astify(this.sql);
-    if (parse_err) {
-      throw new SQLError(parse_err, this.sql);
-    }
+    const list = _astify(this.sql);
     if (list.length === 0) {
       throw new SQLError('ER_EMPTY_QUERY', this.sql);
     }
@@ -248,11 +245,10 @@ export class Query extends EventEmitter {
   }
 }
 
-function _astify(sql: string): {
-  err: { err: string; args: [number, number] } | null;
-  list: ExtendedAST[];
-} {
-  let err: { err: string; args: [number, number] } | null = null;
+interface PegError {
+  location?: { start?: { line?: number; column?: number } };
+}
+function _astify(sql: string): ExtendedAST[] {
   let list: ExtendedAST[] = [];
   try {
     const result = g_parser.astify(sql, { database: 'MySQL' });
@@ -263,12 +259,21 @@ function _astify(sql: string): {
     }
   } catch (e: unknown) {
     logger.error('parse error:', e);
-    const start = (
-      e as { location?: { start?: { line: number; column: number } } }
-    )?.location?.start;
-    err = { err: 'parse', args: [start?.line ?? 0, start?.column ?? 0] };
+    const peg_error = e as PegError | undefined;
+    const line = peg_error?.location?.start?.line;
+    const column = peg_error?.location?.start?.column;
+    if (line !== undefined && column !== undefined) {
+      throw new SQLError({ err: 'parse', args: [line, column] }, sql);
+    } else if (e instanceof Error) {
+      throw new SQLError(
+        { code: 'ER_PARSE_ERROR', sqlMessage: e.message },
+        sql
+      );
+    } else {
+      throw new SQLError({ err: 'parse' }, sql);
+    }
   }
-  return { err, list };
+  return list;
 }
 
 interface UseDatabaseParams {
