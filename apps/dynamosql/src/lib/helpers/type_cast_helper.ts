@@ -1,5 +1,7 @@
 import { CHARSETS } from '../../constants/mysql';
 import { Types } from '../../types';
+import { toBigInt } from '../../tools/safe_convert';
+
 import type { FieldInfo } from '../../types';
 import type { TypeCastOptions } from '../../session';
 
@@ -8,9 +10,8 @@ export function typeCast(
   column: FieldInfo,
   options?: TypeCastOptions
 ): unknown {
-  let ret;
   if (value === null || value === undefined) {
-    ret = null;
+    return null;
   } else {
     switch (column.type) {
       case Types.NEWDECIMAL:
@@ -19,17 +20,29 @@ export function typeCast(
       case Types.LONG:
       case Types.FLOAT:
       case Types.DOUBLE:
-      case Types.LONGLONG:
       case Types.INT24:
       case Types.YEAR:
       case Types.BIT:
       case Types.DECIMAL:
-        if (typeof value === 'number') {
-          ret = value;
-        } else if (typeof value === 'string') {
-          ret = parseFloat(value);
-        } else {
-          ret = parseFloat(String(value));
+        return _toNumber(value);
+      case Types.LONGLONG:
+        switch (options?.bigNumType ?? 'number') {
+          case 'bigint':
+            return toBigInt(value);
+          case 'string':
+            return String(value);
+          case 'number|string': {
+            const num = _toNumber(value);
+            if (
+              num > Number.MAX_SAFE_INTEGER ||
+              num < Number.MIN_SAFE_INTEGER
+            ) {
+              return String(value);
+            }
+            return num;
+          }
+          case 'number':
+            return _toNumber(value);
         }
         break;
       case Types.TIMESTAMP:
@@ -37,70 +50,62 @@ export function typeCast(
       case Types.DATETIME:
       case Types.NEWDATE:
         if (options?.dateStrings) {
-          ret = String(value);
+          return String(value);
         } else if (value instanceof Date) {
-          ret = value;
+          return value;
         } else if (
           typeof value === 'object' &&
           value !== null &&
           'toDate' in value &&
           typeof (value as { toDate: () => Date }).toDate === 'function'
         ) {
-          ret = (value as { toDate: () => Date }).toDate();
+          return (value as { toDate: () => Date }).toDate();
         } else {
-          ret = new Date(String(value));
+          return new Date(String(value));
         }
         break;
       case Types.GEOMETRY:
       case Types.TIME:
-        if (typeof value === 'string') {
-          ret = value;
-        } else {
-          ret = String(value);
-        }
-        break;
+        return typeof value === 'string' ? value : String(value);
       case Types.VARCHAR:
       case Types.ENUM:
       case Types.SET:
       case Types.VAR_STRING:
       case Types.STRING:
         if (column.charsetNr === CHARSETS.BINARY) {
-          if (Buffer.isBuffer(ret)) {
-            ret = value;
-          } else {
-            ret = Buffer.from(String(value));
-          }
-        } else if (typeof value === 'string') {
-          ret = value;
+          return Buffer.isBuffer(value) ? value : Buffer.from(String(value));
         } else {
-          ret = String(value);
+          return typeof value === 'string' ? value : String(value);
         }
         break;
       case Types.JSON:
         if (typeof value === 'object') {
-          ret = value;
+          return value;
         } else if (typeof value === 'string') {
-          ret = _jsonParse(value);
+          return _jsonParse(value);
         } else {
-          ret = value;
+          return value;
         }
         break;
       case Types.TINY_BLOB:
       case Types.MEDIUM_BLOB:
       case Types.LONG_BLOB:
       case Types.BLOB:
-        if (Buffer.isBuffer(value)) {
-          ret = value;
-        } else {
-          ret = Buffer.from(String(value));
-        }
-        break;
+        return Buffer.isBuffer(value) ? value : Buffer.from(String(value));
+      default:
       case Types.NULL:
-        ret = value;
-        break;
+        return null;
     }
   }
-  return ret;
+}
+function _toNumber(value: unknown): number {
+  if (typeof value === 'number') {
+    return value;
+  } else if (typeof value === 'string') {
+    return parseFloat(value);
+  } else {
+    return parseFloat(String(value));
+  }
 }
 function _jsonParse(obj: string): unknown {
   try {

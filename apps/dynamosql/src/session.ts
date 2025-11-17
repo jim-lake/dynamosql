@@ -22,6 +22,7 @@ let g_threadId = 1;
 
 export interface TypeCastOptions {
   dateStrings?: boolean;
+  bigNumType: 'bigint' | 'string' | 'number|string' | 'number';
 }
 
 export interface SessionConfig extends DynamoDBWithCacheConstructorParams {
@@ -30,6 +31,9 @@ export interface SessionConfig extends DynamoDBWithCacheConstructorParams {
   resultObjects?: boolean | undefined;
   typeCast?: TypeCast | undefined;
   dateStrings?: boolean | Array<'TIMESTAMP' | 'DATETIME' | 'DATE'> | undefined;
+  supportBigNumbers?: boolean | undefined;
+  bigNumberStrings?: boolean | undefined;
+  bigintNative?: boolean | undefined;
 }
 
 export interface SqlValue {
@@ -43,7 +47,7 @@ export class Session extends EventEmitter implements PoolConnection {
   public readonly threadId: number | null = g_threadId++;
 
   public readonly dynamodb: ReturnType<typeof DynamoDB.createDynamoDB>;
-  public readonly typeCastOptions: TypeCastOptions = {};
+  public readonly typeCastOptions: TypeCastOptions = { bigNumType: 'number' };
   public readonly typeCast: TypeCast;
   public readonly resultObjects: boolean;
   public readonly multipleStatements: boolean;
@@ -95,9 +99,20 @@ export class Session extends EventEmitter implements PoolConnection {
     this._divPrecisionIncrement = GlobalSettings.divPrecisionIncrement;
     this._sqlMode = GlobalSettings.sqlMode;
     this._timeZone = GlobalSettings.timeZone;
+
     if (params?.dateStrings) {
       this.typeCastOptions.dateStrings = true;
     }
+    if (params?.bigintNative) {
+      this.typeCastOptions.bigNumType = 'bigint';
+    } else if (params?.supportBigNumbers) {
+      if (params?.bigNumberStrings) {
+        this.typeCastOptions.bigNumType = 'string';
+      } else {
+        this.typeCastOptions.bigNumType = 'number|string';
+      }
+    }
+
     if (params?.database) {
       this.setCurrentDatabase(params.database);
     }
