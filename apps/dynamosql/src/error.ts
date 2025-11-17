@@ -159,7 +159,7 @@ export class SQLError extends Error {
         super(arg);
         this.code = DEFAULT_CODE;
       }
-      this.errno = CODE_ERRNO[this.code];
+      this.errno = CODE_ERRNO[this.code as keyof typeof CODE_ERRNO];
     } else if (arg instanceof SQLError) {
       super(arg.message, { cause: arg });
       this.code = arg.code;
@@ -170,7 +170,7 @@ export class SQLError extends Error {
     } else if (arg instanceof Error) {
       super(arg.message, { cause: arg });
       this.code = DEFAULT_CODE;
-      this.errno = CODE_ERRNO[this.code];
+      this.errno = CODE_ERRNO[this.code as keyof typeof CODE_ERRNO];
     } else if (typeof arg === 'object') {
       const found = ERROR_MAP[arg.code ?? ''] ?? ERROR_MAP[arg.err ?? ''];
       if (found !== undefined) {
@@ -193,12 +193,12 @@ export class SQLError extends Error {
       if (arg.errno !== undefined) {
         this.errno = arg.errno;
       } else {
-        this.errno = CODE_ERRNO[this.code];
+        this.errno = CODE_ERRNO[this.code as keyof typeof CODE_ERRNO];
       }
     } else {
       super('unknown error');
       this.code = DEFAULT_CODE;
-      this.errno = CODE_ERRNO[this.code];
+      this.errno = CODE_ERRNO[this.code as keyof typeof CODE_ERRNO];
     }
 
     if (sql) {
