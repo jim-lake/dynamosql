@@ -27,8 +27,6 @@ SELECT CONCAT(@name, " value") AS result;
 SET @bigname = 222222222222222222;
 SELECT @bigname AS result;
 
--- Variables with queries (removed - requires subquery support)
-
 -- Variables in calculations
 SET @base = 100;
 SET @multiplier = 2;
@@ -36,3 +34,18 @@ SELECT @base * @multiplier AS result;
 
 -- Undefined variables (should be NULL)
 SELECT @undefined_var AS result;
+
+-- SET with SELECT subquery
+USE _dynamodb;
+SET @result = (SELECT 42);
+SELECT @result AS value;
+
+-- System variables
+SET @@session.time_zone = "+00:00";
+SET @@global.time_zone = "+00:00";
+SET @@global.collation_connection = "utf8_general_ci";
+SET @@global.div_precision_increment = 8;
+SET @@global.sql_mode = "STRICT_TRANS_TABLES";
+
+-- Invalid SET syntax (should error)
+SET invalid_syntax;

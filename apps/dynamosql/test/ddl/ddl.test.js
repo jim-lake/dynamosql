@@ -38,4 +38,16 @@ describe('DDL', function () {
     { skipAffected: true, timeout: 15000 },
     true
   );
+  runTests(
+    'show.sql',
+    path.join(__dirname, 'show.sql'),
+    { skipAffected: true, timeout: 15000 },
+    true
+  );
+  runTests(
+    'error_cases.sql',
+    path.join(__dirname, 'error_cases.sql'),
+    { skipAffected: true, timeout: 15000 },
+    true
+  );
 });
