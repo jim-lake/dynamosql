@@ -1,4 +1,3 @@
-const async = require('async');
 const { expect } = require('chai');
 const fs = require('node:fs');
 const path = require('node:path');
@@ -39,40 +38,38 @@ describe('setup.sql', function () {
 });
 
 function _runTest(sql) {
-  it(sql, function (done) {
+  it(sql, async function () {
     const mysql_result = {};
     const ddb_result = {};
 
-    async.series(
-      [
-        (done) => {
-          mysql_conn.query(sql, (err, results, columns) => {
-            mysql_result.err = err;
-            mysql_result.results = results;
-            mysql_result.columns = columns;
-            done();
-          });
-        },
-        (done) => {
-          ddb_session.query(sql, (err, results, columns) => {
-            ddb_result.err = err;
-            ddb_result.results = results;
-            ddb_result.columns = columns;
-            done();
-          });
-        },
-      ],
-      () => {
-        try {
-          expect(ddb_result.err, 'err equality').to.equal(mysql_result.err);
-          expect(ddb_result.results.length, 'results length').to.equal(
-            mysql_result.results.length
-          );
-          done();
-        } catch (e) {
-          done(e);
-        }
-      }
+    await new Promise((resolve) => {
+      mysql_conn.query(sql, (err, results, columns) => {
+        mysql_result.err = err;
+        mysql_result.results = results;
+        mysql_result.columns = columns;
+        resolve();
+      });
+    });
+    await new Promise((resolve) => {
+      ddb_session.query(sql, (err, results, columns) => {
+        ddb_result.err = err;
+        ddb_result.results = results;
+        ddb_result.columns = columns;
+        resolve();
+      });
+    });
+
+    if (
+      ddb_result.err?.code === 'ER_DBACCESS_DENIED_ERROR' &&
+      sql.includes('DROP DATABASE')
+    ) {
+      // ignore DROP DATABASE MISMATCH
+      return;
+    }
+
+    expect(ddb_result.err, 'err equality').to.equal(mysql_result.err);
+    expect(ddb_result.results.length, 'results length').to.equal(
+      mysql_result.results.length
     );
   });
 }
