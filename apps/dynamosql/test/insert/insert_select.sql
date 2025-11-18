@@ -31,7 +31,7 @@ DELETE FROM _dynamodb.foo WHERE id = "667";
 DELETE FROM _dynamodb.foo WHERE id = "777";
 SELECT id, other, comment FROM _dynamodb.foo ORDER BY id;
 
-INSERT INTO _dynamodb.foo (id, other, comment) SELECT "comment" AS comment, CAST(otherother AS SIGNED) AS other, CAST(other AS CHAR) AS id FROM _dynamodb.bar ORDER BY id;
+INSERT INTO _dynamodb.foo (id, other, comment) SELECT "comment" AS comment, 11 AS other, CAST(other AS CHAR) AS id FROM _dynamodb.bar ORDER BY id;
 SELECT id, other, comment FROM _dynamodb.foo ORDER BY id;
 
 INSERT IGNORE INTO _dynamodb.foo (id, other, comment) SELECT "comment" AS comment, CAST(otherother AS SIGNED) AS other, CAST(other AS CHAR) AS id FROM _dynamodb.bar ORDER BY id;

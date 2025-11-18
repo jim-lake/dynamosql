@@ -85,6 +85,9 @@ function runTests(test_name, file_path, extra, maybe_skip) {
         }),
         new Promise((resolve) => {
           ddb_session.query(opts, (err, results, columns) => {
+            if (err) {
+              err.cause = null;
+            }
             ddb_result.err = err;
             ddb_result.results = results;
             ddb_result.columns = columns;
