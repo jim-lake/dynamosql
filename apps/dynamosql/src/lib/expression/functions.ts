@@ -197,6 +197,31 @@ function not(expr: Function, state: EvaluationState): EvaluationResult {
   }
   return result;
 }
+function unix_timestamp(
+  expr: Function,
+  state: EvaluationState
+): EvaluationResult {
+  const ret: EvaluationResult = {
+    err: null,
+    name: `UNIX_TIMESTAMP()`,
+    type: 'longlong',
+    value: BigInt(Math.floor(Date.now() / 1000)),
+  };
+  if (expr.args?.value?.[0]) {
+    const val = getValue(expr.args.value[0], state);
+    if (val.err) {
+      return val;
+    }
+    ret.name = `UNIX_TIMESTAMP(${val.name})`;
+    const dt = convertDateTime(val.value);
+    if (dt === null) {
+      ret.value = 0n;
+    } else {
+      ret.value = BigInt(Math.floor(dt.toDate().getTime() / 1000));
+    }
+  }
+  return ret;
+}
 export const methods: Record<
   string,
   undefined | ((expr: Function, state: EvaluationState) => EvaluationResult)
@@ -220,4 +245,5 @@ export const methods: Record<
   current_date: curdate,
   curtime,
   current_time: curtime,
+  unix_timestamp,
 };

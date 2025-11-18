@@ -19,7 +19,6 @@ const opts = {
   dateStrings: true,
   resultObjects: true,
   typeCast(field, next) {
-    console.log('typecast:', field);
     if (field.type === 'LONGLONG') {
       const val = field.string();
       if (val === null) {
