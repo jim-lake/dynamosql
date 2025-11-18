@@ -18,9 +18,7 @@ INSERT INTO _dynamodb.unknown (id) SELECT "111";
 INSERT IGNORE INTO _dynamodb.unknown (id) SELECT "111";
 INSERT INTO _dynamodb.foo (id) SELECT id FROM _dynamodb.bar;
 SELECT id, other, comment FROM _dynamodb.foo ORDER BY id;
-INSERT IGNORE INTO _dynamodb.foo (id, other, comment)
-  SELECT id, CAST(other AS SIGNED), otherother FROM _dynamodb.bar
-;
+INSERT IGNORE INTO _dynamodb.foo (id, other, comment) SELECT id, CAST(other AS SIGNED), otherother FROM _dynamodb.bar;
 SELECT id, other, comment FROM _dynamodb.foo ORDER BY id;
 
 -- Removed added rows
@@ -33,29 +31,16 @@ DELETE FROM _dynamodb.foo WHERE id = "667";
 DELETE FROM _dynamodb.foo WHERE id = "777";
 SELECT id, other, comment FROM _dynamodb.foo ORDER BY id;
 
-INSERT INTO _dynamodb.foo (id, other, comment)
-  SELECT "comment" AS comment, CAST(otherother AS SIGNED) AS other, CAST(other AS CHAR) AS id
-  FROM _dynamodb.bar
-  ORDER BY id
-;
+INSERT INTO _dynamodb.foo (id, other, comment) SELECT "comment" AS comment, CAST(otherother AS SIGNED) AS other, CAST(other AS CHAR) AS id FROM _dynamodb.bar ORDER BY id;
 SELECT id, other, comment FROM _dynamodb.foo ORDER BY id;
 
-INSERT IGNORE INTO _dynamodb.foo (id, other, comment)
-  SELECT "comment" AS comment, CAST(otherother AS SIGNED) AS other, CAST(other AS CHAR) AS id
-  FROM _dynamodb.bar
-  ORDER BY id
-;
+INSERT IGNORE INTO _dynamodb.foo (id, other, comment) SELECT "comment" AS comment, CAST(otherother AS SIGNED) AS other, CAST(other AS CHAR) AS id FROM _dynamodb.bar ORDER BY id;
 SELECT id, other, comment FROM _dynamodb.foo ORDER BY id;
 
 DELETE FROM _dynamodb.foo WHERE id = "comment";
-INSERT IGNORE INTO _dynamodb.foo (id, other, comment)
-  SELECT "comment" AS comment, CAST(otherother AS SIGNED) AS other, CAST(other AS CHAR) AS id
-  FROM _dynamodb.bar
-  ORDER BY id DESC
-;
+INSERT IGNORE INTO _dynamodb.foo (id, other, comment) SELECT "comment" AS comment, CAST(otherother AS SIGNED) AS other, CAST(other AS CHAR) AS id FROM _dynamodb.bar ORDER BY id DESC;
 SELECT id, other, comment FROM _dynamodb.foo ORDER BY id;
 
--- Reset
 DELETE FROM _dynamodb.foo WHERE id = "comment";
 DELETE FROM _dynamodb.foo WHERE id = "333";
 DELETE FROM _dynamodb.foo WHERE id = "123";
