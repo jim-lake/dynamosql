@@ -11,6 +11,15 @@ const Session = require('../src/session');
 
 const SECONDS_REGEX = /:[0-9]{2}(\.[0-9]*)?$/g;
 
+process.on('uncaughtException', err => {
+  console.error('Caught uncaught exception:', err);
+  process.exit(1);
+});
+process.on('unhandledRejection', err => {
+  console.error('Caught unhandled rejection:', err);
+  process.exit(1);
+});
+
 function runTests(test_name, file_path, extra, maybe_skip) {
   const skip = maybe_skip && !process.env.TEST_RUN_SLOW;
 
