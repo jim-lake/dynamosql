@@ -113,7 +113,7 @@ export class SQLInterval {
     const number = this._number * mult;
     let value = null;
     if (type === 'time') {
-      value = createSQLTime(old_time + number, decimals);
+      value = createSQLTime({ time: old_time + number, decimals });
     } else {
       if (old_type === 'time') {
         const now = Date.now() / 1000;

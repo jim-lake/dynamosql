@@ -1,4 +1,5 @@
 const OFFSET_REGEX = /^([+-])(\d{2}):(\d{2})$/;
+const FLEX_OFFSET_REGEX = /([+-])(\d{1,2})(?::(\d{2}))?$/;
 
 export function offsetAtTime(
   time_zone: string,
@@ -25,17 +26,14 @@ export function offsetAtTime(
     if (!tzPart) {
       return null;
     }
-
-    const match = OFFSET_REGEX.exec(tzPart.value);
-    if (!match) {
+    const m = FLEX_OFFSET_REGEX.exec(tzPart.value);
+    if (!m) {
       return null;
     }
-    const sign = match[1] === '+' ? 1 : -1;
-    return (
-      sign *
-      (parseInt(match[2] ?? '', 10) * 60 + parseInt(match[3] ?? '', 10)) *
-      60
-    );
+    const sign = m[1] === '+' ? 1 : -1;
+    const hours = parseInt(m[2] ?? '', 10);
+    const minutes = m[3] ? parseInt(m[3], 10) : 0;
+    return sign * (hours * 3600 + minutes * 60);
   } catch {
     return null;
   }

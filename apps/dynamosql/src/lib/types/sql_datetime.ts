@@ -1,3 +1,5 @@
+import { offsetAtTime } from '../helpers/timezone';
+
 const YEAR_MULT = 10000;
 const MONTH_MULT = 100;
 const DAY_MULT = 1;
@@ -32,7 +34,6 @@ export class SQLDateTime {
     this._type = params.type;
     if (this._type === 'date') {
       this._decimals = 0;
-      this._time -= this._time % (24 * 60 * 60);
       this._fraction = 0;
     } else {
       this._decimals = params.decimals ?? (this._fraction ? 6 : 0);
@@ -50,9 +51,20 @@ export class SQLDateTime {
       }
     }
   }
-  private _makeDate(): Date {
-    if (!this._date) {
-      this._date = new Date(Math.floor(this._time * 1000));
+  private _makeDate(timeZone?: string): Date {
+    let time = this._time;
+    if (timeZone) {
+      const offset = offsetAtTime(timeZone, this._time) ?? 0;
+      time += offset;
+    }
+
+    if (this._type === 'date') {
+      time -= time % (24 * 60 * 60);
+      return new Date(Math.floor(time * 1000));
+    } else if (timeZone) {
+      return new Date(Math.floor(time * 1000));
+    } else if (!this._date) {
+      return (this._date = new Date(Math.floor(this._time * 1000)));
     }
     return this._date;
   }
@@ -76,9 +88,9 @@ export class SQLDateTime {
     const other_date = Math.floor(other._time / (24 * 60 * 60));
     return this_date - other_date;
   }
-  toString(): string {
+  toString(timeZone?: string): string {
     let ret;
-    const date = this._makeDate();
+    const date = this._makeDate(timeZone);
     if (isNaN(date.getTime())) {
       ret = '';
     } else {
@@ -102,8 +114,8 @@ export class SQLDateTime {
       return _dateFormat(date, format);
     }
   }
-  toDate(): Date {
-    return this._makeDate();
+  toDate(timeZone?: string): Date {
+    return this._makeDate(timeZone);
   }
   toNumber(): number {
     let ret = 0;
@@ -140,8 +152,12 @@ export function cloneSQLDateTime(
   other: SQLDateTime,
   params: Omit<SQLDateTimeConstructorParams, 'time' | 'fraction'>
 ): SQLDateTime {
+  let time = other.getTime();
+  if (other.getType() === 'date') {
+    time -= time % (24 * 60 * 60);
+  }
   return new SQLDateTime({
-    time: other.getTime(),
+    time,
     fraction: other.getFraction(),
     decimals: params.decimals ?? other.getDecimals(),
     type: params.type ?? other.getType(),

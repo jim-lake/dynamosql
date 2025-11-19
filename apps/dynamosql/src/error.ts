@@ -135,6 +135,10 @@ const ERROR_MAP: Record<string, ErrorMapEntry> = {
     code: 'ER_WRONG_TYPE_FOR_VAR',
     sqlMessage: errStr`Incorrect argument type to variable '${0}'`,
   },
+  ER_UNKNOWN_TIME_ZONE: {
+    code: 'ER_UNKNOWN_TIME_ZONE',
+    sqlMessage: errStr`Uknown or incorrect time zone: '${0}'`,
+  },
 };
 
 export class SQLError extends Error {

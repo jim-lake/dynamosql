@@ -1,6 +1,8 @@
 import { CHARSETS } from '../../constants/mysql';
 import { Types } from '../../types';
 import { toBigInt } from '../../tools/safe_convert';
+import { SQLDateTime } from '../types/sql_datetime';
+import { SQLTime } from '../types/sql_time';
 
 import type { FieldInfo } from '../../types';
 import type { TypeCastOptions } from '../../session';
@@ -8,7 +10,8 @@ import type { TypeCastOptions } from '../../session';
 export function typeCast(
   value: unknown,
   column: FieldInfo,
-  options?: TypeCastOptions
+  options?: TypeCastOptions,
+  timeZone?: string
 ): unknown {
   if (value === null || value === undefined) {
     return null;
@@ -46,26 +49,28 @@ export function typeCast(
         }
         break;
       case Types.TIMESTAMP:
-      case Types.DATE:
       case Types.DATETIME:
+      case Types.DATE:
       case Types.NEWDATE:
-        if (options?.dateStrings) {
+        if (options?.dateStrings && value instanceof SQLDateTime) {
+          return value.toString(timeZone);
+        } else if (options?.dateStrings) {
           return String(value);
         } else if (value instanceof Date) {
           return value;
-        } else if (
-          typeof value === 'object' &&
-          value !== null &&
-          'toDate' in value &&
-          typeof (value as { toDate: () => Date }).toDate === 'function'
-        ) {
-          return (value as { toDate: () => Date }).toDate();
+        } else if (value instanceof SQLDateTime) {
+          return value.toDate(timeZone);
         } else {
           return new Date(String(value));
         }
         break;
-      case Types.GEOMETRY:
       case Types.TIME:
+        if (value instanceof SQLTime) {
+          return value.toString(timeZone);
+        } else {
+          return typeof value === 'string' ? value : String(value);
+        }
+      case Types.GEOMETRY:
         return typeof value === 'string' ? value : String(value);
       case Types.VARCHAR:
       case Types.ENUM:

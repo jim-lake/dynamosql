@@ -170,7 +170,7 @@ function curtime(expr: Function, state: EvaluationState): EvaluationResult {
       result.err = 'ER_TOO_BIG_PRECISION';
     }
     const time = (Date.now() / 1000) % DAY;
-    result.value = createSQLTime(time, decimals);
+    result.value = createSQLTime({ time, decimals });
     result.type = 'time';
   }
   return result;

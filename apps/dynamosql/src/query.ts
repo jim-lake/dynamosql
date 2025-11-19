@@ -248,11 +248,22 @@ export class Query extends EventEmitter {
           string: () => (value === null ? null : String(value)),
           buffer: () => (value === null ? null : Buffer.from(String(value))),
         },
-        () => typeCast(value, column, this._session.typeCastOptions)
+        () =>
+          typeCast(
+            value,
+            column,
+            this._session.typeCastOptions,
+            this._session.timeZone
+          )
       );
     }
     return this.typeCast
-      ? typeCast(value, column, this._session.typeCastOptions)
+      ? typeCast(
+          value,
+          column,
+          this._session.typeCastOptions,
+          this._session.timeZone
+        )
       : value;
   }
 }

@@ -126,11 +126,11 @@ export function convertTime(value: unknown, decimals?: number): SQLTime | null {
     if (time === undefined) {
       return null;
     } else {
-      return createSQLTime(time, decimals);
+      return createSQLTime({ time, decimals });
     }
   } else if (typeof value === 'number') {
     const time = _numToTime(value);
-    return createSQLTime(time, decimals);
+    return createSQLTime({ time, decimals });
   }
   return null;
 }

@@ -6,6 +6,7 @@ import { SQLError } from './error';
 import { Query } from './query';
 import GlobalSettings from './global_settings';
 import { SYSTEM_VARIABLE_TYPES } from './constants/system_variables';
+import { offsetAtTime } from './lib/helpers/timezone';
 
 import type {
   TypeCast,
@@ -173,6 +174,12 @@ export class Session extends EventEmitter implements PoolConnection {
         this._divPrecisionIncrement = Number(value);
         return;
       case 'TIME_ZONE':
+        if (offsetAtTime(String(value), Date.now() / 1000) === null) {
+          throw new SQLError({
+            code: 'ER_UNKNOWN_TIME_ZONE',
+            args: [String(value)],
+          });
+        }
         this._timeZone = String(value);
         return;
       case 'SQL_MODE':
