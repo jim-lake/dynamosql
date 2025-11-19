@@ -1,9 +1,14 @@
-import { createSQLDateTime, SQLDateTime } from '../types/sql_datetime';
+import { cloneSQLDateTime, SQLDateTime } from '../types/sql_datetime';
 import { createSQLTime, SQLTime } from '../types/sql_time';
 
 const MINUTE = 60;
 const HOUR = 60 * MINUTE;
 const DAY = 24 * HOUR;
+
+interface TimeFraction {
+  time: number;
+  fraction?: number;
+}
 
 export function convertNum(value: unknown): number | null {
   let ret: number | null = null;
@@ -60,52 +65,49 @@ const DATETIME2_REGEX = new RegExp(DATETIME2_RS);
 
 export function convertDateTime(
   value: unknown,
-  type?: string,
+  type?: 'datetime' | 'date' | undefined,
   decimals?: number
-): any {
-  let ret;
+): SQLDateTime | null {
   if (value === null) {
-    ret = null;
+    return null;
   } else if (value instanceof SQLDateTime) {
-    ret = createSQLDateTime(value, type, decimals);
+    return cloneSQLDateTime(value, { type: type ?? 'datetime', decimals });
   } else if (value instanceof SQLTime) {
-    ret = value.toSQLDateTime(decimals);
-  } else if (typeof value === 'string') {
-    let time = _stringToDateTime(value);
-    if (time === undefined) {
-      time = _stringToDate(value);
-      if (!type) {
-        type = 'date';
+    return value.toSQLDateTime(decimals);
+  } else {
+    let convert_result: TimeFraction | undefined;
+    if (typeof value === 'string') {
+      convert_result = _stringToDateTime(value);
+      if (convert_result === undefined) {
+        convert_result = _stringToDate(value);
+        if (!type) {
+          type = 'date';
+        }
       }
+      if (convert_result === undefined) {
+        convert_result = _numToDateTime(value);
+      }
+    } else if (typeof value === 'number') {
+      convert_result = _numToDateTime(value);
     }
-
-    if (time === undefined) {
-      time = _numToDateTime(value);
-    }
-    if (time === undefined) {
-      ret = null;
-    } else {
-      ret = createSQLDateTime(time, type ?? 'datetime', decimals);
-    }
-  } else if (typeof value === 'number') {
-    const time = _numToDateTime(value);
-    if (time === undefined) {
-      ret = null;
-    } else {
-      ret = createSQLDateTime(time, type, decimals);
+    if (convert_result) {
+      return new SQLDateTime({
+        ...convert_result,
+        type: type ?? 'datetime',
+        decimals,
+      });
     }
   }
-  return ret;
+  return null;
 }
 
 const DAY_TIME_REGEX =
   /^(-)?([0-9]+)\s+([0-9]*)(:([0-9]{1,2}))?(:([0-9]{1,2}))?(\.[0-9]+)?/;
 const TIME_REGEX = /^(-)?([0-9]*):([0-9]{1,2})(:([0-9]{1,2}))?(\.[0-9]+)?/;
 
-export function convertTime(value: any, decimals?: number): any {
-  let ret;
+export function convertTime(value: unknown, decimals?: number): SQLTime | null {
   if (value instanceof SQLTime) {
-    ret = value;
+    return value;
   } else if (typeof value === 'string') {
     let time = _stringToTime(value);
     if (time === undefined) {
@@ -122,15 +124,15 @@ export function convertTime(value: any, decimals?: number): any {
     }
 
     if (time === undefined) {
-      ret = null;
+      return null;
     } else {
-      ret = createSQLTime(time, decimals);
+      return createSQLTime(time, decimals);
     }
   } else if (typeof value === 'number') {
     const time = _numToTime(value);
-    ret = createSQLTime(time, decimals);
+    return createSQLTime(time, decimals);
   }
-  return ret;
+  return null;
 }
 
 function _stringToTime(value: string): number | undefined {
@@ -165,8 +167,7 @@ function _stringToTime(value: string): number | undefined {
   }
   return ret;
 }
-
-function _stringToDate(value: string): any {
+function _stringToDate(value: string): TimeFraction | undefined {
   let ret;
   const match = value.trim().match(DATE_REGEX);
   if (match && match[1] && match[2] && match[3]) {
@@ -178,7 +179,7 @@ function _stringToDate(value: string): any {
   return ret;
 }
 
-function _stringToDateTime(value: string): any {
+function _stringToDateTime(value: string): TimeFraction | undefined {
   let ret;
   const match = value.trim().match(DATETIME_REGEX);
   if (match && match[1] && match[2] && match[3] && match[5]) {
@@ -194,7 +195,7 @@ function _stringToDateTime(value: string): any {
   return ret;
 }
 
-function _numToDateTime(number: any): any {
+function _numToDateTime(number: any): TimeFraction | undefined {
   let ret;
   const s = String(number);
   let match = s.match(DATETIME4_REGEX);
@@ -292,12 +293,12 @@ function _partsToTime(
   min: string | number,
   sec: string | number,
   fraction?: number
-): any {
+): TimeFraction | undefined {
   const iso = `${_pad4(year)}-${_pad2(month)}-${_pad2(day)}T${_pad2(
     hour
   )}:${_pad2(min)}:${_pad2(sec)}Z`;
   const time = Date.parse(iso);
-  let ret;
+  let ret: TimeFraction | undefined;
   if (!isNaN(time)) {
     ret = { time: time / 1000, fraction };
   }

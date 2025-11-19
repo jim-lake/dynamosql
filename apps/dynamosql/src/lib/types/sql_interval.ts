@@ -2,6 +2,10 @@ import { createSQLDateTime } from './sql_datetime';
 import { createSQLTime } from './sql_time';
 import { getDecimals, convertNum } from '../helpers/sql_conversion';
 
+import type { SQLDateTime } from './sql_datetime';
+import type { SQLTime } from './sql_time';
+import type { EvaluationValue } from '../expression';
+
 const SINGLE_TIME: Record<string, number> = {
   microsecond: 0.000001,
   second: 1,
@@ -53,10 +57,10 @@ const DECIMALS: Record<string, number> = {
 };
 
 export class SQLInterval {
-  private _number: number;
-  private _decimals: number;
-  private _isMonth: boolean;
-  private _forceDate: boolean;
+  private readonly _number: number;
+  private readonly _decimals: number;
+  private readonly _isMonth: boolean;
+  private readonly _forceDate: boolean;
 
   constructor(
     number: number,
@@ -79,24 +83,21 @@ export class SQLInterval {
   getNumber(): number {
     return this._number;
   }
-
   isMonth(): boolean {
     return this._isMonth;
   }
-
   forceDate(): boolean {
     return this._forceDate;
   }
-
   toString(): null {
     return null;
   }
 
-  _add(datetime: any, mult: number): any {
-    let old_time = datetime.getTime?.();
-    let fraction = datetime.getFraction?.();
-    const old_type = datetime?.getType?.();
-    let type;
+  private _add(datetime: SQLDateTime | SQLTime, mult: number): EvaluationValue {
+    let old_time = datetime.getTime();
+    let fraction = datetime.getFraction();
+    const old_type = datetime.getType();
+    let type: 'datetime' | 'date' | 'time' | undefined = undefined;
     if (old_type === 'datetime') {
       type = 'datetime';
     } else if (old_type === 'date' && !this._forceDate) {
@@ -108,7 +109,7 @@ export class SQLInterval {
     } else if (old_type === 'time') {
       type = 'time';
     }
-    const decimals = Math.max(datetime.getDecimals?.(), this._decimals);
+    const decimals = Math.max(datetime.getDecimals(), this._decimals);
     const number = this._number * mult;
     let value = null;
     if (type === 'time') {
@@ -129,16 +130,19 @@ export class SQLInterval {
         time += overflow;
         fraction -= overflow;
       }
-      value = createSQLDateTime({ time, fraction }, type, decimals);
+      value = createSQLDateTime({
+        time,
+        fraction,
+        type: type ?? 'datetime',
+        decimals,
+      });
     }
-    return { type, value };
+    return { type: type ?? 'datetime', value };
   }
-
-  add(datetime: any): any {
+  add(datetime: SQLDateTime | SQLTime): EvaluationValue {
     return this._add(datetime, 1);
   }
-
-  sub(datetime: any): any {
+  sub(datetime: SQLDateTime | SQLTime): EvaluationValue {
     return this._add(datetime, -1);
   }
 }

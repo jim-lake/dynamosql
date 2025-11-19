@@ -4,27 +4,19 @@ import {
   convertDateTime,
 } from '../helpers/sql_conversion';
 import { getValue } from './evaluate';
+import { SQLDateTime } from '../types/sql_datetime';
+import { SQLTime } from '../types/sql_time';
+
 import type { Binary, ExpressionValue } from 'node-sql-parser';
 import type { EvaluationState, EvaluationResult } from './evaluate';
-
-function _isDateOrTimeLike(type: string): boolean {
-  return type === 'date' || type === 'datetime' || type === 'time';
-}
-
-function _isDateLike(type: string): boolean {
-  return type === 'date' || type === 'datetime';
-}
+import type { SQLInterval } from '../types/sql_interval';
 
 interface NumBothSidesResult extends EvaluationResult {
   left_num?: number;
   right_num?: number;
-  interval?: {
-    add: (dt: unknown) => { value: unknown; type: string };
-    sub: (dt: unknown) => { value: unknown; type: string };
-  };
-  datetime?: unknown;
+  interval?: SQLInterval;
+  datetime?: SQLDateTime | SQLTime | null;
 }
-
 function _numBothSides(
   expr: Binary,
   state: EvaluationState,
@@ -38,22 +30,20 @@ function _numBothSides(
   let value;
   let left_num;
   let right_num;
-  let interval:
-    | {
-        add: (dt: unknown) => { value: unknown; type: string };
-        sub: (dt: unknown) => { value: unknown; type: string };
-      }
-    | undefined;
-  let datetime;
+  let interval: SQLInterval | undefined;
+  let datetime: SQLDateTime | SQLTime | null | undefined;
   if (!err) {
     if (left.value === null || right.value === null) {
       value = null;
     } else if (allow_interval && left.type === 'interval') {
       interval = left.value as typeof interval;
-      if (right.type && _isDateOrTimeLike(right.type)) {
+      if (
+        right.value instanceof SQLDateTime ||
+        right.value instanceof SQLTime
+      ) {
         datetime = right.value;
       } else if (right.value !== undefined && typeof right.value === 'string') {
-        datetime = convertDateTime(right.value as string);
+        datetime = convertDateTime(right.value);
         if (!datetime) {
           value = null;
         }
@@ -62,10 +52,10 @@ function _numBothSides(
       }
     } else if (allow_interval && right.type === 'interval') {
       interval = right.value as typeof interval;
-      if (left.type && _isDateOrTimeLike(left.type)) {
+      if (left.value instanceof SQLDateTime || left.value instanceof SQLTime) {
         datetime = left.value;
       } else if (left.value !== undefined && typeof left.value === 'string') {
-        datetime = convertDateTime(left.value as string);
+        datetime = convertDateTime(left.value);
         if (!datetime) {
           value = null;
         }
@@ -96,7 +86,6 @@ function _numBothSides(
     type: 'number',
   };
 }
-
 function plus(expr: Binary, state: EvaluationState): EvaluationResult {
   const result = _numBothSides(expr, state, ' + ', true);
   const { err, name, left_num, right_num, interval, datetime } = result;
@@ -114,7 +103,6 @@ function plus(expr: Binary, state: EvaluationState): EvaluationResult {
   }
   return { err, value, type, name };
 }
-
 function minus(expr: Binary, state: EvaluationState): EvaluationResult {
   const result = _numBothSides(expr, state, ' - ', true);
   const { err, name, left_num, right_num, interval, datetime } = result;
@@ -132,7 +120,6 @@ function minus(expr: Binary, state: EvaluationState): EvaluationResult {
   }
   return { err, value, type, name };
 }
-
 function mul(expr: Binary, state: EvaluationState): EvaluationResult {
   const result = _numBothSides(expr, state, ' * ');
   const { err, name, left_num, right_num } = result;
@@ -147,7 +134,6 @@ function mul(expr: Binary, state: EvaluationState): EvaluationResult {
   }
   return { err, value, name, type: 'number' };
 }
-
 function div(expr: Binary, state: EvaluationState): EvaluationResult {
   const result = _numBothSides(expr, state, ' / ');
   const { err, name, left_num, right_num } = result;
@@ -333,7 +319,7 @@ function lte(expr: Binary, state: EvaluationState): EvaluationResult {
   return _gte(expr.right, expr.left, state, ' <= ', true);
 }
 
-export function and(expr: Binary, state: EvaluationState): EvaluationResult {
+function and(expr: Binary, state: EvaluationState): EvaluationResult {
   const left = getValue(expr.left, state);
   let err = left.err;
   let name = left.name + ' AND ';
@@ -355,7 +341,7 @@ export function and(expr: Binary, state: EvaluationState): EvaluationResult {
   return { err, value, name, type: 'longlong' };
 }
 
-export function or(expr: Binary, state: EvaluationState): EvaluationResult {
+function or(expr: Binary, state: EvaluationState): EvaluationResult {
   const left = getValue(expr.left, state);
   let err = left.err;
   let name = left.name + ' OR ';
@@ -377,7 +363,7 @@ export function or(expr: Binary, state: EvaluationState): EvaluationResult {
   return { err, value, name, type: 'longlong' };
 }
 
-export function xor(expr: Binary, state: EvaluationState): EvaluationResult {
+function xor(expr: Binary, state: EvaluationState): EvaluationResult {
   const left = getValue(expr.left, state);
   const right = getValue(expr.right, state);
   const err = left.err || right.err;
@@ -395,16 +381,14 @@ export function xor(expr: Binary, state: EvaluationState): EvaluationResult {
   return { err, value, name, type: 'longlong' };
 }
 
-export function is(expr: Binary, state: EvaluationState): EvaluationResult {
+function is(expr: Binary, state: EvaluationState): EvaluationResult {
   return _is(expr, state, 'IS');
 }
-
 function isNot(expr: Binary, state: EvaluationState): EvaluationResult {
   const result = _is(expr, state, 'IS NOT');
   result.value = result.value ? 0 : 1;
   return result;
 }
-
 function _is(
   expr: Binary,
   state: EvaluationState,
@@ -456,21 +440,6 @@ function _is(
   result.type = 'longlong';
   return result;
 }
-
-function _unionDateTime(type1: string, type2: string): string | undefined {
-  let ret;
-  if (type1 === 'string') {
-    ret = 'datetime';
-  } else if (type2 === 'string') {
-    ret = 'datetime';
-  } else if (type1 === 'time' || type2 === 'time') {
-    ret = 'datetime';
-  } else if (_isDateLike(type1) && _isDateLike(type2)) {
-    ret = 'datetime';
-  }
-  return ret;
-}
-
 function like(expr: Binary, state: EvaluationState): EvaluationResult {
   const left = getValue(expr.left, state);
   const right = getValue(expr.right, state);
@@ -492,7 +461,6 @@ function like(expr: Binary, state: EvaluationState): EvaluationResult {
   }
   return { err, value, name, type: 'longlong' };
 }
-
 function notLike(expr: Binary, state: EvaluationState): EvaluationResult {
   const result = like(expr, state);
   result.name = result.name?.replace(' LIKE ', ' NOT LIKE ') ?? '';
@@ -501,7 +469,6 @@ function notLike(expr: Binary, state: EvaluationState): EvaluationResult {
   }
   return result;
 }
-
 function inOp(expr: Binary, state: EvaluationState): EvaluationResult {
   const left = getValue(expr.left, state);
   const err = left.err;
@@ -542,6 +509,25 @@ function notIn(expr: Binary, state: EvaluationState): EvaluationResult {
     result.value = result.value ? 0 : 1;
   }
   return result;
+}
+function _isDateOrTimeLike(type: string): boolean {
+  return type === 'date' || type === 'datetime' || type === 'time';
+}
+function _isDateLike(type: string): boolean {
+  return type === 'date' || type === 'datetime';
+}
+function _unionDateTime(type1: string, type2: string): string | undefined {
+  let ret;
+  if (type1 === 'string') {
+    ret = 'datetime';
+  } else if (type2 === 'string') {
+    ret = 'datetime';
+  } else if (type1 === 'time' || type2 === 'time') {
+    ret = 'datetime';
+  } else if (_isDateLike(type1) && _isDateLike(type2)) {
+    ret = 'datetime';
+  }
+  return ret;
 }
 
 export const methods: Record<

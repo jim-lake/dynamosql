@@ -5,32 +5,37 @@ const HOUR_MULT = 10000;
 const MINUTE_MULT = 100;
 const DATE_TIME_MULT = 10000;
 
+export interface SQLDateTimeConstructorParams {
+  time: number;
+  fraction?: number;
+  type: 'date' | 'datetime';
+  decimals?: number;
+}
 export class SQLDateTime {
-  private _time: number;
-  private _fraction: number = 0;
-  private _fractionText: string = '';
-  private _type: string;
-  private _decimals: number;
+  private readonly _time: number;
+  private readonly _fraction: number = 0;
+  private readonly _fractionText: string = '';
+  private readonly _type: 'date' | 'datetime';
+  private readonly _decimals: number;
   private _date: Date | null = null;
 
-  constructor(time_arg: any, type?: string, decimals?: number) {
-    this._time = Math.floor(time_arg?.time ?? time_arg);
-    if (time_arg?.fraction !== undefined) {
-      this._fraction = time_arg.fraction;
-    } else if (typeof time_arg === 'number') {
-      this._fraction = parseFloat(
-        '0.' + (String(time_arg).split('.')[1] || '').slice(0, 6).padEnd(6, '0')
-      );
+  constructor(params: SQLDateTimeConstructorParams) {
+    this._time = params.time;
+    if (params?.fraction !== undefined) {
+      this._fraction = params.fraction;
     } else {
-      this._fraction = 0;
+      this._fraction = parseFloat(
+        '0.' +
+          (String(params.time).split('.')[1] || '').slice(0, 6).padEnd(6, '0')
+      );
     }
-    this._type = type || 'datetime';
-    if (type === 'date') {
+    this._type = params.type;
+    if (this._type === 'date') {
       this._decimals = 0;
       this._time -= this._time % (24 * 60 * 60);
       this._fraction = 0;
     } else {
-      this._decimals = decimals ?? (this._fraction ? 6 : 0);
+      this._decimals = params.decimals ?? (this._fraction ? 6 : 0);
       this._fraction = parseFloat(this._fraction.toFixed(this._decimals));
       let fd = 0;
       if (this._fraction >= 1.0) {
@@ -45,59 +50,39 @@ export class SQLDateTime {
       }
     }
   }
-
-  _makeDate(): void {
+  private _makeDate(): Date {
     if (!this._date) {
       this._date = new Date(Math.floor(this._time * 1000));
     }
+    return this._date;
   }
-
-  getType(): string {
+  getType(): 'date' | 'datetime' {
     return this._type;
   }
-
   getTime(): number {
     return this._time;
   }
-
   getFraction(): number {
     return this._fraction;
   }
-
   getDecimals(): number {
     return this._decimals;
   }
-
-  setType(type: string): void {
-    if (type === 'date' && this._type !== 'date') {
-      this._type = 'date';
-      this._decimals = 0;
-      this._time -= this._time % (24 * 60 * 60);
-      this._fraction = 0;
-      this._fractionText = '';
-      this._date = null; // Reset cached date
-    } else if (type !== 'date') {
-      this._type = type;
-    }
-  }
-
   diff(other: SQLDateTime | null | undefined): number | null {
     if (!other) {
       return null;
     }
-    // DATEDIFF returns the difference in days
-    const thisDate = Math.floor(this._time / (24 * 60 * 60));
-    const otherDate = Math.floor(other.getTime() / (24 * 60 * 60));
-    return thisDate - otherDate;
+    const this_date = Math.floor(this._time / (24 * 60 * 60));
+    const other_date = Math.floor(other._time / (24 * 60 * 60));
+    return this_date - other_date;
   }
-
   toString(): string {
     let ret;
-    this._makeDate();
-    if (isNaN(this._date as any)) {
+    const date = this._makeDate();
+    if (isNaN(date.getTime())) {
       ret = '';
     } else {
-      ret = this._date!.toISOString().replace('T', ' ');
+      ret = date.toISOString().replace('T', ' ');
       if (this._type === 'date') {
         ret = ret.slice(0, 10);
       } else {
@@ -109,34 +94,28 @@ export class SQLDateTime {
     }
     return ret;
   }
-
   dateFormat(format: string): string {
-    let ret;
-    this._makeDate();
-    if (isNaN(this._date as any)) {
-      ret = '';
+    const date = this._makeDate();
+    if (isNaN(date.getTime())) {
+      return '';
     } else {
-      ret = _dateFormat(this._date!, format);
+      return _dateFormat(date, format);
     }
-    return ret;
   }
-
-  toDate(): Date | null {
-    this._makeDate();
-    return this._date;
+  toDate(): Date {
+    return this._makeDate();
   }
-
   toNumber(): number {
     let ret = 0;
-    this._makeDate();
-    ret += this._date!.getUTCFullYear() * YEAR_MULT;
-    ret += (this._date!.getUTCMonth() + 1) * MONTH_MULT;
-    ret += this._date!.getUTCDate() * DAY_MULT;
+    const date = this._makeDate();
+    ret += date.getUTCFullYear() * YEAR_MULT;
+    ret += (date.getUTCMonth() + 1) * MONTH_MULT;
+    ret += date.getUTCDate() * DAY_MULT;
     if (this._type === 'datetime') {
       ret = ret * DATE_TIME_MULT;
-      ret += this._date!.getUTCHours() * HOUR_MULT;
-      ret += this._date!.getUTCMinutes() * MINUTE_MULT;
-      ret += this._date!.getUTCSeconds();
+      ret += date.getUTCHours() * HOUR_MULT;
+      ret += date.getUTCMinutes() * MINUTE_MULT;
+      ret += date.getUTCSeconds();
       if (this._decimals > 0) {
         ret += this._fraction;
       }
@@ -144,45 +123,29 @@ export class SQLDateTime {
     return ret;
   }
 }
-
 export function createSQLDateTime(
-  arg: any,
-  type?: string,
-  decimals?: number
+  params: SQLDateTimeConstructorParams
 ): SQLDateTime | null {
-  let ret;
-  if (arg instanceof SQLDateTime) {
-    if (arg.getType() === type && arg.getDecimals() === decimals) {
-      ret = arg;
-    } else {
-      const opts = { time: arg.getTime(), fraction: arg.getFraction() };
-      ret = new SQLDateTime(
-        opts,
-        type ?? arg.getType(),
-        decimals ?? arg.getDecimals()
-      );
-    }
+  if (isNaN(params.time)) {
+    return null;
+  } else if (params.time >= 253402300800) {
+    return null;
+  } else if (params.time <= -62167219201) {
+    return null;
   } else {
-    const time = arg?.time ?? arg;
-    if (isNaN(time)) {
-      ret = null;
-    } else if (time >= 253402300800) {
-      ret = null;
-    } else if (time <= -62167219201) {
-      ret = null;
-    } else {
-      ret = new SQLDateTime(arg, type, decimals);
-    }
+    return new SQLDateTime(params);
   }
-  return ret;
 }
-
-export function createDateTime(
-  arg: any,
-  type?: string,
-  decimals?: number
-): SQLDateTime | null {
-  return createSQLDateTime(arg, type, decimals);
+export function cloneSQLDateTime(
+  other: SQLDateTime,
+  params: Omit<SQLDateTimeConstructorParams, 'time' | 'fraction'>
+): SQLDateTime {
+  return new SQLDateTime({
+    time: other.getTime(),
+    fraction: other.getFraction(),
+    decimals: params.decimals ?? other.getDecimals(),
+    type: params.type ?? other.getType(),
+  });
 }
 
 const FORMAT_LONG_NUMBER = new Intl.DateTimeFormat('en-US', {

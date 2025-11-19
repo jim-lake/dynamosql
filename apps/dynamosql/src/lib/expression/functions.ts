@@ -1,6 +1,6 @@
 import { getValue } from './evaluate';
 import { convertNum, convertDateTime } from '../helpers/sql_conversion';
-import { createSQLDateTime } from '../types/sql_datetime';
+import { SQLDateTime, createSQLDateTime } from '../types/sql_datetime';
 import { createSQLTime } from '../types/sql_time';
 import type { Function } from 'node-sql-parser';
 import type { EvaluationState, EvaluationResult } from './evaluate';
@@ -89,7 +89,11 @@ function now(expr: Function, state: EvaluationState): EvaluationResult {
     if (decimals > 6) {
       result.err = 'ER_TOO_BIG_PRECISION';
     }
-    result.value = createSQLDateTime(Date.now() / 1000, 'datetime', decimals);
+    result.value = new SQLDateTime({
+      time: state.session.timestamp,
+      type: 'datetime',
+      decimals,
+    });
     result.type = 'datetime';
   }
   return result;
@@ -105,8 +109,7 @@ function from_unixtime(
     const time = convertNum(result.value);
     if (time !== null) {
       const decimals = Math.min(6, String(time).split('.')?.[1]?.length || 0);
-      result.value =
-        time < 0 ? null : createSQLDateTime(time, 'datetime', decimals);
+      result.value = createSQLDateTime({ time, type: 'datetime', decimals });
     }
   }
   return result;
@@ -116,16 +119,7 @@ function date(expr: Function, state: EvaluationState): EvaluationResult {
   result.name = `DATE(${result.name})`;
   result.type = 'date';
   if (!result.err && result.value !== null) {
-    const dateValue = convertDateTime(result.value);
-    if (
-      dateValue &&
-      typeof dateValue === 'object' &&
-      'setType' in dateValue &&
-      typeof dateValue.setType === 'function'
-    ) {
-      dateValue.setType('date');
-    }
-    result.value = dateValue;
+    result.value = convertDateTime(result.value, 'date');
   }
   return result;
 }
@@ -157,10 +151,13 @@ function datediff(expr: Function, state: EvaluationState): EvaluationResult {
     );
     value = result !== undefined ? result : null;
   }
-  return { err, name, value, type: 'int' };
+  return { err, name, value, type: 'longlong' };
 }
-function curdate(expr: Function): EvaluationResult {
-  const value = createSQLDateTime(Date.now() / 1000, 'date');
+function curdate(expr: Function, state: EvaluationState): EvaluationResult {
+  const value = new SQLDateTime({
+    time: state.session.timestamp,
+    type: 'date',
+  });
   const name = expr.args ? 'CURDATE()' : 'CURRENT_DATE';
   return { err: null, value, name, type: 'date' };
 }

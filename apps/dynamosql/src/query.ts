@@ -94,6 +94,7 @@ export class Query extends EventEmitter {
     const schema_list: FieldInfo[][] = [];
     try {
       for (const ast of list) {
+        this._session.startStatement();
         const { result, columns } = await this._singleQuery(ast);
         if (!Array.isArray(result)) {
           result_list.push(Object.assign({}, DEFAULT_RESULT, result));

@@ -57,6 +57,7 @@ export class Session extends EventEmitter implements PoolConnection {
   private _transaction: unknown = null;
   private _isReleased = false;
   private readonly _tempTableMap = new Map<string, unknown>();
+  private _isTimestampFixed = false;
 
   private _collationConnection: string;
   private _divPrecisionIncrement: number;
@@ -179,6 +180,7 @@ export class Session extends EventEmitter implements PoolConnection {
         return;
       case 'TIMESTAMP':
         this._timestamp = Number(value);
+        this._isTimestampFixed = this._timestamp !== 0;
         return;
       case 'LAST_INSERT_ID':
         if (typeof value === 'number' || typeof value === 'bigint') {
@@ -266,6 +268,11 @@ export class Session extends EventEmitter implements PoolConnection {
       done?.(null, results, fields);
     } catch (e) {
       done?.(e as MysqlError);
+    }
+  }
+  public startStatement() {
+    if (!this._isTimestampFixed) {
+      this._timestamp = Date.now() / 1000;
     }
   }
 }
