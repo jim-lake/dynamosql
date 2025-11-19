@@ -157,11 +157,7 @@ export function getValue(
     const varExpr = expr as VarExpr;
     const { prefix, members } = varExpr;
     const scope = members.length > 0 ? varExpr.name.toLowerCase() : '';
-    const firstMember = members.length > 0 ? members[0] : null;
-    const name =
-      firstMember && typeof firstMember === 'object' && 'value' in firstMember
-        ? String(firstMember.value)
-        : varExpr.name;
+    const name = (members?.[0] as unknown as string) ?? varExpr.name;
     result.name = prefix + (scope ? scope + '.' : '') + name;
     if (prefix === '@@') {
       let val: EvaluationValue | undefined;
