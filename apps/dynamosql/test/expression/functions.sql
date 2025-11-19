@@ -75,3 +75,13 @@ SELECT LEFT("hello", NULL) AS result;
 -- LEFT with columns
 SELECT id, LEFT(comment, 5) AS short_comment FROM _dynamodb.foo ORDER BY id;
 SELECT id, LEFT(comment, other) AS result FROM _dynamodb.foo WHERE other IS NOT NULL ORDER BY id;
+
+-- UNIX_TIMESTAMP tests
+SELECT UNIX_TIMESTAMP("2024-01-15 10:30:45") AS result;
+SELECT UNIX_TIMESTAMP("1970-01-01 00:00:00") AS result;
+
+-- NOT function tests
+SELECT NOT(1) AS result;
+SELECT NOT(0) AS result;
+SELECT NOT(NULL) AS result;
+SELECT NOT(5) AS result;

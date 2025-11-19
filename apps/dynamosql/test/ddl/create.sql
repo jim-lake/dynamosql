@@ -1,3 +1,8 @@
+-- CREATE DATABASE
+CREATE DATABASE IF NOT EXISTS test_create_db;
+CREATE DATABASE IF NOT EXISTS test_create_db;
+DROP DATABASE test_create_db;
+
 -- Create table with single column
 DROP TABLE IF EXISTS _dynamodb.test123;
 CREATE TABLE _dynamodb.test123 (id INT PRIMARY KEY);
