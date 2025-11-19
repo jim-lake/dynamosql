@@ -50,3 +50,6 @@ DELETE FROM _dynamodb.foo WHERE id IN (
   "multi1", "multi2", "multi3", "multi4"
 );
 SELECT id, other, comment FROM _dynamodb.foo ORDER BY id;
+
+-- INSERT SELECT with mismatched column count (should error)
+INSERT INTO _dynamodb.foo (id, other, comment) SELECT "test", 123;

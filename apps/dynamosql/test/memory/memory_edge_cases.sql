@@ -51,3 +51,13 @@ SELECT * FROM type_test ORDER BY id LIMIT 2 OFFSET 2;
 -- Cleanup
 USE _dynamodb;
 DROP DATABASE mem_edge_test;
+
+-- Non-temporary memory tables
+CREATE DATABASE IF NOT EXISTS mem_test2;
+CREATE TABLE mem_test2.persistent_mem (id INT PRIMARY KEY, name VARCHAR(256)) ENGINE=MEMORY;
+INSERT INTO mem_test2.persistent_mem (id, name) VALUES (1, "test1"), (2, "test2");
+SELECT * FROM mem_test2.persistent_mem ORDER BY id;
+
+-- Drop non-temp memory table
+DROP TABLE mem_test2.persistent_mem;
+DROP DATABASE mem_test2;

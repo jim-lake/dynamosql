@@ -42,10 +42,39 @@ SELECT @result AS value;
 
 -- System variables
 SET @@session.time_zone = "+00:00";
+SELECT @@time_zone AS tz;
+
+SET @@session.collation_connection = "utf8mb4_general_ci";
+SELECT @@collation_connection AS collation;
+
+SET @@session.div_precision_increment = 8;
+SELECT @@div_precision_increment AS div_prec;
+
+SET @@session.sql_mode = "STRICT_TRANS_TABLES";
+SELECT @@sql_mode AS mode;
+
+SET @@session.timestamp = 1234567890;
+SELECT @@timestamp AS ts;
+
+SET @@session.last_insert_id = 999;
+SELECT @@last_insert_id AS last_id;
+
+SET @@session.insert_id = 888;
+SELECT @@insert_id AS ins_id;
+
+-- Global variables
 SET @@global.time_zone = "+00:00";
-SET @@global.collation_connection = "utf8_general_ci";
-SET @@global.div_precision_increment = 8;
-SET @@global.sql_mode = "STRICT_TRANS_TABLES";
+SELECT @@global.time_zone AS tz;
+
+SET @@global.collation_connection = "utf8mb4_general_ci";
+SELECT @@global.collation_connection AS collation;
+
+SET @@global.div_precision_increment = 10;
+SELECT @@global.div_precision_increment AS div_prec;
+
+SET @@global.sql_mode = "TRADITIONAL";
+
+SELECT @@global.system_time_zone IS NOT NULL AS has_system_tz;
 
 -- Invalid SET syntax (should error)
 SET invalid_syntax;
