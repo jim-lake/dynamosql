@@ -13,13 +13,10 @@ export async function query(params: HandlerParams): Promise<AffectedResult> {
   const current_database = session.getCurrentDatabase() ?? undefined;
   resolveReferences(ast, current_database);
   const database = ast.from?.[0]?.db ?? undefined;
-
   if (!database) {
     throw new SQLError('no_current_database');
   }
-
-  const opts = { ...params, func: _runDelete };
-  return await TransactionManager.run(opts);
+  return await TransactionManager.run(_runDelete, params);
 }
 
 async function _runDelete(params: HandlerParams): Promise<AffectedResult> {

@@ -20,6 +20,7 @@ export type {
   AffectedResult,
 } from '../handler_types';
 export type { AttributeValue } from '../../tools/dynamodb';
+import type { Transaction } from '../transaction_manager';
 
 export interface ColumnDef {
   name: string;
@@ -53,7 +54,10 @@ export interface TableData<T = Row> {
   data: { row_list: T[]; primary_map: Map<string, number> };
 }
 export interface CommitParams<T = Row> {
+  engine: Engine;
+  dynamodb: DynamoDBClient;
   session: Session;
+  transaction: Transaction;
   data: Record<string, TableData<T>>;
 }
 export interface TableListParams {

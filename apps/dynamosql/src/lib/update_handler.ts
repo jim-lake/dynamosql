@@ -12,18 +12,14 @@ import type { UpdateChange } from './engine';
 export async function query(params: HandlerParams): Promise<ChangedResult> {
   const { ast, session } = params;
   const current_database = session.getCurrentDatabase() ?? undefined;
-
   ast.from = ast.table;
   delete ast.table;
   resolveReferences(ast, current_database);
   const database = ast.from?.[0]?.db ?? undefined;
-
   if (!database) {
     throw new SQLError('no_current_database');
   }
-
-  const opts = { ...params, func: _runUpdate };
-  return await TransactionManager.run(opts);
+  return await TransactionManager.run(_runUpdate, params);
 }
 
 async function _runUpdate(params: HandlerParams): Promise<ChangedResult> {

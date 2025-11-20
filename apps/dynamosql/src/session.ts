@@ -18,6 +18,7 @@ import type {
 } from './types';
 import type { DynamoDBWithCacheConstructorParams } from './lib/dynamodb';
 import type { EvaluationValue } from './lib/expression';
+import type { Transaction } from './lib/transaction_manager';
 
 let g_threadId = 1;
 
@@ -55,7 +56,7 @@ export class Session extends EventEmitter implements PoolConnection {
 
   private _currentDatabase: string | null = null;
   private readonly _localVariables = new Map<string, EvaluationValue>();
-  private _transaction: unknown = null;
+  private _transaction: Transaction | null = null;
   private _isReleased = false;
   private readonly _tempTableMap = new Map<string, unknown>();
   private _isTimestampFixed = false;
@@ -206,10 +207,10 @@ export class Session extends EventEmitter implements PoolConnection {
     }
     throw new SQLError({ err: 'ER_UNKNOWN_SYSTEM_VARIABLE', args: [name] });
   }
-  getTransaction<T>(): T | null {
-    return this._transaction as T | null;
+  getTransaction() {
+    return this._transaction;
   }
-  setTransaction(tx: unknown) {
+  setTransaction(tx: Transaction | null) {
     this._transaction = tx;
   }
   getTempTableList() {

@@ -1,5 +1,3 @@
-import { Transaction } from '../../transaction_manager';
-
 import type { Session } from '../../../session';
 import type { ColumnDef, CellRow } from '../index';
 
@@ -57,7 +55,7 @@ export function txSaveData(
   session: Session,
   data: Partial<TableData>
 ): void {
-  const tx = session.getTransaction<Transaction>();
+  const tx = session.getTransaction();
   if (tx) {
     const existing = tx.getData<TxMap>('memory') ?? {};
     existing[`${database}.${table}`] = { database, table, data };
@@ -69,7 +67,7 @@ export function txGetData(
   table: string,
   session: Session
 ): TxData | undefined {
-  const tx = session.getTransaction<Transaction>();
+  const tx = session.getTransaction();
   if (tx) {
     return tx.getData<TxMap>('memory')?.[`${database}.${table}`];
   }

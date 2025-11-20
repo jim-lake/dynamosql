@@ -1,76 +1,99 @@
 import * as Engine from './engine';
 
+import type { DynamoDBWithCache } from './dynamodb';
+import type { HandlerParams } from './handler_types';
+import type { Session } from '../session';
+import type { CommitParams } from './engine';
+
 export class Transaction {
-  _dataMap = new Map();
+  _dataMap = new Map<string, unknown>();
   _isAutoCommit: boolean;
 
-  constructor(auto_commit: any) {
+  constructor(auto_commit: boolean) {
     this._isAutoCommit = Boolean(auto_commit);
   }
-  isAutoCommit() {
+  isAutoCommit(): boolean {
     return this._isAutoCommit;
   }
   getEngineNameList() {
     return this._dataMap.keys();
   }
   getData<T>(name: string): T | undefined {
-    return this._dataMap.get(name);
+    return this._dataMap.get(name) as T | undefined;
   }
-  setData(name: string, data: any) {
+  setData(name: string, data: unknown) {
     this._dataMap.set(name, data);
   }
 }
 
-export async function run(params: any): Promise<any> {
-  const { dynamodb, session, func } = params;
+type WithTransaction<S> = S & { transaction: Transaction };
+export type TransactionFunctionParams<
+  R,
+  S extends HandlerParams<R>,
+> = WithTransaction<S>;
 
-  startTransaction({ session, auto_commit: true });
-  const tx = session.getTransaction();
-  params.transaction = tx;
+export type TransactionRunFunction<R, S extends HandlerParams<R>, T> = (
+  params: WithTransaction<S>
+) => Promise<T>;
 
+export async function run<R, S extends HandlerParams<R>, T>(
+  func: TransactionRunFunction<R, S, T>,
+  params: S
+): Promise<T> {
+  const { dynamodb, session } = params;
+  const transaction = startTransaction({ session, auto_commit: true });
   try {
-    const result = await func(params);
-    if (tx.isAutoCommit()) {
+    const result = await func({ ...params, transaction });
+    if (transaction.isAutoCommit()) {
       await commit({ dynamodb, session });
     }
     return result;
   } catch (err) {
-    if (tx.isAutoCommit()) {
+    if (transaction.isAutoCommit()) {
       await rollback({ dynamodb, session });
     }
     throw err;
   }
 }
-
-export function startTransaction(params: any): void {
+export interface StartTransactionParams {
+  session: Session;
+  auto_commit: boolean;
+}
+export function startTransaction(params: StartTransactionParams): Transaction {
   const { session, auto_commit } = params;
   const existing = session.getTransaction();
-  if (!existing) {
-    const tx = new Transaction(auto_commit);
-    session.setTransaction(tx);
+  if (existing) {
+    return existing;
   }
+  const tx = new Transaction(auto_commit);
+  session.setTransaction(tx);
+  return tx;
 }
-
-export async function commit(params: any): Promise<void> {
+interface InternalCommitParams {
+  dynamodb: DynamoDBWithCache;
+  session: Session;
+}
+export async function commit(params: InternalCommitParams): Promise<void> {
   await _txEach(params, async ({ engine, ...other }: any) => {
     await engine.commit(other);
   });
 }
-
-export async function rollback(params: any): Promise<void> {
+export async function rollback(params: InternalCommitParams): Promise<void> {
   await _txEach(params, async ({ engine, ...other }: any) => {
     await engine.rollback(other);
   });
 }
-
-async function _txEach(params: any, callback: any) {
+type TxEachCallback<T> = (params: CommitParams<T>) => Promise<void>;
+async function _txEach<T>(
+  params: InternalCommitParams,
+  callback: TxEachCallback<T>
+) {
   const { dynamodb, session } = params;
   const transaction = session.getTransaction();
   if (transaction) {
-    const list = Array.from(transaction.getEngineNameList()) as string[];
-    for (const name of list) {
+    for (const name of transaction.getEngineNameList()) {
       const engine = Engine.getEngineByName(name);
-      const data = transaction.getData(name);
+      const data = transaction.getData(name) as any;
       await callback({ engine, dynamodb, session, transaction, data });
     }
     session.setTransaction(null);

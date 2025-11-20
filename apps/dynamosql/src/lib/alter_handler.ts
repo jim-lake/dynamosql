@@ -10,8 +10,8 @@ export async function query(params: HandlerParams): Promise<void> {
   const engine = SchemaManager.getEngine(database, table, session);
 
   if (ast.table && database) {
-    const opts = { dynamodb, ast, engine, session, func: _runAlterTable };
-    return await TransactionManager.run(opts);
+    const opts = { dynamodb, ast, engine, session };
+    await TransactionManager.run(_runAlterTable, opts);
   } else if (ast.table) {
     throw new SQLError('no_current_database');
   } else {

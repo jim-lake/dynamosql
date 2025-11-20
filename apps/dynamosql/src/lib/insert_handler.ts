@@ -28,14 +28,8 @@ export async function query(params: HandlerParams): Promise<AffectedResult> {
   _checkAst(ast);
 
   const engine = SchemaManager.getEngine(database, table, session);
-  const opts = {
-    ...params,
-    database,
-    engine,
-    duplicate_mode,
-    func: _runInsert,
-  };
-  return await TransactionManager.run(opts);
+  const opts = { ...params, database, engine, duplicate_mode };
+  return await TransactionManager.run(_runInsert, opts);
 }
 
 async function _runInsert(
