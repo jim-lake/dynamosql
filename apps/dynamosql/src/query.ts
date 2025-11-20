@@ -17,7 +17,13 @@ import { Types } from './types';
 
 import type { Readable, ReadableOptions } from 'node:stream';
 import type { Session } from './session';
-import type { FieldInfo, OkPacket, QueryOptions, TypeCast } from './types';
+import type {
+  FieldInfo,
+  OkPacket,
+  QueryOptions,
+  TypeCast,
+  QueryListResult,
+} from './types';
 import type { AffectedResult, ChangedResult } from './lib/handler_types';
 import type { Use, Select } from 'node-sql-parser';
 import type { ExtendedAST } from './lib/ast_types';
@@ -44,7 +50,6 @@ type HandlerResult =
   | string[][]
   | OkPacket;
 
-type QueryResult = [any, FieldInfo[] | FieldInfo[][]];
 interface SingleQueryResult {
   result: HandlerResult;
   columns: FieldInfo[];
@@ -71,7 +76,7 @@ export class Query extends EventEmitter {
     throw new SQLError('NOT_IMPLEMENTED');
   }
 
-  async run(): Promise<QueryResult> {
+  async run(): Promise<QueryListResult> {
     try {
       const result = await this._run();
       this.emit('end');
@@ -81,7 +86,7 @@ export class Query extends EventEmitter {
       throw e;
     }
   }
-  private async _run(): Promise<QueryResult> {
+  private async _run(): Promise<QueryListResult> {
     const list = _astify(this.sql);
     if (list.length === 0) {
       throw new SQLError('ER_EMPTY_QUERY', this.sql);
@@ -90,7 +95,7 @@ export class Query extends EventEmitter {
       throw new SQLError('multiple_statements_disabled', this.sql);
     }
 
-    const result_list: any[] = [];
+    const result_list: unknown[] = [];
     const schema_list: FieldInfo[][] = [];
     try {
       for (const ast of list) {
@@ -165,26 +170,9 @@ export class Query extends EventEmitter {
           result: await UpdateHandler.query({ ...params, ast }),
           columns: [],
         };
-      case 'transaction': {
-        const action = (ast as any)?.expr?.action?.value?.toLowerCase();
-        if (action === 'begin' || action === 'start') {
-          TransactionManager.startTransaction({
-            session: this._session,
-            auto_commit: false,
-          });
-        } else if (action === 'commit') {
-          await TransactionManager.commit({
-            dynamodb: this._session.dynamodb,
-            session: this._session,
-          });
-        } else if (action === 'rollback') {
-          await TransactionManager.rollback({
-            dynamodb: this._session.dynamodb,
-            session: this._session,
-          });
-        }
+      case 'transaction':
+        await TransactionManager.query({ ...params, ast });
         return { result: DEFAULT_RESULT, columns: [] };
-      }
       case 'use':
         await _useDatabase({ ast, session: this._session });
         return { result: DEFAULT_RESULT, columns: [] };

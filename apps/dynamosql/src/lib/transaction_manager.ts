@@ -5,6 +5,18 @@ import type { HandlerParams } from './handler_types';
 import type { Session } from '../session';
 import type { CommitParams } from './engine';
 
+export async function query(params: HandlerParams): Promise<void> {
+  const { dynamodb, session, ast } = params;
+  const action = (ast as any)?.expr?.action?.value?.toLowerCase();
+  if (action === 'begin' || action === 'start') {
+    startTransaction({ session, auto_commit: false });
+  } else if (action === 'commit') {
+    await commit({ dynamodb, session });
+  } else if (action === 'rollback') {
+    await rollback({ dynamodb, session });
+  }
+}
+
 export class Transaction {
   _dataMap = new Map<string, unknown>();
   _isAutoCommit: boolean;

@@ -3,7 +3,7 @@ import { jsonStringify } from './tools/util';
 
 const DEFAULT_CODE = 'ER_NO';
 
-type ErrorTemplate = (args?: any[]) => string;
+type ErrorTemplate = (args?: unknown[]) => string;
 
 interface ErrorMapEntry {
   code: string;
@@ -21,7 +21,7 @@ export interface ErrorInput {
   errno?: number;
   sqlMessage?: string;
   message?: string;
-  args?: any[];
+  args?: unknown[];
   cause?: unknown;
   index?: number;
 }
@@ -215,7 +215,7 @@ function errStr(
   strings: TemplateStringsArray,
   ...index_list: number[]
 ): ErrorTemplate {
-  return function (arg_list?: any[]) {
+  return function (arg_list?: unknown[]) {
     let s = '';
     for (let i = 0; i < strings.length; i++) {
       s += strings[i];
@@ -225,21 +225,25 @@ function errStr(
     return s;
   };
 }
-function _stringify(arg: any): string {
-  let ret = arg || '';
-  if (arg === null) {
-    ret = 'NULL';
+function _stringify(arg: unknown): string {
+  if (typeof arg === 'string') {
+    return arg;
+  } else if (arg === null) {
+    return 'NULL';
+  } else if (arg === undefined) {
+    return '';
   } else if (Array.isArray(arg)) {
-    ret = arg.map(_stringify).join(',');
+    return arg.map(_stringify).join(',');
   } else if (
     typeof arg === 'object' &&
     arg.toString === Object.prototype.toString
   ) {
-    ret = jsonStringify(arg);
+    return jsonStringify(arg);
+  } else {
+    return String(arg);
   }
-  return ret;
 }
-function _makeMessage(entry: ErrorMapEntry, args: any[]) {
+function _makeMessage(entry: ErrorMapEntry, args: unknown[]) {
   if (typeof entry.sqlMessage === 'function') {
     return entry.sqlMessage(args);
   }

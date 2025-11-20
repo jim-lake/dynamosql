@@ -40,11 +40,11 @@ export class Pool extends EventEmitter {
 
   query(
     opts: string | QueryOptions,
-    values?: any,
+    values?: unknown,
     done?: QueryCallback
   ): Query {
     if (typeof values === 'function') {
-      done = values;
+      done = values as QueryCallback;
       values = undefined;
     }
     const session = Session.createSession(this.config);
@@ -53,7 +53,7 @@ export class Pool extends EventEmitter {
       values,
       (
         error: MysqlError | null,
-        results?: any,
+        results?: unknown,
         fields?: FieldInfo[] | FieldInfo[][]
       ) => {
         session.release();

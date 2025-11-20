@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import type { EventEmitter } from 'node:events';
 import type { Readable, ReadableOptions } from 'node:stream';
 
@@ -80,6 +81,9 @@ export type QueryCallback = (
   results?: any,
   fields?: FieldInfo[] | FieldInfo[][]
 ) => void;
+
+export type QueryListResult = [any, FieldInfo[] | FieldInfo[][]];
+
 export interface Query {
   sql: string;
   values?: string[] | undefined;
