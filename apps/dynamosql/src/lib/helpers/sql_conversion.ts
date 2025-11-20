@@ -258,7 +258,7 @@ function _stringToDateTime(value: string): TimeFraction | undefined {
   return ret;
 }
 
-function _numToDateTime(number: any): TimeFraction | undefined {
+function _numToDateTime(number: unknown): TimeFraction | undefined {
   let ret;
   const s = String(number);
   let match = s.match(DATETIME4_REGEX);
