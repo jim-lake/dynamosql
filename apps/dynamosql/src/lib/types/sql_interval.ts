@@ -155,7 +155,7 @@ export class SQLInterval {
 }
 
 export function createSQLInterval(
-  value: any,
+  value: unknown,
   unit_name: string
 ): SQLInterval | null {
   let is_month = false;
@@ -183,7 +183,7 @@ export function createSQLInterval(
 }
 
 function _convertNumber(
-  value: any,
+  value: unknown,
   unit: number | number[],
   unit_name: string
 ): number | null {
