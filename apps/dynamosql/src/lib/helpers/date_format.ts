@@ -56,7 +56,9 @@ export function dateFormat(date: Date, format: string): string {
       cached = formatter.formatToParts(date);
       format_map.set(formatter, cached);
     }
-    const found = cached.find((part: any) => part.type === type);
+    const found = cached.find(
+      (part: Intl.DateTimeFormatPart) => part.type === type
+    );
     return found?.value || '';
   }
   function _time(formatter: Intl.DateTimeFormat): string {

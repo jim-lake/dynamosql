@@ -31,7 +31,7 @@ export function resolveReferences(
   const table_map: TableMap = {};
   const db_map: DbMap = {};
   const from = ast.type === 'select' ? ast.from : (ast as any).from;
-  from?.forEach?.((from: any) => {
+  from?.forEach?.((from: TableMapEntry & { db?: string; table?: string }) => {
     if (!from.db) {
       if (!current_database) {
         throw new SQLError('no_current_database');
@@ -47,29 +47,31 @@ export function resolveReferences(
     if (from.as) {
       table_map[from.as] = from;
     } else {
-      if (!table_map[from.table]) {
-        table_map[from.table] = from;
+      if (!table_map[from.table ?? '']) {
+        table_map[from.table ?? ''] = from;
       }
       if (!db_map[from.db]) {
         db_map[from.db] = {};
       }
       const dbEntry = db_map[from.db];
-      if (dbEntry) {
+      if (dbEntry && from.table) {
         dbEntry[from.table] = from;
       }
     }
   });
   const table = ast.type === 'update' ? ast.table : (ast as any).table;
-  table?.forEach?.((object: any) => {
-    const from = object.db
-      ? db_map[object.db]?.[object.table]
-      : table_map[object.table];
-    if (!from) {
-      throw new SQLError({ err: 'table_not_found', args: [object.table] });
-    } else {
-      object.from = from;
+  table?.forEach?.(
+    (object: { db?: string; table?: string; from?: TableMapEntry }) => {
+      const from = object.db
+        ? db_map[object.db]?.[object.table ?? '']
+        : table_map[object.table ?? ''];
+      if (!from) {
+        throw new SQLError({ err: 'table_not_found', args: [object.table] });
+      } else {
+        object.from = from;
+      }
     }
-  });
+  );
 
   const name_cache: TableMap = {};
   const columns = ast.type === 'select' ? ast.columns : undefined;
