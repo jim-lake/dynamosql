@@ -23,4 +23,5 @@ describe('Expression', function () {
   runTests('variables.sql', path.join(__dirname, 'variables.sql'));
   runTests('operators.sql', path.join(__dirname, 'operators.sql'));
   runTests('null_handling.sql', path.join(__dirname, 'null_handling.sql'));
+  runTests('timezone.sql', path.join(__dirname, 'timezone.sql'));
 });

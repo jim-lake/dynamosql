@@ -63,11 +63,7 @@ export class SQLTime {
   toSQLDateTime(decimals?: number): SQLDateTime {
     const now = Date.now() / 1000;
     const time = now - (now % DAY) + this._time;
-    return new SQLDateTime({
-      time,
-      type: 'datetime',
-      decimals: decimals ?? this._decimals,
-    });
+    return new SQLDateTime({ time, decimals: decimals ?? this._decimals });
   }
   toNumber(): number {
     let seconds = this._time;

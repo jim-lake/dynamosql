@@ -1,6 +1,7 @@
 import { CHARSETS } from '../../constants/mysql';
 import { Types } from '../../types';
 import { toBigInt } from '../../tools/safe_convert';
+import { SQLDate } from '../types/sql_date';
 import { SQLDateTime } from '../types/sql_datetime';
 import { SQLTime } from '../types/sql_time';
 
@@ -52,13 +53,16 @@ export function typeCast(
       case Types.DATETIME:
       case Types.DATE:
       case Types.NEWDATE:
-        if (options?.dateStrings && value instanceof SQLDateTime) {
+        if (
+          options?.dateStrings &&
+          (value instanceof SQLDateTime || value instanceof SQLDate)
+        ) {
           return value.toString(timeZone);
         } else if (options?.dateStrings) {
           return String(value);
         } else if (value instanceof Date) {
           return value;
-        } else if (value instanceof SQLDateTime) {
+        } else if (value instanceof SQLDateTime || value instanceof SQLDate) {
           return value.toDate(timeZone);
         } else {
           return new Date(String(value));

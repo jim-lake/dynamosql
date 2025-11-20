@@ -1,7 +1,14 @@
 import { getValue } from './evaluate';
-import { convertNum, convertDateTime } from '../helpers/sql_conversion';
+import {
+  convertNum,
+  convertDateTime,
+  convertDate,
+} from '../helpers/sql_conversion';
+import { dateFormat } from '../helpers/date_format';
+import { SQLDate } from '../types/sql_date';
 import { SQLDateTime, createSQLDateTime } from '../types/sql_datetime';
 import { createSQLTime } from '../types/sql_time';
+
 import type { Function } from 'node-sql-parser';
 import type { EvaluationState, EvaluationResult } from './evaluate';
 
@@ -89,11 +96,7 @@ function now(expr: Function, state: EvaluationState): EvaluationResult {
     if (decimals > 6) {
       result.err = 'ER_TOO_BIG_PRECISION';
     }
-    result.value = new SQLDateTime({
-      time: state.session.timestamp,
-      type: 'datetime',
-      decimals,
-    });
+    result.value = new SQLDateTime({ time: state.session.timestamp, decimals });
     result.type = 'datetime';
   }
   return result;
@@ -109,7 +112,7 @@ function from_unixtime(
     const time = convertNum(result.value);
     if (time !== null) {
       const decimals = Math.min(6, String(time).split('.')?.[1]?.length || 0);
-      result.value = createSQLDateTime({ time, type: 'datetime', decimals });
+      result.value = createSQLDateTime({ time, decimals });
     }
   }
   return result;
@@ -119,7 +122,10 @@ function date(expr: Function, state: EvaluationState): EvaluationResult {
   result.name = `DATE(${result.name})`;
   result.type = 'date';
   if (!result.err && result.value !== null) {
-    result.value = convertDateTime(result.value, 'date');
+    result.value = convertDate({
+      value: result.value,
+      timeZone: state.session.timeZone,
+    });
   }
   return result;
 }
@@ -132,12 +138,23 @@ function date_format(expr: Function, state: EvaluationState): EvaluationResult {
   if (!err && (date.value === null || format.value === null)) {
     value = null;
   } else if (!err) {
-    value =
-      convertDateTime(date.value)?.dateFormat?.(String(format.value)) || null;
+    const dt = convertDateTime({
+      value: date.value,
+      timeZone: state.session.timeZone,
+    });
+    if (dt) {
+      value = dateFormat(
+        dt.toDate(state.session.timeZone),
+        String(format.value)
+      );
+    } else {
+      value = null;
+    }
   }
   return { err, name, value, type: 'string' };
 }
 function datediff(expr: Function, state: EvaluationState): EvaluationResult {
+  const { timeZone } = state.session;
   const expr1 = getValue(expr.args?.value?.[0], state);
   const expr2 = getValue(expr.args?.value?.[1], state);
   const err = expr1.err || expr2.err;
@@ -146,17 +163,17 @@ function datediff(expr: Function, state: EvaluationState): EvaluationResult {
   if (!err && (expr1.value === null || expr2.value === null)) {
     value = null;
   } else if (!err) {
-    const result = convertDateTime(expr1.value)?.diff?.(
-      convertDateTime(expr2.value)
+    const result = convertDateTime({ value: expr1.value, timeZone })?.diff?.(
+      convertDateTime({ value: expr2.value, timeZone })
     );
     value = result !== undefined ? result : null;
   }
   return { err, name, value, type: 'longlong' };
 }
 function curdate(expr: Function, state: EvaluationState): EvaluationResult {
-  const value = new SQLDateTime({
+  const value = new SQLDate({
     time: state.session.timestamp,
-    type: 'date',
+    timeZone: state.session.timeZone,
   });
   const name = expr.args ? 'CURDATE()' : 'CURRENT_DATE';
   return { err: null, value, name, type: 'date' };
@@ -210,11 +227,14 @@ function unix_timestamp(
       return val;
     }
     ret.name = `UNIX_TIMESTAMP(${val.name})`;
-    const dt = convertDateTime(val.value);
+    const dt = convertDateTime({
+      value: val.value,
+      timeZone: state.session.timeZone,
+    });
     if (dt === null) {
-      ret.value = 0n;
+      ret.value = 0;
     } else {
-      ret.value = BigInt(Math.floor(dt.toDate().getTime() / 1000));
+      ret.value = dt.getTime();
     }
   }
   return ret;

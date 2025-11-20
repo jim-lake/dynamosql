@@ -1,5 +1,7 @@
-import { cloneSQLDateTime, SQLDateTime } from '../types/sql_datetime';
+import { SQLDateTime } from '../types/sql_datetime';
+import { SQLDate } from '../types/sql_date';
 import { createSQLTime, SQLTime } from '../types/sql_time';
+import { toBigInt } from '../../tools/safe_convert';
 
 const MINUTE = 60;
 const HOUR = 60 * MINUTE;
@@ -9,41 +11,45 @@ interface TimeFraction {
   time: number;
   fraction?: number;
 }
-
 export function convertNum(value: unknown): number | null {
-  let ret: number | null = null;
-  if (value === null) {
-    ret = null;
+  if (value === null || value === undefined) {
+    return null;
+  } else if (typeof value === 'number') {
+    return value;
+  } else if (typeof value === 'bigint') {
+    return Number(value);
   } else if (value === '') {
-    ret = 0;
+    return 0;
   } else if (typeof value === 'string') {
-    ret = parseFloat(value);
-    if (isNaN(ret)) {
-      ret = 0;
-    }
-  } else if (
-    typeof value === 'object' &&
-    value !== null &&
-    'toNumber' in value &&
-    typeof (value as { toNumber: () => number }).toNumber === 'function'
-  ) {
-    ret = (value as { toNumber: () => number }).toNumber();
-  } else if (typeof value === 'number') {
-    ret = value;
+    const ret = parseFloat(value);
+    return isNaN(ret) ? 0 : ret;
+  } else if (_isToNumber(value)) {
+    return value.toNumber();
   }
-  return ret;
+  return null;
 }
-
-export function convertBooleanValue(value: unknown): number | null {
-  let ret;
-  if (value === null) {
-    ret = null;
+export function convertBigInt(value: unknown): bigint | null {
+  if (value === null || value === undefined) {
+    return null;
+  } else if (typeof value === 'bigint') {
+    return value;
   } else if (typeof value === 'number') {
-    ret = value ? 1 : 0;
-  } else {
-    ret = convertNum(value) ? 1 : 0;
+    return BigInt(Math.floor(value));
+  } else if (value === '') {
+    return 0n;
+  } else if (typeof value === 'string') {
+    return toBigInt(value);
   }
-  return ret;
+  return null;
+}
+export function convertBooleanValue(value: unknown): number | null {
+  if (value === null) {
+    return null;
+  } else if (typeof value === 'number') {
+    return value ? 1 : 0;
+  } else {
+    return convertNum(value) ? 1 : 0;
+  }
 }
 
 const SEP = `[-^\\][!@#$%&*()_+={}\\|/\\\\<>,.:;"']+`;
@@ -63,15 +69,19 @@ const DATETIME4_REGEX = new RegExp(DATETIME4_RS);
 const DATE2_REGEX = new RegExp(DATE2_RS);
 const DATETIME2_REGEX = new RegExp(DATETIME2_RS);
 
-export function convertDateTime(
-  value: unknown,
-  type?: 'datetime' | 'date' | undefined,
-  decimals?: number
-): SQLDateTime | null {
+export interface ConvertDateTimeParams {
+  value: unknown;
+  decimals?: number;
+  timeZone: string;
+}
+export function convertDateTimeOrDate(
+  params: ConvertDateTimeParams
+): SQLDateTime | SQLDate | null {
+  const { value, decimals, timeZone } = params;
   if (value === null) {
     return null;
   } else if (value instanceof SQLDateTime) {
-    return cloneSQLDateTime(value, { type: type ?? 'datetime', decimals });
+    return value.clone({ decimals });
   } else if (value instanceof SQLTime) {
     return value.toSQLDateTime(decimals);
   } else {
@@ -80,22 +90,70 @@ export function convertDateTime(
       convert_result = _stringToDateTime(value);
       if (convert_result === undefined) {
         convert_result = _stringToDate(value);
-        if (!type) {
-          type = 'date';
+        if (convert_result !== undefined) {
+          return new SQLDate({ time: convert_result.time, timeZone });
         }
-      }
-      if (convert_result === undefined) {
         convert_result = _numToDateTime(value);
       }
     } else if (typeof value === 'number') {
       convert_result = _numToDateTime(value);
     }
     if (convert_result) {
-      return new SQLDateTime({
-        ...convert_result,
-        type: type ?? 'datetime',
-        decimals,
-      });
+      return new SQLDateTime({ ...convert_result, decimals, timeZone });
+    }
+  }
+  return null;
+}
+export function convertDateTime(params: ConvertDateTimeParams) {
+  const { value, decimals, timeZone } = params;
+  if (value === null) {
+    return null;
+  } else if (value instanceof SQLDateTime) {
+    return value.clone({ decimals });
+  } else if (value instanceof SQLDate) {
+    return new SQLDateTime({ time: value.getTime(), decimals });
+  } else if (value instanceof SQLTime) {
+    return value.toSQLDateTime(decimals);
+  } else {
+    let convert_result: TimeFraction | undefined;
+    if (typeof value === 'string') {
+      convert_result =
+        _stringToDateTime(value) ??
+        _stringToDate(value) ??
+        _numToDateTime(value);
+    } else if (typeof value === 'number') {
+      convert_result = _numToDateTime(value);
+    }
+    if (convert_result) {
+      return new SQLDateTime({ ...convert_result, decimals, timeZone });
+    }
+  }
+  return null;
+}
+export interface ConvertDataParams {
+  value: unknown;
+  timeZone: string;
+}
+export function convertDate(params: ConvertDataParams): SQLDate | null {
+  const { value, timeZone } = params;
+  if (value === null) {
+    return null;
+  } else if (value instanceof SQLDate) {
+    return value;
+  } else if (value instanceof SQLDateTime) {
+    return new SQLDate({ time: value.getTime(), timeZone });
+  } else {
+    let convert_result: TimeFraction | undefined;
+    if (typeof value === 'string') {
+      convert_result =
+        _stringToDateTime(value) ??
+        _stringToDate(value) ??
+        _numToDateTime(value);
+    } else if (typeof value === 'number') {
+      convert_result = _numToDateTime(value);
+    }
+    if (convert_result) {
+      return new SQLDate({ time: convert_result.time, timeZone });
     }
   }
   return null;
@@ -105,7 +163,12 @@ const DAY_TIME_REGEX =
   /^(-)?([0-9]+)\s+([0-9]*)(:([0-9]{1,2}))?(:([0-9]{1,2}))?(\.[0-9]+)?/;
 const TIME_REGEX = /^(-)?([0-9]*):([0-9]{1,2})(:([0-9]{1,2}))?(\.[0-9]+)?/;
 
-export function convertTime(value: unknown, decimals?: number): SQLTime | null {
+export interface ConvertTimeParams {
+  value: unknown;
+  decimals?: number;
+}
+export function convertTime(params: ConvertTimeParams): SQLTime | null {
+  const { value, decimals } = params;
   if (value instanceof SQLTime) {
     return value;
   } else if (typeof value === 'string') {
@@ -303,4 +366,15 @@ function _partsToTime(
     ret = { time: time / 1000, fraction };
   }
   return ret;
+}
+interface ToNumber {
+  toNumber(): number | null;
+}
+function _isToNumber(value: unknown): value is ToNumber {
+  return Boolean(
+    value &&
+      typeof value === 'object' &&
+      'toNumber' in value &&
+      typeof value.toNumber === 'function'
+  );
 }

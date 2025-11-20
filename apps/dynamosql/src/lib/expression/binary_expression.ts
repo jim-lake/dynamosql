@@ -1,10 +1,13 @@
 import {
   convertNum,
+  convertBigInt,
   convertBooleanValue,
   convertDateTime,
+  convertDateTimeOrDate,
 } from '../helpers/sql_conversion';
 import { getValue } from './evaluate';
 import { SQLDateTime } from '../types/sql_datetime';
+import { SQLDate } from '../types/sql_date';
 import { SQLTime } from '../types/sql_time';
 
 import type { Binary, ExpressionValue } from 'node-sql-parser';
@@ -12,10 +15,10 @@ import type { EvaluationState, EvaluationResult } from './evaluate';
 import type { SQLInterval } from '../types/sql_interval';
 
 interface NumBothSidesResult extends EvaluationResult {
-  left_num?: number;
-  right_num?: number;
+  left_num?: bigint | number | undefined;
+  right_num?: bigint | number | undefined;
   interval?: SQLInterval;
-  datetime?: SQLDateTime | SQLTime | null;
+  datetime?: SQLDateTime | SQLDate | SQLTime | null;
 }
 function _numBothSides(
   expr: Binary,
@@ -31,7 +34,7 @@ function _numBothSides(
   let left_num;
   let right_num;
   let interval: SQLInterval | undefined;
-  let datetime: SQLDateTime | SQLTime | null | undefined;
+  let datetime: SQLDateTime | SQLTime | SQLDate | null | undefined;
   if (!err) {
     if (left.value === null || right.value === null) {
       value = null;
@@ -39,11 +42,15 @@ function _numBothSides(
       interval = left.value as typeof interval;
       if (
         right.value instanceof SQLDateTime ||
+        right.value instanceof SQLDate ||
         right.value instanceof SQLTime
       ) {
         datetime = right.value;
       } else if (right.value !== undefined && typeof right.value === 'string') {
-        datetime = convertDateTime(right.value);
+        datetime = convertDateTimeOrDate({
+          value: right.value,
+          timeZone: state.session.timeZone,
+        });
         if (!datetime) {
           value = null;
         }
@@ -52,10 +59,17 @@ function _numBothSides(
       }
     } else if (allow_interval && right.type === 'interval') {
       interval = right.value as typeof interval;
-      if (left.value instanceof SQLDateTime || left.value instanceof SQLTime) {
+      if (
+        left.value instanceof SQLDateTime ||
+        left.value instanceof SQLTime ||
+        left.value instanceof SQLDate
+      ) {
         datetime = left.value;
       } else if (left.value !== undefined && typeof left.value === 'string') {
-        datetime = convertDateTime(left.value);
+        datetime = convertDateTimeOrDate({
+          value: left.value,
+          timeZone: state.session.timeZone,
+        });
         if (!datetime) {
           value = null;
         }
@@ -64,14 +78,26 @@ function _numBothSides(
       }
     } else if (right.type === 'interval' || left.type === 'interval') {
       err = 'bad_interval_usage';
-    } else {
-      const leftNum = convertNum(left.value);
-      const rightNum = convertNum(right.value);
-      if (leftNum === null || rightNum === null) {
+    } else if (
+      typeof left.value === 'bigint' ||
+      typeof right.value === 'bigint'
+    ) {
+      const left_temp = convertBigInt(left.value);
+      const right_temp = convertBigInt(right.value);
+      if (left_temp === null || right_temp === null) {
         value = null;
       } else {
-        left_num = leftNum;
-        right_num = rightNum;
+        left_num = left_temp;
+        right_num = right_temp;
+      }
+    } else {
+      const left_temp = convertNum(left.value);
+      const right_temp = convertNum(right.value);
+      if (left_temp === null || right_temp === null) {
+        value = null;
+      } else {
+        left_num = left_temp;
+        right_num = right_temp;
       }
     }
   }
@@ -93,11 +119,12 @@ function plus(expr: Binary, state: EvaluationState): EvaluationResult {
   let type: string = 'number';
   if (!err && value !== null) {
     if (datetime && interval) {
-      const result = interval.add(datetime);
+      const result = interval.add(datetime, state.session.timeZone);
       value = result.value;
       type = result.type;
-    } else {
-      value = left_num! + right_num!;
+    } else if (left_num !== undefined && right_num !== undefined) {
+      // @ts-expect-error TS2365 ignore bigint/number the code is correct
+      value = left_num + right_num;
       type = 'number';
     }
   }
@@ -110,11 +137,15 @@ function minus(expr: Binary, state: EvaluationState): EvaluationResult {
   let type: string = 'number';
   if (!err && value !== null) {
     if (datetime && interval) {
-      const result = interval.sub(datetime);
+      const result = interval.sub(datetime, state.session.timeZone);
       value = result.value;
       type = result.type;
-    } else {
-      value = left_num! - right_num!;
+    } else if (
+      result.left_num !== undefined &&
+      result.right_num !== undefined
+    ) {
+      // @ts-expect-error TS2365 ignore bigint/number the code is correct
+      value = left_num - right_num;
       type = 'number';
     }
   }
@@ -130,6 +161,7 @@ function mul(expr: Binary, state: EvaluationState): EvaluationResult {
     left_num !== undefined &&
     right_num !== undefined
   ) {
+    // @ts-expect-error TS2365 ignore bigint/number the code is correct
     value = left_num * right_num;
   }
   return { err, value, name, type: 'number' };
@@ -145,9 +177,10 @@ function div(expr: Binary, state: EvaluationState): EvaluationResult {
     right_num !== undefined
   ) {
     // Division by zero returns NULL in MySQL
-    if (right_num === 0) {
+    if (right_num === 0 || right_num === 0n) {
       value = null;
     } else {
+      // @ts-expect-error TS2365 ignore bigint/number the code is correct
       value = left_num / right_num;
     }
   }
@@ -156,7 +189,8 @@ function div(expr: Binary, state: EvaluationState): EvaluationResult {
 
 function _convertCompare(
   left: EvaluationResult,
-  right: EvaluationResult
+  right: EvaluationResult,
+  timeZone: string
 ): void {
   if (
     left.value !== null &&
@@ -164,13 +198,25 @@ function _convertCompare(
     left.value !== right.value
   ) {
     if (
-      (_isDateLike(left.type ?? '') || _isDateLike(right.type ?? '')) &&
+      (_isDateLike(left.value) || _isDateLike(right.value)) &&
       left.type !== right.type
     ) {
-      const union = _unionDateTime(left.type ?? '', right.type ?? '');
-      if (union === 'date' || union === 'datetime') {
-        left.value = convertDateTime(left.value, union, 6) ?? left.value;
-        right.value = convertDateTime(right.value, union, 6) ?? right.value;
+      const type = _unionDateTime(left.value, right.value);
+      if (type === 'datetime') {
+        const left_dt = convertDateTime({
+          value: left.value,
+          decimals: 6,
+          timeZone,
+        });
+        const right_dt = convertDateTime({
+          value: right.value,
+          decimals: 6,
+          timeZone,
+        });
+        if (left_dt && right_dt) {
+          left.value = left_dt.toDate(timeZone).getTime();
+          right.value = right_dt.toDate(timeZone).getTime();
+        }
       }
     }
     if (
@@ -182,10 +228,14 @@ function _convertCompare(
       left.value = convertNum(left.value);
       right.value = convertNum(right.value);
     } else {
-      if (typeof left.value !== 'string') {
+      if (left.value instanceof SQLDateTime) {
+        left.value = left.value.toString(timeZone);
+      } else if (typeof left.value !== 'string') {
         left.value = String(left.value);
       }
-      if (typeof right.value !== 'string') {
+      if (right.value instanceof SQLDateTime) {
+        right.value = right.value.toString(timeZone);
+      } else if (typeof right.value !== 'string') {
         right.value = String(right.value);
       }
     }
@@ -203,7 +253,7 @@ function _equal(
   const name = (left.name ?? '') + op + (right.name ?? '');
   let value: unknown = 0;
   if (!err) {
-    _convertCompare(left, right);
+    _convertCompare(left, right, state.session.timeZone);
     if (left.value === null || right.value === null) {
       value = null;
     } else if (left.value === right.value) {
@@ -245,7 +295,7 @@ function _gt(
     : (left.name ?? '') + op + (right.name ?? '');
   let value: unknown = 0;
   if (!err) {
-    _convertCompare(left, right);
+    _convertCompare(left, right, state.session.timeZone);
     if (left.value === null || right.value === null) {
       value = null;
     } else if (left.value === right.value) {
@@ -288,7 +338,7 @@ function _gte(
     : (left.name ?? '') + op + (right.name ?? '');
   let value: unknown = 0;
   if (!err) {
-    _convertCompare(left, right);
+    _convertCompare(left, right, state.session.timeZone);
     if (left.value === null || right.value === null) {
       value = null;
     } else if (left.value === right.value) {
@@ -510,24 +560,30 @@ function notIn(expr: Binary, state: EvaluationState): EvaluationResult {
   }
   return result;
 }
-function _isDateOrTimeLike(type: string): boolean {
-  return type === 'date' || type === 'datetime' || type === 'time';
+function _isDateOrTimeLike(
+  value: unknown
+): value is SQLDate | SQLDateTime | SQLTime {
+  return (
+    value instanceof SQLDate ||
+    value instanceof SQLDateTime ||
+    value instanceof SQLTime
+  );
 }
-function _isDateLike(type: string): boolean {
-  return type === 'date' || type === 'datetime';
+function _isDateLike(value: unknown): value is SQLDate | SQLDateTime {
+  return value instanceof SQLDate || value instanceof SQLDateTime;
 }
-function _unionDateTime(type1: string, type2: string): string | undefined {
-  let ret;
-  if (type1 === 'string') {
-    ret = 'datetime';
-  } else if (type2 === 'string') {
-    ret = 'datetime';
-  } else if (type1 === 'time' || type2 === 'time') {
-    ret = 'datetime';
-  } else if (_isDateLike(type1) && _isDateLike(type2)) {
-    ret = 'datetime';
+function _unionDateTime(
+  value1: unknown,
+  value2: unknown
+): 'datetime' | undefined {
+  if (typeof value1 === 'string' || typeof value2 === 'string') {
+    return 'datetime';
+  } else if (value1 instanceof SQLTime || value2 instanceof SQLTime) {
+    return 'datetime';
+  } else if (_isDateLike(value1) && _isDateLike(value2)) {
+    return 'datetime';
   }
-  return ret;
+  return undefined;
 }
 
 export const methods: Record<

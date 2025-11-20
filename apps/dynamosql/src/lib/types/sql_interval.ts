@@ -1,9 +1,8 @@
-import { createSQLDateTime } from './sql_datetime';
-import { createSQLTime } from './sql_time';
+import { createSQLDateTime, SQLDateTime } from './sql_datetime';
+import { createSQLDate, SQLDate } from './sql_date';
+import { createSQLTime, SQLTime } from './sql_time';
 import { getDecimals, convertNum } from '../helpers/sql_conversion';
 
-import type { SQLDateTime } from './sql_datetime';
-import type { SQLTime } from './sql_time';
 import type { EvaluationValue } from '../expression';
 
 const SINGLE_TIME: Record<string, number> = {
@@ -93,20 +92,23 @@ export class SQLInterval {
     return null;
   }
 
-  private _add(datetime: SQLDateTime | SQLTime, mult: number): EvaluationValue {
+  private _add(
+    datetime: SQLDateTime | SQLDate | SQLTime,
+    mult: number,
+    timeZone: string
+  ): EvaluationValue {
     let old_time = datetime.getTime();
     let fraction = datetime.getFraction();
-    const old_type = datetime.getType();
     let type: 'datetime' | 'date' | 'time' | undefined = undefined;
-    if (old_type === 'datetime') {
+    if (datetime instanceof SQLDateTime) {
       type = 'datetime';
-    } else if (old_type === 'date' && !this._forceDate) {
+    } else if (datetime instanceof SQLDate && !this._forceDate) {
       type = 'datetime';
-    } else if (old_type === 'date') {
+    } else if (datetime instanceof SQLDate) {
       type = 'date';
-    } else if (old_type === 'time' && this._forceDate) {
+    } else if (this._forceDate) {
       type = 'datetime';
-    } else if (old_type === 'time') {
+    } else {
       type = 'time';
     }
     const decimals = Math.max(datetime.getDecimals(), this._decimals);
@@ -115,11 +117,11 @@ export class SQLInterval {
     if (type === 'time') {
       value = createSQLTime({ time: old_time + number, decimals });
     } else {
-      if (old_type === 'time') {
+      let time;
+      if (datetime instanceof SQLTime) {
         const now = Date.now() / 1000;
         old_time += now - (now % (24 * 60 * 60));
       }
-      let time;
       if (this._isMonth) {
         time = _addMonth(old_time, number);
       } else {
@@ -130,20 +132,25 @@ export class SQLInterval {
         time += overflow;
         fraction -= overflow;
       }
-      value = createSQLDateTime({
-        time,
-        fraction,
-        type: type ?? 'datetime',
-        decimals,
-      });
+      if (type === 'date') {
+        value = createSQLDate({ time, timeZone });
+      } else {
+        value = createSQLDateTime({ time, fraction, decimals });
+      }
     }
     return { type: type ?? 'datetime', value };
   }
-  add(datetime: SQLDateTime | SQLTime): EvaluationValue {
-    return this._add(datetime, 1);
+  add(
+    datetime: SQLDateTime | SQLDate | SQLTime,
+    timeZone: string
+  ): EvaluationValue {
+    return this._add(datetime, 1, timeZone);
   }
-  sub(datetime: SQLDateTime | SQLTime): EvaluationValue {
-    return this._add(datetime, -1);
+  sub(
+    datetime: SQLDateTime | SQLDate | SQLTime,
+    timeZone: string
+  ): EvaluationValue {
+    return this._add(datetime, -1, timeZone);
   }
 }
 
@@ -212,7 +219,7 @@ function _convertNumber(
       }
     }
   } else {
-    ret = convertNum(value);
+    ret = Number(convertNum(value));
     if (ret !== null) {
       if (unit_name !== 'second') {
         ret = Math.trunc(ret);
