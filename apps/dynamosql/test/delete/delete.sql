@@ -75,3 +75,16 @@ INSERT IGNORE INTO _dynamodb.foo (id, other, comment) VALUES
   ("115", 222, "115 comment dup 222")
 ;
 SELECT id, other, comment FROM _dynamodb.foo ORDER BY id;
+
+-- Cleanup: restore original state
+DELETE FROM _dynamodb.foo WHERE id IN ("4", "99", "111", "112", "113", "114", "115");
+INSERT IGNORE INTO _dynamodb.foo (id, other, comment) VALUES
+  ("4", 4, "4 comment"),
+  ("99", null, "99 comment with null"),
+  ("111", 111, "111 comment"),
+  ("112", 222, "112 comment"),
+  ("113", 333, "113 comment"),
+  ("114", null, "114 comment with null"),
+  ("115", 222, "115 comment dup 222")
+;
+SELECT id, other, comment FROM _dynamodb.foo ORDER BY id;
