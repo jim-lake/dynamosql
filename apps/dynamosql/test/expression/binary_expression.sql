@@ -36,6 +36,15 @@ SELECT "1foo" * "-1foo" AS foo;
 SELECT "1foo" * "-2foo" AS foo;
 SELECT "1foo" * "-3foo" AS foo;
 
+SELECT 10 / 2 AS foo;
+SELECT 10 / 0 AS foo;
+SELECT 0 / 10 AS foo;
+SELECT 10 / null AS foo;
+SELECT null / 10 AS foo;
+SELECT "10foo" / "2foo" AS foo;
+SELECT 10 / "2foo" AS foo;
+SELECT "10foo" / 2 AS foo;
+
 SELECT 1 = 1 AS foo;
 SELECT 0 = 0 AS foo;
 SELECT 1 = 0 AS foo;

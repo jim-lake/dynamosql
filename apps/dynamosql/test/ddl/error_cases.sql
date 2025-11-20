@@ -3,6 +3,9 @@ ALTER TABLE test ADD COLUMN col1 INT;
 DELETE FROM test_table WHERE id = 1;
 UPDATE test_table SET id = 1;
 INSERT INTO test_table (id) VALUES (1);
+
+-- DROP TABLE without database context
+DROP TABLE test_table;
 DROP TABLE test_table;
 SHOW TABLES;
 
