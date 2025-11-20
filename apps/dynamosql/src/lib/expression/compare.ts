@@ -32,7 +32,6 @@ export function gt(expr: Binary, state: EvaluationState): EvaluationResult {
 export function lt(expr: Binary, state: EvaluationState): EvaluationResult {
   return _gt(expr.right, expr.left, state, ' < ', true);
 }
-
 function _convertCompare(
   left: EvaluationResult,
   right: EvaluationResult,
@@ -87,7 +86,6 @@ function _convertCompare(
     }
   }
 }
-
 function _equal(
   expr: Binary,
   state: EvaluationState,
@@ -183,16 +181,6 @@ function _gte(
     }
   }
   return { err, value, type: 'longlong', name };
-}
-
-function _isDateOrTimeLike(
-  value: unknown
-): value is SQLDate | SQLDateTime | SQLTime {
-  return (
-    value instanceof SQLDate ||
-    value instanceof SQLDateTime ||
-    value instanceof SQLTime
-  );
 }
 function _isDateLike(value: unknown): value is SQLDate | SQLDateTime {
   return value instanceof SQLDate || value instanceof SQLDateTime;

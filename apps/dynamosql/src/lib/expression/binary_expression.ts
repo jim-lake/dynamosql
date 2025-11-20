@@ -1,8 +1,5 @@
 import { convertBooleanValue } from '../helpers/sql_conversion';
 import { getValue } from './evaluate';
-import { SQLDateTime } from '../types/sql_datetime';
-import { SQLDate } from '../types/sql_date';
-import { SQLTime } from '../types/sql_time';
 
 import type { Binary } from 'node-sql-parser';
 import type { EvaluationState, EvaluationResult } from './evaluate';
@@ -31,7 +28,6 @@ function and(expr: Binary, state: EvaluationState): EvaluationResult {
   }
   return { err, value, name, type: 'longlong' };
 }
-
 function or(expr: Binary, state: EvaluationState): EvaluationResult {
   const left = getValue(expr.left, state);
   let err = left.err;
@@ -53,7 +49,6 @@ function or(expr: Binary, state: EvaluationState): EvaluationResult {
   }
   return { err, value, name, type: 'longlong' };
 }
-
 function xor(expr: Binary, state: EvaluationState): EvaluationResult {
   const left = getValue(expr.left, state);
   const right = getValue(expr.right, state);
@@ -192,7 +187,6 @@ function inOp(expr: Binary, state: EvaluationState): EvaluationResult {
   }
   return { err, value, name: `${left.name} IN (...)`, type: 'longlong' };
 }
-
 function notIn(expr: Binary, state: EvaluationState): EvaluationResult {
   const result = inOp(expr, state);
   result.name = result.name?.replace(' IN ', ' NOT IN ') ?? '';
@@ -200,31 +194,6 @@ function notIn(expr: Binary, state: EvaluationState): EvaluationResult {
     result.value = result.value ? 0 : 1;
   }
   return result;
-}
-function _isDateOrTimeLike(
-  value: unknown
-): value is SQLDate | SQLDateTime | SQLTime {
-  return (
-    value instanceof SQLDate ||
-    value instanceof SQLDateTime ||
-    value instanceof SQLTime
-  );
-}
-function _isDateLike(value: unknown): value is SQLDate | SQLDateTime {
-  return value instanceof SQLDate || value instanceof SQLDateTime;
-}
-function _unionDateTime(
-  value1: unknown,
-  value2: unknown
-): 'datetime' | undefined {
-  if (typeof value1 === 'string' || typeof value2 === 'string') {
-    return 'datetime';
-  } else if (value1 instanceof SQLTime || value2 instanceof SQLTime) {
-    return 'datetime';
-  } else if (_isDateLike(value1) && _isDateLike(value2)) {
-    return 'datetime';
-  }
-  return undefined;
 }
 
 export const methods: Record<
