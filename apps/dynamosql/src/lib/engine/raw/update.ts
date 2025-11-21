@@ -34,7 +34,7 @@ export async function singleUpdate(
   }
   const value_list = set.map((object) => {
     const { value } = object;
-    let ret: string | undefined;
+    let ret: string | number | null | undefined;
     const result = convertWhere(value, { session, from_key: from?.[0]?.key });
     if (result.err) {
       throw new NoSingleOperationError();

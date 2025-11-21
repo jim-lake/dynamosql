@@ -3,10 +3,36 @@ import * as Functions from './functions';
 import { getValue } from '../../expression';
 import { getFunctionName } from '../ast_helper';
 
-export function convertWhere(expr: any, state: any): any {
+import type {
+  Function as FunctionType,
+  Binary,
+  ColumnRefItem,
+} from 'node-sql-parser';
+import type {
+  ExtendedExpressionValue,
+  UnaryExpr,
+  ExtendedColumnRef,
+} from '../../ast_types';
+import type { Session } from '../../../session';
+
+export interface ConvertWhereState {
+  session: Session;
+  from_key?: string;
+  default_true?: boolean;
+}
+
+export interface ConvertResult {
+  err: string | null;
+  value: string | number | null;
+}
+
+export function convertWhere(
+  expr: ExtendedExpressionValue | Binary | FunctionType | null | undefined,
+  state: ConvertWhereState
+): ConvertResult {
   const { from_key } = state;
-  let err = null;
-  let value = null;
+  let err: string | null = null;
+  let value: string | number | null = null;
 
   if (expr) {
     const { type } = expr;
@@ -19,10 +45,11 @@ export function convertWhere(expr: any, state: any): any {
     } else if (type === 'bool') {
       value = expr.value;
     } else if (type === 'function') {
-      const funcName = getFunctionName(expr.name);
+      const funcExpr = expr as FunctionType;
+      const funcName = getFunctionName(funcExpr.name);
       const func = Functions[funcName.toLowerCase() as keyof typeof Functions];
       if (func && typeof func === 'function') {
-        const result = (func as (expr: any, state: any) => any)(expr, state);
+        const result = func(funcExpr, state);
         if (result.err) {
           err = result.err;
         } else {
@@ -32,12 +59,13 @@ export function convertWhere(expr: any, state: any): any {
         err = 'unsupported';
       }
     } else if (type === 'binary_expr' || type === 'unary_expr') {
+      const opExpr = expr as Binary | UnaryExpr;
       const func =
         ConvertExpression[
-          expr.operator.toLowerCase() as keyof typeof ConvertExpression
+          opExpr.operator.toLowerCase() as keyof typeof ConvertExpression
         ];
       if (func) {
-        const result = func(expr, state);
+        const result = func(opExpr, state);
         if (result.err) {
           err = result.err;
         } else {
@@ -47,15 +75,23 @@ export function convertWhere(expr: any, state: any): any {
         err = 'unsupported';
       }
     } else if (type === 'column_ref') {
-      if (expr.from?.key === from_key) {
-        value = expr.column;
+      const colRef = expr as ExtendedColumnRef;
+      if ('from' in colRef && colRef.from?.key === from_key) {
+        const colRefItem = colRef as ColumnRefItem & { from?: { key: string } };
+        const col = colRefItem.column;
+        value = typeof col === 'string' ? col : String(col);
       } else {
         err = 'unsupported';
       }
     } else {
-      const result = getValue(expr, state);
-      err = result.err;
-      value = result.value;
+      const result = getValue(expr as ExtendedExpressionValue, state);
+      err = result.err ? 'unsupported' : null;
+      value =
+        typeof result.value === 'string' ||
+        typeof result.value === 'number' ||
+        result.value === null
+          ? result.value
+          : String(result.value);
     }
   }
   return { err, value };

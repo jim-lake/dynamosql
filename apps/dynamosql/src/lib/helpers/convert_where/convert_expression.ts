@@ -1,18 +1,37 @@
 import { getValue } from '../../expression';
 import { convertWhere } from './convert_where';
 
-function constantFixup(func: (expr: any, state: any) => any) {
-  return (expr: any, state: any) => {
-    let result;
-    result = getValue(expr, state);
+import type { Binary } from 'node-sql-parser';
+import type { ExtendedExpressionValue, UnaryExpr } from '../../ast_types';
+import type { ConvertWhereState, ConvertResult } from './convert_where';
+
+type ConvertFunc = (
+  expr: ExtendedExpressionValue,
+  state: ConvertWhereState
+) => ConvertResult;
+
+function constantFixup(func: ConvertFunc): ConvertFunc {
+  return (
+    expr: ExtendedExpressionValue,
+    state: ConvertWhereState
+  ): ConvertResult => {
+    const result = getValue(expr, state);
     if (result.err) {
-      result = func(expr, state);
+      return func(expr, state);
     }
-    return result;
+    return {
+      err: null,
+      value:
+        typeof result.value === 'string' ||
+        typeof result.value === 'number' ||
+        result.value === null
+          ? result.value
+          : String(result.value),
+    };
   };
 }
 
-function and(expr: any, state: any): any {
+function and(expr: Binary, state: ConvertWhereState): ConvertResult {
   const left = convertWhere(expr.left, state);
   const right = convertWhere(expr.right, state);
   if (left.err === 'unsupported' && state?.default_true) {
@@ -25,7 +44,7 @@ function and(expr: any, state: any): any {
   }
 
   const err = left.err || right.err;
-  let value;
+  let value: string | number | null;
   if (!left.value || !right.value) {
     value = 0;
   } else if (left.value === 1 && right.value === 1) {
@@ -40,11 +59,11 @@ function and(expr: any, state: any): any {
   return { err, value };
 }
 
-function or(expr: any, state: any): any {
+function or(expr: Binary, state: ConvertWhereState): ConvertResult {
   const left = convertWhere(expr.left, state);
   const right = convertWhere(expr.right, state);
   let err = left.err || right.err;
-  let value;
+  let value: string | number | null;
   if (err === 'unsupported' && state?.default_true) {
     value = 1;
     err = null;
@@ -62,19 +81,23 @@ function or(expr: any, state: any): any {
   return { err, value };
 }
 
-function _in(expr: any, state: any): any {
+function _in(expr: Binary, state: ConvertWhereState): ConvertResult {
   const left = convertWhere(expr.left, state);
-  let err;
-  let value;
+  let err: string | null = null;
+  let value: string | number | null = null;
   if (left.err) {
     err = left.err;
   } else if (left.value === null) {
     value = null;
   } else {
-    const count = expr.right?.value?.length;
-    const list: any[] = [];
+    const rightExpr = expr.right as { value?: unknown[] };
+    const count = rightExpr.value?.length || 0;
+    const list: (string | number | null)[] = [];
     for (let i = 0; i < count; i++) {
-      const right = convertWhere(expr.right.value[i], state);
+      const right = convertWhere(
+        rightExpr.value![i] as ExtendedExpressionValue,
+        state
+      );
       if (right.err) {
         err = right.err;
         break;
@@ -92,7 +115,11 @@ function _in(expr: any, state: any): any {
   return { err, value };
 }
 
-function _comparator(expr: any, state: any, op: string): any {
+function _comparator(
+  expr: Binary,
+  state: ConvertWhereState,
+  op: string
+): ConvertResult {
   const left = convertWhere(expr.left, state);
   const right = convertWhere(expr.right, state);
 
@@ -101,48 +128,53 @@ function _comparator(expr: any, state: any, op: string): any {
   return { err, value };
 }
 
-function equal(expr: any, state: any): any {
+function equal(expr: Binary, state: ConvertWhereState): ConvertResult {
   return _comparator(expr, state, '=');
 }
 
-function notEqual(expr: any, state: any): any {
+function notEqual(expr: Binary, state: ConvertWhereState): ConvertResult {
   return _comparator(expr, state, '!=');
 }
 
-function gt(expr: any, state: any): any {
+function gt(expr: Binary, state: ConvertWhereState): ConvertResult {
   return _comparator(expr, state, '>');
 }
 
-function lt(expr: any, state: any): any {
+function lt(expr: Binary, state: ConvertWhereState): ConvertResult {
   return _comparator(expr, state, '<');
 }
 
-function gte(expr: any, state: any): any {
+function gte(expr: Binary, state: ConvertWhereState): ConvertResult {
   return _comparator(expr, state, '>=');
 }
 
-function lte(expr: any, state: any): any {
+function lte(expr: Binary, state: ConvertWhereState): ConvertResult {
   return _comparator(expr, state, '<=');
 }
 
-function is(expr: any, state: any): any {
+function is(expr: Binary, state: ConvertWhereState): ConvertResult {
   return _is(expr, state, 'IS');
 }
 
-function isNot(expr: any, state: any): any {
+function isNot(expr: Binary, state: ConvertWhereState): ConvertResult {
   return _is(expr, state, 'IS NOT');
 }
 
-function _is(expr: any, state: any, op: string): any {
+function _is(
+  expr: Binary,
+  state: ConvertWhereState,
+  op: string
+): ConvertResult {
   const left = convertWhere(expr.left, state);
-  let right;
+  let right: string | undefined;
   let err = left.err;
   if (!err) {
-    if (expr.right.value === null) {
+    const rightExpr = expr.right as { value?: unknown };
+    if (rightExpr.value === null) {
       right = 'NULL';
-    } else if (expr.right.value === true) {
+    } else if (rightExpr.value === true) {
       right = 'TRUE';
-    } else if (expr.right.value === false) {
+    } else if (rightExpr.value === false) {
       right = 'FALSE';
     } else {
       err = 'syntax_err';
@@ -152,37 +184,45 @@ function _is(expr: any, state: any, op: string): any {
   return { err, value };
 }
 
-function not(expr: any, state: any): any {
-  const result = convertWhere(expr.expr, state);
+function not(
+  expr: ExtendedExpressionValue,
+  state: ConvertWhereState
+): ConvertResult {
+  const unaryExpr = expr as UnaryExpr;
+  const result = convertWhere(unaryExpr.expr, state);
   if (!result.err) {
     result.value = 'NOT ' + result.value;
   }
   return result;
 }
 
-function minus(expr: any, state: any): any {
-  const result = convertWhere(expr.expr, state);
+function minus(
+  expr: ExtendedExpressionValue,
+  state: ConvertWhereState
+): ConvertResult {
+  const unaryExpr = expr as UnaryExpr;
+  const result = convertWhere(unaryExpr.expr, state);
   if (!result.err) {
     result.value = '-' + result.value;
   }
   return result;
 }
 
-function unsupported(): any {
-  return { err: 'unsupported' };
+function unsupported(): ConvertResult {
+  return { err: 'unsupported', value: null };
 }
 
-const _equal = constantFixup(equal);
-const _notEqual = constantFixup(notEqual);
-const _gt = constantFixup(gt);
-const _lt = constantFixup(lt);
-const _gte = constantFixup(gte);
-const _lte = constantFixup(lte);
-const _and = constantFixup(and);
-const _or = constantFixup(or);
-const _inOp = constantFixup(_in);
-const _isOp = constantFixup(is);
-const _isNotOp = constantFixup(isNot);
+const _equal = constantFixup(equal as ConvertFunc);
+const _notEqual = constantFixup(notEqual as ConvertFunc);
+const _gt = constantFixup(gt as ConvertFunc);
+const _lt = constantFixup(lt as ConvertFunc);
+const _gte = constantFixup(gte as ConvertFunc);
+const _lte = constantFixup(lte as ConvertFunc);
+const _and = constantFixup(and as ConvertFunc);
+const _or = constantFixup(or as ConvertFunc);
+const _inOp = constantFixup(_in as ConvertFunc);
+const _isOp = constantFixup(is as ConvertFunc);
+const _isNotOp = constantFixup(isNot as ConvertFunc);
 const _between = constantFixup(unsupported);
 const _not = constantFixup(not);
 const _minus = constantFixup(minus);
