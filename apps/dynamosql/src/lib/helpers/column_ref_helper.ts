@@ -1,7 +1,7 @@
 import { walkColumnRefs } from './ast_helper';
 import { SQLError } from '../../error';
 
-import type { Select, Update } from 'node-sql-parser';
+import type { Select, Update, From, BaseFrom } from 'node-sql-parser';
 
 interface TableMapEntry {
   db?: string;
@@ -30,8 +30,11 @@ export function resolveReferences(
 ) {
   const table_map: TableMap = {};
   const db_map: DbMap = {};
-  const from = ast.type === 'select' ? ast.from : (ast as any).from;
-  from?.forEach?.((from: TableMapEntry & { db?: string; table?: string }) => {
+  const fromRaw =
+    ast.type === 'select' ? ast.from : (ast as Update & { from?: From[] }).from;
+  const from = Array.isArray(fromRaw) ? fromRaw : null;
+  from?.forEach?.((fromItem: From) => {
+    const from = fromItem as TableMapEntry & { db?: string; table?: string };
     if (!from.db) {
       if (!current_database) {
         throw new SQLError('no_current_database');
@@ -59,19 +62,22 @@ export function resolveReferences(
       }
     }
   });
-  const table = ast.type === 'update' ? ast.table : (ast as any).table;
-  table?.forEach?.(
-    (object: { db?: string; table?: string; from?: TableMapEntry }) => {
-      const from = object.db
-        ? db_map[object.db]?.[object.table ?? '']
-        : table_map[object.table ?? ''];
-      if (!from) {
-        throw new SQLError({ err: 'table_not_found', args: [object.table] });
-      } else {
-        object.from = from;
-      }
+  const tableRaw =
+    ast.type === 'update'
+      ? ast.table
+      : (ast as Select & { table?: From[] }).table;
+  const table = Array.isArray(tableRaw) ? tableRaw : null;
+  table?.forEach?.((object: From & { from?: TableMapEntry }) => {
+    const obj = object as BaseFrom & { from?: TableMapEntry };
+    const from = obj.db
+      ? db_map[obj.db]?.[obj.table ?? '']
+      : table_map[obj.table ?? ''];
+    if (!from) {
+      throw new SQLError({ err: 'table_not_found', args: [obj.table] });
+    } else {
+      obj.from = from;
     }
-  );
+  });
 
   const name_cache: TableMap = {};
   const columns = ast.type === 'select' ? ast.columns : undefined;

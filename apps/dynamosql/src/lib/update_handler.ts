@@ -8,6 +8,28 @@ import { SQLError, NoSingleOperationError } from '../error';
 
 import type { HandlerParams, ChangedResult } from './handler_types';
 import type { UpdateChange } from './engine';
+import type { SetList } from 'node-sql-parser';
+import type { EvaluationResult } from './expression';
+import type { SelectResultItem } from './helpers/select_modify';
+import type { EngineValue } from './engine';
+import type { RowWithResult } from './select_handler';
+
+interface ExtendedFrom {
+  key?: string;
+  db?: string;
+  table?: string;
+  _updateList?: Array<{ key: EngineValue[]; set_list: SetListWithValue[] }>;
+  _keyList?: string[];
+}
+
+interface ExtendedSetList extends SetList {
+  from?: { key?: string };
+}
+
+interface SetListWithValue {
+  column: string;
+  value: EvaluationResult;
+}
 
 export async function query(params: HandlerParams): Promise<ChangedResult> {
   const { ast, session } = params;
@@ -51,19 +73,17 @@ async function _multipleUpdate(params: HandlerParams): Promise<ChangedResult> {
   // Get rows to update
   const result_list = await runSelect(params);
 
-  ast.from.forEach((object: any) => {
+  (ast.from as ExtendedFrom[]).forEach((object) => {
     const from_key = object.key;
-    const list = result_list.find(
-      (result: any) => result.key === from_key
-    )?.list;
+    const list = result_list.find((result) => result.key === from_key)?.list;
     object._updateList = [];
-    list?.forEach?.(({ key, row }: any) => {
-      const set_list = ast.set
-        .filter((set_item: any) => set_item.from.key === from_key)
-        .map((set_item: any) => {
+    list?.forEach?.(({ key, row }) => {
+      const set_list = (ast.set as ExtendedSetList[])
+        .filter((set_item) => set_item.from?.key === from_key)
+        .map((set_item) => {
           const expr_result = Expression.getValue(set_item.value, {
             session,
-            row,
+            row: row as RowWithResult,
           });
           if (expr_result.err) {
             throw new SQLError(expr_result.err);
@@ -71,20 +91,23 @@ async function _multipleUpdate(params: HandlerParams): Promise<ChangedResult> {
           return { column: set_item.column, value: expr_result };
         });
       if (set_list.length > 0) {
+        if (!object._updateList) {
+          object._updateList = [];
+        }
         object._updateList.push({ key, set_list });
       }
     });
   });
 
   // Update rows
-  const from_list = ast.from
-    .map((obj: any) => ({
-      database: obj.db,
-      table: obj.table,
-      key_list: obj._keyList,
-      update_list: obj._updateList,
+  const from_list = (ast.from as ExtendedFrom[])
+    .map((obj) => ({
+      database: obj.db ?? '',
+      table: obj.table ?? '',
+      key_list: obj._keyList ?? [],
+      update_list: obj._updateList ?? [],
     }))
-    .filter((obj: any) => obj.update_list.length > 0);
+    .filter((obj) => obj.update_list.length > 0);
 
   if (from_list.length > 0) {
     const groups = makeEngineGroups<UpdateChange>(session, from_list);

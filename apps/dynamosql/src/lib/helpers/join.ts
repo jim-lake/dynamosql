@@ -17,7 +17,9 @@ export function formJoin(params: FormJoinParams): RowWithResult[] {
   from.forEach(
     (from_table: From & { key?: string; is_left?: boolean; join?: string }) => {
       if (from_table.key) {
-        (row_list as any)[from_table.key] = [];
+        (row_list as RowWithResult[] & Record<string, unknown[]>)[
+          from_table.key
+        ] = [];
       }
       from_table.is_left = (from_table.join?.indexOf?.('LEFT') ?? -1) >= 0;
     }

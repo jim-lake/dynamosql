@@ -1,12 +1,7 @@
 import { getValue } from './evaluate';
 import { convertNum } from '../helpers/sql_conversion';
 import type { EvaluationState, EvaluationResult } from './evaluate';
-
-interface UnaryExpr {
-  type: 'unary_expr';
-  operator: string;
-  expr: any;
-}
+import type { UnaryExpr } from '../ast_types';
 
 function plus(expr: UnaryExpr, state: EvaluationState): EvaluationResult {
   return getValue(expr.expr, state);

@@ -9,7 +9,7 @@ import { SQLDate } from '../types/sql_date';
 import { SQLDateTime, createSQLDateTime } from '../types/sql_datetime';
 import { createSQLTime } from '../types/sql_time';
 
-import type { Function } from 'node-sql-parser';
+import type { Function, ExpressionValue } from 'node-sql-parser';
 import type { EvaluationState, EvaluationResult } from './evaluate';
 
 const DAY = 24 * 60 * 60;
@@ -45,7 +45,7 @@ function length(expr: Function, state: EvaluationState): EvaluationResult {
 function concat(expr: Function, state: EvaluationState): EvaluationResult {
   let err: EvaluationResult['err'] = null;
   let value: string | null = '';
-  expr.args?.value?.every?.((sub: any) => {
+  expr.args?.value?.every?.((sub: ExpressionValue) => {
     const result = getValue(sub, state);
     if (!err && result.err) {
       err = result.err;
@@ -77,7 +77,7 @@ function coalesce(expr: Function, state: EvaluationState): EvaluationResult {
   let err: EvaluationResult['err'] = null;
   let value = null;
   let type = 'null';
-  expr.args?.value?.some?.((sub: any) => {
+  expr.args?.value?.some?.((sub: ExpressionValue) => {
     const result = getValue(sub, state);
     if (result.err) {
       err = result.err;

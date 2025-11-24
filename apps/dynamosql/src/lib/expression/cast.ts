@@ -8,12 +8,18 @@ import { getValue } from './evaluate';
 import type { Cast } from 'node-sql-parser';
 import type { EvaluationState, EvaluationResult } from './evaluate';
 
+interface CastTarget {
+  dataType: string;
+  quoted?: string;
+  length?: number;
+}
+
 function datetime(expr: Cast, state: EvaluationState): EvaluationResult {
   const result = getValue(expr.expr, state);
   result.name = `CAST(${result.name} AS DATETIME)`;
   result.type = 'datetime';
   if (!result.err && result.value !== null) {
-    const target: any = Array.isArray(expr.target)
+    const target: CastTarget | undefined = Array.isArray(expr.target)
       ? expr.target[0]
       : expr.target;
     const decimals = target?.length || 0;
@@ -45,7 +51,7 @@ function time(expr: Cast, state: EvaluationState): EvaluationResult {
   result.name = `CAST(${result.name} AS TIME)`;
   result.type = 'time';
   if (!result.err && result.value !== null) {
-    const target: any = Array.isArray(expr.target)
+    const target: CastTarget | undefined = Array.isArray(expr.target)
       ? expr.target[0]
       : expr.target;
     const decimals = target?.length || 0;

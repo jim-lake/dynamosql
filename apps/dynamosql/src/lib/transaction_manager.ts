@@ -3,11 +3,12 @@ import * as Engine from './engine';
 import type { DynamoDBWithCache } from './dynamodb';
 import type { HandlerParams } from './handler_types';
 import type { Session } from '../session';
-import type { CommitParams } from './engine';
+import type { CommitParams, TableData } from './engine';
 
 export async function query(params: HandlerParams): Promise<void> {
   const { dynamodb, session, ast } = params;
-  const action = (ast as any)?.expr?.action?.value?.toLowerCase();
+  const astWithExpr = ast as { expr?: { action?: { value?: string } } };
+  const action = astWithExpr?.expr?.action?.value?.toLowerCase();
   if (action === 'begin' || action === 'start') {
     startTransaction({ session, auto_commit: false });
   } else if (action === 'commit') {
@@ -86,13 +87,13 @@ interface InternalCommitParams {
   session: Session;
 }
 export async function commit(params: InternalCommitParams): Promise<void> {
-  await _txEach(params, async ({ engine, ...other }: any) => {
-    await engine.commit(other);
+  await _txEach(params, async ({ engine, ...other }) => {
+    await engine.commit(other as CommitParams);
   });
 }
 export async function rollback(params: InternalCommitParams): Promise<void> {
-  await _txEach(params, async ({ engine, ...other }: any) => {
-    await engine.rollback(other);
+  await _txEach(params, async ({ engine, ...other }) => {
+    await engine.rollback(other as CommitParams);
   });
 }
 type TxEachCallback<T> = (params: CommitParams<T>) => Promise<void>;
@@ -105,7 +106,7 @@ async function _txEach<T>(
   if (transaction) {
     for (const name of transaction.getEngineNameList()) {
       const engine = Engine.getEngineByName(name);
-      const data = transaction.getData(name) as any;
+      const data = transaction.getData(name) as Record<string, TableData<T>>;
       await callback({ engine, dynamodb, session, transaction, data });
     }
     session.setTransaction(null);

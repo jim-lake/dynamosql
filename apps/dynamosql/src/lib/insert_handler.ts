@@ -102,17 +102,23 @@ async function _runInsert(
     };
     try {
       return await engine.insertRowList(opts);
-    } catch (err: any) {
-      const errStr = String(err?.message || '').toLowerCase();
+    } catch (err: unknown) {
+      const error = err as {
+        message?: string;
+        err?: string;
+        name?: string;
+        args?: unknown[];
+      };
+      const errStr = String(error?.message || '').toLowerCase();
       if (
-        err?.message === 'resource_not_found' ||
-        err?.err === 'resource_not_found' ||
-        err?.name === 'ResourceNotFoundException' ||
+        error?.message === 'resource_not_found' ||
+        error?.err === 'resource_not_found' ||
+        error?.name === 'ResourceNotFoundException' ||
         errStr.includes('resource not found')
       ) {
         throw new SQLError({
           err: 'table_not_found',
-          args: err?.args || [table],
+          args: error?.args || [table],
         });
       }
       throw err;

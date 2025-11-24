@@ -201,7 +201,7 @@ export function getValue(
 
     // Handle both ColumnRefItem and ColumnRefExpr
     let columnName: string;
-    let columnValue: string | { expr: any };
+    let columnValue: unknown;
 
     if ('column' in colRef) {
       // ColumnRefItem
@@ -227,9 +227,11 @@ export function getValue(
     } else if (row) {
       const fromKey = colRef.from?.key;
       const cell = fromKey
-        ? (row as Record<string, any>)[fromKey]?.[columnName]
+        ? (row as Record<string, Record<string, unknown>>)[fromKey]?.[
+            columnName
+          ]
         : undefined;
-      const decode = _decodeCell(cell);
+      const decode = _decodeCell(cell as EngineValue | null | undefined);
       result.type = decode?.type ?? 'string';
       result.value = decode?.value;
     } else {
