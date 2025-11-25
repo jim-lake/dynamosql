@@ -108,7 +108,7 @@ async function _txEach<T>(
   if (transaction) {
     for (const name of transaction.getEngineNameList()) {
       const engine = Engine.getEngineByName(name);
-      const data = transaction.getData(name) as Record<string, TableData<T>>;
+      const data = transaction.getData<T>(name) ?? {};
       await callback({ engine, dynamodb, session, transaction, data });
     }
     session.setTransaction(null);
