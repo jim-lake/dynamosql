@@ -3,31 +3,33 @@ import { EventEmitter } from 'node:events';
 import { ReadableOptions, Readable } from 'node:stream';
 import { AwsCredentialIdentity } from '@aws-sdk/types';
 
+interface IndexError extends Error {
+    index?: number;
+}
 interface ErrorInput {
     err?: string;
     code?: string;
     errno?: number;
     sqlMessage?: string;
     message?: string;
-    args?: any[];
-    cause?: Error;
+    args?: unknown[];
+    cause?: unknown;
     index?: number;
 }
 declare class SQLError extends Error {
-    code: string;
-    errno: number;
-    sqlStateMarker?: string;
+    readonly code: string;
+    readonly errno: number;
     sqlState?: string;
     fieldCount?: number;
     fatal: boolean;
     sqlMessage?: string;
     sql?: string;
     index: number;
-    constructor(err: string | ErrorInput, sql?: string);
+    constructor(arg: string | ErrorInput | IndexError, sql?: string);
 }
 
 type MysqlError = SQLError;
-declare const enum Types {
+declare enum Types {
     DECIMAL = 0,// aka DECIMAL (http://dev.mysql.com/doc/refman/5.0/en/precision-math-decimal-changes.html)
     TINY = 1,
     SHORT = 2,
@@ -131,8 +133,8 @@ interface OkPacket {
     fieldCount: number;
     affectedRows: number;
     insertId: number;
-    serverStatus?: number;
-    warningCount?: number;
+    serverStatus?: number | undefined;
+    warningCount?: number | undefined;
     message: string;
     changedRows: number;
     protocol41: boolean;
@@ -152,6 +154,9 @@ interface SessionConfig extends DynamoDBWithCacheConstructorParams {
     resultObjects?: boolean | undefined;
     typeCast?: TypeCast | undefined;
     dateStrings?: boolean | Array<'TIMESTAMP' | 'DATETIME' | 'DATE'> | undefined;
+    supportBigNumbers?: boolean | undefined;
+    bigNumberStrings?: boolean | undefined;
+    bigintNative?: boolean | undefined;
 }
 declare function createSession$1(args?: SessionConfig): PoolConnection;
 
@@ -165,7 +170,7 @@ declare class Pool extends EventEmitter {
     constructor(args: PoolConfig);
     end(done?: (err?: MysqlError) => void): void;
     getConnection(done: (err: MysqlError | null, connection?: PoolConnection) => void): void;
-    query(opts: string | QueryOptions, values?: any, done?: QueryCallback): Query;
+    query(opts: string | QueryOptions, values?: unknown, done?: QueryCallback): Query;
 }
 
 declare const createConnection: typeof createSession$1;
