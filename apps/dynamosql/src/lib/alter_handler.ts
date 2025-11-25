@@ -79,8 +79,7 @@ async function _runAlterTable(
       try {
         await engine.createIndex(opts);
       } catch (err) {
-        const error = err as Error & { message?: string };
-        if (error?.message === 'index_exists') {
+        if (err instanceof Error && err.message === 'index_exists') {
           throw new SQLError({ err: 'ER_DUP_KEYNAME', args: [def.index] });
         }
         throw err;
@@ -91,8 +90,7 @@ async function _runAlterTable(
       try {
         await engine.deleteIndex(opts);
       } catch (err) {
-        const error = err as Error & { message?: string };
-        if (error?.message === 'index_not_found') {
+        if (err instanceof Error && err.message === 'index_not_found') {
           throw new SQLError({
             err: 'ER_CANT_DROP_FIELD_OR_KEY',
             args: [def.index],

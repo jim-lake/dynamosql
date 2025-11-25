@@ -164,8 +164,11 @@ async function _createTable(
     };
     await SchemaManager.createTable(opts);
   } catch (err) {
-    const error = err as { code?: string };
-    if (error?.code === 'ER_TABLE_EXISTS_ERROR' && ast.if_not_exists) {
+    if (
+      err instanceof SQLError &&
+      err.code === 'ER_TABLE_EXISTS_ERROR' &&
+      ast.if_not_exists
+    ) {
       return { affectedRows: 0 };
     }
     throw err;
