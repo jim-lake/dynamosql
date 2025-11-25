@@ -4,7 +4,7 @@ import type { DynamoDBWithCache } from './dynamodb';
 import type { Transaction as TransactionAST } from './ast_types';
 import type { HandlerParams } from './handler_types';
 import type { Session } from '../session';
-import type { CommitParams, TableData } from './engine';
+import type { CommitParams } from './engine';
 
 export async function query(
   params: HandlerParams<TransactionAST>

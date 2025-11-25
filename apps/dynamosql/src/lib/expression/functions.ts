@@ -73,6 +73,25 @@ function left(expr: Function, state: EvaluationState): EvaluationResult {
   }
   return result;
 }
+function right(expr: Function, state: EvaluationState): EvaluationResult {
+  const result = getValue(expr.args?.value?.[0], state);
+  const len_result = getValue(expr.args?.value?.[1], state);
+  result.name = `RIGHT(${result.name ?? ''}, ${len_result.name ?? ''})`;
+  result.err = result.err || len_result.err;
+  result.type = 'string';
+  if (!result.err && (result.value === null || len_result.value === null)) {
+    result.value = null;
+  } else if (!result.err) {
+    const length = convertNum(len_result.value);
+    if (length !== null && length <= 0) {
+      result.value = '';
+    } else {
+      result.value =
+        length !== null ? String(result.value).slice(-length) : null;
+    }
+  }
+  return result;
+}
 function coalesce(expr: Function, state: EvaluationState): EvaluationResult {
   let err: EvaluationResult['err'] = null;
   let value = null;
@@ -201,6 +220,240 @@ function lower(expr: Function, state: EvaluationState): EvaluationResult {
   }
   return result;
 }
+function upper(expr: Function, state: EvaluationState): EvaluationResult {
+  const result = getValue(expr.args?.value?.[0], state);
+  if (!result.err && result.value !== null) {
+    result.name = `UPPER(${result.name})`;
+    result.type = 'string';
+    result.value = String(result.value).toUpperCase();
+  }
+  return result;
+}
+function trim(expr: Function, state: EvaluationState): EvaluationResult {
+  const result = getValue(expr.args?.value?.[0], state);
+  if (!result.err && result.value !== null) {
+    result.name = `TRIM(${result.name})`;
+    result.type = 'string';
+    result.value = String(result.value).trim();
+  }
+  return result;
+}
+function ltrim(expr: Function, state: EvaluationState): EvaluationResult {
+  const result = getValue(expr.args?.value?.[0], state);
+  if (!result.err && result.value !== null) {
+    result.name = `LTRIM(${result.name})`;
+    result.type = 'string';
+    result.value = String(result.value).trimStart();
+  }
+  return result;
+}
+function rtrim(expr: Function, state: EvaluationState): EvaluationResult {
+  const result = getValue(expr.args?.value?.[0], state);
+  if (!result.err && result.value !== null) {
+    result.name = `RTRIM(${result.name})`;
+    result.type = 'string';
+    result.value = String(result.value).trimEnd();
+  }
+  return result;
+}
+function reverse(expr: Function, state: EvaluationState): EvaluationResult {
+  const result = getValue(expr.args?.value?.[0], state);
+  if (!result.err && result.value !== null) {
+    result.name = `REVERSE(${result.name})`;
+    result.type = 'string';
+    result.value = String(result.value).split('').reverse().join('');
+  }
+  return result;
+}
+function repeat(expr: Function, state: EvaluationState): EvaluationResult {
+  const arg1 = getValue(expr.args?.value?.[0], state);
+  const arg2 = getValue(expr.args?.value?.[1], state);
+  const err = arg1.err || arg2.err;
+  let value;
+  const name = `REPEAT(${arg1.name}, ${arg2.name})`;
+
+  if (!err && (arg1.value === null || arg2.value === null)) {
+    value = null;
+  } else if (!err) {
+    const count = convertNum(arg2.value);
+    value =
+      count !== null && count >= 0 ? String(arg1.value).repeat(count) : null;
+  }
+  return { err, name, value, type: 'string' };
+}
+function char_length(expr: Function, state: EvaluationState): EvaluationResult {
+  const result = getValue(expr.args?.value?.[0], state);
+  result.name = `CHAR_LENGTH(${result.name})`;
+  result.type = 'number';
+  if (!result.err && result.value !== null) {
+    result.value = String(result.value).length;
+  }
+  return result;
+}
+function abs(expr: Function, state: EvaluationState): EvaluationResult {
+  const result = getValue(expr.args?.value?.[0], state);
+  result.name = `ABS(${result.name})`;
+  result.type = 'number';
+  if (!result.err && result.value !== null) {
+    const num = convertNum(result.value);
+    result.value = num !== null ? Math.abs(num) : null;
+  }
+  return result;
+}
+function ceil(expr: Function, state: EvaluationState): EvaluationResult {
+  const result = getValue(expr.args?.value?.[0], state);
+  result.name = `CEIL(${result.name})`;
+  result.type = 'number';
+  if (!result.err && result.value !== null) {
+    const num = convertNum(result.value);
+    result.value = num !== null ? Math.ceil(num) : null;
+  }
+  return result;
+}
+function floor(expr: Function, state: EvaluationState): EvaluationResult {
+  const result = getValue(expr.args?.value?.[0], state);
+  result.name = `FLOOR(${result.name})`;
+  result.type = 'number';
+  if (!result.err && result.value !== null) {
+    const num = convertNum(result.value);
+    result.value = num !== null ? Math.floor(num) : null;
+  }
+  return result;
+}
+function round(expr: Function, state: EvaluationState): EvaluationResult {
+  const arg1 = getValue(expr.args?.value?.[0], state);
+  const arg2 = getValue(expr.args?.value?.[1], state);
+  const err = arg1.err || arg2.err;
+  let value;
+  const name =
+    arg2.value !== undefined
+      ? `ROUND(${arg1.name}, ${arg2.name})`
+      : `ROUND(${arg1.name})`;
+
+  if (!err && arg1.value === null) {
+    value = null;
+  } else if (!err) {
+    const num = convertNum(arg1.value);
+    if (num !== null) {
+      if (arg2.value !== undefined && arg2.value !== null) {
+        const decimals = convertNum(arg2.value) || 0;
+        value =
+          Math.round(num * Math.pow(10, decimals)) / Math.pow(10, decimals);
+      } else {
+        value = Math.round(num);
+      }
+    } else {
+      value = null;
+    }
+  }
+  return { err, name, value, type: 'number' };
+}
+function mod(expr: Function, state: EvaluationState): EvaluationResult {
+  const arg1 = getValue(expr.args?.value?.[0], state);
+  const arg2 = getValue(expr.args?.value?.[1], state);
+  const err = arg1.err || arg2.err;
+  let value;
+  const name = `MOD(${arg1.name}, ${arg2.name})`;
+
+  if (!err && (arg1.value === null || arg2.value === null)) {
+    value = null;
+  } else if (!err) {
+    const num1 = convertNum(arg1.value);
+    const num2 = convertNum(arg2.value);
+    value = num1 !== null && num2 !== null ? num1 % num2 : null;
+  }
+  return { err, name, value, type: 'number' };
+}
+function pow(expr: Function, state: EvaluationState): EvaluationResult {
+  const arg1 = getValue(expr.args?.value?.[0], state);
+  const arg2 = getValue(expr.args?.value?.[1], state);
+  const err = arg1.err || arg2.err;
+  let value;
+  const name = `POW(${arg1.name}, ${arg2.name})`;
+
+  if (!err && (arg1.value === null || arg2.value === null)) {
+    value = null;
+  } else if (!err) {
+    const num1 = convertNum(arg1.value);
+    const num2 = convertNum(arg2.value);
+    value = num1 !== null && num2 !== null ? Math.pow(num1, num2) : null;
+  }
+  return { err, name, value, type: 'number' };
+}
+function sqrt(expr: Function, state: EvaluationState): EvaluationResult {
+  const result = getValue(expr.args?.value?.[0], state);
+  result.name = `SQRT(${result.name})`;
+  result.type = 'number';
+  if (!result.err && result.value !== null) {
+    const num = convertNum(result.value);
+    result.value = num !== null ? Math.sqrt(num) : null;
+  }
+  return result;
+}
+function sign(expr: Function, state: EvaluationState): EvaluationResult {
+  const result = getValue(expr.args?.value?.[0], state);
+  result.name = `SIGN(${result.name})`;
+  result.type = 'number';
+  if (!result.err && result.value !== null) {
+    const num = convertNum(result.value);
+    result.value = num !== null ? Math.sign(num) : null;
+  }
+  return result;
+}
+function greatest(expr: Function, state: EvaluationState): EvaluationResult {
+  let err: EvaluationResult['err'] = null;
+  let value: EvaluationResult['value'] = null;
+  let hasNull = false;
+  const names: string[] = [];
+
+  expr.args?.value?.forEach?.((sub: ExpressionValue) => {
+    const result = getValue(sub, state);
+    names.push(result.name ?? '');
+    if (!err && result.err) {
+      err = result.err;
+    } else if (result.value === null || result.value === undefined) {
+      hasNull = true;
+    } else {
+      if (value === null || value === undefined || result.value > value) {
+        value = result.value;
+      }
+    }
+  });
+
+  return {
+    err,
+    value: hasNull ? null : value,
+    type: 'string',
+    name: `GREATEST(${names.join(', ')})`,
+  };
+}
+function least(expr: Function, state: EvaluationState): EvaluationResult {
+  let err: EvaluationResult['err'] = null;
+  let value: EvaluationResult['value'] = null;
+  let hasNull = false;
+  const names: string[] = [];
+
+  expr.args?.value?.forEach?.((sub: ExpressionValue) => {
+    const result = getValue(sub, state);
+    names.push(result.name ?? '');
+    if (!err && result.err) {
+      err = result.err;
+    } else if (result.value === null || result.value === undefined) {
+      hasNull = true;
+    } else {
+      if (value === null || value === undefined || result.value < value) {
+        value = result.value;
+      }
+    }
+  });
+
+  return {
+    err,
+    value: hasNull ? null : value,
+    type: 'string',
+    name: `LEAST(${names.join(', ')})`,
+  };
+}
 function not(expr: Function, state: EvaluationState): EvaluationResult {
   const result = getValue(expr.args?.value?.[0], state);
   result.name = `NOT(${result.name})`;
@@ -246,9 +499,30 @@ export const methods: Record<
   database,
   sleep,
   length,
+  char_length,
+  character_length: char_length,
   concat,
   left,
+  right,
   lower,
+  upper,
+  trim,
+  ltrim,
+  rtrim,
+  reverse,
+  repeat,
+  abs,
+  ceil,
+  ceiling: ceil,
+  floor,
+  round,
+  mod,
+  pow,
+  power: pow,
+  sqrt,
+  sign,
+  greatest,
+  least,
   not,
   coalesce,
   ifnull: coalesce,
