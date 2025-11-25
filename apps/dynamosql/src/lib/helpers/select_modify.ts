@@ -3,31 +3,48 @@ import { internalQuery } from '../select_handler';
 import { logger } from '@dynamosql/shared';
 import { SQLError } from '../../error';
 import type { HandlerParams } from '../handler_types';
-import type { EngineValue } from '../engine';
+import type { EngineValue, UpdateAST, DeleteAST } from '../engine';
+import type { Select } from 'node-sql-parser';
 
 export interface SelectResultItem {
   key: string;
   list: Array<{ key: EngineValue[]; row: unknown }>;
 }
+
+type SelectModifyAST = Select | UpdateAST | DeleteAST;
+
 export async function runSelect(
-  params: HandlerParams
+  params: HandlerParams<SelectModifyAST>
 ): Promise<SelectResultItem[]> {
   const { dynamodb, session, ast } = params;
   const result_list: SelectResultItem[] = [];
 
+  if (!ast.from || !Array.isArray(ast.from)) {
+    return result_list;
+  }
+
   // Get table info for all tables
   for (const object of ast.from) {
+    if (!('db' in object) || !('table' in object)) {
+      continue;
+    }
     const { db, table } = object;
-    const engine = getEngine(db, table, session);
-    const opts = { dynamodb, session, database: db, table };
+    const engine = getEngine(db ?? undefined, table, session);
+    const opts = { dynamodb, session, database: db ?? undefined, table };
 
     try {
       const result = await engine.getTableInfo(opts);
       if (result?.primary_key?.length > 0) {
-        object._keyList = result.primary_key.map(
+        const extendedObject = object as unknown as {
+          _keyList: string[];
+          _requestSet: Set<string>;
+        };
+        extendedObject._keyList = result.primary_key.map(
           (key: { name: string }) => key.name
         );
-        object._keyList.forEach((key: string) => object._requestSet.add(key));
+        extendedObject._keyList.forEach((key: string) =>
+          extendedObject._requestSet.add(key)
+        );
       } else {
         throw new SQLError('bad_schema');
       }
@@ -38,13 +55,22 @@ export async function runSelect(
   }
 
   // Run the select query
-  const opts = { dynamodb, session, ast, skip_resolve: true };
+  const opts = {
+    dynamodb,
+    session,
+    ast: ast as unknown as Select,
+    skip_resolve: true,
+  };
 
   const { row_list } = await internalQuery(opts);
 
   for (const object of ast.from) {
-    const from_key = object.key;
-    const key_list = object._keyList;
+    const extendedObject = object as unknown as {
+      key: string;
+      _keyList: string[];
+    };
+    const from_key = extendedObject.key;
+    const key_list = extendedObject._keyList;
     const collection = new Map<EngineValue, unknown>();
     for (const row of row_list) {
       const rowValue = row[from_key];

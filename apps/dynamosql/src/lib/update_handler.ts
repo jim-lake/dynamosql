@@ -8,7 +8,11 @@ import { SQLError, NoSingleOperationError } from '../error';
 
 import type { SetList, Update } from 'node-sql-parser';
 import type { HandlerParams, ChangedResult } from './handler_types';
-import type { UpdateChange } from './engine';
+import type {
+  UpdateChange,
+  UpdateAST,
+  ExtendedFrom as EngineExtendedFrom,
+} from './engine';
 import type { EvaluationResult } from './expression';
 import type { EngineValue } from './engine';
 import type { RowWithResult } from './select_handler';
@@ -35,22 +39,31 @@ export async function query(
 ): Promise<ChangedResult> {
   const { ast, session } = params;
   const current_database = session.getCurrentDatabase() ?? undefined;
-  ast.from = ast.table;
-  delete ast.table;
-  resolveReferences(ast, current_database);
-  const database = ast.from?.[0]?.db ?? undefined;
+  // Temporarily add from property for resolveReferences
+  const astExtended = ast as Update & { from?: EngineExtendedFrom[] };
+  astExtended.from = (ast.table ?? []) as unknown as EngineExtendedFrom[];
+  (astExtended as { table?: unknown }).table = null;
+  resolveReferences(astExtended as unknown as Update, current_database);
+  const firstFrom = astExtended.from?.[0];
+  const database =
+    (firstFrom && 'db' in firstFrom ? firstFrom.db : null) ?? undefined;
   if (!database) {
     throw new SQLError('no_current_database');
   }
-  return await TransactionManager.run(_runUpdate, params);
+  return await TransactionManager.run(_runUpdate, {
+    ...params,
+    ast: astExtended as unknown as UpdateAST,
+  } as HandlerParams<UpdateAST>);
 }
 
 async function _runUpdate(
-  params: HandlerParams<Update>
+  params: HandlerParams<UpdateAST>
 ): Promise<ChangedResult> {
   const { ast, session, dynamodb } = params;
-  const database = ast.from?.[0]?.db ?? undefined;
-  const table = ast.from?.[0]?.table;
+  const firstFrom = ast.from?.[0];
+  const database =
+    (firstFrom && 'db' in firstFrom ? firstFrom.db : null) ?? undefined;
+  const table = firstFrom && 'table' in firstFrom ? firstFrom.table : undefined;
   const engine = SchemaManager.getEngine(database, table, session);
 
   if (ast.from.length === 1) {
@@ -69,7 +82,7 @@ async function _runUpdate(
 }
 
 async function _multipleUpdate(
-  params: HandlerParams<Update>
+  params: HandlerParams<UpdateAST>
 ): Promise<ChangedResult> {
   const { dynamodb, session, ast } = params;
   let affectedRows = 0;

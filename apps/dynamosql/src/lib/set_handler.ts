@@ -16,14 +16,12 @@ export async function query(
   const expr = ast?.expr;
   if (Array.isArray(expr)) {
     for (const e of expr) {
-      if (e?.type === 'assign') {
+      if (e && 'type' in e && e.type === 'assign') {
         await _handleAssignment(e, params);
       } else {
         throw new SQLError('unsupported');
       }
     }
-  } else if (expr?.type === 'assign') {
-    await _handleAssignment(expr, params);
   } else {
     throw new SQLError('unsupported');
   }
@@ -31,7 +29,7 @@ export async function query(
 
 async function _handleAssignment(
   expr: AssignExpr,
-  params: HandlerParams
+  params: HandlerParams<SetStatement>
 ): Promise<void> {
   const { session } = params;
   const { left, right } = expr;

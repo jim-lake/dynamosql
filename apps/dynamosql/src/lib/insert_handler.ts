@@ -5,15 +5,19 @@ import * as SelectHandler from './select_handler';
 import { logger } from '@dynamosql/shared';
 import { SQLError } from '../error';
 
-import type { Insert } from 'node-sql-parser';
+import type { Insert_Replace, SetList } from 'node-sql-parser';
 import type { HandlerParams, AffectedResult } from './handler_types';
 import type { Engine, EvaluationResultRow } from './engine';
 import type { EvaluationResult } from './expression';
 
+interface InsertReplaceExtended extends Insert_Replace {
+  set?: SetList[];
+}
+
 type DuplicateMode = 'replace' | 'ignore' | null;
 
 export async function query(
-  params: HandlerParams<Insert>
+  params: HandlerParams<InsertReplaceExtended>
 ): Promise<AffectedResult> {
   const { ast, session } = params;
   const duplicate_mode: DuplicateMode =
@@ -36,7 +40,7 @@ export async function query(
 }
 
 async function _runInsert(
-  params: HandlerParams<Insert> & {
+  params: HandlerParams<InsertReplaceExtended> & {
     database: string;
     engine: Engine;
     duplicate_mode: DuplicateMode;
@@ -47,7 +51,7 @@ async function _runInsert(
   let list: EvaluationResultRow[];
 
   // Build the list of rows to insert
-  if (ast.set?.length > 0) {
+  if (ast.set && ast.set.length > 0) {
     const obj: EvaluationResultRow = {};
     for (const item of ast.set) {
       const expr_result = Expression.getValue(item.value, { session });
@@ -57,37 +61,42 @@ async function _runInsert(
       obj[item.column] = expr_result;
     }
     list = [obj];
-  } else if (ast.columns?.length > 0 && ast.values.type === 'select') {
+  } else if (
+    ast.columns &&
+    ast.columns.length > 0 &&
+    ast.values.type === 'select'
+  ) {
     const opts = { ast: ast.values, session, dynamodb };
     const { rows } = await SelectHandler.internalQuery(opts);
     list = rows.map((row) => {
       const obj: EvaluationResultRow = {};
-      ast.columns.forEach((name: string, i: number) => {
+      ast.columns?.forEach((name: string, i: number) => {
         obj[name] = row[i] as EvaluationResult;
       });
       return obj;
     });
-  } else if (ast.columns?.length > 0) {
+  } else if (ast.columns && ast.columns.length > 0) {
     list = [];
-    const values =
-      ast.values?.type === 'values' ? ast.values.values : ast.values;
-    values?.forEach?.((row: { value: unknown[] }, i: number) => {
-      const obj: EvaluationResultRow = {};
-      if (row.value.length === ast.columns.length) {
-        ast.columns.forEach((name: string, j: number) => {
-          const expr_result = Expression.getValue(row.value[j] as never, {
-            session,
+    const values = ast.values?.type === 'values' ? ast.values.values : [];
+    if (Array.isArray(values)) {
+      values.forEach((row: { value: unknown[] }, i: number) => {
+        const obj: EvaluationResultRow = {};
+        if (ast.columns && row.value.length === ast.columns.length) {
+          ast.columns.forEach((name: string, j: number) => {
+            const expr_result = Expression.getValue(row.value[j] as never, {
+              session,
+            });
+            if (expr_result.err) {
+              throw new SQLError(expr_result.err);
+            }
+            obj[name] = expr_result;
           });
-          if (expr_result.err) {
-            throw new SQLError(expr_result.err);
-          }
-          obj[name] = expr_result;
-        });
-        list.push(obj);
-      } else {
-        throw new SQLError({ err: 'ER_WRONG_VALUE_COUNT_ON_ROW', args: [i] });
-      }
-    });
+          list.push(obj);
+        } else {
+          throw new SQLError({ err: 'ER_WRONG_VALUE_COUNT_ON_ROW', args: [i] });
+        }
+      });
+    }
   } else {
     logger.error('unsupported insert without column names');
     throw new SQLError('unsupported');
@@ -130,7 +139,7 @@ async function _runInsert(
     return { affectedRows: 0 };
   }
 }
-function _checkAst(ast: Insert) {
+function _checkAst(ast: InsertReplaceExtended) {
   if (ast.values?.type === 'select') {
     if (ast.columns?.length !== ast.values.columns?.length) {
       throw new SQLError({ err: 'ER_WRONG_VALUE_COUNT_ON_ROW', args: [1] });

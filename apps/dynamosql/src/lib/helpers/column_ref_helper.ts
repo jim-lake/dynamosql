@@ -1,7 +1,7 @@
 import { walkColumnRefs } from './ast_helper';
 import { SQLError } from '../../error';
 
-import type { Select, Update, From, BaseFrom } from 'node-sql-parser';
+import type { Select, Update, Delete, From, BaseFrom } from 'node-sql-parser';
 
 interface TableMapEntry {
   db?: string;
@@ -25,13 +25,17 @@ interface ResultMap {
 }
 
 export function resolveReferences(
-  ast: Select | Update,
+  ast: Select | Update | Delete,
   current_database?: string
 ) {
   const table_map: TableMap = {};
   const db_map: DbMap = {};
   const fromRaw =
-    ast.type === 'select' ? ast.from : (ast as Update & { from?: From[] }).from;
+    ast.type === 'select'
+      ? ast.from
+      : ast.type === 'delete'
+        ? ast.from
+        : (ast as Update & { from?: From[] }).from;
   const from = Array.isArray(fromRaw) ? fromRaw : null;
   from?.forEach?.((fromItem: From) => {
     const from = fromItem as TableMapEntry & { db?: string; table?: string };
@@ -129,7 +133,7 @@ export function resolveReferences(
 
 function _resolveObject(
   object: unknown,
-  ast: Select | Update,
+  ast: Select | Update | Delete,
   db_map: DbMap,
   table_map: TableMap,
   name_cache: TableMap,

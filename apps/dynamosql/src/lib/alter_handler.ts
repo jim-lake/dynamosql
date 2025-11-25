@@ -7,9 +7,12 @@ import type { HandlerParams } from './handler_types';
 
 export async function query(params: HandlerParams<Alter>): Promise<void> {
   const { ast, dynamodb, session } = params;
-  const database = ast.table?.[0]?.db || session.getCurrentDatabase();
-  const table = ast.table?.[0]?.table;
-  const engine = SchemaManager.getEngine(database, table, session);
+  const firstTable = ast.table?.[0];
+  const dbRaw = firstTable && 'db' in firstTable ? firstTable.db : null;
+  const database = dbRaw ?? session.getCurrentDatabase();
+  const table =
+    firstTable && 'table' in firstTable ? firstTable.table : undefined;
+  const engine = SchemaManager.getEngine(database ?? undefined, table, session);
 
   if (ast.table && database) {
     const opts = { dynamodb, ast, engine, session };
@@ -25,7 +28,14 @@ async function _runAlterTable(
   params: HandlerParams<Alter> & { engine: any }
 ): Promise<void> {
   const { ast, dynamodb, engine, session } = params;
-  const table = ast.table?.[0]?.table;
+  const firstTable = ast.table?.[0];
+  const table =
+    firstTable && 'table' in firstTable ? firstTable.table : undefined;
+
+  if (!table) {
+    throw new SQLError('bad_table_name');
+  }
+
   const column_list: any[] = [];
 
   // Process column additions

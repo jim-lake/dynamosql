@@ -12,7 +12,11 @@ export async function query(
   params: HandlerParams<Create>
 ): Promise<AffectedResult> {
   const { ast, session } = params;
-  const database = ast.table?.[0]?.db || session.getCurrentDatabase();
+  const tableArray = Array.isArray(ast.table) ? ast.table : [ast.table];
+  const firstTable = tableArray[0];
+  const database =
+    (firstTable && 'db' in firstTable ? firstTable.db : null) ??
+    session.getCurrentDatabase();
 
   if (ast.keyword === 'database') {
     return await _createDatabase(params);
@@ -30,8 +34,15 @@ async function _createDatabase(
   params: HandlerParams<Create>
 ): Promise<AffectedResult> {
   const { ast } = params;
+  if (!ast.database) {
+    throw new SQLError('bad_database_name');
+  }
+  const dbName =
+    typeof ast.database === 'string'
+      ? ast.database
+      : getDatabaseName(ast.database);
   try {
-    SchemaManager.createDatabase(getDatabaseName(ast.database));
+    SchemaManager.createDatabase(dbName);
     return { affectedRows: 1 };
   } catch (err) {
     if (err instanceof SQLError && err.code === 'ER_DB_CREATE_EXISTS') {
@@ -51,13 +62,18 @@ async function _createTable(
   params: HandlerParams<Create>
 ): Promise<AffectedResult> {
   const { ast, session, dynamodb } = params;
-  const database = ast.table?.[0]?.db || session.getCurrentDatabase();
-  const table = ast.table?.[0]?.table;
-  const duplicate_mode = ast.ignore_replace;
+  const tableArray = Array.isArray(ast.table) ? ast.table : [ast.table];
+  const firstTable = tableArray[0];
+  const database =
+    (firstTable && 'db' in firstTable ? firstTable.db : null) ??
+    session.getCurrentDatabase();
+  const table = firstTable && 'table' in firstTable ? firstTable.table : '';
+  const duplicate_mode = ast.ignore_replace ?? undefined;
   const column_list: any[] = [];
   let primary_key: any[] = [];
 
-  ast.create_definitions?.forEach?.((def: any) => {
+  ast.create_definitions?.forEach?.((defRaw) => {
+    const def = defRaw as any;
     if (def.resource === 'column') {
       column_list.push({
         name: def.column?.column,
@@ -111,7 +127,7 @@ async function _createTable(
     const opts = {
       dynamodb,
       session,
-      database,
+      database: database ?? '',
       table,
       column_list,
       primary_key,
@@ -126,14 +142,14 @@ async function _createTable(
     throw err;
   }
   if (list?.length > 0) {
-    const engine = SchemaManager.getEngine(database, table, session);
+    const engine = SchemaManager.getEngine(database ?? '', table, session);
     const insertOpts = {
       dynamodb,
       session,
-      database,
+      database: database ?? '',
       table,
       list,
-      duplicate_mode,
+      duplicate_mode: duplicate_mode ?? undefined,
     };
     return await engine.insertRowList(insertOpts);
   }

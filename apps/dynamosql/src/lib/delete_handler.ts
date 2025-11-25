@@ -7,7 +7,7 @@ import { SQLError, NoSingleOperationError } from '../error';
 
 import type { Delete } from 'node-sql-parser';
 import type { HandlerParams, AffectedResult } from './handler_types';
-import type { EngineValue } from './engine';
+import type { EngineValue, DeleteAST } from './engine';
 
 export async function query(
   params: HandlerParams<Delete>
@@ -15,7 +15,9 @@ export async function query(
   const { ast, session } = params;
   const current_database = session.getCurrentDatabase() ?? undefined;
   resolveReferences(ast, current_database);
-  const database = ast.from?.[0]?.db ?? undefined;
+  const firstFrom = ast.from?.[0];
+  const database =
+    (firstFrom && 'db' in firstFrom ? firstFrom.db : null) ?? undefined;
   if (!database) {
     throw new SQLError('no_current_database');
   }
@@ -26,12 +28,14 @@ async function _runDelete(
   params: HandlerParams<Delete>
 ): Promise<AffectedResult> {
   const { ast, session, dynamodb } = params;
-  const database = ast.from?.[0]?.db ?? undefined;
-  const table = ast.from?.[0]?.table;
+  const firstFrom = ast.from?.[0];
+  const database =
+    (firstFrom && 'db' in firstFrom ? firstFrom.db : null) ?? undefined;
+  const table = firstFrom && 'table' in firstFrom ? firstFrom.table : undefined;
   const engine = SchemaManager.getEngine(database, table, session);
 
   if (ast.from.length === 1) {
-    const opts = { dynamodb, session, ast };
+    const opts = { dynamodb, session, ast: ast as unknown as DeleteAST };
     try {
       const result = await engine.singleDelete(opts);
       return { affectedRows: result.affectedRows };
@@ -53,7 +57,9 @@ async function _multipleDelete(
   let affectedRows = 0;
 
   // Get rows to delete
-  const result_list = await runSelect(params);
+  const result_list = await runSelect(
+    params as unknown as HandlerParams<DeleteAST>
+  );
 
   const from_list: {
     database: string;
