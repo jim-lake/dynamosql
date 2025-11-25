@@ -4,6 +4,7 @@ import { SQLError } from '../error';
 
 import type { Alter } from 'node-sql-parser';
 import type { HandlerParams } from './handler_types';
+import type { Engine, ColumnDef } from './engine';
 
 export async function query(params: HandlerParams<Alter>): Promise<void> {
   const { ast, dynamodb, session } = params;
@@ -25,7 +26,7 @@ export async function query(params: HandlerParams<Alter>): Promise<void> {
 }
 
 async function _runAlterTable(
-  params: HandlerParams<Alter> & { engine: any }
+  params: HandlerParams<Alter> & { engine: Engine }
 ): Promise<void> {
   const { ast, dynamodb, engine, session } = params;
   const firstTable = ast.table?.[0];
@@ -36,16 +37,20 @@ async function _runAlterTable(
     throw new SQLError('bad_table_name');
   }
 
-  const column_list: any[] = [];
+  const column_list: ColumnDef[] = [];
 
   // Process column additions
   for (const def of ast.expr) {
     if (def.resource === 'column' && def.action === 'add') {
       const column_name = def.column?.column;
       const type = def.definition?.dataType;
-      const length = def.definition?.length;
-      column_list.push({ name: column_name, type, length });
-      const opts = { dynamodb, session, table, column_name, type, length };
+      column_list.push({ name: column_name, type });
+      const opts = {
+        dynamodb,
+        session,
+        table,
+        column: { name: column_name, type },
+      };
       await engine.addColumn(opts);
     }
   }
@@ -54,7 +59,7 @@ async function _runAlterTable(
   for (const def of ast.expr) {
     if (def.resource === 'index' && def.action === 'add') {
       const key_list =
-        def.definition?.map?.((sub: any) => {
+        def.definition?.map?.((sub: { column: string; order_by?: string }) => {
           const column_def = column_list.find((col) => col.name === sub.column);
           return {
             name: sub.column,
@@ -73,8 +78,9 @@ async function _runAlterTable(
 
       try {
         await engine.createIndex(opts);
-      } catch (err: any) {
-        if (err?.message === 'index_exists') {
+      } catch (err) {
+        const error = err as Error & { message?: string };
+        if (error?.message === 'index_exists') {
           throw new SQLError({ err: 'ER_DUP_KEYNAME', args: [def.index] });
         }
         throw err;
@@ -84,8 +90,9 @@ async function _runAlterTable(
 
       try {
         await engine.deleteIndex(opts);
-      } catch (err: any) {
-        if (err?.message === 'index_not_found') {
+      } catch (err) {
+        const error = err as Error & { message?: string };
+        if (error?.message === 'index_not_found') {
           throw new SQLError({
             err: 'ER_CANT_DROP_FIELD_OR_KEY',
             args: [def.index],

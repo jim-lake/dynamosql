@@ -37,10 +37,14 @@ export async function query(
 
     try {
       await SchemaManager.dropTable(opts);
-    } catch (err: any) {
-      if (err?.message === 'resource_not_found' && ast.prefix === 'if exists') {
+    } catch (err) {
+      const error = err as Error & { message?: string };
+      if (
+        error?.message === 'resource_not_found' &&
+        ast.prefix === 'if exists'
+      ) {
         return;
-      } else if (err?.message === 'resource_not_found') {
+      } else if (error?.message === 'resource_not_found') {
         throw new SQLError({ err: 'ER_BAD_TABLE_ERROR', args: [table] });
       }
       throw err;
