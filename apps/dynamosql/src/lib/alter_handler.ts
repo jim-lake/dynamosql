@@ -1,9 +1,11 @@
 import * as SchemaManager from './schema_manager';
 import * as TransactionManager from './transaction_manager';
 import { SQLError } from '../error';
+
+import type { Alter } from 'node-sql-parser';
 import type { HandlerParams } from './handler_types';
 
-export async function query(params: HandlerParams): Promise<void> {
+export async function query(params: HandlerParams<Alter>): Promise<void> {
   const { ast, dynamodb, session } = params;
   const database = ast.table?.[0]?.db || session.getCurrentDatabase();
   const table = ast.table?.[0]?.table;
@@ -20,7 +22,7 @@ export async function query(params: HandlerParams): Promise<void> {
 }
 
 async function _runAlterTable(
-  params: HandlerParams & { engine: any }
+  params: HandlerParams<Alter> & { engine: any }
 ): Promise<void> {
   const { ast, dynamodb, engine, session } = params;
   const table = ast.table?.[0]?.table;

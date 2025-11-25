@@ -7,9 +7,11 @@ import { SQLError } from '../error';
 import type { Select } from 'node-sql-parser';
 import type { HandlerParams } from './handler_types';
 import type { EvaluationResult } from './expression';
-import type { AssignExpr } from './ast_types';
+import type { AssignExpr, SetStatement } from './ast_types';
 
-export async function query(params: HandlerParams): Promise<void> {
+export async function query(
+  params: HandlerParams<SetStatement>
+): Promise<void> {
   const { ast } = params;
   const expr = ast?.expr;
   if (Array.isArray(expr)) {

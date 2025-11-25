@@ -1,9 +1,11 @@
 import * as SchemaManager from './schema_manager';
 import { logger } from '@dynamosql/shared';
 import { SQLError } from '../error';
+
+import type { Drop } from 'node-sql-parser';
 import type { HandlerParams } from './handler_types';
 
-export async function query(params: HandlerParams): Promise<void> {
+export async function query(params: HandlerParams<Drop>): Promise<void> {
   const { ast, session, dynamodb } = params;
 
   if (ast.keyword === 'database') {

@@ -1,11 +1,14 @@
 import * as Engine from './engine';
 
 import type { DynamoDBWithCache } from './dynamodb';
+import type { Transaction as TransactionAst } from './ast_types';
 import type { HandlerParams } from './handler_types';
 import type { Session } from '../session';
 import type { CommitParams, TableData } from './engine';
 
-export async function query(params: HandlerParams): Promise<void> {
+export async function query(
+  params: HandlerParams<TransactionAst>
+): Promise<void> {
   const { dynamodb, session, ast } = params;
   const astWithExpr = ast as { expr?: { action?: { value?: string } } };
   const action = astWithExpr?.expr?.action?.value?.toLowerCase();
@@ -25,16 +28,16 @@ export class Transaction {
   constructor(auto_commit: boolean) {
     this._isAutoCommit = Boolean(auto_commit);
   }
-  isAutoCommit(): boolean {
+  public isAutoCommit(): boolean {
     return this._isAutoCommit;
   }
-  getEngineNameList() {
+  public getEngineNameList() {
     return this._dataMap.keys();
   }
-  getData<T>(name: string): T | undefined {
+  public getData<T>(name: string): T | undefined {
     return this._dataMap.get(name) as T | undefined;
   }
-  setData(name: string, data: unknown) {
+  public setData(name: string, data: unknown) {
     this._dataMap.set(name, data);
   }
 }

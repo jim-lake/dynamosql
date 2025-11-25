@@ -2,6 +2,7 @@ import * as SchemaManager from './schema_manager';
 import { convertType } from './helpers/column_type_helper';
 import { SQLError } from '../error';
 
+import type { Show } from './ast_types';
 import type { HandlerParams } from './handler_types';
 import type { FieldInfo } from '../types';
 
@@ -9,7 +10,7 @@ export interface ShowResult {
   rows: string[][];
   columns: FieldInfo[];
 }
-export async function query(params: HandlerParams): Promise<ShowResult> {
+export async function query(params: HandlerParams<Show>): Promise<ShowResult> {
   const { ast, session, dynamodb } = params;
 
   if (ast.keyword === 'databases') {

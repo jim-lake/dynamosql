@@ -7,7 +7,7 @@ export type { ShowResult } from './show_handler';
 
 export type DynamoDBClient = ReturnType<typeof createDynamoDB>;
 
-export interface HandlerParams<T = any> {
+export interface HandlerParams<T> {
   ast: T;
   dynamodb: DynamoDBClient;
   session: Session;

@@ -6,11 +6,10 @@ import { resolveReferences } from './helpers/column_ref_helper';
 import { runSelect } from './helpers/select_modify';
 import { SQLError, NoSingleOperationError } from '../error';
 
+import type { SetList, Update } from 'node-sql-parser';
 import type { HandlerParams, ChangedResult } from './handler_types';
 import type { UpdateChange } from './engine';
-import type { SetList } from 'node-sql-parser';
 import type { EvaluationResult } from './expression';
-import type { SelectResultItem } from './helpers/select_modify';
 import type { EngineValue } from './engine';
 import type { RowWithResult } from './select_handler';
 
@@ -31,7 +30,9 @@ interface SetListWithValue {
   value: EvaluationResult;
 }
 
-export async function query(params: HandlerParams): Promise<ChangedResult> {
+export async function query(
+  params: HandlerParams<Update>
+): Promise<ChangedResult> {
   const { ast, session } = params;
   const current_database = session.getCurrentDatabase() ?? undefined;
   ast.from = ast.table;
@@ -44,7 +45,9 @@ export async function query(params: HandlerParams): Promise<ChangedResult> {
   return await TransactionManager.run(_runUpdate, params);
 }
 
-async function _runUpdate(params: HandlerParams): Promise<ChangedResult> {
+async function _runUpdate(
+  params: HandlerParams<Update>
+): Promise<ChangedResult> {
   const { ast, session, dynamodb } = params;
   const database = ast.from?.[0]?.db ?? undefined;
   const table = ast.from?.[0]?.table;
@@ -65,7 +68,9 @@ async function _runUpdate(params: HandlerParams): Promise<ChangedResult> {
   }
 }
 
-async function _multipleUpdate(params: HandlerParams): Promise<ChangedResult> {
+async function _multipleUpdate(
+  params: HandlerParams<Update>
+): Promise<ChangedResult> {
   const { dynamodb, session, ast } = params;
   let affectedRows = 0;
   let changedRows = 0;

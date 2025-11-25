@@ -5,9 +5,12 @@ import { logger } from '@dynamosql/shared';
 import { SQLError } from '../error';
 import { getDatabaseName } from './helpers/ast_helper';
 
+import type { Create } from 'node-sql-parser';
 import type { HandlerParams, AffectedResult } from './handler_types';
 
-export async function query(params: HandlerParams): Promise<AffectedResult> {
+export async function query(
+  params: HandlerParams<Create>
+): Promise<AffectedResult> {
   const { ast, session } = params;
   const database = ast.table?.[0]?.db || session.getCurrentDatabase();
 
@@ -23,7 +26,9 @@ export async function query(params: HandlerParams): Promise<AffectedResult> {
   }
 }
 
-async function _createDatabase(params: HandlerParams): Promise<AffectedResult> {
+async function _createDatabase(
+  params: HandlerParams<Create>
+): Promise<AffectedResult> {
   const { ast } = params;
   try {
     SchemaManager.createDatabase(getDatabaseName(ast.database));
@@ -42,7 +47,9 @@ async function _createDatabase(params: HandlerParams): Promise<AffectedResult> {
   }
 }
 
-async function _createTable(params: HandlerParams): Promise<AffectedResult> {
+async function _createTable(
+  params: HandlerParams<Create>
+): Promise<AffectedResult> {
   const { ast, session, dynamodb } = params;
   const database = ast.table?.[0]?.db || session.getCurrentDatabase();
   const table = ast.table?.[0]?.table;

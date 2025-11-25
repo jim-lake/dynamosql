@@ -5,13 +5,16 @@ import * as SelectHandler from './select_handler';
 import { logger } from '@dynamosql/shared';
 import { SQLError } from '../error';
 
+import type { Insert } from 'node-sql-parser';
 import type { HandlerParams, AffectedResult } from './handler_types';
 import type { Engine, EvaluationResultRow } from './engine';
 import type { EvaluationResult } from './expression';
 
 type DuplicateMode = 'replace' | 'ignore' | null;
 
-export async function query(params: HandlerParams): Promise<AffectedResult> {
+export async function query(
+  params: HandlerParams<Insert>
+): Promise<AffectedResult> {
   const { ast, session } = params;
   const duplicate_mode: DuplicateMode =
     ast.type === 'replace'
@@ -33,7 +36,7 @@ export async function query(params: HandlerParams): Promise<AffectedResult> {
 }
 
 async function _runInsert(
-  params: HandlerParams & {
+  params: HandlerParams<Insert> & {
     database: string;
     engine: Engine;
     duplicate_mode: DuplicateMode;
@@ -127,13 +130,9 @@ async function _runInsert(
     return { affectedRows: 0 };
   }
 }
-function _checkAst(ast: unknown) {
-  const astObj = ast as {
-    values?: { type?: string; columns?: unknown[] };
-    columns?: unknown[];
-  };
-  if (astObj.values?.type === 'select') {
-    if (astObj.columns?.length !== astObj.values.columns?.length) {
+function _checkAst(ast: Insert) {
+  if (ast.values?.type === 'select') {
+    if (ast.columns?.length !== ast.values.columns?.length) {
       throw new SQLError({ err: 'ER_WRONG_VALUE_COUNT_ON_ROW', args: [1] });
     }
   }

@@ -5,10 +5,13 @@ import { resolveReferences } from './helpers/column_ref_helper';
 import { runSelect } from './helpers/select_modify';
 import { SQLError, NoSingleOperationError } from '../error';
 
+import type { Delete } from 'node-sql-parser';
 import type { HandlerParams, AffectedResult } from './handler_types';
 import type { EngineValue } from './engine';
 
-export async function query(params: HandlerParams): Promise<AffectedResult> {
+export async function query(
+  params: HandlerParams<Delete>
+): Promise<AffectedResult> {
   const { ast, session } = params;
   const current_database = session.getCurrentDatabase() ?? undefined;
   resolveReferences(ast, current_database);
@@ -19,7 +22,9 @@ export async function query(params: HandlerParams): Promise<AffectedResult> {
   return await TransactionManager.run(_runDelete, params);
 }
 
-async function _runDelete(params: HandlerParams): Promise<AffectedResult> {
+async function _runDelete(
+  params: HandlerParams<Delete>
+): Promise<AffectedResult> {
   const { ast, session, dynamodb } = params;
   const database = ast.from?.[0]?.db ?? undefined;
   const table = ast.from?.[0]?.table;
@@ -41,7 +46,9 @@ async function _runDelete(params: HandlerParams): Promise<AffectedResult> {
   }
 }
 
-async function _multipleDelete(params: HandlerParams): Promise<AffectedResult> {
+async function _multipleDelete(
+  params: HandlerParams<Delete>
+): Promise<AffectedResult> {
   const { dynamodb, session, ast } = params;
   let affectedRows = 0;
 
