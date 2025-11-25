@@ -2,9 +2,11 @@ import { getEngine } from '../schema_manager';
 import { internalQuery } from '../select_handler';
 import { logger } from '@dynamosql/shared';
 import { SQLError } from '../../error';
-import type { HandlerParams } from '../handler_types';
-import type { EngineValue, UpdateAST, DeleteAST } from '../engine';
+
 import type { Select } from 'node-sql-parser';
+import type { UpdateAST, DeleteAST } from '../ast_types';
+import type { EngineValue } from '../engine';
+import type { HandlerParams } from '../handler_types';
 
 export interface SelectResultItem {
   key: string;

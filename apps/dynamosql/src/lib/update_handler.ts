@@ -1,58 +1,39 @@
 import * as Expression from './expression';
 import * as SchemaManager from './schema_manager';
 import * as TransactionManager from './transaction_manager';
+
+import { getDatabaseFromUpdate } from './helpers/ast_helper';
 import { makeEngineGroups } from './helpers/engine_groups';
 import { resolveReferences } from './helpers/column_ref_helper';
 import { runSelect } from './helpers/select_modify';
 import { SQLError, NoSingleOperationError } from '../error';
 
-import type { SetList, Update } from 'node-sql-parser';
+import type { SetList } from 'node-sql-parser';
+import type { UpdateAST, ExtendedFrom } from './ast_types';
 import type { HandlerParams, ChangedResult } from './handler_types';
-import type {
-  UpdateChange,
-  UpdateAST,
-  ExtendedFrom as EngineExtendedFrom,
-} from './engine';
-import type { EvaluationResult } from './expression';
-import type { EngineValue } from './engine';
+import type { UpdateChange } from './engine';
 import type { RowWithResult } from './select_handler';
-
-interface ExtendedFrom {
-  key?: string;
-  db?: string;
-  table?: string;
-  _updateList?: Array<{ key: EngineValue[]; set_list: SetListWithValue[] }>;
-  _keyList?: string[];
-}
 
 interface ExtendedSetList extends SetList {
   from?: { key?: string };
 }
 
-interface SetListWithValue {
-  column: string;
-  value: EvaluationResult;
-}
-
 export async function query(
-  params: HandlerParams<Update>
+  params: HandlerParams<UpdateAST>
 ): Promise<ChangedResult> {
   const { ast, session } = params;
   const current_database = session.getCurrentDatabase() ?? undefined;
   // Temporarily add from property for resolveReferences
-  const astExtended = ast as Update & { from?: EngineExtendedFrom[] };
-  astExtended.from = (ast.table ?? []) as unknown as EngineExtendedFrom[];
-  (astExtended as { table?: unknown }).table = null;
-  resolveReferences(astExtended as unknown as Update, current_database);
-  const firstFrom = astExtended.from?.[0];
-  const database =
-    (firstFrom && 'db' in firstFrom ? firstFrom.db : null) ?? undefined;
+  ast.from = (ast.table ?? []) as ExtendedFrom[];
+  ast.table = null;
+  resolveReferences(ast, current_database);
+  const database = getDatabaseFromUpdate(ast);
   if (!database) {
     throw new SQLError('no_current_database');
   }
   return await TransactionManager.run(_runUpdate, {
     ...params,
-    ast: astExtended as unknown as UpdateAST,
+    ast,
   } as HandlerParams<UpdateAST>);
 }
 
@@ -60,12 +41,11 @@ async function _runUpdate(
   params: HandlerParams<UpdateAST>
 ): Promise<ChangedResult> {
   const { ast, session, dynamodb } = params;
-  const firstFrom = ast.from?.[0];
-  const database =
-    (firstFrom && 'db' in firstFrom ? firstFrom.db : null) ?? undefined;
-  const table = firstFrom && 'table' in firstFrom ? firstFrom.table : undefined;
-  const engine = SchemaManager.getEngine(database, table, session);
-
+  if (!ast.from || !ast.from[0]) {
+    throw new SQLError('no_current_database');
+  }
+  const { db, table } = ast.from[0];
+  const engine = SchemaManager.getEngine(db, table, session);
   if (ast.from.length === 1) {
     const opts = { dynamodb, session, ast };
     try {

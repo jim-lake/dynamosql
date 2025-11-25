@@ -3,11 +3,16 @@ import * as SchemaManager from './schema_manager';
 import { trackFirstSeen } from '../tools/util';
 import { logger } from '@dynamosql/shared';
 import { SQLError } from '../error';
-import { getDatabaseName } from './helpers/ast_helper';
+import {
+  getDatabaseName,
+  getDatabaseFromTable,
+  getTableFromTable,
+} from './helpers/ast_helper';
 
-import type { Create, CreateDefinition } from 'node-sql-parser';
-import type { HandlerParams, AffectedResult } from './handler_types';
+import type { Create } from 'node-sql-parser';
+import type { ExtendedColumnDefinitionOptList } from './ast_types';
 import type { ColumnDef, KeyDef, EvaluationResultRow } from './engine';
+import type { HandlerParams, AffectedResult } from './handler_types';
 import type { FieldInfo } from '../types';
 import type { EvaluationResult } from './expression';
 
@@ -15,11 +20,7 @@ export async function query(
   params: HandlerParams<Create>
 ): Promise<AffectedResult> {
   const { ast, session } = params;
-  const tableArray = Array.isArray(ast.table) ? ast.table : [ast.table];
-  const firstTable = tableArray[0];
-  const database =
-    (firstTable && 'db' in firstTable ? firstTable.db : null) ??
-    session.getCurrentDatabase();
+  const database = getDatabaseFromTable(ast) ?? session.getCurrentDatabase();
 
   if (ast.keyword === 'database') {
     return await _createDatabase(params);
@@ -32,7 +33,6 @@ export async function query(
     throw new SQLError('unsupported');
   }
 }
-
 async function _createDatabase(
   params: HandlerParams<Create>
 ): Promise<AffectedResult> {
@@ -40,12 +40,9 @@ async function _createDatabase(
   if (!ast.database) {
     throw new SQLError('bad_database_name');
   }
-  const dbName =
-    typeof ast.database === 'string'
-      ? ast.database
-      : getDatabaseName(ast.database);
+  const name = getDatabaseName(ast.database);
   try {
-    SchemaManager.createDatabase(dbName);
+    SchemaManager.createDatabase(name);
     return { affectedRows: 1 };
   } catch (err) {
     if (err instanceof SQLError && err.code === 'ER_DB_CREATE_EXISTS') {
@@ -60,63 +57,52 @@ async function _createDatabase(
     throw err;
   }
 }
-
 async function _createTable(
   params: HandlerParams<Create>
 ): Promise<AffectedResult> {
   const { ast, session, dynamodb } = params;
-  const tableArray = Array.isArray(ast.table) ? ast.table : [ast.table];
-  const firstTable = tableArray[0];
-  const database =
-    (firstTable && 'db' in firstTable ? firstTable.db : null) ??
-    session.getCurrentDatabase();
-  const table = firstTable && 'table' in firstTable ? firstTable.table : '';
+  const database = getDatabaseFromTable(ast) ?? session.getCurrentDatabase();
+  const table = getTableFromTable(ast);
+  if (!table) {
+    throw new SQLError('bad_table_name');
+  }
+
   const duplicate_mode = ast.ignore_replace ?? undefined;
   const column_list: ColumnDef[] = [];
-  let primary_key: KeyDef[] = [];
+  const primary_key: KeyDef[] = [];
 
-  ast.create_definitions?.forEach?.((defRaw: CreateDefinition) => {
-    const def = defRaw as {
-      resource?: string;
-      column?: { column: string };
-      definition?: { dataType: string; length?: number };
-      primary_key?: string;
-      constraint_type?: string;
-      map?: (sub: { column: string; order_by?: string }) => {
-        name: string;
-        order_by?: string;
-      };
-    };
-    if (def.resource === 'column') {
-      column_list.push({
+  for (const def of ast.create_definitions ?? []) {
+    if (
+      def.resource === 'column' &&
+      def.column?.type === 'column_ref' &&
+      typeof def.column?.column === 'string'
+    ) {
+      const col = {
         name: def.column?.column ?? '',
         type: def.definition?.dataType ?? 'string',
-      });
-      if (def.primary_key === 'primary key') {
-        primary_key.push({
-          name: def.column?.column ?? '',
-          type: def.definition?.dataType ?? 'string',
-        });
+      };
+      column_list.push(col);
+      const def_key = def as ExtendedColumnDefinitionOptList;
+      if (def_key.primary_key === 'primary key') {
+        primary_key.push(col);
       }
-    } else if (def.constraint_type === 'primary key') {
-      primary_key =
-        (
-          def.definition as unknown as Array<{
-            column: string;
-            order_by?: string;
-          }>
-        )?.map?.((sub) => ({
-          name: sub.column,
-          type:
+    } else if (
+      def.resource === 'constraint' &&
+      def.constraint_type === 'primary key'
+    ) {
+      for (const sub of def.definition) {
+        if (sub.type === 'column_ref' && typeof sub.column === 'string') {
+          const type =
             column_list.find((col) => col.name === sub.column)?.type ??
-            'string',
-        })) ?? [];
+            'string';
+          primary_key.push({ name: sub.column, type });
+        }
+      }
     }
-  });
+  }
 
   let list: EvaluationResultRow[] | undefined;
 
-  // Handle CREATE TABLE AS SELECT
   if (ast.as && ast.query_expr) {
     const opts = { ast: ast.query_expr, session, dynamodb };
     const { rows, columns } = await SelectHandler.internalQuery(opts);

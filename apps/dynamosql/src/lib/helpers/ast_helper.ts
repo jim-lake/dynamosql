@@ -1,5 +1,36 @@
 import type { FunctionName } from 'node-sql-parser';
 
+import type { ExtendedAST } from '../ast_types';
+
+export function getDatabaseFromTable(ast: ExtendedAST): string | undefined {
+  if (ast.type === 'create') {
+    if (Array.isArray(ast.table)) {
+      return ast.table[0]?.db;
+    } else if (ast.table) {
+      return ast.table.db ?? undefined;
+    }
+  }
+  return undefined;
+}
+export function getTableFromTable(ast: ExtendedAST): string | undefined {
+  if (ast.type === 'create') {
+    if (Array.isArray(ast.table)) {
+      return ast.table[0]?.table;
+    } else if (ast.table) {
+      return ast.table.table;
+    }
+  }
+  return undefined;
+}
+export function getDatabaseFromUpdate(ast: ExtendedAST): string | undefined {
+  if (ast.type === 'update') {
+    if (Array.isArray(ast.from)) {
+      return ast.from[0]?.db;
+    }
+  }
+  return undefined;
+}
+
 // Helper to extract function name from node-sql-parser AST format
 export function getFunctionName(nameObj: string | FunctionName): string {
   if (typeof nameObj === 'string') {

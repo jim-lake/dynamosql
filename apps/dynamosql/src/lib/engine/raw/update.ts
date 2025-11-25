@@ -29,7 +29,7 @@ export async function singleUpdate(
   if (where_result.err) {
     throw new NoSingleOperationError();
   }
-  if (from.length > 1 || !where_result.value) {
+  if (!from || from.length > 1 || !where_result.value) {
     throw new NoSingleOperationError();
   }
   const value_list = set.map((object) => {

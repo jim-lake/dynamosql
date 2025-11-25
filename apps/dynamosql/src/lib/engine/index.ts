@@ -3,24 +3,23 @@ import * as MemoryEngine from './memory';
 import { SQLError } from '../../error';
 
 import type { Binary, Function } from 'node-sql-parser';
-import type { ExtendedFrom } from '../ast_types';
+import type { ExtendedFrom, UpdateAST, DeleteAST } from '../ast_types';
 import type {
   DynamoDBClient,
   ChangedResult,
   AffectedResult,
 } from '../handler_types';
 import type { Session } from '../../session';
-import type { AttributeValue, ItemRecord } from '../../tools/dynamodb';
 import type { EvaluationResult } from '../expression';
+import type { Transaction } from '../transaction_manager';
+import type { AttributeValue, ItemRecord } from '../../tools/dynamodb';
 
-export type { ExtendedFrom } from '../ast_types';
 export type {
   DynamoDBClient,
   ChangedResult,
   AffectedResult,
 } from '../handler_types';
 export type { AttributeValue } from '../../tools/dynamodb';
-import type { Transaction } from '../transaction_manager';
 
 export interface ColumnDef {
   name: string;
@@ -105,11 +104,6 @@ export interface RowListParams {
   list: ExtendedFrom[];
   where?: Binary | Function | null;
 }
-export interface DeleteAST {
-  type: 'delete';
-  from: ExtendedFrom[];
-  where?: Binary | Function | null;
-}
 export interface DeleteChange {
   database: string;
   table: string;
@@ -129,12 +123,6 @@ export interface MultiDeleteParams {
 export interface SetClause {
   column: string;
   value: EvaluationResult;
-}
-export interface UpdateAST {
-  type: 'update';
-  from: ExtendedFrom[];
-  set: SetClause[];
-  where?: Binary | Function | null;
 }
 export interface UpdateItem {
   key: EngineValue[];

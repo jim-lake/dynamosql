@@ -1,6 +1,8 @@
 import * as Storage from './storage';
-import type { RowListParams, ExtendedFrom, Row } from '../index';
 import { SQLError } from '../../../error';
+
+import type { RowListParams, Row } from '../index';
+import type { ExtendedFrom } from '../../ast_types';
 
 export async function getRowList(
   params: RowListParams

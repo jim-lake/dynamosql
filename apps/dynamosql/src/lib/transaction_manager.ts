@@ -1,17 +1,16 @@
 import * as Engine from './engine';
 
 import type { DynamoDBWithCache } from './dynamodb';
-import type { Transaction as TransactionAst } from './ast_types';
+import type { Transaction as TransactionAST } from './ast_types';
 import type { HandlerParams } from './handler_types';
 import type { Session } from '../session';
 import type { CommitParams, TableData } from './engine';
 
 export async function query(
-  params: HandlerParams<TransactionAst>
+  params: HandlerParams<TransactionAST>
 ): Promise<void> {
   const { dynamodb, session, ast } = params;
-  const astWithExpr = ast as { expr?: { action?: { value?: string } } };
-  const action = astWithExpr?.expr?.action?.value?.toLowerCase();
+  const action = ast?.expr?.action?.value?.toLowerCase();
   if (action === 'begin' || action === 'start') {
     startTransaction({ session, auto_commit: false });
   } else if (action === 'commit') {
