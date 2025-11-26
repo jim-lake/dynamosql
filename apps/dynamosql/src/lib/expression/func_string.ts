@@ -84,6 +84,7 @@ export function lower(
   }
   return result;
 }
+export const lcase = lower;
 export function upper(
   expr: Function,
   state: EvaluationState
@@ -96,6 +97,7 @@ export function upper(
   }
   return result;
 }
+export const ucase = upper;
 export function trim(expr: Function, state: EvaluationState): EvaluationResult {
   const result = getValue(expr.args?.value?.[0], state);
   if (!result.err && result.value !== null) {
@@ -232,4 +234,74 @@ export function replace(
     );
   }
   return { err, name, value, type: 'string' };
+}
+export function ascii(
+  expr: Function,
+  state: EvaluationState
+): EvaluationResult {
+  const result = getValue(expr.args?.value?.[0], state);
+  result.name = `ASCII(${result.name})`;
+  result.type = 'number';
+  if (!result.err && result.value !== null) {
+    const str = String(result.value);
+    result.value = str.length > 0 ? str.charCodeAt(0) : 0;
+  }
+  return result;
+}
+export function ord(expr: Function, state: EvaluationState): EvaluationResult {
+  const result = getValue(expr.args?.value?.[0], state);
+  result.name = `ORD(${result.name})`;
+  result.type = 'number';
+  if (!result.err && result.value !== null) {
+    const str = String(result.value);
+    result.value = str.length > 0 ? str.codePointAt(0) : 0;
+  }
+  return result;
+}
+export function space(
+  expr: Function,
+  state: EvaluationState
+): EvaluationResult {
+  const result = getValue(expr.args?.value?.[0], state);
+  result.name = `SPACE(${result.name})`;
+  result.type = 'string';
+  if (!result.err && result.value !== null) {
+    const count = convertNum(result.value);
+    result.value = count !== null && count >= 0 ? ' '.repeat(count) : null;
+  }
+  return result;
+}
+export function hex(expr: Function, state: EvaluationState): EvaluationResult {
+  const result = getValue(expr.args?.value?.[0], state);
+  result.name = `HEX(${result.name})`;
+  result.type = 'string';
+  if (!result.err && result.value !== null) {
+    if (typeof result.value === 'number' || typeof result.value === 'bigint') {
+      result.value = result.value.toString(16).toUpperCase();
+    } else if (Buffer.isBuffer(result.value)) {
+      result.value = result.value.toString('hex').toUpperCase();
+    } else {
+      result.value = Buffer.from(String(result.value))
+        .toString('hex')
+        .toUpperCase();
+    }
+  }
+  return result;
+}
+export function unhex(
+  expr: Function,
+  state: EvaluationState
+): EvaluationResult {
+  const result = getValue(expr.args?.value?.[0], state);
+  result.name = `UNHEX(${result.name})`;
+  result.type = 'buffer';
+  if (!result.err && result.value !== null) {
+    const str = String(result.value);
+    if (/^[0-9A-Fa-f]*$/.test(str)) {
+      result.value = Buffer.from(str, 'hex');
+    } else {
+      result.value = null;
+    }
+  }
+  return result;
 }

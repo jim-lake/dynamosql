@@ -4,14 +4,43 @@ import { convertNum } from '../helpers/sql_conversion';
 import type { Function, ExpressionValue } from 'node-sql-parser';
 import type { EvaluationState, EvaluationResult } from './evaluate';
 
-import { abs, ceil, floor, round, mod, pow, sqrt, sign } from './func_math';
+import {
+  abs,
+  ceil,
+  floor,
+  round,
+  mod,
+  pow,
+  sqrt,
+  sign,
+  bin,
+  oct,
+  pi,
+  degrees,
+  radians,
+  exp,
+  ln,
+  log,
+  log2,
+  log10,
+  acos,
+  asin,
+  atan,
+  atan2,
+  cos,
+  sin,
+  tan,
+  cot,
+} from './func_math';
 import {
   length,
   concat,
   left,
   right,
   lower,
+  lcase,
   upper,
+  ucase,
   trim,
   ltrim,
   rtrim,
@@ -20,9 +49,16 @@ import {
   char_length,
   substring,
   replace,
+  ascii,
+  ord,
+  space,
+  hex,
+  unhex,
 } from './func_string';
 import {
   now,
+  localtime,
+  localtimestamp,
   from_unixtime,
   date,
   date_format,
@@ -50,6 +86,16 @@ function database(expr: Function, state: EvaluationState): EvaluationResult {
     value: state.session.getCurrentDatabase(),
     type: 'string',
   };
+}
+const schema = database;
+function isnull(expr: Function, state: EvaluationState): EvaluationResult {
+  const result = getValue(expr.args?.value?.[0], state);
+  result.name = `ISNULL(${result.name})`;
+  result.type = 'number';
+  if (!result.err) {
+    result.value = result.value === null ? 1 : 0;
+  }
+  return result;
 }
 function sleep(expr: Function, state: EvaluationState): EvaluationResult {
   const result = getValue(expr.args?.value?.[0], state);
@@ -176,6 +222,8 @@ export const methods: Record<
   undefined | ((expr: Function, state: EvaluationState) => EvaluationResult)
 > = {
   database,
+  schema,
+  isnull,
   sleep,
   length,
   char_length,
@@ -184,7 +232,9 @@ export const methods: Record<
   left,
   right,
   lower,
+  lcase,
   upper,
+  ucase,
   trim,
   ltrim,
   rtrim,
@@ -193,6 +243,11 @@ export const methods: Record<
   substring,
   substr: substring,
   replace,
+  ascii,
+  ord,
+  space,
+  hex,
+  unhex,
   abs,
   ceil,
   ceiling: ceil,
@@ -203,6 +258,24 @@ export const methods: Record<
   power: pow,
   sqrt,
   sign,
+  bin,
+  oct,
+  pi,
+  degrees,
+  radians,
+  exp,
+  ln,
+  log,
+  log2,
+  log10,
+  acos,
+  asin,
+  atan,
+  atan2,
+  cos,
+  sin,
+  tan,
+  cot,
   greatest,
   least,
   not,
@@ -211,6 +284,8 @@ export const methods: Record<
   nullif,
   if: ifFunc,
   now,
+  localtime,
+  localtimestamp,
   current_timestamp: now,
   from_unixtime,
   date,
