@@ -3,8 +3,8 @@
 Taken from the 8.4 docs, a list of all the MySQL functions, exluding internal
 and geometry
 
-| Name | Supported | Description |
-| :---------- | :-------: | :---- |
+| Name                            | Supported | Description                                                                                                                                             |
+| :------------------------------ | :-------: | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | \&                              |    ❌     | Bitwise AND                                                                                                                                             |
 | \>                              |    ❌     | Greater than operator                                                                                                                                   |
 | \>\>                            |    ❌     | Right shift                                                                                                                                             |
@@ -176,7 +176,7 @@ and geometry
 | JSON_INSERT()                   |    ❌     | Insert data into JSON document                                                                                                                          |
 | JSON_KEYS()                     |    ❌     | Array of keys from JSON document                                                                                                                        |
 | JSON_LENGTH()                   |    ❌     | Number of elements in JSON document                                                                                                                     |
-| JSON_MERGE()                    |    ❌     | Merge JSON documents, preserving duplicate keys. Deprecated synonym for JSON_MERGE_PRESERVE()                                                           | Yes |
+| JSON_MERGE()                    |    ❌     | Merge JSON documents, preserving duplicate keys. Deprecated synonym for JSON_MERGE_PRESERVE()                                                           |
 | JSON_MERGE_PATCH()              |    ❌     | Merge JSON documents, replacing values of duplicate keys                                                                                                |
 | JSON_MERGE_PRESERVE()           |    ❌     | Merge JSON documents, preserving duplicate keys                                                                                                         |
 | JSON_OBJECT()                   |    ❌     | Create JSON object                                                                                                                                      |
