@@ -29,8 +29,6 @@ export function now(expr: Function, state: EvaluationState): EvaluationResult {
   }
   return result;
 }
-export const localtime = now;
-export const localtimestamp = now;
 export function from_unixtime(
   expr: Function,
   state: EvaluationState

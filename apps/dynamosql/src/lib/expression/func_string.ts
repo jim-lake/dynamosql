@@ -84,7 +84,6 @@ export function lower(
   }
   return result;
 }
-export const lcase = lower;
 export function upper(
   expr: Function,
   state: EvaluationState
@@ -97,7 +96,6 @@ export function upper(
   }
   return result;
 }
-export const ucase = upper;
 export function trim(expr: Function, state: EvaluationState): EvaluationResult {
   const result = getValue(expr.args?.value?.[0], state);
   if (!result.err && result.value !== null) {

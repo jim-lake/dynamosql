@@ -38,9 +38,7 @@ import {
   left,
   right,
   lower,
-  lcase,
   upper,
-  ucase,
   trim,
   ltrim,
   rtrim,
@@ -57,8 +55,6 @@ import {
 } from './func_string';
 import {
   now,
-  localtime,
-  localtimestamp,
   from_unixtime,
   date,
   date_format,
@@ -87,7 +83,6 @@ function database(expr: Function, state: EvaluationState): EvaluationResult {
     type: 'string',
   };
 }
-const schema = database;
 function isnull(expr: Function, state: EvaluationState): EvaluationResult {
   const result = getValue(expr.args?.value?.[0], state);
   result.name = `ISNULL(${result.name})`;
@@ -222,7 +217,7 @@ export const methods: Record<
   undefined | ((expr: Function, state: EvaluationState) => EvaluationResult)
 > = {
   database,
-  schema,
+  schema: database,
   isnull,
   sleep,
   length,
@@ -232,9 +227,9 @@ export const methods: Record<
   left,
   right,
   lower,
-  lcase,
+  lcase: lower,
   upper,
-  ucase,
+  ucase: upper,
   trim,
   ltrim,
   rtrim,
@@ -284,8 +279,8 @@ export const methods: Record<
   nullif,
   if: ifFunc,
   now,
-  localtime,
-  localtimestamp,
+  localtime: now,
+  localtimestamp: now,
   current_timestamp: now,
   from_unixtime,
   date,
