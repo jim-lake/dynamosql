@@ -9,7 +9,7 @@ import type {
 } from './engine';
 import type { DynamoDBClient } from './handler_types';
 
-const BUILT_IN = ['_dynamodb'];
+const BUILT_IN = ['_dynamodb', 'information_schema'];
 
 interface SchemaEntry {
   table_engine: string;
@@ -27,6 +27,8 @@ export function getEngine(
   const schema_table = table ? schema?.get(table) : undefined;
   if (database === '_dynamodb') {
     ret = Engine.getEngineByName('raw');
+  } else if (database === 'information_schema') {
+    ret = Engine.getEngineByName('information_schema');
   } else if (!database) {
     ret = Engine.getDatabaseError('');
   } else if (!schema) {
@@ -63,7 +65,10 @@ export async function getTableList(
   const { dynamodb, database } = params;
   if (database === '_dynamodb') {
     const engine = Engine.getEngineByName('raw');
-    return await engine.getTableList({ dynamodb } as never);
+    return await engine.getTableList({ dynamodb });
+  } else if (database === 'information_schema') {
+    const engine = Engine.getEngineByName('information_schema');
+    return await engine.getTableList({ dynamodb });
   } else if (g_schemaMap.has(database)) {
     const schema = g_schemaMap.get(database);
     return schema ? Array.from(schema.keys()) : [];
@@ -71,14 +76,12 @@ export async function getTableList(
     throw new SQLError({ err: 'db_not_found', args: [database] });
   }
 }
-
 export function createDatabase(database: string): void {
   if (BUILT_IN.includes(database) || g_schemaMap.has(database)) {
     throw new SQLError('database_exists');
   }
   g_schemaMap.set(database, new Map());
 }
-
 interface DropDatabaseParams {
   session: Session;
   database: string;

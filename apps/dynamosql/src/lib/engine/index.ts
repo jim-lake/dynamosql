@@ -1,5 +1,6 @@
 import * as RawEngine from './raw';
 import * as MemoryEngine from './memory';
+import * as InformationSchemaEngine from './information_schema';
 import { SQLError } from '../../error';
 
 import type { Binary, Function } from 'node-sql-parser';
@@ -218,23 +219,18 @@ const NullEngine: Engine = {
     throw new Error('unsupported');
   },
 };
-
 export function getEngineByName(name: string): Engine {
-  let ret: Engine;
   switch (name) {
     case 'raw':
-      ret = RawEngine;
-      break;
+      return RawEngine;
     case 'memory':
-      ret = MemoryEngine;
-      break;
+      return MemoryEngine;
+    case 'information_schema':
+      return InformationSchemaEngine;
     default:
-      ret = NullEngine;
-      break;
+      return NullEngine;
   }
-  return ret;
 }
-
 export function getDatabaseError(database: string): Engine {
   const error = new SQLError({ err: 'db_not_found', args: [database] });
   return {

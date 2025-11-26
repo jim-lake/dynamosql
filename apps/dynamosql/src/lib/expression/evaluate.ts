@@ -67,6 +67,9 @@ export function getValue(
   } else if (type === 'double_quote_string') {
     result.value = expr.value;
     result.name = `"${result.value}"`;
+  } else if (type === 'single_quote_string') {
+    result.value = expr.value;
+    result.name = `'${result.value}'`;
   } else if (type === 'null') {
     result.value = null;
   } else if (type === 'bool') {
