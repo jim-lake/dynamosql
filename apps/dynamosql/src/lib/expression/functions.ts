@@ -2,12 +2,14 @@ import { getValue } from './evaluate';
 import {
   convertNum,
   convertDateTime,
+  convertDateTimeOrDate,
   convertDate,
 } from '../helpers/sql_conversion';
 import { dateFormat } from '../helpers/date_format';
 import { SQLDate } from '../types/sql_date';
 import { SQLDateTime, createSQLDateTime } from '../types/sql_datetime';
 import { createSQLTime } from '../types/sql_time';
+import { SQLInterval } from '../types/sql_interval';
 
 import type { Function, ExpressionValue } from 'node-sql-parser';
 import type { EvaluationState, EvaluationResult } from './evaluate';
@@ -281,6 +283,61 @@ function repeat(expr: Function, state: EvaluationState): EvaluationResult {
   }
   return { err, name, value, type: 'string' };
 }
+function substring(expr: Function, state: EvaluationState): EvaluationResult {
+  const arg1 = getValue(expr.args?.value?.[0], state);
+  const arg2 = getValue(expr.args?.value?.[1], state);
+  const hasThirdArg = expr.args?.value?.[2] !== undefined;
+  const arg3 =
+    hasThirdArg && expr.args ? getValue(expr.args.value[2], state) : null;
+  const err = arg1.err || arg2.err || (arg3?.err ?? null);
+  let value;
+  const name = hasThirdArg
+    ? `SUBSTRING(${arg1.name}, ${arg2.name}, ${arg3?.name ?? ''})`
+    : `SUBSTRING(${arg1.name}, ${arg2.name})`;
+
+  if (
+    !err &&
+    (arg1.value === null ||
+      arg2.value === null ||
+      (hasThirdArg && arg3?.value === null))
+  ) {
+    value = null;
+  } else if (!err) {
+    const str = String(arg1.value);
+    const pos = convertNum(arg2.value);
+    const len = hasThirdArg ? convertNum(arg3?.value) : null;
+
+    if (pos === null || (hasThirdArg && len === null)) {
+      value = null;
+    } else {
+      const start = pos < 0 ? str.length + pos : pos - 1;
+      value =
+        len !== null ? str.substring(start, start + len) : str.substring(start);
+    }
+  }
+  return { err, name, value, type: 'string' };
+}
+function replace(expr: Function, state: EvaluationState): EvaluationResult {
+  const arg1 = getValue(expr.args?.value?.[0], state);
+  const arg2 = getValue(expr.args?.value?.[1], state);
+  const arg3 = getValue(expr.args?.value?.[2], state);
+  const err = arg1.err || arg2.err || arg3.err || null;
+  let value;
+  const name = `REPLACE(${arg1.name}, ${arg2.name}, ${arg3.name})`;
+
+  if (
+    !err &&
+    (arg1.value === null || arg2.value === null || arg3.value === null)
+  ) {
+    value = null;
+  } else if (!err) {
+    value = String(arg1.value).replaceAll(
+      String(arg2.value),
+      String(arg3.value)
+    );
+  }
+  return { err, name, value, type: 'string' };
+}
 function char_length(expr: Function, state: EvaluationState): EvaluationResult {
   const result = getValue(expr.args?.value?.[0], state);
   result.name = `CHAR_LENGTH(${result.name})`;
@@ -492,6 +549,308 @@ function unix_timestamp(
   }
   return ret;
 }
+function year(expr: Function, state: EvaluationState): EvaluationResult {
+  const result = getValue(expr.args?.value?.[0], state);
+  result.name = `YEAR(${result.name})`;
+  result.type = 'number';
+  if (!result.err && result.value !== null) {
+    const dt = convertDateTime({
+      value: result.value,
+      timeZone: state.session.timeZone,
+    });
+    result.value = dt ? dt.toDate(state.session.timeZone).getFullYear() : null;
+  }
+  return result;
+}
+function month(expr: Function, state: EvaluationState): EvaluationResult {
+  const result = getValue(expr.args?.value?.[0], state);
+  result.name = `MONTH(${result.name})`;
+  result.type = 'number';
+  if (!result.err && result.value !== null) {
+    const dt = convertDateTime({
+      value: result.value,
+      timeZone: state.session.timeZone,
+    });
+    result.value = dt ? dt.toDate(state.session.timeZone).getMonth() + 1 : null;
+  }
+  return result;
+}
+function day(expr: Function, state: EvaluationState): EvaluationResult {
+  const result = getValue(expr.args?.value?.[0], state);
+  result.name = `DAY(${result.name})`;
+  result.type = 'number';
+  if (!result.err && result.value !== null) {
+    const dt = convertDateTime({
+      value: result.value,
+      timeZone: state.session.timeZone,
+    });
+    result.value = dt ? dt.toDate(state.session.timeZone).getDate() : null;
+  }
+  return result;
+}
+function hour(expr: Function, state: EvaluationState): EvaluationResult {
+  const result = getValue(expr.args?.value?.[0], state);
+  result.name = `HOUR(${result.name})`;
+  result.type = 'number';
+  if (!result.err && result.value !== null) {
+    const dt = convertDateTime({
+      value: result.value,
+      timeZone: state.session.timeZone,
+    });
+    result.value = dt ? dt.toDate(state.session.timeZone).getHours() : null;
+  }
+  return result;
+}
+function minute(expr: Function, state: EvaluationState): EvaluationResult {
+  const result = getValue(expr.args?.value?.[0], state);
+  result.name = `MINUTE(${result.name})`;
+  result.type = 'number';
+  if (!result.err && result.value !== null) {
+    const dt = convertDateTime({
+      value: result.value,
+      timeZone: state.session.timeZone,
+    });
+    result.value = dt ? dt.toDate(state.session.timeZone).getMinutes() : null;
+  }
+  return result;
+}
+function second(expr: Function, state: EvaluationState): EvaluationResult {
+  const result = getValue(expr.args?.value?.[0], state);
+  result.name = `SECOND(${result.name})`;
+  result.type = 'number';
+  if (!result.err && result.value !== null) {
+    const dt = convertDateTime({
+      value: result.value,
+      timeZone: state.session.timeZone,
+    });
+    result.value = dt ? dt.toDate(state.session.timeZone).getSeconds() : null;
+  }
+  return result;
+}
+function nullif(expr: Function, state: EvaluationState): EvaluationResult {
+  const arg1 = getValue(expr.args?.value?.[0], state);
+  const arg2 = getValue(expr.args?.value?.[1], state);
+  const err = arg1.err || arg2.err || null;
+  let value;
+  const name = `NULLIF(${arg1.name}, ${arg2.name})`;
+
+  if (!err) {
+    value = arg1.value === arg2.value ? null : arg1.value;
+  }
+  return { err, name, value, type: arg1.type };
+}
+function dayofweek(expr: Function, state: EvaluationState): EvaluationResult {
+  const result = getValue(expr.args?.value?.[0], state);
+  result.name = `DAYOFWEEK(${result.name})`;
+  result.type = 'number';
+  if (!result.err && result.value !== null) {
+    const dt = convertDateTime({
+      value: result.value,
+      timeZone: state.session.timeZone,
+    });
+    result.value = dt ? dt.toDate(state.session.timeZone).getDay() + 1 : null;
+  }
+  return result;
+}
+function dayname(expr: Function, state: EvaluationState): EvaluationResult {
+  const result = getValue(expr.args?.value?.[0], state);
+  result.name = `DAYNAME(${result.name})`;
+  result.type = 'string';
+  if (!result.err && result.value !== null) {
+    const dt = convertDateTime({
+      value: result.value,
+      timeZone: state.session.timeZone,
+    });
+    if (dt) {
+      const days = [
+        'Sunday',
+        'Monday',
+        'Tuesday',
+        'Wednesday',
+        'Thursday',
+        'Friday',
+        'Saturday',
+      ];
+      result.value = days[dt.toDate(state.session.timeZone).getDay()];
+    } else {
+      result.value = null;
+    }
+  }
+  return result;
+}
+function monthname(expr: Function, state: EvaluationState): EvaluationResult {
+  const result = getValue(expr.args?.value?.[0], state);
+  result.name = `MONTHNAME(${result.name})`;
+  result.type = 'string';
+  if (!result.err && result.value !== null) {
+    const dt = convertDateTime({
+      value: result.value,
+      timeZone: state.session.timeZone,
+    });
+    if (dt) {
+      const months = [
+        'January',
+        'February',
+        'March',
+        'April',
+        'May',
+        'June',
+        'July',
+        'August',
+        'September',
+        'October',
+        'November',
+        'December',
+      ];
+      result.value = months[dt.toDate(state.session.timeZone).getMonth()];
+    } else {
+      result.value = null;
+    }
+  }
+  return result;
+}
+function ifFunc(expr: Function, state: EvaluationState): EvaluationResult {
+  const condition = getValue(expr.args?.value?.[0], state);
+  const trueValue = getValue(expr.args?.value?.[1], state);
+  const falseValue = getValue(expr.args?.value?.[2], state);
+  const err = condition.err || trueValue.err || falseValue.err || null;
+  let value;
+  const name = `IF(${condition.name}, ${trueValue.name}, ${falseValue.name})`;
+
+  if (!err) {
+    const condResult = convertNum(condition.value);
+    if (condResult === null || condResult === 0) {
+      value = falseValue.value;
+    } else {
+      value = trueValue.value;
+    }
+  }
+  return { err, name, value, type: 'string' };
+}
+function date_add(expr: Function, state: EvaluationState): EvaluationResult {
+  const dateArg = getValue(expr.args?.value?.[0], state);
+  const intervalArg = getValue(expr.args?.value?.[1], state);
+  const err = dateArg.err || intervalArg.err;
+  let value = null;
+  let type: EvaluationResult['type'] = 'datetime';
+  const name = `DATE_ADD(${dateArg.name}, ${intervalArg.name})`;
+
+  if (
+    !err &&
+    dateArg.value !== null &&
+    intervalArg.value instanceof SQLInterval
+  ) {
+    const dt = convertDateTimeOrDate({
+      value: dateArg.value,
+      timeZone: state.session.timeZone,
+    });
+    if (dt) {
+      const result = intervalArg.value.add(dt, state.session.timeZone);
+      value = result.value;
+      type = result.type;
+    }
+  }
+  return { err, name, value, type };
+}
+function date_sub(expr: Function, state: EvaluationState): EvaluationResult {
+  const dateArg = getValue(expr.args?.value?.[0], state);
+  const intervalArg = getValue(expr.args?.value?.[1], state);
+  const err = dateArg.err || intervalArg.err;
+  let value = null;
+  let type: EvaluationResult['type'] = 'datetime';
+  const name = `DATE_SUB(${dateArg.name}, ${intervalArg.name})`;
+
+  if (
+    !err &&
+    dateArg.value !== null &&
+    intervalArg.value instanceof SQLInterval
+  ) {
+    const dt = convertDateTimeOrDate({
+      value: dateArg.value,
+      timeZone: state.session.timeZone,
+    });
+    if (dt) {
+      const result = intervalArg.value.sub(dt, state.session.timeZone);
+      value = result.value;
+      type = result.type;
+    }
+  }
+  return { err, name, value, type };
+}
+function timestampdiff(
+  expr: Function,
+  state: EvaluationState
+): EvaluationResult {
+  const unitArg = expr.args?.value?.[0];
+  const startArg = getValue(expr.args?.value?.[1], state);
+  const endArg = getValue(expr.args?.value?.[2], state);
+  const err = startArg.err || endArg.err;
+  let value = null;
+  const unitValue = unitArg && 'value' in unitArg ? unitArg.value : undefined;
+  const name = `TIMESTAMPDIFF(${unitValue}, ${startArg.name}, ${endArg.name})`;
+
+  if (!err && startArg.value !== null && endArg.value !== null) {
+    const start = convertDateTime({
+      value: startArg.value,
+      timeZone: state.session.timeZone,
+    });
+    const end = convertDateTime({
+      value: endArg.value,
+      timeZone: state.session.timeZone,
+    });
+    if (start && end && unitValue) {
+      const unit = String(unitValue).toLowerCase();
+      const diffSeconds = end.getTime() - start.getTime();
+
+      switch (unit) {
+        case 'microsecond':
+          value = Math.floor(diffSeconds * 1000000);
+          break;
+        case 'second':
+          value = Math.floor(diffSeconds);
+          break;
+        case 'minute':
+          value = Math.floor(diffSeconds / 60);
+          break;
+        case 'hour':
+          value = Math.floor(diffSeconds / 3600);
+          break;
+        case 'day':
+          value = Math.floor(diffSeconds / 86400);
+          break;
+        case 'week':
+          value = Math.floor(diffSeconds / (86400 * 7));
+          break;
+        case 'month': {
+          const startDate = start.toDate(state.session.timeZone);
+          const endDate = end.toDate(state.session.timeZone);
+          value =
+            (endDate.getFullYear() - startDate.getFullYear()) * 12 +
+            (endDate.getMonth() - startDate.getMonth());
+          break;
+        }
+        case 'quarter': {
+          const startDate = start.toDate(state.session.timeZone);
+          const endDate = end.toDate(state.session.timeZone);
+          const months =
+            (endDate.getFullYear() - startDate.getFullYear()) * 12 +
+            (endDate.getMonth() - startDate.getMonth());
+          value = Math.floor(months / 3);
+          break;
+        }
+        case 'year': {
+          const startDate = start.toDate(state.session.timeZone);
+          const endDate = end.toDate(state.session.timeZone);
+          value = endDate.getFullYear() - startDate.getFullYear();
+          break;
+        }
+        default:
+          value = null;
+      }
+    }
+  }
+  return { err, name, value, type: 'longlong' };
+}
 export const methods: Record<
   string,
   undefined | ((expr: Function, state: EvaluationState) => EvaluationResult)
@@ -511,6 +870,9 @@ export const methods: Record<
   rtrim,
   reverse,
   repeat,
+  substring,
+  substr: substring,
+  replace,
   abs,
   ceil,
   ceiling: ceil,
@@ -526,15 +888,30 @@ export const methods: Record<
   not,
   coalesce,
   ifnull: coalesce,
+  nullif,
+  if: ifFunc,
   now,
   current_timestamp: now,
   from_unixtime,
   date,
   date_format,
+  date_add,
+  date_sub,
   datediff,
+  timestampdiff,
   curdate,
   current_date: curdate,
   curtime,
   current_time: curtime,
   unix_timestamp,
+  year,
+  month,
+  day,
+  dayofmonth: day,
+  hour,
+  minute,
+  second,
+  dayofweek,
+  dayname,
+  monthname,
 };
