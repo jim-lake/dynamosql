@@ -3,8 +3,8 @@
 Taken from the 8.4 docs, a list of all the MySQL functions, exluding internal
 and geometry
 
-| Name                            | Supported | Description                                                                                                                                             |
-| :------------------------------ | :-------: | :------------------------------------------------------------------------------------------------------------------------------------------------------ | --- |
+| Name | Supported | Description |
+| :---------- | :-------: | :---- |
 | \&                              |    ❌     | Bitwise AND                                                                                                                                             |
 | \>                              |    ❌     | Greater than operator                                                                                                                                   |
 | \>\>                            |    ❌     | Right shift                                                                                                                                             |
