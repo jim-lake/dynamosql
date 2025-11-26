@@ -1,7 +1,7 @@
 import { getValue } from '../expression';
 import { SQLError } from '../../error';
 
-import type { Select, ValueExpr } from 'node-sql-parser';
+import type { ExpressionValue, Select, ValueExpr } from 'node-sql-parser';
 import type { Session } from '../../session';
 import type { ExtendedColumnRef, ExtendedExpressionValue } from '../ast_types';
 import type { RowWithResult } from '../handler_types';
@@ -20,6 +20,25 @@ export interface FormGroupParams {
   session: Session;
 }
 
+export function hasAggregate(ast: Select): boolean {
+  if (Array.isArray(ast.columns)) {
+    for (const column of ast.columns) {
+      if (_hasAgg(column)) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+export function formImplicitGroup(
+  params: Omit<FormGroupParams, 'groupby'>
+): RowWithResult[] {
+  const { row_list } = params;
+  if (row_list[0]) {
+    return [{ ...row_list[0], '@@group': row_list }];
+  }
+  return row_list;
+}
 export function formGroup(params: FormGroupParams): RowWithResult[] {
   const { groupby, ast, row_list, session } = params;
 
@@ -70,4 +89,25 @@ function _unroll(list: RowWithResult[], obj: unknown): void {
       _unroll(list, objMap[key]);
     }
   }
+}
+function _hasAgg(expr: ExpressionValue): boolean {
+  if (
+    expr.type === 'aggr_func' ||
+    ('expr' in expr && expr.expr && expr.expr.type === 'aggr_func')
+  ) {
+    return true;
+  }
+  if (
+    'args' in expr &&
+    expr.args &&
+    'value' in expr.args &&
+    Array.isArray(expr.args.value)
+  ) {
+    for (const sub of expr.args.value) {
+      if (_hasAgg(sub)) {
+        return true;
+      }
+    }
+  }
+  return false;
 }

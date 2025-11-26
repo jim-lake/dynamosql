@@ -8,58 +8,58 @@ function sum(expr: AggrFunc, state: EvaluationState): EvaluationResult {
   const group = (row?.['@@group'] ?? [{}]) as EvaluationState['row'][];
   let err: EvaluationResult['err'] = null;
   let value: number | null = 0;
-  let name = 'SUM(';
-  group.forEach((group_row, i: number) => {
+  let name = '';
+  for (const group_row of group) {
     const group_state: EvaluationState = { ...other, row: group_row };
     const result = getValue(expr.args?.expr, group_state);
-    if (i === 0) {
-      name += result.name;
+    if (!name) {
+      name = `SUM(${result.name})`;
     }
 
-    if (!err && result.err) {
+    if (result.err) {
       err = result.err;
+      break;
     } else if (result.value === null) {
       value = null;
-    } else if (value !== null) {
+      break;
+    } else {
       const num = convertNum(result.value);
-      if (num !== null) {
-        value += num;
+      if (num === null) {
+        value = null;
+        break;
       }
+      value += num;
     }
-  });
-  name += ')';
+  }
   return { err, value, type: 'number', name };
 }
-
 function count(expr: AggrFunc, state: EvaluationState): EvaluationResult {
   const { row, ...other } = state;
   const group = (row?.['@@group'] ?? [{}]) as EvaluationState['row'][];
+  let err: EvaluationResult['err'] = null;
   let value = 0;
-  let name = 'COUNT(';
+  let name = '';
 
-  const argExpr = expr.args?.expr;
-  if (
-    argExpr?.type === 'column_ref' &&
-    'column' in argExpr &&
-    argExpr.column === '*'
-  ) {
+  if (expr.args?.expr?.type === 'star') {
     value = group.length;
-    name += '*';
+    name = 'COUNT(*)';
   } else {
-    group.forEach((group_row, i: number) => {
+    for (const group_row of group) {
       const group_state: EvaluationState = { ...other, row: group_row };
       const result = getValue(expr.args?.expr, group_state);
-      if (i === 0) {
-        name += result.name;
+      if (!name) {
+        name = `COUNT(${result.name})`;
       }
-      if (result.value !== null) {
+      if (result.err) {
+        err = result.err;
+        break;
+      }
+      if (result.value !== null && result.value !== undefined) {
         value++;
       }
-    });
+    }
   }
-
-  name += ')';
-  return { err: null, value, type: 'number', name };
+  return { err, value, type: 'longlong', name };
 }
 
 export const methods: Record<

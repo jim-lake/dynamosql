@@ -5,7 +5,7 @@ import * as SchemaManager from './schema_manager';
 import { convertType } from './helpers/column_type_helper';
 import { resolveReferences } from './helpers/column_ref_helper';
 import { formJoin } from './helpers/join';
-import { formGroup } from './helpers/group';
+import { formGroup, formImplicitGroup, hasAggregate } from './helpers/group';
 import { sort } from './helpers/sort';
 import { SQLError } from '../error';
 
@@ -34,7 +34,6 @@ interface QueryColumn {
   result_nullable?: boolean;
   db?: string;
 }
-
 export interface RowWithResult {
   [key: string]: unknown;
   '@@result': EvaluationResult[];
@@ -109,6 +108,8 @@ async function _evaluateReturn(
 
   if (groupby) {
     row_list = formGroup({ groupby, ast, row_list, session });
+  } else if (hasAggregate(ast)) {
+    row_list = formImplicitGroup({ ast, row_list, session });
   }
 
   for (const row of row_list) {

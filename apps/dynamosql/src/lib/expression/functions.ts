@@ -80,57 +80,55 @@ function coalesce(expr: Function, state: EvaluationState): EvaluationResult {
 }
 function greatest(expr: Function, state: EvaluationState): EvaluationResult {
   let err: EvaluationResult['err'] = null;
-  let value: EvaluationResult['value'] = null;
-  let hasNull = false;
+  let value: EvaluationResult['value'];
   const names: string[] = [];
 
-  expr.args?.value?.forEach?.((sub: ExpressionValue) => {
+  for (const sub of expr.args?.value ?? []) {
     const result = getValue(sub, state);
     names.push(result.name ?? '');
-    if (!err && result.err) {
+    if (result.err) {
       err = result.err;
-    } else if (result.value === null || result.value === undefined) {
-      hasNull = true;
+      break;
+    } else if (
+      result.value === null ||
+      result.value === undefined ||
+      value === null
+    ) {
+      value = null;
+      break;
     } else {
-      if (value === null || value === undefined || result.value > value) {
+      if (value === undefined || result.value > value) {
         value = result.value;
       }
     }
-  });
-
-  return {
-    err,
-    value: hasNull ? null : value,
-    type: 'string',
-    name: `GREATEST(${names.join(', ')})`,
-  };
+  }
+  return { err, value, type: 'string', name: `GREATEST(${names.join(', ')})` };
 }
 function least(expr: Function, state: EvaluationState): EvaluationResult {
   let err: EvaluationResult['err'] = null;
-  let value: EvaluationResult['value'] = null;
-  let hasNull = false;
+  let value: EvaluationResult['value'];
   const names: string[] = [];
 
-  expr.args?.value?.forEach?.((sub: ExpressionValue) => {
+  for (const sub of expr.args?.value ?? []) {
     const result = getValue(sub, state);
     names.push(result.name ?? '');
-    if (!err && result.err) {
+    if (result.err) {
       err = result.err;
-    } else if (result.value === null || result.value === undefined) {
-      hasNull = true;
+      break;
+    } else if (
+      result.value === null ||
+      result.value === undefined ||
+      value === null
+    ) {
+      value = null;
+      break;
     } else {
-      if (value === null || value === undefined || result.value < value) {
+      if (value === undefined || result.value < value) {
         value = result.value;
       }
     }
-  });
-
-  return {
-    err,
-    value: hasNull ? null : value,
-    type: 'string',
-    name: `LEAST(${names.join(', ')})`,
-  };
+  }
+  return { err, value, type: 'string', name: `LEAST(${names.join(', ')})` };
 }
 function not(expr: Function, state: EvaluationState): EvaluationResult {
   const result = getValue(expr.args?.value?.[0], state);
