@@ -66,8 +66,8 @@ function avg(expr: AggrFunc, state: EvaluationState): EvaluationResult {
   const { row, ...other } = state;
   const group = (row?.['@@group'] ?? [{}]) as EvaluationState['row'][];
   let err: EvaluationResult['err'] = null;
-  let sum = 0;
-  let count = 0;
+  let total = 0;
+  let cnt = 0;
   let name = '';
   for (const group_row of group) {
     const group_state: EvaluationState = { ...other, row: group_row };
@@ -81,12 +81,12 @@ function avg(expr: AggrFunc, state: EvaluationState): EvaluationResult {
     } else if (result.value !== null) {
       const num = convertNum(result.value);
       if (num !== null) {
-        sum += num;
-        count++;
+        total += num;
+        cnt++;
       }
     }
   }
-  const value = count > 0 ? sum / count : null;
+  const value = cnt > 0 ? total / cnt : null;
   return { err, value, type: 'number', name };
 }
 function min(expr: AggrFunc, state: EvaluationState): EvaluationResult {

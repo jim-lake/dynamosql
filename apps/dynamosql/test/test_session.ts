@@ -69,9 +69,9 @@ session.query({ sql }, (err, results, fields) => {
   process.exit(err ? 1 : 0);
 });
 
-function tryRequire(path) {
+function tryRequire(modulePath) {
   try {
-    return require(path);
+    return require(modulePath);
   } catch {
     return {};
   }

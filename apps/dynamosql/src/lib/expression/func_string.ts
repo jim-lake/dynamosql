@@ -44,9 +44,8 @@ export function left(expr: Function, state: EvaluationState): EvaluationResult {
   if (!result.err && (result.value === null || len_result.value === null)) {
     result.value = null;
   } else if (!result.err) {
-    const length = convertNum(len_result.value);
-    result.value =
-      length !== null ? String(result.value).substring(0, length) : null;
+    const len = convertNum(len_result.value);
+    result.value = len !== null ? String(result.value).substring(0, len) : null;
   }
   return result;
 }
@@ -62,12 +61,11 @@ export function right(
   if (!result.err && (result.value === null || len_result.value === null)) {
     result.value = null;
   } else if (!result.err) {
-    const length = convertNum(len_result.value);
-    if (length !== null && length <= 0) {
+    const len = convertNum(len_result.value);
+    if (len !== null && len <= 0) {
       result.value = '';
     } else {
-      result.value =
-        length !== null ? String(result.value).slice(-length) : null;
+      result.value = len !== null ? String(result.value).slice(-len) : null;
     }
   }
   return result;

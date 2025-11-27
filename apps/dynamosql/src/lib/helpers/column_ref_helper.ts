@@ -38,31 +38,34 @@ export function resolveReferences(
         : (ast as Update & { from?: From[] }).from;
   const from = Array.isArray(fromRaw) ? fromRaw : null;
   from?.forEach?.((fromItem: From) => {
-    const from = fromItem as TableMapEntry & { db?: string; table?: string };
-    if (!from.db) {
+    const fromEntry = fromItem as TableMapEntry & {
+      db?: string;
+      table?: string;
+    };
+    if (!fromEntry.db) {
       if (!current_database) {
         throw new SQLError('no_current_database');
       } else {
-        from.db = current_database;
+        fromEntry.db = current_database;
       }
     }
-    if (!from._requestSet) {
-      from._requestSet = new Set();
+    if (!fromEntry._requestSet) {
+      fromEntry._requestSet = new Set();
     }
-    from._requestAll = from._requestAll || false;
-    from.key = from.as || `${from.db}.${from.table}`;
-    if (from.as) {
-      table_map[from.as] = from;
+    fromEntry._requestAll = fromEntry._requestAll || false;
+    fromEntry.key = fromEntry.as || `${fromEntry.db}.${fromEntry.table}`;
+    if (fromEntry.as) {
+      table_map[fromEntry.as] = fromEntry;
     } else {
-      if (!table_map[from.table ?? '']) {
-        table_map[from.table ?? ''] = from;
+      if (!table_map[fromEntry.table ?? '']) {
+        table_map[fromEntry.table ?? ''] = fromEntry;
       }
-      if (!db_map[from.db]) {
-        db_map[from.db] = {};
+      if (!db_map[fromEntry.db]) {
+        db_map[fromEntry.db] = {};
       }
-      const dbEntry = db_map[from.db];
-      if (dbEntry && from.table) {
-        dbEntry[from.table] = from;
+      const dbEntry = db_map[fromEntry.db];
+      if (dbEntry && fromEntry.table) {
+        dbEntry[fromEntry.table] = fromEntry;
       }
     }
   });
@@ -73,13 +76,13 @@ export function resolveReferences(
   const table = Array.isArray(tableRaw) ? tableRaw : null;
   table?.forEach?.((object: From & { from?: TableMapEntry }) => {
     const obj = object as BaseFrom & { from?: TableMapEntry };
-    const from = obj.db
+    const fromEntry = obj.db
       ? db_map[obj.db]?.[obj.table ?? '']
       : table_map[obj.table ?? ''];
-    if (!from) {
+    if (!fromEntry) {
       throw new SQLError({ err: 'table_not_found', args: [obj.table] });
     } else {
-      obj.from = from;
+      obj.from = fromEntry;
     }
   });
 
