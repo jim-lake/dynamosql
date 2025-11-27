@@ -69,11 +69,11 @@ and geometry
 | AES_DECRYPT()                   |    ❌     | Decrypt using AES                                                                                                                                       |
 | AES_ENCRYPT()                   |    ❌     | Encrypt using AES                                                                                                                                       |
 | ANY_VALUE()                     |    ❌     | Suppress ONLY_FULL_GROUP_BY value rejection                                                                                                             |
-| ASCII()                         |    ✅     | Return numeric value of left-most character                                                                                                             |
+| ASCII()                         |    ❌     | Return numeric value of left-most character                                                                                                             |
 | ASIN()                          |    ✅     | Return the arc sine                                                                                                                                     |
 | ATAN()                          |    ✅     | Return the arc tangent                                                                                                                                  |
 | ATAN2()                         |    ✅     | ATAN() Return the arc tangent of the two arguments                                                                                                      |
-| AVG()                           |    ❌     | Return the average value of the argument                                                                                                                |
+| AVG()                           |    ✅     | Return the average value of the argument                                                                                                                |
 | BENCHMARK()                     |    ❌     | Repeatedly execute an expression                                                                                                                        |
 | BIN()                           |    ✅     | Return a string containing binary representation of a number                                                                                            |
 | BIN_TO_UUID()                   |    ❌     | Convert binary UUID to string                                                                                                                           |
@@ -94,7 +94,7 @@ and geometry
 | COLLATION()                     |    ❌     | Return the collation of the string argument                                                                                                             |
 | COMPRESS()                      |    ❌     | Return result as a binary string                                                                                                                        |
 | CONCAT()                        |    ✅     | Return concatenated string                                                                                                                              |
-| CONCAT_WS()                     |    ❌     | Return concatenate with separator                                                                                                                       |
+| CONCAT_WS()                     |    ✅     | Return concatenate with separator                                                                                                                       |
 | CONNECTION_ID()                 |    ❌     | Return the connection ID (thread ID) for the connection                                                                                                 |
 | CONV()                          |    ❌     | Convert numbers between different number bases                                                                                                          |
 | CONVERT()                       |    ❌     | Cast a value as a certain type                                                                                                                          |
@@ -159,7 +159,7 @@ and geometry
 | INET_ATON()                     |    ❌     | Return the numeric value of an IP address                                                                                                               |
 | INET_NTOA()                     |    ❌     | Return the IP address from a numeric value                                                                                                              |
 | INSERT()                        |    ❌     | Insert substring at specified position up to specified number of characters                                                                             |
-| INSTR()                         |    ❌     | Return the index of the first occurrence of substring                                                                                                   |
+| INSTR()                         |    ✅     | Return the index of the first occurrence of substring                                                                                                   |
 | INTERVAL()                      |    ❌     | Return the index of the argument that is less than the first argument                                                                                   |
 | IS_FREE_LOCK()                  |    ❌     | Whether the named lock is free                                                                                                                          |
 | IS_USED_LOCK()                  |    ❌     | Whether the named lock is in use; return connection identifier if true                                                                                  |
@@ -210,22 +210,22 @@ and geometry
 | LOAD_FILE()                     |    ❌     | Load the named file                                                                                                                                     |
 | LOCALTIME()                     |    ✅     | Synonym for NOW()                                                                                                                                       |
 | LOCALTIMESTAMP()                |    ✅     | Synonym for NOW()                                                                                                                                       |
-| LOCATE()                        |    ❌     | Return the position of the first occurrence of substring                                                                                                |
+| LOCATE()                        |    ✅     | Return the position of the first occurrence of substring                                                                                                |
 | LOG()                           |    ✅     | Return the natural logarithm of the first argument                                                                                                      |
 | LOG10()                         |    ✅     | Return the base-10 logarithm of the argument                                                                                                            |
 | LOG2()                          |    ✅     | Return the base-2 logarithm of the argument                                                                                                             |
 | LOWER()                         |    ✅     | Return the argument in lowercase                                                                                                                        |
-| LPAD()                          |    ❌     | Return the string argument, left-padded with the specified string                                                                                       |
+| LPAD()                          |    ✅     | Return the string argument, left-padded with the specified string                                                                                       |
 | LTRIM()                         |    ✅     | Remove leading spaces                                                                                                                                   |
 | MAKE_SET()                      |    ❌     | Return a set of comma-separated strings that have the corresponding bit in bits set                                                                     |
 | MAKEDATE()                      |    ❌     | Create a date from the year and day of year                                                                                                             |
 | MAKETIME()                      |    ❌     | Create time from hour, minute, second                                                                                                                   |
 | MATCH()                         |    ❌     | Perform full-text search                                                                                                                                |
-| MAX()                           |    ❌     | Return the maximum value                                                                                                                                |
+| MAX()                           |    ✅     | Return the maximum value                                                                                                                                |
 | MD5()                           |    ❌     | Calculate MD5 checksum                                                                                                                                  |
 | MICROSECOND()                   |    ❌     | Return the microseconds from argument                                                                                                                   |
-| MID()                           |    ❌     | Return a substring starting from the specified position                                                                                                 |
-| MIN()                           |    ❌     | Return the minimum value                                                                                                                                |
+| MID()                           |    ✅     | Return a substring starting from the specified position                                                                                                 |
+| MIN()                           |    ✅     | Return the minimum value                                                                                                                                |
 | MINUTE()                        |    ✅     | Return the minute from the argument                                                                                                                     |
 | MOD()                           |    ✅     | Return the remainder                                                                                                                                    |
 | MONTH()                         |    ✅     | Return the month from the date passed                                                                                                                   |
@@ -236,8 +236,8 @@ and geometry
 | NTILE()                         |    ❌     | Bucket number of current row within its partition.                                                                                                      |
 | NULLIF()                        |    ✅     | Return NULL if expr1 = expr2                                                                                                                            |
 | OCT()                           |    ✅     | Return a string containing octal representation of a number                                                                                             |
-| OCTET_LENGTH()                  |    ❌     | Synonym for LENGTH()                                                                                                                                    |
-| ORD()                           |    ✅     | Return character code for leftmost character of the argument                                                                                            |
+| OCTET_LENGTH()                  |    ✅     | Synonym for LENGTH()                                                                                                                                    |
+| ORD()                           |    ❌     | Return character code for leftmost character of the argument                                                                                            |
 | PERCENT_RANK()                  |    ❌     | Percentage rank value                                                                                                                                   |
 | PERIOD_ADD()                    |    ❌     | Add a period to a year-month                                                                                                                            |
 | PERIOD_DIFF()                   |    ❌     | Return the number of months between periods                                                                                                             |
@@ -267,7 +267,7 @@ and geometry
 | ROUND()                         |    ✅     | Round the argument                                                                                                                                      |
 | ROW_COUNT()                     |    ❌     | The number of rows updated                                                                                                                              |
 | ROW_NUMBER()                    |    ❌     | Number of current row within its partition                                                                                                              |
-| RPAD()                          |    ❌     | Append string the specified number of times                                                                                                             |
+| RPAD()                          |    ✅     | Append string the specified number of times                                                                                                             |
 | RTRIM()                         |    ✅     | Remove trailing spaces                                                                                                                                  |
 | SCHEMA()                        |    ✅     | Synonym for DATABASE()                                                                                                                                  |
 | SEC_TO_TIME()                   |    ❌     | Converts seconds to 'hh:mm:ss' format                                                                                                                   |
@@ -289,7 +289,7 @@ and geometry
 | STDDEV_POP()                    |    ❌     | Return the population standard deviation                                                                                                                |
 | STDDEV_SAMP()                   |    ❌     | Return the sample standard deviation                                                                                                                    |
 | STR_TO_DATE()                   |    ❌     | Convert a string to a date                                                                                                                              |
-| STRCMP()                        |    ❌     | Compare two strings                                                                                                                                     |
+| STRCMP()                        |    ✅     | Compare two strings                                                                                                                                     |
 | SUBDATE()                       |    ❌     | Synonym for DATE_SUB() when invoked with three arguments                                                                                                |
 | SUBSTR()                        |    ✅     | Return the substring as specified                                                                                                                       |
 | SUBSTRING()                     |    ✅     | Return the substring as specified                                                                                                                       |
@@ -314,7 +314,7 @@ and geometry
 | UCASE()                         |    ✅     | Synonym for UPPER()                                                                                                                                     |
 | UNCOMPRESS()                    |    ❌     | Uncompress a string compressed                                                                                                                          |
 | UNCOMPRESSED_LENGTH()           |    ❌     | Return the length of a string before compression                                                                                                        |
-| UNHEX()                         |    ✅     | Return a string containing hex representation of a number                                                                                               |
+| UNHEX()                         |    ❌     | Return a string containing hex representation of a number                                                                                               |
 | UNIX_TIMESTAMP()                |    ✅     | Return a Unix timestamp                                                                                                                                 |
 | UpdateXML()                     |    ❌     | Return replaced XML fragment                                                                                                                            |
 | UPPER()                         |    ✅     | Convert to uppercase                                                                                                                                    |
