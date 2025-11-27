@@ -139,6 +139,24 @@ function _resolveObject(
   name_cache: TableMap,
   result_map?: ResultMap
 ) {
+  const fixup_object = object as {
+    db?: string | { type: 'backticks_quote_string'; value: string };
+    table?: string | { type: 'backticks_quote_string'; value: string };
+  };
+  if (
+    fixup_object.db &&
+    typeof fixup_object.db === 'object' &&
+    fixup_object.db.value
+  ) {
+    fixup_object.db = fixup_object.db.value;
+  }
+  if (
+    fixup_object.table &&
+    typeof fixup_object.table === 'object' &&
+    fixup_object.table.value
+  ) {
+    fixup_object.table = fixup_object.table.value;
+  }
   const obj = object as {
     column?: string;
     db?: string;
