@@ -303,3 +303,153 @@ export function unhex(
   }
   return result;
 }
+export function concat_ws(
+  expr: Function,
+  state: EvaluationState
+): EvaluationResult {
+  const sep_result = getValue(expr.args?.value?.[0], state);
+  if (sep_result.err || sep_result.value === null) {
+    return {
+      err: sep_result.err,
+      value: null,
+      type: 'string',
+      name: 'CONCAT_WS()',
+    };
+  }
+  const separator = String(sep_result.value);
+  const parts: string[] = [];
+  for (let i = 1; i < (expr.args?.value?.length ?? 0); i++) {
+    const result = getValue(expr.args?.value?.[i], state);
+    if (result.err) {
+      return {
+        err: result.err,
+        value: null,
+        type: 'string',
+        name: 'CONCAT_WS()',
+      };
+    }
+    if (result.value !== null) {
+      parts.push(String(result.value));
+    }
+  }
+  return {
+    err: null,
+    value: parts.join(separator),
+    type: 'string',
+    name: 'CONCAT_WS()',
+  };
+}
+export function lpad(expr: Function, state: EvaluationState): EvaluationResult {
+  const str_result = getValue(expr.args?.value?.[0], state);
+  const len_result = getValue(expr.args?.value?.[1], state);
+  const pad_result = getValue(expr.args?.value?.[2], state);
+  const err = str_result.err || len_result.err || pad_result.err || null;
+  if (
+    err ||
+    str_result.value === null ||
+    len_result.value === null ||
+    pad_result.value === null
+  ) {
+    return { err, value: null, type: 'string' };
+  }
+  const str = String(str_result.value);
+  const len = convertNum(len_result.value);
+  const pad = String(pad_result.value);
+  if (len === null || len < 0 || pad.length === 0) {
+    return { err: null, value: null, type: 'string' };
+  }
+  if (str.length >= len) {
+    return { err: null, value: str.substring(0, len), type: 'string' };
+  }
+  const padLen = len - str.length;
+  const fullPads = Math.floor(padLen / pad.length);
+  const remainder = padLen % pad.length;
+  return {
+    err: null,
+    value: pad.repeat(fullPads) + pad.substring(0, remainder) + str,
+    type: 'string',
+  };
+}
+export function rpad(expr: Function, state: EvaluationState): EvaluationResult {
+  const str_result = getValue(expr.args?.value?.[0], state);
+  const len_result = getValue(expr.args?.value?.[1], state);
+  const pad_result = getValue(expr.args?.value?.[2], state);
+  const err = str_result.err || len_result.err || pad_result.err || null;
+  if (
+    err ||
+    str_result.value === null ||
+    len_result.value === null ||
+    pad_result.value === null
+  ) {
+    return { err, value: null, type: 'string' };
+  }
+  const str = String(str_result.value);
+  const len = convertNum(len_result.value);
+  const pad = String(pad_result.value);
+  if (len === null || len < 0 || pad.length === 0) {
+    return { err: null, value: null, type: 'string' };
+  }
+  if (str.length >= len) {
+    return { err: null, value: str.substring(0, len), type: 'string' };
+  }
+  const padLen = len - str.length;
+  const fullPads = Math.floor(padLen / pad.length);
+  const remainder = padLen % pad.length;
+  return {
+    err: null,
+    value: str + pad.repeat(fullPads) + pad.substring(0, remainder),
+    type: 'string',
+  };
+}
+export function locate(
+  expr: Function,
+  state: EvaluationState
+): EvaluationResult {
+  const substr_result = getValue(expr.args?.value?.[0], state);
+  const str_result = getValue(expr.args?.value?.[1], state);
+  const pos_result = getValue(expr.args?.value?.[2], state);
+  const err = substr_result.err || str_result.err || pos_result?.err || null;
+  if (err || substr_result.value === null || str_result.value === null) {
+    return { err, value: null, type: 'number' };
+  }
+  const substr = String(substr_result.value);
+  const str = String(str_result.value);
+  const pos = pos_result?.value ? (convertNum(pos_result.value) ?? 1) : 1;
+  const index = str.indexOf(substr, pos - 1);
+  return { err: null, value: index === -1 ? 0 : index + 1, type: 'number' };
+}
+export function instr(
+  expr: Function,
+  state: EvaluationState
+): EvaluationResult {
+  const str_result = getValue(expr.args?.value?.[0], state);
+  const substr_result = getValue(expr.args?.value?.[1], state);
+  const err = str_result.err || substr_result.err || null;
+  if (err || str_result.value === null || substr_result.value === null) {
+    return { err, value: null, type: 'number' };
+  }
+  const str = String(str_result.value);
+  const substr = String(substr_result.value);
+  const index = str.indexOf(substr);
+  return { err: null, value: index === -1 ? 0 : index + 1, type: 'number' };
+}
+export function strcmp(
+  expr: Function,
+  state: EvaluationState
+): EvaluationResult {
+  const str1_result = getValue(expr.args?.value?.[0], state);
+  const str2_result = getValue(expr.args?.value?.[1], state);
+  const err = str1_result.err || str2_result.err || null;
+  if (err || str1_result.value === null || str2_result.value === null) {
+    return { err, value: null, type: 'number' };
+  }
+  const str1 = String(str1_result.value);
+  const str2 = String(str2_result.value);
+  if (str1 < str2) {
+    return { err: null, value: -1, type: 'number' };
+  } else if (str1 > str2) {
+    return { err: null, value: 1, type: 'number' };
+  } else {
+    return { err: null, value: 0, type: 'number' };
+  }
+}

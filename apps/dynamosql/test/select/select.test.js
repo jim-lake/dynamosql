@@ -14,4 +14,5 @@ describe('Select', function () {
   );
   runTests('subquery.sql', path.join(__dirname, 'subquery.sql'));
   runTests('advanced.sql', path.join(__dirname, 'advanced.sql'));
+  runTests('aggregate.sql', path.join(__dirname, 'aggregate.sql'));
 });

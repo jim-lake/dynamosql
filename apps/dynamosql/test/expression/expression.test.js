@@ -25,4 +25,6 @@ describe('Expression', function () {
   runTests('null_handling.sql', path.join(__dirname, 'null_handling.sql'));
   runTests('timezone.sql', path.join(__dirname, 'timezone.sql'));
   runTests('new_functions.sql', path.join(__dirname, 'new_functions.sql'));
+  runTests('aggregate_funcs.sql', path.join(__dirname, 'aggregate_funcs.sql'));
+  runTests('string_funcs.sql', path.join(__dirname, 'string_funcs.sql'));
 });

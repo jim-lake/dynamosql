@@ -62,7 +62,81 @@ function count(expr: AggrFunc, state: EvaluationState): EvaluationResult {
   return { err, value, type: 'longlong', name };
 }
 
+function avg(expr: AggrFunc, state: EvaluationState): EvaluationResult {
+  const { row, ...other } = state;
+  const group = (row?.['@@group'] ?? [{}]) as EvaluationState['row'][];
+  let err: EvaluationResult['err'] = null;
+  let sum = 0;
+  let count = 0;
+  let name = '';
+  for (const group_row of group) {
+    const group_state: EvaluationState = { ...other, row: group_row };
+    const result = getValue(expr.args?.expr, group_state);
+    if (!name) {
+      name = `AVG(${result.name})`;
+    }
+    if (result.err) {
+      err = result.err;
+      break;
+    } else if (result.value !== null) {
+      const num = convertNum(result.value);
+      if (num !== null) {
+        sum += num;
+        count++;
+      }
+    }
+  }
+  const value = count > 0 ? sum / count : null;
+  return { err, value, type: 'number', name };
+}
+function min(expr: AggrFunc, state: EvaluationState): EvaluationResult {
+  const { row, ...other } = state;
+  const group = (row?.['@@group'] ?? [{}]) as EvaluationState['row'][];
+  let err: EvaluationResult['err'] = null;
+  let value: EvaluationResult['value'] = null;
+  let name = '';
+  for (const group_row of group) {
+    const group_state: EvaluationState = { ...other, row: group_row };
+    const result = getValue(expr.args?.expr, group_state);
+    if (!name) {
+      name = `MIN(${result.name})`;
+    }
+    if (result.err) {
+      err = result.err;
+      break;
+    } else if (result.value !== null && result.value !== undefined) {
+      if (value === null || result.value < value) {
+        value = result.value;
+      }
+    }
+  }
+  return { err, value, type: 'string', name };
+}
+function max(expr: AggrFunc, state: EvaluationState): EvaluationResult {
+  const { row, ...other } = state;
+  const group = (row?.['@@group'] ?? [{}]) as EvaluationState['row'][];
+  let err: EvaluationResult['err'] = null;
+  let value: EvaluationResult['value'] = null;
+  let name = '';
+  for (const group_row of group) {
+    const group_state: EvaluationState = { ...other, row: group_row };
+    const result = getValue(expr.args?.expr, group_state);
+    if (!name) {
+      name = `MAX(${result.name})`;
+    }
+    if (result.err) {
+      err = result.err;
+      break;
+    } else if (result.value !== null && result.value !== undefined) {
+      if (value === null || result.value > value) {
+        value = result.value;
+      }
+    }
+  }
+  return { err, value, type: 'string', name };
+}
+
 export const methods: Record<
   string,
   undefined | ((expr: AggrFunc, state: EvaluationState) => EvaluationResult)
-> = { sum, count };
+> = { sum, count, avg, min, max };
