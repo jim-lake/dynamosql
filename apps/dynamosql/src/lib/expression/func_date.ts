@@ -433,3 +433,262 @@ export function monthname(
   }
   return result;
 }
+export function dayofyear(
+  expr: Function,
+  state: EvaluationState
+): EvaluationResult {
+  const result = getValue(expr.args?.value?.[0], state);
+  result.name = `DAYOFYEAR(${result.name})`;
+  result.type = 'number';
+  if (!result.err && result.value !== null) {
+    const dt = convertDateTime({
+      value: result.value,
+      timeZone: state.session.timeZone,
+    });
+    if (dt) {
+      const date = dt.toDate(state.session.timeZone);
+      const start = new Date(date.getFullYear(), 0, 0);
+      const diff = date.getTime() - start.getTime();
+      const oneDay = 1000 * 60 * 60 * 24;
+      result.value = Math.floor(diff / oneDay);
+    } else {
+      result.value = null;
+    }
+  }
+  return result;
+}
+export function week(
+  expr: Function,
+  state: EvaluationState
+): EvaluationResult {
+  const dateArg = getValue(expr.args?.value?.[0], state);
+  const modeArg = getValue(expr.args?.value?.[1], state);
+  const mode = modeArg.value !== null ? convertNum(modeArg.value) ?? 0 : 0;
+  const result = {
+    err: dateArg.err || modeArg.err,
+    name: `WEEK(${dateArg.name}${modeArg.value !== null ? ', ' + modeArg.name : ''})`,
+    value: null as number | null,
+    type: 'number' as const,
+  };
+  if (!result.err && dateArg.value !== null) {
+    const dt = convertDateTime({
+      value: dateArg.value,
+      timeZone: state.session.timeZone,
+    });
+    if (dt) {
+      const date = dt.toDate(state.session.timeZone);
+      const yearStart = new Date(date.getFullYear(), 0, 1);
+      const dayOfYear =
+        Math.floor(
+          (date.getTime() - yearStart.getTime()) / (1000 * 60 * 60 * 24)
+        ) + 1;
+      const startDay = yearStart.getDay();
+      const weekStart = mode % 2 === 0 ? 0 : 1;
+      const daysToFirstWeek = (7 - startDay + weekStart) % 7;
+      if (dayOfYear <= daysToFirstWeek) {
+        result.value = 0;
+      } else {
+        result.value = Math.floor((dayOfYear - daysToFirstWeek - 1) / 7) + 1;
+      }
+    }
+  }
+  return result;
+}
+export function weekday(
+  expr: Function,
+  state: EvaluationState
+): EvaluationResult {
+  const result = getValue(expr.args?.value?.[0], state);
+  result.name = `WEEKDAY(${result.name})`;
+  result.type = 'number';
+  if (!result.err && result.value !== null) {
+    const dt = convertDateTime({
+      value: result.value,
+      timeZone: state.session.timeZone,
+    });
+    if (dt) {
+      const day = dt.toDate(state.session.timeZone).getDay();
+      result.value = (day + 6) % 7;
+    } else {
+      result.value = null;
+    }
+  }
+  return result;
+}
+export function quarter(
+  expr: Function,
+  state: EvaluationState
+): EvaluationResult {
+  const result = getValue(expr.args?.value?.[0], state);
+  result.name = `QUARTER(${result.name})`;
+  result.type = 'number';
+  if (!result.err && result.value !== null) {
+    const dt = convertDateTime({
+      value: result.value,
+      timeZone: state.session.timeZone,
+    });
+    result.value = dt
+      ? Math.floor(dt.toDate(state.session.timeZone).getMonth() / 3) + 1
+      : null;
+  }
+  return result;
+}
+export function time(expr: Function, state: EvaluationState): EvaluationResult {
+  const result = getValue(expr.args?.value?.[0], state);
+  result.name = `TIME(${result.name})`;
+  result.type = 'time';
+  if (!result.err && result.value !== null) {
+    const dt = convertDateTime({
+      value: result.value,
+      timeZone: state.session.timeZone,
+    });
+    if (dt) {
+      const date = dt.toDate(state.session.timeZone);
+      const seconds =
+        date.getHours() * 3600 + date.getMinutes() * 60 + date.getSeconds();
+      result.value = createSQLTime({ time: seconds, decimals: 0 });
+    } else {
+      result.value = null;
+    }
+  }
+  return result;
+}
+export function microsecond(
+  expr: Function,
+  state: EvaluationState
+): EvaluationResult {
+  const result = getValue(expr.args?.value?.[0], state);
+  result.name = `MICROSECOND(${result.name})`;
+  result.type = 'number';
+  if (!result.err && result.value !== null) {
+    const dt = convertDateTime({
+      value: result.value,
+      timeZone: state.session.timeZone,
+    });
+    if (dt) {
+      result.value = Math.round(dt.getFraction() * 1000000);
+    } else {
+      result.value = null;
+    }
+  }
+  return result;
+}
+export function last_day(
+  expr: Function,
+  state: EvaluationState
+): EvaluationResult {
+  const result = getValue(expr.args?.value?.[0], state);
+  result.name = `LAST_DAY(${result.name})`;
+  result.type = 'date';
+  if (!result.err && result.value !== null) {
+    const dt = convertDateTime({
+      value: result.value,
+      timeZone: state.session.timeZone,
+    });
+    if (dt) {
+      const date = dt.toDate(state.session.timeZone);
+      const lastDay = new Date(
+        date.getFullYear(),
+        date.getMonth() + 1,
+        0
+      );
+      result.value = new SQLDate({
+        time: lastDay.getTime() / 1000,
+        timeZone: state.session.timeZone,
+      });
+    } else {
+      result.value = null;
+    }
+  }
+  return result;
+}
+export function weekofyear(
+  expr: Function,
+  state: EvaluationState
+): EvaluationResult {
+  const result = getValue(expr.args?.value?.[0], state);
+  result.name = `WEEKOFYEAR(${result.name})`;
+  result.type = 'number';
+  if (!result.err && result.value !== null) {
+    const dt = convertDateTime({
+      value: result.value,
+      timeZone: state.session.timeZone,
+    });
+    if (dt) {
+      const date = dt.toDate(state.session.timeZone);
+      const yearStart = new Date(date.getFullYear(), 0, 1);
+      const dayOfYear =
+        Math.floor(
+          (date.getTime() - yearStart.getTime()) / (1000 * 60 * 60 * 24)
+        ) + 1;
+      const startDay = yearStart.getDay();
+      const weekStart = 1;
+      const daysToFirstWeek = (7 - startDay + weekStart) % 7;
+      if (dayOfYear <= daysToFirstWeek) {
+        const prevYear = new Date(date.getFullYear() - 1, 11, 31);
+        const prevYearStart = new Date(date.getFullYear() - 1, 0, 1);
+        const prevDayOfYear =
+          Math.floor(
+            (prevYear.getTime() - prevYearStart.getTime()) / (1000 * 60 * 60 * 24)
+          ) + 1;
+        const prevStartDay = prevYearStart.getDay();
+        const prevDaysToFirstWeek = (7 - prevStartDay + weekStart) % 7;
+        result.value = Math.floor((prevDayOfYear - prevDaysToFirstWeek - 1) / 7) + 1;
+      } else {
+        result.value = Math.floor((dayOfYear - daysToFirstWeek - 1) / 7) + 1;
+      }
+    } else {
+      result.value = null;
+    }
+  }
+  return result;
+}
+export function yearweek(
+  expr: Function,
+  state: EvaluationState
+): EvaluationResult {
+  const dateArg = getValue(expr.args?.value?.[0], state);
+  const modeArg = getValue(expr.args?.value?.[1], state);
+  const mode = modeArg.value !== null ? convertNum(modeArg.value) ?? 0 : 0;
+  const result = {
+    err: dateArg.err || modeArg.err,
+    name: `YEARWEEK(${dateArg.name}${modeArg.value !== null ? ', ' + modeArg.name : ''})`,
+    value: null as number | null,
+    type: 'number' as const,
+  };
+  if (!result.err && dateArg.value !== null) {
+    const dt = convertDateTime({
+      value: dateArg.value,
+      timeZone: state.session.timeZone,
+    });
+    if (dt) {
+      const date = dt.toDate(state.session.timeZone);
+      const yearStart = new Date(date.getFullYear(), 0, 1);
+      const dayOfYear =
+        Math.floor(
+          (date.getTime() - yearStart.getTime()) / (1000 * 60 * 60 * 24)
+        ) + 1;
+      const startDay = yearStart.getDay();
+      const weekStart = mode % 2 === 0 ? 0 : 1;
+      const daysToFirstWeek = (7 - startDay + weekStart) % 7;
+      let year = date.getFullYear();
+      let weekNum;
+      if (dayOfYear <= daysToFirstWeek) {
+        year--;
+        const prevYear = new Date(year, 11, 31);
+        const prevYearStart = new Date(year, 0, 1);
+        const prevDayOfYear =
+          Math.floor(
+            (prevYear.getTime() - prevYearStart.getTime()) / (1000 * 60 * 60 * 24)
+          ) + 1;
+        const prevStartDay = prevYearStart.getDay();
+        const prevDaysToFirstWeek = (7 - prevStartDay + weekStart) % 7;
+        weekNum = Math.floor((prevDayOfYear - prevDaysToFirstWeek - 1) / 7) + 1;
+      } else {
+        weekNum = Math.floor((dayOfYear - daysToFirstWeek - 1) / 7) + 1;
+      }
+      result.value = year * 100 + weekNum;
+    }
+  }
+  return result;
+}
