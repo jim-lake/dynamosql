@@ -1,6 +1,6 @@
-import { EventEmitter } from 'node:events';
 import * as SqlString from 'sqlstring';
 
+import { SQLMode } from './lib/helpers/sql_mode';
 import * as DynamoDB from './lib/dynamodb';
 import { SQLError } from './error';
 import { Query } from './query';
@@ -43,7 +43,7 @@ export interface SqlValue {
   value: unknown;
 }
 
-export class Session extends EventEmitter implements PoolConnection {
+export class Session extends SQLMode implements PoolConnection {
   public readonly config: SessionConfig;
   public readonly state: string = 'connected';
   public readonly threadId: number | null = g_threadId++;
@@ -64,7 +64,6 @@ export class Session extends EventEmitter implements PoolConnection {
   private _collationConnection: string;
   private _divPrecisionIncrement: number;
   private _timeZone: string;
-  private _sqlMode: string;
   private _timestamp = 0;
   private _insertId = 0n;
   private _lastInsertId = 0n;
@@ -74,9 +73,6 @@ export class Session extends EventEmitter implements PoolConnection {
   }
   public get divPrecisionIncrement() {
     return this._divPrecisionIncrement;
-  }
-  public get sqlMode() {
-    return this._sqlMode;
   }
   public get timeZone() {
     return this._timeZone;
@@ -92,7 +88,7 @@ export class Session extends EventEmitter implements PoolConnection {
   }
 
   constructor(params?: SessionConfig) {
-    super();
+    super(GlobalSettings.sqlMode);
     this.config = params || {};
     this.dynamodb = DynamoDB.createDynamoDB(params);
     this.multipleStatements = Boolean(params?.multipleStatements ?? false);
@@ -100,7 +96,6 @@ export class Session extends EventEmitter implements PoolConnection {
     this.typeCast = params?.typeCast ?? true;
     this._collationConnection = GlobalSettings.collationConnection;
     this._divPrecisionIncrement = GlobalSettings.divPrecisionIncrement;
-    this._sqlMode = GlobalSettings.sqlMode;
     this._timeZone = GlobalSettings.timeZone;
 
     if (params?.dateStrings) {
@@ -184,7 +179,7 @@ export class Session extends EventEmitter implements PoolConnection {
         this._timeZone = String(value);
         return;
       case 'SQL_MODE':
-        this._sqlMode = String(value);
+        this.sqlMode = String(value);
         return;
       case 'TIMESTAMP':
         this._timestamp = Number(value);

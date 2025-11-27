@@ -64,7 +64,7 @@ async function _handleAssignment(
 
   if (prefix === '@') {
     session.setVariable(left.name, result);
-  } else if (prefix === '@@') {
+  } else if (prefix === '@@' || prefix === null) {
     if (scope === 'global') {
       GlobalSettings.setGlobalVariable(
         typeof name === 'string' ? name : String(name),
