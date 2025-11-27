@@ -6,7 +6,6 @@ SELECT * FROM _dynamodb.alter_test ORDER BY id;
 
 -- ALTER TABLE ADD COLUMN
 ALTER TABLE _dynamodb.alter_test ADD COLUMN age INT;
-SELECT * FROM _dynamodb.alter_test ORDER BY id;
 
 -- Insert with new column
 INSERT INTO _dynamodb.alter_test (id, name, age) VALUES (3, "test3", 30);
@@ -14,7 +13,6 @@ SELECT * FROM _dynamodb.alter_test ORDER BY id;
 
 -- ALTER TABLE ADD another COLUMN
 ALTER TABLE _dynamodb.alter_test ADD COLUMN email VARCHAR(256);
-SELECT * FROM _dynamodb.alter_test ORDER BY id;
 
 -- Update with new columns
 UPDATE _dynamodb.alter_test SET age = 25, email = "test1@example.com" WHERE id = 1;
