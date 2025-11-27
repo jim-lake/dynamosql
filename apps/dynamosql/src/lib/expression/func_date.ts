@@ -406,16 +406,7 @@ export function dayname(
       timeZone: state.session.timeZone,
     });
     if (dt) {
-      const days = [
-        'Sunday',
-        'Monday',
-        'Tuesday',
-        'Wednesday',
-        'Thursday',
-        'Friday',
-        'Saturday',
-      ];
-      result.value = days[dt.toDate(state.session.timeZone).getDay()];
+      result.value = dateFormat(dt.toDate(), "%W");
     } else {
       result.value = null;
     }
@@ -435,21 +426,7 @@ export function monthname(
       timeZone: state.session.timeZone,
     });
     if (dt) {
-      const months = [
-        'January',
-        'February',
-        'March',
-        'April',
-        'May',
-        'June',
-        'July',
-        'August',
-        'September',
-        'October',
-        'November',
-        'December',
-      ];
-      result.value = months[dt.toDate(state.session.timeZone).getMonth()];
+      result.value = dateFormat(dt.toDate(), "%M");
     } else {
       result.value = null;
     }
