@@ -110,7 +110,8 @@ function min(expr: AggrFunc, state: EvaluationState): EvaluationResult {
       }
     }
   }
-  return { err, value, type: 'string', name };
+  const type = typeof value === 'string' ? 'string' : 'number';
+  return { err, value, type, name };
 }
 function max(expr: AggrFunc, state: EvaluationState): EvaluationResult {
   const { row, ...other } = state;
@@ -133,7 +134,8 @@ function max(expr: AggrFunc, state: EvaluationState): EvaluationResult {
       }
     }
   }
-  return { err, value, type: 'string', name };
+  const type = typeof value === 'string' ? 'string' : 'number';
+  return { err, value, type, name };
 }
 
 export const methods: Record<
