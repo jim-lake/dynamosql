@@ -43,17 +43,9 @@ export interface QueryConstructorParams extends QueryOptions {
   session: Session;
 }
 
-type HandlerResult =
-  | AffectedResult
-  | ChangedResult
-  | unknown[][]
-  | string[][]
-  | OkPacket;
-
-interface SingleQueryResult {
-  result: HandlerResult;
-  columns: FieldInfo[];
-}
+type SingleQueryResult =
+  | { result: AffectedResult | ChangedResult | OkPacket; columns: undefined }
+  | { result: unknown[][] | string[][]; columns: FieldInfo[] };
 
 export class Query extends EventEmitter {
   private readonly _session: Session;
@@ -96,7 +88,7 @@ export class Query extends EventEmitter {
     }
 
     const result_list: unknown[] = [];
-    const schema_list: FieldInfo[][] = [];
+    const schema_list: (FieldInfo[] | undefined)[] = [];
     try {
       for (const ast of list) {
         this._session.startStatement();
@@ -104,16 +96,16 @@ export class Query extends EventEmitter {
         if (!Array.isArray(result)) {
           result_list.push(Object.assign({}, DEFAULT_RESULT, result));
         } else if (this._session.resultObjects) {
-          result_list.push(this._transformResultObject(result, columns));
+          result_list.push(this._transformResultObject(result, columns ?? []));
         } else {
-          result_list.push(this._transformResultArray(result, columns));
+          result_list.push(this._transformResultArray(result, columns ?? []));
         }
         schema_list.push(columns);
       }
       if (list.length === 1) {
-        return [result_list[0], schema_list[0] ?? []];
+        return [result_list[0], schema_list[0]] as QueryListResult;
       } else {
-        return [result_list, schema_list];
+        return [result_list, schema_list] as QueryListResult;
       }
     } catch (err: unknown) {
       const sql_err =
@@ -131,25 +123,25 @@ export class Query extends EventEmitter {
     switch (type) {
       case 'alter':
         await AlterHandler.query({ ...params, ast });
-        return { result: DEFAULT_RESULT, columns: [] };
+        return { result: DEFAULT_RESULT, columns: undefined };
       case 'create':
         return {
           result: await CreateHandler.query({ ...params, ast }),
-          columns: [],
+          columns: undefined,
         };
       case 'delete':
         return {
           result: await DeleteHandler.query({ ...params, ast }),
-          columns: [],
+          columns: undefined,
         };
       case 'drop':
         await DropHandler.query({ ...params, ast });
-        return { result: DEFAULT_RESULT, columns: [] };
+        return { result: DEFAULT_RESULT, columns: undefined };
       case 'insert':
       case 'replace':
         return {
           result: await InsertHandler.query({ ...params, ast }),
-          columns: [],
+          columns: undefined,
         };
       case 'show': {
         const { rows, columns } = await ShowHandler.query({ ...params, ast });
@@ -164,18 +156,18 @@ export class Query extends EventEmitter {
       }
       case 'set':
         await SetHandler.query({ ...params, ast });
-        return { result: DEFAULT_RESULT, columns: [] };
+        return { result: DEFAULT_RESULT, columns: undefined };
       case 'update':
         return {
           result: await UpdateHandler.query({ ...params, ast }),
-          columns: [],
+          columns: undefined,
         };
       case 'transaction':
         await TransactionManager.query({ ...params, ast });
-        return { result: DEFAULT_RESULT, columns: [] };
+        return { result: DEFAULT_RESULT, columns: undefined };
       case 'use':
         await _useDatabase({ ast, session: this._session });
-        return { result: DEFAULT_RESULT, columns: [] };
+        return { result: DEFAULT_RESULT, columns: undefined };
       default: {
         logger.error('unsupported statement type:', type);
         throw new SQLError({

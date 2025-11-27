@@ -45,5 +45,5 @@ SELECT CAST("100" AS SIGNED) * 2 AS result;
 SELECT CONCAT("Value: ", CAST(123 AS CHAR)) AS result;
 
 -- CAST in WHERE clause
-SELECT id, other FROM _dynamodb.foo WHERE CAST(id AS SIGNED) > 100 ORDER BY id;
-SELECT id, other FROM _dynamodb.foo WHERE CAST(other AS CHAR) = "111" ORDER BY id;
+SELECT id, CAST(other AS DECIMAL) FROM _dynamodb.foo WHERE CAST(id AS SIGNED) > 100 ORDER BY id;
+SELECT id, CAST(other AS DECIMAL) FROM _dynamodb.foo WHERE CAST(other AS CHAR) = "111" ORDER BY id;

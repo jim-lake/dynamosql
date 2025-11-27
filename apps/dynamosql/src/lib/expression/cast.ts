@@ -2,7 +2,7 @@ import {
   convertDate,
   convertDateTime,
   convertTime,
-  convertNum,
+  convertBigInt,
 } from '../helpers/sql_conversion';
 import { getValue } from './evaluate';
 import type { Cast } from 'node-sql-parser';
@@ -67,19 +67,34 @@ function signed(expr: Cast, state: EvaluationState): EvaluationResult {
   result.name = `CAST(${result.name} AS SIGNED)`;
   result.type = 'bigint';
   if (!result.err && result.value !== null) {
-    const num = convertNum(result.value);
-    if (num !== null) {
-      result.value = Math.trunc(num);
-    }
+    result.value = convertBigInt(result.value);
   }
   return result;
 }
 function char(expr: Cast, state: EvaluationState): EvaluationResult {
   const result = getValue(expr.expr, state);
   result.name = `CAST(${result.name} AS CHAR)`;
+  result.type = 'string';
   if (!result.err && result.value !== null && result.type !== 'string') {
-    result.type = 'string';
     result.value = String(result.value);
+  }
+  return result;
+}
+function decimal(expr: Cast, state: EvaluationState): EvaluationResult {
+  const result = getValue(expr.expr, state);
+  result.name = `CAST(${result.name} AS DECIMAL)`;
+  result.type = 'decimal';
+  if (!result.err && result.value !== null && result.type !== 'decimal') {
+    result.value = Number(result.value);
+  }
+  return result;
+}
+function double(expr: Cast, state: EvaluationState): EvaluationResult {
+  const result = getValue(expr.expr, state);
+  result.name = `CAST(${result.name} AS DOUBLE)`;
+  result.type = 'double';
+  if (!result.err && result.value !== null && result.type !== 'double') {
+    result.value = Number(result.value);
   }
   return result;
 }
@@ -87,4 +102,4 @@ function char(expr: Cast, state: EvaluationState): EvaluationResult {
 export const methods: Record<
   string,
   undefined | ((expr: Cast, state: EvaluationState) => EvaluationResult)
-> = { datetime, date, time, signed, char };
+> = { datetime, date, time, signed, char, decimal, double };

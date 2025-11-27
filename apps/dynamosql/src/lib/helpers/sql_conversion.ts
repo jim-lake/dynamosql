@@ -38,7 +38,8 @@ export function convertBigInt(value: unknown): bigint | null {
   } else if (value === '') {
     return 0n;
   } else if (typeof value === 'string') {
-    return toBigInt(value);
+    const s = value.match(/-?\d*/)?.[0] ?? '';
+    return toBigInt(s) ?? 0n;
   }
   return null;
 }

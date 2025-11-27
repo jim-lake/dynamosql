@@ -12,6 +12,85 @@ import type { Binary } from 'node-sql-parser';
 import type { EvaluationState, EvaluationResult } from './evaluate';
 import type { SQLInterval } from '../types/sql_interval';
 
+export function plus(expr: Binary, state: EvaluationState): EvaluationResult {
+  const result = _numBothSides(expr, state, ' + ', true);
+  const { err, name, left_num, right_num, interval, datetime } = result;
+  let value = result.value;
+  let type = result.type;
+  if (!err && value !== null) {
+    if (datetime && interval) {
+      const add_result = interval.add(datetime, state.session.timeZone);
+      value = add_result.value;
+      type = add_result.type;
+    } else if (left_num !== undefined && right_num !== undefined) {
+      // @ts-expect-error TS2365 ignore bigint/number the code is correct
+      value = left_num + right_num;
+    }
+  }
+  return { err, value, type, name };
+}
+export function minus(expr: Binary, state: EvaluationState): EvaluationResult {
+  const result = _numBothSides(expr, state, ' - ', true);
+  const { err, name, left_num, right_num, interval, datetime } = result;
+  let value = result.value;
+  let type = result.type;
+  if (!err && value !== null) {
+    if (datetime && interval) {
+      const sub_result = interval.sub(datetime, state.session.timeZone);
+      value = sub_result.value;
+      type = sub_result.type;
+    } else if (
+      result.left_num !== undefined &&
+      result.right_num !== undefined
+    ) {
+      // @ts-expect-error TS2365 ignore bigint/number the code is correct
+      value = left_num - right_num;
+      type = 'number';
+    }
+  }
+  return { err, value, type, name };
+}
+export function mul(expr: Binary, state: EvaluationState): EvaluationResult {
+  const result = _numBothSides(expr, state, ' * ');
+  const { err, name, left_num, right_num } = result;
+  let value = result.value;
+  if (
+    !err &&
+    value !== null &&
+    left_num !== undefined &&
+    right_num !== undefined
+  ) {
+    // @ts-expect-error TS2365 ignore bigint/number the code is correct
+    value = left_num * right_num;
+  }
+  return { err, value, name, type: result.type };
+}
+export function div(expr: Binary, state: EvaluationState): EvaluationResult {
+  const result = _numBothSides(expr, state, ' / ');
+  const { err, name, left_num, right_num } = result;
+  let value = result.value;
+  if (
+    !err &&
+    value !== null &&
+    left_num !== undefined &&
+    right_num !== undefined
+  ) {
+    // Division by zero returns NULL in MySQL
+    if (right_num === 0 || right_num === 0n) {
+      value = null;
+    } else if (typeof left_num === 'bigint' || typeof right_num === 'bigint') {
+      value = Number(left_num) / Number(right_num);
+    } else {
+      value = left_num / right_num;
+    }
+  }
+  return {
+    err,
+    value,
+    name,
+    type: result.type === 'double' ? 'double' : 'number',
+  };
+}
 interface NumBothSidesResult extends EvaluationResult {
   left_num?: bigint | number | undefined;
   right_num?: bigint | number | undefined;
@@ -33,6 +112,7 @@ function _numBothSides(
   let right_num;
   let interval: SQLInterval | undefined;
   let datetime: SQLDateTime | SQLTime | SQLDate | null | undefined;
+  let type = 'number';
   if (!err) {
     if (left.value === null || right.value === null) {
       value = null;
@@ -88,6 +168,7 @@ function _numBothSides(
         left_num = left_temp;
         right_num = right_temp;
       }
+      type = _unionNumberType(left.type, right.type, 'bigint');
     } else {
       const left_temp = convertNum(left.value);
       const right_temp = convertNum(right.value);
@@ -97,90 +178,18 @@ function _numBothSides(
         left_num = left_temp;
         right_num = right_temp;
       }
+      type = _unionNumberType(left.type, right.type, 'number');
     }
   }
-  return {
-    err,
-    name,
-    value,
-    left_num,
-    right_num,
-    interval,
-    datetime,
-    type: 'number',
-  };
+  return { err, name, value, left_num, right_num, interval, datetime, type };
 }
-export function plus(expr: Binary, state: EvaluationState): EvaluationResult {
-  const result = _numBothSides(expr, state, ' + ', true);
-  const { err, name, left_num, right_num, interval, datetime } = result;
-  let value = result.value;
-  let type: string = 'number';
-  if (!err && value !== null) {
-    if (datetime && interval) {
-      const result = interval.add(datetime, state.session.timeZone);
-      value = result.value;
-      type = result.type;
-    } else if (left_num !== undefined && right_num !== undefined) {
-      // @ts-expect-error TS2365 ignore bigint/number the code is correct
-      value = left_num + right_num;
-      type = 'number';
-    }
+function _unionNumberType(type1: string, type2: string, default_type: string) {
+  if (type1 === type2) {
+    return type1;
+  } else if (type1 === 'double' || type2 === 'double') {
+    return 'double';
+  } else if (type1 === 'decimal' || type2 === 'decimal') {
+    return 'decimal';
   }
-  return { err, value, type, name };
-}
-export function minus(expr: Binary, state: EvaluationState): EvaluationResult {
-  const result = _numBothSides(expr, state, ' - ', true);
-  const { err, name, left_num, right_num, interval, datetime } = result;
-  let value = result.value;
-  let type: string = 'number';
-  if (!err && value !== null) {
-    if (datetime && interval) {
-      const result = interval.sub(datetime, state.session.timeZone);
-      value = result.value;
-      type = result.type;
-    } else if (
-      result.left_num !== undefined &&
-      result.right_num !== undefined
-    ) {
-      // @ts-expect-error TS2365 ignore bigint/number the code is correct
-      value = left_num - right_num;
-      type = 'number';
-    }
-  }
-  return { err, value, type, name };
-}
-export function mul(expr: Binary, state: EvaluationState): EvaluationResult {
-  const result = _numBothSides(expr, state, ' * ');
-  const { err, name, left_num, right_num } = result;
-  let value = result.value;
-  if (
-    !err &&
-    value !== null &&
-    left_num !== undefined &&
-    right_num !== undefined
-  ) {
-    // @ts-expect-error TS2365 ignore bigint/number the code is correct
-    value = left_num * right_num;
-  }
-  return { err, value, name, type: 'number' };
-}
-export function div(expr: Binary, state: EvaluationState): EvaluationResult {
-  const result = _numBothSides(expr, state, ' / ');
-  const { err, name, left_num, right_num } = result;
-  let value = result.value;
-  if (
-    !err &&
-    value !== null &&
-    left_num !== undefined &&
-    right_num !== undefined
-  ) {
-    // Division by zero returns NULL in MySQL
-    if (right_num === 0 || right_num === 0n) {
-      value = null;
-    } else {
-      // @ts-expect-error TS2365 ignore bigint/number the code is correct
-      value = left_num / right_num;
-    }
-  }
-  return { err, value, name, type: 'number' };
+  return default_type;
 }

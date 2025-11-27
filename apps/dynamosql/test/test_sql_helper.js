@@ -76,21 +76,21 @@ function runTests(test_name, file_path, extra, maybe_skip) {
 
       await Promise.all([
         new Promise((resolve) => {
-          mysql_conn.query(opts, (err, results, columns) => {
+          mysql_conn.query(opts, (err, results, fields) => {
             mysql_result.err = err;
             mysql_result.results = results;
-            mysql_result.columns = columns;
+            mysql_result.fields = fields;
             resolve();
           });
         }),
         new Promise((resolve) => {
-          ddb_session.query(opts, (err, results, columns) => {
+          ddb_session.query(opts, (err, results, fields) => {
             if (err) {
               err.cause = null;
             }
             ddb_result.err = err;
             ddb_result.results = results;
-            ddb_result.columns = columns;
+            ddb_result.fields = fields;
             resolve();
           });
         }),
@@ -123,14 +123,14 @@ function runTests(test_name, file_path, extra, maybe_skip) {
       if (Array.isArray(ddb_result.results)) {
         ddb_result.results?.forEach?.((result, i) => {
           if (Array.isArray(result)) {
-            ddb_result.columns.forEach((column, j) => {
+            ddb_result.fields.forEach((column, j) => {
               const name = column.name;
               const left = String(result[j]);
               const right = String(mysql_result.results[i][name]);
               _checkEqual(name, i, left, right);
             });
           } else {
-            ddb_result.columns.forEach((column) => {
+            ddb_result.fields.forEach((column) => {
               const { table, name } = column;
               const left = opts.nestTables
                 ? result[table]?.[name]
@@ -142,6 +142,24 @@ function runTests(test_name, file_path, extra, maybe_skip) {
             });
           }
         });
+        if (mysql_result.fields === undefined) {
+          expect(ddb_result.fields, 'fields should be undefined').to.be
+            .undefined;
+        } else {
+          expect(
+            ddb_result.fields.length,
+            'fields should be the same length'
+          ).to.equal(mysql_result.fields.length);
+          if (extra?.verify_field_types) {
+            for (let i = 0; i < ddb_result.fields.length; i++) {
+              const ddb_field = ddb_result.fields[i];
+              const mysql_field = mysql_result.fields[i];
+              expect(ddb_field.type, `field ${ddb_field.name} type`).to.equal(
+                mysql_field.type
+              );
+            }
+          }
+        }
       } else {
         if (extra?.skipAffected !== true) {
           expect(

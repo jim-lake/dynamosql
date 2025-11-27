@@ -21,6 +21,7 @@ export function convertType(type?: string, nullable?: boolean): FieldInfo {
         zeroFill: false,
         protocol41: true,
       };
+    case 'decimal':
     case 'number':
       return {
         catalog: 'def',
