@@ -105,7 +105,7 @@ function min(expr: AggrFunc, state: EvaluationState): EvaluationResult {
       err = result.err;
       break;
     } else if (result.value !== null && result.value !== undefined) {
-      if (value === null || result.value < value) {
+      if (value === null || value === undefined || result.value < value) {
         value = result.value;
       }
     }
@@ -128,7 +128,7 @@ function max(expr: AggrFunc, state: EvaluationState): EvaluationResult {
       err = result.err;
       break;
     } else if (result.value !== null && result.value !== undefined) {
-      if (value === null || result.value > value) {
+      if (value === null || value === undefined || result.value > value) {
         value = result.value;
       }
     }
