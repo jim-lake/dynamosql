@@ -32,3 +32,32 @@ SELECT MID('foobarbar', 4, 3) AS result;
 
 -- Test OCTET_LENGTH (alias for LENGTH)
 SELECT OCTET_LENGTH('hello') AS result;
+
+-- Test ASCII function
+SELECT ASCII('A') AS result;
+SELECT ASCII('hello') AS result;
+SELECT ASCII('') AS result;
+SELECT ASCII(NULL) AS result;
+SELECT ASCII('123') AS result;
+
+-- Test ORD function
+SELECT ORD('A') AS result;
+SELECT ORD('hello') AS result;
+SELECT ORD('') AS result;
+SELECT ORD(NULL) AS result;
+
+-- Test SPACE function
+SELECT SPACE(5) AS result;
+SELECT SPACE(0) AS result;
+SELECT SPACE(NULL) AS result;
+
+-- Test HEX function
+SELECT HEX(255) AS result;
+SELECT HEX(0) AS result;
+SELECT HEX('hello') AS result;
+SELECT HEX(NULL) AS result;
+
+-- Test UNHEX function
+SELECT UNHEX('48656C6C6F') AS result;
+SELECT UNHEX('FF') AS result;
+SELECT UNHEX(NULL) AS result;

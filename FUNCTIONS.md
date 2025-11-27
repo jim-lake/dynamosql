@@ -48,8 +48,8 @@ and geometry
 | IS NULL                         |    ✅     | NULL value test                                                                                                                                         |
 | LAST_DAY                        |    ❌     | Return the last day of the month for the argument                                                                                                       |
 | LIKE                            |    ✅     | Simple pattern matching                                                                                                                                 |
-| LOCALTIME                       |    ❌     | Synonym for NOW()                                                                                                                                       |
-| LOCALTIMESTAMP                  |    ❌     | Synonym for NOW()                                                                                                                                       |
+| LOCALTIME                       |    ✅     | Synonym for NOW()                                                                                                                                       |
+| LOCALTIMESTAMP                  |    ✅     | Synonym for NOW()                                                                                                                                       |
 | MEMBER OF()                     |    ❌     | Returns true (1) if first operand matches any element of JSON array passed as second operand, otherwise returns false (0)                               |
 | NOT                             |    ✅     | Negates value                                                                                                                                           |
 | NOT BETWEEN                     |    ❌     | ... AND ... Whether a value is not within a range of values                                                                                             |
@@ -69,7 +69,7 @@ and geometry
 | AES_DECRYPT()                   |    ❌     | Decrypt using AES                                                                                                                                       |
 | AES_ENCRYPT()                   |    ❌     | Encrypt using AES                                                                                                                                       |
 | ANY_VALUE()                     |    ❌     | Suppress ONLY_FULL_GROUP_BY value rejection                                                                                                             |
-| ASCII()                         |    ❌     | Return numeric value of left-most character                                                                                                             |
+| ASCII()                         |    ✅     | Return numeric value of left-most character                                                                                                             |
 | ASIN()                          |    ✅     | Return the arc sine                                                                                                                                     |
 | ATAN()                          |    ✅     | Return the arc tangent                                                                                                                                  |
 | ATAN2()                         |    ✅     | ATAN() Return the arc tangent of the two arguments                                                                                                      |
@@ -237,12 +237,12 @@ and geometry
 | NULLIF()                        |    ✅     | Return NULL if expr1 = expr2                                                                                                                            |
 | OCT()                           |    ✅     | Return a string containing octal representation of a number                                                                                             |
 | OCTET_LENGTH()                  |    ✅     | Synonym for LENGTH()                                                                                                                                    |
-| ORD()                           |    ❌     | Return character code for leftmost character of the argument                                                                                            |
+| ORD()                           |    ✅     | Return character code for leftmost character of the argument                                                                                            |
 | PERCENT_RANK()                  |    ❌     | Percentage rank value                                                                                                                                   |
 | PERIOD_ADD()                    |    ❌     | Add a period to a year-month                                                                                                                            |
 | PERIOD_DIFF()                   |    ❌     | Return the number of months between periods                                                                                                             |
 | PI()                            |    ✅     | Return the value of pi                                                                                                                                  |
-| POSITION()                      |    ❌     | Synonym for LOCATE()                                                                                                                                    |
+| POSITION()                      |    ✅     | Synonym for LOCATE()                                                                                                                                    |
 | POW()                           |    ✅     | Return the argument raised to the specified power                                                                                                       |
 | POWER()                         |    ✅     | Return the argument raised to the specified power                                                                                                       |
 | PS_CURRENT_THREAD_ID()          |    ❌     | Performance Schema thread ID for current thread                                                                                                         |
@@ -314,7 +314,7 @@ and geometry
 | UCASE()                         |    ✅     | Synonym for UPPER()                                                                                                                                     |
 | UNCOMPRESS()                    |    ❌     | Uncompress a string compressed                                                                                                                          |
 | UNCOMPRESSED_LENGTH()           |    ❌     | Return the length of a string before compression                                                                                                        |
-| UNHEX()                         |    ❌     | Return a string containing hex representation of a number                                                                                               |
+| UNHEX()                         |    ✅     | Return a string containing hex representation of a number                                                                                               |
 | UNIX_TIMESTAMP()                |    ✅     | Return a Unix timestamp                                                                                                                                 |
 | UpdateXML()                     |    ❌     | Return replaced XML fragment                                                                                                                            |
 | UPPER()                         |    ✅     | Convert to uppercase                                                                                                                                    |
