@@ -1,12 +1,12 @@
 process.env.TZ = 'UTC';
 
-exports.runTests = runTests;
-
 const { assert, expect } = require('chai');
 const fs = require('node:fs');
-const config = require('../../../config');
+const config = require('../../../config.json');
 const mysql = require('mysql');
-const Session = require('../src/session');
+const { createSession } = require('../src/session');
+
+const { Types } = require('../src/types');
 
 const SECONDS_REGEX = /:[0-9]{2}(\.[0-9]*)?$/g;
 
@@ -19,7 +19,7 @@ process.on('unhandledRejection', (err) => {
   process.exit(1);
 });
 
-function runTests(test_name, file_path, extra, maybe_skip) {
+export function runTests(test_name, file_path, extra, maybe_skip) {
   const skip = maybe_skip && !process.env.TEST_RUN_SLOW;
 
   const mysql_opts = Object.assign(
@@ -44,7 +44,7 @@ function runTests(test_name, file_path, extra, maybe_skip) {
     },
     extra?.session
   );
-  const ddb_session = Session.createSession(session_opts);
+  const ddb_session = createSession(session_opts);
   after(() => {
     mysql_conn.destroy();
     ddb_session.destroy();
@@ -154,8 +154,10 @@ function runTests(test_name, file_path, extra, maybe_skip) {
             for (let i = 0; i < ddb_result.fields.length; i++) {
               const ddb_field = ddb_result.fields[i];
               const mysql_field = mysql_result.fields[i];
-              expect(ddb_field.type, `field ${ddb_field.name} type`).to.equal(
-                mysql_field.type
+              const ddb_type = Types[ddb_field.type];
+              const mysql_type = Types[mysql_field.type];
+              expect(ddb_type, `field ${ddb_field.name} type`).to.equal(
+                mysql_type
               );
             }
           }
