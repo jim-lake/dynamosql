@@ -257,12 +257,14 @@ export function date_add(
   const dateArg = getValue(expr.args?.value?.[0], state);
   const intervalArg = getValue(expr.args?.value?.[1], state);
   let err = dateArg.err ?? intervalArg.err;
-  let value = null;
+  let value: EvaluationResult['value'] = null;
   let type = 'char';
   const name = `DATE_ADD(${dateArg.name}, ${intervalArg.name})`;
-  if (!err && !(intervalArg.value instanceof SQLInterval)) {
-    err = { code: 'ER_PARSE_ERROR' };
-  } else if (!err && dateArg.value !== null) {
+  if (
+    !err &&
+    dateArg.value !== null &&
+    intervalArg.value instanceof SQLInterval
+  ) {
     const dt = convertDateTimeOrDate({
       value: dateArg.value,
       timeZone: state.session.timeZone,
@@ -274,6 +276,8 @@ export function date_add(
         type = result.type;
       }
     }
+  } else if (!err && !(intervalArg.value instanceof SQLInterval)) {
+    err = { err: 'ER_PARSE_ERROR' };
   }
   return { err, name, value, type };
 }
@@ -283,8 +287,8 @@ export function date_sub(
 ): EvaluationResult {
   const dateArg = getValue(expr.args?.value?.[0], state);
   const intervalArg = getValue(expr.args?.value?.[1], state);
-  const err = dateArg.err || intervalArg.err;
-  let value = null;
+  let err = dateArg.err || intervalArg.err;
+  let value: EvaluationResult['value'] = null;
   const type: EvaluationResult['type'] = 'char';
   const name = `DATE_SUB(${dateArg.name}, ${intervalArg.name})`;
 
@@ -301,6 +305,8 @@ export function date_sub(
       const result = intervalArg.value.sub(dt, state.session.timeZone);
       value = result.value;
     }
+  } else if (!err && !(intervalArg.value instanceof SQLInterval)) {
+    err = { err: 'ER_PARSE_ERROR' };
   }
   return { err, name, value, type };
 }

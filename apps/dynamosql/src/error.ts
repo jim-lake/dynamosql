@@ -137,7 +137,11 @@ const ERROR_MAP: Record<string, ErrorMapEntry> = {
   },
   ER_UNKNOWN_TIME_ZONE: {
     code: 'ER_UNKNOWN_TIME_ZONE',
-    sqlMessage: errStr`Uknown or incorrect time zone: '${0}'`,
+    sqlMessage: errStr`Unkown or incorrect time zone: '${0}'`,
+  },
+  ER_PARSE_ERROR: {
+    code: 'ER_PARSE_ERROR',
+    sqlMessage: 'You have an error in your SQL syntax.',
   },
 };
 

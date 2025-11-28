@@ -21,7 +21,7 @@ export function plus(expr: Binary, state: EvaluationState): EvaluationResult {
     if (datetime && interval) {
       const add_result = interval.add(datetime, state.session.timeZone);
       value = add_result.value;
-      type = add_result.type;
+      type = result.type === 'char' ? 'char' : add_result.type;
     } else if (left_num !== undefined && right_num !== undefined) {
       // @ts-expect-error TS2365 ignore bigint/number the code is correct
       value = left_num + right_num;
@@ -38,7 +38,7 @@ export function minus(expr: Binary, state: EvaluationState): EvaluationResult {
     if (datetime && interval) {
       const sub_result = interval.sub(datetime, state.session.timeZone);
       value = sub_result.value;
-      type = sub_result.type;
+      type = result.type === 'char' ? 'char' : sub_result.type;
     } else if (
       result.left_num !== undefined &&
       result.right_num !== undefined
@@ -132,6 +132,7 @@ function _numBothSides(
         if (!datetime) {
           value = null;
         }
+        type = 'char';
       } else {
         value = null;
       }
@@ -151,6 +152,7 @@ function _numBothSides(
         if (!datetime) {
           value = null;
         }
+        type = 'char';
       } else {
         value = null;
       }
