@@ -1,13 +1,22 @@
 -- User variables - SET and SELECT
 SET @myvar = 10;
 SELECT @myvar AS result;
-
 SET @myvar = 20;
 SELECT @myvar AS result;
-
+SET @myvar = 2.0;
+SELECT @myvar AS result;
+SET @myvar = 2.5;
+SELECT @myvar AS result;
+SET @myvar = "1"/2;
+SELECT @myvar AS result;
+SET @myvar = NOW();
+SELECT @myvar AS ignore_seconds;
+SET @myvar = CURDATE();
+SELECT @myvar AS ignore_seconds;
+SET @myvar = CURTIME();
+SELECT @myvar AS ignore_seconds;
 SET @str = "hello";
 SELECT @str AS result;
-
 SET @null_var = NULL;
 SELECT @null_var AS result;
 
