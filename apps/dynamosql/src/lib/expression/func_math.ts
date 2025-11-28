@@ -48,7 +48,7 @@ export function round(
     ? getValue(expr.args?.value?.[1], state)
     : undefined;
   if (result.err) {
-    return arg1;
+    return result;
   }
   if (arg2 && arg2.err) {
     return arg2;
