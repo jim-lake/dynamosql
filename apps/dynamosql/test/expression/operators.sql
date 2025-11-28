@@ -75,20 +75,6 @@ SELECT (5 > 3) XOR (10 < 20) AS result;
 SELECT NOT (5 > 3) AS result;
 SELECT (5 > 3) AND NOT (10 > 20) AS result;
 
--- Arithmetic with columns
-SELECT id, other, other + 10 AS plus_ten FROM _dynamodb.foo WHERE other IS NOT NULL ORDER BY id;
-SELECT id, other, other - 10 AS minus_ten FROM _dynamodb.foo WHERE other IS NOT NULL ORDER BY id;
-SELECT id, other, other * 2 AS doubled FROM _dynamodb.foo WHERE other IS NOT NULL ORDER BY id;
-SELECT id, other, other / 2 AS halved FROM _dynamodb.foo WHERE other IS NOT NULL ORDER BY id;
-
--- Comparison with columns
-SELECT id, other FROM _dynamodb.foo WHERE other = 111 ORDER BY id;
-SELECT id, other FROM _dynamodb.foo WHERE other != 111 ORDER BY id;
-SELECT id, other FROM _dynamodb.foo WHERE other > 200 ORDER BY id;
-SELECT id, other FROM _dynamodb.foo WHERE other < 200 ORDER BY id;
-SELECT id, other FROM _dynamodb.foo WHERE other >= 222 ORDER BY id;
-SELECT id, other FROM _dynamodb.foo WHERE other <= 222 ORDER BY id;
-
 -- IN operator
 SELECT 1 IN (1, 2, 3) AS result;
 SELECT 4 IN (1, 2, 3) AS result;

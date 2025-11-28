@@ -15,4 +15,9 @@ describe('Select', function () {
   runTests('subquery.sql', path.join(__dirname, 'subquery.sql'));
   runTests('advanced.sql', path.join(__dirname, 'advanced.sql'));
   runTests('aggregate.sql', path.join(__dirname, 'aggregate.sql'));
+  runTests('cast.sql', path.join(__dirname, 'cast.sql'));
+  runTests('functions.sql', path.join(__dirname, 'functions.sql'));
+  runTests('null_handling.sql', path.join(__dirname, 'null_handling.sql'));
+  runTests('operators.sql', path.join(__dirname, 'operators.sql'));
+  runTests('string_funcs.sql', path.join(__dirname, 'string_funcs.sql'));
 });

@@ -35,15 +35,7 @@ SELECT CAST("00:00:00" AS TIME) AS result;
 SELECT CAST("2024-01-15 10:30:00" AS TIME) AS result;
 SELECT CAST(NULL AS TIME) AS result;
 
--- CAST with columns
-SELECT id, CAST(other AS CHAR) AS other_str FROM _dynamodb.foo WHERE other IS NOT NULL ORDER BY id;
-SELECT id, CAST(id AS SIGNED) AS id_num FROM _dynamodb.foo ORDER BY id;
-
 -- CAST in expressions
 SELECT CAST("10" AS SIGNED) + CAST("20" AS SIGNED) AS result;
 SELECT CAST("100" AS SIGNED) * 2 AS result;
 SELECT CONCAT("Value: ", CAST(123 AS CHAR)) AS result;
-
--- CAST in WHERE clause
-SELECT id, CAST(other AS DECIMAL) FROM _dynamodb.foo WHERE CAST(id AS SIGNED) > 100 ORDER BY id;
-SELECT id, CAST(other AS DECIMAL) FROM _dynamodb.foo WHERE CAST(other AS CHAR) = "111" ORDER BY id;
