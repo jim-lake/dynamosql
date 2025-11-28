@@ -53,13 +53,17 @@ export function getValue(
   if (!expr) {
     // no expression results in undefined
   } else if (type === 'number') {
-    result.value =
-      typeof expr.value === 'number' ? expr.value : Number(expr.value);
-    // Check if original string had decimal point to match MySQL behavior
-    const hasDecimal =
-      typeof expr.value === 'string' && expr.value.includes('.');
-    result.type =
-      Number.isInteger(result.value) && !hasDecimal ? 'longlong' : 'number';
+    if (typeof expr.value === 'number') {
+      result.value = expr.value;
+      result.type = Number.isInteger(result.value) ? 'longlong' : 'number';
+    } else {
+      result.value = Number(expr.value);
+      if (typeof expr.value === 'string' && expr.value.includes('.')) {
+        result.type = 'number';
+      } else {
+        result.type = Number.isInteger(result.value) ? 'longlong' : 'number';
+      }
+    }
   } else if (type === 'bigint') {
     const val = toBigInt(expr.value);
     if (val === null) {
