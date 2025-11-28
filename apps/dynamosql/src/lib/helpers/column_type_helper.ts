@@ -167,6 +167,22 @@ export function convertType(type?: string, nullable?: boolean): FieldInfo {
         zeroFill: false,
         protocol41: true,
       };
+    case 'medium_blob':
+      return {
+        catalog: 'def',
+        db: '',
+        table: '',
+        orgTable: '',
+        name: '',
+        orgName: '',
+        charsetNr: CHARSETS.BINARY,
+        length: 16777215,
+        type: Types.MEDIUM_BLOB,
+        flags,
+        decimals: 31,
+        zeroFill: false,
+        protocol41: true,
+      };
     case 'char':
       return {
         catalog: 'def',

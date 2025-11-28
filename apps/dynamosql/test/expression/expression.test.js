@@ -36,9 +36,13 @@ describe('Expression', function () {
   runTests('datetime.sql', path.join(__dirname, 'datetime.sql'), {
     verify_field_types: true,
   });
-  runTests('variables.sql', path.join(__dirname, 'variables.sql'));
-  runTests('operators.sql', path.join(__dirname, 'operators.sql'));
-  runTests('null_handling.sql', path.join(__dirname, 'null_handling.sql'));
+  runTests('variables.sql', path.join(__dirname, 'variables.sql'), {});
+  runTests('operators.sql', path.join(__dirname, 'operators.sql'), {
+    verify_field_types: true,
+  });
+  runTests('null_handling.sql', path.join(__dirname, 'null_handling.sql'), {
+    verify_field_types: true,
+  });
   runTests('timezone.sql', path.join(__dirname, 'timezone.sql'), {
     verify_field_types: true,
   });

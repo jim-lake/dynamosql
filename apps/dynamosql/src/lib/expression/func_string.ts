@@ -22,8 +22,12 @@ export function concat(
 ): EvaluationResult {
   let err: EvaluationResult['err'] = null;
   let value: string | null = '';
+  let has_blob = false;
   expr.args?.value?.every?.((sub: ExpressionValue) => {
     const result = getValue(sub, state);
+    if (result.type === 'long_blob' || result.type === 'medium_blob') {
+      has_blob = true;
+    }
     if (!err && result.err) {
       err = result.err;
     } else if (result.value === null) {
@@ -33,7 +37,7 @@ export function concat(
     }
     return value !== null;
   });
-  return { err, value, type: 'string' };
+  return { err, value, type: has_blob ? 'medium_blob' : 'string' };
 }
 export function left(expr: Function, state: EvaluationState): EvaluationResult {
   const result = getValue(expr.args?.value?.[0], state);
