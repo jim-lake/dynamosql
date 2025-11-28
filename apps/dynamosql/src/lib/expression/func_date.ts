@@ -256,16 +256,13 @@ export function date_add(
 ): EvaluationResult {
   const dateArg = getValue(expr.args?.value?.[0], state);
   const intervalArg = getValue(expr.args?.value?.[1], state);
-  const err = dateArg.err || intervalArg.err;
+  let err = dateArg.err ?? intervalArg.err;
   let value = null;
-  const type: EvaluationResult['type'] = 'char';
+  let type = 'char';
   const name = `DATE_ADD(${dateArg.name}, ${intervalArg.name})`;
-
-  if (
-    !err &&
-    dateArg.value !== null &&
-    intervalArg.value instanceof SQLInterval
-  ) {
+  if (!err && !(intervalArg.value instanceof SQLInterval)) {
+    err = { code: 'ER_PARSE_ERROR' };
+  } else if (!err && dateArg.value !== null) {
     const dt = convertDateTimeOrDate({
       value: dateArg.value,
       timeZone: state.session.timeZone,
@@ -273,6 +270,9 @@ export function date_add(
     if (dt) {
       const result = intervalArg.value.add(dt, state.session.timeZone);
       value = result.value;
+      if (dateArg.type !== 'string') {
+        type = result.type;
+      }
     }
   }
   return { err, name, value, type };

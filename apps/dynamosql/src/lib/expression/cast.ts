@@ -75,7 +75,11 @@ function char(expr: Cast, state: EvaluationState): EvaluationResult {
   const result = getValue(expr.expr, state);
   result.name = `CAST(${result.name} AS CHAR)`;
   result.type = 'string';
-  if (!result.err && result.value !== null && result.type !== 'string') {
+  if (
+    !result.err &&
+    result.value !== null &&
+    typeof result.value !== 'string'
+  ) {
     result.value = String(result.value);
   }
   return result;
@@ -83,8 +87,12 @@ function char(expr: Cast, state: EvaluationState): EvaluationResult {
 function decimal(expr: Cast, state: EvaluationState): EvaluationResult {
   const result = getValue(expr.expr, state);
   result.name = `CAST(${result.name} AS DECIMAL)`;
-  result.type = 'decimal';
-  if (!result.err && result.value !== null && result.type !== 'decimal') {
+  result.type = 'number';
+  if (
+    !result.err &&
+    result.value !== null &&
+    typeof result.value !== 'number'
+  ) {
     result.value = Number(result.value);
   }
   return result;
@@ -93,7 +101,11 @@ function double(expr: Cast, state: EvaluationState): EvaluationResult {
   const result = getValue(expr.expr, state);
   result.name = `CAST(${result.name} AS DOUBLE)`;
   result.type = 'double';
-  if (!result.err && result.value !== null && result.type !== 'double') {
+  if (
+    !result.err &&
+    result.value !== null &&
+    typeof result.value !== 'number'
+  ) {
     result.value = Number(result.value);
   }
   return result;

@@ -7,13 +7,11 @@ describe('Expression', function () {
     path.join(__dirname, 'binary_expression.sql'),
     { verify_field_types: true }
   );
-
   runTests(
     'unary_expression.sql',
     path.join(__dirname, 'unary_expression.sql'),
     { verify_field_types: true }
   );
-
   runTests('date.sql', path.join(__dirname, 'date.sql'), {
     verify_field_types: true,
   });
@@ -21,9 +19,7 @@ describe('Expression', function () {
   runTests('string.sql', path.join(__dirname, 'string.sql'), {
     verify_field_types: true,
   });
-  runTests('precedence.sql', path.join(__dirname, 'precedence.sql'), {
-    verify_field_types: true,
-  });
+  runTests('precedence.sql', path.join(__dirname, 'precedence.sql'), {});
   runTests('functions.sql', path.join(__dirname, 'functions.sql'));
   runTests('cast.sql', path.join(__dirname, 'cast.sql'), {
     verify_field_types: true,

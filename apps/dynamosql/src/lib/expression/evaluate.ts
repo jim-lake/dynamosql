@@ -54,8 +54,8 @@ export function getValue(
     // no expression results in undefined
   } else if (type === 'number') {
     result.value =
-      typeof expr.value === 'string' ? Number(expr.value) : expr.value;
-    result.type = 'number';
+      typeof expr.value === 'number' ? expr.value : Number(expr.value);
+    result.type = Number.isInteger(result.value) ? 'longlong' : 'number';
   } else if (type === 'bigint') {
     const val = toBigInt(expr.value);
     if (val === null) {

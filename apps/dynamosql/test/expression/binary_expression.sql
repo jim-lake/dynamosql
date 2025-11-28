@@ -1,6 +1,17 @@
 SELECT 1 + 1 AS foo;
+SELECT 1.5 + 1.5 AS foo;
+SELECT 1 + 1.5 AS foo;
+SELECT 1.5 + 1 AS foo;
 SELECT 1 + "2foo" AS foo;
 SELECT -1 + 0 AS foo;
+SELECT "1" + 1 AS foo;
+SELECT "1.5" + 1.5 AS foo;
+SELECT "1" + 1.5 AS foo;
+SELECT "1.5" + 1 AS foo;
+SELECT 1 + "1" AS foo;
+SELECT 1.5 + "1.5" AS foo;
+SELECT 1 + "1.5" AS foo;
+SELECT 1.5 + "1" AS foo;
 
 SELECT 1 - 1 AS foo;
 SELECT 1 - "2foo" AS foo;
