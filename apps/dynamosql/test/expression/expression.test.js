@@ -36,7 +36,9 @@ describe('Expression', function () {
   runTests('datetime.sql', path.join(__dirname, 'datetime.sql'), {
     verify_field_types: true,
   });
-  runTests('variables.sql', path.join(__dirname, 'variables.sql'), {});
+  runTests('variables.sql', path.join(__dirname, 'variables.sql'), {
+    verify_field_types: true,
+  });
   runTests('operators.sql', path.join(__dirname, 'operators.sql'), {
     verify_field_types: true,
   });

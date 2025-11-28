@@ -55,7 +55,11 @@ export function getValue(
   } else if (type === 'number') {
     result.value =
       typeof expr.value === 'number' ? expr.value : Number(expr.value);
-    result.type = Number.isInteger(result.value) ? 'longlong' : 'number';
+    // Check if original string had decimal point to match MySQL behavior
+    const hasDecimal =
+      typeof expr.value === 'string' && expr.value.includes('.');
+    result.type =
+      Number.isInteger(result.value) && !hasDecimal ? 'longlong' : 'number';
   } else if (type === 'bigint') {
     const val = toBigInt(expr.value);
     if (val === null) {
@@ -188,10 +192,22 @@ export function getValue(
       const val = session.getVariable(name);
       if (val === undefined) {
         result.value = null;
-        result.type = 'null';
+        result.type = 'string';
       } else {
         result.value = val.value;
-        result.type = val.type;
+        // MySQL converts user variable types to blob/string types
+        if (val.type === 'string' || val.type === 'char') {
+          result.type = 'long_blob';
+        } else if (
+          val.type === 'datetime' ||
+          val.type === 'date' ||
+          val.type === 'time' ||
+          val.type === 'null'
+        ) {
+          result.type = 'medium_blob';
+        } else {
+          result.type = val.type;
+        }
       }
     } else {
       result.err = 'unsupported';
