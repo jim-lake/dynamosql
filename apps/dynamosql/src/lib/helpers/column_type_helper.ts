@@ -151,6 +151,22 @@ export function convertType(type?: string, nullable?: boolean): FieldInfo {
         zeroFill: false,
         protocol41: true,
       };
+    case 'long_blob':
+      return {
+        catalog: 'def',
+        db: '',
+        table: '',
+        orgTable: '',
+        name: '',
+        orgName: '',
+        charsetNr: CHARSETS.UTF8_GENERAL_CI,
+        length: 150994944,
+        type: Types.LONG_BLOB,
+        flags,
+        decimals: 31,
+        zeroFill: false,
+        protocol41: true,
+      };
     case 'char':
       return {
         catalog: 'def',

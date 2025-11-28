@@ -87,18 +87,18 @@ export function upper(
   state: EvaluationState
 ): EvaluationResult {
   const result = getValue(expr.args?.value?.[0], state);
+  result.name = `UPPER(${result.name})`;
+  result.type = 'string';
   if (!result.err && result.value !== null) {
-    result.name = `UPPER(${result.name})`;
-    result.type = 'string';
     result.value = String(result.value).toUpperCase();
   }
   return result;
 }
 export function trim(expr: Function, state: EvaluationState): EvaluationResult {
   const result = getValue(expr.args?.value?.[0], state);
+  result.name = `TRIM(${result.name})`;
+  result.type = 'string';
   if (!result.err && result.value !== null) {
-    result.name = `TRIM(${result.name})`;
-    result.type = 'string';
     result.value = String(result.value).trim();
   }
   return result;
@@ -108,9 +108,9 @@ export function ltrim(
   state: EvaluationState
 ): EvaluationResult {
   const result = getValue(expr.args?.value?.[0], state);
+  result.name = `LTRIM(${result.name})`;
+  result.type = 'string';
   if (!result.err && result.value !== null) {
-    result.name = `LTRIM(${result.name})`;
-    result.type = 'string';
     result.value = String(result.value).trimStart();
   }
   return result;
@@ -120,9 +120,9 @@ export function rtrim(
   state: EvaluationState
 ): EvaluationResult {
   const result = getValue(expr.args?.value?.[0], state);
+  result.name = `RTRIM(${result.name})`;
+  result.type = 'string';
   if (!result.err && result.value !== null) {
-    result.name = `RTRIM(${result.name})`;
-    result.type = 'string';
     result.value = String(result.value).trimEnd();
   }
   return result;
@@ -132,9 +132,9 @@ export function reverse(
   state: EvaluationState
 ): EvaluationResult {
   const result = getValue(expr.args?.value?.[0], state);
+  result.name = `REVERSE(${result.name})`;
+  result.type = 'string';
   if (!result.err && result.value !== null) {
-    result.name = `REVERSE(${result.name})`;
-    result.type = 'string';
     result.value = String(result.value).split('').reverse().join('');
   }
   return result;
@@ -147,16 +147,24 @@ export function repeat(
   const arg2 = getValue(expr.args?.value?.[1], state);
   const err = arg1.err || arg2.err;
   let value;
+  let type;
   const name = `REPEAT(${arg1.name}, ${arg2.name})`;
 
-  if (!err && (arg1.value === null || arg2.value === null)) {
+  if (!err && arg2.value === null) {
     value = null;
+    type = 'long_blob';
+  } else if (!err && arg1.value === null) {
+    value = null;
+    type = 'string';
   } else if (!err) {
     const count = convertNum(arg2.value);
     value =
       count !== null && count >= 0 ? String(arg1.value).repeat(count) : null;
+    type = 'string';
+  } else {
+    type = 'long_blob';
   }
-  return { err, name, value, type: 'string' };
+  return { err, name, value, type };
 }
 export function char_length(
   expr: Function,
@@ -164,7 +172,7 @@ export function char_length(
 ): EvaluationResult {
   const result = getValue(expr.args?.value?.[0], state);
   result.name = `CHAR_LENGTH(${result.name})`;
-  result.type = 'number';
+  result.type = 'longlong';
   if (!result.err && result.value !== null) {
     result.value = String(result.value).length;
   }

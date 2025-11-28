@@ -7,20 +7,24 @@ import type { EvaluationState, EvaluationResult } from './evaluate';
 export function abs(expr: Function, state: EvaluationState): EvaluationResult {
   const result = getValue(expr.args?.value?.[0], state);
   result.name = `ABS(${result.name})`;
-  result.type = 'number';
   if (!result.err && result.value !== null) {
     const num = convertNum(result.value);
     result.value = num !== null ? Math.abs(num) : null;
+    result.type = Number.isInteger(num) ? 'longlong' : 'number';
+  } else {
+    result.type = 'double';
   }
   return result;
 }
 export function ceil(expr: Function, state: EvaluationState): EvaluationResult {
   const result = getValue(expr.args?.value?.[0], state);
   result.name = `CEIL(${result.name})`;
-  result.type = 'number';
   if (!result.err && result.value !== null) {
     const num = convertNum(result.value);
     result.value = num !== null ? Math.ceil(num) : null;
+    result.type = 'longlong';
+  } else {
+    result.type = 'double';
   }
   return result;
 }
@@ -30,10 +34,12 @@ export function floor(
 ): EvaluationResult {
   const result = getValue(expr.args?.value?.[0], state);
   result.name = `FLOOR(${result.name})`;
-  result.type = 'number';
   if (!result.err && result.value !== null) {
     const num = convertNum(result.value);
     result.value = num !== null ? Math.floor(num) : null;
+    result.type = 'longlong';
+  } else {
+    result.type = 'double';
   }
   return result;
 }
@@ -45,6 +51,7 @@ export function round(
   const arg2 = getValue(expr.args?.value?.[1], state);
   const err = arg1.err || arg2.err;
   let value;
+  let type;
   const name =
     arg2.value !== undefined
       ? `ROUND(${arg1.name}, ${arg2.name})`
@@ -52,6 +59,7 @@ export function round(
 
   if (!err && arg1.value === null) {
     value = null;
+    type = 'double';
   } else if (!err) {
     const num = convertNum(arg1.value);
     if (num !== null) {
@@ -65,24 +73,32 @@ export function round(
     } else {
       value = null;
     }
+    type = 'number';
+  } else {
+    type = 'number';
   }
-  return { err, name, value, type: 'number' };
+  return { err, name, value, type };
 }
 export function mod(expr: Function, state: EvaluationState): EvaluationResult {
   const arg1 = getValue(expr.args?.value?.[0], state);
   const arg2 = getValue(expr.args?.value?.[1], state);
   const err = arg1.err || arg2.err;
   let value;
+  let type: string;
   const name = `MOD(${arg1.name}, ${arg2.name})`;
 
   if (!err && (arg1.value === null || arg2.value === null)) {
     value = null;
+    type = 'double';
   } else if (!err) {
     const num1 = convertNum(arg1.value);
     const num2 = convertNum(arg2.value);
     value = num1 !== null && num2 !== null ? num1 % num2 : null;
+    type = 'longlong';
+  } else {
+    type = 'double';
   }
-  return { err, name, value, type: 'number' };
+  return { err, name, value, type };
 }
 export function pow(expr: Function, state: EvaluationState): EvaluationResult {
   const arg1 = getValue(expr.args?.value?.[0], state);
@@ -98,12 +114,12 @@ export function pow(expr: Function, state: EvaluationState): EvaluationResult {
     const num2 = convertNum(arg2.value);
     value = num1 !== null && num2 !== null ? Math.pow(num1, num2) : null;
   }
-  return { err, name, value, type: 'number' };
+  return { err, name, value, type: 'double' };
 }
 export function sqrt(expr: Function, state: EvaluationState): EvaluationResult {
   const result = getValue(expr.args?.value?.[0], state);
   result.name = `SQRT(${result.name})`;
-  result.type = 'number';
+  result.type = 'double';
   if (!result.err && result.value !== null) {
     const num = convertNum(result.value);
     result.value = num !== null ? Math.sqrt(num) : null;
@@ -113,7 +129,7 @@ export function sqrt(expr: Function, state: EvaluationState): EvaluationResult {
 export function sign(expr: Function, state: EvaluationState): EvaluationResult {
   const result = getValue(expr.args?.value?.[0], state);
   result.name = `SIGN(${result.name})`;
-  result.type = 'number';
+  result.type = 'longlong';
   if (!result.err && result.value !== null) {
     const num = convertNum(result.value);
     result.value = num !== null ? Math.sign(num) : null;

@@ -129,7 +129,7 @@ function coalesce(expr: Function, state: EvaluationState): EvaluationResult {
       err = result.err;
     }
     value = result.value;
-    type = result.type;
+    type = result.type === 'number' ? 'longlong' : result.type;
     return !err && value !== null;
   });
   return { err, value, type };
@@ -137,20 +137,27 @@ function coalesce(expr: Function, state: EvaluationState): EvaluationResult {
 function greatest(expr: Function, state: EvaluationState): EvaluationResult {
   let err: EvaluationResult['err'] = null;
   let value: EvaluationResult['value'];
+  let type = 'longlong';
   const names: string[] = [];
 
   for (const sub of expr.args?.value ?? []) {
     const result = getValue(sub, state);
     names.push(result.name ?? '');
+    if (
+      result.type !== 'number' &&
+      result.type !== 'longlong' &&
+      result.type !== 'double' &&
+      result.type !== 'null'
+    ) {
+      type = result.type;
+    }
     if (result.err) {
       err = result.err;
       break;
-    } else if (
-      result.value === null ||
-      result.value === undefined ||
-      value === null
-    ) {
+    } else if (result.value === null || result.value === undefined) {
       value = null;
+      break;
+    } else if (value === null) {
       break;
     } else {
       if (value === undefined || result.value > value) {
@@ -158,25 +165,32 @@ function greatest(expr: Function, state: EvaluationState): EvaluationResult {
       }
     }
   }
-  return { err, value, type: 'string', name: `GREATEST(${names.join(', ')})` };
+  return { err, value, type, name: `GREATEST(${names.join(', ')})` };
 }
 function least(expr: Function, state: EvaluationState): EvaluationResult {
   let err: EvaluationResult['err'] = null;
   let value: EvaluationResult['value'];
+  let type = 'longlong';
   const names: string[] = [];
 
   for (const sub of expr.args?.value ?? []) {
     const result = getValue(sub, state);
     names.push(result.name ?? '');
+    if (
+      result.type !== 'number' &&
+      result.type !== 'longlong' &&
+      result.type !== 'double' &&
+      result.type !== 'null'
+    ) {
+      type = result.type;
+    }
     if (result.err) {
       err = result.err;
       break;
-    } else if (
-      result.value === null ||
-      result.value === undefined ||
-      value === null
-    ) {
+    } else if (result.value === null || result.value === undefined) {
       value = null;
+      break;
+    } else if (value === null) {
       break;
     } else {
       if (value === undefined || result.value < value) {
@@ -184,12 +198,12 @@ function least(expr: Function, state: EvaluationState): EvaluationResult {
       }
     }
   }
-  return { err, value, type: 'string', name: `LEAST(${names.join(', ')})` };
+  return { err, value, type, name: `LEAST(${names.join(', ')})` };
 }
 function not(expr: Function, state: EvaluationState): EvaluationResult {
   const result = getValue(expr.args?.value?.[0], state);
   result.name = `NOT(${result.name})`;
-  result.type = 'number';
+  result.type = 'longlong';
   if (!result.err && result.value !== null) {
     const num = convertNum(result.value);
     result.value = num ? 0 : 1;
@@ -214,17 +228,22 @@ function ifFunc(expr: Function, state: EvaluationState): EvaluationResult {
   const falseValue = getValue(expr.args?.value?.[2], state);
   const err = condition.err || trueValue.err || falseValue.err || null;
   let value;
+  let type;
   const name = `IF(${condition.name}, ${trueValue.name}, ${falseValue.name})`;
 
   if (!err) {
     const condResult = convertNum(condition.value);
     if (condResult === null || condResult === 0) {
       value = falseValue.value;
+      type = falseValue.type === 'number' ? 'longlong' : falseValue.type;
     } else {
       value = trueValue.value;
+      type = trueValue.type === 'number' ? 'longlong' : trueValue.type;
     }
+  } else {
+    type = 'longlong';
   }
-  return { err, name, value, type: 'string' };
+  return { err, name, value, type };
 }
 
 export const methods: Record<

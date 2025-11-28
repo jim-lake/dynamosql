@@ -15,12 +15,18 @@ describe('Expression', function () {
   runTests('date.sql', path.join(__dirname, 'date.sql'), {
     verify_field_types: true,
   });
-  runTests('interval.sql', path.join(__dirname, 'interval.sql'));
+  runTests('interval.sql', path.join(__dirname, 'interval.sql'), {
+    verify_field_types: true,
+  });
   runTests('string.sql', path.join(__dirname, 'string.sql'), {
     verify_field_types: true,
   });
-  runTests('precedence.sql', path.join(__dirname, 'precedence.sql'), {});
-  runTests('functions.sql', path.join(__dirname, 'functions.sql'));
+  runTests('precedence.sql', path.join(__dirname, 'precedence.sql'), {
+    verify_field_types: true,
+  });
+  runTests('functions.sql', path.join(__dirname, 'functions.sql'), {
+    verify_field_types: true,
+  });
   runTests('cast.sql', path.join(__dirname, 'cast.sql'), {
     verify_field_types: true,
   });
