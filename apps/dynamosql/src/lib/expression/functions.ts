@@ -101,7 +101,7 @@ function database(expr: Function, state: EvaluationState): EvaluationResult {
 function isnull(expr: Function, state: EvaluationState): EvaluationResult {
   const result = getValue(expr.args?.value?.[0], state);
   result.name = `ISNULL(${result.name})`;
-  result.type = 'number';
+  result.type = 'longlong';
   if (!result.err) {
     result.value = result.value === null ? 1 : 0;
   }
@@ -122,14 +122,21 @@ function sleep(expr: Function, state: EvaluationState): EvaluationResult {
 function coalesce(expr: Function, state: EvaluationState): EvaluationResult {
   let err: EvaluationResult['err'] = null;
   let value = null;
-  let type = 'null';
+  let type: EvaluationResult['type'] = 'null';
   expr.args?.value?.some?.((sub: ExpressionValue) => {
     const result = getValue(sub, state);
     if (result.err) {
       err = result.err;
     }
     value = result.value;
-    type = result.type === 'number' ? 'longlong' : result.type;
+    // Update type if we have a non-null type
+    if (result.type !== 'null') {
+      if (result.type === 'number') {
+        type = 'longlong';
+      } else {
+        type = result.type;
+      }
+    }
     return !err && value !== null;
   });
   return { err, value, type };

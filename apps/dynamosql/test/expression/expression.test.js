@@ -30,13 +30,25 @@ describe('Expression', function () {
   runTests('cast.sql', path.join(__dirname, 'cast.sql'), {
     verify_field_types: true,
   });
-  runTests('cast_edge_cases.sql', path.join(__dirname, 'cast_edge_cases.sql'));
-  runTests('datetime.sql', path.join(__dirname, 'datetime.sql'));
+  runTests('cast_edge_cases.sql', path.join(__dirname, 'cast_edge_cases.sql'), {
+    verify_field_types: true,
+  });
+  runTests('datetime.sql', path.join(__dirname, 'datetime.sql'), {
+    verify_field_types: true,
+  });
   runTests('variables.sql', path.join(__dirname, 'variables.sql'));
   runTests('operators.sql', path.join(__dirname, 'operators.sql'));
   runTests('null_handling.sql', path.join(__dirname, 'null_handling.sql'));
-  runTests('timezone.sql', path.join(__dirname, 'timezone.sql'));
-  runTests('new_functions.sql', path.join(__dirname, 'new_functions.sql'));
-  runTests('aggregate_funcs.sql', path.join(__dirname, 'aggregate_funcs.sql'));
-  runTests('string_funcs.sql', path.join(__dirname, 'string_funcs.sql'));
+  runTests('timezone.sql', path.join(__dirname, 'timezone.sql'), {
+    verify_field_types: true,
+  });
+  runTests('new_functions.sql', path.join(__dirname, 'new_functions.sql'), {
+    verify_field_types: true,
+  });
+  runTests('aggregate_funcs.sql', path.join(__dirname, 'aggregate_funcs.sql'), {
+    verify_field_types: true,
+  });
+  runTests('string_funcs.sql', path.join(__dirname, 'string_funcs.sql'), {
+    verify_field_types: true,
+  });
 });

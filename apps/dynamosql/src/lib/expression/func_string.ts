@@ -245,7 +245,7 @@ export function ascii(
 ): EvaluationResult {
   const result = getValue(expr.args?.value?.[0], state);
   result.name = `ASCII(${result.name})`;
-  result.type = 'number';
+  result.type = 'longlong';
   if (!result.err && result.value !== null) {
     const str = String(result.value);
     result.value = str.length > 0 ? str.charCodeAt(0) : 0;
@@ -255,7 +255,7 @@ export function ascii(
 export function ord(expr: Function, state: EvaluationState): EvaluationResult {
   const result = getValue(expr.args?.value?.[0], state);
   result.name = `ORD(${result.name})`;
-  result.type = 'number';
+  result.type = 'longlong';
   if (!result.err && result.value !== null) {
     const str = String(result.value);
     result.value = str.length > 0 ? str.codePointAt(0) : 0;
@@ -416,13 +416,13 @@ export function locate(
   const pos_result = getValue(expr.args?.value?.[2], state);
   const err = substr_result.err || str_result.err || pos_result?.err || null;
   if (err || substr_result.value === null || str_result.value === null) {
-    return { err, value: null, type: 'number' };
+    return { err, value: null, type: 'longlong' };
   }
   const substr = String(substr_result.value);
   const str = String(str_result.value);
   const pos = pos_result?.value ? (convertNum(pos_result.value) ?? 1) : 1;
   const index = str.indexOf(substr, pos - 1);
-  return { err: null, value: index === -1 ? 0 : index + 1, type: 'number' };
+  return { err: null, value: index === -1 ? 0 : index + 1, type: 'longlong' };
 }
 export function instr(
   expr: Function,
@@ -432,12 +432,12 @@ export function instr(
   const substr_result = getValue(expr.args?.value?.[1], state);
   const err = str_result.err || substr_result.err || null;
   if (err || str_result.value === null || substr_result.value === null) {
-    return { err, value: null, type: 'number' };
+    return { err, value: null, type: 'longlong' };
   }
   const str = String(str_result.value);
   const substr = String(substr_result.value);
   const index = str.indexOf(substr);
-  return { err: null, value: index === -1 ? 0 : index + 1, type: 'number' };
+  return { err: null, value: index === -1 ? 0 : index + 1, type: 'longlong' };
 }
 export function strcmp(
   expr: Function,
@@ -447,15 +447,15 @@ export function strcmp(
   const str2_result = getValue(expr.args?.value?.[1], state);
   const err = str1_result.err || str2_result.err || null;
   if (err || str1_result.value === null || str2_result.value === null) {
-    return { err, value: null, type: 'number' };
+    return { err, value: null, type: 'longlong' };
   }
   const str1 = String(str1_result.value);
   const str2 = String(str2_result.value);
   if (str1 < str2) {
-    return { err: null, value: -1, type: 'number' };
+    return { err: null, value: -1, type: 'longlong' };
   } else if (str1 > str2) {
-    return { err: null, value: 1, type: 'number' };
+    return { err: null, value: 1, type: 'longlong' };
   } else {
-    return { err: null, value: 0, type: 'number' };
+    return { err: null, value: 0, type: 'longlong' };
   }
 }

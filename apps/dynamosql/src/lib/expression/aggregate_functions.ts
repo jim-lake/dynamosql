@@ -9,6 +9,7 @@ function sum(expr: AggrFunc, state: EvaluationState): EvaluationResult {
   let err: EvaluationResult['err'] = null;
   let value: number | null = 0;
   let name = '';
+  let hasString = false;
   for (const group_row of group) {
     const group_state: EvaluationState = { ...other, row: group_row };
     const result = getValue(expr.args?.expr, group_state);
@@ -23,6 +24,9 @@ function sum(expr: AggrFunc, state: EvaluationState): EvaluationResult {
       value = null;
       break;
     } else {
+      if (result.type === 'string') {
+        hasString = true;
+      }
       const num = convertNum(result.value);
       if (num === null) {
         value = null;
@@ -31,7 +35,8 @@ function sum(expr: AggrFunc, state: EvaluationState): EvaluationResult {
       value += num;
     }
   }
-  return { err, value, type: 'number', name };
+  const type = value === null || hasString ? 'double' : 'number';
+  return { err, value, type, name };
 }
 function count(expr: AggrFunc, state: EvaluationState): EvaluationResult {
   const { row, ...other } = state;
@@ -69,6 +74,7 @@ function avg(expr: AggrFunc, state: EvaluationState): EvaluationResult {
   let total = 0;
   let cnt = 0;
   let name = '';
+  let hasString = false;
   for (const group_row of group) {
     const group_state: EvaluationState = { ...other, row: group_row };
     const result = getValue(expr.args?.expr, group_state);
@@ -79,6 +85,9 @@ function avg(expr: AggrFunc, state: EvaluationState): EvaluationResult {
       err = result.err;
       break;
     } else if (result.value !== null) {
+      if (result.type === 'string') {
+        hasString = true;
+      }
       const num = convertNum(result.value);
       if (num !== null) {
         total += num;
@@ -87,13 +96,15 @@ function avg(expr: AggrFunc, state: EvaluationState): EvaluationResult {
     }
   }
   const value = cnt > 0 ? total / cnt : null;
-  return { err, value, type: 'number', name };
+  const type = value === null || hasString ? 'double' : 'number';
+  return { err, value, type, name };
 }
 function min(expr: AggrFunc, state: EvaluationState): EvaluationResult {
   const { row, ...other } = state;
   const group = (row?.['@@group'] ?? [{}]) as EvaluationState['row'][];
   let err: EvaluationResult['err'] = null;
   let value: EvaluationResult['value'] = null;
+  let type: EvaluationResult['type'] = 'null';
   let name = '';
   for (const group_row of group) {
     const group_state: EvaluationState = { ...other, row: group_row };
@@ -107,10 +118,10 @@ function min(expr: AggrFunc, state: EvaluationState): EvaluationResult {
     } else if (result.value !== null && result.value !== undefined) {
       if (value === null || value === undefined || result.value < value) {
         value = result.value;
+        type = result.type;
       }
     }
   }
-  const type = typeof value === 'string' ? 'string' : 'number';
   return { err, value, type, name };
 }
 function max(expr: AggrFunc, state: EvaluationState): EvaluationResult {
@@ -118,6 +129,7 @@ function max(expr: AggrFunc, state: EvaluationState): EvaluationResult {
   const group = (row?.['@@group'] ?? [{}]) as EvaluationState['row'][];
   let err: EvaluationResult['err'] = null;
   let value: EvaluationResult['value'] = null;
+  let type: EvaluationResult['type'] = 'null';
   let name = '';
   for (const group_row of group) {
     const group_state: EvaluationState = { ...other, row: group_row };
@@ -131,10 +143,10 @@ function max(expr: AggrFunc, state: EvaluationState): EvaluationResult {
     } else if (result.value !== null && result.value !== undefined) {
       if (value === null || value === undefined || result.value > value) {
         value = result.value;
+        type = result.type;
       }
     }
   }
-  const type = typeof value === 'string' ? 'string' : 'number';
   return { err, value, type, name };
 }
 

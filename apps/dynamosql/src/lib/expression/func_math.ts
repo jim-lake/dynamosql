@@ -167,7 +167,7 @@ export function oct(expr: Function, state: EvaluationState): EvaluationResult {
   return result;
 }
 export function pi(_expr: Function, _state: EvaluationState): EvaluationResult {
-  return { err: null, name: 'PI()', value: Math.PI, type: 'number' };
+  return { err: null, name: 'PI()', value: Math.PI, type: 'double' };
 }
 export function degrees(
   expr: Function,
@@ -175,7 +175,7 @@ export function degrees(
 ): EvaluationResult {
   const result = getValue(expr.args?.value?.[0], state);
   result.name = `DEGREES(${result.name})`;
-  result.type = 'number';
+  result.type = 'double';
   if (!result.err && result.value !== null) {
     const num = convertNum(result.value);
     result.value = num !== null ? (num * 180) / Math.PI : null;
@@ -188,7 +188,7 @@ export function radians(
 ): EvaluationResult {
   const result = getValue(expr.args?.value?.[0], state);
   result.name = `RADIANS(${result.name})`;
-  result.type = 'number';
+  result.type = 'double';
   if (!result.err && result.value !== null) {
     const num = convertNum(result.value);
     result.value = num !== null ? (num * Math.PI) / 180 : null;
@@ -198,7 +198,7 @@ export function radians(
 export function exp(expr: Function, state: EvaluationState): EvaluationResult {
   const result = getValue(expr.args?.value?.[0], state);
   result.name = `EXP(${result.name})`;
-  result.type = 'number';
+  result.type = 'double';
   if (!result.err && result.value !== null) {
     const num = convertNum(result.value);
     result.value = num !== null ? Math.exp(num) : null;
@@ -208,7 +208,7 @@ export function exp(expr: Function, state: EvaluationState): EvaluationResult {
 export function ln(expr: Function, state: EvaluationState): EvaluationResult {
   const result = getValue(expr.args?.value?.[0], state);
   result.name = `LN(${result.name})`;
-  result.type = 'number';
+  result.type = 'double';
   if (!result.err && result.value !== null) {
     const num = convertNum(result.value);
     result.value = num !== null && num > 0 ? Math.log(num) : null;
@@ -239,12 +239,12 @@ export function log(expr: Function, state: EvaluationState): EvaluationResult {
       value = num1 !== null && num1 > 0 ? Math.log(num1) : null;
     }
   }
-  return { err, name, value, type: 'number' };
+  return { err, name, value, type: 'double' };
 }
 export function log2(expr: Function, state: EvaluationState): EvaluationResult {
   const result = getValue(expr.args?.value?.[0], state);
   result.name = `LOG2(${result.name})`;
-  result.type = 'number';
+  result.type = 'double';
   if (!result.err && result.value !== null) {
     const num = convertNum(result.value);
     result.value = num !== null && num > 0 ? Math.log2(num) : null;
@@ -257,7 +257,7 @@ export function log10(
 ): EvaluationResult {
   const result = getValue(expr.args?.value?.[0], state);
   result.name = `LOG10(${result.name})`;
-  result.type = 'number';
+  result.type = 'double';
   if (!result.err && result.value !== null) {
     const num = convertNum(result.value);
     result.value = num !== null && num > 0 ? Math.log10(num) : null;
@@ -267,7 +267,7 @@ export function log10(
 export function acos(expr: Function, state: EvaluationState): EvaluationResult {
   const result = getValue(expr.args?.value?.[0], state);
   result.name = `ACOS(${result.name})`;
-  result.type = 'number';
+  result.type = 'double';
   if (!result.err && result.value !== null) {
     const num = convertNum(result.value);
     result.value =
@@ -278,7 +278,7 @@ export function acos(expr: Function, state: EvaluationState): EvaluationResult {
 export function asin(expr: Function, state: EvaluationState): EvaluationResult {
   const result = getValue(expr.args?.value?.[0], state);
   result.name = `ASIN(${result.name})`;
-  result.type = 'number';
+  result.type = 'double';
   if (!result.err && result.value !== null) {
     const num = convertNum(result.value);
     result.value =
@@ -289,7 +289,7 @@ export function asin(expr: Function, state: EvaluationState): EvaluationResult {
 export function atan(expr: Function, state: EvaluationState): EvaluationResult {
   const result = getValue(expr.args?.value?.[0], state);
   result.name = `ATAN(${result.name})`;
-  result.type = 'number';
+  result.type = 'double';
   if (!result.err && result.value !== null) {
     const num = convertNum(result.value);
     result.value = num !== null ? Math.atan(num) : null;
@@ -313,12 +313,12 @@ export function atan2(
     const num2 = convertNum(arg2.value);
     value = num1 !== null && num2 !== null ? Math.atan2(num1, num2) : null;
   }
-  return { err, name, value, type: 'number' };
+  return { err, name, value, type: 'double' };
 }
 export function cos(expr: Function, state: EvaluationState): EvaluationResult {
   const result = getValue(expr.args?.value?.[0], state);
   result.name = `COS(${result.name})`;
-  result.type = 'number';
+  result.type = 'double';
   if (!result.err && result.value !== null) {
     const num = convertNum(result.value);
     result.value = num !== null ? Math.cos(num) : null;
@@ -328,7 +328,7 @@ export function cos(expr: Function, state: EvaluationState): EvaluationResult {
 export function sin(expr: Function, state: EvaluationState): EvaluationResult {
   const result = getValue(expr.args?.value?.[0], state);
   result.name = `SIN(${result.name})`;
-  result.type = 'number';
+  result.type = 'double';
   if (!result.err && result.value !== null) {
     const num = convertNum(result.value);
     result.value = num !== null ? Math.sin(num) : null;
@@ -338,7 +338,7 @@ export function sin(expr: Function, state: EvaluationState): EvaluationResult {
 export function tan(expr: Function, state: EvaluationState): EvaluationResult {
   const result = getValue(expr.args?.value?.[0], state);
   result.name = `TAN(${result.name})`;
-  result.type = 'number';
+  result.type = 'double';
   if (!result.err && result.value !== null) {
     const num = convertNum(result.value);
     result.value = num !== null ? Math.tan(num) : null;
@@ -348,7 +348,7 @@ export function tan(expr: Function, state: EvaluationState): EvaluationResult {
 export function cot(expr: Function, state: EvaluationState): EvaluationResult {
   const result = getValue(expr.args?.value?.[0], state);
   result.name = `COT(${result.name})`;
-  result.type = 'number';
+  result.type = 'double';
   if (!result.err && result.value !== null) {
     const num = convertNum(result.value);
     result.value = num !== null ? 1 / Math.tan(num) : null;
