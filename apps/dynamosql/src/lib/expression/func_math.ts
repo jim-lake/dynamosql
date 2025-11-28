@@ -10,7 +10,7 @@ export function abs(expr: Function, state: EvaluationState): EvaluationResult {
   if (!result.err && result.value !== null) {
     const num = convertNum(result.value);
     result.value = num !== null ? Math.abs(num) : null;
-    result.type = Number.isInteger(num) ? 'longlong' : 'number';
+    result.type = result.type === 'string' ? 'double' : result.type;
   } else {
     result.type = 'double';
   }
@@ -21,11 +21,9 @@ export function ceil(expr: Function, state: EvaluationState): EvaluationResult {
   result.name = `CEIL(${result.name})`;
   if (!result.err && result.value !== null) {
     const num = convertNum(result.value);
-    result.value = num !== null ? Math.ceil(num) : null;
-    result.type = 'longlong';
-  } else {
-    result.type = 'double';
+    result.value = num === null ? null : Math.ceil(num);
   }
+  result.type = _resolveTypeForRounding(result);
   return result;
 }
 export function floor(
@@ -37,47 +35,51 @@ export function floor(
   if (!result.err && result.value !== null) {
     const num = convertNum(result.value);
     result.value = num !== null ? Math.floor(num) : null;
-    result.type = 'longlong';
-  } else {
-    result.type = 'double';
   }
+  result.type = _resolveTypeForRounding(result);
   return result;
 }
 export function round(
   expr: Function,
   state: EvaluationState
 ): EvaluationResult {
-  const arg1 = getValue(expr.args?.value?.[0], state);
-  const arg2 = getValue(expr.args?.value?.[1], state);
-  const err = arg1.err || arg2.err;
-  let value;
-  let type;
-  const name =
-    arg2.value !== undefined
-      ? `ROUND(${arg1.name}, ${arg2.name})`
-      : `ROUND(${arg1.name})`;
-
-  if (!err && arg1.value === null) {
-    value = null;
-    type = 'double';
-  } else if (!err) {
-    const num = convertNum(arg1.value);
-    if (num !== null) {
-      if (arg2.value !== undefined && arg2.value !== null) {
-        const decimals = convertNum(arg2.value) || 0;
-        value =
-          Math.round(num * Math.pow(10, decimals)) / Math.pow(10, decimals);
-      } else {
-        value = Math.round(num);
-      }
-    } else {
-      value = null;
-    }
-    type = 'number';
-  } else {
-    type = 'number';
+  const result = getValue(expr.args?.value?.[0], state);
+  const arg2 = expr.args?.value?.[1]
+    ? getValue(expr.args?.value?.[1], state)
+    : undefined;
+  if (result.err) {
+    return arg1;
   }
-  return { err, name, value, type };
+  if (arg2 && arg2.err) {
+    return arg2;
+  }
+  if (result.value === null) {
+    result.type = 'double';
+  }
+  let value = convertNum(result.value);
+  let decimals = 0;
+  result.name = arg2
+    ? `ROUND(${result.name}, ${arg2.name})`
+    : `ROUND(${result.name})`;
+  if (arg2) {
+    const arg2_num = convertNum(arg2.value);
+    if (arg2_num === null) {
+      value = null;
+    } else {
+      decimals = arg2_num;
+    }
+  }
+  if (value === null) {
+    result.value = null;
+  } else if (decimals === 0) {
+    result.value = Math.round(value);
+  } else if (decimals > 0) {
+    result.value = Number(value.toFixed(decimals));
+  }
+  if (result.type === 'string') {
+    result.type = 'double';
+  }
+  return result;
 }
 export function mod(expr: Function, state: EvaluationState): EvaluationResult {
   const arg1 = getValue(expr.args?.value?.[0], state);
@@ -99,6 +101,14 @@ export function mod(expr: Function, state: EvaluationState): EvaluationResult {
     type = 'double';
   }
   return { err, name, value, type };
+}
+function _resolveTypeForRounding(result: EvaluationResult): string {
+  if (result.value === null || result.type === 'string') {
+    return 'double';
+  } else if (result.type === 'number') {
+    return 'longlong';
+  }
+  return result.type;
 }
 export function pow(expr: Function, state: EvaluationState): EvaluationResult {
   const arg1 = getValue(expr.args?.value?.[0], state);

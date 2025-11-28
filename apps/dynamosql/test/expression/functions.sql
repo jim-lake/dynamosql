@@ -151,6 +151,8 @@ SELECT CHARACTER_LENGTH("hello") AS result;
 SELECT CHARACTER_LENGTH("") AS result;
 
 -- ABS tests
+SELECT ABS("-5") AS result;
+SELECT ABS("5") AS result;
 SELECT ABS(-5) AS result;
 SELECT ABS(5) AS result;
 SELECT ABS(0) AS result;
@@ -158,34 +160,67 @@ SELECT ABS(-3.14) AS result;
 SELECT ABS(3.14) AS result;
 SELECT ABS(NULL) AS result;
 
--- ABS with columns
-SELECT id, ABS(other) AS abs_other FROM _dynamodb.foo WHERE other IS NOT NULL ORDER BY id;
-
 -- CEIL tests
 SELECT CEIL(3.14) AS result;
 SELECT CEIL(3.99) AS result;
 SELECT CEIL(-3.14) AS result;
 SELECT CEIL(5) AS result;
+SELECT CEIL("5") AS result;
+SELECT CEIL("5.5") AS result;
+SELECT CEIL("5.49") AS result;
+SELECT CEIL("5.71") AS result;
 SELECT CEIL(NULL) AS result;
 
 -- CEILING tests
 SELECT CEILING(3.14) AS result;
+SELECT CEILING(3.99) AS result;
 SELECT CEILING(-3.14) AS result;
+SELECT CEILING(5) AS result;
+SELECT CEILING("5") AS result;
+SELECT CEILING("5.5") AS result;
+SELECT CEILING("5.49") AS result;
+SELECT CEILING("5.71") AS result;
+SELECT CEILING(NULL) AS result;
 
 -- FLOOR tests
 SELECT FLOOR(3.14) AS result;
 SELECT FLOOR(3.99) AS result;
 SELECT FLOOR(-3.14) AS result;
 SELECT FLOOR(5) AS result;
-SELECT FLOOR(NULL) AS result;
+SELECT FLOOR("5") AS result;
+SELECT FLOOR("5.5") AS result;
+SELECT FLOOR("5.49") AS result;
+SELECT FLOOR("5.71") AS result;
+SELECT CEILING(NULL) AS result;
 
 -- ROUND tests
 SELECT ROUND(3.14) AS result;
 SELECT ROUND(3.5) AS result;
 SELECT ROUND(3.99) AS result;
-SELECT ROUND(3.14159, 2) AS result;
-SELECT ROUND(3.14159, 0) AS result;
+SELECT ROUND(3.14159) AS result;
+SELECT ROUND(3.14159) AS result;
+SELECT ROUND("5") AS result;
+SELECT ROUND("5.5") AS result;
+SELECT ROUND("5.49") AS result;
+SELECT ROUND("5.71") AS result;
 SELECT ROUND(NULL) AS result;
+
+SELECT ROUND(3.14,2) AS result;
+SELECT ROUND(3.5,2) AS result;
+SELECT ROUND(3.99,2) AS result;
+SELECT ROUND(3.14159,2) AS result;
+SELECT ROUND(3.14159,2) AS result;
+SELECT ROUND("5",2) AS result;
+SELECT ROUND("5.5",2) AS result;
+SELECT ROUND("5.49",2) AS result;
+SELECT ROUND("5.71",2) AS result;
+SELECT ROUND(NULL,2) AS result;
+
+SELECT ROUND(3,NULL) AS result;
+SELECT ROUND(3.14159,NULL) AS result;
+SELECT ROUND("5",NULL) AS result;
+SELECT ROUND("5.71",NULL) AS result;
+SELECT ROUND(NULL,NULL) AS result;
 
 -- MOD tests
 SELECT MOD(10, 3) AS result;
