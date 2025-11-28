@@ -10,7 +10,7 @@ function plus(expr: UnaryExpr, state: EvaluationState): EvaluationResult {
 function not(expr: UnaryExpr, state: EvaluationState): EvaluationResult {
   const result = getValue(expr.expr, state);
   result.name = 'NOT ' + result.name;
-  result.type = 'number';
+  result.type = 'longlong';
   if (!result.err && result.value !== null) {
     result.value = convertNum(result.value) ? 0 : 1;
   }
@@ -20,10 +20,18 @@ function not(expr: UnaryExpr, state: EvaluationState): EvaluationResult {
 function minus(expr: UnaryExpr, state: EvaluationState): EvaluationResult {
   const result = getValue(expr.expr, state);
   result.name = '-' + result.name;
-  result.type = 'number';
   if (!result.err && result.value !== null) {
     const num = convertNum(result.value);
     result.value = num !== null ? -num : null;
+    if (result.type === 'string') {
+      result.type = 'double';
+    } else if (
+      result.type === 'number' &&
+      typeof result.value === 'number' &&
+      Number.isInteger(result.value)
+    ) {
+      result.type = 'longlong';
+    }
   }
   return result;
 }

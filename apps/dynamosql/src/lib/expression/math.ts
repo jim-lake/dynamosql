@@ -45,7 +45,6 @@ export function minus(expr: Binary, state: EvaluationState): EvaluationResult {
     ) {
       // @ts-expect-error TS2365 ignore bigint/number the code is correct
       value = left_num - right_num;
-      type = 'number';
     }
   }
   return { err, value, type, name };
@@ -116,6 +115,7 @@ function _numBothSides(
   if (!err) {
     if (left.value === null || right.value === null) {
       value = null;
+      type = 'double';
     } else if (allow_interval && left.type === 'interval') {
       interval = left.value as typeof interval;
       if (
@@ -168,7 +168,7 @@ function _numBothSides(
         left_num = left_temp;
         right_num = right_temp;
       }
-      type = _unionNumberType(left.type, right.type, 'bigint');
+      type = _unionNumberType(left.type, right.type, 'longlong');
     } else {
       const left_temp = convertNum(left.value);
       const right_temp = convertNum(right.value);
@@ -178,13 +178,28 @@ function _numBothSides(
         left_num = left_temp;
         right_num = right_temp;
       }
-      type = _unionNumberType(left.type, right.type, 'number');
+      const left_is_int =
+        typeof left.value === 'number' && Number.isInteger(left.value);
+      const right_is_int =
+        typeof right.value === 'number' && Number.isInteger(right.value);
+      if (
+        left_is_int &&
+        right_is_int &&
+        left.type === 'number' &&
+        right.type === 'number'
+      ) {
+        type = 'longlong';
+      } else {
+        type = _unionNumberType(left.type, right.type, 'double');
+      }
     }
   }
   return { err, name, value, left_num, right_num, interval, datetime, type };
 }
 function _unionNumberType(type1: string, type2: string, default_type: string) {
-  if (type1 === type2) {
+  if (type1 === 'string' || type2 === 'string') {
+    return 'double';
+  } else if (type1 === type2) {
     return type1;
   } else if (type1 === 'double' || type2 === 'double') {
     return 'double';

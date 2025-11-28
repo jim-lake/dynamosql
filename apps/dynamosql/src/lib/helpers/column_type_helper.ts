@@ -151,6 +151,22 @@ export function convertType(type?: string, nullable?: boolean): FieldInfo {
         zeroFill: false,
         protocol41: true,
       };
+    case 'char':
+      return {
+        catalog: 'def',
+        db: '',
+        table: '',
+        orgTable: '',
+        name: '',
+        orgName: '',
+        charsetNr: CHARSETS.UTF8_GENERAL_CI,
+        length: 255,
+        type: Types.STRING,
+        flags,
+        decimals: 0,
+        zeroFill: false,
+        protocol41: true,
+      };
     case 'string':
     default:
       return {

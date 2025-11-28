@@ -22,7 +22,7 @@ SELECT LEFT("abcdefg", "-1foo") AS foo;
 SELECT LEFT("abcdefg", null) AS foo;
 SELECT LEFT(null, 1) AS foo;
 -- check table before we run
-SELECT id, other, comment FROM _dynamodb.foo ORDER BY id;
+SELECT id, CAST(other AS SIGNED) AS other, comment FROM _dynamodb.foo ORDER BY id;
 -- with column refs
 SELECT LEFT(comment, other) AS foo FROM _dynamodb.foo WHERE id = "4";
 SELECT LEFT(comment, -other) AS foo FROM _dynamodb.foo WHERE id = "4";

@@ -10,7 +10,7 @@ export function length(
 ): EvaluationResult {
   const result = getValue(expr.args?.value?.[0], state);
   result.name = `LENGTH(${result.name})`;
-  result.type = 'number';
+  result.type = 'longlong';
   if (!result.err && result.value !== null) {
     result.value = String(result.value).length;
   }
@@ -75,9 +75,9 @@ export function lower(
   state: EvaluationState
 ): EvaluationResult {
   const result = getValue(expr.args?.value?.[0], state);
+  result.name = `LOWER(${result.name})`;
+  result.type = 'string';
   if (!result.err && result.value !== null) {
-    result.name = `LOWER(${result.name})`;
-    result.type = 'string';
     result.value = String(result.value).toLowerCase();
   }
   return result;

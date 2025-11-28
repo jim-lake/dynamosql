@@ -166,7 +166,7 @@ export function unix_timestamp(
 export function year(expr: Function, state: EvaluationState): EvaluationResult {
   const result = getValue(expr.args?.value?.[0], state);
   result.name = `YEAR(${result.name})`;
-  result.type = 'number';
+  result.type = 'longlong';
   if (!result.err && result.value !== null) {
     const dt = convertDateTime({
       value: result.value,
@@ -182,7 +182,7 @@ export function month(
 ): EvaluationResult {
   const result = getValue(expr.args?.value?.[0], state);
   result.name = `MONTH(${result.name})`;
-  result.type = 'number';
+  result.type = 'longlong';
   if (!result.err && result.value !== null) {
     const dt = convertDateTime({
       value: result.value,
@@ -195,7 +195,7 @@ export function month(
 export function day(expr: Function, state: EvaluationState): EvaluationResult {
   const result = getValue(expr.args?.value?.[0], state);
   result.name = `DAY(${result.name})`;
-  result.type = 'number';
+  result.type = 'longlong';
   if (!result.err && result.value !== null) {
     const dt = convertDateTime({
       value: result.value,
@@ -208,7 +208,7 @@ export function day(expr: Function, state: EvaluationState): EvaluationResult {
 export function hour(expr: Function, state: EvaluationState): EvaluationResult {
   const result = getValue(expr.args?.value?.[0], state);
   result.name = `HOUR(${result.name})`;
-  result.type = 'number';
+  result.type = 'longlong';
   if (!result.err && result.value !== null) {
     const dt = convertDateTime({
       value: result.value,
@@ -224,7 +224,7 @@ export function minute(
 ): EvaluationResult {
   const result = getValue(expr.args?.value?.[0], state);
   result.name = `MINUTE(${result.name})`;
-  result.type = 'number';
+  result.type = 'longlong';
   if (!result.err && result.value !== null) {
     const dt = convertDateTime({
       value: result.value,
@@ -240,7 +240,7 @@ export function second(
 ): EvaluationResult {
   const result = getValue(expr.args?.value?.[0], state);
   result.name = `SECOND(${result.name})`;
-  result.type = 'number';
+  result.type = 'longlong';
   if (!result.err && result.value !== null) {
     const dt = convertDateTime({
       value: result.value,
@@ -258,7 +258,7 @@ export function date_add(
   const intervalArg = getValue(expr.args?.value?.[1], state);
   const err = dateArg.err || intervalArg.err;
   let value = null;
-  let type: EvaluationResult['type'] = 'datetime';
+  const type: EvaluationResult['type'] = 'char';
   const name = `DATE_ADD(${dateArg.name}, ${intervalArg.name})`;
 
   if (
@@ -273,7 +273,6 @@ export function date_add(
     if (dt) {
       const result = intervalArg.value.add(dt, state.session.timeZone);
       value = result.value;
-      type = result.type;
     }
   }
   return { err, name, value, type };
@@ -286,7 +285,7 @@ export function date_sub(
   const intervalArg = getValue(expr.args?.value?.[1], state);
   const err = dateArg.err || intervalArg.err;
   let value = null;
-  let type: EvaluationResult['type'] = 'datetime';
+  const type: EvaluationResult['type'] = 'char';
   const name = `DATE_SUB(${dateArg.name}, ${intervalArg.name})`;
 
   if (
@@ -301,7 +300,6 @@ export function date_sub(
     if (dt) {
       const result = intervalArg.value.sub(dt, state.session.timeZone);
       value = result.value;
-      type = result.type;
     }
   }
   return { err, name, value, type };
@@ -386,7 +384,7 @@ export function dayofweek(
 ): EvaluationResult {
   const result = getValue(expr.args?.value?.[0], state);
   result.name = `DAYOFWEEK(${result.name})`;
-  result.type = 'number';
+  result.type = 'longlong';
   if (!result.err && result.value !== null) {
     const dt = convertDateTime({
       value: result.value,
@@ -442,7 +440,7 @@ export function dayofyear(
 ): EvaluationResult {
   const result = getValue(expr.args?.value?.[0], state);
   result.name = `DAYOFYEAR(${result.name})`;
-  result.type = 'number';
+  result.type = 'longlong';
   if (!result.err && result.value !== null) {
     const dt = convertDateTime({
       value: result.value,
@@ -468,7 +466,7 @@ export function week(expr: Function, state: EvaluationState): EvaluationResult {
     err: dateArg.err || modeArg.err,
     name: `WEEK(${dateArg.name}${modeArg.value !== null ? ', ' + modeArg.name : ''})`,
     value: null as number | null,
-    type: 'number' as const,
+    type: 'longlong' as const,
   };
   if (!result.err && dateArg.value !== null) {
     const dt = convertDateTime({
@@ -500,7 +498,7 @@ export function weekday(
 ): EvaluationResult {
   const result = getValue(expr.args?.value?.[0], state);
   result.name = `WEEKDAY(${result.name})`;
-  result.type = 'number';
+  result.type = 'longlong';
   if (!result.err && result.value !== null) {
     const dt = convertDateTime({
       value: result.value,
@@ -521,7 +519,7 @@ export function quarter(
 ): EvaluationResult {
   const result = getValue(expr.args?.value?.[0], state);
   result.name = `QUARTER(${result.name})`;
-  result.type = 'number';
+  result.type = 'longlong';
   if (!result.err && result.value !== null) {
     const dt = convertDateTime({
       value: result.value,
@@ -561,7 +559,7 @@ export function microsecond(
 ): EvaluationResult {
   const result = getValue(expr.args?.value?.[0], state);
   result.name = `MICROSECOND(${result.name})`;
-  result.type = 'number';
+  result.type = 'longlong';
   if (!result.err && result.value !== null) {
     const dt = convertDateTime({
       value: result.value,
@@ -610,7 +608,7 @@ export function weekofyear(
 ): EvaluationResult {
   const result = getValue(expr.args?.value?.[0], state);
   result.name = `WEEKOFYEAR(${result.name})`;
-  result.type = 'number';
+  result.type = 'longlong';
   if (!result.err && result.value !== null) {
     const dt = convertDateTime({
       value: result.value,
@@ -658,7 +656,7 @@ export function yearweek(
     err: dateArg.err || modeArg.err,
     name: `YEARWEEK(${dateArg.name}${modeArg.value !== null ? ', ' + modeArg.name : ''})`,
     value: null as number | null,
-    type: 'number' as const,
+    type: 'longlong' as const,
   };
   if (!result.err && dateArg.value !== null) {
     const dt = convertDateTime({
