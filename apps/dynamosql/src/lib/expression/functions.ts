@@ -1,7 +1,7 @@
 import { getValue } from './evaluate';
 import { convertNum } from '../helpers/sql_conversion';
 
-import type { Function, ExpressionValue } from 'node-sql-parser';
+import type { Function } from 'node-sql-parser';
 import type { EvaluationState, EvaluationResult } from './evaluate';
 
 import {
@@ -121,58 +121,79 @@ function sleep(expr: Function, state: EvaluationState): EvaluationResult {
 }
 function coalesce(expr: Function, state: EvaluationState): EvaluationResult {
   let err: EvaluationResult['err'] = null;
-  let value = null;
+  let value: EvaluationResult['value'] = null;
   let type: EvaluationResult['type'] = 'null';
-  expr.args?.value?.some?.((sub: ExpressionValue) => {
-    const result = getValue(sub, state);
-    if (result.err) {
-      err = result.err;
-    }
-    value = result.value;
-    // Update type if we have a non-null type
-    if (result.type !== 'null') {
-      if (result.type === 'number') {
-        type = 'longlong';
-      } else {
-        type = result.type;
-      }
-    }
-    return !err && value !== null;
-  });
-  return { err, value, type };
-}
-function greatest(expr: Function, state: EvaluationState): EvaluationResult {
-  let err: EvaluationResult['err'] = null;
-  let value: EvaluationResult['value'];
-  let type = 'longlong';
   const names: string[] = [];
-
   for (const sub of expr.args?.value ?? []) {
     const result = getValue(sub, state);
     names.push(result.name ?? '');
-    if (
-      result.type !== 'number' &&
-      result.type !== 'longlong' &&
-      result.type !== 'double' &&
-      result.type !== 'null'
-    ) {
-      type = result.type;
-    }
     if (result.err) {
       err = result.err;
       break;
-    } else if (result.value === null || result.value === undefined) {
-      value = null;
+    } else if (result.value !== null) {
+      type = result.type;
+      value = result.value;
       break;
-    } else if (value === null) {
-      break;
-    } else {
-      if (value === undefined || result.value > value) {
-        value = result.value;
-      }
     }
   }
-  return { err, value, type, name: `GREATEST(${names.join(', ')})` };
+  return { err, name: `COALESCE(${names.join(', ')}`, value, type };
+}
+function greatest(expr: Function, state: EvaluationState): EvaluationResult {
+  let value: bigint | number | string | null | undefined;
+  let type = 'null';
+  const names: string[] = [];
+
+  const values = expr.args?.value?.map((sub) => getValue(sub, state)) ?? [];
+  for (const sub of values) {
+    names.push(sub.name ?? '');
+    if (sub.err) {
+      return sub;
+    } else if (sub.value === null) {
+      value = null;
+    }
+    if (sub.type === 'string') {
+      type = 'string';
+      break;
+    } else if (sub.type === 'double' || type === 'double') {
+      type = 'double';
+    } else if (sub.type === 'number' || type === 'number') {
+      type = 'number';
+    } else if (sub.type === 'longlong') {
+      type = 'longlong';
+    }
+  }
+
+  if (value !== null && values.length > 0) {
+    if (type === 'string') {
+      let val: string | undefined = undefined;
+      for (const sub of values) {
+        const val_s = String(sub.value);
+        if (val === undefined || val_s > val) {
+          val = val_s;
+        }
+      }
+      value = val;
+    } else if (type === 'longlong') {
+      let val: bigint | undefined = undefined;
+      for (const sub of values) {
+        const val_big = BigInt(sub.value as number);
+        if (val === undefined || val_big > val) {
+          val = val_big;
+        }
+      }
+      value = val;
+    } else {
+      let val: number | undefined = undefined;
+      for (const sub of values) {
+        const val_n = sub.value as number;
+        if (val === undefined || val_n > val) {
+          val = val_n;
+        }
+      }
+      value = val;
+    }
+  }
+  return { err: null, value, type, name: `GREATEST(${names.join(', ')})` };
 }
 function least(expr: Function, state: EvaluationState): EvaluationResult {
   let err: EvaluationResult['err'] = null;

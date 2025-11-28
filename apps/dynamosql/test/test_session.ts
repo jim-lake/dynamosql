@@ -21,7 +21,7 @@ const opts = {
   typeCast(field, next) {
     if (field.type === 'LONGLONG') {
       const val = field.string();
-      if (val === null) {
+      if (val === null || val === undefined) {
         return null;
       }
       return BigInt(val);
