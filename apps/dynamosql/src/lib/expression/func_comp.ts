@@ -33,31 +33,25 @@ function _gtList<T extends Comparable<T>>(
   timeZone: string,
   convert: ConvertFunction<T>
 ): { value: T | string | null; decimals: number } | null {
-  const convert_list = list.map((item) => convert(item.value));
-  const decimals = list.reduce((memo, r, i) => {
-    const converted = convert_list[i];
-    const dec = converted?.getDecimals
-      ? converted.getDecimals()
-      : getDecimals(r);
-    return Math.max(memo, dec);
-  }, 0);
-
-  let value: T | string | undefined = undefined;
-  for (let i = 0; i < list.length; i++) {
-    const item = list[i];
-    const converted_item = convert_list[i];
-    if (value === undefined) {
-      value = converted_item ?? String(item?.value);
-    } else if (!converted_item) {
-      if (typeof value === 'string') {
-        const item_string = String(item?.value);
-        if (item_string > value) {
-          value = item_string;
-        }
-      }
-    } else if (typeof value === 'string' || converted_item.gt(value)) {
-      value = converted_item;
+  const convert_list: T[] = [];
+  let decimals = 0;
+  for (const item of list) {
+    const ret = convert(item.value, undefined);
+    if (ret) {
+      convert_list.push(ret);
+      decimals = Math.max(decimals, ret.getDecimals?.() ?? 0);
+    } else {
+      decimals = Math.max(decimals, getDecimals(item));
     }
+  }
+  let value: T | string | undefined = undefined;
+  for (const converted of convert_list) {
+    if (value === undefined || converted.gt(value)) {
+      value = converted;
+    }
+  }
+  if (value && value.getDecimals?.() !== decimals) {
+    value = convert(value, decimals) ?? '';
   }
   return { value: value ?? null, decimals };
 }
@@ -97,8 +91,7 @@ function _ltList<T extends Comparable<T>>(
       }
     }
     if (val && val.getDecimals?.() !== decimals) {
-      value =
-        convert({ value: val, type: 'datetime', err: null }, decimals) ?? '';
+      value = convert(val, decimals) ?? '';
     } else {
       value = val;
     }
