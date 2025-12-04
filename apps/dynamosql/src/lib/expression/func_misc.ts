@@ -41,28 +41,6 @@ export function sleep(
   result.type = 'longlong';
   return result;
 }
-export function coalesce(
-  expr: Function,
-  state: EvaluationState
-): EvaluationResult {
-  let err: EvaluationResult['err'] = null;
-  let value: EvaluationResult['value'] = null;
-  let type: EvaluationResult['type'] = 'null';
-  const names: string[] = [];
-  for (const sub of expr.args?.value ?? []) {
-    const result = getValue(sub, state);
-    names.push(result.name ?? '');
-    if (result.err) {
-      err = result.err;
-      break;
-    } else if (result.value !== null) {
-      type = result.type;
-      value = result.value;
-      break;
-    }
-  }
-  return { err, name: `COALESCE(${names.join(', ')}`, value, type };
-}
 export function not(expr: Function, state: EvaluationState): EvaluationResult {
   const result = getValue(expr.args?.value?.[0], state);
   result.name = `NOT(${result.name})`;

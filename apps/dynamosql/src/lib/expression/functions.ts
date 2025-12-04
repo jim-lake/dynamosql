@@ -82,14 +82,11 @@ import {
   yearweek,
 } from './func_date';
 import { curtime, time, hour, minute, second, microsecond } from './func_time';
-
-import { greatest, least } from './func_comp';
-
+import { coalesce, greatest, least } from './func_comp';
 import {
   database,
   isnull,
   sleep,
-  coalesce,
   not,
   nullif,
   ifFunc,

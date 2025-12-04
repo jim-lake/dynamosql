@@ -75,15 +75,15 @@ describe('Expression', function () {
     path.join(__dirname, 'function_datetime_types.sql'),
     { verify_field_types: true }
   );
+  runTests(
+    'function_type_combinations.sql',
+    path.join(__dirname, 'function_type_combinations.sql'),
+    { verify_field_types: true }
+  );
   /*
   runTests(
     'function_edge_cases.sql',
     path.join(__dirname, 'function_edge_cases.sql'),
-    { verify_field_types: true }
-  );
-  runTests(
-    'function_type_combinations.sql',
-    path.join(__dirname, 'function_type_combinations.sql'),
     { verify_field_types: true }
   );
   runTests(

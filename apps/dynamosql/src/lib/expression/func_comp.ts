@@ -10,6 +10,28 @@ import {
 import type { Function } from 'node-sql-parser';
 import type { EvaluationState, EvaluationResult } from './evaluate';
 
+export function coalesce(
+  expr: Function,
+  state: EvaluationState
+): EvaluationResult {
+  let err: EvaluationResult['err'] = null;
+  let value: EvaluationResult['value'] = null;
+  const names: string[] = [];
+  const values: ExpressionResult[] = [];
+  for (const sub of expr.args?.value ?? []) {
+    const result = getValue(sub, state);
+    names.push(result.name ?? '');
+    values.push(result);
+    if (result.err) {
+      err = result.err;
+      break;
+    } else if (value === null && result.value !== null) {
+      value = result.value;
+    }
+  }
+  const { type } = _unionType(values);
+  return { err, name: `COALESCE(${names.join(', ')}`, value, type };
+}
 export function greatest(
   expr: Function,
   state: EvaluationState
