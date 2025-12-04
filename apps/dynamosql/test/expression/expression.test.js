@@ -62,6 +62,9 @@ describe('Expression', function () {
     path.join(__dirname, 'function_greatest.sql'),
     { verify_field_types: true }
   );
+  runTests('function_least.sql', path.join(__dirname, 'function_least.sql'), {
+    verify_field_types: true,
+  });
   runTests(
     'function_success_cases.sql',
     path.join(__dirname, 'function_success_cases.sql'),

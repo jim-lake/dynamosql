@@ -1,6 +1,7 @@
 import { getValue } from './evaluate';
 import { getDecimals } from '../helpers/decimals';
 import {
+  convertString,
   convertDateTime,
   convertDate,
   convertTime,
@@ -56,7 +57,7 @@ export function greatest(
         {
           const ret = _gtList(
             values,
-            (arg) => convert_func?.({ value: arg.value, timeZone }) ?? null
+            (val) => convert_func?.({ value: val, timeZone }) ?? null
           );
           if (ret === null) {
             value = null;
@@ -129,15 +130,23 @@ export function greatest(
     decimals,
   };
 }
+export function least(
+  expr: Function,
+  state: EvaluationState
+): EvaluationResult {
+  return _compare(expr, state, 'LEAST', _ltList, (a, b) => a < b);
+}
+
 type Comparable<T> = { gt(other: T): boolean; getDecimals?(): number };
 type ConvertFunction<T extends Comparable<T>> = (
-  arg: EvaluationResult
+  value: EvaluationResult['value'],
+  decimals?: number | undefined
 ) => T | null;
 function _gtList<T extends Comparable<T>>(
   list: EvaluationResult[],
   convert: ConvertFunction<T>
 ): { value: T | string | null; decimals: number } | null {
-  const convert_list = list.map(convert);
+  const convert_list = list.map(item => convert(item.value));
   const decimals = list.reduce((memo, r, i) => {
     const converted = convert_list[i];
     const dec = converted?.getDecimals
@@ -161,6 +170,50 @@ function _gtList<T extends Comparable<T>>(
       }
     } else if (typeof value === 'string' || converted_item.gt(value)) {
       value = converted_item;
+    }
+  }
+  return { value: value ?? null, decimals };
+}
+function _ltList<T extends Comparable<T>>(
+  list: EvaluationResult[],
+  timeZone: string,
+  convert: ConvertFunction<T>
+): { value: T | string | null; decimals: number } | null {
+  const convert_list: T[] = [];
+  for (const item of list) {
+    const ret = convert(item.value, undefined);
+    if (ret) {
+      convert_list.push(ret);
+    }
+  }
+  let value: T | string | undefined = undefined;
+  let decimals = 0;
+  if (convert_list.length !== list.length) {
+    let val: string | undefined = undefined;
+    for (const item of list) {
+      const item_s = convertString({ value: item.value, timeZone }) ?? '';
+      if (val === undefined || item_s < val) {
+        val = item_s;
+      }
+    }
+    value = val;
+  } else {
+    decimals = convert_list.reduce((memo, converted) => {
+      const dec = converted.getDecimals?.() ?? 0;
+      return Math.max(memo, dec);
+    }, 0);
+
+    let val: T | undefined = undefined;
+    for (const converted of convert_list) {
+      if (val === undefined || val.gt(converted)) {
+        val = converted;
+      }
+    }
+    if (val && val.getDecimals?.() !== decimals) {
+      value =
+        convert({ value: val, type: 'datetime', err: null }, decimals) ?? '';
+    } else {
+      value = val;
     }
   }
   return { value: value ?? null, decimals };
@@ -215,39 +268,131 @@ function _unionType(list: EvaluationResult[]): UnionTypeResult {
   }
   return { compare_type, type };
 }
-export function least(
+
+type NativeCompareFunction<T> = (a: T, b: T) => boolean;
+export function _compare(
   expr: Function,
-  state: EvaluationState
+  state: EvaluationState,
+  functionName: string,
+  dateCompare: typeof _ltList,
+  nativeCompare: NativeCompareFunction<string | number | bigint>
 ): EvaluationResult {
-  let err: EvaluationResult['err'] = null;
+  const { timeZone } = state.session;
   let value: EvaluationResult['value'];
-  let type = 'longlong';
   const names: string[] = [];
 
-  for (const sub of expr.args?.value ?? []) {
-    const result = getValue(sub, state);
-    names.push(result.name ?? '');
-    if (
-      result.type !== 'number' &&
-      result.type !== 'longlong' &&
-      result.type !== 'double' &&
-      result.type !== 'null'
-    ) {
-      type = result.type;
+  const values = expr.args?.value?.map((sub) => getValue(sub, state)) ?? [];
+  if (values.length < 2) {
+    return {
+      err: { err: 'ER_WRONG_PARAMCOUNT_TO_NATIVE_FCT', args: [functionName] },
+      value: null,
+      type: 'null',
+    };
+  }
+
+  for (const sub of values) {
+    names.push(sub.name ?? '');
+    if (sub.err) {
+      return sub;
     }
-    if (result.err) {
-      err = result.err;
-      break;
-    } else if (result.value === null || result.value === undefined) {
+    if (sub.value === null) {
       value = null;
-      break;
-    } else if (value === null) {
-      break;
-    } else {
-      if (value === undefined || result.value < value) {
-        value = result.value;
-      }
     }
   }
-  return { err, value, type, name: `LEAST(${names.join(', ')})` };
+  const { compare_type, type } = _unionType(values);
+
+  let decimals = 0;
+  let convert_func:
+    | typeof convertDateTime
+    | typeof convertDate
+    | typeof convertTime
+    | undefined = undefined;
+  if (value !== null) {
+    switch (compare_type) {
+      case 'datetime':
+        convert_func = convertDateTime;
+      // eslint-disable-next-line no-fallthrough
+      case 'date':
+        convert_func ??= convertDate;
+      // eslint-disable-next-line no-fallthrough
+      case 'time':
+        convert_func ??= convertTime;
+        {
+          const ret = dateCompare(
+            values,
+            timeZone,
+            (val, dec) =>
+              convert_func?.({ value: val, timeZone, decimals: dec }) ??
+              null
+          );
+          if (ret === null) {
+            value = null;
+          } else {
+            decimals = ret.decimals;
+            if (
+              ret.value &&
+              type === 'string' &&
+              typeof ret.value !== 'string'
+            ) {
+              value = ret.value.toString({ timeZone, decimals });
+            } else {
+              value = ret.value;
+            }
+          }
+        }
+        break;
+      case 'longlong':
+        {
+          let val: bigint | number | undefined = undefined;
+          for (const sub of values) {
+            if (typeof val === 'bigint' || typeof sub.value === 'bigint') {
+              const val_big = BigInt(sub.value as number);
+              if (val === undefined || nativeCompare(val_big, val)) {
+                val = val_big;
+              }
+            } else {
+              const val_num = Number(sub.value);
+              if (val === undefined || nativeCompare(val_num, val)) {
+                val = val_num;
+              }
+            }
+          }
+          value = val;
+        }
+        break;
+      case 'double':
+      case 'number':
+        {
+          let val: number | undefined = undefined;
+          for (const sub of values) {
+            const val_n = Number(sub.value);
+            if (val === undefined || nativeCompare(val_n, val)) {
+              val = val_n;
+            }
+          }
+          value = val;
+        }
+        break;
+      default:
+      case 'string':
+        {
+          let val: string | undefined = undefined;
+          for (const sub of values) {
+            const val_s = String(sub.value);
+            if (val === undefined || nativeCompare(val_s, val)) {
+              val = val_s;
+            }
+          }
+          value = val;
+        }
+        break;
+    }
+  }
+  return {
+    err: null,
+    value,
+    type,
+    name: `${functionName}(${names.join(', ')})`,
+    decimals,
+  };
 }
