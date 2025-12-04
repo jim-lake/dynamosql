@@ -191,7 +191,8 @@ export interface ConvertTimeParams {
   timeZone?: string;
 }
 export function convertTime(params: ConvertTimeParams): SQLTime | null {
-  const { value, decimals } = params;
+  const { value } = params;
+  let { decimals } = params;
   if (value instanceof SQLTime) {
     return value;
   } else if (value instanceof SQLDateTime) {
@@ -219,6 +220,9 @@ export function convertTime(params: ConvertTimeParams): SQLTime | null {
     }
   } else if (typeof value === 'number') {
     const time = _numToTime(value);
+    if (decimals === undefined) {
+      decimals = getDecimals(value);
+    }
     return createSQLTime({ time, decimals });
   }
   return null;
