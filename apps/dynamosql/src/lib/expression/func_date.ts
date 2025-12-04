@@ -9,12 +9,9 @@ import { dateFormat } from '../helpers/date_format';
 import { SQLDate } from '../types/sql_date';
 import { SQLDateTime, createSQLDateTime } from '../types/sql_datetime';
 import { SQLInterval } from '../types/sql_interval';
-import { createSQLTime } from '../types/sql_time';
 
 import type { Function } from 'node-sql-parser';
 import type { EvaluationState, EvaluationResult } from './evaluate';
-
-const DAY = 24 * 60 * 60;
 
 export function now(expr: Function, state: EvaluationState): EvaluationResult {
   const result = getValue(expr.args?.value?.[0], state);
@@ -37,13 +34,20 @@ export function from_unixtime(
   result.name = `FROM_UNIXTIME(${result.name})`;
   result.type = 'datetime';
   if (!result.err && result.value !== null) {
-    const unixTime = convertNum(result.value);
-    if (unixTime !== null) {
-      const decimals = Math.min(
-        6,
-        String(unixTime).split('.')?.[1]?.length || 0
-      );
-      result.value = createSQLDateTime({ time: unixTime, decimals });
+    const unix_time = convertNum(result.value);
+    if (unix_time !== null) {
+      let decimals = 0;
+      if (typeof result.value === 'string') {
+        decimals = 6;
+      } else {
+        const unix_s = String(unix_time);
+        const index = unix_s.indexOf('.');
+        if (index !== -1) {
+          const dec = unix_s.length - index - 1;
+          decimals = Math.min(dec, 6);
+        }
+      }
+      result.value = createSQLDateTime({ time: unix_time, decimals });
     }
   }
   return result;
@@ -118,28 +122,11 @@ export function curdate(
   const name = expr.args ? 'CURDATE()' : 'CURRENT_DATE';
   return { err: null, value, name, type: 'date' };
 }
-export function curtime(
-  expr: Function,
-  state: EvaluationState
-): EvaluationResult {
-  const result = getValue(expr.args?.value?.[0], state);
-  result.name = expr.args ? `CURTIME(${result.name ?? ''})` : 'CURRENT_TIME';
-  if (!result.err && result.type) {
-    const decimals = typeof result.value === 'number' ? result.value : 0;
-    if (decimals > 6) {
-      result.err = 'ER_TOO_BIG_PRECISION';
-    }
-    const currentTime = (Date.now() / 1000) % DAY;
-    result.value = createSQLTime({ time: currentTime, decimals });
-    result.type = 'time';
-  }
-  return result;
-}
 export function unix_timestamp(
   expr: Function,
   state: EvaluationState
 ): EvaluationResult {
-  const ret: EvaluationResult = {
+  const result: EvaluationResult = {
     err: null,
     name: `UNIX_TIMESTAMP()`,
     type: 'longlong',
@@ -150,18 +137,25 @@ export function unix_timestamp(
     if (val.err) {
       return val;
     }
-    ret.name = `UNIX_TIMESTAMP(${val.name})`;
-    const dt = convertDateTime({
-      value: val.value,
-      timeZone: state.session.timeZone,
-    });
-    if (dt === null) {
-      ret.value = 0;
+    result.name = `UNIX_TIMESTAMP(${val.name})`;
+    if (val.value === null) {
+      result.value = null;
     } else {
-      ret.value = dt.getTime();
+      const dt = convertDateTime({
+        value: val.value,
+        timeZone: state.session.timeZone,
+      });
+      if (dt === null) {
+        result.value = 0;
+        if (typeof val.value === 'string') {
+          result.type = 'decimal';
+        }
+      } else {
+        result.value = dt.getTime();
+      }
     }
   }
-  return ret;
+  return result;
 }
 export function year(expr: Function, state: EvaluationState): EvaluationResult {
   const result = getValue(expr.args?.value?.[0], state);
@@ -202,51 +196,6 @@ export function day(expr: Function, state: EvaluationState): EvaluationResult {
       timeZone: state.session.timeZone,
     });
     result.value = dt ? dt.toDate(state.session.timeZone).getDate() : null;
-  }
-  return result;
-}
-export function hour(expr: Function, state: EvaluationState): EvaluationResult {
-  const result = getValue(expr.args?.value?.[0], state);
-  result.name = `HOUR(${result.name})`;
-  result.type = 'longlong';
-  if (!result.err && result.value !== null) {
-    const dt = convertDateTime({
-      value: result.value,
-      timeZone: state.session.timeZone,
-    });
-    result.value = dt ? dt.toDate(state.session.timeZone).getHours() : null;
-  }
-  return result;
-}
-export function minute(
-  expr: Function,
-  state: EvaluationState
-): EvaluationResult {
-  const result = getValue(expr.args?.value?.[0], state);
-  result.name = `MINUTE(${result.name})`;
-  result.type = 'longlong';
-  if (!result.err && result.value !== null) {
-    const dt = convertDateTime({
-      value: result.value,
-      timeZone: state.session.timeZone,
-    });
-    result.value = dt ? dt.toDate(state.session.timeZone).getMinutes() : null;
-  }
-  return result;
-}
-export function second(
-  expr: Function,
-  state: EvaluationState
-): EvaluationResult {
-  const result = getValue(expr.args?.value?.[0], state);
-  result.name = `SECOND(${result.name})`;
-  result.type = 'longlong';
-  if (!result.err && result.value !== null) {
-    const dt = convertDateTime({
-      value: result.value,
-      timeZone: state.session.timeZone,
-    });
-    result.value = dt ? dt.toDate(state.session.timeZone).getSeconds() : null;
   }
   return result;
 }
@@ -537,48 +486,7 @@ export function quarter(
   }
   return result;
 }
-export function time(expr: Function, state: EvaluationState): EvaluationResult {
-  const result = getValue(expr.args?.value?.[0], state);
-  result.name = `TIME(${result.name})`;
-  result.type = 'time';
-  if (!result.err && result.value !== null) {
-    const dt = convertDateTime({
-      value: result.value,
-      timeZone: state.session.timeZone,
-    });
-    if (dt) {
-      const dateObj = dt.toDate(state.session.timeZone);
-      const seconds =
-        dateObj.getHours() * 3600 +
-        dateObj.getMinutes() * 60 +
-        dateObj.getSeconds();
-      result.value = createSQLTime({ time: seconds, decimals: 0 });
-    } else {
-      result.value = null;
-    }
-  }
-  return result;
-}
-export function microsecond(
-  expr: Function,
-  state: EvaluationState
-): EvaluationResult {
-  const result = getValue(expr.args?.value?.[0], state);
-  result.name = `MICROSECOND(${result.name})`;
-  result.type = 'longlong';
-  if (!result.err && result.value !== null) {
-    const dt = convertDateTime({
-      value: result.value,
-      timeZone: state.session.timeZone,
-    });
-    if (dt) {
-      result.value = Math.round(dt.getFraction() * 1000000);
-    } else {
-      result.value = null;
-    }
-  }
-  return result;
-}
+
 export function last_day(
   expr: Function,
   state: EvaluationState

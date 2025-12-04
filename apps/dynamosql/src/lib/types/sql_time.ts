@@ -29,7 +29,7 @@ export class SQLTime {
     return this._time;
   }
   getFraction(): number {
-    return 0;
+    return this._time % 1;
   }
   getDecimals(): number {
     return this._decimals;

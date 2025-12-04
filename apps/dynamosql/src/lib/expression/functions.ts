@@ -63,14 +63,10 @@ import {
   date_format,
   datediff,
   curdate,
-  curtime,
   unix_timestamp,
   year,
   month,
   day,
-  hour,
-  minute,
-  second,
   date_add,
   date_sub,
   timestampdiff,
@@ -81,12 +77,11 @@ import {
   week,
   weekday,
   quarter,
-  time,
-  microsecond,
   last_day,
   weekofyear,
   yearweek,
 } from './func_date';
+import { curtime, time, hour, minute, second, microsecond } from './func_time';
 
 import { greatest, least } from './func_comp';
 

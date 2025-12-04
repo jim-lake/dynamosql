@@ -188,11 +188,15 @@ const TIME_REGEX = /^(-)?([0-9]*):([0-9]{1,2})(:([0-9]{1,2}))?(\.[0-9]+)?/;
 export interface ConvertTimeParams {
   value: unknown;
   decimals?: number;
+  timeZone?: string;
 }
 export function convertTime(params: ConvertTimeParams): SQLTime | null {
   const { value, decimals } = params;
   if (value instanceof SQLTime) {
     return value;
+  } else if (value instanceof SQLDateTime) {
+    const time = (value.getTime() % DAY) + value.getFraction();
+    return createSQLTime({ time, decimals: value.getDecimals() });
   } else if (typeof value === 'string') {
     let time = _stringToTime(value);
     if (time === undefined) {

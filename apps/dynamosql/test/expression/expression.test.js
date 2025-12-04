@@ -70,6 +70,11 @@ describe('Expression', function () {
     path.join(__dirname, 'function_success_cases.sql'),
     { verify_field_types: true }
   );
+  runTests(
+    'function_datetime_types.sql',
+    path.join(__dirname, 'function_datetime_types.sql'),
+    { verify_field_types: true }
+  );
   /*
   runTests(
     'function_edge_cases.sql',
@@ -94,11 +99,6 @@ describe('Expression', function () {
   runTests(
     'function_string_types.sql',
     path.join(__dirname, 'function_string_types.sql'),
-    { verify_field_types: true }
-  );
-  runTests(
-    'function_datetime_types.sql',
-    path.join(__dirname, 'function_datetime_types.sql'),
     { verify_field_types: true }
   );
   runTests(
