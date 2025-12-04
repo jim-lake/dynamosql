@@ -621,35 +621,18 @@ export function weekofyear(
       timeZone: state.session.timeZone,
     });
     if (dt) {
-      const dateObj = dt.toDate(state.session.timeZone);
-      const yearStart = new Date(dateObj.getFullYear(), 0, 1);
-      const dayOfYear =
-        Math.floor(
-          (dateObj.getTime() - yearStart.getTime()) / (1000 * 60 * 60 * 24)
-        ) + 1;
-      const startDay = yearStart.getDay();
-      const weekStart = 1;
-      const daysToFirstWeek = (7 - startDay + weekStart) % 7;
-      if (dayOfYear <= daysToFirstWeek) {
-        const prevYear = new Date(dateObj.getFullYear() - 1, 11, 31);
-        const prevYearStart = new Date(dateObj.getFullYear() - 1, 0, 1);
-        const prevDayOfYear =
-          Math.floor(
-            (prevYear.getTime() - prevYearStart.getTime()) /
-              (1000 * 60 * 60 * 24)
-          ) + 1;
-        const prevStartDay = prevYearStart.getDay();
-        const prevDaysToFirstWeek = (7 - prevStartDay + weekStart) % 7;
-        result.value =
-          Math.floor((prevDayOfYear - prevDaysToFirstWeek - 1) / 7) + 1;
-      } else {
-        result.value = Math.floor((dayOfYear - daysToFirstWeek - 1) / 7) + 1;
-      }
+      result.value = _weekOfYear(dt.toDate(state.session.timeZone));
     } else {
       result.value = null;
     }
   }
   return result;
+}
+function _weekOfYear(d: Date): number {
+  const day_num = d.getUTCDay() || 7;
+  d.setUTCDate(d.getUTCDate() + 4 - day_num);
+  const year_start = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+  return Math.ceil(((d.getTime() - year_start.getTime()) / 86400000 + 1) / 7);
 }
 export function yearweek(
   expr: Function,

@@ -7,9 +7,28 @@ const MINUTE = 60;
 const HOUR = 60 * MINUTE;
 const DAY = 24 * HOUR;
 
-interface TimeFraction {
+export interface TimeFraction {
   time: number;
   fraction?: number;
+}
+export interface ConvertStringParams {
+  value: unknown;
+  decimals?: number;
+  timeZone: string;
+}
+export function convertString(params: ConvertStringParams): string | null {
+  const { value, decimals, timeZone } = params;
+  if (value === null) {
+    return null;
+  }
+  if (
+    value instanceof SQLDateTime ||
+    value instanceof SQLDate ||
+    value instanceof SQLTime
+  ) {
+    return value.toString({ decimals, timeZone });
+  }
+  return String(value);
 }
 export function convertNum(value: unknown): number | null {
   if (value === null || value === undefined) {
@@ -131,11 +150,11 @@ export function convertDateTime(params: ConvertDateTimeParams) {
   }
   return null;
 }
-export interface ConvertDataParams {
+export interface ConvertDateParams {
   value: unknown;
   timeZone: string;
 }
-export function convertDate(params: ConvertDataParams): SQLDate | null {
+export function convertDate(params: ConvertDateParams): SQLDate | null {
   const { value, timeZone } = params;
   if (value === null) {
     return null;
@@ -143,6 +162,8 @@ export function convertDate(params: ConvertDataParams): SQLDate | null {
     return value;
   } else if (value instanceof SQLDateTime) {
     return new SQLDate({ time: value.getTime(), timeZone });
+  } else if (value instanceof SQLTime) {
+    return new SQLDate({ time: Date.now() / 1000, timeZone });
   } else {
     let convert_result: TimeFraction | undefined;
     if (typeof value === 'string') {

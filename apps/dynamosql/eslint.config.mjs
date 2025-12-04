@@ -46,6 +46,24 @@ export default tseslint.config(
           message:
             'Type import() syntax is not allowed — use an explicit import type instead.',
         },
+        {
+          selector:
+            "ConditionalExpression[test.operator='==='][test.left.operator='typeof'][test.right.value='number'][consequent.type='Identifier'][alternate.type='CallExpression'][alternate.callee.name='Number']",
+          message:
+            "Avoid `typeof x === 'number' ? x : Number(x)` — just use Number(x).",
+        },
+        {
+          selector:
+            "ConditionalExpression[test.operator='==='][test.left.operator='typeof'][test.right.value='string'][consequent.type='Identifier'][alternate.type='CallExpression'][alternate.callee.name='String']",
+          message:
+            "Avoid `typeof x === 'string' ? x : String(x)` — just use String(x).",
+        },
+        {
+          selector:
+            "ConditionalExpression[test.operator='==='][test.left.operator='typeof'][test.right.value='bigint'][consequent.type='Identifier'][alternate.type='CallExpression'][alternate.callee.name='BigInt']",
+          message:
+            "Avoid `typeof x === 'bigint' ? x : BigInt(x)` — just use BigInt(x).",
+        },
       ],
     },
   },

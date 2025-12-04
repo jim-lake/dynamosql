@@ -74,13 +74,13 @@ function _convertCompare(
       right.value = convertNum(right.value);
     } else {
       if (left.value instanceof SQLDateTime) {
-        left.value = left.value.toString(timeZone);
-      } else if (typeof left.value !== 'string') {
+        left.value = left.value.toString({ timeZone });
+      } else {
         left.value = String(left.value);
       }
       if (right.value instanceof SQLDateTime) {
-        right.value = right.value.toString(timeZone);
-      } else if (typeof right.value !== 'string') {
+        right.value = right.value.toString({ timeZone });
+      } else {
         right.value = String(right.value);
       }
     }

@@ -8,6 +8,10 @@ export interface SQLDateConstructorParams {
   time: bigint | number;
   timeZone: string;
 }
+interface SQLDateToStringParams {
+  decimals?: number;
+  timeZone?: string;
+}
 export class SQLDate {
   private readonly _time: number;
   private _date: Date | null = null;
@@ -50,8 +54,11 @@ export class SQLDate {
     const other_date = Math.floor(other._time / (24 * 60 * 60));
     return this_date - other_date;
   }
-  toString(timeZone?: string): string {
-    const date = this._makeDate(timeZone);
+  gt(other: SQLDate): boolean {
+    return this._time > other.getTime();
+  }
+  toString(params?: SQLDateToStringParams): string {
+    const date = this._makeDate(params?.timeZone);
     if (isNaN(date.getTime())) {
       return '';
     } else {

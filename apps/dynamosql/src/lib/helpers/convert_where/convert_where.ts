@@ -20,12 +20,10 @@ export interface ConvertWhereState {
   from_key?: string;
   default_true?: boolean;
 }
-
 export interface ConvertResult {
   err: string | null;
   value: string | number | null;
 }
-
 export function convertWhere(
   expr: ExtendedExpressionValue | Binary | FunctionType | null | undefined,
   state: ConvertWhereState
@@ -79,7 +77,7 @@ export function convertWhere(
       if ('from' in colRef && colRef.from?.key === from_key) {
         const colRefItem = colRef as ColumnRefItem & { from?: { key: string } };
         const col = colRefItem.column;
-        value = typeof col === 'string' ? col : String(col);
+        value = String(col);
       } else {
         err = 'unsupported';
       }

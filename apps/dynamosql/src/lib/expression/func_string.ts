@@ -48,8 +48,8 @@ export function left(expr: Function, state: EvaluationState): EvaluationResult {
   if (!result.err && (result.value === null || len_result.value === null)) {
     result.value = null;
   } else if (!result.err) {
-    const len = convertNum(len_result.value);
-    result.value = len !== null ? String(result.value).substring(0, len) : null;
+    const len = Math.round(convertNum(len_result.value) ?? 0);
+    result.value = String(result.value).substring(0, len);
   }
   return result;
 }
@@ -65,11 +65,11 @@ export function right(
   if (!result.err && (result.value === null || len_result.value === null)) {
     result.value = null;
   } else if (!result.err) {
-    const len = convertNum(len_result.value);
-    if (len !== null && len <= 0) {
+    const len = Math.round(convertNum(len_result.value) ?? 0);
+    if (len <= 0) {
       result.value = '';
     } else {
-      result.value = len !== null ? String(result.value).slice(-len) : null;
+      result.value = String(result.value).slice(-len);
     }
   }
   return result;

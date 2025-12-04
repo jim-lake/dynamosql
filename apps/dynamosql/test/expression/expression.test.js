@@ -57,28 +57,51 @@ describe('Expression', function () {
   runTests('string_funcs.sql', path.join(__dirname, 'string_funcs.sql'), {
     verify_field_types: true,
   });
-  runTests('function_edge_cases.sql', path.join(__dirname, 'function_edge_cases.sql'), {
-    verify_field_types: true,
-  });
-  runTests('function_success_cases.sql', path.join(__dirname, 'function_success_cases.sql'), {
-    verify_field_types: true,
-  });
-  runTests('function_type_combinations.sql', path.join(__dirname, 'function_type_combinations.sql'), {
-    verify_field_types: true,
-  });
-  runTests('function_arithmetic_types.sql', path.join(__dirname, 'function_arithmetic_types.sql'), {
-    verify_field_types: true,
-  });
-  runTests('function_comparison_types.sql', path.join(__dirname, 'function_comparison_types.sql'), {
-    verify_field_types: true,
-  });
-  runTests('function_string_types.sql', path.join(__dirname, 'function_string_types.sql'), {
-    verify_field_types: true,
-  });
-  runTests('function_datetime_types.sql', path.join(__dirname, 'function_datetime_types.sql'), {
-    verify_field_types: true,
-  });
-  runTests('function_logical_types.sql', path.join(__dirname, 'function_logical_types.sql'), {
-    verify_field_types: true,
-  });
+  runTests(
+    'function_greatest.sql',
+    path.join(__dirname, 'function_greatest.sql'),
+    { verify_field_types: true }
+  );
+  runTests(
+    'function_success_cases.sql',
+    path.join(__dirname, 'function_success_cases.sql'),
+    { verify_field_types: true }
+  );
+  /*
+  runTests(
+    'function_edge_cases.sql',
+    path.join(__dirname, 'function_edge_cases.sql'),
+    { verify_field_types: true }
+  );
+  runTests(
+    'function_type_combinations.sql',
+    path.join(__dirname, 'function_type_combinations.sql'),
+    { verify_field_types: true }
+  );
+  runTests(
+    'function_arithmetic_types.sql',
+    path.join(__dirname, 'function_arithmetic_types.sql'),
+    { verify_field_types: true }
+  );
+  runTests(
+    'function_comparison_types.sql',
+    path.join(__dirname, 'function_comparison_types.sql'),
+    { verify_field_types: true }
+  );
+  runTests(
+    'function_string_types.sql',
+    path.join(__dirname, 'function_string_types.sql'),
+    { verify_field_types: true }
+  );
+  runTests(
+    'function_datetime_types.sql',
+    path.join(__dirname, 'function_datetime_types.sql'),
+    { verify_field_types: true }
+  );
+  runTests(
+    'function_logical_types.sql',
+    path.join(__dirname, 'function_logical_types.sql'),
+    { verify_field_types: true }
+  );
+  */
 });

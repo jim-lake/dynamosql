@@ -143,6 +143,10 @@ const ERROR_MAP: Record<string, ErrorMapEntry> = {
     code: 'ER_PARSE_ERROR',
     sqlMessage: 'You have an error in your SQL syntax.',
   },
+  ER_WRONG_PARAMCOUNT_TO_NATIVE_FCT: {
+    code: 'ER_WRONG_PARAMCOUNT_TO_NATIVE_FCT',
+    sqlMessage: errStr`Incorrect parameter count in the call to native function '${0}'`,
+  },
 };
 
 export class SQLError extends Error {

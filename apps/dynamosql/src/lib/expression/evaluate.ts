@@ -8,7 +8,9 @@ import GlobalSettings from '../../global_settings';
 import { mapToObject } from '../../tools/dynamodb_helper';
 import { logger } from '@dynamosql/shared';
 import { getFunctionName } from '../helpers/ast_helper';
+import { getDecimalsForString } from '../helpers/decimals';
 import { toBigInt } from '../../tools/safe_convert';
+import { SQLError } from '../../error';
 
 import type {
   Function,
@@ -32,8 +34,9 @@ export interface EvaluationValue {
   value: unknown;
 }
 export interface EvaluationResult extends EvaluationValue {
-  err: { err: string; args?: unknown[] } | string | null;
+  err: ConstructorParameters<typeof SQLError>[0] | null;
   name?: string;
+  decimals?: number;
   sleep_ms?: number;
 }
 
@@ -60,6 +63,7 @@ export function getValue(
       result.value = Number(expr.value);
       if (typeof expr.value === 'string' && expr.value.includes('.')) {
         result.type = 'number';
+        result.decimals = getDecimalsForString(expr.value);
       } else {
         result.type = Number.isInteger(result.value) ? 'longlong' : 'number';
       }
@@ -83,6 +87,7 @@ export function getValue(
   } else if (type === 'bool') {
     result.value = expr.value ? 1 : 0;
     result.name = expr.value ? 'TRUE' : 'FALSE';
+    result.type = 'longlong';
   } else if (type === 'hex_string' || type === 'full_hex_string') {
     result.value = Buffer.from(expr.value, 'hex');
     result.name = 'x' + expr.value.slice(0, 10);
@@ -222,20 +227,15 @@ export function getValue(
       from?: { key: string };
     };
 
-    // Handle both ColumnRefItem and ColumnRefExpr
     let columnName: string;
     let columnValue: unknown;
 
     if ('column' in colRef) {
-      // ColumnRefItem
       columnValue = colRef.column;
-      columnName =
-        typeof columnValue === 'string' ? columnValue : String(columnValue);
+      columnName = String(columnValue);
     } else if ('expr' in colRef && colRef.expr && 'column' in colRef.expr) {
-      // ColumnRefExpr
       columnValue = colRef.expr.column;
-      columnName =
-        typeof columnValue === 'string' ? columnValue : String(columnValue);
+      columnName = String(columnValue);
     } else {
       columnName = String(colRef);
     }

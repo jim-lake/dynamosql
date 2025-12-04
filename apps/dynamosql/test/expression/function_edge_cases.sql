@@ -187,16 +187,6 @@ SELECT SIGN("abc") AS result;
 SELECT SIGN("123") AS result;
 SELECT SIGN("-123") AS result;
 
--- GREATEST edge cases
-SELECT GREATEST() AS result;
-SELECT GREATEST(1) AS result;
-SELECT GREATEST(1, 2) AS result;
-SELECT GREATEST(1, 2, 3, 4, 5) AS result;
-SELECT GREATEST("", "a") AS result;
-SELECT GREATEST(1, "2") AS result;
-SELECT GREATEST(1.5, 2) AS result;
-SELECT GREATEST(1, 2.5) AS result;
-
 -- LEAST edge cases
 SELECT LEAST() AS result;
 SELECT LEAST(1) AS result;

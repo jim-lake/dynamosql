@@ -57,7 +57,7 @@ export function typeCast(
           options?.dateStrings &&
           (value instanceof SQLDateTime || value instanceof SQLDate)
         ) {
-          return value.toString(timeZone);
+          return value.toString({ timeZone });
         } else if (options?.dateStrings) {
           return String(value);
         } else if (value instanceof Date) {
@@ -70,12 +70,12 @@ export function typeCast(
         break;
       case Types.TIME:
         if (value instanceof SQLTime) {
-          return value.toString(timeZone);
+          return value.toString({ timeZone });
         } else {
-          return typeof value === 'string' ? value : String(value);
+          return String(value);
         }
       case Types.GEOMETRY:
-        return typeof value === 'string' ? value : String(value);
+        return String(value);
       case Types.VARCHAR:
       case Types.ENUM:
       case Types.SET:
@@ -84,7 +84,7 @@ export function typeCast(
         if (column.charsetNr === CHARSETS.BINARY) {
           return Buffer.isBuffer(value) ? value : Buffer.from(String(value));
         } else {
-          return typeof value === 'string' ? value : String(value);
+          return String(value);
         }
         break;
       case Types.JSON:

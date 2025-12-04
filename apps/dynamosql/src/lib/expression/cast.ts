@@ -101,6 +101,7 @@ function double(expr: Cast, state: EvaluationState): EvaluationResult {
   const result = getValue(expr.expr, state);
   result.name = `CAST(${result.name} AS DOUBLE)`;
   result.type = 'double';
+  result.decimals = 31;
   if (
     !result.err &&
     result.value !== null &&

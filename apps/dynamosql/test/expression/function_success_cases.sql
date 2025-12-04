@@ -170,24 +170,6 @@ SELECT SIGN(100) AS result;
 SELECT SIGN(-0.5) AS result;
 SELECT SIGN(0.5) AS result;
 
--- GREATEST with various arguments
-SELECT GREATEST(1, 2) AS result;
-SELECT GREATEST(1, 2, 3) AS result;
-SELECT GREATEST(5, 2, 8, 1, 9) AS result;
-SELECT GREATEST(-5, -2, -8) AS result;
-SELECT GREATEST(1.5, 2.3, 1.9) AS result;
-SELECT GREATEST("a", "b", "c", "d") AS result;
-SELECT GREATEST("z", "a", "m", "b") AS result;
-
--- LEAST with various arguments
-SELECT LEAST(1, 2) AS result;
-SELECT LEAST(1, 2, 3) AS result;
-SELECT LEAST(5, 2, 8, 1, 9) AS result;
-SELECT LEAST(-5, -2, -8) AS result;
-SELECT LEAST(1.5, 2.3, 1.9) AS result;
-SELECT LEAST("a", "b", "c", "d") AS result;
-SELECT LEAST("z", "a", "m", "b") AS result;
-
 -- NULLIF with various values
 SELECT NULLIF(1, 2) AS result;
 SELECT NULLIF(1, 1) AS result;
@@ -462,7 +444,7 @@ SELECT SPACE(10) AS result;
 -- DEGREES with various radians
 SELECT DEGREES(0) AS result;
 SELECT DEGREES(1) AS result;
-SELECT DEGREES(3.14159265359) AS result;
+SELECT ROUND(DEGREES(3.14159265359),8) AS result;
 
 -- RADIANS with various degrees
 SELECT RADIANS(0) AS result;

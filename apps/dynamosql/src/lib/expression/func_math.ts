@@ -72,7 +72,7 @@ export function round(
   if (value === null) {
     result.value = null;
   } else if (decimals === 0) {
-    result.value = Math.round(value);
+    result.value = _mysqlRound(value);
   } else if (decimals > 0) {
     result.value = Number(value.toFixed(decimals));
   }
@@ -80,6 +80,9 @@ export function round(
     result.type = 'double';
   }
   return result;
+}
+function _mysqlRound(x: number): number {
+  return x >= 0 ? Math.round(x) : -Math.round(-x);
 }
 export function mod(expr: Function, state: EvaluationState): EvaluationResult {
   const arg1 = getValue(expr.args?.value?.[0], state);

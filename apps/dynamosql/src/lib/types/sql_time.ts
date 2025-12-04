@@ -10,7 +10,10 @@ export interface SQLTimeConstructorParams {
   decimals?: number;
   timeZone?: string;
 }
-
+interface SQLTimeToStringParams {
+  decimals?: number;
+  timeZone?: string;
+}
 export class SQLTime {
   private readonly _time: number;
   private readonly _decimals: number;
@@ -31,16 +34,16 @@ export class SQLTime {
   getDecimals(): number {
     return this._decimals;
   }
-  toString(timeZone?: string): string {
+  toString(params?: SQLTimeToStringParams): string {
     let ret;
     if (isNaN(this._time)) {
       ret = '';
     } else {
       let seconds = this._time;
-      if (timeZone) {
+      if (params?.timeZone) {
         const remainder = seconds - (seconds % (24 * 60 * 60));
         seconds -= remainder;
-        seconds += offsetAtTime(timeZone, Date.now() / 1000) ?? 0;
+        seconds += offsetAtTime(params?.timeZone, Date.now() / 1000) ?? 0;
         seconds = seconds % (24 * 60 * 60);
         seconds += remainder;
       }
@@ -54,8 +57,8 @@ export class SQLTime {
       const minutes = Math.floor(seconds / MINUTE);
       seconds -= minutes * MINUTE;
 
-      const ret_secs =
-        (seconds < 10 ? '0' : '') + seconds.toFixed(this._decimals);
+      const decimals = params?.decimals ?? this._decimals;
+      const ret_secs = (seconds < 10 ? '0' : '') + seconds.toFixed(decimals);
       ret = `${neg}${_pad(hours)}:${_pad(minutes)}:${ret_secs}`;
     }
     return ret;
@@ -72,6 +75,9 @@ export class SQLTime {
     const minutes = Math.floor(seconds / MINUTE);
     seconds -= minutes * MINUTE;
     return hours * 10000 + minutes * 100 + seconds;
+  }
+  gt(other: SQLTime): boolean {
+    return this._time > other.getTime();
   }
 }
 export function createSQLTime(

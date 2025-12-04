@@ -13,10 +13,13 @@ export interface SQLDateTimeConstructorParams {
   decimals?: number;
   timeZone?: string;
 }
+interface SQLDateTimeToStringParams {
+  decimals?: number;
+  timeZone?: string;
+}
 export class SQLDateTime {
   private readonly _time: number;
   private readonly _fraction: number = 0;
-  private readonly _fractionText: string = '';
   private readonly _decimals: number;
   private _date: Date | null = null;
 
@@ -37,16 +40,9 @@ export class SQLDateTime {
     }
     this._decimals = params.decimals ?? (this._fraction ? 6 : 0);
     this._fraction = parseFloat(this._fraction.toFixed(this._decimals));
-    let fd = 0;
     if (this._fraction >= 1.0) {
       this._fraction = 0;
       this._time += this._time < 0 ? -1 : 1;
-    } else {
-      fd = this._fraction;
-    }
-    if (this._decimals > 0) {
-      this._fractionText =
-        '.' + fd.toFixed(this._decimals).slice(-this._decimals);
     }
   }
   private _makeDate(timeZone?: string): Date {
@@ -80,16 +76,18 @@ export class SQLDateTime {
     const other_date = Math.floor(other._time / (24 * 60 * 60));
     return this_date - other_date;
   }
-  toString(timeZone?: string): string {
+  toString(params?: SQLDateTimeToStringParams): string {
     let ret;
-    const date = this._makeDate(timeZone);
+    const date = this._makeDate(params?.timeZone);
     if (isNaN(date.getTime())) {
       ret = '';
     } else {
       ret = date.toISOString().replace('T', ' ');
       ret = ret.replace(/\..*/, '');
-      if (this._decimals > 0) {
-        ret = ret + this._fractionText;
+      const decimals = params?.decimals ?? this._decimals;
+      if (decimals > 0) {
+        const dec = Math.min(decimals, 6);
+        ret += '.' + this._fraction.toFixed(dec).slice(-dec);
       }
     }
     return ret;
@@ -111,6 +109,13 @@ export class SQLDateTime {
       ret += this._fraction;
     }
     return ret;
+  }
+  gt(other: SQLDateTime): boolean {
+    const time_diff = this._time - other.getTime();
+    if (time_diff === 0) {
+      return this._fraction > other.getFraction();
+    }
+    return time_diff > 0;
   }
   clone(
     params: Omit<SQLDateTimeConstructorParams, 'time' | 'fraction'>

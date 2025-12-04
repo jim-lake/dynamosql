@@ -66,15 +66,9 @@ async function _handleAssignment(
     session.setVariable(left.name, result);
   } else if (prefix === '@@' || prefix === null) {
     if (scope === 'global') {
-      GlobalSettings.setGlobalVariable(
-        typeof name === 'string' ? name : String(name),
-        result.value
-      );
+      GlobalSettings.setGlobalVariable(String(name), result.value);
     } else if (scope === 'session' || !scope) {
-      session.setSessionVariable(
-        typeof name === 'string' ? name : String(name),
-        result.value
-      );
+      session.setSessionVariable(String(name), result.value);
     }
   } else {
     logger.error('set_handler._handleAssignment: unsupported left:', left);
