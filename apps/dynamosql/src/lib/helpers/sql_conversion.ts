@@ -7,9 +7,10 @@ const MINUTE = 60;
 const HOUR = 60 * MINUTE;
 const DAY = 24 * HOUR;
 
-export interface TimeFraction {
+export interface ConvertTimeResult {
   time: number;
   fraction?: number;
+  type?: string;
 }
 export interface ConvertStringParams {
   value: unknown;
@@ -105,7 +106,7 @@ export function convertDateTimeOrDate(
   } else if (value instanceof SQLTime) {
     return value.toSQLDateTime(decimals);
   } else {
-    let convert_result: TimeFraction | undefined;
+    let convert_result: ConvertTimeResult | undefined;
     if (typeof value === 'string') {
       convert_result = _stringToDateTime(value);
       if (convert_result === undefined) {
@@ -119,7 +120,12 @@ export function convertDateTimeOrDate(
       convert_result = _numToDateTime(value);
     }
     if (convert_result) {
-      return new SQLDateTime({ ...convert_result, decimals, timeZone });
+      const { type, ...time_fraction } = convert_result;
+      if (type === 'date') {
+        return new SQLDate({ ...time_fraction, timeZone });
+      } else {
+        return new SQLDateTime({ ...time_fraction, decimals, timeZone });
+      }
     }
   }
   return null;
@@ -135,7 +141,7 @@ export function convertDateTime(params: ConvertDateTimeParams) {
   } else if (value instanceof SQLTime) {
     return value.toSQLDateTime(decimals);
   } else {
-    let convert_result: TimeFraction | undefined;
+    let convert_result: ConvertTimeResult | undefined;
     if (typeof value === 'string') {
       convert_result =
         _stringToDateTime(value) ??
@@ -165,7 +171,7 @@ export function convertDate(params: ConvertDateParams): SQLDate | null {
   } else if (value instanceof SQLTime) {
     return new SQLDate({ time: Date.now() / 1000, timeZone });
   } else {
-    let convert_result: TimeFraction | undefined;
+    let convert_result: ConvertTimeResult | undefined;
     if (typeof value === 'string') {
       convert_result =
         _stringToDateTime(value) ??
@@ -227,7 +233,6 @@ export function convertTime(params: ConvertTimeParams): SQLTime | null {
   }
   return null;
 }
-
 function _stringToTime(value: string): number | undefined {
   let ret;
   value = value.trim();
@@ -260,19 +265,18 @@ function _stringToTime(value: string): number | undefined {
   }
   return ret;
 }
-function _stringToDate(value: string): TimeFraction | undefined {
+function _stringToDate(value: string): ConvertTimeResult | undefined {
   let ret;
   const match = value.trim().match(DATE_REGEX);
   if (match && match[1] && match[2] && match[3]) {
     const year = _fix2year(match[1]) as string | number;
     const month = match[2];
     const day = match[3];
-    ret = _partsToTime(year, month, day, 0, 0, 0);
+    ret = _partsToTime('date', year, month, day, 0, 0, 0);
   }
   return ret;
 }
-
-function _stringToDateTime(value: string): TimeFraction | undefined {
+function _stringToDateTime(value: string): ConvertTimeResult | undefined {
   let ret;
   const match = value.trim().match(DATETIME_REGEX);
   if (match && match[1] && match[2] && match[3] && match[5]) {
@@ -283,12 +287,11 @@ function _stringToDateTime(value: string): TimeFraction | undefined {
     const min = match[7] || '0';
     const sec = match[9] || '0';
     const fraction = parseFloat('0' + match[10]);
-    ret = _partsToTime(year, month, day, hour, min, sec, fraction);
+    ret = _partsToTime('datetime', year, month, day, hour, min, sec, fraction);
   }
   return ret;
 }
-
-function _numToDateTime(number: unknown): TimeFraction | undefined {
+function _numToDateTime(number: unknown): ConvertTimeResult | undefined {
   let ret;
   const s = String(number);
   let match = s.match(DATETIME4_REGEX);
@@ -300,7 +303,7 @@ function _numToDateTime(number: unknown): TimeFraction | undefined {
     const min = match[5];
     const sec = match[7] || '0';
     const fraction = parseFloat('0' + match[8]);
-    ret = _partsToTime(year, month, day, hour, min, sec, fraction);
+    ret = _partsToTime('datetime', year, month, day, hour, min, sec, fraction);
   }
   if (ret === undefined) {
     match = s.match(DATETIME2_REGEX);
@@ -312,7 +315,16 @@ function _numToDateTime(number: unknown): TimeFraction | undefined {
       const min = match[5];
       const sec = match[7] || '0';
       const fraction = parseFloat('0' + match[8]);
-      ret = _partsToTime(year, month, day, hour, min, sec, fraction);
+      ret = _partsToTime(
+        'datetime',
+        year,
+        month,
+        day,
+        hour,
+        min,
+        sec,
+        fraction
+      );
     }
   }
   if (ret === undefined) {
@@ -321,7 +333,7 @@ function _numToDateTime(number: unknown): TimeFraction | undefined {
       const year = match[1];
       const month = match[2];
       const day = match[3];
-      ret = _partsToTime(year, month, day, 0, 0, 0);
+      ret = _partsToTime('date', year, month, day, 0, 0, 0);
     }
   }
   if (ret === undefined) {
@@ -330,12 +342,11 @@ function _numToDateTime(number: unknown): TimeFraction | undefined {
       const year = _fix2year(match[1]) as string | number;
       const month = match[2];
       const day = match[3];
-      ret = _partsToTime(year, month, day, 0, 0, 0);
+      ret = _partsToTime('date', year, month, day, 0, 0, 0);
     }
   }
   return ret;
 }
-
 function _numToTime(number: number): number {
   const hours = Math.floor(number / 10000);
   number -= hours * 10000;
@@ -343,7 +354,6 @@ function _numToTime(number: number): number {
   number -= minutes * 100;
   return hours * HOUR + minutes * MINUTE + number;
 }
-
 export function getDecimals(value: unknown, max?: number): number {
   let ret = 0;
   if (typeof value === 'number') {
@@ -356,15 +366,12 @@ export function getDecimals(value: unknown, max?: number): number {
   }
   return ret;
 }
-
 function _pad2(num: unknown): string {
   return String(num).padStart(2, '0');
 }
-
 function _pad4(num: unknown): string {
   return String(num).padStart(4, '0');
 }
-
 function _fix2year(num: unknown): string | number {
   let ret: string | number = num as string | number;
   if (typeof num === 'string' && num.length <= 2) {
@@ -377,8 +384,8 @@ function _fix2year(num: unknown): string | number {
   }
   return ret;
 }
-
 function _partsToTime(
+  type: string,
   year: string | number,
   month: string | number,
   day: string | number,
@@ -386,14 +393,14 @@ function _partsToTime(
   min: string | number,
   sec: string | number,
   fraction?: number
-): TimeFraction | undefined {
+): ConvertTimeResult | undefined {
   const iso = `${_pad4(year)}-${_pad2(month)}-${_pad2(day)}T${_pad2(
     hour
   )}:${_pad2(min)}:${_pad2(sec)}Z`;
   const time = Date.parse(iso);
-  let ret: TimeFraction | undefined;
+  let ret: ConvertTimeResult | undefined;
   if (!isNaN(time)) {
-    ret = { time: time / 1000, fraction };
+    ret = { type, time: time / 1000, fraction };
   }
   return ret;
 }

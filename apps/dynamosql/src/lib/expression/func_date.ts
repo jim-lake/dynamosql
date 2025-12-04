@@ -68,16 +68,16 @@ export function date_format(
   expr: Function,
   state: EvaluationState
 ): EvaluationResult {
-  const dateArg = getValue(expr.args?.value?.[0], state);
+  const date_arg = getValue(expr.args?.value?.[0], state);
   const format = getValue(expr.args?.value?.[1], state);
-  const err = dateArg.err || format.err;
+  const err = date_arg.err || format.err;
   let value;
-  const name = `DATE_FORMAT(${dateArg.name}, ${format.name})`;
-  if (!err && (dateArg.value === null || format.value === null)) {
+  const name = `DATE_FORMAT(${date_arg.name}, ${format.name})`;
+  if (!err && (date_arg.value === null || format.value === null)) {
     value = null;
   } else if (!err) {
     const dt = convertDateTime({
-      value: dateArg.value,
+      value: date_arg.value,
       timeZone: state.session.timeZone,
     });
     if (dt) {
@@ -203,29 +203,33 @@ export function date_add(
   expr: Function,
   state: EvaluationState
 ): EvaluationResult {
-  const dateArg = getValue(expr.args?.value?.[0], state);
-  const intervalArg = getValue(expr.args?.value?.[1], state);
-  let err = dateArg.err ?? intervalArg.err;
+  const date_arg = getValue(expr.args?.value?.[0], state);
+  const interval_arg = getValue(expr.args?.value?.[1], state);
+  let err = date_arg.err ?? interval_arg.err;
   let value: EvaluationResult['value'] = null;
   let type = 'char';
-  const name = `DATE_ADD(${dateArg.name}, ${intervalArg.name})`;
+  const name = `DATE_ADD(${date_arg.name}, ${interval_arg.name})`;
   if (
     !err &&
-    dateArg.value !== null &&
-    intervalArg.value instanceof SQLInterval
+    date_arg.value !== null &&
+    interval_arg.value instanceof SQLInterval
   ) {
     const dt = convertDateTimeOrDate({
-      value: dateArg.value,
+      value: date_arg.value,
       timeZone: state.session.timeZone,
     });
     if (dt) {
-      const result = intervalArg.value.add(dt, state.session.timeZone);
+      const result = interval_arg.value.add(dt, state.session.timeZone);
       value = result.value;
-      if (dateArg.type !== 'string') {
+      if (
+        date_arg.type === 'datetime' ||
+        date_arg.type === 'date' ||
+        date_arg.type === 'time'
+      ) {
         type = result.type;
       }
     }
-  } else if (!err && !(intervalArg.value instanceof SQLInterval)) {
+  } else if (!err && !(interval_arg.value instanceof SQLInterval)) {
     err = { err: 'ER_PARSE_ERROR' };
   }
   return { err, name, value, type };
@@ -234,27 +238,27 @@ export function date_sub(
   expr: Function,
   state: EvaluationState
 ): EvaluationResult {
-  const dateArg = getValue(expr.args?.value?.[0], state);
-  const intervalArg = getValue(expr.args?.value?.[1], state);
-  let err = dateArg.err || intervalArg.err;
+  const date_arg = getValue(expr.args?.value?.[0], state);
+  const interval_arg = getValue(expr.args?.value?.[1], state);
+  let err = date_arg.err || interval_arg.err;
   let value: EvaluationResult['value'] = null;
   const type: EvaluationResult['type'] = 'char';
-  const name = `DATE_SUB(${dateArg.name}, ${intervalArg.name})`;
+  const name = `DATE_SUB(${date_arg.name}, ${interval_arg.name})`;
 
   if (
     !err &&
-    dateArg.value !== null &&
-    intervalArg.value instanceof SQLInterval
+    date_arg.value !== null &&
+    interval_arg.value instanceof SQLInterval
   ) {
     const dt = convertDateTimeOrDate({
-      value: dateArg.value,
+      value: date_arg.value,
       timeZone: state.session.timeZone,
     });
     if (dt) {
-      const result = intervalArg.value.sub(dt, state.session.timeZone);
+      const result = interval_arg.value.sub(dt, state.session.timeZone);
       value = result.value;
     }
-  } else if (!err && !(intervalArg.value instanceof SQLInterval)) {
+  } else if (!err && !(interval_arg.value instanceof SQLInterval)) {
     err = { err: 'ER_PARSE_ERROR' };
   }
   return { err, name, value, type };
@@ -263,21 +267,22 @@ export function timestampdiff(
   expr: Function,
   state: EvaluationState
 ): EvaluationResult {
-  const unitArg = expr.args?.value?.[0];
-  const startArg = getValue(expr.args?.value?.[1], state);
-  const endArg = getValue(expr.args?.value?.[2], state);
-  const err = startArg.err || endArg.err;
+  const unit_arg = expr.args?.value?.[0];
+  const start_arg = getValue(expr.args?.value?.[1], state);
+  const end_arg = getValue(expr.args?.value?.[2], state);
+  const err = start_arg.err || end_arg.err;
   let value = null;
-  const unitValue = unitArg && 'value' in unitArg ? unitArg.value : undefined;
-  const name = `TIMESTAMPDIFF(${unitValue}, ${startArg.name}, ${endArg.name})`;
+  const unitValue =
+    unit_arg && 'value' in unit_arg ? unit_arg.value : undefined;
+  const name = `TIMESTAMPDIFF(${unitValue}, ${start_arg.name}, ${end_arg.name})`;
 
-  if (!err && startArg.value !== null && endArg.value !== null) {
+  if (!err && start_arg.value !== null && end_arg.value !== null) {
     const start = convertDateTime({
-      value: startArg.value,
+      value: start_arg.value,
       timeZone: state.session.timeZone,
     });
     const end = convertDateTime({
-      value: endArg.value,
+      value: end_arg.value,
       timeZone: state.session.timeZone,
     });
     if (start && end && unitValue) {
@@ -414,18 +419,20 @@ export function dayofyear(
   return result;
 }
 export function week(expr: Function, state: EvaluationState): EvaluationResult {
-  const dateArg = getValue(expr.args?.value?.[0], state);
-  const modeArg = getValue(expr.args?.value?.[1], state);
-  const mode = modeArg.value !== null ? (convertNum(modeArg.value) ?? 0) : 0;
+  const date_arg = getValue(expr.args?.value?.[0], state);
+  const mode_arg = getValue(expr.args?.value?.[1], state);
+  const mode = Math.round(
+    mode_arg.value !== null ? (convertNum(mode_arg.value) ?? 0) : 0
+  );
   const result = {
-    err: dateArg.err || modeArg.err,
-    name: `WEEK(${dateArg.name}${modeArg.value !== null ? ', ' + modeArg.name : ''})`,
+    err: date_arg.err || mode_arg.err,
+    name: `WEEK(${date_arg.name}${mode_arg.value !== null ? ', ' + mode_arg.name : ''})`,
     value: null as number | null,
     type: 'longlong' as const,
   };
-  if (!result.err && dateArg.value !== null) {
+  if (!result.err && date_arg.value !== null) {
     const dt = convertDateTime({
-      value: dateArg.value,
+      value: date_arg.value,
       timeZone: state.session.timeZone,
     });
     if (dt) {
@@ -546,18 +553,18 @@ export function yearweek(
   expr: Function,
   state: EvaluationState
 ): EvaluationResult {
-  const dateArg = getValue(expr.args?.value?.[0], state);
-  const modeArg = getValue(expr.args?.value?.[1], state);
-  const mode = modeArg.value !== null ? (convertNum(modeArg.value) ?? 0) : 0;
+  const date_arg = getValue(expr.args?.value?.[0], state);
+  const mode_arg = getValue(expr.args?.value?.[1], state);
+  const mode = mode_arg.value !== null ? (convertNum(mode_arg.value) ?? 0) : 0;
   const result = {
-    err: dateArg.err || modeArg.err,
-    name: `YEARWEEK(${dateArg.name}${modeArg.value !== null ? ', ' + modeArg.name : ''})`,
+    err: date_arg.err || mode_arg.err,
+    name: `YEARWEEK(${date_arg.name}${mode_arg.value !== null ? ', ' + mode_arg.name : ''})`,
     value: null as number | null,
     type: 'longlong' as const,
   };
-  if (!result.err && dateArg.value !== null) {
+  if (!result.err && date_arg.value !== null) {
     const dt = convertDateTime({
-      value: dateArg.value,
+      value: date_arg.value,
       timeZone: state.session.timeZone,
     });
     if (dt) {

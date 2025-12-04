@@ -124,7 +124,7 @@ function _numBothSides(
         right.value instanceof SQLTime
       ) {
         datetime = right.value;
-      } else if (right.value !== undefined && typeof right.value === 'string') {
+      } else if (right.value !== undefined) {
         datetime = convertDateTimeOrDate({
           value: right.value,
           timeZone: state.session.timeZone,
@@ -144,7 +144,7 @@ function _numBothSides(
         left.value instanceof SQLDate
       ) {
         datetime = left.value;
-      } else if (left.value !== undefined && typeof left.value === 'string') {
+      } else if (left.value !== undefined) {
         datetime = convertDateTimeOrDate({
           value: left.value,
           timeZone: state.session.timeZone,

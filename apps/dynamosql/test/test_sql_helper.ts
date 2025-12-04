@@ -180,9 +180,10 @@ export function runTests(test_name, file_path, extra, maybe_skip) {
 }
 function _checkEqual(name, i, left, right) {
   if (name === 'ignore_seconds') {
-    expect(left.length, `results[${i}].${name} length equal`).to.equal(
-      right.length
-    );
+    expect(
+      left.length,
+      `results[${i}].${name}: (${left}).length === (${right}).length`
+    ).to.equal(right.length);
     if (left.length === 8) {
       const l_time = Date.parse('2020-01-01 ' + left);
       const r_time = Date.parse('2020-01-01 ' + right);
