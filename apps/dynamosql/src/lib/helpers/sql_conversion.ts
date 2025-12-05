@@ -29,6 +29,9 @@ export function convertString(params: ConvertStringParams): string | null {
   ) {
     return value.toString({ decimals, timeZone });
   }
+  if (typeof value === 'number' && decimals !== undefined) {
+    return value.toFixed(decimals);
+  }
   return String(value);
 }
 export function convertNum(value: unknown): number | null {

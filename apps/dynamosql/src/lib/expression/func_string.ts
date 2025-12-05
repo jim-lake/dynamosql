@@ -1,5 +1,5 @@
 import { getValue } from './evaluate';
-import { convertNum } from '../helpers/sql_conversion';
+import { convertNum, convertString } from '../helpers/sql_conversion';
 
 import type { Function, ExpressionValue } from 'node-sql-parser';
 import type { EvaluationState, EvaluationResult } from './evaluate';
@@ -164,7 +164,7 @@ export function repeat(
     const count = convertNum(arg2.value);
     value =
       count !== null && count >= 0
-        ? String(arg1.value).repeat(Math.trunc(count))
+        ? String(arg1.value).repeat(Math.round(count))
         : null;
     type = 'string';
   } else {
@@ -214,11 +214,11 @@ export function substring(
     if (pos === null || (hasThirdArg && len === null)) {
       value = null;
     } else {
-      const posInt = Math.trunc(pos);
+      const posInt = Math.round(pos);
       const start = posInt < 0 ? str.length + posInt : posInt - 1;
       value =
         len !== null
-          ? str.substring(start, start + Math.trunc(len))
+          ? str.substring(start, start + Math.round(len))
           : str.substring(start);
     }
   }
@@ -241,10 +241,22 @@ export function replace(
   ) {
     value = null;
   } else if (!err) {
-    value = String(arg1.value).replaceAll(
-      String(arg2.value),
-      String(arg3.value)
-    );
+    const str1 = convertString({
+      value: arg1.value,
+      decimals: arg1.decimals,
+      timeZone: state.session.timeZone,
+    });
+    const str2 = convertString({
+      value: arg2.value,
+      decimals: arg2.decimals,
+      timeZone: state.session.timeZone,
+    });
+    const str3 = convertString({
+      value: arg3.value,
+      decimals: arg3.decimals,
+      timeZone: state.session.timeZone,
+    });
+    value = str1?.replaceAll(str2 ?? '', str3 ?? '') ?? null;
   }
   return { err, name, value, type: 'string' };
 }
@@ -368,7 +380,7 @@ export function lpad(expr: Function, state: EvaluationState): EvaluationResult {
     return { err, value: null, type: 'string' };
   }
   const str = String(str_result.value);
-  const len = Math.trunc(convertNum(len_result.value) ?? 0);
+  const len = Math.round(convertNum(len_result.value) ?? 0);
   const pad = String(pad_result.value);
   if (len < 0 || pad.length === 0) {
     return { err: null, value: null, type: 'string' };
@@ -399,7 +411,7 @@ export function rpad(expr: Function, state: EvaluationState): EvaluationResult {
     return { err, value: null, type: 'string' };
   }
   const str = String(str_result.value);
-  const len = Math.trunc(convertNum(len_result.value) ?? 0);
+  const len = Math.round(convertNum(len_result.value) ?? 0);
   const pad = String(pad_result.value);
   if (len < 0 || pad.length === 0) {
     return { err: null, value: null, type: 'string' };
@@ -427,10 +439,20 @@ export function locate(
   if (err || substr_result.value === null || str_result.value === null) {
     return { err, value: null, type: 'longlong' };
   }
-  const substr = String(substr_result.value);
-  const str = String(str_result.value);
+  const substr =
+    convertString({
+      value: substr_result.value,
+      decimals: substr_result.decimals,
+      timeZone: state.session.timeZone,
+    }) ?? '';
+  const str =
+    convertString({
+      value: str_result.value,
+      decimals: str_result.decimals,
+      timeZone: state.session.timeZone,
+    }) ?? '';
   const pos = pos_result?.value ? (convertNum(pos_result.value) ?? 1) : 1;
-  const index = str.indexOf(substr, Math.trunc(pos) - 1);
+  const index = str.indexOf(substr, Math.round(pos) - 1);
   return { err: null, value: index === -1 ? 0 : index + 1, type: 'longlong' };
 }
 export function instr(
@@ -458,8 +480,18 @@ export function strcmp(
   if (err || str1_result.value === null || str2_result.value === null) {
     return { err, value: null, type: 'longlong' };
   }
-  const str1 = String(str1_result.value);
-  const str2 = String(str2_result.value);
+  const str1 =
+    convertString({
+      value: str1_result.value,
+      decimals: str1_result.decimals,
+      timeZone: state.session.timeZone,
+    }) ?? '';
+  const str2 =
+    convertString({
+      value: str2_result.value,
+      decimals: str2_result.decimals,
+      timeZone: state.session.timeZone,
+    }) ?? '';
 
   if (str1 < str2) {
     return { err: null, value: -1, type: 'longlong' };
