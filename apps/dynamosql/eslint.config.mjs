@@ -1,5 +1,6 @@
 import js from '@eslint/js';
 import tseslint from 'typescript-eslint';
+import { plugin as localPlugin } from '@dynamosql/lint';
 
 export default tseslint.config(
   js.configs.recommended,
@@ -24,8 +25,13 @@ export default tseslint.config(
         clearInterval: 'readonly',
       },
     },
+    plugins: { local: localPlugin },
     rules: {
       'no-console': 'error',
+      'local/local-snake-case': [
+        0,
+        { exclude: [/^affectedRows$/, /^changedRows$/] },
+      ],
       '@typescript-eslint/prefer-as-const': 'error',
       '@typescript-eslint/no-shadow': 'error',
       '@typescript-eslint/no-explicit-any': 'error',
@@ -82,6 +88,7 @@ export default tseslint.config(
     },
     linterOptions: { reportUnusedDisableDirectives: 'warn' },
     rules: {
+      '@typescript-eslint/naming-convention': 0,
       '@typescript-eslint/no-shadow': ['error', { allow: ['err'] }],
       '@typescript-eslint/no-explicit-any': 0,
       'no-console': 0,

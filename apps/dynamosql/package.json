@@ -28,6 +28,7 @@
     "sqlstring": "2.3.3"
   },
   "devDependencies": {
+    "@dynamosql/lint": "*",
     "@eslint/js": "^9.20.0",
     "@rollup/plugin-commonjs": "^29.0.0",
     "@rollup/plugin-node-resolve": "^16.0.3",

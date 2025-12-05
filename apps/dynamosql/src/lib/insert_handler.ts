@@ -121,12 +121,12 @@ async function _runInsert(
         name?: string;
         args?: unknown[];
       };
-      const errStr = String(error?.message || '').toLowerCase();
+      const err_str = String(error?.message || '').toLowerCase();
       if (
         error?.message === 'resource_not_found' ||
         error?.err === 'resource_not_found' ||
         error?.name === 'ResourceNotFoundException' ||
-        errStr.includes('resource not found')
+        err_str.includes('resource not found')
       ) {
         throw new SQLError({
           err: 'table_not_found',

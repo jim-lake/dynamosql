@@ -42,6 +42,7 @@ export type {
 export type { KeyValue, ItemRecord, NativeType } from './dynamodb_helper';
 
 const QUERY_LIMIT = 5;
+const BATCH_LIMIT = 100;
 
 interface ErrorEntry {
   err: Error | unknown;
@@ -224,7 +225,6 @@ export class DynamoDB {
   }
 
   async deleteItems(params: DeleteItemsParams): Promise<ItemRecord[]> {
-    const BATCH_LIMIT = 100;
     const { table, key_list, list } = params;
     const prefix = `DELETE FROM ${escapeIdentifier(table)} WHERE `;
     return parallelBatch(list, BATCH_LIMIT, QUERY_LIMIT, async (batch) => {
@@ -246,7 +246,6 @@ export class DynamoDB {
   }
 
   async updateItems(params: UpdateItemsParams): Promise<ItemRecord[]> {
-    const BATCH_LIMIT = 100;
     const { table, key_list, list } = params;
     const prefix = `UPDATE ${escapeIdentifier(table)} SET `;
     return parallelBatch(list, BATCH_LIMIT, QUERY_LIMIT, async (batch) => {
@@ -276,7 +275,6 @@ export class DynamoDB {
   }
 
   async putItems(params: PutItemsParams): Promise<void> {
-    const BATCH_LIMIT = 100;
     const { list } = params;
     const table = `${this.namespace}${params.table}`;
     const err_list: ErrorEntry[] = [];
@@ -358,15 +356,15 @@ export class DynamoDB {
   async createTable(params: CreateTableParams): Promise<void> {
     const { billing_mode, column_list, primary_key } = params;
     const table = `${this.namespace}${params.table}`;
-    const AttributeDefinitions = column_list.map((column) => ({
+    const defs = column_list.map((column) => ({
       AttributeName: column.name,
       AttributeType: dynamoType(column.type),
     }));
-    const KeySchema: KeySchemaElement[] = [
+    const schema: KeySchemaElement[] = [
       { AttributeName: primary_key?.[0]?.name, KeyType: KeyType.HASH },
     ];
     if (primary_key?.[1]) {
-      KeySchema.push({
+      schema.push({
         AttributeName: primary_key[1].name,
         KeyType: KeyType.RANGE,
       });
@@ -375,8 +373,8 @@ export class DynamoDB {
     const input = {
       TableName: table,
       BillingMode: (billing_mode ?? 'PAY_PER_REQUEST') as BillingMode,
-      AttributeDefinitions,
-      KeySchema,
+      AttributeDefinitions: defs,
+      KeySchema: schema,
     };
     const command = new CreateTableCommand(input);
     try {
@@ -399,27 +397,24 @@ export class DynamoDB {
   async createIndex(params: CreateIndexParams): Promise<void> {
     const { index_name, key_list, projection_type } = params;
     const table = `${this.namespace}${params.table}`;
-    const AttributeDefinitions = key_list.map((item) => ({
+    const defs = key_list.map((item) => ({
       AttributeName: item.name,
       AttributeType: dynamoType(item.type),
     }));
-    const KeySchema: KeySchemaElement[] = [
+    const schema: KeySchemaElement[] = [
       { AttributeName: key_list?.[0]?.name, KeyType: KeyType.HASH },
     ];
     if (key_list?.[1]) {
-      KeySchema.push({
-        AttributeName: key_list[1].name,
-        KeyType: KeyType.RANGE,
-      });
+      schema.push({ AttributeName: key_list[1].name, KeyType: KeyType.RANGE });
     }
     const input = {
       TableName: table,
-      AttributeDefinitions,
+      AttributeDefinitions: defs,
       GlobalSecondaryIndexUpdates: [
         {
           Create: {
             IndexName: index_name,
-            KeySchema,
+            KeySchema: schema,
             Projection: {
               ProjectionType: (projection_type ||
                 'KEYS_ONLY') as ProjectionType,

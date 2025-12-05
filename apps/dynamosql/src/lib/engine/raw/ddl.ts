@@ -15,7 +15,7 @@ const TYPE_MAP: Record<string, string> = {
   S: 'string',
   N: 'number',
   B: 'buffer',
-};
+} as const;
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -157,14 +157,13 @@ interface WaitForTableParams {
   index_name?: string;
 }
 
+const LOOP_MS = 250;
 async function _waitForTable(params: WaitForTableParams): Promise<void> {
   const { dynamodb, table, index_name } = params;
-  const LOOP_MS = 500;
 
   while (true) {
     const result = await dynamodb.getTable(table);
     const status = result?.Table?.TableStatus;
-
     if (
       status === 'CREATING' ||
       status === 'UPDATING' ||
@@ -173,7 +172,6 @@ async function _waitForTable(params: WaitForTableParams): Promise<void> {
       await sleep(LOOP_MS);
       continue;
     }
-
     if (index_name) {
       const index = result?.Table?.GlobalSecondaryIndexes?.find(
         (item) => item.IndexName === index_name
@@ -183,7 +181,6 @@ async function _waitForTable(params: WaitForTableParams): Promise<void> {
         continue;
       }
     }
-
     return;
   }
 }

@@ -38,6 +38,8 @@ export function convertWhere(
       value = expr.value;
     } else if (type === 'double_quote_string') {
       value = `'${expr.value}'`;
+    } else if (type === 'single_quote_string') {
+      value = `'${expr.value}'`;
     } else if (type === 'null') {
       value = null;
     } else if (type === 'bool') {
