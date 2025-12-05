@@ -51,21 +51,6 @@ export function not(expr: Function, state: EvaluationState): EvaluationResult {
   }
   return result;
 }
-export function nullif(
-  expr: Function,
-  state: EvaluationState
-): EvaluationResult {
-  const arg1 = getValue(expr.args?.value?.[0], state);
-  const arg2 = getValue(expr.args?.value?.[1], state);
-  const err = arg1.err || arg2.err || null;
-  let value;
-  const name = `NULLIF(${arg1.name}, ${arg2.name})`;
-
-  if (!err) {
-    value = arg1.value === arg2.value ? null : arg1.value;
-  }
-  return { err, name, value, type: arg1.type };
-}
 export function ifFunc(
   expr: Function,
   state: EvaluationState
@@ -75,17 +60,42 @@ export function ifFunc(
   const falseValue = getValue(expr.args?.value?.[2], state);
   const err = condition.err || trueValue.err || falseValue.err || null;
   let value;
-  let type;
+  let type: string;
   const name = `IF(${condition.name}, ${trueValue.name}, ${falseValue.name})`;
 
   if (!err) {
     const condResult = convertNum(condition.value);
     if (condResult === null || condResult === 0) {
       value = falseValue.value;
-      type = falseValue.type === 'number' ? 'longlong' : falseValue.type;
     } else {
       value = trueValue.value;
-      type = trueValue.type === 'number' ? 'longlong' : trueValue.type;
+    }
+
+    // Use union type logic from func_comp.ts
+    const types = [trueValue.type, falseValue.type];
+    if (types.includes('datetime')) {
+      type = 'datetime';
+    } else if (types.includes('date')) {
+      type = 'date';
+    } else if (types.includes('time')) {
+      type = 'time';
+    } else if (types.includes('string')) {
+      type = 'string';
+    } else if (types.includes('double')) {
+      type = 'double';
+    } else if (types.includes('number')) {
+      type = 'number';
+    } else if (types.includes('longlong')) {
+      type = 'longlong';
+    } else {
+      type = 'string';
+    }
+
+    // If temporal type mixed with non-temporal, return string
+    if (type === 'datetime' || type === 'date' || type === 'time') {
+      if (types.some((t) => t !== type && t !== 'null')) {
+        type = 'string';
+      }
     }
   } else {
     type = 'longlong';

@@ -66,7 +66,7 @@ export function round(
     if (arg2_num === null) {
       value = null;
     } else {
-      decimals = arg2_num;
+      decimals = Math.round(arg2_num);
     }
   }
   if (value === null) {
@@ -99,7 +99,16 @@ export function mod(expr: Function, state: EvaluationState): EvaluationResult {
     const num1 = convertNum(arg1.value);
     const num2 = convertNum(arg2.value);
     value = num1 !== null && num2 !== null ? num1 % num2 : null;
-    type = 'longlong';
+
+    if (arg1.type === 'double' || arg2.type === 'double') {
+      type = 'double';
+    } else if (arg1.type === 'string' || arg2.type === 'string') {
+      type = 'double';
+    } else if (arg1.type === 'number' || arg2.type === 'number') {
+      type = 'number';
+    } else {
+      type = 'longlong';
+    }
   } else {
     type = 'double';
   }

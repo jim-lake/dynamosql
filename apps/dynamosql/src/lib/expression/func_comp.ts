@@ -17,7 +17,7 @@ export function coalesce(
   let err: EvaluationResult['err'] = null;
   let value: EvaluationResult['value'] = null;
   const names: string[] = [];
-  const values: ExpressionResult[] = [];
+  const values: EvaluationResult[] = [];
   for (const sub of expr.args?.value ?? []) {
     const result = getValue(sub, state);
     names.push(result.name ?? '');

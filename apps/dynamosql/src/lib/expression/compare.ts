@@ -4,7 +4,7 @@ import { SQLDateTime } from '../types/sql_datetime';
 import { SQLDate } from '../types/sql_date';
 import { SQLTime } from '../types/sql_time';
 
-import type { Binary, ExpressionValue } from 'node-sql-parser';
+import type { Binary, ExpressionValue, Function } from 'node-sql-parser';
 import type { EvaluationState, EvaluationResult } from './evaluate';
 
 export function equal(expr: Binary, state: EvaluationState): EvaluationResult {
@@ -31,6 +31,35 @@ export function gt(expr: Binary, state: EvaluationState): EvaluationResult {
 }
 export function lt(expr: Binary, state: EvaluationState): EvaluationResult {
   return _gt(expr.right, expr.left, state, ' < ', true);
+}
+export function nullif(
+  expr: Function,
+  state: EvaluationState
+): EvaluationResult {
+  const arg1 = getValue(expr.args?.value?.[0], state);
+  const arg2 = getValue(expr.args?.value?.[1], state);
+  const err = arg1.err || arg2.err || null;
+  let value;
+  let type = arg1.type;
+  const name = `NULLIF(${arg1.name}, ${arg2.name})`;
+
+  if (!err) {
+    const origValue = arg1.value;
+    _convertCompare(arg1, arg2, state.session.timeZone);
+    const isEqual =
+      arg1.value !== null && arg2.value !== null && arg1.value === arg2.value;
+
+    value = isEqual ? null : origValue;
+
+    if (
+      origValue instanceof SQLDate ||
+      origValue instanceof SQLDateTime ||
+      origValue instanceof SQLTime
+    ) {
+      type = 'string';
+    }
+  }
+  return { err, name, value, type };
 }
 function _convertCompare(
   left: EvaluationResult,

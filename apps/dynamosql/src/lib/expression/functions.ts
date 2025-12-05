@@ -83,14 +83,8 @@ import {
 } from './func_date';
 import { curtime, time, hour, minute, second, microsecond } from './func_time';
 import { coalesce, greatest, least } from './func_comp';
-import {
-  database,
-  isnull,
-  sleep,
-  not,
-  nullif,
-  ifFunc,
-} from './func_misc';
+import { nullif } from './compare';
+import { database, isnull, sleep, not, ifFunc } from './func_misc';
 
 export const methods: Record<
   string,

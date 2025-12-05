@@ -67,7 +67,11 @@ Or use AWS profiles in `~/.aws/credentials`.
 
 ## Running Tests
 
-**IMPORTANT: Never use grep, head, tail, or other output filtering when running tests. These commands hide failures and make it impossible to see what actually happened. Use `npm run test:quiet` if you want to suppress verbose output while still seeing test results.**
+**CRITICAL RULES:**
+
+1. **NEVER use grep, head, tail, or any output filtering on test commands** - These hide failures and make debugging impossible
+2. **ALWAYS run the full test suite after making changes** - Use `npm run test:quiet` to see all results
+3. **ALWAYS run `npm run ts:check && npm run lint` after code changes** - Don't skip this step
 
 ### Setup Test Tables
 
@@ -247,6 +251,35 @@ npm run pretty
 npm test --workspace=apps/dynamosql
 npm test --workspace=apps/server
 ```
+
+## Code Organization
+
+### Type System
+
+- **Valid types**: `longlong`, `double`, `string`, `date`, `datetime`, `time`, `number`, `buffer`, etc.
+- **`number` type**: Maps to MySQL's NEWDECIMAL type (0xf6) - used for decimal literals
+- **NEVER use `newdecimal` as a string type name** - Use `number` which maps to NEWDECIMAL
+
+### Function Organization
+
+- **Comparison functions** (`=`, `!=`, `<`, `>`, etc.): `src/lib/expression/compare.ts`
+  - Contains `_convertCompare()` helper for proper type conversion before comparison
+  - Converts to numbers if either operand is a number type, otherwise converts to strings
+  - `NULLIF` belongs here since it uses comparison logic
+- **String functions**: `src/lib/expression/func_string.ts`
+  - Use `String()` for basic string conversion
+  - Use `convertString()` from sql_conversion.ts for temporal types
+  - **DO NOT create custom conversion helpers** - use existing helpers
+- **Math functions**: `src/lib/expression/func_math.ts`
+- **Misc functions**: `src/lib/expression/func_misc.ts`
+- **Function registry**: `src/lib/expression/functions.ts` - imports and registers all functions
+
+### Key Patterns
+
+- Float parameters for counts/positions/lengths should be rounded with `Math.round()`
+- Use existing comparison/conversion logic from compare.ts - don't reinvent it
+- Temporal types (SQLDate, SQLDateTime, SQLTime) need special handling via existing helpers
+- Import directly - don't create unnecessary re-export chains
 
 ## Notes
 

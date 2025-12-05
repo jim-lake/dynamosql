@@ -163,7 +163,9 @@ export function repeat(
   } else if (!err) {
     const count = convertNum(arg2.value);
     value =
-      count !== null && count >= 0 ? String(arg1.value).repeat(count) : null;
+      count !== null && count >= 0
+        ? String(arg1.value).repeat(Math.trunc(count))
+        : null;
     type = 'string';
   } else {
     type = 'long_blob';
@@ -212,9 +214,12 @@ export function substring(
     if (pos === null || (hasThirdArg && len === null)) {
       value = null;
     } else {
-      const start = pos < 0 ? str.length + pos : pos - 1;
+      const posInt = Math.trunc(pos);
+      const start = posInt < 0 ? str.length + posInt : posInt - 1;
       value =
-        len !== null ? str.substring(start, start + len) : str.substring(start);
+        len !== null
+          ? str.substring(start, start + Math.trunc(len))
+          : str.substring(start);
     }
   }
   return { err, name, value, type: 'string' };
@@ -363,9 +368,9 @@ export function lpad(expr: Function, state: EvaluationState): EvaluationResult {
     return { err, value: null, type: 'string' };
   }
   const str = String(str_result.value);
-  const len = convertNum(len_result.value);
+  const len = Math.trunc(convertNum(len_result.value) ?? 0);
   const pad = String(pad_result.value);
-  if (len === null || len < 0 || pad.length === 0) {
+  if (len < 0 || pad.length === 0) {
     return { err: null, value: null, type: 'string' };
   }
   if (str.length >= len) {
@@ -394,9 +399,9 @@ export function rpad(expr: Function, state: EvaluationState): EvaluationResult {
     return { err, value: null, type: 'string' };
   }
   const str = String(str_result.value);
-  const len = convertNum(len_result.value);
+  const len = Math.trunc(convertNum(len_result.value) ?? 0);
   const pad = String(pad_result.value);
-  if (len === null || len < 0 || pad.length === 0) {
+  if (len < 0 || pad.length === 0) {
     return { err: null, value: null, type: 'string' };
   }
   if (str.length >= len) {
@@ -425,7 +430,7 @@ export function locate(
   const substr = String(substr_result.value);
   const str = String(str_result.value);
   const pos = pos_result?.value ? (convertNum(pos_result.value) ?? 1) : 1;
-  const index = str.indexOf(substr, pos - 1);
+  const index = str.indexOf(substr, Math.trunc(pos) - 1);
   return { err: null, value: index === -1 ? 0 : index + 1, type: 'longlong' };
 }
 export function instr(
@@ -455,6 +460,7 @@ export function strcmp(
   }
   const str1 = String(str1_result.value);
   const str2 = String(str2_result.value);
+
   if (str1 < str2) {
     return { err: null, value: -1, type: 'longlong' };
   } else if (str1 > str2) {
