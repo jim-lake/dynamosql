@@ -11,5 +11,5 @@ export async function getTableInfo(
 export async function getTableList(
   _params: TableListParams
 ): Promise<string[]> {
-  return [];
+  return ['SCHEMATA', 'TABLES', 'COLUMNS'];
 }

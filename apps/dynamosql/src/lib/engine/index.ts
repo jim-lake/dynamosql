@@ -65,9 +65,9 @@ export interface TableListParams {
 }
 export interface TableInfoParams {
   dynamodb: DynamoDBClient;
+  database: string;
   table: string;
-  session?: Session;
-  database?: string;
+  session: Session;
 }
 export interface CreateTableParams {
   dynamodb: DynamoDBClient;

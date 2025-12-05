@@ -81,7 +81,7 @@ const ERROR_MAP: Record<string, ErrorMapEntry> = {
   },
   ER_BAD_TABLE_ERROR: {
     code: 'ER_BAD_TABLE_ERROR',
-    sqlMessage: errStr`Unknown  table '${0}'`,
+    sqlMessage: errStr`Unknown table '${0}'`,
   },
   ER_SP_DOES_NOT_EXIST: {
     code: 'ER_SP_DOES_NOT_EXIST',

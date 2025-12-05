@@ -9,7 +9,7 @@ import type {
 } from './engine';
 import type { DynamoDBClient } from './handler_types';
 
-const BUILT_IN = ['_dynamodb', 'information_schema'];
+const BUILT_IN = ['_dynamodb', 'information_schema'] as readonly string[];
 
 interface SchemaEntry {
   table_engine: string;

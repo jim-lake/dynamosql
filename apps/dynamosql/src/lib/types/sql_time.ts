@@ -57,8 +57,11 @@ export class SQLTime {
       const minutes = Math.floor(seconds / MINUTE);
       seconds -= minutes * MINUTE;
 
-      const decimals = params?.decimals ?? this._decimals;
-      const ret_secs = (seconds < 10 ? '0' : '') + seconds.toFixed(decimals);
+      const decimals = Math.min(params?.decimals ?? this._decimals, 6);
+      let ret_secs = seconds.toFixed(decimals);
+      if (ret_secs.length < (decimals > 0 ? decimals + 3 : 2)) {
+        ret_secs = '0' + ret_secs;
+      }
       ret = `${neg}${_pad(hours)}:${_pad(minutes)}:${ret_secs}`;
     }
     return ret;

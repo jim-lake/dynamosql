@@ -25,13 +25,11 @@ export async function getTableInfo(
   }
   throw new SQLError({ err: 'table_not_found', args: [table] });
 }
-
 export async function getTableList(
   _params: TableListParams
 ): Promise<string[]> {
   return [];
 }
-
 export async function createTable(params: CreateTableParams): Promise<void> {
   const { session, database, table, primary_key, column_list, is_temp } =
     params;

@@ -31,8 +31,8 @@ export async function runSelect(
       continue;
     }
     const { db, table } = object;
-    const engine = getEngine(db ?? undefined, table, session);
-    const opts = { dynamodb, session, database: db ?? undefined, table };
+    const engine = getEngine(db ?? '', table, session);
+    const opts = { dynamodb, session, database: db ?? '', table };
 
     try {
       const result = await engine.getTableInfo(opts);

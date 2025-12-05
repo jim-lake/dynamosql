@@ -26,6 +26,7 @@ export default tseslint.config(
     },
     rules: {
       'no-console': 'error',
+      '@typescript-eslint/prefer-as-const': 'error',
       '@typescript-eslint/no-shadow': 'error',
       '@typescript-eslint/no-explicit-any': 'error',
       '@typescript-eslint/no-unused-vars': [

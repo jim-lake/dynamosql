@@ -193,7 +193,10 @@ function _checkEqual(name, i, left, right) {
       const l_time = Date.parse(left);
       const r_time = Date.parse(right);
       const delta = Math.abs(l_time - r_time);
-      expect(delta, `delta results[${i}].${name} < 2000`).to.be.lt(2000);
+      expect(
+        delta,
+        `delta results[${i}].${name} left: ${left} (${l_time}) right: ${right} (${r_time}) < 2000`
+      ).to.be.lt(2000);
     } else {
       left = String(left).replace(SECONDS_REGEX, '');
       right = String(right).replace(SECONDS_REGEX, '');
