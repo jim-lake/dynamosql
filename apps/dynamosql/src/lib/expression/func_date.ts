@@ -9,11 +9,20 @@ import { dateFormat } from '../helpers/date_format';
 import { SQLDate } from '../types/sql_date';
 import { SQLDateTime, createSQLDateTime } from '../types/sql_datetime';
 import { SQLInterval } from '../types/sql_interval';
+import { assertArgCount, assertArgCountParse } from '../helpers/arg_count';
+import { SQLError } from '../../error';
 
 import type { Function } from 'node-sql-parser';
 import type { EvaluationState, EvaluationResult } from './evaluate';
 
 export function now(expr: Function, state: EvaluationState): EvaluationResult {
+  const arg_count = expr.args?.value?.length ?? 0;
+  if (arg_count > 1) {
+    throw new SQLError({
+      err: 'ER_WRONG_PARAMCOUNT_TO_NATIVE_FCT',
+      args: ['NOW'],
+    });
+  }
   const result = getValue(expr.args?.value?.[0], state);
   result.name = expr.args ? `NOW(${result.name ?? ''})` : 'CURRENT_TIMESTAMP';
   if (!result.err && result.type) {
@@ -30,7 +39,8 @@ export function from_unixtime(
   expr: Function,
   state: EvaluationState
 ): EvaluationResult {
-  const result = getValue(expr.args?.value?.[0], state);
+  assertArgCount(expr, 1);
+  const result = getValue(expr.args.value[0], state);
   result.name = `FROM_UNIXTIME(${result.name})`;
   result.type = 'datetime';
   if (!result.err && result.value !== null) {
@@ -53,16 +63,8 @@ export function from_unixtime(
   return result;
 }
 export function date(expr: Function, state: EvaluationState): EvaluationResult {
-  const arg_count = expr.args?.value?.length ?? 0;
-  if (arg_count !== 1) {
-    return {
-      err: { err: 'ER_PARSE_ERROR' },
-      value: null,
-      type: 'date',
-      name: 'DATE()',
-    };
-  }
-  const result = getValue(expr.args?.value?.[0], state);
+  assertArgCountParse(expr, 1);
+  const result = getValue(expr.args.value[0], state);
   result.name = `DATE(${result.name})`;
   result.type = 'date';
   if (!result.err && result.value !== null) {
@@ -77,8 +79,9 @@ export function date_format(
   expr: Function,
   state: EvaluationState
 ): EvaluationResult {
-  const date_arg = getValue(expr.args?.value?.[0], state);
-  const format = getValue(expr.args?.value?.[1], state);
+  assertArgCount(expr, 2);
+  const date_arg = getValue(expr.args.value[0], state);
+  const format = getValue(expr.args.value[1], state);
   const err = date_arg.err || format.err;
   let value;
   const name = `DATE_FORMAT(${date_arg.name}, ${format.name})`;
@@ -104,9 +107,10 @@ export function datediff(
   expr: Function,
   state: EvaluationState
 ): EvaluationResult {
+  assertArgCount(expr, 2);
   const { timeZone } = state.session;
-  const expr1 = getValue(expr.args?.value?.[0], state);
-  const expr2 = getValue(expr.args?.value?.[1], state);
+  const expr1 = getValue(expr.args.value[0], state);
+  const expr2 = getValue(expr.args.value[1], state);
   const err = expr1.err || expr2.err;
   let value;
   const name = `DATEDIFF(${expr1.name}, ${expr2.name})`;
@@ -124,6 +128,13 @@ export function curdate(
   expr: Function,
   state: EvaluationState
 ): EvaluationResult {
+  const arg_count = expr.args?.value?.length ?? 0;
+  if (arg_count > 0) {
+    throw new SQLError({
+      err: 'ER_WRONG_PARAMCOUNT_TO_NATIVE_FCT',
+      args: ['CURDATE'],
+    });
+  }
   const value = new SQLDate({
     time: state.session.timestamp,
     timeZone: state.session.timeZone,
@@ -135,6 +146,13 @@ export function unix_timestamp(
   expr: Function,
   state: EvaluationState
 ): EvaluationResult {
+  const arg_count = expr.args?.value?.length ?? 0;
+  if (arg_count > 1) {
+    throw new SQLError({
+      err: 'ER_WRONG_PARAMCOUNT_TO_NATIVE_FCT',
+      args: ['UNIX_TIMESTAMP'],
+    });
+  }
   const result: EvaluationResult = {
     err: null,
     name: `UNIX_TIMESTAMP()`,
@@ -167,16 +185,8 @@ export function unix_timestamp(
   return result;
 }
 export function year(expr: Function, state: EvaluationState): EvaluationResult {
-  const arg_count = expr.args?.value?.length ?? 0;
-  if (arg_count !== 1) {
-    return {
-      err: { err: 'ER_PARSE_ERROR' },
-      value: null,
-      type: 'longlong',
-      name: 'YEAR()',
-    };
-  }
-  const result = getValue(expr.args?.value?.[0], state);
+  assertArgCountParse(expr, 1);
+  const result = getValue(expr.args.value[0], state);
   result.name = `YEAR(${result.name})`;
   result.type = 'longlong';
   if (!result.err && result.value !== null) {
@@ -192,16 +202,8 @@ export function month(
   expr: Function,
   state: EvaluationState
 ): EvaluationResult {
-  const arg_count = expr.args?.value?.length ?? 0;
-  if (arg_count !== 1) {
-    return {
-      err: { err: 'ER_PARSE_ERROR' },
-      value: null,
-      type: 'longlong',
-      name: 'MONTH()',
-    };
-  }
-  const result = getValue(expr.args?.value?.[0], state);
+  assertArgCountParse(expr, 1);
+  const result = getValue(expr.args.value[0], state);
   result.name = `MONTH(${result.name})`;
   result.type = 'longlong';
   if (!result.err && result.value !== null) {
@@ -214,16 +216,8 @@ export function month(
   return result;
 }
 export function day(expr: Function, state: EvaluationState): EvaluationResult {
-  const arg_count = expr.args?.value?.length ?? 0;
-  if (arg_count !== 1) {
-    return {
-      err: { err: 'ER_PARSE_ERROR' },
-      value: null,
-      type: 'longlong',
-      name: 'DAY()',
-    };
-  }
-  const result = getValue(expr.args?.value?.[0], state);
+  assertArgCountParse(expr, 1);
+  const result = getValue(expr.args.value[0], state);
   result.name = `DAY(${result.name})`;
   result.type = 'longlong';
   if (!result.err && result.value !== null) {
@@ -239,8 +233,9 @@ export function date_add(
   expr: Function,
   state: EvaluationState
 ): EvaluationResult {
-  const date_arg = getValue(expr.args?.value?.[0], state);
-  const interval_arg = getValue(expr.args?.value?.[1], state);
+  assertArgCountParse(expr, 2);
+  const date_arg = getValue(expr.args.value[0], state);
+  const interval_arg = getValue(expr.args.value[1], state);
   let err = date_arg.err ?? interval_arg.err;
   let value: EvaluationResult['value'] = null;
   let type = 'char';
@@ -274,8 +269,9 @@ export function date_sub(
   expr: Function,
   state: EvaluationState
 ): EvaluationResult {
-  const date_arg = getValue(expr.args?.value?.[0], state);
-  const interval_arg = getValue(expr.args?.value?.[1], state);
+  assertArgCountParse(expr, 2);
+  const date_arg = getValue(expr.args.value[0], state);
+  const interval_arg = getValue(expr.args.value[1], state);
   let err = date_arg.err || interval_arg.err;
   let value: EvaluationResult['value'] = null;
   const type: EvaluationResult['type'] = 'char';
@@ -303,9 +299,10 @@ export function timestampdiff(
   expr: Function,
   state: EvaluationState
 ): EvaluationResult {
-  const unit_arg = expr.args?.value?.[0];
-  const start_arg = getValue(expr.args?.value?.[1], state);
-  const end_arg = getValue(expr.args?.value?.[2], state);
+  assertArgCount(expr, 3);
+  const unit_arg = expr.args.value[0];
+  const start_arg = getValue(expr.args.value[1], state);
+  const end_arg = getValue(expr.args.value[2], state);
   const err = start_arg.err || end_arg.err;
   let value = null;
   const unitValue =
@@ -378,16 +375,8 @@ export function dayofweek(
   expr: Function,
   state: EvaluationState
 ): EvaluationResult {
-  const arg_count = expr.args?.value?.length ?? 0;
-  if (arg_count !== 1) {
-    return {
-      err: { err: 'ER_WRONG_PARAMCOUNT_TO_NATIVE_FCT', args: ['DAYOFWEEK'] },
-      value: null,
-      type: 'longlong',
-      name: 'DAYOFWEEK()',
-    };
-  }
-  const result = getValue(expr.args?.value?.[0], state);
+  assertArgCount(expr, 1);
+  const result = getValue(expr.args.value[0], state);
   result.name = `DAYOFWEEK(${result.name})`;
   result.type = 'longlong';
   if (!result.err && result.value !== null) {
@@ -403,16 +392,8 @@ export function dayname(
   expr: Function,
   state: EvaluationState
 ): EvaluationResult {
-  const arg_count = expr.args?.value?.length ?? 0;
-  if (arg_count !== 1) {
-    return {
-      err: { err: 'ER_WRONG_PARAMCOUNT_TO_NATIVE_FCT', args: ['DAYNAME'] },
-      value: null,
-      type: 'string',
-      name: 'DAYNAME()',
-    };
-  }
-  const result = getValue(expr.args?.value?.[0], state);
+  assertArgCount(expr, 1);
+  const result = getValue(expr.args.value[0], state);
   result.name = `DAYNAME(${result.name})`;
   result.type = 'string';
   if (!result.err && result.value !== null) {
@@ -432,16 +413,8 @@ export function monthname(
   expr: Function,
   state: EvaluationState
 ): EvaluationResult {
-  const arg_count = expr.args?.value?.length ?? 0;
-  if (arg_count !== 1) {
-    return {
-      err: { err: 'ER_WRONG_PARAMCOUNT_TO_NATIVE_FCT', args: ['MONTHNAME'] },
-      value: null,
-      type: 'string',
-      name: 'MONTHNAME()',
-    };
-  }
-  const result = getValue(expr.args?.value?.[0], state);
+  assertArgCount(expr, 1);
+  const result = getValue(expr.args.value[0], state);
   result.name = `MONTHNAME(${result.name})`;
   result.type = 'string';
   if (!result.err && result.value !== null) {
@@ -461,16 +434,8 @@ export function dayofyear(
   expr: Function,
   state: EvaluationState
 ): EvaluationResult {
-  const arg_count = expr.args?.value?.length ?? 0;
-  if (arg_count !== 1) {
-    return {
-      err: { err: 'ER_WRONG_PARAMCOUNT_TO_NATIVE_FCT', args: ['DAYOFYEAR'] },
-      value: null,
-      type: 'longlong',
-      name: 'DAYOFYEAR()',
-    };
-  }
-  const result = getValue(expr.args?.value?.[0], state);
+  assertArgCount(expr, 1);
+  const result = getValue(expr.args.value[0], state);
   result.name = `DAYOFYEAR(${result.name})`;
   result.type = 'longlong';
   if (!result.err && result.value !== null) {
@@ -491,8 +456,9 @@ export function dayofyear(
   return result;
 }
 export function week(expr: Function, state: EvaluationState): EvaluationResult {
-  const date_arg = getValue(expr.args?.value?.[0], state);
-  const mode_arg = getValue(expr.args?.value?.[1], state);
+  assertArgCount(expr, 1, 2);
+  const date_arg = getValue(expr.args.value[0], state);
+  const mode_arg = getValue(expr.args.value[1], state);
   const mode = Math.round(
     mode_arg.value !== null ? (convertNum(mode_arg.value) ?? 0) : 0
   );
@@ -530,7 +496,8 @@ export function weekday(
   expr: Function,
   state: EvaluationState
 ): EvaluationResult {
-  const result = getValue(expr.args?.value?.[0], state);
+  assertArgCount(expr, 1);
+  const result = getValue(expr.args.value[0], state);
   result.name = `WEEKDAY(${result.name})`;
   result.type = 'longlong';
   if (!result.err && result.value !== null) {
@@ -551,7 +518,8 @@ export function quarter(
   expr: Function,
   state: EvaluationState
 ): EvaluationResult {
-  const result = getValue(expr.args?.value?.[0], state);
+  assertArgCount(expr, 1);
+  const result = getValue(expr.args.value[0], state);
   result.name = `QUARTER(${result.name})`;
   result.type = 'longlong';
   if (!result.err && result.value !== null) {
@@ -570,7 +538,8 @@ export function last_day(
   expr: Function,
   state: EvaluationState
 ): EvaluationResult {
-  const result = getValue(expr.args?.value?.[0], state);
+  assertArgCount(expr, 1);
+  const result = getValue(expr.args.value[0], state);
   result.name = `LAST_DAY(${result.name})`;
   result.type = 'date';
   if (!result.err && result.value !== null) {
@@ -599,7 +568,8 @@ export function weekofyear(
   expr: Function,
   state: EvaluationState
 ): EvaluationResult {
-  const result = getValue(expr.args?.value?.[0], state);
+  assertArgCount(expr, 1);
+  const result = getValue(expr.args.value[0], state);
   result.name = `WEEKOFYEAR(${result.name})`;
   result.type = 'longlong';
   if (!result.err && result.value !== null) {
@@ -625,8 +595,9 @@ export function yearweek(
   expr: Function,
   state: EvaluationState
 ): EvaluationResult {
-  const date_arg = getValue(expr.args?.value?.[0], state);
-  const mode_arg = getValue(expr.args?.value?.[1], state);
+  assertArgCount(expr, 1, 2);
+  const date_arg = getValue(expr.args.value[0], state);
+  const mode_arg = getValue(expr.args.value[1], state);
   const mode = mode_arg.value !== null ? (convertNum(mode_arg.value) ?? 0) : 0;
   const result = {
     err: date_arg.err || mode_arg.err,

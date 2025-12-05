@@ -1,5 +1,7 @@
 import { getValue } from './evaluate';
 import { convertNum } from '../helpers/sql_conversion';
+import { assertArgCount } from '../helpers/arg_count';
+import { SQLError } from '../../error';
 
 import type { Function } from 'node-sql-parser';
 import type { EvaluationState, EvaluationResult } from './evaluate';
@@ -8,6 +10,13 @@ export function database(
   expr: Function,
   state: EvaluationState
 ): EvaluationResult {
+  const arg_count = expr.args?.value?.length ?? 0;
+  if (arg_count > 0) {
+    throw new SQLError({
+      err: 'ER_WRONG_PARAMCOUNT_TO_NATIVE_FCT',
+      args: ['DATABASE'],
+    });
+  }
   return {
     err: null,
     value: state.session.getCurrentDatabase(),
@@ -18,7 +27,8 @@ export function isnull(
   expr: Function,
   state: EvaluationState
 ): EvaluationResult {
-  const result = getValue(expr.args?.value?.[0], state);
+  assertArgCount(expr, 1);
+  const result = getValue(expr.args.value[0], state);
   result.name = `ISNULL(${result.name})`;
   result.type = 'longlong';
   if (!result.err) {
@@ -30,7 +40,8 @@ export function sleep(
   expr: Function,
   state: EvaluationState
 ): EvaluationResult {
-  const result = getValue(expr.args?.value?.[0], state);
+  assertArgCount(expr, 1);
+  const result = getValue(expr.args.value[0], state);
   result.name = `SLEEP(${result.name})`;
   const sleep_ms = convertNum(result.value);
   if (sleep_ms !== null && sleep_ms > 0) {
@@ -42,7 +53,8 @@ export function sleep(
   return result;
 }
 export function not(expr: Function, state: EvaluationState): EvaluationResult {
-  const result = getValue(expr.args?.value?.[0], state);
+  assertArgCount(expr, 1);
+  const result = getValue(expr.args.value[0], state);
   result.name = `NOT(${result.name})`;
   result.type = 'longlong';
   if (!result.err && result.value !== null) {
@@ -55,9 +67,10 @@ export function ifFunc(
   expr: Function,
   state: EvaluationState
 ): EvaluationResult {
-  const condition = getValue(expr.args?.value?.[0], state);
-  const trueValue = getValue(expr.args?.value?.[1], state);
-  const falseValue = getValue(expr.args?.value?.[2], state);
+  assertArgCount(expr, 3);
+  const condition = getValue(expr.args.value[0], state);
+  const trueValue = getValue(expr.args.value[1], state);
+  const falseValue = getValue(expr.args.value[2], state);
   const err = condition.err || trueValue.err || falseValue.err || null;
   let value;
   let type: string;

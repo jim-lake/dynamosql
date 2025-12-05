@@ -1,20 +1,13 @@
 import { getValue } from './evaluate';
 import { convertNum } from '../helpers/sql_conversion';
+import { assertArgCount, assertArgCountParse } from '../helpers/arg_count';
 
 import type { Function } from 'node-sql-parser';
 import type { EvaluationState, EvaluationResult } from './evaluate';
 
 export function abs(expr: Function, state: EvaluationState): EvaluationResult {
-  const arg_count = expr.args?.value?.length ?? 0;
-  if (arg_count !== 1) {
-    return {
-      err: { err: 'ER_WRONG_PARAMCOUNT_TO_NATIVE_FCT', args: ['ABS'] },
-      name: 'ABS()',
-      value: null,
-      type: 'double',
-    };
-  }
-  const result = getValue(expr.args?.value?.[0], state);
+  assertArgCount(expr, 1);
+  const result = getValue(expr.args.value[0], state);
   result.name = `ABS(${result.name})`;
   if (!result.err && result.value !== null) {
     const num = convertNum(result.value);
@@ -26,16 +19,8 @@ export function abs(expr: Function, state: EvaluationState): EvaluationResult {
   return result;
 }
 export function ceil(expr: Function, state: EvaluationState): EvaluationResult {
-  const arg_count = expr.args?.value?.length ?? 0;
-  if (arg_count !== 1) {
-    return {
-      err: { err: 'ER_WRONG_PARAMCOUNT_TO_NATIVE_FCT', args: ['CEIL'] },
-      name: 'CEIL()',
-      value: null,
-      type: 'double',
-    };
-  }
-  const result = getValue(expr.args?.value?.[0], state);
+  assertArgCount(expr, 1);
+  const result = getValue(expr.args.value[0], state);
   result.name = `CEIL(${result.name})`;
   if (!result.err && result.value !== null) {
     const num = convertNum(result.value);
@@ -48,16 +33,8 @@ export function floor(
   expr: Function,
   state: EvaluationState
 ): EvaluationResult {
-  const arg_count = expr.args?.value?.length ?? 0;
-  if (arg_count !== 1) {
-    return {
-      err: { err: 'ER_WRONG_PARAMCOUNT_TO_NATIVE_FCT', args: ['FLOOR'] },
-      name: 'FLOOR()',
-      value: null,
-      type: 'double',
-    };
-  }
-  const result = getValue(expr.args?.value?.[0], state);
+  assertArgCount(expr, 1);
+  const result = getValue(expr.args.value[0], state);
   result.name = `FLOOR(${result.name})`;
   if (!result.err && result.value !== null) {
     const num = convertNum(result.value);
@@ -70,18 +47,10 @@ export function round(
   expr: Function,
   state: EvaluationState
 ): EvaluationResult {
-  const arg_count = expr.args?.value?.length ?? 0;
-  if (arg_count === 0 || arg_count > 2) {
-    return {
-      err: { err: 'ER_WRONG_PARAMCOUNT_TO_NATIVE_FCT', args: ['ROUND'] },
-      name: 'ROUND()',
-      value: null,
-      type: 'double',
-    };
-  }
-  const result = getValue(expr.args?.value?.[0], state);
-  const arg2 = expr.args?.value?.[1]
-    ? getValue(expr.args?.value?.[1], state)
+  assertArgCount(expr, 1, 2);
+  const result = getValue(expr.args.value[0], state);
+  const arg2 = expr.args.value[1]
+    ? getValue(expr.args.value[1], state)
     : undefined;
   if (result.err) {
     return result;
@@ -125,17 +94,9 @@ function _mysqlRound(x: number): number {
   return x >= 0 ? Math.round(x) : -Math.round(-x);
 }
 export function mod(expr: Function, state: EvaluationState): EvaluationResult {
-  const arg_count = expr.args?.value?.length ?? 0;
-  if (arg_count !== 2) {
-    return {
-      err: { err: 'ER_PARSE_ERROR' },
-      name: 'MOD()',
-      value: null,
-      type: 'double',
-    };
-  }
-  const arg1 = getValue(expr.args?.value?.[0], state);
-  const arg2 = getValue(expr.args?.value?.[1], state);
+  assertArgCountParse(expr, 2);
+  const arg1 = getValue(expr.args.value[0], state);
+  const arg2 = getValue(expr.args.value[1], state);
   const err = arg1.err || arg2.err;
   let value;
   let type: string;
@@ -176,17 +137,9 @@ function _resolveTypeForRounding(result: EvaluationResult): string {
   return result.type;
 }
 export function pow(expr: Function, state: EvaluationState): EvaluationResult {
-  const arg_count = expr.args?.value?.length ?? 0;
-  if (arg_count !== 2) {
-    return {
-      err: { err: 'ER_WRONG_PARAMCOUNT_TO_NATIVE_FCT', args: ['POW'] },
-      name: 'POW()',
-      value: null,
-      type: 'double',
-    };
-  }
-  const arg1 = getValue(expr.args?.value?.[0], state);
-  const arg2 = getValue(expr.args?.value?.[1], state);
+  assertArgCount(expr, 2);
+  const arg1 = getValue(expr.args.value[0], state);
+  const arg2 = getValue(expr.args.value[1], state);
   const err = arg1.err || arg2.err;
   let value;
   const name = `POW(${arg1.name}, ${arg2.name})`;
@@ -201,16 +154,8 @@ export function pow(expr: Function, state: EvaluationState): EvaluationResult {
   return { err, name, value, type: 'double' };
 }
 export function sqrt(expr: Function, state: EvaluationState): EvaluationResult {
-  const arg_count = expr.args?.value?.length ?? 0;
-  if (arg_count !== 1) {
-    return {
-      err: { err: 'ER_WRONG_PARAMCOUNT_TO_NATIVE_FCT', args: ['SQRT'] },
-      name: 'SQRT()',
-      value: null,
-      type: 'double',
-    };
-  }
-  const result = getValue(expr.args?.value?.[0], state);
+  assertArgCount(expr, 1);
+  const result = getValue(expr.args.value[0], state);
   result.name = `SQRT(${result.name})`;
   result.type = 'double';
   if (!result.err && result.value !== null) {
@@ -220,16 +165,8 @@ export function sqrt(expr: Function, state: EvaluationState): EvaluationResult {
   return result;
 }
 export function sign(expr: Function, state: EvaluationState): EvaluationResult {
-  const arg_count = expr.args?.value?.length ?? 0;
-  if (arg_count !== 1) {
-    return {
-      err: { err: 'ER_WRONG_PARAMCOUNT_TO_NATIVE_FCT', args: ['SIGN'] },
-      name: 'SIGN()',
-      value: null,
-      type: 'longlong',
-    };
-  }
-  const result = getValue(expr.args?.value?.[0], state);
+  assertArgCount(expr, 1);
+  const result = getValue(expr.args.value[0], state);
   result.name = `SIGN(${result.name})`;
   result.type = 'longlong';
   if (!result.err && result.value !== null) {
@@ -239,7 +176,8 @@ export function sign(expr: Function, state: EvaluationState): EvaluationResult {
   return result;
 }
 export function bin(expr: Function, state: EvaluationState): EvaluationResult {
-  const result = getValue(expr.args?.value?.[0], state);
+  assertArgCount(expr, 1);
+  const result = getValue(expr.args.value[0], state);
   result.name = `BIN(${result.name})`;
   result.type = 'string';
   if (!result.err && result.value !== null) {
@@ -249,7 +187,8 @@ export function bin(expr: Function, state: EvaluationState): EvaluationResult {
   return result;
 }
 export function oct(expr: Function, state: EvaluationState): EvaluationResult {
-  const result = getValue(expr.args?.value?.[0], state);
+  assertArgCount(expr, 1);
+  const result = getValue(expr.args.value[0], state);
   result.name = `OCT(${result.name})`;
   result.type = 'string';
   if (!result.err && result.value !== null) {
@@ -265,7 +204,8 @@ export function degrees(
   expr: Function,
   state: EvaluationState
 ): EvaluationResult {
-  const result = getValue(expr.args?.value?.[0], state);
+  assertArgCount(expr, 1);
+  const result = getValue(expr.args.value[0], state);
   result.name = `DEGREES(${result.name})`;
   result.type = 'double';
   if (!result.err && result.value !== null) {
@@ -278,7 +218,8 @@ export function radians(
   expr: Function,
   state: EvaluationState
 ): EvaluationResult {
-  const result = getValue(expr.args?.value?.[0], state);
+  assertArgCount(expr, 1);
+  const result = getValue(expr.args.value[0], state);
   result.name = `RADIANS(${result.name})`;
   result.type = 'double';
   if (!result.err && result.value !== null) {
@@ -288,7 +229,8 @@ export function radians(
   return result;
 }
 export function exp(expr: Function, state: EvaluationState): EvaluationResult {
-  const result = getValue(expr.args?.value?.[0], state);
+  assertArgCount(expr, 1);
+  const result = getValue(expr.args.value[0], state);
   result.name = `EXP(${result.name})`;
   result.type = 'double';
   if (!result.err && result.value !== null) {
@@ -298,7 +240,8 @@ export function exp(expr: Function, state: EvaluationState): EvaluationResult {
   return result;
 }
 export function ln(expr: Function, state: EvaluationState): EvaluationResult {
-  const result = getValue(expr.args?.value?.[0], state);
+  assertArgCount(expr, 1);
+  const result = getValue(expr.args.value[0], state);
   result.name = `LN(${result.name})`;
   result.type = 'double';
   if (!result.err && result.value !== null) {
@@ -308,8 +251,9 @@ export function ln(expr: Function, state: EvaluationState): EvaluationResult {
   return result;
 }
 export function log(expr: Function, state: EvaluationState): EvaluationResult {
-  const arg1 = getValue(expr.args?.value?.[0], state);
-  const arg2 = getValue(expr.args?.value?.[1], state);
+  assertArgCount(expr, 1, 2);
+  const arg1 = getValue(expr.args.value[0], state);
+  const arg2 = getValue(expr.args.value[1], state);
   const err = arg1.err || arg2.err;
   let value;
   const name =
@@ -334,7 +278,8 @@ export function log(expr: Function, state: EvaluationState): EvaluationResult {
   return { err, name, value, type: 'double' };
 }
 export function log2(expr: Function, state: EvaluationState): EvaluationResult {
-  const result = getValue(expr.args?.value?.[0], state);
+  assertArgCount(expr, 1);
+  const result = getValue(expr.args.value[0], state);
   result.name = `LOG2(${result.name})`;
   result.type = 'double';
   if (!result.err && result.value !== null) {
@@ -347,7 +292,8 @@ export function log10(
   expr: Function,
   state: EvaluationState
 ): EvaluationResult {
-  const result = getValue(expr.args?.value?.[0], state);
+  assertArgCount(expr, 1);
+  const result = getValue(expr.args.value[0], state);
   result.name = `LOG10(${result.name})`;
   result.type = 'double';
   if (!result.err && result.value !== null) {
@@ -357,7 +303,8 @@ export function log10(
   return result;
 }
 export function acos(expr: Function, state: EvaluationState): EvaluationResult {
-  const result = getValue(expr.args?.value?.[0], state);
+  assertArgCount(expr, 1);
+  const result = getValue(expr.args.value[0], state);
   result.name = `ACOS(${result.name})`;
   result.type = 'double';
   if (!result.err && result.value !== null) {
@@ -368,7 +315,8 @@ export function acos(expr: Function, state: EvaluationState): EvaluationResult {
   return result;
 }
 export function asin(expr: Function, state: EvaluationState): EvaluationResult {
-  const result = getValue(expr.args?.value?.[0], state);
+  assertArgCount(expr, 1);
+  const result = getValue(expr.args.value[0], state);
   result.name = `ASIN(${result.name})`;
   result.type = 'double';
   if (!result.err && result.value !== null) {
@@ -379,7 +327,8 @@ export function asin(expr: Function, state: EvaluationState): EvaluationResult {
   return result;
 }
 export function atan(expr: Function, state: EvaluationState): EvaluationResult {
-  const result = getValue(expr.args?.value?.[0], state);
+  assertArgCount(expr, 1);
+  const result = getValue(expr.args.value[0], state);
   result.name = `ATAN(${result.name})`;
   result.type = 'double';
   if (!result.err && result.value !== null) {
@@ -392,8 +341,9 @@ export function atan2(
   expr: Function,
   state: EvaluationState
 ): EvaluationResult {
-  const arg1 = getValue(expr.args?.value?.[0], state);
-  const arg2 = getValue(expr.args?.value?.[1], state);
+  assertArgCount(expr, 2);
+  const arg1 = getValue(expr.args.value[0], state);
+  const arg2 = getValue(expr.args.value[1], state);
   const err = arg1.err || arg2.err;
   let value;
   const name = `ATAN2(${arg1.name}, ${arg2.name})`;
@@ -408,7 +358,8 @@ export function atan2(
   return { err, name, value, type: 'double' };
 }
 export function cos(expr: Function, state: EvaluationState): EvaluationResult {
-  const result = getValue(expr.args?.value?.[0], state);
+  assertArgCount(expr, 1);
+  const result = getValue(expr.args.value[0], state);
   result.name = `COS(${result.name})`;
   result.type = 'double';
   if (!result.err && result.value !== null) {
@@ -418,7 +369,8 @@ export function cos(expr: Function, state: EvaluationState): EvaluationResult {
   return result;
 }
 export function sin(expr: Function, state: EvaluationState): EvaluationResult {
-  const result = getValue(expr.args?.value?.[0], state);
+  assertArgCount(expr, 1);
+  const result = getValue(expr.args.value[0], state);
   result.name = `SIN(${result.name})`;
   result.type = 'double';
   if (!result.err && result.value !== null) {
@@ -428,7 +380,8 @@ export function sin(expr: Function, state: EvaluationState): EvaluationResult {
   return result;
 }
 export function tan(expr: Function, state: EvaluationState): EvaluationResult {
-  const result = getValue(expr.args?.value?.[0], state);
+  assertArgCount(expr, 1);
+  const result = getValue(expr.args.value[0], state);
   result.name = `TAN(${result.name})`;
   result.type = 'double';
   if (!result.err && result.value !== null) {
@@ -438,7 +391,8 @@ export function tan(expr: Function, state: EvaluationState): EvaluationResult {
   return result;
 }
 export function cot(expr: Function, state: EvaluationState): EvaluationResult {
-  const result = getValue(expr.args?.value?.[0], state);
+  assertArgCount(expr, 1);
+  const result = getValue(expr.args.value[0], state);
   result.name = `COT(${result.name})`;
   result.type = 'double';
   if (!result.err && result.value !== null) {

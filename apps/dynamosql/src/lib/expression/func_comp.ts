@@ -6,6 +6,8 @@ import {
   convertDate,
   convertTime,
 } from '../helpers/sql_conversion';
+import { assertArgCount } from '../helpers/arg_count';
+import { SQLError } from '../../error';
 
 import type { Function } from 'node-sql-parser';
 import type { EvaluationState, EvaluationResult } from './evaluate';
@@ -15,19 +17,14 @@ export function coalesce(
   state: EvaluationState
 ): EvaluationResult {
   const arg_count = expr.args?.value?.length ?? 0;
-  if (arg_count === 0) {
-    return {
-      err: { err: 'ER_PARSE_ERROR' },
-      name: 'COALESCE()',
-      value: null,
-      type: 'string',
-    };
+  if (arg_count === 0 || !Array.isArray(expr.args?.value)) {
+    throw new SQLError({ err: 'ER_PARSE_ERROR' });
   }
   let err: EvaluationResult['err'] = null;
   let value: EvaluationResult['value'] = null;
   const names: string[] = [];
   const values: EvaluationResult[] = [];
-  for (const sub of expr.args?.value ?? []) {
+  for (const sub of expr.args.value) {
     const result = getValue(sub, state);
     names.push(result.name ?? '');
     values.push(result);
@@ -45,17 +42,9 @@ export function ifnull(
   expr: Function,
   state: EvaluationState
 ): EvaluationResult {
-  const arg_count = expr.args?.value?.length ?? 0;
-  if (arg_count !== 2) {
-    return {
-      err: { err: 'ER_WRONG_PARAMCOUNT_TO_NATIVE_FCT', args: ['IFNULL'] },
-      name: 'IFNULL()',
-      value: null,
-      type: 'string',
-    };
-  }
-  const arg1 = getValue(expr.args?.value?.[0], state);
-  const arg2 = getValue(expr.args?.value?.[1], state);
+  assertArgCount(expr, 2);
+  const arg1 = getValue(expr.args.value[0], state);
+  const arg2 = getValue(expr.args.value[1], state);
   if (arg1.err) {
     return arg1;
   }
@@ -213,18 +202,18 @@ export function _compare(
   dateCompare: typeof _ltList,
   nativeCompare: NativeCompareFunction<string | number | bigint>
 ): EvaluationResult {
+  const arg_count = expr.args?.value?.length ?? 0;
+  if (arg_count < 2 || !Array.isArray(expr.args?.value)) {
+    throw new SQLError({
+      err: 'ER_WRONG_PARAMCOUNT_TO_NATIVE_FCT',
+      args: [functionName],
+    });
+  }
   const { timeZone } = state.session;
   let value: EvaluationResult['value'];
   const names: string[] = [];
 
-  const values = expr.args?.value?.map((sub) => getValue(sub, state)) ?? [];
-  if (values.length < 2) {
-    return {
-      err: { err: 'ER_WRONG_PARAMCOUNT_TO_NATIVE_FCT', args: [functionName] },
-      value: null,
-      type: 'null',
-    };
-  }
+  const values = expr.args.value.map((sub) => getValue(sub, state));
 
   for (const sub of values) {
     names.push(sub.name ?? '');

@@ -1,5 +1,7 @@
 import { getValue } from './evaluate';
 import { convertNum, convertString } from '../helpers/sql_conversion';
+import { assertArgCount, assertArgCountParse } from '../helpers/arg_count';
+import { SQLError } from '../../error';
 
 import type { Function, ExpressionValue } from 'node-sql-parser';
 import type { EvaluationState, EvaluationResult } from './evaluate';
@@ -8,16 +10,8 @@ export function length(
   expr: Function,
   state: EvaluationState
 ): EvaluationResult {
-  const arg_count = expr.args?.value?.length ?? 0;
-  if (arg_count !== 1) {
-    return {
-      err: { err: 'ER_WRONG_PARAMCOUNT_TO_NATIVE_FCT', args: ['LENGTH'] },
-      name: 'LENGTH()',
-      value: null,
-      type: 'longlong',
-    };
-  }
-  const result = getValue(expr.args?.value?.[0], state);
+  assertArgCount(expr, 1);
+  const result = getValue(expr.args.value[0], state);
   result.name = `LENGTH(${result.name})`;
   result.type = 'longlong';
   if (!result.err && result.value !== null) {
@@ -30,17 +24,16 @@ export function concat(
   state: EvaluationState
 ): EvaluationResult {
   const arg_count = expr.args?.value?.length ?? 0;
-  if (arg_count === 0) {
-    return {
-      err: { err: 'ER_WRONG_PARAMCOUNT_TO_NATIVE_FCT', args: ['CONCAT'] },
-      value: null,
-      type: 'string',
-    };
+  if (arg_count === 0 || !Array.isArray(expr.args?.value)) {
+    throw new SQLError({
+      err: 'ER_WRONG_PARAMCOUNT_TO_NATIVE_FCT',
+      args: ['CONCAT'],
+    });
   }
   let err: EvaluationResult['err'] = null;
   let value: string | null = '';
   let has_blob = false;
-  expr.args?.value?.every?.((sub: ExpressionValue) => {
+  expr.args.value.every((sub: ExpressionValue) => {
     const result = getValue(sub, state);
     if (result.type === 'long_blob' || result.type === 'medium_blob') {
       has_blob = true;
@@ -57,17 +50,9 @@ export function concat(
   return { err, value, type: has_blob ? 'medium_blob' : 'string' };
 }
 export function left(expr: Function, state: EvaluationState): EvaluationResult {
-  const arg_count = expr.args?.value?.length ?? 0;
-  if (arg_count !== 2) {
-    return {
-      err: { err: 'ER_PARSE_ERROR' },
-      name: 'LEFT()',
-      value: null,
-      type: 'string',
-    };
-  }
-  const result = getValue(expr.args?.value?.[0], state);
-  const len_result = getValue(expr.args?.value?.[1], state);
+  assertArgCountParse(expr, 2);
+  const result = getValue(expr.args.value[0], state);
+  const len_result = getValue(expr.args.value[1], state);
   result.name = `LEFT(${result.name ?? ''}, ${len_result.name ?? ''})`;
   result.err = result.err || len_result.err;
   result.type = 'string';
@@ -83,17 +68,9 @@ export function right(
   expr: Function,
   state: EvaluationState
 ): EvaluationResult {
-  const arg_count = expr.args?.value?.length ?? 0;
-  if (arg_count !== 2) {
-    return {
-      err: { err: 'ER_PARSE_ERROR' },
-      name: 'RIGHT()',
-      value: null,
-      type: 'string',
-    };
-  }
-  const result = getValue(expr.args?.value?.[0], state);
-  const len_result = getValue(expr.args?.value?.[1], state);
+  assertArgCountParse(expr, 2);
+  const result = getValue(expr.args.value[0], state);
+  const len_result = getValue(expr.args.value[1], state);
   result.name = `RIGHT(${result.name ?? ''}, ${len_result.name ?? ''})`;
   result.err = result.err || len_result.err;
   result.type = 'string';
@@ -113,16 +90,8 @@ export function lower(
   expr: Function,
   state: EvaluationState
 ): EvaluationResult {
-  const arg_count = expr.args?.value?.length ?? 0;
-  if (arg_count !== 1) {
-    return {
-      err: { err: 'ER_WRONG_PARAMCOUNT_TO_NATIVE_FCT', args: ['LOWER'] },
-      name: 'LOWER()',
-      value: null,
-      type: 'string',
-    };
-  }
-  const result = getValue(expr.args?.value?.[0], state);
+  assertArgCount(expr, 1);
+  const result = getValue(expr.args.value[0], state);
   result.name = `LOWER(${result.name})`;
   result.type = 'string';
   if (!result.err && result.value !== null) {
@@ -134,16 +103,8 @@ export function upper(
   expr: Function,
   state: EvaluationState
 ): EvaluationResult {
-  const arg_count = expr.args?.value?.length ?? 0;
-  if (arg_count !== 1) {
-    return {
-      err: { err: 'ER_WRONG_PARAMCOUNT_TO_NATIVE_FCT', args: ['UPPER'] },
-      name: 'UPPER()',
-      value: null,
-      type: 'string',
-    };
-  }
-  const result = getValue(expr.args?.value?.[0], state);
+  assertArgCount(expr, 1);
+  const result = getValue(expr.args.value[0], state);
   result.name = `UPPER(${result.name})`;
   result.type = 'string';
   if (!result.err && result.value !== null) {
@@ -152,16 +113,8 @@ export function upper(
   return result;
 }
 export function trim(expr: Function, state: EvaluationState): EvaluationResult {
-  const arg_count = expr.args?.value?.length ?? 0;
-  if (arg_count !== 1) {
-    return {
-      err: { err: 'ER_PARSE_ERROR' },
-      name: 'TRIM()',
-      value: null,
-      type: 'string',
-    };
-  }
-  const result = getValue(expr.args?.value?.[0], state);
+  assertArgCountParse(expr, 1);
+  const result = getValue(expr.args.value[0], state);
   result.name = `TRIM(${result.name})`;
   result.type = 'string';
   if (!result.err && result.value !== null) {
@@ -173,16 +126,8 @@ export function ltrim(
   expr: Function,
   state: EvaluationState
 ): EvaluationResult {
-  const arg_count = expr.args?.value?.length ?? 0;
-  if (arg_count !== 1) {
-    return {
-      err: { err: 'ER_WRONG_PARAMCOUNT_TO_NATIVE_FCT', args: ['LTRIM'] },
-      name: 'LTRIM()',
-      value: null,
-      type: 'string',
-    };
-  }
-  const result = getValue(expr.args?.value?.[0], state);
+  assertArgCount(expr, 1);
+  const result = getValue(expr.args.value[0], state);
   result.name = `LTRIM(${result.name})`;
   result.type = 'string';
   if (!result.err && result.value !== null) {
@@ -194,16 +139,8 @@ export function rtrim(
   expr: Function,
   state: EvaluationState
 ): EvaluationResult {
-  const arg_count = expr.args?.value?.length ?? 0;
-  if (arg_count !== 1) {
-    return {
-      err: { err: 'ER_WRONG_PARAMCOUNT_TO_NATIVE_FCT', args: ['RTRIM'] },
-      name: 'RTRIM()',
-      value: null,
-      type: 'string',
-    };
-  }
-  const result = getValue(expr.args?.value?.[0], state);
+  assertArgCount(expr, 1);
+  const result = getValue(expr.args.value[0], state);
   result.name = `RTRIM(${result.name})`;
   result.type = 'string';
   if (!result.err && result.value !== null) {
@@ -215,16 +152,8 @@ export function reverse(
   expr: Function,
   state: EvaluationState
 ): EvaluationResult {
-  const arg_count = expr.args?.value?.length ?? 0;
-  if (arg_count !== 1) {
-    return {
-      err: { err: 'ER_PARSE_ERROR' },
-      name: 'REVERSE()',
-      value: null,
-      type: 'string',
-    };
-  }
-  const result = getValue(expr.args?.value?.[0], state);
+  assertArgCountParse(expr, 1);
+  const result = getValue(expr.args.value[0], state);
   result.name = `REVERSE(${result.name})`;
   result.type = 'string';
   if (!result.err && result.value !== null) {
@@ -236,17 +165,9 @@ export function repeat(
   expr: Function,
   state: EvaluationState
 ): EvaluationResult {
-  const arg_count = expr.args?.value?.length ?? 0;
-  if (arg_count !== 2) {
-    return {
-      err: { err: 'ER_PARSE_ERROR' },
-      name: 'REPEAT()',
-      value: null,
-      type: 'long_blob',
-    };
-  }
-  const arg1 = getValue(expr.args?.value?.[0], state);
-  const arg2 = getValue(expr.args?.value?.[1], state);
+  assertArgCountParse(expr, 2);
+  const arg1 = getValue(expr.args.value[0], state);
+  const arg2 = getValue(expr.args.value[1], state);
   const err = arg1.err || arg2.err;
   let value;
   let type;
@@ -274,16 +195,8 @@ export function char_length(
   expr: Function,
   state: EvaluationState
 ): EvaluationResult {
-  const arg_count = expr.args?.value?.length ?? 0;
-  if (arg_count !== 1) {
-    return {
-      err: { err: 'ER_WRONG_PARAMCOUNT_TO_NATIVE_FCT', args: ['CHAR_LENGTH'] },
-      name: 'CHAR_LENGTH()',
-      value: null,
-      type: 'longlong',
-    };
-  }
-  const result = getValue(expr.args?.value?.[0], state);
+  assertArgCount(expr, 1);
+  const result = getValue(expr.args.value[0], state);
   result.name = `CHAR_LENGTH(${result.name})`;
   result.type = 'longlong';
   if (!result.err && result.value !== null) {
@@ -295,20 +208,11 @@ export function substring(
   expr: Function,
   state: EvaluationState
 ): EvaluationResult {
-  const arg_count = expr.args?.value?.length ?? 0;
-  if (arg_count < 2 || arg_count > 3) {
-    return {
-      err: { err: 'ER_PARSE_ERROR' },
-      name: 'SUBSTRING()',
-      value: null,
-      type: 'string',
-    };
-  }
-  const arg1 = getValue(expr.args?.value?.[0], state);
-  const arg2 = getValue(expr.args?.value?.[1], state);
-  const hasThirdArg = expr.args?.value?.[2] !== undefined;
-  const arg3 =
-    hasThirdArg && expr.args ? getValue(expr.args.value[2], state) : null;
+  assertArgCountParse(expr, 2, 3);
+  const arg1 = getValue(expr.args.value[0], state);
+  const arg2 = getValue(expr.args.value[1], state);
+  const hasThirdArg = expr.args.value[2] !== undefined;
+  const arg3 = hasThirdArg ? getValue(expr.args.value[2], state) : null;
   const err = arg1.err || arg2.err || (arg3?.err ?? null);
   let value;
   const name = hasThirdArg
@@ -349,18 +253,10 @@ export function replace(
   expr: Function,
   state: EvaluationState
 ): EvaluationResult {
-  const arg_count = expr.args?.value?.length ?? 0;
-  if (arg_count !== 3) {
-    return {
-      err: { err: 'ER_PARSE_ERROR' },
-      name: 'REPLACE()',
-      value: null,
-      type: 'string',
-    };
-  }
-  const arg1 = getValue(expr.args?.value?.[0], state);
-  const arg2 = getValue(expr.args?.value?.[1], state);
-  const arg3 = getValue(expr.args?.value?.[2], state);
+  assertArgCountParse(expr, 3);
+  const arg1 = getValue(expr.args.value[0], state);
+  const arg2 = getValue(expr.args.value[1], state);
+  const arg3 = getValue(expr.args.value[2], state);
   const err = arg1.err || arg2.err || arg3.err || null;
   let value;
   const name = `REPLACE(${arg1.name}, ${arg2.name}, ${arg3.name})`;
@@ -399,16 +295,8 @@ export function ascii(
   expr: Function,
   state: EvaluationState
 ): EvaluationResult {
-  const arg_count = expr.args?.value?.length ?? 0;
-  if (arg_count !== 1) {
-    return {
-      err: { err: 'ER_PARSE_ERROR' },
-      name: 'ASCII()',
-      value: null,
-      type: 'longlong',
-    };
-  }
-  const result = getValue(expr.args?.value?.[0], state);
+  assertArgCountParse(expr, 1);
+  const result = getValue(expr.args.value[0], state);
   result.name = `ASCII(${result.name})`;
   result.type = 'longlong';
   if (!result.err && result.value !== null) {
@@ -418,16 +306,8 @@ export function ascii(
   return result;
 }
 export function ord(expr: Function, state: EvaluationState): EvaluationResult {
-  const arg_count = expr.args?.value?.length ?? 0;
-  if (arg_count !== 1) {
-    return {
-      err: { err: 'ER_WRONG_PARAMCOUNT_TO_NATIVE_FCT', args: ['ORD'] },
-      name: 'ORD()',
-      value: null,
-      type: 'longlong',
-    };
-  }
-  const result = getValue(expr.args?.value?.[0], state);
+  assertArgCount(expr, 1);
+  const result = getValue(expr.args.value[0], state);
   result.name = `ORD(${result.name})`;
   result.type = 'longlong';
   if (!result.err && result.value !== null) {
@@ -440,16 +320,8 @@ export function space(
   expr: Function,
   state: EvaluationState
 ): EvaluationResult {
-  const arg_count = expr.args?.value?.length ?? 0;
-  if (arg_count !== 1) {
-    return {
-      err: { err: 'ER_WRONG_PARAMCOUNT_TO_NATIVE_FCT', args: ['SPACE'] },
-      name: 'SPACE()',
-      value: null,
-      type: 'string',
-    };
-  }
-  const result = getValue(expr.args?.value?.[0], state);
+  assertArgCount(expr, 1);
+  const result = getValue(expr.args.value[0], state);
   result.name = `SPACE(${result.name})`;
   result.type = 'string';
   if (!result.err && result.value !== null) {
@@ -460,16 +332,8 @@ export function space(
   return result;
 }
 export function hex(expr: Function, state: EvaluationState): EvaluationResult {
-  const arg_count = expr.args?.value?.length ?? 0;
-  if (arg_count !== 1) {
-    return {
-      err: { err: 'ER_WRONG_PARAMCOUNT_TO_NATIVE_FCT', args: ['HEX'] },
-      name: 'HEX()',
-      value: null,
-      type: 'string',
-    };
-  }
-  const result = getValue(expr.args?.value?.[0], state);
+  assertArgCount(expr, 1);
+  const result = getValue(expr.args.value[0], state);
   result.name = `HEX(${result.name})`;
   result.type = 'string';
   if (!result.err && result.value !== null) {
@@ -495,16 +359,8 @@ export function unhex(
   expr: Function,
   state: EvaluationState
 ): EvaluationResult {
-  const arg_count = expr.args?.value?.length ?? 0;
-  if (arg_count !== 1) {
-    return {
-      err: { err: 'ER_WRONG_PARAMCOUNT_TO_NATIVE_FCT', args: ['UNHEX'] },
-      value: null,
-      type: 'buffer',
-      name: 'UNHEX()',
-    };
-  }
-  const result = getValue(expr.args?.value?.[0], state);
+  assertArgCount(expr, 1);
+  const result = getValue(expr.args.value[0], state);
   result.name = `UNHEX(${result.name})`;
   result.type = 'buffer';
   if (!result.err && result.value !== null) {
@@ -526,15 +382,13 @@ export function concat_ws(
   state: EvaluationState
 ): EvaluationResult {
   const arg_count = expr.args?.value?.length ?? 0;
-  if (arg_count < 2) {
-    return {
-      err: { err: 'ER_WRONG_PARAMCOUNT_TO_NATIVE_FCT', args: ['CONCAT_WS'] },
-      value: null,
-      type: 'string',
-      name: 'CONCAT_WS()',
-    };
+  if (arg_count < 2 || !Array.isArray(expr.args?.value)) {
+    throw new SQLError({
+      err: 'ER_WRONG_PARAMCOUNT_TO_NATIVE_FCT',
+      args: ['CONCAT_WS'],
+    });
   }
-  const sep_result = getValue(expr.args?.value?.[0], state);
+  const sep_result = getValue(expr.args.value[0], state);
   if (sep_result.err || sep_result.value === null) {
     return {
       err: sep_result.err,
@@ -545,8 +399,8 @@ export function concat_ws(
   }
   const separator = String(sep_result.value);
   const parts: string[] = [];
-  for (let i = 1; i < (expr.args?.value?.length ?? 0); i++) {
-    const result = getValue(expr.args?.value?.[i], state);
+  for (let i = 1; i < expr.args.value.length; i++) {
+    const result = getValue(expr.args.value[i], state);
     if (result.err) {
       return {
         err: result.err,
@@ -567,17 +421,10 @@ export function concat_ws(
   };
 }
 export function lpad(expr: Function, state: EvaluationState): EvaluationResult {
-  const arg_count = expr.args?.value?.length ?? 0;
-  if (arg_count !== 3) {
-    return {
-      err: { err: 'ER_WRONG_PARAMCOUNT_TO_NATIVE_FCT', args: ['LPAD'] },
-      value: null,
-      type: 'string',
-    };
-  }
-  const str_result = getValue(expr.args?.value?.[0], state);
-  const len_result = getValue(expr.args?.value?.[1], state);
-  const pad_result = getValue(expr.args?.value?.[2], state);
+  assertArgCount(expr, 3);
+  const str_result = getValue(expr.args.value[0], state);
+  const len_result = getValue(expr.args.value[1], state);
+  const pad_result = getValue(expr.args.value[2], state);
   const err = str_result.err || len_result.err || pad_result.err || null;
   if (
     err ||
@@ -609,17 +456,10 @@ export function lpad(expr: Function, state: EvaluationState): EvaluationResult {
   };
 }
 export function rpad(expr: Function, state: EvaluationState): EvaluationResult {
-  const arg_count = expr.args?.value?.length ?? 0;
-  if (arg_count !== 3) {
-    return {
-      err: { err: 'ER_WRONG_PARAMCOUNT_TO_NATIVE_FCT', args: ['RPAD'] },
-      value: null,
-      type: 'string',
-    };
-  }
-  const str_result = getValue(expr.args?.value?.[0], state);
-  const len_result = getValue(expr.args?.value?.[1], state);
-  const pad_result = getValue(expr.args?.value?.[2], state);
+  assertArgCount(expr, 3);
+  const str_result = getValue(expr.args.value[0], state);
+  const len_result = getValue(expr.args.value[1], state);
+  const pad_result = getValue(expr.args.value[2], state);
   const err = str_result.err || len_result.err || pad_result.err || null;
   if (
     err ||
@@ -654,17 +494,10 @@ export function locate(
   expr: Function,
   state: EvaluationState
 ): EvaluationResult {
-  const arg_count = expr.args?.value?.length ?? 0;
-  if (arg_count < 2 || arg_count > 3) {
-    return {
-      err: { err: 'ER_WRONG_PARAMCOUNT_TO_NATIVE_FCT', args: ['LOCATE'] },
-      value: null,
-      type: 'longlong',
-    };
-  }
-  const substr_result = getValue(expr.args?.value?.[0], state);
-  const str_result = getValue(expr.args?.value?.[1], state);
-  const pos_result = getValue(expr.args?.value?.[2], state);
+  assertArgCount(expr, 2, 3);
+  const substr_result = getValue(expr.args.value[0], state);
+  const str_result = getValue(expr.args.value[1], state);
+  const pos_result = getValue(expr.args.value[2], state);
   const err = substr_result.err || str_result.err || pos_result?.err || null;
   if (err || substr_result.value === null || str_result.value === null) {
     return { err, value: null, type: 'longlong' };
@@ -696,16 +529,9 @@ export function instr(
   expr: Function,
   state: EvaluationState
 ): EvaluationResult {
-  const arg_count = expr.args?.value?.length ?? 0;
-  if (arg_count !== 2) {
-    return {
-      err: { err: 'ER_WRONG_PARAMCOUNT_TO_NATIVE_FCT', args: ['INSTR'] },
-      value: null,
-      type: 'longlong',
-    };
-  }
-  const str_result = getValue(expr.args?.value?.[0], state);
-  const substr_result = getValue(expr.args?.value?.[1], state);
+  assertArgCount(expr, 2);
+  const str_result = getValue(expr.args.value[0], state);
+  const substr_result = getValue(expr.args.value[1], state);
   const err = str_result.err || substr_result.err || null;
   if (err || str_result.value === null || substr_result.value === null) {
     return { err, value: null, type: 'longlong' };
@@ -719,16 +545,9 @@ export function strcmp(
   expr: Function,
   state: EvaluationState
 ): EvaluationResult {
-  const arg_count = expr.args?.value?.length ?? 0;
-  if (arg_count !== 2) {
-    return {
-      err: { err: 'ER_WRONG_PARAMCOUNT_TO_NATIVE_FCT', args: ['STRCMP'] },
-      value: null,
-      type: 'longlong',
-    };
-  }
-  const str1_result = getValue(expr.args?.value?.[0], state);
-  const str2_result = getValue(expr.args?.value?.[1], state);
+  assertArgCount(expr, 2);
+  const str1_result = getValue(expr.args.value[0], state);
+  const str2_result = getValue(expr.args.value[1], state);
   const err = str1_result.err || str2_result.err || null;
   if (err || str1_result.value === null || str2_result.value === null) {
     return { err, value: null, type: 'longlong' };
