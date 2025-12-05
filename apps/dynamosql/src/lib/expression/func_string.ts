@@ -8,6 +8,15 @@ export function length(
   expr: Function,
   state: EvaluationState
 ): EvaluationResult {
+  const arg_count = expr.args?.value?.length ?? 0;
+  if (arg_count !== 1) {
+    return {
+      err: { err: 'ER_WRONG_PARAMCOUNT_TO_NATIVE_FCT', args: ['LENGTH'] },
+      name: 'LENGTH()',
+      value: null,
+      type: 'longlong',
+    };
+  }
   const result = getValue(expr.args?.value?.[0], state);
   result.name = `LENGTH(${result.name})`;
   result.type = 'longlong';
@@ -20,6 +29,14 @@ export function concat(
   expr: Function,
   state: EvaluationState
 ): EvaluationResult {
+  const arg_count = expr.args?.value?.length ?? 0;
+  if (arg_count === 0) {
+    return {
+      err: { err: 'ER_WRONG_PARAMCOUNT_TO_NATIVE_FCT', args: ['CONCAT'] },
+      value: null,
+      type: 'string',
+    };
+  }
   let err: EvaluationResult['err'] = null;
   let value: string | null = '';
   let has_blob = false;
@@ -40,6 +57,15 @@ export function concat(
   return { err, value, type: has_blob ? 'medium_blob' : 'string' };
 }
 export function left(expr: Function, state: EvaluationState): EvaluationResult {
+  const arg_count = expr.args?.value?.length ?? 0;
+  if (arg_count !== 2) {
+    return {
+      err: { err: 'ER_PARSE_ERROR' },
+      name: 'LEFT()',
+      value: null,
+      type: 'string',
+    };
+  }
   const result = getValue(expr.args?.value?.[0], state);
   const len_result = getValue(expr.args?.value?.[1], state);
   result.name = `LEFT(${result.name ?? ''}, ${len_result.name ?? ''})`;
@@ -57,6 +83,15 @@ export function right(
   expr: Function,
   state: EvaluationState
 ): EvaluationResult {
+  const arg_count = expr.args?.value?.length ?? 0;
+  if (arg_count !== 2) {
+    return {
+      err: { err: 'ER_PARSE_ERROR' },
+      name: 'RIGHT()',
+      value: null,
+      type: 'string',
+    };
+  }
   const result = getValue(expr.args?.value?.[0], state);
   const len_result = getValue(expr.args?.value?.[1], state);
   result.name = `RIGHT(${result.name ?? ''}, ${len_result.name ?? ''})`;
@@ -78,6 +113,15 @@ export function lower(
   expr: Function,
   state: EvaluationState
 ): EvaluationResult {
+  const arg_count = expr.args?.value?.length ?? 0;
+  if (arg_count !== 1) {
+    return {
+      err: { err: 'ER_WRONG_PARAMCOUNT_TO_NATIVE_FCT', args: ['LOWER'] },
+      name: 'LOWER()',
+      value: null,
+      type: 'string',
+    };
+  }
   const result = getValue(expr.args?.value?.[0], state);
   result.name = `LOWER(${result.name})`;
   result.type = 'string';
@@ -90,6 +134,15 @@ export function upper(
   expr: Function,
   state: EvaluationState
 ): EvaluationResult {
+  const arg_count = expr.args?.value?.length ?? 0;
+  if (arg_count !== 1) {
+    return {
+      err: { err: 'ER_WRONG_PARAMCOUNT_TO_NATIVE_FCT', args: ['UPPER'] },
+      name: 'UPPER()',
+      value: null,
+      type: 'string',
+    };
+  }
   const result = getValue(expr.args?.value?.[0], state);
   result.name = `UPPER(${result.name})`;
   result.type = 'string';
@@ -99,6 +152,15 @@ export function upper(
   return result;
 }
 export function trim(expr: Function, state: EvaluationState): EvaluationResult {
+  const arg_count = expr.args?.value?.length ?? 0;
+  if (arg_count !== 1) {
+    return {
+      err: { err: 'ER_PARSE_ERROR' },
+      name: 'TRIM()',
+      value: null,
+      type: 'string',
+    };
+  }
   const result = getValue(expr.args?.value?.[0], state);
   result.name = `TRIM(${result.name})`;
   result.type = 'string';
@@ -111,6 +173,15 @@ export function ltrim(
   expr: Function,
   state: EvaluationState
 ): EvaluationResult {
+  const arg_count = expr.args?.value?.length ?? 0;
+  if (arg_count !== 1) {
+    return {
+      err: { err: 'ER_WRONG_PARAMCOUNT_TO_NATIVE_FCT', args: ['LTRIM'] },
+      name: 'LTRIM()',
+      value: null,
+      type: 'string',
+    };
+  }
   const result = getValue(expr.args?.value?.[0], state);
   result.name = `LTRIM(${result.name})`;
   result.type = 'string';
@@ -123,6 +194,15 @@ export function rtrim(
   expr: Function,
   state: EvaluationState
 ): EvaluationResult {
+  const arg_count = expr.args?.value?.length ?? 0;
+  if (arg_count !== 1) {
+    return {
+      err: { err: 'ER_WRONG_PARAMCOUNT_TO_NATIVE_FCT', args: ['RTRIM'] },
+      name: 'RTRIM()',
+      value: null,
+      type: 'string',
+    };
+  }
   const result = getValue(expr.args?.value?.[0], state);
   result.name = `RTRIM(${result.name})`;
   result.type = 'string';
@@ -135,6 +215,15 @@ export function reverse(
   expr: Function,
   state: EvaluationState
 ): EvaluationResult {
+  const arg_count = expr.args?.value?.length ?? 0;
+  if (arg_count !== 1) {
+    return {
+      err: { err: 'ER_PARSE_ERROR' },
+      name: 'REVERSE()',
+      value: null,
+      type: 'string',
+    };
+  }
   const result = getValue(expr.args?.value?.[0], state);
   result.name = `REVERSE(${result.name})`;
   result.type = 'string';
@@ -147,6 +236,15 @@ export function repeat(
   expr: Function,
   state: EvaluationState
 ): EvaluationResult {
+  const arg_count = expr.args?.value?.length ?? 0;
+  if (arg_count !== 2) {
+    return {
+      err: { err: 'ER_PARSE_ERROR' },
+      name: 'REPEAT()',
+      value: null,
+      type: 'long_blob',
+    };
+  }
   const arg1 = getValue(expr.args?.value?.[0], state);
   const arg2 = getValue(expr.args?.value?.[1], state);
   const err = arg1.err || arg2.err;
@@ -163,9 +261,9 @@ export function repeat(
   } else if (!err) {
     const count = convertNum(arg2.value);
     value =
-      count !== null && count >= 0
+      count !== null && count > 0
         ? String(arg1.value).repeat(Math.round(count))
-        : null;
+        : '';
     type = 'string';
   } else {
     type = 'long_blob';
@@ -176,6 +274,15 @@ export function char_length(
   expr: Function,
   state: EvaluationState
 ): EvaluationResult {
+  const arg_count = expr.args?.value?.length ?? 0;
+  if (arg_count !== 1) {
+    return {
+      err: { err: 'ER_WRONG_PARAMCOUNT_TO_NATIVE_FCT', args: ['CHAR_LENGTH'] },
+      name: 'CHAR_LENGTH()',
+      value: null,
+      type: 'longlong',
+    };
+  }
   const result = getValue(expr.args?.value?.[0], state);
   result.name = `CHAR_LENGTH(${result.name})`;
   result.type = 'longlong';
@@ -188,6 +295,15 @@ export function substring(
   expr: Function,
   state: EvaluationState
 ): EvaluationResult {
+  const arg_count = expr.args?.value?.length ?? 0;
+  if (arg_count < 2 || arg_count > 3) {
+    return {
+      err: { err: 'ER_PARSE_ERROR' },
+      name: 'SUBSTRING()',
+      value: null,
+      type: 'string',
+    };
+  }
   const arg1 = getValue(expr.args?.value?.[0], state);
   const arg2 = getValue(expr.args?.value?.[1], state);
   const hasThirdArg = expr.args?.value?.[2] !== undefined;
@@ -215,11 +331,16 @@ export function substring(
       value = null;
     } else {
       const posInt = Math.round(pos);
-      const start = posInt < 0 ? str.length + posInt : posInt - 1;
-      value =
-        len !== null
-          ? str.substring(start, start + Math.round(len))
-          : str.substring(start);
+      // Position 0 returns empty string
+      if (posInt === 0) {
+        value = '';
+      } else {
+        const start = posInt < 0 ? str.length + posInt : posInt - 1;
+        value =
+          len !== null
+            ? str.substring(start, start + Math.round(len))
+            : str.substring(start);
+      }
     }
   }
   return { err, name, value, type: 'string' };
@@ -228,6 +349,15 @@ export function replace(
   expr: Function,
   state: EvaluationState
 ): EvaluationResult {
+  const arg_count = expr.args?.value?.length ?? 0;
+  if (arg_count !== 3) {
+    return {
+      err: { err: 'ER_PARSE_ERROR' },
+      name: 'REPLACE()',
+      value: null,
+      type: 'string',
+    };
+  }
   const arg1 = getValue(expr.args?.value?.[0], state);
   const arg2 = getValue(expr.args?.value?.[1], state);
   const arg3 = getValue(expr.args?.value?.[2], state);
@@ -256,7 +386,12 @@ export function replace(
       decimals: arg3.decimals,
       timeZone: state.session.timeZone,
     });
-    value = str1?.replaceAll(str2 ?? '', str3 ?? '') ?? null;
+    // Empty search string returns original string
+    if (str2 === '') {
+      value = str1;
+    } else {
+      value = str1?.replaceAll(str2 ?? '', str3 ?? '') ?? null;
+    }
   }
   return { err, name, value, type: 'string' };
 }
@@ -264,6 +399,15 @@ export function ascii(
   expr: Function,
   state: EvaluationState
 ): EvaluationResult {
+  const arg_count = expr.args?.value?.length ?? 0;
+  if (arg_count !== 1) {
+    return {
+      err: { err: 'ER_PARSE_ERROR' },
+      name: 'ASCII()',
+      value: null,
+      type: 'longlong',
+    };
+  }
   const result = getValue(expr.args?.value?.[0], state);
   result.name = `ASCII(${result.name})`;
   result.type = 'longlong';
@@ -274,6 +418,15 @@ export function ascii(
   return result;
 }
 export function ord(expr: Function, state: EvaluationState): EvaluationResult {
+  const arg_count = expr.args?.value?.length ?? 0;
+  if (arg_count !== 1) {
+    return {
+      err: { err: 'ER_WRONG_PARAMCOUNT_TO_NATIVE_FCT', args: ['ORD'] },
+      name: 'ORD()',
+      value: null,
+      type: 'longlong',
+    };
+  }
   const result = getValue(expr.args?.value?.[0], state);
   result.name = `ORD(${result.name})`;
   result.type = 'longlong';
@@ -287,22 +440,47 @@ export function space(
   expr: Function,
   state: EvaluationState
 ): EvaluationResult {
+  const arg_count = expr.args?.value?.length ?? 0;
+  if (arg_count !== 1) {
+    return {
+      err: { err: 'ER_WRONG_PARAMCOUNT_TO_NATIVE_FCT', args: ['SPACE'] },
+      name: 'SPACE()',
+      value: null,
+      type: 'string',
+    };
+  }
   const result = getValue(expr.args?.value?.[0], state);
   result.name = `SPACE(${result.name})`;
   result.type = 'string';
   if (!result.err && result.value !== null) {
     const count = convertNum(result.value);
-    result.value = count !== null && count >= 0 ? ' '.repeat(count) : null;
+    result.value =
+      count !== null && count > 0 ? ' '.repeat(Math.trunc(count)) : '';
   }
   return result;
 }
 export function hex(expr: Function, state: EvaluationState): EvaluationResult {
+  const arg_count = expr.args?.value?.length ?? 0;
+  if (arg_count !== 1) {
+    return {
+      err: { err: 'ER_WRONG_PARAMCOUNT_TO_NATIVE_FCT', args: ['HEX'] },
+      name: 'HEX()',
+      value: null,
+      type: 'string',
+    };
+  }
   const result = getValue(expr.args?.value?.[0], state);
   result.name = `HEX(${result.name})`;
   result.type = 'string';
   if (!result.err && result.value !== null) {
     if (typeof result.value === 'number' || typeof result.value === 'bigint') {
-      result.value = result.value.toString(16).toUpperCase();
+      const num =
+        typeof result.value === 'bigint'
+          ? result.value
+          : BigInt(Math.trunc(result.value));
+      // Convert to unsigned 64-bit
+      const unsigned = num < 0n ? (1n << 64n) + num : num;
+      result.value = unsigned.toString(16).toUpperCase();
     } else if (Buffer.isBuffer(result.value)) {
       result.value = result.value.toString('hex').toUpperCase();
     } else {
@@ -317,12 +495,25 @@ export function unhex(
   expr: Function,
   state: EvaluationState
 ): EvaluationResult {
+  const arg_count = expr.args?.value?.length ?? 0;
+  if (arg_count !== 1) {
+    return {
+      err: { err: 'ER_WRONG_PARAMCOUNT_TO_NATIVE_FCT', args: ['UNHEX'] },
+      value: null,
+      type: 'buffer',
+      name: 'UNHEX()',
+    };
+  }
   const result = getValue(expr.args?.value?.[0], state);
   result.name = `UNHEX(${result.name})`;
   result.type = 'buffer';
   if (!result.err && result.value !== null) {
-    const str = String(result.value);
+    let str = String(result.value);
     if (/^[0-9A-Fa-f]*$/.test(str)) {
+      // Pad odd-length strings with leading zero
+      if (str.length % 2 === 1) {
+        str = '0' + str;
+      }
       result.value = Buffer.from(str, 'hex');
     } else {
       result.value = null;
@@ -334,6 +525,15 @@ export function concat_ws(
   expr: Function,
   state: EvaluationState
 ): EvaluationResult {
+  const arg_count = expr.args?.value?.length ?? 0;
+  if (arg_count < 2) {
+    return {
+      err: { err: 'ER_WRONG_PARAMCOUNT_TO_NATIVE_FCT', args: ['CONCAT_WS'] },
+      value: null,
+      type: 'string',
+      name: 'CONCAT_WS()',
+    };
+  }
   const sep_result = getValue(expr.args?.value?.[0], state);
   if (sep_result.err || sep_result.value === null) {
     return {
@@ -367,6 +567,14 @@ export function concat_ws(
   };
 }
 export function lpad(expr: Function, state: EvaluationState): EvaluationResult {
+  const arg_count = expr.args?.value?.length ?? 0;
+  if (arg_count !== 3) {
+    return {
+      err: { err: 'ER_WRONG_PARAMCOUNT_TO_NATIVE_FCT', args: ['LPAD'] },
+      value: null,
+      type: 'string',
+    };
+  }
   const str_result = getValue(expr.args?.value?.[0], state);
   const len_result = getValue(expr.args?.value?.[1], state);
   const pad_result = getValue(expr.args?.value?.[2], state);
@@ -382,8 +590,11 @@ export function lpad(expr: Function, state: EvaluationState): EvaluationResult {
   const str = String(str_result.value);
   const len = Math.round(convertNum(len_result.value) ?? 0);
   const pad = String(pad_result.value);
-  if (len < 0 || pad.length === 0) {
-    return { err: null, value: null, type: 'string' };
+  if (len < 0) {
+    return { err: null, value: null, type: 'medium_blob' };
+  }
+  if (pad.length === 0) {
+    return { err: null, value: '', type: 'string' };
   }
   if (str.length >= len) {
     return { err: null, value: str.substring(0, len), type: 'string' };
@@ -398,6 +609,14 @@ export function lpad(expr: Function, state: EvaluationState): EvaluationResult {
   };
 }
 export function rpad(expr: Function, state: EvaluationState): EvaluationResult {
+  const arg_count = expr.args?.value?.length ?? 0;
+  if (arg_count !== 3) {
+    return {
+      err: { err: 'ER_WRONG_PARAMCOUNT_TO_NATIVE_FCT', args: ['RPAD'] },
+      value: null,
+      type: 'string',
+    };
+  }
   const str_result = getValue(expr.args?.value?.[0], state);
   const len_result = getValue(expr.args?.value?.[1], state);
   const pad_result = getValue(expr.args?.value?.[2], state);
@@ -413,8 +632,11 @@ export function rpad(expr: Function, state: EvaluationState): EvaluationResult {
   const str = String(str_result.value);
   const len = Math.round(convertNum(len_result.value) ?? 0);
   const pad = String(pad_result.value);
-  if (len < 0 || pad.length === 0) {
-    return { err: null, value: null, type: 'string' };
+  if (len < 0) {
+    return { err: null, value: null, type: 'medium_blob' };
+  }
+  if (pad.length === 0) {
+    return { err: null, value: '', type: 'string' };
   }
   if (str.length >= len) {
     return { err: null, value: str.substring(0, len), type: 'string' };
@@ -432,6 +654,14 @@ export function locate(
   expr: Function,
   state: EvaluationState
 ): EvaluationResult {
+  const arg_count = expr.args?.value?.length ?? 0;
+  if (arg_count < 2 || arg_count > 3) {
+    return {
+      err: { err: 'ER_WRONG_PARAMCOUNT_TO_NATIVE_FCT', args: ['LOCATE'] },
+      value: null,
+      type: 'longlong',
+    };
+  }
   const substr_result = getValue(expr.args?.value?.[0], state);
   const str_result = getValue(expr.args?.value?.[1], state);
   const pos_result = getValue(expr.args?.value?.[2], state);
@@ -451,14 +681,29 @@ export function locate(
       decimals: str_result.decimals,
       timeZone: state.session.timeZone,
     }) ?? '';
-  const pos = pos_result?.value ? (convertNum(pos_result.value) ?? 1) : 1;
-  const index = str.indexOf(substr, Math.round(pos) - 1);
+  const pos =
+    pos_result?.value !== undefined && pos_result?.value !== null
+      ? (convertNum(pos_result.value) ?? 1)
+      : 1;
+  const posInt = Math.round(pos);
+  if (posInt < 1) {
+    return { err: null, value: 0, type: 'longlong' };
+  }
+  const index = str.indexOf(substr, posInt - 1);
   return { err: null, value: index === -1 ? 0 : index + 1, type: 'longlong' };
 }
 export function instr(
   expr: Function,
   state: EvaluationState
 ): EvaluationResult {
+  const arg_count = expr.args?.value?.length ?? 0;
+  if (arg_count !== 2) {
+    return {
+      err: { err: 'ER_WRONG_PARAMCOUNT_TO_NATIVE_FCT', args: ['INSTR'] },
+      value: null,
+      type: 'longlong',
+    };
+  }
   const str_result = getValue(expr.args?.value?.[0], state);
   const substr_result = getValue(expr.args?.value?.[1], state);
   const err = str_result.err || substr_result.err || null;
@@ -474,6 +719,14 @@ export function strcmp(
   expr: Function,
   state: EvaluationState
 ): EvaluationResult {
+  const arg_count = expr.args?.value?.length ?? 0;
+  if (arg_count !== 2) {
+    return {
+      err: { err: 'ER_WRONG_PARAMCOUNT_TO_NATIVE_FCT', args: ['STRCMP'] },
+      value: null,
+      type: 'longlong',
+    };
+  }
   const str1_result = getValue(expr.args?.value?.[0], state);
   const str2_result = getValue(expr.args?.value?.[1], state);
   const err = str1_result.err || str2_result.err || null;

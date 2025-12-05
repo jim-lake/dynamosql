@@ -53,6 +53,15 @@ export function from_unixtime(
   return result;
 }
 export function date(expr: Function, state: EvaluationState): EvaluationResult {
+  const arg_count = expr.args?.value?.length ?? 0;
+  if (arg_count !== 1) {
+    return {
+      err: { err: 'ER_PARSE_ERROR' },
+      value: null,
+      type: 'date',
+      name: 'DATE()',
+    };
+  }
   const result = getValue(expr.args?.value?.[0], state);
   result.name = `DATE(${result.name})`;
   result.type = 'date';
@@ -158,6 +167,15 @@ export function unix_timestamp(
   return result;
 }
 export function year(expr: Function, state: EvaluationState): EvaluationResult {
+  const arg_count = expr.args?.value?.length ?? 0;
+  if (arg_count !== 1) {
+    return {
+      err: { err: 'ER_PARSE_ERROR' },
+      value: null,
+      type: 'longlong',
+      name: 'YEAR()',
+    };
+  }
   const result = getValue(expr.args?.value?.[0], state);
   result.name = `YEAR(${result.name})`;
   result.type = 'longlong';
@@ -174,6 +192,15 @@ export function month(
   expr: Function,
   state: EvaluationState
 ): EvaluationResult {
+  const arg_count = expr.args?.value?.length ?? 0;
+  if (arg_count !== 1) {
+    return {
+      err: { err: 'ER_PARSE_ERROR' },
+      value: null,
+      type: 'longlong',
+      name: 'MONTH()',
+    };
+  }
   const result = getValue(expr.args?.value?.[0], state);
   result.name = `MONTH(${result.name})`;
   result.type = 'longlong';
@@ -187,6 +214,15 @@ export function month(
   return result;
 }
 export function day(expr: Function, state: EvaluationState): EvaluationResult {
+  const arg_count = expr.args?.value?.length ?? 0;
+  if (arg_count !== 1) {
+    return {
+      err: { err: 'ER_PARSE_ERROR' },
+      value: null,
+      type: 'longlong',
+      name: 'DAY()',
+    };
+  }
   const result = getValue(expr.args?.value?.[0], state);
   result.name = `DAY(${result.name})`;
   result.type = 'longlong';
@@ -342,6 +378,15 @@ export function dayofweek(
   expr: Function,
   state: EvaluationState
 ): EvaluationResult {
+  const arg_count = expr.args?.value?.length ?? 0;
+  if (arg_count !== 1) {
+    return {
+      err: { err: 'ER_WRONG_PARAMCOUNT_TO_NATIVE_FCT', args: ['DAYOFWEEK'] },
+      value: null,
+      type: 'longlong',
+      name: 'DAYOFWEEK()',
+    };
+  }
   const result = getValue(expr.args?.value?.[0], state);
   result.name = `DAYOFWEEK(${result.name})`;
   result.type = 'longlong';
@@ -358,6 +403,15 @@ export function dayname(
   expr: Function,
   state: EvaluationState
 ): EvaluationResult {
+  const arg_count = expr.args?.value?.length ?? 0;
+  if (arg_count !== 1) {
+    return {
+      err: { err: 'ER_WRONG_PARAMCOUNT_TO_NATIVE_FCT', args: ['DAYNAME'] },
+      value: null,
+      type: 'string',
+      name: 'DAYNAME()',
+    };
+  }
   const result = getValue(expr.args?.value?.[0], state);
   result.name = `DAYNAME(${result.name})`;
   result.type = 'string';
@@ -378,6 +432,15 @@ export function monthname(
   expr: Function,
   state: EvaluationState
 ): EvaluationResult {
+  const arg_count = expr.args?.value?.length ?? 0;
+  if (arg_count !== 1) {
+    return {
+      err: { err: 'ER_WRONG_PARAMCOUNT_TO_NATIVE_FCT', args: ['MONTHNAME'] },
+      value: null,
+      type: 'string',
+      name: 'MONTHNAME()',
+    };
+  }
   const result = getValue(expr.args?.value?.[0], state);
   result.name = `MONTHNAME(${result.name})`;
   result.type = 'string';
@@ -398,6 +461,15 @@ export function dayofyear(
   expr: Function,
   state: EvaluationState
 ): EvaluationResult {
+  const arg_count = expr.args?.value?.length ?? 0;
+  if (arg_count !== 1) {
+    return {
+      err: { err: 'ER_WRONG_PARAMCOUNT_TO_NATIVE_FCT', args: ['DAYOFYEAR'] },
+      value: null,
+      type: 'longlong',
+      name: 'DAYOFYEAR()',
+    };
+  }
   const result = getValue(expr.args?.value?.[0], state);
   result.name = `DAYOFYEAR(${result.name})`;
   result.type = 'longlong';

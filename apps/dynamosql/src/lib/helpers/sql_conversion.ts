@@ -296,7 +296,13 @@ function _stringToDateTime(value: string): ConvertTimeResult | undefined {
 }
 function _numToDateTime(number: unknown): ConvertTimeResult | undefined {
   let ret;
-  const s = String(number);
+  let s = String(number);
+
+  // Pad short numbers to 6 digits for YYMMDD format
+  if (/^[0-9]+$/.test(s) && s.length < 6) {
+    s = s.padStart(6, '0');
+  }
+
   let match = s.match(DATETIME4_REGEX);
   if (match && match[1] && match[2] && match[3] && match[4] && match[5]) {
     const year = match[1];

@@ -80,12 +80,12 @@ describe('Expression', function () {
     path.join(__dirname, 'function_type_combinations.sql'),
     { verify_field_types: true }
   );
-  /*
   runTests(
     'function_edge_cases.sql',
     path.join(__dirname, 'function_edge_cases.sql'),
     { verify_field_types: true }
   );
+  /*
   runTests(
     'function_arithmetic_types.sql',
     path.join(__dirname, 'function_arithmetic_types.sql'),

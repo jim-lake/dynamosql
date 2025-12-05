@@ -5,6 +5,15 @@ import type { Function } from 'node-sql-parser';
 import type { EvaluationState, EvaluationResult } from './evaluate';
 
 export function abs(expr: Function, state: EvaluationState): EvaluationResult {
+  const arg_count = expr.args?.value?.length ?? 0;
+  if (arg_count !== 1) {
+    return {
+      err: { err: 'ER_WRONG_PARAMCOUNT_TO_NATIVE_FCT', args: ['ABS'] },
+      name: 'ABS()',
+      value: null,
+      type: 'double',
+    };
+  }
   const result = getValue(expr.args?.value?.[0], state);
   result.name = `ABS(${result.name})`;
   if (!result.err && result.value !== null) {
@@ -17,6 +26,15 @@ export function abs(expr: Function, state: EvaluationState): EvaluationResult {
   return result;
 }
 export function ceil(expr: Function, state: EvaluationState): EvaluationResult {
+  const arg_count = expr.args?.value?.length ?? 0;
+  if (arg_count !== 1) {
+    return {
+      err: { err: 'ER_WRONG_PARAMCOUNT_TO_NATIVE_FCT', args: ['CEIL'] },
+      name: 'CEIL()',
+      value: null,
+      type: 'double',
+    };
+  }
   const result = getValue(expr.args?.value?.[0], state);
   result.name = `CEIL(${result.name})`;
   if (!result.err && result.value !== null) {
@@ -30,6 +48,15 @@ export function floor(
   expr: Function,
   state: EvaluationState
 ): EvaluationResult {
+  const arg_count = expr.args?.value?.length ?? 0;
+  if (arg_count !== 1) {
+    return {
+      err: { err: 'ER_WRONG_PARAMCOUNT_TO_NATIVE_FCT', args: ['FLOOR'] },
+      name: 'FLOOR()',
+      value: null,
+      type: 'double',
+    };
+  }
   const result = getValue(expr.args?.value?.[0], state);
   result.name = `FLOOR(${result.name})`;
   if (!result.err && result.value !== null) {
@@ -43,6 +70,15 @@ export function round(
   expr: Function,
   state: EvaluationState
 ): EvaluationResult {
+  const arg_count = expr.args?.value?.length ?? 0;
+  if (arg_count === 0 || arg_count > 2) {
+    return {
+      err: { err: 'ER_WRONG_PARAMCOUNT_TO_NATIVE_FCT', args: ['ROUND'] },
+      name: 'ROUND()',
+      value: null,
+      type: 'double',
+    };
+  }
   const result = getValue(expr.args?.value?.[0], state);
   const arg2 = expr.args?.value?.[1]
     ? getValue(expr.args?.value?.[1], state)
@@ -75,6 +111,10 @@ export function round(
     result.value = _mysqlRound(value);
   } else if (decimals > 0) {
     result.value = Number(value.toFixed(decimals));
+  } else {
+    // Negative decimals - round to nearest 10, 100, 1000, etc.
+    const factor = Math.pow(10, -decimals);
+    result.value = _mysqlRound(value / factor) * factor;
   }
   if (result.type === 'string') {
     result.type = 'double';
@@ -85,6 +125,15 @@ function _mysqlRound(x: number): number {
   return x >= 0 ? Math.round(x) : -Math.round(-x);
 }
 export function mod(expr: Function, state: EvaluationState): EvaluationResult {
+  const arg_count = expr.args?.value?.length ?? 0;
+  if (arg_count !== 2) {
+    return {
+      err: { err: 'ER_PARSE_ERROR' },
+      name: 'MOD()',
+      value: null,
+      type: 'double',
+    };
+  }
   const arg1 = getValue(expr.args?.value?.[0], state);
   const arg2 = getValue(expr.args?.value?.[1], state);
   const err = arg1.err || arg2.err;
@@ -98,7 +147,11 @@ export function mod(expr: Function, state: EvaluationState): EvaluationResult {
   } else if (!err) {
     const num1 = convertNum(arg1.value);
     const num2 = convertNum(arg2.value);
-    value = num1 !== null && num2 !== null ? num1 % num2 : null;
+    if (num2 === 0 || num2 === null) {
+      value = null;
+    } else {
+      value = num1 !== null ? num1 % num2 : null;
+    }
 
     if (arg1.type === 'double' || arg2.type === 'double') {
       type = 'double';
@@ -123,6 +176,15 @@ function _resolveTypeForRounding(result: EvaluationResult): string {
   return result.type;
 }
 export function pow(expr: Function, state: EvaluationState): EvaluationResult {
+  const arg_count = expr.args?.value?.length ?? 0;
+  if (arg_count !== 2) {
+    return {
+      err: { err: 'ER_WRONG_PARAMCOUNT_TO_NATIVE_FCT', args: ['POW'] },
+      name: 'POW()',
+      value: null,
+      type: 'double',
+    };
+  }
   const arg1 = getValue(expr.args?.value?.[0], state);
   const arg2 = getValue(expr.args?.value?.[1], state);
   const err = arg1.err || arg2.err;
@@ -139,16 +201,34 @@ export function pow(expr: Function, state: EvaluationState): EvaluationResult {
   return { err, name, value, type: 'double' };
 }
 export function sqrt(expr: Function, state: EvaluationState): EvaluationResult {
+  const arg_count = expr.args?.value?.length ?? 0;
+  if (arg_count !== 1) {
+    return {
+      err: { err: 'ER_WRONG_PARAMCOUNT_TO_NATIVE_FCT', args: ['SQRT'] },
+      name: 'SQRT()',
+      value: null,
+      type: 'double',
+    };
+  }
   const result = getValue(expr.args?.value?.[0], state);
   result.name = `SQRT(${result.name})`;
   result.type = 'double';
   if (!result.err && result.value !== null) {
     const num = convertNum(result.value);
-    result.value = num !== null ? Math.sqrt(num) : null;
+    result.value = num !== null && num >= 0 ? Math.sqrt(num) : null;
   }
   return result;
 }
 export function sign(expr: Function, state: EvaluationState): EvaluationResult {
+  const arg_count = expr.args?.value?.length ?? 0;
+  if (arg_count !== 1) {
+    return {
+      err: { err: 'ER_WRONG_PARAMCOUNT_TO_NATIVE_FCT', args: ['SIGN'] },
+      name: 'SIGN()',
+      value: null,
+      type: 'longlong',
+    };
+  }
   const result = getValue(expr.args?.value?.[0], state);
   result.name = `SIGN(${result.name})`;
   result.type = 'longlong';

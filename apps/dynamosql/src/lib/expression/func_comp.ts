@@ -14,6 +14,15 @@ export function coalesce(
   expr: Function,
   state: EvaluationState
 ): EvaluationResult {
+  const arg_count = expr.args?.value?.length ?? 0;
+  if (arg_count === 0) {
+    return {
+      err: { err: 'ER_PARSE_ERROR' },
+      name: 'COALESCE()',
+      value: null,
+      type: 'string',
+    };
+  }
   let err: EvaluationResult['err'] = null;
   let value: EvaluationResult['value'] = null;
   const names: string[] = [];
@@ -31,6 +40,31 @@ export function coalesce(
   }
   const { type } = _unionType(values);
   return { err, name: `COALESCE(${names.join(', ')}`, value, type };
+}
+export function ifnull(
+  expr: Function,
+  state: EvaluationState
+): EvaluationResult {
+  const arg_count = expr.args?.value?.length ?? 0;
+  if (arg_count !== 2) {
+    return {
+      err: { err: 'ER_WRONG_PARAMCOUNT_TO_NATIVE_FCT', args: ['IFNULL'] },
+      name: 'IFNULL()',
+      value: null,
+      type: 'string',
+    };
+  }
+  const arg1 = getValue(expr.args?.value?.[0], state);
+  const arg2 = getValue(expr.args?.value?.[1], state);
+  if (arg1.err) {
+    return arg1;
+  }
+  if (arg2.err) {
+    return arg2;
+  }
+  const value = arg1.value !== null ? arg1.value : arg2.value;
+  const { type } = _unionType([arg1, arg2]);
+  return { err: null, name: `IFNULL(${arg1.name}, ${arg2.name})`, value, type };
 }
 export function greatest(
   expr: Function,

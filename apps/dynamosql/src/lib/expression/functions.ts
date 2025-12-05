@@ -82,7 +82,7 @@ import {
   yearweek,
 } from './func_date';
 import { curtime, time, hour, minute, second, microsecond } from './func_time';
-import { coalesce, greatest, least } from './func_comp';
+import { coalesce, ifnull, greatest, least } from './func_comp';
 import { nullif } from './compare';
 import { database, isnull, sleep, not, ifFunc } from './func_misc';
 
@@ -158,7 +158,7 @@ export const methods: Record<
   least,
   not,
   coalesce,
-  ifnull: coalesce,
+  ifnull,
   nullif,
   if: ifFunc,
   now,

@@ -25,6 +25,15 @@ export function curtime(
   return result;
 }
 export function hour(expr: Function, state: EvaluationState): EvaluationResult {
+  const arg_count = expr.args?.value?.length ?? 0;
+  if (arg_count !== 1) {
+    return {
+      err: { err: 'ER_PARSE_ERROR' },
+      value: null,
+      type: 'longlong',
+      name: 'HOUR()',
+    };
+  }
   const result = getValue(expr.args?.value?.[0], state);
   result.name = `HOUR(${result.name})`;
   result.type = 'longlong';
@@ -43,6 +52,15 @@ export function minute(
   expr: Function,
   state: EvaluationState
 ): EvaluationResult {
+  const arg_count = expr.args?.value?.length ?? 0;
+  if (arg_count !== 1) {
+    return {
+      err: { err: 'ER_PARSE_ERROR' },
+      value: null,
+      type: 'longlong',
+      name: 'MINUTE()',
+    };
+  }
   const result = getValue(expr.args?.value?.[0], state);
   result.name = `MINUTE(${result.name})`;
   result.type = 'longlong';
@@ -61,6 +79,15 @@ export function second(
   expr: Function,
   state: EvaluationState
 ): EvaluationResult {
+  const arg_count = expr.args?.value?.length ?? 0;
+  if (arg_count !== 1) {
+    return {
+      err: { err: 'ER_PARSE_ERROR' },
+      value: null,
+      type: 'longlong',
+      name: 'SECOND()',
+    };
+  }
   const result = getValue(expr.args?.value?.[0], state);
   result.name = `SECOND(${result.name})`;
   result.type = 'longlong';
