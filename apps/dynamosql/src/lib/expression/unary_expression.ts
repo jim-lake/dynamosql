@@ -6,7 +6,6 @@ import type { UnaryExpr } from '../ast_types';
 function plus(expr: UnaryExpr, state: EvaluationState): EvaluationResult {
   return getValue(expr.expr, state);
 }
-
 function not(expr: UnaryExpr, state: EvaluationState): EvaluationResult {
   const result = getValue(expr.expr, state);
   result.name = 'NOT ' + result.name;
@@ -16,7 +15,6 @@ function not(expr: UnaryExpr, state: EvaluationState): EvaluationResult {
   }
   return result;
 }
-
 function minus(expr: UnaryExpr, state: EvaluationState): EvaluationResult {
   const result = getValue(expr.expr, state);
   result.name = '-' + result.name;
@@ -28,18 +26,11 @@ function minus(expr: UnaryExpr, state: EvaluationState): EvaluationResult {
       result.value = num !== null ? -num : null;
       if (result.type === 'string') {
         result.type = 'double';
-      } else if (
-        result.type === 'number' &&
-        typeof result.value === 'number' &&
-        Number.isInteger(result.value)
-      ) {
-        result.type = 'longlong';
       }
     }
   }
   return result;
 }
-
 export const methods: Record<
   string,
   undefined | ((expr: UnaryExpr, state: EvaluationState) => EvaluationResult)
