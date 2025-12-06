@@ -90,12 +90,12 @@ describe('Expression', function () {
     path.join(__dirname, 'function_arithmetic_types.sql'),
     { verify_field_types: true }
   );
-  /*
   runTests(
     'function_comparison_types.sql',
     path.join(__dirname, 'function_comparison_types.sql'),
     { verify_field_types: true }
   );
+  /*
   runTests(
     'function_string_types.sql',
     path.join(__dirname, 'function_string_types.sql'),
