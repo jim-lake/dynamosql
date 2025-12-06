@@ -20,17 +20,21 @@ function not(expr: UnaryExpr, state: EvaluationState): EvaluationResult {
 function minus(expr: UnaryExpr, state: EvaluationState): EvaluationResult {
   const result = getValue(expr.expr, state);
   result.name = '-' + result.name;
-  if (!result.err && result.value !== null) {
-    const num = convertNum(result.value);
-    result.value = num !== null ? -num : null;
-    if (result.type === 'string') {
+  if (!result.err) {
+    if (result.value === null) {
       result.type = 'double';
-    } else if (
-      result.type === 'number' &&
-      typeof result.value === 'number' &&
-      Number.isInteger(result.value)
-    ) {
-      result.type = 'longlong';
+    } else {
+      const num = convertNum(result.value);
+      result.value = num !== null ? -num : null;
+      if (result.type === 'string') {
+        result.type = 'double';
+      } else if (
+        result.type === 'number' &&
+        typeof result.value === 'number' &&
+        Number.isInteger(result.value)
+      ) {
+        result.type = 'longlong';
+      }
     }
   }
   return result;

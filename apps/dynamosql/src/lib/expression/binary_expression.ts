@@ -4,7 +4,7 @@ import { getValue } from './evaluate';
 import type { Binary } from 'node-sql-parser';
 import type { EvaluationState, EvaluationResult } from './evaluate';
 
-import { plus, minus, div, mul } from './math';
+import { plus, minus, div, mul, mod } from './math';
 import { equal, notEqual, gt, lt, gte, lte } from './compare';
 
 function and(expr: Binary, state: EvaluationState): EvaluationResult {
@@ -204,6 +204,7 @@ export const methods: Record<
   '-': minus,
   '*': mul,
   '/': div,
+  '%': mod,
   '=': equal,
   '!=': notEqual,
   '<>': notEqual,

@@ -90,6 +90,46 @@ export function div(expr: Binary, state: EvaluationState): EvaluationResult {
     type: result.type === 'double' ? 'double' : 'number',
   };
 }
+export function mod(expr: Binary, state: EvaluationState): EvaluationResult {
+  const left = getValue(expr.left, state);
+  const right = getValue(expr.right, state);
+  return modHelper(left, right, left.name + ' % ' + right.name);
+}
+export function modHelper(
+  left: EvaluationResult,
+  right: EvaluationResult,
+  name: string
+): EvaluationResult {
+  const err = left.err || right.err;
+  let value;
+  let type: string;
+
+  if (!err && (left.value === null || right.value === null)) {
+    value = null;
+    type = 'double';
+  } else if (!err) {
+    const num1 = convertNum(left.value);
+    const num2 = convertNum(right.value);
+    if (num2 === 0 || num2 === null) {
+      value = null;
+    } else {
+      value = num1 !== null ? num1 % num2 : null;
+    }
+
+    if (left.type === 'double' || right.type === 'double') {
+      type = 'double';
+    } else if (left.type === 'string' || right.type === 'string') {
+      type = 'double';
+    } else if (left.type === 'number' || right.type === 'number') {
+      type = 'number';
+    } else {
+      type = 'longlong';
+    }
+  } else {
+    type = 'double';
+  }
+  return { err, name, value, type };
+}
 interface NumBothSidesResult extends EvaluationResult {
   left_num?: bigint | number | undefined;
   right_num?: bigint | number | undefined;

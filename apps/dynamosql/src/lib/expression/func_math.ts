@@ -1,6 +1,7 @@
 import { getValue } from './evaluate';
 import { convertNum } from '../helpers/sql_conversion';
 import { assertArgCount, assertArgCountParse } from '../helpers/arg_count';
+import { modHelper } from './math';
 
 import type { Function } from 'node-sql-parser';
 import type { EvaluationState, EvaluationResult } from './evaluate';
@@ -97,36 +98,7 @@ export function mod(expr: Function, state: EvaluationState): EvaluationResult {
   assertArgCountParse(expr, 2);
   const arg1 = getValue(expr.args.value[0], state);
   const arg2 = getValue(expr.args.value[1], state);
-  const err = arg1.err || arg2.err;
-  let value;
-  let type: string;
-  const name = `MOD(${arg1.name}, ${arg2.name})`;
-
-  if (!err && (arg1.value === null || arg2.value === null)) {
-    value = null;
-    type = 'double';
-  } else if (!err) {
-    const num1 = convertNum(arg1.value);
-    const num2 = convertNum(arg2.value);
-    if (num2 === 0 || num2 === null) {
-      value = null;
-    } else {
-      value = num1 !== null ? num1 % num2 : null;
-    }
-
-    if (arg1.type === 'double' || arg2.type === 'double') {
-      type = 'double';
-    } else if (arg1.type === 'string' || arg2.type === 'string') {
-      type = 'double';
-    } else if (arg1.type === 'number' || arg2.type === 'number') {
-      type = 'number';
-    } else {
-      type = 'longlong';
-    }
-  } else {
-    type = 'double';
-  }
-  return { err, name, value, type };
+  return modHelper(arg1, arg2, `MOD(${arg1.name}, ${arg2.name})`);
 }
 function _resolveTypeForRounding(result: EvaluationResult): string {
   if (result.value === null || result.type === 'string') {
