@@ -642,3 +642,52 @@ export function yearweek(
   }
   return result;
 }
+
+export function utc_date(
+  expr: Function,
+  state: EvaluationState
+): EvaluationResult {
+  const arg_count = expr.args?.value?.length ?? 0;
+  if (arg_count > 0) {
+    throw new SQLError({
+      err: 'ER_WRONG_PARAMCOUNT_TO_NATIVE_FCT',
+      args: ['UTC_DATE'],
+    });
+  }
+  return {
+    err: null,
+    name: 'UTC_DATE()',
+    value: new SQLDate({ time: state.session.timestamp, timeZone: 'UTC' }),
+    type: 'date',
+  };
+}
+
+export function utc_timestamp(
+  expr: Function,
+  state: EvaluationState
+): EvaluationResult {
+  const arg_count = expr.args?.value?.length ?? 0;
+  if (arg_count > 1) {
+    throw new SQLError({
+      err: 'ER_WRONG_PARAMCOUNT_TO_NATIVE_FCT',
+      args: ['UTC_TIMESTAMP'],
+    });
+  }
+  const result = getValue(expr.args?.value?.[0], state);
+  result.name = 'UTC_TIMESTAMP()';
+  if (!result.err && result.type) {
+    const decimals = typeof result.value === 'number' ? result.value : 0;
+    if (decimals > 6) {
+      result.err = 'ER_TOO_BIG_PRECISION';
+    }
+    result.value = new SQLDateTime({ time: state.session.timestamp, decimals });
+    result.type = 'datetime';
+  } else {
+    result.value = new SQLDateTime({
+      time: state.session.timestamp,
+      decimals: 0,
+    });
+    result.type = 'datetime';
+  }
+  return result;
+}

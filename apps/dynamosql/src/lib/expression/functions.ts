@@ -94,8 +94,18 @@ import {
   last_day,
   weekofyear,
   yearweek,
+  utc_date,
+  utc_timestamp,
 } from './func_date';
-import { curtime, time, hour, minute, second, microsecond } from './func_time';
+import {
+  curtime,
+  time,
+  hour,
+  minute,
+  second,
+  microsecond,
+  utc_time,
+} from './func_time';
 import { coalesce, ifnull, greatest, least } from './func_comp';
 import { nullif } from './compare';
 import {
@@ -236,6 +246,9 @@ export const methods: Record<
   last_day,
   weekofyear,
   yearweek,
+  utc_date,
+  utc_time,
+  utc_timestamp,
   user,
   current_user: user,
   session_user: user,

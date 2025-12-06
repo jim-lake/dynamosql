@@ -2,6 +2,7 @@ import { getValue } from './evaluate';
 import { convertTime } from '../helpers/sql_conversion';
 import { createSQLTime } from '../types/sql_time';
 import { assertArgCount, assertArgCountParse } from '../helpers/arg_count';
+import { SQLError } from '../../error';
 
 import type { Function } from 'node-sql-parser';
 import type { EvaluationState, EvaluationResult } from './evaluate';
@@ -118,6 +119,31 @@ export function time(expr: Function, state: EvaluationState): EvaluationResult {
     } else {
       result.value = null;
     }
+  }
+  return result;
+}
+
+export function utc_time(
+  expr: Function,
+  state: EvaluationState
+): EvaluationResult {
+  const arg_count = expr.args?.value?.length ?? 0;
+  if (arg_count > 1) {
+    throw new SQLError({
+      err: 'ER_WRONG_PARAMCOUNT_TO_NATIVE_FCT',
+      args: ['UTC_TIME'],
+    });
+  }
+  const result = getValue(expr.args?.value?.[0], state);
+  result.name = 'UTC_TIME()';
+  if (!result.err && result.type) {
+    const decimals = typeof result.value === 'number' ? result.value : 0;
+    if (decimals > 6) {
+      result.err = 'ER_TOO_BIG_PRECISION';
+    }
+    const currentTime = state.session.timestamp % DAY;
+    result.value = createSQLTime({ time: currentTime, decimals });
+    result.type = 'time';
   }
   return result;
 }
