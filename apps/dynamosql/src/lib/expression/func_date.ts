@@ -10,19 +10,12 @@ import { SQLDate } from '../types/sql_date';
 import { SQLDateTime, createSQLDateTime } from '../types/sql_datetime';
 import { SQLInterval } from '../types/sql_interval';
 import { assertArgCount, assertArgCountParse } from '../helpers/arg_count';
-import { SQLError } from '../../error';
 
 import type { Function } from 'node-sql-parser';
 import type { EvaluationState, EvaluationResult } from './evaluate';
 
 export function now(expr: Function, state: EvaluationState): EvaluationResult {
-  const arg_count = expr.args?.value?.length ?? 0;
-  if (arg_count > 1) {
-    throw new SQLError({
-      err: 'ER_WRONG_PARAMCOUNT_TO_NATIVE_FCT',
-      args: ['NOW'],
-    });
-  }
+  assertArgCount(expr, 0, 1);
   const result = getValue(expr.args?.value?.[0], state);
   result.name = expr.args ? `NOW(${result.name ?? ''})` : 'CURRENT_TIMESTAMP';
   if (!result.err && result.type) {
@@ -128,13 +121,7 @@ export function curdate(
   expr: Function,
   state: EvaluationState
 ): EvaluationResult {
-  const arg_count = expr.args?.value?.length ?? 0;
-  if (arg_count > 0) {
-    throw new SQLError({
-      err: 'ER_WRONG_PARAMCOUNT_TO_NATIVE_FCT',
-      args: ['CURDATE'],
-    });
-  }
+  assertArgCount(expr, 0);
   const value = new SQLDate({
     time: state.session.timestamp,
     timeZone: state.session.timeZone,
@@ -146,13 +133,7 @@ export function unix_timestamp(
   expr: Function,
   state: EvaluationState
 ): EvaluationResult {
-  const arg_count = expr.args?.value?.length ?? 0;
-  if (arg_count > 1) {
-    throw new SQLError({
-      err: 'ER_WRONG_PARAMCOUNT_TO_NATIVE_FCT',
-      args: ['UNIX_TIMESTAMP'],
-    });
-  }
+  assertArgCount(expr, 0, 1);
   const result: EvaluationResult = {
     err: null,
     name: `UNIX_TIMESTAMP()`,
@@ -647,13 +628,7 @@ export function utc_date(
   expr: Function,
   state: EvaluationState
 ): EvaluationResult {
-  const arg_count = expr.args?.value?.length ?? 0;
-  if (arg_count > 0) {
-    throw new SQLError({
-      err: 'ER_WRONG_PARAMCOUNT_TO_NATIVE_FCT',
-      args: ['UTC_DATE'],
-    });
-  }
+  assertArgCount(expr, 0);
   return {
     err: null,
     name: 'UTC_DATE()',
@@ -666,13 +641,7 @@ export function utc_timestamp(
   expr: Function,
   state: EvaluationState
 ): EvaluationResult {
-  const arg_count = expr.args?.value?.length ?? 0;
-  if (arg_count > 1) {
-    throw new SQLError({
-      err: 'ER_WRONG_PARAMCOUNT_TO_NATIVE_FCT',
-      args: ['UTC_TIMESTAMP'],
-    });
-  }
+  assertArgCount(expr, 0, 1);
   const result = getValue(expr.args?.value?.[0], state);
   result.name = 'UTC_TIMESTAMP()';
   if (!result.err && result.type) {

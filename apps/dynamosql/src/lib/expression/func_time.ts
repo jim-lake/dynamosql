@@ -2,7 +2,6 @@ import { getValue } from './evaluate';
 import { convertTime } from '../helpers/sql_conversion';
 import { createSQLTime } from '../types/sql_time';
 import { assertArgCount, assertArgCountParse } from '../helpers/arg_count';
-import { SQLError } from '../../error';
 
 import type { Function } from 'node-sql-parser';
 import type { EvaluationState, EvaluationResult } from './evaluate';
@@ -127,13 +126,7 @@ export function utc_time(
   expr: Function,
   state: EvaluationState
 ): EvaluationResult {
-  const arg_count = expr.args?.value?.length ?? 0;
-  if (arg_count > 1) {
-    throw new SQLError({
-      err: 'ER_WRONG_PARAMCOUNT_TO_NATIVE_FCT',
-      args: ['UTC_TIME'],
-    });
-  }
+  assertArgCount(expr, 0, 1);
   const result = getValue(expr.args?.value?.[0], state);
   result.name = 'UTC_TIME()';
   if (!result.err && result.type) {

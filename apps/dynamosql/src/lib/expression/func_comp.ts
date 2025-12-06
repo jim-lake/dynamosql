@@ -6,8 +6,7 @@ import {
   convertDate,
   convertTime,
 } from '../helpers/sql_conversion';
-import { assertArgCount } from '../helpers/arg_count';
-import { SQLError } from '../../error';
+import { assertArgCount, assertArgCountParse } from '../helpers/arg_count';
 
 import type { Function } from 'node-sql-parser';
 import type { EvaluationState, EvaluationResult } from './evaluate';
@@ -16,10 +15,7 @@ export function coalesce(
   expr: Function,
   state: EvaluationState
 ): EvaluationResult {
-  const arg_count = expr.args?.value?.length ?? 0;
-  if (arg_count === 0 || !Array.isArray(expr.args?.value)) {
-    throw new SQLError({ err: 'ER_PARSE_ERROR' });
-  }
+  assertArgCountParse(expr, 1, Infinity);
   let err: EvaluationResult['err'] = null;
   let value: EvaluationResult['value'] = null;
   const names: string[] = [];
@@ -202,13 +198,7 @@ export function _compare(
   dateCompare: typeof _ltList,
   nativeCompare: NativeCompareFunction<string | number | bigint>
 ): EvaluationResult {
-  const arg_count = expr.args?.value?.length ?? 0;
-  if (arg_count < 2 || !Array.isArray(expr.args?.value)) {
-    throw new SQLError({
-      err: 'ER_WRONG_PARAMCOUNT_TO_NATIVE_FCT',
-      args: [functionName],
-    });
-  }
+  assertArgCount(expr, 2, Infinity);
   const { timeZone } = state.session;
   let value: EvaluationResult['value'];
   const names: string[] = [];

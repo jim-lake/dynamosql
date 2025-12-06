@@ -1,7 +1,6 @@
 import { getValue } from './evaluate';
 import { convertNum, convertString } from '../helpers/sql_conversion';
 import { assertArgCount, assertArgCountParse } from '../helpers/arg_count';
-import { SQLError } from '../../error';
 
 import type { Function, ExpressionValue } from 'node-sql-parser';
 import type { EvaluationState, EvaluationResult } from './evaluate';
@@ -37,13 +36,7 @@ export function concat(
   expr: Function,
   state: EvaluationState
 ): EvaluationResult {
-  const arg_count = expr.args?.value?.length ?? 0;
-  if (arg_count === 0 || !Array.isArray(expr.args?.value)) {
-    throw new SQLError({
-      err: 'ER_WRONG_PARAMCOUNT_TO_NATIVE_FCT',
-      args: ['CONCAT'],
-    });
-  }
+  assertArgCount(expr, 1, Infinity);
   let err: EvaluationResult['err'] = null;
   let value: string | null = '';
   let has_blob = false;
@@ -382,13 +375,7 @@ export function concat_ws(
   expr: Function,
   state: EvaluationState
 ): EvaluationResult {
-  const arg_count = expr.args?.value?.length ?? 0;
-  if (arg_count < 2 || !Array.isArray(expr.args?.value)) {
-    throw new SQLError({
-      err: 'ER_WRONG_PARAMCOUNT_TO_NATIVE_FCT',
-      args: ['CONCAT_WS'],
-    });
-  }
+  assertArgCount(expr, 2, Infinity);
   const sep_result = getValue(expr.args.value[0], state);
   if (sep_result.err || sep_result.value === null) {
     return {
@@ -692,13 +679,8 @@ export function quote(
 }
 
 export function elt(expr: Function, state: EvaluationState): EvaluationResult {
-  const arg_count = expr.args?.value?.length ?? 0;
-  if (arg_count < 2 || !expr.args?.value) {
-    throw new SQLError({
-      err: 'ER_WRONG_PARAMCOUNT_TO_NATIVE_FCT',
-      args: ['ELT'],
-    });
-  }
+  assertArgCount(expr, 2, Infinity);
+  const arg_count = expr.args.value.length;
 
   const index_result = getValue(expr.args.value[0], state);
   if (index_result.err) {
@@ -724,13 +706,8 @@ export function field(
   expr: Function,
   state: EvaluationState
 ): EvaluationResult {
-  const arg_count = expr.args?.value?.length ?? 0;
-  if (arg_count < 2 || !expr.args?.value) {
-    throw new SQLError({
-      err: 'ER_WRONG_PARAMCOUNT_TO_NATIVE_FCT',
-      args: ['FIELD'],
-    });
-  }
+  assertArgCount(expr, 2, Infinity);
+  const arg_count = expr.args.value.length;
 
   const search_result = getValue(expr.args.value[0], state);
   if (search_result.err) {
@@ -874,13 +851,8 @@ export function make_set(
   expr: Function,
   state: EvaluationState
 ): EvaluationResult {
-  const arg_count = expr.args?.value?.length ?? 0;
-  if (arg_count < 2 || !expr.args?.value) {
-    throw new SQLError({
-      err: 'ER_WRONG_PARAMCOUNT_TO_NATIVE_FCT',
-      args: ['MAKE_SET'],
-    });
-  }
+  assertArgCount(expr, 2, Infinity);
+  const arg_count = expr.args.value.length;
 
   const bits_result = getValue(expr.args.value[0], state);
   if (bits_result.err) {
@@ -913,13 +885,8 @@ export function export_set(
   expr: Function,
   state: EvaluationState
 ): EvaluationResult {
-  const arg_count = expr.args?.value?.length ?? 0;
-  if (arg_count < 3 || arg_count > 5 || !expr.args?.value) {
-    throw new SQLError({
-      err: 'ER_WRONG_PARAMCOUNT_TO_NATIVE_FCT',
-      args: ['EXPORT_SET'],
-    });
-  }
+  assertArgCount(expr, 3, 5);
+  const arg_count = expr.args.value.length;
 
   const bits_result = getValue(expr.args.value[0], state);
   const on_result = getValue(expr.args.value[1], state);
@@ -973,13 +940,7 @@ export function format_func(
   expr: Function,
   state: EvaluationState
 ): EvaluationResult {
-  const arg_count = expr.args?.value?.length ?? 0;
-  if (arg_count < 2 || arg_count > 3 || !expr.args?.value) {
-    throw new SQLError({
-      err: 'ER_WRONG_PARAMCOUNT_TO_NATIVE_FCT',
-      args: ['FORMAT'],
-    });
-  }
+  assertArgCount(expr, 2, 3);
 
   const num_result = getValue(expr.args.value[0], state);
   const decimals_result = getValue(expr.args.value[1], state);
@@ -1012,13 +973,8 @@ export function char_func(
   expr: Function,
   state: EvaluationState
 ): EvaluationResult {
-  const arg_count = expr.args?.value?.length ?? 0;
-  if (arg_count === 0 || !expr.args?.value) {
-    throw new SQLError({
-      err: 'ER_WRONG_PARAMCOUNT_TO_NATIVE_FCT',
-      args: ['CHAR'],
-    });
-  }
+  assertArgCount(expr, 1, Infinity);
+  const arg_count = expr.args.value.length;
 
   const chars: number[] = [];
   for (let i = 0; i < arg_count; i++) {

@@ -1,4 +1,5 @@
 import { SQLError } from '../../error';
+import { getFunctionName } from './ast_helper';
 import type { Function } from 'node-sql-parser';
 
 export function assertArgCount(
@@ -12,14 +13,19 @@ export function assertArgCount(
   if (arg_count < min || arg_count > expected) {
     throw new SQLError({
       err: 'ER_WRONG_PARAMCOUNT_TO_NATIVE_FCT',
-      args: [String(expr.name ?? 'FUNCTION').toUpperCase()],
+      args: [getFunctionName(expr.name).toUpperCase()],
     });
   }
 
-  if (expr.args && !Array.isArray(expr.args.value)) {
+  if (
+    expr.args &&
+    expr.args.value !== undefined &&
+    expr.args.value !== null &&
+    !Array.isArray(expr.args.value)
+  ) {
     throw new SQLError({
       err: 'ER_WRONG_PARAMCOUNT_TO_NATIVE_FCT',
-      args: [String(expr.name ?? 'FUNCTION').toUpperCase()],
+      args: [getFunctionName(expr.name).toUpperCase()],
     });
   }
 }
@@ -36,7 +42,12 @@ export function assertArgCountParse(
     throw new SQLError({ err: 'ER_PARSE_ERROR' });
   }
 
-  if (expr.args && !Array.isArray(expr.args.value)) {
+  if (
+    expr.args &&
+    expr.args.value !== undefined &&
+    expr.args.value !== null &&
+    !Array.isArray(expr.args.value)
+  ) {
     throw new SQLError({ err: 'ER_PARSE_ERROR' });
   }
 }
