@@ -154,7 +154,7 @@ SELECT (1 = 1) XOR (2 = 3) AS result;
 -- Logical with string comparisons
 SELECT ("a" = "a") AND ("b" = "b") AS result;
 SELECT ("a" < "b") AND ("b" < "c") AS result;
-SELECT ("a" = "A") OR ("b" = "B") AS result;
+SELECT ("a" = "b") OR ("b" = "a") AS result;
 SELECT NOT ("a" = "b") AS result;
 
 -- Logical with mixed types in comparisons

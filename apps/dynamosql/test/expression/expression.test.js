@@ -100,11 +100,9 @@ describe('Expression', function () {
     path.join(__dirname, 'function_string_types.sql'),
     { verify_field_types: true }
   );
-  /*
   runTests(
     'function_logical_types.sql',
     path.join(__dirname, 'function_logical_types.sql'),
     { verify_field_types: true }
   );
-  */
 });
