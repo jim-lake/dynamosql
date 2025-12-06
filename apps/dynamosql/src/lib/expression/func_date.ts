@@ -157,7 +157,7 @@ export function unix_timestamp(
     err: null,
     name: `UNIX_TIMESTAMP()`,
     type: 'longlong',
-    value: BigInt(Math.floor(Date.now() / 1000)),
+    value: BigInt(Math.floor(state.session.timestamp)),
   };
   if (expr.args?.value?.[0]) {
     const val = getValue(expr.args.value[0], state);

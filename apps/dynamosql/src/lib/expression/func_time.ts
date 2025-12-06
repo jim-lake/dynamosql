@@ -20,7 +20,7 @@ export function curtime(
     if (decimals > 6) {
       result.err = 'ER_TOO_BIG_PRECISION';
     }
-    const currentTime = (Date.now() / 1000) % DAY;
+    const currentTime = state.session.timestamp % DAY;
     result.value = createSQLTime({ time: currentTime, decimals });
     result.type = 'time';
   }
