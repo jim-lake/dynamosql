@@ -101,28 +101,3 @@ function _tableToTable(database: string, table: string): Row {
     TABLE_COMMENT: { value: '', type: 'string' },
   };
 }
-
-/*
-{
-    TABLE_CATALOG: 'def',
-    TABLE_SCHEMA: '_dynamodb',
-    TABLE_NAME: 'otherother',
-    TABLE_TYPE: 'BASE TABLE',
-    ENGINE: 'InnoDB',
-    VERSION: 10n,
-    ROW_FORMAT: 'Dynamic',
-    TABLE_ROWS: 0n,
-    AVG_ROW_LENGTH: 0n,
-    DATA_LENGTH: 16384n,
-    MAX_DATA_LENGTH: 0n,
-    INDEX_LENGTH: 0n,
-    DATA_FREE: 0n,
-    AUTO_INCREMENT: null,
-    CREATE_TIME: '2025-11-25 16:43:42',
-    UPDATE_TIME: null,
-    CHECK_TIME: null,
-    TABLE_COLLATION: 'utf8mb4_0900_ai_ci',
-    CHECKSUM: null,
-    CREATE_OPTIONS: '',
-    TABLE_COMMENT: ''
-  }*/
