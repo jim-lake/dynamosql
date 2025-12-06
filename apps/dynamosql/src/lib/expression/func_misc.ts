@@ -108,3 +108,27 @@ export function ifFunc(
   }
   return { err, name, value, type };
 }
+
+export function user(
+  expr: Function,
+  _state: EvaluationState
+): EvaluationResult {
+  assertArgCountParse(expr, 0);
+  return { err: null, value: 'root@localhost', type: 'string' };
+}
+
+export function version(
+  expr: Function,
+  _state: EvaluationState
+): EvaluationResult {
+  assertArgCountParse(expr, 0);
+  return { err: null, value: '8.0.0-dynamosql', type: 'string' };
+}
+
+export function connection_id(
+  expr: Function,
+  state: EvaluationState
+): EvaluationResult {
+  assertArgCountParse(expr, 0);
+  return { err: null, value: state.session.threadId, type: 'longlong' };
+}

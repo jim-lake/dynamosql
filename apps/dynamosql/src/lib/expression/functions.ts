@@ -55,6 +55,20 @@ import {
   locate,
   instr,
   strcmp,
+  charset,
+  collation,
+  bit_length,
+  soundex,
+  quote,
+  elt,
+  field,
+  find_in_set,
+  substring_index,
+  insert_func,
+  make_set,
+  export_set,
+  format_func,
+  char_func,
 } from './func_string';
 import {
   now,
@@ -84,7 +98,16 @@ import {
 import { curtime, time, hour, minute, second, microsecond } from './func_time';
 import { coalesce, ifnull, greatest, least } from './func_comp';
 import { nullif } from './compare';
-import { database, isnull, sleep, not, ifFunc } from './func_misc';
+import {
+  database,
+  isnull,
+  sleep,
+  not,
+  ifFunc,
+  user,
+  version,
+  connection_id,
+} from './func_misc';
 
 export const methods: Record<
   string,
@@ -126,6 +149,20 @@ export const methods: Record<
   instr,
   position: locate,
   strcmp,
+  charset,
+  collation,
+  bit_length,
+  soundex,
+  quote,
+  elt,
+  field,
+  find_in_set,
+  substring_index,
+  insert: insert_func,
+  make_set,
+  export_set,
+  format: format_func,
+  char: char_func,
   abs,
   ceil,
   ceiling: ceil,
@@ -199,4 +236,10 @@ export const methods: Record<
   last_day,
   weekofyear,
   yearweek,
+  user,
+  current_user: user,
+  session_user: user,
+  system_user: user,
+  version,
+  connection_id,
 };

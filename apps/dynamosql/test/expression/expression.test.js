@@ -105,4 +105,15 @@ describe('Expression', function () {
     path.join(__dirname, 'function_logical_types.sql'),
     { verify_field_types: true }
   );
+  runTests('function_user.sql', path.join(__dirname, 'function_user.sql'), {
+    verify_field_types: true,
+  });
+  runTests(
+    'function_charset.sql',
+    path.join(__dirname, 'function_charset.sql'),
+    { verify_field_types: true }
+  );
+  runTests('function_tier3.sql', path.join(__dirname, 'function_tier3.sql'), {
+    verify_field_types: true,
+  });
 });

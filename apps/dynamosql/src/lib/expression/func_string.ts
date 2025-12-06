@@ -574,3 +574,466 @@ export function strcmp(
     return { err: null, value: 0, type: 'longlong' };
   }
 }
+
+export function charset(
+  expr: Function,
+  state: EvaluationState
+): EvaluationResult {
+  assertArgCount(expr, 1);
+  const arg = getValue(expr.args.value[0], state);
+  if (arg.err) {
+    return arg;
+  }
+  const value = arg.type === 'string' ? 'utf8mb4' : 'binary';
+  return { err: null, value, type: 'string' };
+}
+
+export function collation(
+  expr: Function,
+  state: EvaluationState
+): EvaluationResult {
+  assertArgCount(expr, 1);
+  const arg = getValue(expr.args.value[0], state);
+  if (arg.err) {
+    return arg;
+  }
+  const value = arg.type === 'string' ? 'utf8mb4_general_ci' : 'binary';
+  return { err: null, value, type: 'string' };
+}
+
+export function bit_length(
+  expr: Function,
+  state: EvaluationState
+): EvaluationResult {
+  assertArgCount(expr, 1);
+  const result = getValue(expr.args.value[0], state);
+  result.name = `BIT_LENGTH(${result.name})`;
+  result.type = 'longlong';
+  if (!result.err && result.value !== null) {
+    result.value = Buffer.byteLength(String(result.value), 'utf8') * 8;
+  }
+  return result;
+}
+
+export function soundex(
+  expr: Function,
+  state: EvaluationState
+): EvaluationResult {
+  assertArgCount(expr, 1);
+  const arg = getValue(expr.args.value[0], state);
+  const name = `SOUNDEX(${arg.name})`;
+  if (arg.err) {
+    return { ...arg, name };
+  }
+
+  let value = arg.value;
+  if (value !== null) {
+    const str = String(value).toUpperCase();
+    if (str.length === 0) {
+      value = '';
+    } else {
+      const codes: Record<string, string> = {
+        B: '1',
+        F: '1',
+        P: '1',
+        V: '1',
+        C: '2',
+        G: '2',
+        J: '2',
+        K: '2',
+        Q: '2',
+        S: '2',
+        X: '2',
+        Z: '2',
+        D: '3',
+        T: '3',
+        L: '4',
+        M: '5',
+        N: '5',
+        R: '6',
+      };
+      let result = str[0] || '';
+      let prev = codes[str[0] || ''] || '';
+      for (let i = 1; i < str.length && result.length < 4; i++) {
+        const char = str[i];
+        const code = char ? codes[char] : undefined;
+        if (code && code !== prev) {
+          result += code;
+        }
+        if (code) {
+          prev = code;
+        }
+      }
+      value = result.padEnd(4, '0');
+    }
+  }
+  return { err: null, name, value, type: 'string' };
+}
+
+export function quote(
+  expr: Function,
+  state: EvaluationState
+): EvaluationResult {
+  assertArgCount(expr, 1);
+  const arg = getValue(expr.args.value[0], state);
+  const name = `QUOTE(${arg.name})`;
+  if (arg.err) {
+    return { ...arg, name };
+  }
+
+  let value = arg.value;
+  if (value === null) {
+    value = 'NULL';
+  } else {
+    const str = String(value);
+    value = "'" + str.replace(/[\\']/g, '\\$&').replace(/\0/g, '\\0') + "'";
+  }
+  return { err: null, name, value, type: 'string' };
+}
+
+export function elt(expr: Function, state: EvaluationState): EvaluationResult {
+  const arg_count = expr.args?.value?.length ?? 0;
+  if (arg_count < 2 || !expr.args?.value) {
+    throw new SQLError({
+      err: 'ER_WRONG_PARAMCOUNT_TO_NATIVE_FCT',
+      args: ['ELT'],
+    });
+  }
+
+  const index_result = getValue(expr.args.value[0], state);
+  if (index_result.err) {
+    return index_result;
+  }
+
+  let value = null;
+  if (index_result.value !== null) {
+    const index = Math.round(convertNum(index_result.value) ?? 0);
+    if (index >= 1 && index < arg_count) {
+      const elem_result = getValue(expr.args.value[index], state);
+      if (elem_result.err) {
+        return elem_result;
+      }
+      value = elem_result.value;
+    }
+  }
+
+  return { err: null, value, type: 'string' };
+}
+
+export function field(
+  expr: Function,
+  state: EvaluationState
+): EvaluationResult {
+  const arg_count = expr.args?.value?.length ?? 0;
+  if (arg_count < 2 || !expr.args?.value) {
+    throw new SQLError({
+      err: 'ER_WRONG_PARAMCOUNT_TO_NATIVE_FCT',
+      args: ['FIELD'],
+    });
+  }
+
+  const search_result = getValue(expr.args.value[0], state);
+  if (search_result.err) {
+    return search_result;
+  }
+
+  let value = 0;
+  if (search_result.value !== null) {
+    const search_str = String(search_result.value);
+    for (let i = 1; i < arg_count; i++) {
+      const elem_result = getValue(expr.args.value[i], state);
+      if (elem_result.err) {
+        return elem_result;
+      }
+      if (
+        elem_result.value !== null &&
+        String(elem_result.value) === search_str
+      ) {
+        value = i;
+        break;
+      }
+    }
+  }
+
+  return { err: null, value, type: 'longlong' };
+}
+
+export function find_in_set(
+  expr: Function,
+  state: EvaluationState
+): EvaluationResult {
+  assertArgCount(expr, 2);
+  const str_result = getValue(expr.args.value[0], state);
+  const strlist_result = getValue(expr.args.value[1], state);
+  const name = `FIND_IN_SET(${str_result.name}, ${strlist_result.name})`;
+
+  const err = str_result.err || strlist_result.err || null;
+  if (err) {
+    return { err, value: null, type: 'longlong' };
+  }
+
+  let value: number | null = 0;
+  if (str_result.value === null || strlist_result.value === null) {
+    value = null;
+  } else {
+    const search = String(str_result.value);
+    const list = String(strlist_result.value).split(',');
+    for (let i = 0; i < list.length; i++) {
+      if (list[i] === search) {
+        value = i + 1;
+        break;
+      }
+    }
+  }
+
+  return { err: null, name, value, type: 'longlong' };
+}
+
+export function substring_index(
+  expr: Function,
+  state: EvaluationState
+): EvaluationResult {
+  assertArgCount(expr, 3);
+  const str_result = getValue(expr.args.value[0], state);
+  const delim_result = getValue(expr.args.value[1], state);
+  const count_result = getValue(expr.args.value[2], state);
+
+  const err = str_result.err || delim_result.err || count_result.err || null;
+  if (err) {
+    return { err, value: null, type: 'string' };
+  }
+
+  let value = null;
+  if (
+    str_result.value !== null &&
+    delim_result.value !== null &&
+    count_result.value !== null
+  ) {
+    const str = String(str_result.value);
+    const delim = String(delim_result.value);
+    const count = Math.round(convertNum(count_result.value) ?? 0);
+
+    if (count === 0 || delim === '') {
+      value = '';
+    } else if (count > 0) {
+      const parts = str.split(delim);
+      value = parts.slice(0, count).join(delim);
+    } else {
+      const parts = str.split(delim);
+      value = parts.slice(count).join(delim);
+    }
+  }
+
+  return { err: null, value, type: 'string' };
+}
+
+export function insert_func(
+  expr: Function,
+  state: EvaluationState
+): EvaluationResult {
+  assertArgCount(expr, 4);
+  const str_result = getValue(expr.args.value[0], state);
+  const pos_result = getValue(expr.args.value[1], state);
+  const len_result = getValue(expr.args.value[2], state);
+  const newstr_result = getValue(expr.args.value[3], state);
+
+  const err =
+    str_result.err ||
+    pos_result.err ||
+    len_result.err ||
+    newstr_result.err ||
+    null;
+  if (err) {
+    return { err, value: null, type: 'string' };
+  }
+
+  let value = null;
+  if (
+    str_result.value !== null &&
+    pos_result.value !== null &&
+    len_result.value !== null &&
+    newstr_result.value !== null
+  ) {
+    const str = String(str_result.value);
+    const pos = Math.round(convertNum(pos_result.value) ?? 0);
+    const len = Math.round(convertNum(len_result.value) ?? 0);
+    const newstr = String(newstr_result.value);
+
+    if (pos < 1 || pos > str.length) {
+      value = str;
+    } else {
+      const start = pos - 1;
+      value = str.substring(0, start) + newstr + str.substring(start + len);
+    }
+  }
+
+  return { err: null, value, type: 'string' };
+}
+
+export function make_set(
+  expr: Function,
+  state: EvaluationState
+): EvaluationResult {
+  const arg_count = expr.args?.value?.length ?? 0;
+  if (arg_count < 2 || !expr.args?.value) {
+    throw new SQLError({
+      err: 'ER_WRONG_PARAMCOUNT_TO_NATIVE_FCT',
+      args: ['MAKE_SET'],
+    });
+  }
+
+  const bits_result = getValue(expr.args.value[0], state);
+  if (bits_result.err) {
+    return bits_result;
+  }
+
+  let value = null;
+  if (bits_result.value !== null) {
+    const bits = Math.round(convertNum(bits_result.value) ?? 0);
+    const parts: string[] = [];
+
+    for (let i = 1; i < arg_count; i++) {
+      if (bits & (1 << (i - 1))) {
+        const elem_result = getValue(expr.args.value[i], state);
+        if (elem_result.err) {
+          return elem_result;
+        }
+        if (elem_result.value !== null) {
+          parts.push(String(elem_result.value));
+        }
+      }
+    }
+    value = parts.join(',');
+  }
+
+  return { err: null, value, type: 'string' };
+}
+
+export function export_set(
+  expr: Function,
+  state: EvaluationState
+): EvaluationResult {
+  const arg_count = expr.args?.value?.length ?? 0;
+  if (arg_count < 3 || arg_count > 5 || !expr.args?.value) {
+    throw new SQLError({
+      err: 'ER_WRONG_PARAMCOUNT_TO_NATIVE_FCT',
+      args: ['EXPORT_SET'],
+    });
+  }
+
+  const bits_result = getValue(expr.args.value[0], state);
+  const on_result = getValue(expr.args.value[1], state);
+  const off_result = getValue(expr.args.value[2], state);
+  const sep_result =
+    arg_count > 3
+      ? getValue(expr.args.value[3], state)
+      : { err: null, value: ',' };
+  const num_bits_result =
+    arg_count > 4
+      ? getValue(expr.args.value[4], state)
+      : { err: null, value: 64 };
+
+  const err =
+    bits_result.err ||
+    on_result.err ||
+    off_result.err ||
+    sep_result.err ||
+    num_bits_result.err ||
+    null;
+  if (err) {
+    return { err, value: null, type: 'string' };
+  }
+
+  let value = null;
+  if (
+    bits_result.value !== null &&
+    on_result.value !== null &&
+    off_result.value !== null
+  ) {
+    const bits = Math.round(convertNum(bits_result.value) ?? 0);
+    const on = String(on_result.value);
+    const off = String(off_result.value);
+    const sep = sep_result.value !== null ? String(sep_result.value) : ',';
+    const num_bits = Math.min(
+      64,
+      Math.round(convertNum(num_bits_result.value) ?? 64)
+    );
+
+    const parts: string[] = [];
+    for (let i = 0; i < num_bits; i++) {
+      parts.push(bits & (1 << i) ? on : off);
+    }
+    value = parts.join(sep);
+  }
+
+  return { err: null, value, type: 'string' };
+}
+
+export function format_func(
+  expr: Function,
+  state: EvaluationState
+): EvaluationResult {
+  const arg_count = expr.args?.value?.length ?? 0;
+  if (arg_count < 2 || arg_count > 3 || !expr.args?.value) {
+    throw new SQLError({
+      err: 'ER_WRONG_PARAMCOUNT_TO_NATIVE_FCT',
+      args: ['FORMAT'],
+    });
+  }
+
+  const num_result = getValue(expr.args.value[0], state);
+  const decimals_result = getValue(expr.args.value[1], state);
+
+  const err = num_result.err || decimals_result.err || null;
+  if (err) {
+    return { err, value: null, type: 'string' };
+  }
+
+  let value = null;
+  if (num_result.value !== null && decimals_result.value !== null) {
+    const num = convertNum(num_result.value) ?? 0;
+    const decimals = Math.max(
+      0,
+      Math.round(convertNum(decimals_result.value) ?? 0)
+    );
+
+    const fixed = num.toFixed(decimals);
+    const parts = fixed.split('.');
+    if (parts[0]) {
+      parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+    }
+    value = parts.join('.');
+  }
+
+  return { err: null, value, type: 'string' };
+}
+
+export function char_func(
+  expr: Function,
+  state: EvaluationState
+): EvaluationResult {
+  const arg_count = expr.args?.value?.length ?? 0;
+  if (arg_count === 0 || !expr.args?.value) {
+    throw new SQLError({
+      err: 'ER_WRONG_PARAMCOUNT_TO_NATIVE_FCT',
+      args: ['CHAR'],
+    });
+  }
+
+  const chars: number[] = [];
+  for (let i = 0; i < arg_count; i++) {
+    const arg_result = getValue(expr.args.value[i], state);
+    if (arg_result.err) {
+      return arg_result;
+    }
+    if (arg_result.value !== null) {
+      const code = Math.round(convertNum(arg_result.value) ?? 0);
+      if (code > 0) {
+        chars.push(code);
+      }
+    }
+  }
+
+  const value = String.fromCodePoint(...chars);
+  return { err: null, value, type: 'string' };
+}
