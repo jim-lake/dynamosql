@@ -20,6 +20,43 @@ export function notEqual(
   }
   return ret;
 }
+export function inOp(expr: Binary, state: EvaluationState): EvaluationResult {
+  const left = getValue(expr.left, state);
+  if (left.err) {
+    return left;
+  }
+  let value: number | null = 0;
+  const names: string[] = [];
+  if (left.value === null) {
+    value = null;
+  } else if (expr.right?.type === 'expr_list') {
+    const list = expr.right.value ?? [];
+    for (const item of list) {
+      const right = getValue(item, state);
+      names.push(right.name ?? '');
+      const new_left = { ...left };
+      _convertCompare(new_left, right, state.session.timeZone);
+      if (right.err) {
+        return right;
+      }
+      if (right.value === null) {
+        value = null;
+      } else if (new_left.value === right.value) {
+        value = 1;
+        break;
+      }
+    }
+  }
+  return { err: null, value, name: `${left.name} IN (${names.join(', ')})`, type: 'longlong' };
+}
+export function notIn(expr: Binary, state: EvaluationState): EvaluationResult {
+  const result = inOp(expr, state);
+  result.name = result.name?.replace(' IN ', ' NOT IN ') ?? '';
+  if (result.value !== null) {
+    result.value = result.value ? 0 : 1;
+  }
+  return result;
+}
 export function gte(expr: Binary, state: EvaluationState): EvaluationResult {
   return _gte(expr.left, expr.right, state, ' >= ', false);
 }
@@ -105,12 +142,12 @@ function _convertCompare(
       if (left.value instanceof SQLDateTime) {
         left.value = left.value.toString({ timeZone });
       } else {
-        left.value = String(left.value);
+        left.value = String(left.value).trimEnd();
       }
       if (right.value instanceof SQLDateTime) {
         right.value = right.value.toString({ timeZone });
       } else {
-        right.value = String(right.value);
+        right.value = String(right.value).trimEnd();
       }
     }
   }

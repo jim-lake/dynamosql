@@ -5,7 +5,7 @@ import type { Binary } from 'node-sql-parser';
 import type { EvaluationState, EvaluationResult } from './evaluate';
 
 import { plus, minus, div, mul, mod } from './math';
-import { equal, notEqual, gt, lt, gte, lte } from './compare';
+import { equal, notEqual, gt, lt, gte, lte, inOp, notIn } from './compare';
 
 function and(expr: Binary, state: EvaluationState): EvaluationResult {
   const left = getValue(expr.left, state);
@@ -155,47 +155,6 @@ function notLike(expr: Binary, state: EvaluationState): EvaluationResult {
   }
   return result;
 }
-function inOp(expr: Binary, state: EvaluationState): EvaluationResult {
-  const left = getValue(expr.left, state);
-  const err = left.err;
-  let value: number | null = 0;
-  const rightExpr = expr.right;
-
-  if (!err) {
-    if (left.value === null) {
-      value = null;
-    } else if (
-      typeof rightExpr === 'object' &&
-      rightExpr &&
-      'type' in rightExpr &&
-      rightExpr.type === 'expr_list'
-    ) {
-      const list = rightExpr.value || [];
-      for (const item of list) {
-        const right = getValue(item, state);
-        if (right.err) {
-          return { err: right.err, value: null, type: 'longlong' };
-        }
-        if (right.value === null) {
-          value = null;
-        } else if (left.value === right.value) {
-          value = 1;
-          break;
-        }
-      }
-    }
-  }
-  return { err, value, name: `${left.name} IN (...)`, type: 'longlong' };
-}
-function notIn(expr: Binary, state: EvaluationState): EvaluationResult {
-  const result = inOp(expr, state);
-  result.name = result.name?.replace(' IN ', ' NOT IN ') ?? '';
-  if (result.value !== null) {
-    result.value = result.value ? 0 : 1;
-  }
-  return result;
-}
-
 export const methods: Record<
   string,
   undefined | ((expr: Binary, state: EvaluationState) => EvaluationResult)
