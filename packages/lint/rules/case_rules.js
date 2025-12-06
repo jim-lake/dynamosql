@@ -1,22 +1,23 @@
 export const localSnakeCaseRule = {
   meta: {
-    type: "problem",
+    type: 'problem',
     docs: {
       description:
-        "Enforce snake_case for local variables only, ignoring top-level, exports, globals, and excluded patterns"
+        'Enforce snake_case for local variables only, ignoring top-level, exports, globals, and excluded patterns',
     },
     schema: [
       {
-        type: "object",
+        type: 'object',
         properties: {
           exclude: {
-            type: "array",
-            description: "Array of objects with a .test(string) method to ignore"
-          }
+            type: 'array',
+            description:
+              'Array of objects with a .test(string) method to ignore',
+          },
         },
-        additionalProperties: false
-      }
-    ]
+        additionalProperties: false,
+      },
+    ],
   },
 
   create(context) {
@@ -26,16 +27,16 @@ export const localSnakeCaseRule = {
     return {
       VariableDeclarator(node) {
         // only Identifier (ignore destructuring)
-        if (node.id.type !== "Identifier") return;
+        if (node.id.type !== 'Identifier') return;
         const name = node.id.name;
         if (!name) return;
 
         // ignore top-level variables, exports
         const parentType = node.parent.parent.type;
         const isLocal =
-          parentType !== "Program" &&
-          parentType !== "ExportNamedDeclaration" &&
-          parentType !== "ExportDefaultDeclaration";
+          parentType !== 'Program' &&
+          parentType !== 'ExportNamedDeclaration' &&
+          parentType !== 'ExportDefaultDeclaration';
 
         if (!isLocal) return; // skip non-locals
 
@@ -46,10 +47,10 @@ export const localSnakeCaseRule = {
         if (!/^[a-z][a-z0-9_]*$/.test(name)) {
           context.report({
             node: node.id,
-            message: `Local variable "${name}" must be snake_case`
+            message: `Local variable "${name}" must be snake_case`,
           });
         }
-      }
+      },
     };
-  }
+  },
 };

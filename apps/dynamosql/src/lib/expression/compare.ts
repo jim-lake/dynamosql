@@ -47,7 +47,12 @@ export function inOp(expr: Binary, state: EvaluationState): EvaluationResult {
       }
     }
   }
-  return { err: null, value, name: `${left.name} IN (${names.join(', ')})`, type: 'longlong' };
+  return {
+    err: null,
+    value,
+    name: `${left.name} IN (${names.join(', ')})`,
+    type: 'longlong',
+  };
 }
 export function notIn(expr: Binary, state: EvaluationState): EvaluationResult {
   const result = inOp(expr, state);

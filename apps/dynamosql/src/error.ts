@@ -91,6 +91,10 @@ const ERROR_MAP: Record<string, ErrorMapEntry> = {
     code: 'ER_TOO_BIG_PRECISION',
     sqlMessage: 'Too-big precision specified. Maximum is 6.',
   },
+  ER_DATA_OUT_OF_RANGE: {
+    code: 'ER_DATA_OUT_OF_RANGE',
+    sqlMessage: 'DOUBLE value is out of range',
+  },
   table_exists: {
     code: 'ER_TABLE_EXISTS_ERROR',
     sqlMessage: 'Table already exists.',

@@ -154,7 +154,14 @@ export function bin(expr: Function, state: EvaluationState): EvaluationResult {
   result.type = 'string';
   if (!result.err && result.value !== null) {
     const num = convertNum(result.value);
-    result.value = num !== null ? Math.floor(num).toString(2) : null;
+    if (num !== null) {
+      const bigNum = BigInt(Math.trunc(num));
+      // Convert to unsigned 64-bit
+      const unsigned = bigNum < 0n ? (1n << 64n) + bigNum : bigNum;
+      result.value = unsigned.toString(2);
+    } else {
+      result.value = null;
+    }
   }
   return result;
 }
@@ -165,7 +172,14 @@ export function oct(expr: Function, state: EvaluationState): EvaluationResult {
   result.type = 'string';
   if (!result.err && result.value !== null) {
     const num = convertNum(result.value);
-    result.value = num !== null ? Math.floor(num).toString(8) : null;
+    if (num !== null) {
+      const bigNum = BigInt(Math.trunc(num));
+      // Convert to unsigned 64-bit
+      const unsigned = bigNum < 0n ? (1n << 64n) + bigNum : bigNum;
+      result.value = unsigned.toString(8);
+    } else {
+      result.value = null;
+    }
   }
   return result;
 }
@@ -233,11 +247,14 @@ export function log(expr: Function, state: EvaluationState): EvaluationResult {
       ? `LOG(${arg1.name}, ${arg2.name})`
       : `LOG(${arg1.name})`;
 
-  if (!err && arg1.value === null) {
+  if (
+    !err &&
+    (arg1.value === null || (arg2.value !== undefined && arg2.value === null))
+  ) {
     value = null;
   } else if (!err) {
     const num1 = convertNum(arg1.value);
-    if (arg2.value !== undefined && arg2.value !== null) {
+    if (arg2.value !== undefined) {
       const num2 = convertNum(arg2.value);
       value =
         num1 !== null && num1 > 0 && num2 !== null && num2 > 0
@@ -369,7 +386,17 @@ export function cot(expr: Function, state: EvaluationState): EvaluationResult {
   result.type = 'double';
   if (!result.err && result.value !== null) {
     const num = convertNum(result.value);
-    result.value = num !== null ? 1 / Math.tan(num) : null;
+    if (num !== null) {
+      const cotValue = 1 / Math.tan(num);
+      if (!isFinite(cotValue)) {
+        result.err = 'ER_DATA_OUT_OF_RANGE';
+        result.value = null;
+      } else {
+        result.value = cotValue;
+      }
+    } else {
+      result.value = null;
+    }
   }
   return result;
 }

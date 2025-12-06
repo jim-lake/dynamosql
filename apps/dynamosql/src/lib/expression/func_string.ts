@@ -327,7 +327,7 @@ export function space(
   if (!result.err && result.value !== null) {
     const count = convertNum(result.value);
     result.value =
-      count !== null && count > 0 ? ' '.repeat(Math.trunc(count)) : '';
+      count !== null && count > 0 ? ' '.repeat(Math.round(count)) : '';
   }
   return result;
 }
@@ -341,7 +341,7 @@ export function hex(expr: Function, state: EvaluationState): EvaluationResult {
       const num =
         typeof result.value === 'bigint'
           ? result.value
-          : BigInt(Math.trunc(result.value));
+          : BigInt(Math.round(result.value));
       // Convert to unsigned 64-bit
       const unsigned = num < 0n ? (1n << 64n) + num : num;
       result.value = unsigned.toString(16).toUpperCase();
