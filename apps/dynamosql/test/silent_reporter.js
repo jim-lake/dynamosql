@@ -61,7 +61,7 @@ class OneLineSummaryReporter {
           console.log(`Suite: ${suite.title}: ${fails}/${suite.total} FAILED`);
           for (const fail of suite.failList) {
             console.log(fail.test.fullTitle());
-            console.log(fail.err, fail.err.stack);
+            console.log(fail.err);
             console.log('');
           }
           console.log('');
