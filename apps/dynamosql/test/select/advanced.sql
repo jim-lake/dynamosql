@@ -1,5 +1,6 @@
 -- Test SELECT with DATABASE() function
 SELECT DATABASE();
+SELECT DATABASE('foo');
 
 -- Test SELECT with multiple columns and aliases
 SELECT id AS user_id, name AS user_name, email AS user_email FROM _dynamodb.users ORDER BY id LIMIT 3;

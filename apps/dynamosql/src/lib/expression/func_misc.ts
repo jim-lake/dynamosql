@@ -1,7 +1,6 @@
 import { getValue } from './evaluate';
 import { convertNum } from '../helpers/sql_conversion';
-import { assertArgCount } from '../helpers/arg_count';
-import { SQLError } from '../../error';
+import { assertArgCount, assertArgCountParse } from '../helpers/arg_count';
 
 import type { Function } from 'node-sql-parser';
 import type { EvaluationState, EvaluationResult } from './evaluate';
@@ -10,13 +9,7 @@ export function database(
   expr: Function,
   state: EvaluationState
 ): EvaluationResult {
-  const arg_count = expr.args?.value?.length ?? 0;
-  if (arg_count > 0) {
-    throw new SQLError({
-      err: 'ER_WRONG_PARAMCOUNT_TO_NATIVE_FCT',
-      args: ['DATABASE'],
-    });
-  }
+  assertArgCountParse(expr, 0);
   return {
     err: null,
     value: state.session.getCurrentDatabase(),
