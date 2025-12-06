@@ -46,7 +46,7 @@ and geometry
 | IS NOT                          |    ✅     | Test a value against a boolean                                                                                                                          |
 | IS NOT NULL                     |    ✅     | NOT NULL value test                                                                                                                                     |
 | IS NULL                         |    ✅     | NULL value test                                                                                                                                         |
-| LAST_DAY                        |    ❌     | Return the last day of the month for the argument                                                                                                       |
+| LAST_DAY                        |    ✅     | Return the last day of the month for the argument                                                                                                       |
 | LIKE                            |    ✅     | Simple pattern matching                                                                                                                                 |
 | LOCALTIME                       |    ✅     | Synonym for NOW()                                                                                                                                       |
 | LOCALTIMESTAMP                  |    ✅     | Synonym for NOW()                                                                                                                                       |
@@ -64,7 +64,7 @@ and geometry
 | XOR                             |    ✅     | Logical XOR                                                                                                                                             |
 | ABS()                           |    ✅     | Return the absolute value                                                                                                                               |
 | ACOS()                          |    ✅     | Return the arc cosine                                                                                                                                   |
-| ADDDATE()                       |    ❌     | Add time values (intervals) to a date value                                                                                                             |
+| ADDDATE()                       |    ✅     | Add time values (intervals) to a date value                                                                                                             |
 | ADDTIME()                       |    ❌     | Add time                                                                                                                                                |
 | AES_DECRYPT()                   |    ❌     | Decrypt using AES                                                                                                                                       |
 | AES_ENCRYPT()                   |    ❌     | Encrypt using AES                                                                                                                                       |
@@ -122,7 +122,7 @@ and geometry
 | DAYNAME()                       |    ✅     | Return the name of the weekday                                                                                                                          |
 | DAYOFMONTH()                    |    ✅     | Return the day of the month (0-31)                                                                                                                      |
 | DAYOFWEEK()                     |    ✅     | Return the weekday index of the argument                                                                                                                |
-| DAYOFYEAR()                     |    ❌     | Return the day of the year (1-366)                                                                                                                      |
+| DAYOFYEAR()                     |    ✅     | Return the day of the year (1-366)                                                                                                                      |
 | DEFAULT()                       |    ❌     | Return the default value for a table column                                                                                                             |
 | DEGREES()                       |    ✅     | Convert radians to degrees                                                                                                                              |
 | DENSE_RANK()                    |    ❌     | Rank of current row within its partition, without gaps                                                                                                  |
@@ -223,7 +223,7 @@ and geometry
 | MATCH()                         |    ❌     | Perform full-text search                                                                                                                                |
 | MAX()                           |    ✅     | Return the maximum value                                                                                                                                |
 | MD5()                           |    ❌     | Calculate MD5 checksum                                                                                                                                  |
-| MICROSECOND()                   |    ❌     | Return the microseconds from argument                                                                                                                   |
+| MICROSECOND()                   |    ✅     | Return the microseconds from argument                                                                                                                   |
 | MID()                           |    ✅     | Return a substring starting from the specified position                                                                                                 |
 | MIN()                           |    ✅     | Return the minimum value                                                                                                                                |
 | MINUTE()                        |    ✅     | Return the minute from the argument                                                                                                                     |
@@ -247,7 +247,7 @@ and geometry
 | POWER()                         |    ✅     | Return the argument raised to the specified power                                                                                                       |
 | PS_CURRENT_THREAD_ID()          |    ❌     | Performance Schema thread ID for current thread                                                                                                         |
 | PS_THREAD_ID()                  |    ❌     | Performance Schema thread ID for given thread                                                                                                           |
-| QUARTER()                       |    ❌     | Return the quarter from a date argument                                                                                                                 |
+| QUARTER()                       |    ✅     | Return the quarter from a date argument                                                                                                                 |
 | QUOTE()                         |    ❌     | Escape the argument for use in an SQL statement                                                                                                         |
 | RADIANS()                       |    ✅     | Return argument converted to radians                                                                                                                    |
 | RAND()                          |    ❌     | Return a random floating-point value                                                                                                                    |
@@ -290,16 +290,16 @@ and geometry
 | STDDEV_SAMP()                   |    ❌     | Return the sample standard deviation                                                                                                                    |
 | STR_TO_DATE()                   |    ❌     | Convert a string to a date                                                                                                                              |
 | STRCMP()                        |    ✅     | Compare two strings                                                                                                                                     |
-| SUBDATE()                       |    ❌     | Synonym for DATE_SUB() when invoked with three arguments                                                                                                |
+| SUBDATE()                       |    ✅     | Synonym for DATE_SUB() when invoked with three arguments                                                                                                |
 | SUBSTR()                        |    ✅     | Return the substring as specified                                                                                                                       |
 | SUBSTRING()                     |    ✅     | Return the substring as specified                                                                                                                       |
 | SUBSTRING_INDEX()               |    ❌     | Return a substring from a string before the specified number of occurrences of the delimiter                                                            |
 | SUBTIME()                       |    ❌     | Subtract times                                                                                                                                          |
 | SUM()                           |    ✅     | Return the sum                                                                                                                                          |
-| SYSDATE()                       |    ❌     | Return the time at which the function executes                                                                                                          |
+| SYSDATE()                       |    ✅     | Return the time at which the function executes                                                                                                          |
 | SYSTEM_USER()                   |    ❌     | Synonym for USER()                                                                                                                                      |
 | TAN()                           |    ✅     | Return the tangent of the argument                                                                                                                      |
-| TIME()                          |    ❌     | Extract the time portion of the expression passed                                                                                                       |
+| TIME()                          |    ✅     | Extract the time portion of the expression passed                                                                                                       |
 | TIME_FORMAT()                   |    ❌     | Format as time                                                                                                                                          |
 | TIME_TO_SEC()                   |    ❌     | Return the argument converted to seconds                                                                                                                |
 | TIMEDIFF()                      |    ❌     | Subtract time                                                                                                                                           |
@@ -331,9 +331,9 @@ and geometry
 | VAR_SAMP()                      |    ❌     | Return the sample variance                                                                                                                              |
 | VARIANCE()                      |    ❌     | Return the population standard variance                                                                                                                 |
 | VERSION()                       |    ❌     | Return a string that indicates the MySQL server version                                                                                                 |
-| WEEK()                          |    ❌     | Return the week number                                                                                                                                  |
-| WEEKDAY()                       |    ❌     | Return the weekday index                                                                                                                                |
-| WEEKOFYEAR()                    |    ❌     | Return the calendar week of the date (1-53)                                                                                                             |
+| WEEK()                          |    ✅     | Return the week number                                                                                                                                  |
+| WEEKDAY()                       |    ✅     | Return the weekday index                                                                                                                                |
+| WEEKOFYEAR()                    |    ✅     | Return the calendar week of the date (1-53)                                                                                                             |
 | WEIGHT_STRING()                 |    ❌     | Return the weight string for a string                                                                                                                   |
 | YEAR()                          |    ✅     | Return the year                                                                                                                                         |
-| YEARWEEK()                      |    ❌     | Return the year and week                                                                                                                                |
+| YEARWEEK()                      |    ✅     | Return the year and week                                                                                                                                |
