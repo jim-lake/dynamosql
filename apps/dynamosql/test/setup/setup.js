@@ -11,6 +11,7 @@ const mysql_conn = mysql.createConnection({
   user: config.db.user,
   password: config.db.password,
   //database: config.db.database,
+  charset: 'utf8mb4',
   multipleStatements: true,
   dateStrings: true,
 });

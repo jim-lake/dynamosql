@@ -28,6 +28,7 @@ const conn = mysql.createConnection({
   password: config.db.password,
   //database: config.db.database,
   //debug: true,
+  charset: 'utf8mb4',
   multipleStatements: true,
   dateStrings: true,
   typeCast(field, next) {

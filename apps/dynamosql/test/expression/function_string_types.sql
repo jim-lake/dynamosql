@@ -8,6 +8,12 @@ SELECT LENGTH("") AS result;
 SELECT LENGTH(NULL) AS result;
 SELECT LENGTH(TRUE) AS result;
 SELECT LENGTH(FALSE) AS result;
+SELECT LENGTH("😀") AS result;
+SELECT LENGTH("👍") AS result;
+SELECT LENGTH("🥰") AS result;
+SELECT LENGTH("🏳️‍🌈") AS result;
+SELECT LENGTH("👩‍❤️‍💋‍👨") AS result;
+SELECT LENGTH("🐬") AS result;
 
 -- LOWER with all types
 SELECT LOWER(123) AS result;
@@ -69,6 +75,12 @@ SELECT CHAR_LENGTH("abc") AS result;
 SELECT CHAR_LENGTH("") AS result;
 SELECT CHAR_LENGTH(NULL) AS result;
 SELECT CHAR_LENGTH("hello world") AS result;
+SELECT CHAR_LENGTH("😀") AS result;
+SELECT CHAR_LENGTH("👍") AS result;
+SELECT CHAR_LENGTH("🥰") AS result;
+SELECT CHAR_LENGTH("🏳️‍🌈") AS result;
+SELECT CHAR_LENGTH("👩‍❤️‍💋‍👨") AS result;
+SELECT CHAR_LENGTH("🐬") AS result;
 
 -- INSTR with type combinations
 SELECT INSTR(123456, 34) AS result;

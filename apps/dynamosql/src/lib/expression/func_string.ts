@@ -15,7 +15,21 @@ export function length(
   result.name = `LENGTH(${result.name})`;
   result.type = 'longlong';
   if (!result.err && result.value !== null) {
-    result.value = String(result.value).length;
+    result.value = Buffer.byteLength(String(result.value), 'utf8');
+  }
+  return result;
+}
+export function char_length(
+  expr: Function,
+  state: EvaluationState
+): EvaluationResult {
+  assertArgCount(expr, 1);
+  const result = getValue(expr.args.value[0], state);
+  result.name = `CHAR_LENGTH(${result.name})`;
+  result.type = 'longlong';
+  if (!result.err && result.value !== null) {
+    const str = String(result.value);
+    result.value = [...str].length;
   }
   return result;
 }
@@ -47,7 +61,7 @@ export function concat(
     }
     return value !== null;
   });
-  return { err, value, type: has_blob ? 'medium_blob' : 'string' };
+  return { err, value, type: has_blob ? 'long_blob' : 'string' };
 }
 export function left(expr: Function, state: EvaluationState): EvaluationResult {
   assertArgCountParse(expr, 2);
@@ -190,19 +204,6 @@ export function repeat(
     type = 'long_blob';
   }
   return { err, name, value, type };
-}
-export function char_length(
-  expr: Function,
-  state: EvaluationState
-): EvaluationResult {
-  assertArgCount(expr, 1);
-  const result = getValue(expr.args.value[0], state);
-  result.name = `CHAR_LENGTH(${result.name})`;
-  result.type = 'longlong';
-  if (!result.err && result.value !== null) {
-    result.value = String(result.value).length;
-  }
-  return result;
 }
 export function substring(
   expr: Function,
@@ -438,7 +439,7 @@ export function lpad(expr: Function, state: EvaluationState): EvaluationResult {
   const len = Math.round(convertNum(len_result.value) ?? 0);
   const pad = String(pad_result.value);
   if (len < 0) {
-    return { err: null, value: null, type: 'medium_blob' };
+    return { err: null, value: null, type: 'long_blob' };
   }
   if (pad.length === 0) {
     return { err: null, value: '', type: 'string' };
@@ -473,7 +474,7 @@ export function rpad(expr: Function, state: EvaluationState): EvaluationResult {
   const len = Math.round(convertNum(len_result.value) ?? 0);
   const pad = String(pad_result.value);
   if (len < 0) {
-    return { err: null, value: null, type: 'medium_blob' };
+    return { err: null, value: null, type: 'long_blob' };
   }
   if (pad.length === 0) {
     return { err: null, value: '', type: 'string' };

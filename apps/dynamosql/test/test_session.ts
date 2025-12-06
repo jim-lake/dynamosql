@@ -18,6 +18,7 @@ const opts = {
   multipleStatements: true,
   dateStrings: true,
   resultObjects: true,
+  charset: 'utf8mb4',
   typeCast(field, next) {
     if (field.type === 'LONGLONG') {
       const val = field.string();

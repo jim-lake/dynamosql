@@ -30,6 +30,7 @@ export function runTests(test_name, file_path, extra, maybe_skip) {
       password: config.db.password,
       //database: config.db.database,
       dateStrings: true,
+      charset: 'utf8mb4',
     },
     extra?.mysql
   );
