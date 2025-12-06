@@ -106,6 +106,10 @@ import {
   yearweek,
   utc_date,
   utc_timestamp,
+  from_days,
+  to_days,
+  to_seconds,
+  makedate,
 } from './func_date';
 import {
   curtime,
@@ -115,6 +119,9 @@ import {
   second,
   microsecond,
   utc_time,
+  sec_to_time,
+  time_to_sec,
+  maketime,
 } from './func_time';
 import { coalesce, ifnull, greatest, least } from './func_comp';
 import { nullif } from './compare';
@@ -270,6 +277,13 @@ export const methods: Record<
   utc_date,
   utc_time,
   utc_timestamp,
+  from_days,
+  to_days,
+  to_seconds,
+  sec_to_time,
+  time_to_sec,
+  makedate,
+  maketime,
   user,
   current_user: user,
   session_user: user,

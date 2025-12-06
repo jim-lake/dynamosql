@@ -660,3 +660,95 @@ export function utc_timestamp(
   }
   return result;
 }
+
+export function from_days(
+  expr: Function,
+  state: EvaluationState
+): EvaluationResult {
+  assertArgCount(expr, 1);
+  const result = getValue(expr.args.value[0], state);
+  result.name = `FROM_DAYS(${result.name})`;
+  result.type = 'date';
+  if (!result.err && result.value !== null) {
+    const dayNum = convertNum(result.value);
+    if (dayNum !== null) {
+      if (dayNum < 366) {
+        result.value = '0000-00-00';
+      } else {
+        const time = (dayNum - 719528) * 86400;
+        result.value = new SQLDate({ time, timeZone: 'UTC' });
+      }
+    } else {
+      result.value = null;
+    }
+  }
+  return result;
+}
+
+export function to_days(
+  expr: Function,
+  state: EvaluationState
+): EvaluationResult {
+  assertArgCount(expr, 1);
+  const result = getValue(expr.args.value[0], state);
+  result.name = `TO_DAYS(${result.name})`;
+  result.type = 'longlong';
+  if (!result.err && result.value !== null) {
+    const dt = convertDate({
+      value: result.value,
+      timeZone: state.session.timeZone,
+    });
+    if (dt) {
+      const time = dt.getTime();
+      result.value = Math.floor(time / 86400) + 719528;
+    } else {
+      result.value = null;
+    }
+  }
+  return result;
+}
+
+export function to_seconds(
+  expr: Function,
+  state: EvaluationState
+): EvaluationResult {
+  assertArgCount(expr, 1);
+  const result = getValue(expr.args.value[0], state);
+  result.name = `TO_SECONDS(${result.name})`;
+  result.type = 'longlong';
+  if (!result.err && result.value !== null) {
+    const dt = convertDateTime({
+      value: result.value,
+      timeZone: state.session.timeZone,
+    });
+    if (dt) {
+      const time = dt.getTime();
+      result.value = BigInt(Math.floor(time + 62167219200));
+    } else {
+      result.value = null;
+    }
+  }
+  return result;
+}
+
+export function makedate(
+  expr: Function,
+  state: EvaluationState
+): EvaluationResult {
+  assertArgCount(expr, 2);
+  const year_arg = getValue(expr.args.value[0], state);
+  const dayofyear_arg = getValue(expr.args.value[1], state);
+  const err = year_arg.err || dayofyear_arg.err;
+  let value = null;
+  const name = `MAKEDATE(${year_arg.name}, ${dayofyear_arg.name})`;
+  if (!err && year_arg.value !== null && dayofyear_arg.value !== null) {
+    const yearNum = Math.round(convertNum(year_arg.value) ?? 0);
+    const dayOfYear = Math.round(convertNum(dayofyear_arg.value) ?? 0);
+    if (dayOfYear > 0) {
+      const dateObj = new Date(yearNum, 0, dayOfYear);
+      const time = dateObj.getTime() / 1000;
+      value = new SQLDate({ time, timeZone: state.session.timeZone });
+    }
+  }
+  return { err, name, value, type: 'date' };
+}

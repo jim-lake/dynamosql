@@ -120,6 +120,19 @@ describe('Expression', function () {
     verify_field_types: true,
   });
   runTests(
+    'function_days_seconds.sql',
+    path.join(__dirname, 'function_days_seconds.sql'),
+    { verify_field_types: true }
+  );
+  runTests(
+    'function_time_sec.sql',
+    path.join(__dirname, 'function_time_sec.sql'),
+    { verify_field_types: true }
+  );
+  runTests('function_make.sql', path.join(__dirname, 'function_make.sql'), {
+    verify_field_types: true,
+  });
+  runTests(
     'function_bit_count.sql',
     path.join(__dirname, 'function_bit_count.sql'),
     { verify_field_types: true }

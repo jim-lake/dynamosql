@@ -1,0 +1,20 @@
+-- FROM_DAYS tests
+SELECT FROM_DAYS(738000) AS from_days_1;
+SELECT FROM_DAYS(730120) AS from_days_2;
+SELECT FROM_DAYS(1) AS from_days_3;
+SELECT FROM_DAYS(NULL) AS from_days_null;
+
+-- TO_DAYS tests
+SELECT TO_DAYS('2020-02-20') AS to_days_1;
+SELECT TO_DAYS('2000-01-01') AS to_days_2;
+SELECT TO_DAYS('1970-01-01') AS to_days_3;
+SELECT TO_DAYS(NULL) AS to_days_null;
+
+-- TO_SECONDS tests
+SELECT TO_SECONDS('2020-01-01 00:00:00') AS to_seconds_1;
+SELECT TO_SECONDS('2000-01-01 12:30:45') AS to_seconds_2;
+SELECT TO_SECONDS('1970-01-01 00:00:00') AS to_seconds_3;
+SELECT TO_SECONDS(NULL) AS to_seconds_null;
+
+-- Round trip tests
+SELECT TO_DAYS(FROM_DAYS(738000)) AS round_trip_days;
