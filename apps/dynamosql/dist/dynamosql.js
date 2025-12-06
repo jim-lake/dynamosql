@@ -26,6 +26,30 @@ function _interopNamespaceDefault(e) {
 
 var SqlString__namespace = /*#__PURE__*/_interopNamespaceDefault(SqlString);
 
+class SQLMode extends node_events.EventEmitter {
+    _sqlMode;
+    _modeAnsiQuotes = false;
+    constructor(sql_mode) {
+        super();
+        this._sqlMode = sql_mode;
+        this._parseSQLMode();
+    }
+    get sqlMode() {
+        return this._sqlMode;
+    }
+    get modeAnsiQuotes() {
+        return this._modeAnsiQuotes;
+    }
+    set sqlMode(sql_mode) {
+        this._sqlMode = sql_mode;
+        this._parseSQLMode();
+    }
+    _parseSQLMode() {
+        const mode = this._sqlMode.toLowerCase();
+        this._modeAnsiQuotes = mode.includes('ansi_quotes');
+    }
+}
+
 class NativeObjectClass {
     toString() {
         return JSON.stringify(this);
@@ -325,6 +349,7 @@ async function parallelBatch(list, batchSize, limit, iter) {
 }
 
 const QUERY_LIMIT = 5;
+const BATCH_LIMIT = 100;
 class DynamoDB {
     client;
     namespace;
@@ -423,7 +448,6 @@ class DynamoDB {
         }
     }
     async deleteItems(params) {
-        const BATCH_LIMIT = 100;
         const { table, key_list, list } = params;
         const prefix = `DELETE FROM ${escapeIdentifier(table)} WHERE `;
         return parallelBatch(list, BATCH_LIMIT, QUERY_LIMIT, async (batch) => {
@@ -444,7 +468,6 @@ class DynamoDB {
         });
     }
     async updateItems(params) {
-        const BATCH_LIMIT = 100;
         const { table, key_list, list } = params;
         const prefix = `UPDATE ${escapeIdentifier(table)} SET `;
         return parallelBatch(list, BATCH_LIMIT, QUERY_LIMIT, async (batch) => {
@@ -472,7 +495,6 @@ class DynamoDB {
         });
     }
     async putItems(params) {
-        const BATCH_LIMIT = 100;
         const { list } = params;
         const table = `${this.namespace}${params.table}`;
         const err_list = [];
@@ -552,15 +574,15 @@ class DynamoDB {
     async createTable(params) {
         const { billing_mode, column_list, primary_key } = params;
         const table = `${this.namespace}${params.table}`;
-        const AttributeDefinitions = column_list.map((column) => ({
+        const defs = column_list.map((column) => ({
             AttributeName: column.name,
             AttributeType: dynamoType(column.type),
         }));
-        const KeySchema = [
+        const schema = [
             { AttributeName: primary_key?.[0]?.name, KeyType: clientDynamodb.KeyType.HASH },
         ];
         if (primary_key?.[1]) {
-            KeySchema.push({
+            schema.push({
                 AttributeName: primary_key[1].name,
                 KeyType: clientDynamodb.KeyType.RANGE,
             });
@@ -568,8 +590,8 @@ class DynamoDB {
         const input = {
             TableName: table,
             BillingMode: (billing_mode ?? 'PAY_PER_REQUEST'),
-            AttributeDefinitions,
-            KeySchema,
+            AttributeDefinitions: defs,
+            KeySchema: schema,
         };
         const command = new clientDynamodb.CreateTableCommand(input);
         try {
@@ -592,27 +614,24 @@ class DynamoDB {
     async createIndex(params) {
         const { index_name, key_list, projection_type } = params;
         const table = `${this.namespace}${params.table}`;
-        const AttributeDefinitions = key_list.map((item) => ({
+        const defs = key_list.map((item) => ({
             AttributeName: item.name,
             AttributeType: dynamoType(item.type),
         }));
-        const KeySchema = [
+        const schema = [
             { AttributeName: key_list?.[0]?.name, KeyType: clientDynamodb.KeyType.HASH },
         ];
         if (key_list?.[1]) {
-            KeySchema.push({
-                AttributeName: key_list[1].name,
-                KeyType: clientDynamodb.KeyType.RANGE,
-            });
+            schema.push({ AttributeName: key_list[1].name, KeyType: clientDynamodb.KeyType.RANGE });
         }
         const input = {
             TableName: table,
-            AttributeDefinitions,
+            AttributeDefinitions: defs,
             GlobalSecondaryIndexUpdates: [
                 {
                     Create: {
                         IndexName: index_name,
-                        KeySchema,
+                        KeySchema: schema,
                         Projection: {
                             ProjectionType: (projection_type ||
                                 'KEYS_ONLY'),
@@ -2433,7 +2452,7 @@ const ERROR_MAP = {
     },
     ER_BAD_TABLE_ERROR: {
         code: 'ER_BAD_TABLE_ERROR',
-        sqlMessage: errStr `Unknown  table '${0}'`,
+        sqlMessage: errStr `Unknown table '${0}'`,
     },
     ER_SP_DOES_NOT_EXIST: {
         code: 'ER_SP_DOES_NOT_EXIST',
@@ -2442,6 +2461,10 @@ const ERROR_MAP = {
     ER_TOO_BIG_PRECISION: {
         code: 'ER_TOO_BIG_PRECISION',
         sqlMessage: 'Too-big precision specified. Maximum is 6.',
+    },
+    ER_DATA_OUT_OF_RANGE: {
+        code: 'ER_DATA_OUT_OF_RANGE',
+        sqlMessage: 'DOUBLE value is out of range',
     },
     table_exists: {
         code: 'ER_TABLE_EXISTS_ERROR',
@@ -2489,7 +2512,15 @@ const ERROR_MAP = {
     },
     ER_UNKNOWN_TIME_ZONE: {
         code: 'ER_UNKNOWN_TIME_ZONE',
-        sqlMessage: errStr `Uknown or incorrect time zone: '${0}'`,
+        sqlMessage: errStr `Unkown or incorrect time zone: '${0}'`,
+    },
+    ER_PARSE_ERROR: {
+        code: 'ER_PARSE_ERROR',
+        sqlMessage: 'You have an error in your SQL syntax.',
+    },
+    ER_WRONG_PARAMCOUNT_TO_NATIVE_FCT: {
+        code: 'ER_WRONG_PARAMCOUNT_TO_NATIVE_FCT',
+        sqlMessage: errStr `Incorrect parameter count in the call to native function '${0}'`,
     },
 };
 class SQLError extends Error {
@@ -2635,7 +2666,7 @@ const TYPE_MAP = {
     B: 'buffer',
 };
 const sleep$1 = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
-async function getTableInfo$1(params) {
+async function getTableInfo$2(params) {
     const { dynamodb, table } = params;
     let data;
     try {
@@ -2659,7 +2690,7 @@ async function getTableInfo$1(params) {
     });
     return { table, primary_key, column_list, is_open: true };
 }
-async function getTableList$2(params) {
+async function getTableList$3(params) {
     const { dynamodb } = params;
     try {
         return await dynamodb.getTableList();
@@ -2669,7 +2700,7 @@ async function getTableList$2(params) {
         throw err;
     }
 }
-async function createTable$2(params) {
+async function createTable$3(params) {
     const { dynamodb, table, primary_key, ...other } = params;
     const column_list = params.column_list.filter((column) => primary_key.find((key) => key.name === column.name));
     const opts = { ...other, table, primary_key, column_list };
@@ -2685,7 +2716,7 @@ async function createTable$2(params) {
         throw err;
     }
 }
-async function dropTable$2(params) {
+async function dropTable$3(params) {
     const { dynamodb, table } = params;
     try {
         await dynamodb.deleteTable(table);
@@ -2710,8 +2741,8 @@ async function dropTable$2(params) {
         throw wait_err;
     }
 }
-async function addColumn$1(_params) { }
-async function createIndex$1(params) {
+async function addColumn$2(_params) { }
+async function createIndex$2(params) {
     const { dynamodb, table, index_name, key_list } = params;
     if (!key_list) {
         throw new Error('key_list is required');
@@ -2732,7 +2763,7 @@ async function createIndex$1(params) {
         throw err;
     }
 }
-async function deleteIndex$1(params) {
+async function deleteIndex$2(params) {
     const { dynamodb, table, index_name } = params;
     try {
         await dynamodb.deleteIndex({ table, index_name });
@@ -2746,9 +2777,9 @@ async function deleteIndex$1(params) {
         throw err;
     }
 }
+const LOOP_MS = 250;
 async function _waitForTable(params) {
     const { dynamodb, table, index_name } = params;
-    const LOOP_MS = 500;
     while (true) {
         const result = await dynamodb.getTable(table);
         const status = result?.Table?.TableStatus;
@@ -2814,7 +2845,6 @@ const DATE_TIME_MULT = 10000;
 class SQLDateTime {
     _time;
     _fraction = 0;
-    _fractionText = '';
     _decimals;
     _date = null;
     constructor(params) {
@@ -2832,17 +2862,9 @@ class SQLDateTime {
         }
         this._decimals = params.decimals ?? (this._fraction ? 6 : 0);
         this._fraction = parseFloat(this._fraction.toFixed(this._decimals));
-        let fd = 0;
         if (this._fraction >= 1.0) {
             this._fraction = 0;
             this._time += this._time < 0 ? -1 : 1;
-        }
-        else {
-            fd = this._fraction;
-        }
-        if (this._decimals > 0) {
-            this._fractionText =
-                '.' + fd.toFixed(this._decimals).slice(-this._decimals);
         }
     }
     _makeDate(timeZone) {
@@ -2876,17 +2898,19 @@ class SQLDateTime {
         const other_date = Math.floor(other._time / (24 * 60 * 60));
         return this_date - other_date;
     }
-    toString(timeZone) {
+    toString(params) {
         let ret;
-        const date = this._makeDate(timeZone);
+        const date = this._makeDate(params?.timeZone);
         if (isNaN(date.getTime())) {
             ret = '';
         }
         else {
             ret = date.toISOString().replace('T', ' ');
             ret = ret.replace(/\..*/, '');
-            if (this._decimals > 0) {
-                ret = ret + this._fractionText;
+            const decimals = params?.decimals ?? this._decimals;
+            if (decimals > 0) {
+                const dec = Math.min(decimals, 6);
+                ret += '.' + this._fraction.toFixed(dec).slice(-dec);
             }
         }
         return ret;
@@ -2908,6 +2932,13 @@ class SQLDateTime {
             ret += this._fraction;
         }
         return ret;
+    }
+    gt(other) {
+        const time_diff = this._time - other.getTime();
+        if (time_diff === 0) {
+            return this._fraction > other.getFraction();
+        }
+        return time_diff > 0;
     }
     clone(params) {
         if (params.decimals === undefined || this._decimals === params.decimals) {
@@ -2980,8 +3011,11 @@ class SQLDate {
         const other_date = Math.floor(other._time / (24 * 60 * 60));
         return this_date - other_date;
     }
-    toString(timeZone) {
-        const date = this._makeDate(timeZone);
+    gt(other) {
+        return this._time > other.getTime();
+    }
+    toString(params) {
+        const date = this._makeDate(params?.timeZone);
         if (isNaN(date.getTime())) {
             return '';
         }
@@ -3034,22 +3068,22 @@ class SQLTime {
         return this._time;
     }
     getFraction() {
-        return 0;
+        return this._time % 1;
     }
     getDecimals() {
         return this._decimals;
     }
-    toString(timeZone) {
+    toString(params) {
         let ret;
         if (isNaN(this._time)) {
             ret = '';
         }
         else {
             let seconds = this._time;
-            if (timeZone) {
+            if (params?.timeZone) {
                 const remainder = seconds - (seconds % (24 * 60 * 60));
                 seconds -= remainder;
-                seconds += offsetAtTime(timeZone, Date.now() / 1000) ?? 0;
+                seconds += offsetAtTime(params?.timeZone, Date.now() / 1000) ?? 0;
                 seconds = seconds % (24 * 60 * 60);
                 seconds += remainder;
             }
@@ -3061,7 +3095,11 @@ class SQLTime {
             seconds -= hours * HOUR$1;
             const minutes = Math.floor(seconds / MINUTE$1);
             seconds -= minutes * MINUTE$1;
-            const ret_secs = (seconds < 10 ? '0' : '') + seconds.toFixed(this._decimals);
+            const decimals = Math.min(params?.decimals ?? this._decimals, 6);
+            let ret_secs = seconds.toFixed(decimals);
+            if (ret_secs.length < (decimals > 0 ? decimals + 3 : 2)) {
+                ret_secs = '0' + ret_secs;
+            }
             ret = `${neg}${_pad(hours)}:${_pad(minutes)}:${ret_secs}`;
         }
         return ret;
@@ -3078,6 +3116,9 @@ class SQLTime {
         const minutes = Math.floor(seconds / MINUTE$1);
         seconds -= minutes * MINUTE$1;
         return hours * 10000 + minutes * 100 + seconds;
+    }
+    gt(other) {
+        return this._time > other.getTime();
     }
 }
 function createSQLTime(params) {
@@ -3112,6 +3153,21 @@ function toBigInt(value) {
 const MINUTE = 60;
 const HOUR = 60 * MINUTE;
 const DAY$1 = 24 * HOUR;
+function convertString(params) {
+    const { value, decimals, timeZone } = params;
+    if (value === null) {
+        return null;
+    }
+    if (value instanceof SQLDateTime ||
+        value instanceof SQLDate ||
+        value instanceof SQLTime) {
+        return value.toString({ decimals, timeZone });
+    }
+    if (typeof value === 'number' && decimals !== undefined) {
+        return value.toFixed(decimals);
+    }
+    return String(value);
+}
 function convertNum(value) {
     if (value === null || value === undefined) {
         return null;
@@ -3148,7 +3204,8 @@ function convertBigInt(value) {
         return 0n;
     }
     else if (typeof value === 'string') {
-        return toBigInt(value);
+        const s = value.match(/-?\d*/)?.[0] ?? '';
+        return toBigInt(s) ?? 0n;
     }
     return null;
 }
@@ -3205,7 +3262,13 @@ function convertDateTimeOrDate(params) {
             convert_result = _numToDateTime(value);
         }
         if (convert_result) {
-            return new SQLDateTime({ ...convert_result, decimals, timeZone });
+            const { type, ...time_fraction } = convert_result;
+            if (type === 'date') {
+                return new SQLDate({ ...time_fraction, timeZone });
+            }
+            else {
+                return new SQLDateTime({ ...time_fraction, decimals, timeZone });
+            }
         }
     }
     return null;
@@ -3252,6 +3315,9 @@ function convertDate(params) {
     else if (value instanceof SQLDateTime) {
         return new SQLDate({ time: value.getTime(), timeZone });
     }
+    else if (value instanceof SQLTime) {
+        return new SQLDate({ time: Date.now() / 1000, timeZone });
+    }
     else {
         let convert_result;
         if (typeof value === 'string') {
@@ -3272,9 +3338,14 @@ function convertDate(params) {
 const DAY_TIME_REGEX = /^(-)?([0-9]+)\s+([0-9]*)(:([0-9]{1,2}))?(:([0-9]{1,2}))?(\.[0-9]+)?/;
 const TIME_REGEX = /^(-)?([0-9]*):([0-9]{1,2})(:([0-9]{1,2}))?(\.[0-9]+)?/;
 function convertTime(params) {
-    const { value, decimals } = params;
+    const { value } = params;
+    let { decimals } = params;
     if (value instanceof SQLTime) {
         return value;
+    }
+    else if (value instanceof SQLDateTime) {
+        const time = (value.getTime() % DAY$1) + value.getFraction();
+        return createSQLTime({ time, decimals: value.getDecimals() });
     }
     else if (typeof value === 'string') {
         let time = _stringToTime(value);
@@ -3299,6 +3370,9 @@ function convertTime(params) {
     }
     else if (typeof value === 'number') {
         const time = _numToTime(value);
+        if (decimals === undefined) {
+            decimals = getDecimals$1(value);
+        }
         return createSQLTime({ time, decimals });
     }
     return null;
@@ -3342,7 +3416,7 @@ function _stringToDate(value) {
         const year = _fix2year(match[1]);
         const month = match[2];
         const day = match[3];
-        ret = _partsToTime(year, month, day, 0, 0, 0);
+        ret = _partsToTime('date', year, month, day, 0, 0, 0);
     }
     return ret;
 }
@@ -3357,13 +3431,17 @@ function _stringToDateTime(value) {
         const min = match[7] || '0';
         const sec = match[9] || '0';
         const fraction = parseFloat('0' + match[10]);
-        ret = _partsToTime(year, month, day, hour, min, sec, fraction);
+        ret = _partsToTime('datetime', year, month, day, hour, min, sec, fraction);
     }
     return ret;
 }
 function _numToDateTime(number) {
     let ret;
-    const s = String(number);
+    let s = String(number);
+    // Pad short numbers to 6 digits for YYMMDD format
+    if (/^[0-9]+$/.test(s) && s.length < 6) {
+        s = s.padStart(6, '0');
+    }
     let match = s.match(DATETIME4_REGEX);
     if (match && match[1] && match[2] && match[3] && match[4] && match[5]) {
         const year = match[1];
@@ -3373,7 +3451,7 @@ function _numToDateTime(number) {
         const min = match[5];
         const sec = match[7] || '0';
         const fraction = parseFloat('0' + match[8]);
-        ret = _partsToTime(year, month, day, hour, min, sec, fraction);
+        ret = _partsToTime('datetime', year, month, day, hour, min, sec, fraction);
     }
     if (ret === undefined) {
         match = s.match(DATETIME2_REGEX);
@@ -3385,7 +3463,7 @@ function _numToDateTime(number) {
             const min = match[5];
             const sec = match[7] || '0';
             const fraction = parseFloat('0' + match[8]);
-            ret = _partsToTime(year, month, day, hour, min, sec, fraction);
+            ret = _partsToTime('datetime', year, month, day, hour, min, sec, fraction);
         }
     }
     if (ret === undefined) {
@@ -3394,7 +3472,7 @@ function _numToDateTime(number) {
             const year = match[1];
             const month = match[2];
             const day = match[3];
-            ret = _partsToTime(year, month, day, 0, 0, 0);
+            ret = _partsToTime('date', year, month, day, 0, 0, 0);
         }
     }
     if (ret === undefined) {
@@ -3403,7 +3481,7 @@ function _numToDateTime(number) {
             const year = _fix2year(match[1]);
             const month = match[2];
             const day = match[3];
-            ret = _partsToTime(year, month, day, 0, 0, 0);
+            ret = _partsToTime('date', year, month, day, 0, 0, 0);
         }
     }
     return ret;
@@ -3415,7 +3493,7 @@ function _numToTime(number) {
     number -= minutes * 100;
     return hours * HOUR + minutes * MINUTE + number;
 }
-function getDecimals(value, max) {
+function getDecimals$1(value, max) {
     let ret = 0;
     if (typeof value === 'number') {
         ret = String(value).split('.')?.[1]?.length || 0;
@@ -3423,7 +3501,7 @@ function getDecimals(value, max) {
     else if (typeof value === 'string') {
         ret = value.split('.')?.[1]?.length || 0;
     }
-    {
+    if (max !== undefined) {
         ret = Math.min(max, ret);
     }
     return ret;
@@ -3447,12 +3525,12 @@ function _fix2year(num) {
     }
     return ret;
 }
-function _partsToTime(year, month, day, hour, min, sec, fraction) {
+function _partsToTime(type, year, month, day, hour, min, sec, fraction) {
     const iso = `${_pad4(year)}-${_pad2(month)}-${_pad2(day)}T${_pad2(hour)}:${_pad2(min)}:${_pad2(sec)}Z`;
     const time = Date.parse(iso);
     let ret;
     if (!isNaN(time)) {
-        ret = { time: time / 1000, fraction };
+        ret = { type, time: time / 1000, fraction };
     }
     return ret;
 }
@@ -3468,58 +3546,268 @@ function sum(expr, state) {
     const group = (row?.['@@group'] ?? [{}]);
     let err = null;
     let value = 0;
-    let name = 'SUM(';
-    group.forEach((group_row, i) => {
+    let name = '';
+    let hasString = false;
+    for (const group_row of group) {
         const group_state = { ...other, row: group_row };
         const result = getValue(expr.args?.expr, group_state);
-        if (i === 0) {
-            name += result.name;
+        if (!name) {
+            name = `SUM(${result.name})`;
         }
-        if (!err && result.err) {
+        if (result.err) {
             err = result.err;
+            break;
         }
         else if (result.value === null) {
             value = null;
+            break;
         }
-        else if (value !== null) {
-            const num = convertNum(result.value);
-            if (num !== null) {
-                value += num;
+        else {
+            if (result.type === 'string') {
+                hasString = true;
             }
+            const num = convertNum(result.value);
+            if (num === null) {
+                value = null;
+                break;
+            }
+            value += num;
         }
-    });
-    name += ')';
-    return { err, value, type: 'number', name };
+    }
+    const type = value === null || hasString ? 'double' : 'number';
+    return { err, value, type, name };
 }
 function count(expr, state) {
     const { row, ...other } = state;
     const group = (row?.['@@group'] ?? [{}]);
+    let err = null;
     let value = 0;
-    let name = 'COUNT(';
-    const argExpr = expr.args?.expr;
-    if (argExpr?.type === 'column_ref' &&
-        'column' in argExpr &&
-        argExpr.column === '*') {
+    let name = '';
+    if (expr.args?.expr?.type === 'star') {
         value = group.length;
-        name += '*';
+        name = 'COUNT(*)';
     }
     else {
-        group.forEach((group_row, i) => {
+        for (const group_row of group) {
             const group_state = { ...other, row: group_row };
             const result = getValue(expr.args?.expr, group_state);
-            if (i === 0) {
-                name += result.name;
+            if (!name) {
+                name = `COUNT(${result.name})`;
             }
-            if (result.value !== null) {
+            if (result.err) {
+                err = result.err;
+                break;
+            }
+            if (result.value !== null && result.value !== undefined) {
                 value++;
             }
-        });
+        }
     }
-    name += ')';
-    return { err: null, value, type: 'number', name };
+    return { err, value, type: 'longlong', name };
 }
-const methods$5 = { sum, count };
+function avg(expr, state) {
+    const { row, ...other } = state;
+    const group = (row?.['@@group'] ?? [{}]);
+    let err = null;
+    let total = 0;
+    let cnt = 0;
+    let name = '';
+    let hasString = false;
+    for (const group_row of group) {
+        const group_state = { ...other, row: group_row };
+        const result = getValue(expr.args?.expr, group_state);
+        if (!name) {
+            name = `AVG(${result.name})`;
+        }
+        if (result.err) {
+            err = result.err;
+            break;
+        }
+        else if (result.value !== null) {
+            if (result.type === 'string') {
+                hasString = true;
+            }
+            const num = convertNum(result.value);
+            if (num !== null) {
+                total += num;
+                cnt++;
+            }
+        }
+    }
+    const value = cnt > 0 ? total / cnt : null;
+    const type = value === null || hasString ? 'double' : 'number';
+    return { err, value, type, name };
+}
+function min(expr, state) {
+    const { row, ...other } = state;
+    const group = (row?.['@@group'] ?? [{}]);
+    let err = null;
+    let value = null;
+    let type = 'null';
+    let name = '';
+    for (const group_row of group) {
+        const group_state = { ...other, row: group_row };
+        const result = getValue(expr.args?.expr, group_state);
+        if (!name) {
+            name = `MIN(${result.name})`;
+        }
+        if (result.err) {
+            err = result.err;
+            break;
+        }
+        else if (result.value !== null && result.value !== undefined) {
+            if (value === null || value === undefined || result.value < value) {
+                value = result.value;
+                type = result.type;
+            }
+        }
+    }
+    return { err, value, type, name };
+}
+function max(expr, state) {
+    const { row, ...other } = state;
+    const group = (row?.['@@group'] ?? [{}]);
+    let err = null;
+    let value = null;
+    let type = 'null';
+    let name = '';
+    for (const group_row of group) {
+        const group_state = { ...other, row: group_row };
+        const result = getValue(expr.args?.expr, group_state);
+        if (!name) {
+            name = `MAX(${result.name})`;
+        }
+        if (result.err) {
+            err = result.err;
+            break;
+        }
+        else if (result.value !== null && result.value !== undefined) {
+            if (value === null || value === undefined || result.value > value) {
+                value = result.value;
+                type = result.type;
+            }
+        }
+    }
+    return { err, value, type, name };
+}
+const methods$5 = { sum, count, avg, min, max };
 
+function plus$1(expr, state) {
+    const result = _numBothSides(expr, state, ' + ', true);
+    const { err, name, left_num, right_num, interval, datetime } = result;
+    let value = result.value;
+    let type = result.type;
+    if (!err && value !== null) {
+        if (datetime && interval) {
+            const add_result = interval.add(datetime, state.session.timeZone);
+            value = add_result.value;
+            type = result.type === 'char' ? 'char' : add_result.type;
+        }
+        else if (left_num !== undefined && right_num !== undefined) {
+            // @ts-expect-error TS2365 ignore bigint/number the code is correct
+            value = left_num + right_num;
+        }
+    }
+    return { err, value, type, name };
+}
+function minus$2(expr, state) {
+    const result = _numBothSides(expr, state, ' - ', true);
+    const { err, name, left_num, right_num, interval, datetime } = result;
+    let value = result.value;
+    let type = result.type;
+    if (!err && value !== null) {
+        if (datetime && interval) {
+            const sub_result = interval.sub(datetime, state.session.timeZone);
+            value = sub_result.value;
+            type = result.type === 'char' ? 'char' : sub_result.type;
+        }
+        else if (result.left_num !== undefined &&
+            result.right_num !== undefined) {
+            // @ts-expect-error TS2365 ignore bigint/number the code is correct
+            value = left_num - right_num;
+        }
+    }
+    return { err, value, type, name };
+}
+function mul(expr, state) {
+    const result = _numBothSides(expr, state, ' * ');
+    const { err, name, left_num, right_num } = result;
+    let value = result.value;
+    if (!err &&
+        value !== null &&
+        left_num !== undefined &&
+        right_num !== undefined) {
+        // @ts-expect-error TS2365 ignore bigint/number the code is correct
+        value = left_num * right_num;
+    }
+    return { err, value, name, type: result.type };
+}
+function div(expr, state) {
+    const result = _numBothSides(expr, state, ' / ');
+    const { err, name, left_num, right_num } = result;
+    let value = result.value;
+    if (!err &&
+        value !== null &&
+        left_num !== undefined &&
+        right_num !== undefined) {
+        // Division by zero returns NULL in MySQL
+        if (right_num === 0 || right_num === 0n) {
+            value = null;
+        }
+        else if (typeof left_num === 'bigint' || typeof right_num === 'bigint') {
+            value = Number(left_num) / Number(right_num);
+        }
+        else {
+            value = left_num / right_num;
+        }
+    }
+    return {
+        err,
+        value,
+        name,
+        type: result.type === 'double' ? 'double' : 'number',
+    };
+}
+function mod$1(expr, state) {
+    const left = getValue(expr.left, state);
+    const right = getValue(expr.right, state);
+    return modHelper(left, right, left.name + ' % ' + right.name);
+}
+function modHelper(left, right, name) {
+    const err = left.err || right.err;
+    let value;
+    let type;
+    if (!err && (left.value === null || right.value === null)) {
+        value = null;
+        type = 'double';
+    }
+    else if (!err) {
+        const num1 = convertNum(left.value);
+        const num2 = convertNum(right.value);
+        if (num2 === 0 || num2 === null) {
+            value = null;
+        }
+        else {
+            value = num1 !== null ? num1 % num2 : null;
+        }
+        if (left.type === 'double' || right.type === 'double') {
+            type = 'double';
+        }
+        else if (left.type === 'string' || right.type === 'string') {
+            type = 'double';
+        }
+        else if (left.type === 'number' || right.type === 'number') {
+            type = 'number';
+        }
+        else {
+            type = 'longlong';
+        }
+    }
+    else {
+        type = 'double';
+    }
+    return { err, name, value, type };
+}
 function _numBothSides(expr, state, op, allow_interval) {
     const left = getValue(expr.left, state);
     const right = getValue(expr.right, state);
@@ -3530,9 +3818,11 @@ function _numBothSides(expr, state, op, allow_interval) {
     let right_num;
     let interval;
     let datetime;
+    let type = _unionNumberType(left.type, right.type, 'number');
     if (!err) {
         if (left.value === null || right.value === null) {
             value = null;
+            type = 'double';
         }
         else if (allow_interval && left.type === 'interval') {
             interval = left.value;
@@ -3541,7 +3831,7 @@ function _numBothSides(expr, state, op, allow_interval) {
                 right.value instanceof SQLTime) {
                 datetime = right.value;
             }
-            else if (right.value !== undefined && typeof right.value === 'string') {
+            else if (right.value !== undefined) {
                 datetime = convertDateTimeOrDate({
                     value: right.value,
                     timeZone: state.session.timeZone,
@@ -3549,6 +3839,7 @@ function _numBothSides(expr, state, op, allow_interval) {
                 if (!datetime) {
                     value = null;
                 }
+                type = 'char';
             }
             else {
                 value = null;
@@ -3561,7 +3852,7 @@ function _numBothSides(expr, state, op, allow_interval) {
                 left.value instanceof SQLDate) {
                 datetime = left.value;
             }
-            else if (left.value !== undefined && typeof left.value === 'string') {
+            else if (left.value !== undefined) {
                 datetime = convertDateTimeOrDate({
                     value: left.value,
                     timeZone: state.session.timeZone,
@@ -3569,6 +3860,7 @@ function _numBothSides(expr, state, op, allow_interval) {
                 if (!datetime) {
                     value = null;
                 }
+                type = 'char';
             }
             else {
                 value = null;
@@ -3588,6 +3880,7 @@ function _numBothSides(expr, state, op, allow_interval) {
                 left_num = left_temp;
                 right_num = right_temp;
             }
+            type = _unionNumberType(left.type, right.type, 'longlong');
         }
         else {
             const left_temp = convertNum(left.value);
@@ -3601,87 +3894,22 @@ function _numBothSides(expr, state, op, allow_interval) {
             }
         }
     }
-    return {
-        err,
-        name,
-        value,
-        left_num,
-        right_num,
-        interval,
-        datetime,
-        type: 'number',
-    };
+    return { err, name, value, left_num, right_num, interval, datetime, type };
 }
-function plus$1(expr, state) {
-    const result = _numBothSides(expr, state, ' + ', true);
-    const { err, name, left_num, right_num, interval, datetime } = result;
-    let value = result.value;
-    let type = 'number';
-    if (!err && value !== null) {
-        if (datetime && interval) {
-            const result = interval.add(datetime, state.session.timeZone);
-            value = result.value;
-            type = result.type;
-        }
-        else if (left_num !== undefined && right_num !== undefined) {
-            // @ts-expect-error TS2365 ignore bigint/number the code is correct
-            value = left_num + right_num;
-            type = 'number';
-        }
+function _unionNumberType(type1, type2, default_type) {
+    if (type1 === 'string' || type2 === 'string') {
+        return 'double';
     }
-    return { err, value, type, name };
-}
-function minus$2(expr, state) {
-    const result = _numBothSides(expr, state, ' - ', true);
-    const { err, name, left_num, right_num, interval, datetime } = result;
-    let value = result.value;
-    let type = 'number';
-    if (!err && value !== null) {
-        if (datetime && interval) {
-            const result = interval.sub(datetime, state.session.timeZone);
-            value = result.value;
-            type = result.type;
-        }
-        else if (result.left_num !== undefined &&
-            result.right_num !== undefined) {
-            // @ts-expect-error TS2365 ignore bigint/number the code is correct
-            value = left_num - right_num;
-            type = 'number';
-        }
+    else if (type1 === type2) {
+        return type1;
     }
-    return { err, value, type, name };
-}
-function mul(expr, state) {
-    const result = _numBothSides(expr, state, ' * ');
-    const { err, name, left_num, right_num } = result;
-    let value = result.value;
-    if (!err &&
-        value !== null &&
-        left_num !== undefined &&
-        right_num !== undefined) {
-        // @ts-expect-error TS2365 ignore bigint/number the code is correct
-        value = left_num * right_num;
+    else if (type1 === 'double' || type2 === 'double') {
+        return 'double';
     }
-    return { err, value, name, type: 'number' };
-}
-function div(expr, state) {
-    const result = _numBothSides(expr, state, ' / ');
-    const { err, name, left_num, right_num } = result;
-    let value = result.value;
-    if (!err &&
-        value !== null &&
-        left_num !== undefined &&
-        right_num !== undefined) {
-        // Division by zero returns NULL in MySQL
-        if (right_num === 0 || right_num === 0n) {
-            value = null;
-        }
-        else {
-            // @ts-expect-error TS2365 ignore bigint/number the code is correct
-            value = left_num / right_num;
-        }
+    else if (type1 === 'number' || type2 === 'number') {
+        return 'number';
     }
-    return { err, value, name, type: 'number' };
+    return default_type;
 }
 
 function equal$1(expr, state) {
@@ -3694,6 +3922,50 @@ function notEqual$1(expr, state) {
     }
     return ret;
 }
+function inOp(expr, state) {
+    const left = getValue(expr.left, state);
+    if (left.err) {
+        return left;
+    }
+    let value = 0;
+    const names = [];
+    if (left.value === null) {
+        value = null;
+    }
+    else if (expr.right?.type === 'expr_list') {
+        const list = expr.right.value ?? [];
+        for (const item of list) {
+            const right = getValue(item, state);
+            names.push(right.name ?? '');
+            const new_left = { ...left };
+            _convertCompare(new_left, right, state.session.timeZone);
+            if (right.err) {
+                return right;
+            }
+            if (right.value === null) {
+                value = null;
+            }
+            else if (new_left.value === right.value) {
+                value = 1;
+                break;
+            }
+        }
+    }
+    return {
+        err: null,
+        value,
+        name: `${left.name} IN (${names.join(', ')})`,
+        type: 'longlong',
+    };
+}
+function notIn(expr, state) {
+    const result = inOp(expr, state);
+    result.name = result.name?.replace(' IN ', ' NOT IN ') ?? '';
+    if (result.value !== null) {
+        result.value = result.value ? 0 : 1;
+    }
+    return result;
+}
 function gte$1(expr, state) {
     return _gte$1(expr.left, expr.right, state, ' >= ', false);
 }
@@ -3705,6 +3977,26 @@ function gt$1(expr, state) {
 }
 function lt$1(expr, state) {
     return _gt$1(expr.right, expr.left, state, ' < ', true);
+}
+function nullif(expr, state) {
+    const arg1 = getValue(expr.args?.value?.[0], state);
+    const arg2 = getValue(expr.args?.value?.[1], state);
+    const err = arg1.err || arg2.err || null;
+    let value;
+    let type = arg1.type;
+    const name = `NULLIF(${arg1.name}, ${arg2.name})`;
+    if (!err) {
+        const origValue = arg1.value;
+        _convertCompare(arg1, arg2, state.session.timeZone);
+        const isEqual = arg1.value !== null && arg2.value !== null && arg1.value === arg2.value;
+        value = isEqual ? null : origValue;
+        if (origValue instanceof SQLDate ||
+            origValue instanceof SQLDateTime ||
+            origValue instanceof SQLTime) {
+            type = 'string';
+        }
+    }
+    return { err, name, value, type };
 }
 function _convertCompare(left, right, timeZone) {
     if (left.value !== null &&
@@ -3739,16 +4031,16 @@ function _convertCompare(left, right, timeZone) {
         }
         else {
             if (left.value instanceof SQLDateTime) {
-                left.value = left.value.toString(timeZone);
+                left.value = left.value.toString({ timeZone });
             }
-            else if (typeof left.value !== 'string') {
-                left.value = String(left.value);
+            else {
+                left.value = String(left.value).trimEnd();
             }
             if (right.value instanceof SQLDateTime) {
-                right.value = right.value.toString(timeZone);
+                right.value = right.value.toString({ timeZone });
             }
-            else if (typeof right.value !== 'string') {
-                right.value = String(right.value);
+            else {
+                right.value = String(right.value).trimEnd();
             }
         }
     }
@@ -3998,50 +4290,12 @@ function notLike(expr, state) {
     }
     return result;
 }
-function inOp(expr, state) {
-    const left = getValue(expr.left, state);
-    const err = left.err;
-    let value = 0;
-    const rightExpr = expr.right;
-    if (!err) {
-        if (left.value === null) {
-            value = null;
-        }
-        else if (typeof rightExpr === 'object' &&
-            rightExpr &&
-            'type' in rightExpr &&
-            rightExpr.type === 'expr_list') {
-            const list = rightExpr.value || [];
-            for (const item of list) {
-                const right = getValue(item, state);
-                if (right.err) {
-                    return { err: right.err, value: null, type: 'longlong' };
-                }
-                if (right.value === null) {
-                    value = null;
-                }
-                else if (left.value === right.value) {
-                    value = 1;
-                    break;
-                }
-            }
-        }
-    }
-    return { err, value, name: `${left.name} IN (...)`, type: 'longlong' };
-}
-function notIn(expr, state) {
-    const result = inOp(expr, state);
-    result.name = result.name?.replace(' IN ', ' NOT IN ') ?? '';
-    if (result.value !== null) {
-        result.value = result.value ? 0 : 1;
-    }
-    return result;
-}
 const methods$4 = {
     '+': plus$1,
     '-': minus$2,
     '*': mul,
     '/': div,
+    '%': mod$1,
     '=': equal$1,
     '!=': notEqual$1,
     '<>': notEqual$1,
@@ -4092,7 +4346,7 @@ function date$1(expr, state) {
     }
     return result;
 }
-function time(expr, state) {
+function time$1(expr, state) {
     const result = getValue(expr.expr, state);
     result.name = `CAST(${result.name} AS TIME)`;
     result.type = 'time';
@@ -4113,23 +4367,968 @@ function signed(expr, state) {
     result.name = `CAST(${result.name} AS SIGNED)`;
     result.type = 'bigint';
     if (!result.err && result.value !== null) {
-        const num = convertNum(result.value);
-        if (num !== null) {
-            result.value = Math.trunc(num);
-        }
+        result.value = convertBigInt(result.value);
     }
     return result;
 }
 function char(expr, state) {
     const result = getValue(expr.expr, state);
     result.name = `CAST(${result.name} AS CHAR)`;
-    if (!result.err && result.value !== null && result.type !== 'string') {
-        result.type = 'string';
+    result.type = 'string';
+    if (!result.err &&
+        result.value !== null &&
+        typeof result.value !== 'string') {
         result.value = String(result.value);
     }
     return result;
 }
-const methods$3 = { datetime, date: date$1, time, signed, char };
+function decimal(expr, state) {
+    const result = getValue(expr.expr, state);
+    result.name = `CAST(${result.name} AS DECIMAL)`;
+    result.type = 'number';
+    if (!result.err &&
+        result.value !== null &&
+        typeof result.value !== 'number') {
+        result.value = Number(result.value);
+    }
+    return result;
+}
+function double(expr, state) {
+    const result = getValue(expr.expr, state);
+    result.name = `CAST(${result.name} AS DOUBLE)`;
+    result.type = 'double';
+    result.decimals = 31;
+    if (!result.err &&
+        result.value !== null &&
+        typeof result.value !== 'number') {
+        result.value = Number(result.value);
+    }
+    return result;
+}
+const methods$3 = { datetime, date: date$1, time: time$1, signed, char, decimal, double };
+
+function assertArgCount(expr, min, max) {
+    const arg_count = expr.args?.value?.length ?? 0;
+    const expected = max === undefined ? min : max;
+    if (arg_count < min || arg_count > expected) {
+        throw new SQLError({
+            err: 'ER_WRONG_PARAMCOUNT_TO_NATIVE_FCT',
+            args: [String(expr.name ?? 'FUNCTION').toUpperCase()],
+        });
+    }
+    if (expr.args && !Array.isArray(expr.args.value)) {
+        throw new SQLError({
+            err: 'ER_WRONG_PARAMCOUNT_TO_NATIVE_FCT',
+            args: [String(expr.name ?? 'FUNCTION').toUpperCase()],
+        });
+    }
+}
+function assertArgCountParse(expr, min, max) {
+    const arg_count = expr.args?.value?.length ?? 0;
+    const expected = max === undefined ? min : max;
+    if (arg_count < min || arg_count > expected) {
+        throw new SQLError({ err: 'ER_PARSE_ERROR' });
+    }
+    if (expr.args && !Array.isArray(expr.args.value)) {
+        throw new SQLError({ err: 'ER_PARSE_ERROR' });
+    }
+}
+
+function abs(expr, state) {
+    assertArgCount(expr, 1);
+    const result = getValue(expr.args.value[0], state);
+    result.name = `ABS(${result.name})`;
+    if (!result.err && result.value !== null) {
+        const num = convertNum(result.value);
+        result.value = num !== null ? Math.abs(num) : null;
+        result.type = result.type === 'string' ? 'double' : result.type;
+    }
+    else {
+        result.type = 'double';
+    }
+    return result;
+}
+function ceil(expr, state) {
+    assertArgCount(expr, 1);
+    const result = getValue(expr.args.value[0], state);
+    result.name = `CEIL(${result.name})`;
+    if (!result.err && result.value !== null) {
+        const num = convertNum(result.value);
+        result.value = num === null ? null : Math.ceil(num);
+    }
+    result.type = _resolveTypeForRounding(result);
+    return result;
+}
+function floor(expr, state) {
+    assertArgCount(expr, 1);
+    const result = getValue(expr.args.value[0], state);
+    result.name = `FLOOR(${result.name})`;
+    if (!result.err && result.value !== null) {
+        const num = convertNum(result.value);
+        result.value = num !== null ? Math.floor(num) : null;
+    }
+    result.type = _resolveTypeForRounding(result);
+    return result;
+}
+function round(expr, state) {
+    assertArgCount(expr, 1, 2);
+    const result = getValue(expr.args.value[0], state);
+    const arg2 = expr.args.value[1]
+        ? getValue(expr.args.value[1], state)
+        : undefined;
+    if (result.err) {
+        return result;
+    }
+    if (arg2 && arg2.err) {
+        return arg2;
+    }
+    if (result.value === null) {
+        result.type = 'double';
+    }
+    let value = convertNum(result.value);
+    let decimals = 0;
+    result.name = arg2
+        ? `ROUND(${result.name}, ${arg2.name})`
+        : `ROUND(${result.name})`;
+    if (arg2) {
+        const arg2_num = convertNum(arg2.value);
+        if (arg2_num === null) {
+            value = null;
+        }
+        else {
+            decimals = Math.round(arg2_num);
+        }
+    }
+    if (value === null) {
+        result.value = null;
+    }
+    else if (decimals === 0) {
+        result.value = _mysqlRound(value);
+    }
+    else if (decimals > 0) {
+        result.value = Number(value.toFixed(decimals));
+    }
+    else {
+        // Negative decimals - round to nearest 10, 100, 1000, etc.
+        const factor = Math.pow(10, -decimals);
+        result.value = _mysqlRound(value / factor) * factor;
+    }
+    if (result.type === 'string') {
+        result.type = 'double';
+    }
+    return result;
+}
+function _mysqlRound(x) {
+    return x >= 0 ? Math.round(x) : -Math.round(-x);
+}
+function mod(expr, state) {
+    assertArgCountParse(expr, 2);
+    const arg1 = getValue(expr.args.value[0], state);
+    const arg2 = getValue(expr.args.value[1], state);
+    return modHelper(arg1, arg2, `MOD(${arg1.name}, ${arg2.name})`);
+}
+function _resolveTypeForRounding(result) {
+    if (result.value === null || result.type === 'string') {
+        return 'double';
+    }
+    else if (result.type === 'number') {
+        return 'longlong';
+    }
+    return result.type;
+}
+function pow(expr, state) {
+    assertArgCount(expr, 2);
+    const arg1 = getValue(expr.args.value[0], state);
+    const arg2 = getValue(expr.args.value[1], state);
+    const err = arg1.err || arg2.err;
+    let value;
+    const name = `POW(${arg1.name}, ${arg2.name})`;
+    if (!err && (arg1.value === null || arg2.value === null)) {
+        value = null;
+    }
+    else if (!err) {
+        const num1 = convertNum(arg1.value);
+        const num2 = convertNum(arg2.value);
+        value = num1 !== null && num2 !== null ? Math.pow(num1, num2) : null;
+    }
+    return { err, name, value, type: 'double' };
+}
+function sqrt(expr, state) {
+    assertArgCount(expr, 1);
+    const result = getValue(expr.args.value[0], state);
+    result.name = `SQRT(${result.name})`;
+    result.type = 'double';
+    if (!result.err && result.value !== null) {
+        const num = convertNum(result.value);
+        result.value = num !== null && num >= 0 ? Math.sqrt(num) : null;
+    }
+    return result;
+}
+function sign(expr, state) {
+    assertArgCount(expr, 1);
+    const result = getValue(expr.args.value[0], state);
+    result.name = `SIGN(${result.name})`;
+    result.type = 'longlong';
+    if (!result.err && result.value !== null) {
+        const num = convertNum(result.value);
+        result.value = num !== null ? Math.sign(num) : null;
+    }
+    return result;
+}
+function bin(expr, state) {
+    assertArgCount(expr, 1);
+    const result = getValue(expr.args.value[0], state);
+    result.name = `BIN(${result.name})`;
+    result.type = 'string';
+    if (!result.err && result.value !== null) {
+        const num = convertNum(result.value);
+        if (num !== null) {
+            const bigNum = BigInt(Math.trunc(num));
+            // Convert to unsigned 64-bit
+            const unsigned = bigNum < 0n ? (1n << 64n) + bigNum : bigNum;
+            result.value = unsigned.toString(2);
+        }
+        else {
+            result.value = null;
+        }
+    }
+    return result;
+}
+function oct(expr, state) {
+    assertArgCount(expr, 1);
+    const result = getValue(expr.args.value[0], state);
+    result.name = `OCT(${result.name})`;
+    result.type = 'string';
+    if (!result.err && result.value !== null) {
+        const num = convertNum(result.value);
+        if (num !== null) {
+            const bigNum = BigInt(Math.trunc(num));
+            // Convert to unsigned 64-bit
+            const unsigned = bigNum < 0n ? (1n << 64n) + bigNum : bigNum;
+            result.value = unsigned.toString(8);
+        }
+        else {
+            result.value = null;
+        }
+    }
+    return result;
+}
+function pi(_expr, _state) {
+    return { err: null, name: 'PI()', value: Math.PI, type: 'double' };
+}
+function degrees(expr, state) {
+    assertArgCount(expr, 1);
+    const result = getValue(expr.args.value[0], state);
+    result.name = `DEGREES(${result.name})`;
+    result.type = 'double';
+    if (!result.err && result.value !== null) {
+        const num = convertNum(result.value);
+        result.value = num !== null ? (num * 180) / Math.PI : null;
+    }
+    return result;
+}
+function radians(expr, state) {
+    assertArgCount(expr, 1);
+    const result = getValue(expr.args.value[0], state);
+    result.name = `RADIANS(${result.name})`;
+    result.type = 'double';
+    if (!result.err && result.value !== null) {
+        const num = convertNum(result.value);
+        result.value = num !== null ? (num * Math.PI) / 180 : null;
+    }
+    return result;
+}
+function exp(expr, state) {
+    assertArgCount(expr, 1);
+    const result = getValue(expr.args.value[0], state);
+    result.name = `EXP(${result.name})`;
+    result.type = 'double';
+    if (!result.err && result.value !== null) {
+        const num = convertNum(result.value);
+        result.value = num !== null ? Math.exp(num) : null;
+    }
+    return result;
+}
+function ln(expr, state) {
+    assertArgCount(expr, 1);
+    const result = getValue(expr.args.value[0], state);
+    result.name = `LN(${result.name})`;
+    result.type = 'double';
+    if (!result.err && result.value !== null) {
+        const num = convertNum(result.value);
+        result.value = num !== null && num > 0 ? Math.log(num) : null;
+    }
+    return result;
+}
+function log(expr, state) {
+    assertArgCount(expr, 1, 2);
+    const arg1 = getValue(expr.args.value[0], state);
+    const arg2 = getValue(expr.args.value[1], state);
+    const err = arg1.err || arg2.err;
+    let value;
+    const name = arg2.value !== undefined
+        ? `LOG(${arg1.name}, ${arg2.name})`
+        : `LOG(${arg1.name})`;
+    if (!err &&
+        (arg1.value === null || (arg2.value !== undefined && arg2.value === null))) {
+        value = null;
+    }
+    else if (!err) {
+        const num1 = convertNum(arg1.value);
+        if (arg2.value !== undefined) {
+            const num2 = convertNum(arg2.value);
+            value =
+                num1 !== null && num1 > 0 && num2 !== null && num2 > 0
+                    ? Math.log(num2) / Math.log(num1)
+                    : null;
+        }
+        else {
+            value = num1 !== null && num1 > 0 ? Math.log(num1) : null;
+        }
+    }
+    return { err, name, value, type: 'double' };
+}
+function log2(expr, state) {
+    assertArgCount(expr, 1);
+    const result = getValue(expr.args.value[0], state);
+    result.name = `LOG2(${result.name})`;
+    result.type = 'double';
+    if (!result.err && result.value !== null) {
+        const num = convertNum(result.value);
+        result.value = num !== null && num > 0 ? Math.log2(num) : null;
+    }
+    return result;
+}
+function log10(expr, state) {
+    assertArgCount(expr, 1);
+    const result = getValue(expr.args.value[0], state);
+    result.name = `LOG10(${result.name})`;
+    result.type = 'double';
+    if (!result.err && result.value !== null) {
+        const num = convertNum(result.value);
+        result.value = num !== null && num > 0 ? Math.log10(num) : null;
+    }
+    return result;
+}
+function acos(expr, state) {
+    assertArgCount(expr, 1);
+    const result = getValue(expr.args.value[0], state);
+    result.name = `ACOS(${result.name})`;
+    result.type = 'double';
+    if (!result.err && result.value !== null) {
+        const num = convertNum(result.value);
+        result.value =
+            num !== null && num >= -1 && num <= 1 ? Math.acos(num) : null;
+    }
+    return result;
+}
+function asin(expr, state) {
+    assertArgCount(expr, 1);
+    const result = getValue(expr.args.value[0], state);
+    result.name = `ASIN(${result.name})`;
+    result.type = 'double';
+    if (!result.err && result.value !== null) {
+        const num = convertNum(result.value);
+        result.value =
+            num !== null && num >= -1 && num <= 1 ? Math.asin(num) : null;
+    }
+    return result;
+}
+function atan(expr, state) {
+    assertArgCount(expr, 1);
+    const result = getValue(expr.args.value[0], state);
+    result.name = `ATAN(${result.name})`;
+    result.type = 'double';
+    if (!result.err && result.value !== null) {
+        const num = convertNum(result.value);
+        result.value = num !== null ? Math.atan(num) : null;
+    }
+    return result;
+}
+function atan2(expr, state) {
+    assertArgCount(expr, 2);
+    const arg1 = getValue(expr.args.value[0], state);
+    const arg2 = getValue(expr.args.value[1], state);
+    const err = arg1.err || arg2.err;
+    let value;
+    const name = `ATAN2(${arg1.name}, ${arg2.name})`;
+    if (!err && (arg1.value === null || arg2.value === null)) {
+        value = null;
+    }
+    else if (!err) {
+        const num1 = convertNum(arg1.value);
+        const num2 = convertNum(arg2.value);
+        value = num1 !== null && num2 !== null ? Math.atan2(num1, num2) : null;
+    }
+    return { err, name, value, type: 'double' };
+}
+function cos(expr, state) {
+    assertArgCount(expr, 1);
+    const result = getValue(expr.args.value[0], state);
+    result.name = `COS(${result.name})`;
+    result.type = 'double';
+    if (!result.err && result.value !== null) {
+        const num = convertNum(result.value);
+        result.value = num !== null ? Math.cos(num) : null;
+    }
+    return result;
+}
+function sin(expr, state) {
+    assertArgCount(expr, 1);
+    const result = getValue(expr.args.value[0], state);
+    result.name = `SIN(${result.name})`;
+    result.type = 'double';
+    if (!result.err && result.value !== null) {
+        const num = convertNum(result.value);
+        result.value = num !== null ? Math.sin(num) : null;
+    }
+    return result;
+}
+function tan(expr, state) {
+    assertArgCount(expr, 1);
+    const result = getValue(expr.args.value[0], state);
+    result.name = `TAN(${result.name})`;
+    result.type = 'double';
+    if (!result.err && result.value !== null) {
+        const num = convertNum(result.value);
+        result.value = num !== null ? Math.tan(num) : null;
+    }
+    return result;
+}
+function cot(expr, state) {
+    assertArgCount(expr, 1);
+    const result = getValue(expr.args.value[0], state);
+    result.name = `COT(${result.name})`;
+    result.type = 'double';
+    if (!result.err && result.value !== null) {
+        const num = convertNum(result.value);
+        if (num !== null) {
+            const cotValue = 1 / Math.tan(num);
+            if (!isFinite(cotValue)) {
+                result.err = 'ER_DATA_OUT_OF_RANGE';
+                result.value = null;
+            }
+            else {
+                result.value = cotValue;
+            }
+        }
+        else {
+            result.value = null;
+        }
+    }
+    return result;
+}
+
+function length(expr, state) {
+    assertArgCount(expr, 1);
+    const result = getValue(expr.args.value[0], state);
+    result.name = `LENGTH(${result.name})`;
+    result.type = 'longlong';
+    if (!result.err && result.value !== null) {
+        result.value = Buffer.byteLength(String(result.value), 'utf8');
+    }
+    return result;
+}
+function char_length(expr, state) {
+    assertArgCount(expr, 1);
+    const result = getValue(expr.args.value[0], state);
+    result.name = `CHAR_LENGTH(${result.name})`;
+    result.type = 'longlong';
+    if (!result.err && result.value !== null) {
+        const str = String(result.value);
+        result.value = [...str].length;
+    }
+    return result;
+}
+function concat(expr, state) {
+    const arg_count = expr.args?.value?.length ?? 0;
+    if (arg_count === 0 || !Array.isArray(expr.args?.value)) {
+        throw new SQLError({
+            err: 'ER_WRONG_PARAMCOUNT_TO_NATIVE_FCT',
+            args: ['CONCAT'],
+        });
+    }
+    let err = null;
+    let value = '';
+    let has_blob = false;
+    expr.args.value.every((sub) => {
+        const result = getValue(sub, state);
+        if (result.type === 'long_blob' || result.type === 'medium_blob') {
+            has_blob = true;
+        }
+        if (!err && result.err) {
+            err = result.err;
+        }
+        else if (result.value === null) {
+            value = null;
+        }
+        else {
+            value += String(result.value);
+        }
+        return value !== null;
+    });
+    return { err, value, type: has_blob ? 'long_blob' : 'string' };
+}
+function left(expr, state) {
+    assertArgCountParse(expr, 2);
+    const result = getValue(expr.args.value[0], state);
+    const len_result = getValue(expr.args.value[1], state);
+    result.name = `LEFT(${result.name ?? ''}, ${len_result.name ?? ''})`;
+    result.err = result.err || len_result.err;
+    result.type = 'string';
+    if (!result.err && (result.value === null || len_result.value === null)) {
+        result.value = null;
+    }
+    else if (!result.err) {
+        const len = Math.round(convertNum(len_result.value) ?? 0);
+        result.value = String(result.value).substring(0, len);
+    }
+    return result;
+}
+function right(expr, state) {
+    assertArgCountParse(expr, 2);
+    const result = getValue(expr.args.value[0], state);
+    const len_result = getValue(expr.args.value[1], state);
+    result.name = `RIGHT(${result.name ?? ''}, ${len_result.name ?? ''})`;
+    result.err = result.err || len_result.err;
+    result.type = 'string';
+    if (!result.err && (result.value === null || len_result.value === null)) {
+        result.value = null;
+    }
+    else if (!result.err) {
+        const len = Math.round(convertNum(len_result.value) ?? 0);
+        if (len <= 0) {
+            result.value = '';
+        }
+        else {
+            result.value = String(result.value).slice(-len);
+        }
+    }
+    return result;
+}
+function lower(expr, state) {
+    assertArgCount(expr, 1);
+    const result = getValue(expr.args.value[0], state);
+    result.name = `LOWER(${result.name})`;
+    result.type = 'string';
+    if (!result.err && result.value !== null) {
+        result.value = String(result.value).toLowerCase();
+    }
+    return result;
+}
+function upper(expr, state) {
+    assertArgCount(expr, 1);
+    const result = getValue(expr.args.value[0], state);
+    result.name = `UPPER(${result.name})`;
+    result.type = 'string';
+    if (!result.err && result.value !== null) {
+        result.value = String(result.value).toUpperCase();
+    }
+    return result;
+}
+function trim(expr, state) {
+    assertArgCountParse(expr, 1);
+    const result = getValue(expr.args.value[0], state);
+    result.name = `TRIM(${result.name})`;
+    result.type = 'string';
+    if (!result.err && result.value !== null) {
+        result.value = String(result.value).trim();
+    }
+    return result;
+}
+function ltrim(expr, state) {
+    assertArgCount(expr, 1);
+    const result = getValue(expr.args.value[0], state);
+    result.name = `LTRIM(${result.name})`;
+    result.type = 'string';
+    if (!result.err && result.value !== null) {
+        result.value = String(result.value).trimStart();
+    }
+    return result;
+}
+function rtrim(expr, state) {
+    assertArgCount(expr, 1);
+    const result = getValue(expr.args.value[0], state);
+    result.name = `RTRIM(${result.name})`;
+    result.type = 'string';
+    if (!result.err && result.value !== null) {
+        result.value = String(result.value).trimEnd();
+    }
+    return result;
+}
+function reverse(expr, state) {
+    assertArgCountParse(expr, 1);
+    const result = getValue(expr.args.value[0], state);
+    result.name = `REVERSE(${result.name})`;
+    result.type = 'string';
+    if (!result.err && result.value !== null) {
+        result.value = String(result.value).split('').reverse().join('');
+    }
+    return result;
+}
+function repeat(expr, state) {
+    assertArgCountParse(expr, 2);
+    const arg1 = getValue(expr.args.value[0], state);
+    const arg2 = getValue(expr.args.value[1], state);
+    const err = arg1.err || arg2.err;
+    let value;
+    let type;
+    const name = `REPEAT(${arg1.name}, ${arg2.name})`;
+    if (!err && arg2.value === null) {
+        value = null;
+        type = 'long_blob';
+    }
+    else if (!err && arg1.value === null) {
+        value = null;
+        type = 'string';
+    }
+    else if (!err) {
+        const count = convertNum(arg2.value);
+        value =
+            count !== null && count > 0
+                ? String(arg1.value).repeat(Math.round(count))
+                : '';
+        type = 'string';
+    }
+    else {
+        type = 'long_blob';
+    }
+    return { err, name, value, type };
+}
+function substring(expr, state) {
+    assertArgCountParse(expr, 2, 3);
+    const arg1 = getValue(expr.args.value[0], state);
+    const arg2 = getValue(expr.args.value[1], state);
+    const hasThirdArg = expr.args.value[2] !== undefined;
+    const arg3 = hasThirdArg ? getValue(expr.args.value[2], state) : null;
+    const err = arg1.err || arg2.err || (arg3?.err ?? null);
+    let value;
+    const name = hasThirdArg
+        ? `SUBSTRING(${arg1.name}, ${arg2.name}, ${arg3?.name ?? ''})`
+        : `SUBSTRING(${arg1.name}, ${arg2.name})`;
+    if (!err &&
+        (arg1.value === null ||
+            arg2.value === null ||
+            (hasThirdArg && arg3?.value === null))) {
+        value = null;
+    }
+    else if (!err) {
+        const str = String(arg1.value);
+        const pos = convertNum(arg2.value);
+        const len = hasThirdArg ? convertNum(arg3?.value) : null;
+        if (pos === null || (hasThirdArg && len === null)) {
+            value = null;
+        }
+        else {
+            const posInt = Math.round(pos);
+            // Position 0 returns empty string
+            if (posInt === 0) {
+                value = '';
+            }
+            else {
+                const start = posInt < 0 ? str.length + posInt : posInt - 1;
+                value =
+                    len !== null
+                        ? str.substring(start, start + Math.round(len))
+                        : str.substring(start);
+            }
+        }
+    }
+    return { err, name, value, type: 'string' };
+}
+function replace(expr, state) {
+    assertArgCountParse(expr, 3);
+    const arg1 = getValue(expr.args.value[0], state);
+    const arg2 = getValue(expr.args.value[1], state);
+    const arg3 = getValue(expr.args.value[2], state);
+    const err = arg1.err || arg2.err || arg3.err || null;
+    let value;
+    const name = `REPLACE(${arg1.name}, ${arg2.name}, ${arg3.name})`;
+    if (!err &&
+        (arg1.value === null || arg2.value === null || arg3.value === null)) {
+        value = null;
+    }
+    else if (!err) {
+        const str1 = convertString({
+            value: arg1.value,
+            decimals: arg1.decimals,
+            timeZone: state.session.timeZone,
+        });
+        const str2 = convertString({
+            value: arg2.value,
+            decimals: arg2.decimals,
+            timeZone: state.session.timeZone,
+        });
+        const str3 = convertString({
+            value: arg3.value,
+            decimals: arg3.decimals,
+            timeZone: state.session.timeZone,
+        });
+        // Empty search string returns original string
+        if (str2 === '') {
+            value = str1;
+        }
+        else {
+            value = str1?.replaceAll(str2 ?? '', str3 ?? '') ?? null;
+        }
+    }
+    return { err, name, value, type: 'string' };
+}
+function ascii(expr, state) {
+    assertArgCountParse(expr, 1);
+    const result = getValue(expr.args.value[0], state);
+    result.name = `ASCII(${result.name})`;
+    result.type = 'longlong';
+    if (!result.err && result.value !== null) {
+        const str = String(result.value);
+        result.value = str.length > 0 ? str.charCodeAt(0) : 0;
+    }
+    return result;
+}
+function ord(expr, state) {
+    assertArgCount(expr, 1);
+    const result = getValue(expr.args.value[0], state);
+    result.name = `ORD(${result.name})`;
+    result.type = 'longlong';
+    if (!result.err && result.value !== null) {
+        const str = String(result.value);
+        result.value = str.length > 0 ? str.codePointAt(0) : 0;
+    }
+    return result;
+}
+function space(expr, state) {
+    assertArgCount(expr, 1);
+    const result = getValue(expr.args.value[0], state);
+    result.name = `SPACE(${result.name})`;
+    result.type = 'string';
+    if (!result.err && result.value !== null) {
+        const count = convertNum(result.value);
+        result.value =
+            count !== null && count > 0 ? ' '.repeat(Math.round(count)) : '';
+    }
+    return result;
+}
+function hex(expr, state) {
+    assertArgCount(expr, 1);
+    const result = getValue(expr.args.value[0], state);
+    result.name = `HEX(${result.name})`;
+    result.type = 'string';
+    if (!result.err && result.value !== null) {
+        if (typeof result.value === 'number' || typeof result.value === 'bigint') {
+            const num = typeof result.value === 'bigint'
+                ? result.value
+                : BigInt(Math.round(result.value));
+            // Convert to unsigned 64-bit
+            const unsigned = num < 0n ? (1n << 64n) + num : num;
+            result.value = unsigned.toString(16).toUpperCase();
+        }
+        else if (Buffer.isBuffer(result.value)) {
+            result.value = result.value.toString('hex').toUpperCase();
+        }
+        else {
+            result.value = Buffer.from(String(result.value))
+                .toString('hex')
+                .toUpperCase();
+        }
+    }
+    return result;
+}
+function unhex(expr, state) {
+    assertArgCount(expr, 1);
+    const result = getValue(expr.args.value[0], state);
+    result.name = `UNHEX(${result.name})`;
+    result.type = 'buffer';
+    if (!result.err && result.value !== null) {
+        let str = String(result.value);
+        if (/^[0-9A-Fa-f]*$/.test(str)) {
+            // Pad odd-length strings with leading zero
+            if (str.length % 2 === 1) {
+                str = '0' + str;
+            }
+            result.value = Buffer.from(str, 'hex');
+        }
+        else {
+            result.value = null;
+        }
+    }
+    return result;
+}
+function concat_ws(expr, state) {
+    const arg_count = expr.args?.value?.length ?? 0;
+    if (arg_count < 2 || !Array.isArray(expr.args?.value)) {
+        throw new SQLError({
+            err: 'ER_WRONG_PARAMCOUNT_TO_NATIVE_FCT',
+            args: ['CONCAT_WS'],
+        });
+    }
+    const sep_result = getValue(expr.args.value[0], state);
+    if (sep_result.err || sep_result.value === null) {
+        return {
+            err: sep_result.err,
+            value: null,
+            type: 'string',
+            name: 'CONCAT_WS()',
+        };
+    }
+    const separator = String(sep_result.value);
+    const parts = [];
+    for (let i = 1; i < expr.args.value.length; i++) {
+        const result = getValue(expr.args.value[i], state);
+        if (result.err) {
+            return {
+                err: result.err,
+                value: null,
+                type: 'string',
+                name: 'CONCAT_WS()',
+            };
+        }
+        if (result.value !== null) {
+            parts.push(String(result.value));
+        }
+    }
+    return {
+        err: null,
+        value: parts.join(separator),
+        type: 'string',
+        name: 'CONCAT_WS()',
+    };
+}
+function lpad(expr, state) {
+    assertArgCount(expr, 3);
+    const str_result = getValue(expr.args.value[0], state);
+    const len_result = getValue(expr.args.value[1], state);
+    const pad_result = getValue(expr.args.value[2], state);
+    const err = str_result.err || len_result.err || pad_result.err || null;
+    if (err ||
+        str_result.value === null ||
+        len_result.value === null ||
+        pad_result.value === null) {
+        return { err, value: null, type: 'string' };
+    }
+    const str = String(str_result.value);
+    const len = Math.round(convertNum(len_result.value) ?? 0);
+    const pad = String(pad_result.value);
+    if (len < 0) {
+        return { err: null, value: null, type: 'long_blob' };
+    }
+    if (pad.length === 0) {
+        return { err: null, value: '', type: 'string' };
+    }
+    if (str.length >= len) {
+        return { err: null, value: str.substring(0, len), type: 'string' };
+    }
+    const padLen = len - str.length;
+    const fullPads = Math.floor(padLen / pad.length);
+    const remainder = padLen % pad.length;
+    return {
+        err: null,
+        value: pad.repeat(fullPads) + pad.substring(0, remainder) + str,
+        type: 'string',
+    };
+}
+function rpad(expr, state) {
+    assertArgCount(expr, 3);
+    const str_result = getValue(expr.args.value[0], state);
+    const len_result = getValue(expr.args.value[1], state);
+    const pad_result = getValue(expr.args.value[2], state);
+    const err = str_result.err || len_result.err || pad_result.err || null;
+    if (err ||
+        str_result.value === null ||
+        len_result.value === null ||
+        pad_result.value === null) {
+        return { err, value: null, type: 'string' };
+    }
+    const str = String(str_result.value);
+    const len = Math.round(convertNum(len_result.value) ?? 0);
+    const pad = String(pad_result.value);
+    if (len < 0) {
+        return { err: null, value: null, type: 'long_blob' };
+    }
+    if (pad.length === 0) {
+        return { err: null, value: '', type: 'string' };
+    }
+    if (str.length >= len) {
+        return { err: null, value: str.substring(0, len), type: 'string' };
+    }
+    const padLen = len - str.length;
+    const fullPads = Math.floor(padLen / pad.length);
+    const remainder = padLen % pad.length;
+    return {
+        err: null,
+        value: str + pad.repeat(fullPads) + pad.substring(0, remainder),
+        type: 'string',
+    };
+}
+function locate(expr, state) {
+    assertArgCount(expr, 2, 3);
+    const substr_result = getValue(expr.args.value[0], state);
+    const str_result = getValue(expr.args.value[1], state);
+    const pos_result = getValue(expr.args.value[2], state);
+    const err = substr_result.err || str_result.err || pos_result?.err || null;
+    if (err || substr_result.value === null || str_result.value === null) {
+        return { err, value: null, type: 'longlong' };
+    }
+    const substr = convertString({
+        value: substr_result.value,
+        decimals: substr_result.decimals,
+        timeZone: state.session.timeZone,
+    }) ?? '';
+    const str = convertString({
+        value: str_result.value,
+        decimals: str_result.decimals,
+        timeZone: state.session.timeZone,
+    }) ?? '';
+    const pos = pos_result?.value !== undefined && pos_result?.value !== null
+        ? (convertNum(pos_result.value) ?? 1)
+        : 1;
+    const posInt = Math.round(pos);
+    if (posInt < 1) {
+        return { err: null, value: 0, type: 'longlong' };
+    }
+    const index = str.indexOf(substr, posInt - 1);
+    return { err: null, value: index === -1 ? 0 : index + 1, type: 'longlong' };
+}
+function instr(expr, state) {
+    assertArgCount(expr, 2);
+    const str_result = getValue(expr.args.value[0], state);
+    const substr_result = getValue(expr.args.value[1], state);
+    const err = str_result.err || substr_result.err || null;
+    if (err || str_result.value === null || substr_result.value === null) {
+        return { err, value: null, type: 'longlong' };
+    }
+    const str = String(str_result.value);
+    const substr = String(substr_result.value);
+    const index = str.indexOf(substr);
+    return { err: null, value: index === -1 ? 0 : index + 1, type: 'longlong' };
+}
+function strcmp(expr, state) {
+    assertArgCount(expr, 2);
+    const str1_result = getValue(expr.args.value[0], state);
+    const str2_result = getValue(expr.args.value[1], state);
+    const err = str1_result.err || str2_result.err || null;
+    if (err || str1_result.value === null || str2_result.value === null) {
+        return { err, value: null, type: 'longlong' };
+    }
+    const str1 = convertString({
+        value: str1_result.value,
+        decimals: str1_result.decimals,
+        timeZone: state.session.timeZone,
+    }) ?? '';
+    const str2 = convertString({
+        value: str2_result.value,
+        decimals: str2_result.decimals,
+        timeZone: state.session.timeZone,
+    }) ?? '';
+    if (str1 < str2) {
+        return { err: null, value: -1, type: 'longlong' };
+    }
+    else if (str1 > str2) {
+        return { err: null, value: 1, type: 'longlong' };
+    }
+    else {
+        return { err: null, value: 0, type: 'longlong' };
+    }
+}
 
 const FORMAT_LONG_NUMBER = new Intl.DateTimeFormat('en-US', {
     weekday: 'long',
@@ -4321,251 +5520,6 @@ function _nthNumber(number) {
     return ret;
 }
 
-const DAY = 24 * 60 * 60;
-function database(expr, state) {
-    return {
-        err: null,
-        value: state.session.getCurrentDatabase(),
-        type: 'string',
-    };
-}
-function sleep(expr, state) {
-    const result = getValue(expr.args?.value?.[0], state);
-    result.name = `SLEEP(${result.name})`;
-    const sleep_ms = convertNum(result.value);
-    if (sleep_ms !== null && sleep_ms > 0) {
-        result.sleep_ms = sleep_ms * 1000;
-    }
-    // SLEEP returns 0 on success in MySQL
-    result.value = 0;
-    result.type = 'number';
-    return result;
-}
-function length(expr, state) {
-    const result = getValue(expr.args?.value?.[0], state);
-    result.name = `LENGTH(${result.name})`;
-    result.type = 'number';
-    if (!result.err && result.value !== null) {
-        result.value = String(result.value).length;
-    }
-    return result;
-}
-function concat(expr, state) {
-    let err = null;
-    let value = '';
-    expr.args?.value?.every?.((sub) => {
-        const result = getValue(sub, state);
-        if (!err && result.err) {
-            err = result.err;
-        }
-        else if (result.value === null) {
-            value = null;
-        }
-        else {
-            value += String(result.value);
-        }
-        return value !== null;
-    });
-    return { err, value, type: 'string' };
-}
-function left(expr, state) {
-    const result = getValue(expr.args?.value?.[0], state);
-    const len_result = getValue(expr.args?.value?.[1], state);
-    result.name = `LEFT(${result.name ?? ''}, ${len_result.name ?? ''})`;
-    result.err = result.err || len_result.err;
-    result.type = 'string';
-    if (!result.err && (result.value === null || len_result.value === null)) {
-        result.value = null;
-    }
-    else if (!result.err) {
-        const length = convertNum(len_result.value);
-        result.value =
-            length !== null ? String(result.value).substring(0, length) : null;
-    }
-    return result;
-}
-function coalesce(expr, state) {
-    let err = null;
-    let value = null;
-    let type = 'null';
-    expr.args?.value?.some?.((sub) => {
-        const result = getValue(sub, state);
-        if (result.err) {
-            err = result.err;
-        }
-        value = result.value;
-        type = result.type;
-        return !err && value !== null;
-    });
-    return { err, value, type };
-}
-function now(expr, state) {
-    const result = getValue(expr.args?.value?.[0], state);
-    result.name = expr.args ? `NOW(${result.name ?? ''})` : 'CURRENT_TIMESTAMP';
-    if (!result.err && result.type) {
-        const decimals = typeof result.value === 'number' ? result.value : 0;
-        if (decimals > 6) {
-            result.err = 'ER_TOO_BIG_PRECISION';
-        }
-        result.value = new SQLDateTime({ time: state.session.timestamp, decimals });
-        result.type = 'datetime';
-    }
-    return result;
-}
-function from_unixtime(expr, state) {
-    const result = getValue(expr.args?.value?.[0], state);
-    result.name = `FROM_UNIXTIME(${result.name})`;
-    result.type = 'datetime';
-    if (!result.err && result.value !== null) {
-        const time = convertNum(result.value);
-        if (time !== null) {
-            const decimals = Math.min(6, String(time).split('.')?.[1]?.length || 0);
-            result.value = createSQLDateTime({ time, decimals });
-        }
-    }
-    return result;
-}
-function date(expr, state) {
-    const result = getValue(expr.args?.value?.[0], state);
-    result.name = `DATE(${result.name})`;
-    result.type = 'date';
-    if (!result.err && result.value !== null) {
-        result.value = convertDate({
-            value: result.value,
-            timeZone: state.session.timeZone,
-        });
-    }
-    return result;
-}
-function date_format(expr, state) {
-    const date = getValue(expr.args?.value?.[0], state);
-    const format = getValue(expr.args?.value?.[1], state);
-    const err = date.err || format.err;
-    let value;
-    const name = `DATE_FORMAT(${date.name}, ${format.name})`;
-    if (!err && (date.value === null || format.value === null)) {
-        value = null;
-    }
-    else if (!err) {
-        const dt = convertDateTime({
-            value: date.value,
-            timeZone: state.session.timeZone,
-        });
-        if (dt) {
-            value = dateFormat(dt.toDate(state.session.timeZone), String(format.value));
-        }
-        else {
-            value = null;
-        }
-    }
-    return { err, name, value, type: 'string' };
-}
-function datediff(expr, state) {
-    const { timeZone } = state.session;
-    const expr1 = getValue(expr.args?.value?.[0], state);
-    const expr2 = getValue(expr.args?.value?.[1], state);
-    const err = expr1.err || expr2.err;
-    let value;
-    const name = `DATEDIFF(${expr1.name}, ${expr2.name})`;
-    if (!err && (expr1.value === null || expr2.value === null)) {
-        value = null;
-    }
-    else if (!err) {
-        const result = convertDateTime({ value: expr1.value, timeZone })?.diff?.(convertDateTime({ value: expr2.value, timeZone }));
-        value = result !== undefined ? result : null;
-    }
-    return { err, name, value, type: 'longlong' };
-}
-function curdate(expr, state) {
-    const value = new SQLDate({
-        time: state.session.timestamp,
-        timeZone: state.session.timeZone,
-    });
-    const name = expr.args ? 'CURDATE()' : 'CURRENT_DATE';
-    return { err: null, value, name, type: 'date' };
-}
-function curtime(expr, state) {
-    const result = getValue(expr.args?.value?.[0], state);
-    result.name = expr.args ? `CURTIME(${result.name ?? ''})` : 'CURRENT_TIME';
-    if (!result.err && result.type) {
-        const decimals = typeof result.value === 'number' ? result.value : 0;
-        if (decimals > 6) {
-            result.err = 'ER_TOO_BIG_PRECISION';
-        }
-        const time = (Date.now() / 1000) % DAY;
-        result.value = createSQLTime({ time, decimals });
-        result.type = 'time';
-    }
-    return result;
-}
-function lower(expr, state) {
-    const result = getValue(expr.args?.value?.[0], state);
-    if (!result.err && result.value !== null) {
-        result.name = `LOWER(${result.name})`;
-        result.type = 'string';
-        result.value = String(result.value).toLowerCase();
-    }
-    return result;
-}
-function not$2(expr, state) {
-    const result = getValue(expr.args?.value?.[0], state);
-    result.name = `NOT(${result.name})`;
-    result.type = 'number';
-    if (!result.err && result.value !== null) {
-        const num = convertNum(result.value);
-        result.value = num ? 0 : 1;
-    }
-    return result;
-}
-function unix_timestamp(expr, state) {
-    const ret = {
-        err: null,
-        name: `UNIX_TIMESTAMP()`,
-        type: 'longlong',
-        value: BigInt(Math.floor(Date.now() / 1000)),
-    };
-    if (expr.args?.value?.[0]) {
-        const val = getValue(expr.args.value[0], state);
-        if (val.err) {
-            return val;
-        }
-        ret.name = `UNIX_TIMESTAMP(${val.name})`;
-        const dt = convertDateTime({
-            value: val.value,
-            timeZone: state.session.timeZone,
-        });
-        if (dt === null) {
-            ret.value = 0;
-        }
-        else {
-            ret.value = dt.getTime();
-        }
-    }
-    return ret;
-}
-const methods$2 = {
-    database,
-    sleep,
-    length,
-    concat,
-    left,
-    lower,
-    not: not$2,
-    coalesce,
-    ifnull: coalesce,
-    now,
-    current_timestamp: now,
-    from_unixtime,
-    date,
-    date_format,
-    datediff,
-    curdate,
-    current_date: curdate,
-    curtime,
-    current_time: curtime,
-    unix_timestamp,
-};
-
 const SINGLE_TIME = {
     microsecond: 0.000001,
     second: 1,
@@ -4713,7 +5667,7 @@ function createSQLInterval(value, unit_name) {
         const force_date = unit_name in FORCE_DATE;
         let decimals = DECIMALS[unit_name] || 0;
         if (!decimals && unit_name.endsWith('second')) {
-            decimals = getDecimals(value, 6);
+            decimals = getDecimals$1(value, 6);
             if (typeof value === 'string' && decimals) {
                 decimals = 6;
             }
@@ -4784,6 +5738,1191 @@ function _addMonth(old_time, number) {
     return old_time + delta / 1000;
 }
 
+function now(expr, state) {
+    const arg_count = expr.args?.value?.length ?? 0;
+    if (arg_count > 1) {
+        throw new SQLError({
+            err: 'ER_WRONG_PARAMCOUNT_TO_NATIVE_FCT',
+            args: ['NOW'],
+        });
+    }
+    const result = getValue(expr.args?.value?.[0], state);
+    result.name = expr.args ? `NOW(${result.name ?? ''})` : 'CURRENT_TIMESTAMP';
+    if (!result.err && result.type) {
+        const decimals = typeof result.value === 'number' ? result.value : 0;
+        if (decimals > 6) {
+            result.err = 'ER_TOO_BIG_PRECISION';
+        }
+        result.value = new SQLDateTime({ time: state.session.timestamp, decimals });
+        result.type = 'datetime';
+    }
+    return result;
+}
+function from_unixtime(expr, state) {
+    assertArgCount(expr, 1);
+    const result = getValue(expr.args.value[0], state);
+    result.name = `FROM_UNIXTIME(${result.name})`;
+    result.type = 'datetime';
+    if (!result.err && result.value !== null) {
+        const unix_time = convertNum(result.value);
+        if (unix_time !== null) {
+            let decimals = 0;
+            if (typeof result.value === 'string') {
+                decimals = 6;
+            }
+            else {
+                const unix_s = String(unix_time);
+                const index = unix_s.indexOf('.');
+                if (index !== -1) {
+                    const dec = unix_s.length - index - 1;
+                    decimals = Math.min(dec, 6);
+                }
+            }
+            result.value = createSQLDateTime({ time: unix_time, decimals });
+        }
+    }
+    return result;
+}
+function date(expr, state) {
+    assertArgCountParse(expr, 1);
+    const result = getValue(expr.args.value[0], state);
+    result.name = `DATE(${result.name})`;
+    result.type = 'date';
+    if (!result.err && result.value !== null) {
+        result.value = convertDate({
+            value: result.value,
+            timeZone: state.session.timeZone,
+        });
+    }
+    return result;
+}
+function date_format(expr, state) {
+    assertArgCount(expr, 2);
+    const date_arg = getValue(expr.args.value[0], state);
+    const format = getValue(expr.args.value[1], state);
+    const err = date_arg.err || format.err;
+    let value;
+    const name = `DATE_FORMAT(${date_arg.name}, ${format.name})`;
+    if (!err && (date_arg.value === null || format.value === null)) {
+        value = null;
+    }
+    else if (!err) {
+        const dt = convertDateTime({
+            value: date_arg.value,
+            timeZone: state.session.timeZone,
+        });
+        if (dt) {
+            value = dateFormat(dt.toDate(state.session.timeZone), String(format.value));
+        }
+        else {
+            value = null;
+        }
+    }
+    return { err, name, value, type: 'string' };
+}
+function datediff(expr, state) {
+    assertArgCount(expr, 2);
+    const { timeZone } = state.session;
+    const expr1 = getValue(expr.args.value[0], state);
+    const expr2 = getValue(expr.args.value[1], state);
+    const err = expr1.err || expr2.err;
+    let value;
+    const name = `DATEDIFF(${expr1.name}, ${expr2.name})`;
+    if (!err && (expr1.value === null || expr2.value === null)) {
+        value = null;
+    }
+    else if (!err) {
+        const result = convertDateTime({ value: expr1.value, timeZone })?.diff?.(convertDateTime({ value: expr2.value, timeZone }));
+        value = result !== undefined ? result : null;
+    }
+    return { err, name, value, type: 'longlong' };
+}
+function curdate(expr, state) {
+    const arg_count = expr.args?.value?.length ?? 0;
+    if (arg_count > 0) {
+        throw new SQLError({
+            err: 'ER_WRONG_PARAMCOUNT_TO_NATIVE_FCT',
+            args: ['CURDATE'],
+        });
+    }
+    const value = new SQLDate({
+        time: state.session.timestamp,
+        timeZone: state.session.timeZone,
+    });
+    const name = expr.args ? 'CURDATE()' : 'CURRENT_DATE';
+    return { err: null, value, name, type: 'date' };
+}
+function unix_timestamp(expr, state) {
+    const arg_count = expr.args?.value?.length ?? 0;
+    if (arg_count > 1) {
+        throw new SQLError({
+            err: 'ER_WRONG_PARAMCOUNT_TO_NATIVE_FCT',
+            args: ['UNIX_TIMESTAMP'],
+        });
+    }
+    const result = {
+        err: null,
+        name: `UNIX_TIMESTAMP()`,
+        type: 'longlong',
+        value: BigInt(Math.floor(Date.now() / 1000)),
+    };
+    if (expr.args?.value?.[0]) {
+        const val = getValue(expr.args.value[0], state);
+        if (val.err) {
+            return val;
+        }
+        result.name = `UNIX_TIMESTAMP(${val.name})`;
+        if (val.value === null) {
+            result.value = null;
+        }
+        else {
+            const dt = convertDateTime({
+                value: val.value,
+                timeZone: state.session.timeZone,
+            });
+            if (dt === null) {
+                result.value = 0;
+                if (typeof val.value === 'string') {
+                    result.type = 'decimal';
+                }
+            }
+            else {
+                result.value = dt.getTime();
+            }
+        }
+    }
+    return result;
+}
+function year(expr, state) {
+    assertArgCountParse(expr, 1);
+    const result = getValue(expr.args.value[0], state);
+    result.name = `YEAR(${result.name})`;
+    result.type = 'longlong';
+    if (!result.err && result.value !== null) {
+        const dt = convertDateTime({
+            value: result.value,
+            timeZone: state.session.timeZone,
+        });
+        result.value = dt ? dt.toDate(state.session.timeZone).getFullYear() : null;
+    }
+    return result;
+}
+function month(expr, state) {
+    assertArgCountParse(expr, 1);
+    const result = getValue(expr.args.value[0], state);
+    result.name = `MONTH(${result.name})`;
+    result.type = 'longlong';
+    if (!result.err && result.value !== null) {
+        const dt = convertDateTime({
+            value: result.value,
+            timeZone: state.session.timeZone,
+        });
+        result.value = dt ? dt.toDate(state.session.timeZone).getMonth() + 1 : null;
+    }
+    return result;
+}
+function day(expr, state) {
+    assertArgCountParse(expr, 1);
+    const result = getValue(expr.args.value[0], state);
+    result.name = `DAY(${result.name})`;
+    result.type = 'longlong';
+    if (!result.err && result.value !== null) {
+        const dt = convertDateTime({
+            value: result.value,
+            timeZone: state.session.timeZone,
+        });
+        result.value = dt ? dt.toDate(state.session.timeZone).getDate() : null;
+    }
+    return result;
+}
+function date_add(expr, state) {
+    assertArgCountParse(expr, 2);
+    const date_arg = getValue(expr.args.value[0], state);
+    const interval_arg = getValue(expr.args.value[1], state);
+    let err = date_arg.err ?? interval_arg.err;
+    let value = null;
+    let type = 'char';
+    const name = `DATE_ADD(${date_arg.name}, ${interval_arg.name})`;
+    if (!err &&
+        date_arg.value !== null &&
+        interval_arg.value instanceof SQLInterval) {
+        const dt = convertDateTimeOrDate({
+            value: date_arg.value,
+            timeZone: state.session.timeZone,
+        });
+        if (dt) {
+            const result = interval_arg.value.add(dt, state.session.timeZone);
+            value = result.value;
+            if (date_arg.type === 'datetime' ||
+                date_arg.type === 'date' ||
+                date_arg.type === 'time') {
+                type = result.type;
+            }
+        }
+    }
+    else if (!err && !(interval_arg.value instanceof SQLInterval)) {
+        err = { err: 'ER_PARSE_ERROR' };
+    }
+    return { err, name, value, type };
+}
+function date_sub(expr, state) {
+    assertArgCountParse(expr, 2);
+    const date_arg = getValue(expr.args.value[0], state);
+    const interval_arg = getValue(expr.args.value[1], state);
+    let err = date_arg.err || interval_arg.err;
+    let value = null;
+    const type = 'char';
+    const name = `DATE_SUB(${date_arg.name}, ${interval_arg.name})`;
+    if (!err &&
+        date_arg.value !== null &&
+        interval_arg.value instanceof SQLInterval) {
+        const dt = convertDateTimeOrDate({
+            value: date_arg.value,
+            timeZone: state.session.timeZone,
+        });
+        if (dt) {
+            const result = interval_arg.value.sub(dt, state.session.timeZone);
+            value = result.value;
+        }
+    }
+    else if (!err && !(interval_arg.value instanceof SQLInterval)) {
+        err = { err: 'ER_PARSE_ERROR' };
+    }
+    return { err, name, value, type };
+}
+function timestampdiff(expr, state) {
+    assertArgCount(expr, 3);
+    const unit_arg = expr.args.value[0];
+    const start_arg = getValue(expr.args.value[1], state);
+    const end_arg = getValue(expr.args.value[2], state);
+    const err = start_arg.err || end_arg.err;
+    let value = null;
+    const unitValue = unit_arg && 'value' in unit_arg ? unit_arg.value : undefined;
+    const name = `TIMESTAMPDIFF(${unitValue}, ${start_arg.name}, ${end_arg.name})`;
+    if (!err && start_arg.value !== null && end_arg.value !== null) {
+        const start = convertDateTime({
+            value: start_arg.value,
+            timeZone: state.session.timeZone,
+        });
+        const end = convertDateTime({
+            value: end_arg.value,
+            timeZone: state.session.timeZone,
+        });
+        if (start && end && unitValue) {
+            const unit = String(unitValue).toLowerCase();
+            const diffSeconds = end.getTime() - start.getTime();
+            switch (unit) {
+                case 'microsecond':
+                    value = Math.floor(diffSeconds * 1000000);
+                    break;
+                case 'second':
+                    value = Math.floor(diffSeconds);
+                    break;
+                case 'minute':
+                    value = Math.floor(diffSeconds / 60);
+                    break;
+                case 'hour':
+                    value = Math.floor(diffSeconds / 3600);
+                    break;
+                case 'day':
+                    value = Math.floor(diffSeconds / 86400);
+                    break;
+                case 'week':
+                    value = Math.floor(diffSeconds / (86400 * 7));
+                    break;
+                case 'month': {
+                    const startDate = start.toDate(state.session.timeZone);
+                    const endDate = end.toDate(state.session.timeZone);
+                    value =
+                        (endDate.getFullYear() - startDate.getFullYear()) * 12 +
+                            (endDate.getMonth() - startDate.getMonth());
+                    break;
+                }
+                case 'quarter': {
+                    const startDate = start.toDate(state.session.timeZone);
+                    const endDate = end.toDate(state.session.timeZone);
+                    const months = (endDate.getFullYear() - startDate.getFullYear()) * 12 +
+                        (endDate.getMonth() - startDate.getMonth());
+                    value = Math.floor(months / 3);
+                    break;
+                }
+                case 'year': {
+                    const startDate = start.toDate(state.session.timeZone);
+                    const endDate = end.toDate(state.session.timeZone);
+                    value = endDate.getFullYear() - startDate.getFullYear();
+                    break;
+                }
+                default:
+                    value = null;
+            }
+        }
+    }
+    return { err, name, value, type: 'longlong' };
+}
+function dayofweek(expr, state) {
+    assertArgCount(expr, 1);
+    const result = getValue(expr.args.value[0], state);
+    result.name = `DAYOFWEEK(${result.name})`;
+    result.type = 'longlong';
+    if (!result.err && result.value !== null) {
+        const dt = convertDateTime({
+            value: result.value,
+            timeZone: state.session.timeZone,
+        });
+        result.value = dt ? dt.toDate(state.session.timeZone).getDay() + 1 : null;
+    }
+    return result;
+}
+function dayname(expr, state) {
+    assertArgCount(expr, 1);
+    const result = getValue(expr.args.value[0], state);
+    result.name = `DAYNAME(${result.name})`;
+    result.type = 'string';
+    if (!result.err && result.value !== null) {
+        const dt = convertDateTime({
+            value: result.value,
+            timeZone: state.session.timeZone,
+        });
+        if (dt) {
+            result.value = dateFormat(dt.toDate(), '%W');
+        }
+        else {
+            result.value = null;
+        }
+    }
+    return result;
+}
+function monthname(expr, state) {
+    assertArgCount(expr, 1);
+    const result = getValue(expr.args.value[0], state);
+    result.name = `MONTHNAME(${result.name})`;
+    result.type = 'string';
+    if (!result.err && result.value !== null) {
+        const dt = convertDateTime({
+            value: result.value,
+            timeZone: state.session.timeZone,
+        });
+        if (dt) {
+            result.value = dateFormat(dt.toDate(), '%M');
+        }
+        else {
+            result.value = null;
+        }
+    }
+    return result;
+}
+function dayofyear(expr, state) {
+    assertArgCount(expr, 1);
+    const result = getValue(expr.args.value[0], state);
+    result.name = `DAYOFYEAR(${result.name})`;
+    result.type = 'longlong';
+    if (!result.err && result.value !== null) {
+        const dt = convertDateTime({
+            value: result.value,
+            timeZone: state.session.timeZone,
+        });
+        if (dt) {
+            const dateObj = dt.toDate(state.session.timeZone);
+            const start = new Date(dateObj.getFullYear(), 0, 0);
+            const diff = dateObj.getTime() - start.getTime();
+            const oneDay = 1000 * 60 * 60 * 24;
+            result.value = Math.floor(diff / oneDay);
+        }
+        else {
+            result.value = null;
+        }
+    }
+    return result;
+}
+function week(expr, state) {
+    assertArgCount(expr, 1, 2);
+    const date_arg = getValue(expr.args.value[0], state);
+    const mode_arg = getValue(expr.args.value[1], state);
+    const mode = Math.round(mode_arg.value !== null ? (convertNum(mode_arg.value) ?? 0) : 0);
+    const result = {
+        err: date_arg.err || mode_arg.err,
+        name: `WEEK(${date_arg.name}${mode_arg.value !== null ? ', ' + mode_arg.name : ''})`,
+        value: null,
+        type: 'longlong',
+    };
+    if (!result.err && date_arg.value !== null) {
+        const dt = convertDateTime({
+            value: date_arg.value,
+            timeZone: state.session.timeZone,
+        });
+        if (dt) {
+            const dateObj = dt.toDate(state.session.timeZone);
+            const yearStart = new Date(dateObj.getFullYear(), 0, 1);
+            const dayOfYear = Math.floor((dateObj.getTime() - yearStart.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+            const startDay = yearStart.getDay();
+            const weekStart = mode % 2 === 0 ? 0 : 1;
+            const daysToFirstWeek = (7 - startDay + weekStart) % 7;
+            if (dayOfYear <= daysToFirstWeek) {
+                result.value = 0;
+            }
+            else {
+                result.value = Math.floor((dayOfYear - daysToFirstWeek - 1) / 7) + 1;
+            }
+        }
+    }
+    return result;
+}
+function weekday(expr, state) {
+    assertArgCount(expr, 1);
+    const result = getValue(expr.args.value[0], state);
+    result.name = `WEEKDAY(${result.name})`;
+    result.type = 'longlong';
+    if (!result.err && result.value !== null) {
+        const dt = convertDateTime({
+            value: result.value,
+            timeZone: state.session.timeZone,
+        });
+        if (dt) {
+            const dayOfWeek = dt.toDate(state.session.timeZone).getDay();
+            result.value = (dayOfWeek + 6) % 7;
+        }
+        else {
+            result.value = null;
+        }
+    }
+    return result;
+}
+function quarter(expr, state) {
+    assertArgCount(expr, 1);
+    const result = getValue(expr.args.value[0], state);
+    result.name = `QUARTER(${result.name})`;
+    result.type = 'longlong';
+    if (!result.err && result.value !== null) {
+        const dt = convertDateTime({
+            value: result.value,
+            timeZone: state.session.timeZone,
+        });
+        result.value = dt
+            ? Math.floor(dt.toDate(state.session.timeZone).getMonth() / 3) + 1
+            : null;
+    }
+    return result;
+}
+function last_day(expr, state) {
+    assertArgCount(expr, 1);
+    const result = getValue(expr.args.value[0], state);
+    result.name = `LAST_DAY(${result.name})`;
+    result.type = 'date';
+    if (!result.err && result.value !== null) {
+        const dt = convertDateTime({
+            value: result.value,
+            timeZone: state.session.timeZone,
+        });
+        if (dt) {
+            const dateObj = dt.toDate(state.session.timeZone);
+            const lastDay = new Date(dateObj.getFullYear(), dateObj.getMonth() + 1, 0);
+            result.value = new SQLDate({
+                time: lastDay.getTime() / 1000,
+                timeZone: state.session.timeZone,
+            });
+        }
+        else {
+            result.value = null;
+        }
+    }
+    return result;
+}
+function weekofyear(expr, state) {
+    assertArgCount(expr, 1);
+    const result = getValue(expr.args.value[0], state);
+    result.name = `WEEKOFYEAR(${result.name})`;
+    result.type = 'longlong';
+    if (!result.err && result.value !== null) {
+        const dt = convertDateTime({
+            value: result.value,
+            timeZone: state.session.timeZone,
+        });
+        if (dt) {
+            result.value = _weekOfYear(dt.toDate(state.session.timeZone));
+        }
+        else {
+            result.value = null;
+        }
+    }
+    return result;
+}
+function _weekOfYear(d) {
+    const day_num = d.getUTCDay() || 7;
+    d.setUTCDate(d.getUTCDate() + 4 - day_num);
+    const year_start = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+    return Math.ceil(((d.getTime() - year_start.getTime()) / 86400000 + 1) / 7);
+}
+function yearweek(expr, state) {
+    assertArgCount(expr, 1, 2);
+    const date_arg = getValue(expr.args.value[0], state);
+    const mode_arg = getValue(expr.args.value[1], state);
+    const mode = mode_arg.value !== null ? (convertNum(mode_arg.value) ?? 0) : 0;
+    const result = {
+        err: date_arg.err || mode_arg.err,
+        name: `YEARWEEK(${date_arg.name}${mode_arg.value !== null ? ', ' + mode_arg.name : ''})`,
+        value: null,
+        type: 'longlong',
+    };
+    if (!result.err && date_arg.value !== null) {
+        const dt = convertDateTime({
+            value: date_arg.value,
+            timeZone: state.session.timeZone,
+        });
+        if (dt) {
+            const dateObj = dt.toDate(state.session.timeZone);
+            const yearStart = new Date(dateObj.getFullYear(), 0, 1);
+            const dayOfYear = Math.floor((dateObj.getTime() - yearStart.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+            const startDay = yearStart.getDay();
+            const weekStart = mode % 2 === 0 ? 0 : 1;
+            const daysToFirstWeek = (7 - startDay + weekStart) % 7;
+            let yearValue = dateObj.getFullYear();
+            let weekNum;
+            if (dayOfYear <= daysToFirstWeek) {
+                yearValue--;
+                const prevYear = new Date(yearValue, 11, 31);
+                const prevYearStart = new Date(yearValue, 0, 1);
+                const prevDayOfYear = Math.floor((prevYear.getTime() - prevYearStart.getTime()) /
+                    (1000 * 60 * 60 * 24)) + 1;
+                const prevStartDay = prevYearStart.getDay();
+                const prevDaysToFirstWeek = (7 - prevStartDay + weekStart) % 7;
+                weekNum = Math.floor((prevDayOfYear - prevDaysToFirstWeek - 1) / 7) + 1;
+            }
+            else {
+                weekNum = Math.floor((dayOfYear - daysToFirstWeek - 1) / 7) + 1;
+            }
+            result.value = yearValue * 100 + weekNum;
+        }
+    }
+    return result;
+}
+
+const DAY = 24 * 60 * 60;
+function curtime(expr, state) {
+    const result = getValue(expr.args?.value?.[0], state);
+    result.name = expr.args ? `CURTIME(${result.name ?? ''})` : 'CURRENT_TIME';
+    if (!result.err && result.type) {
+        const decimals = typeof result.value === 'number' ? result.value : 0;
+        if (decimals > 6) {
+            result.err = 'ER_TOO_BIG_PRECISION';
+        }
+        const currentTime = (Date.now() / 1000) % DAY;
+        result.value = createSQLTime({ time: currentTime, decimals });
+        result.type = 'time';
+    }
+    return result;
+}
+function hour(expr, state) {
+    assertArgCountParse(expr, 1);
+    const result = getValue(expr.args.value[0], state);
+    result.name = `HOUR(${result.name})`;
+    result.type = 'longlong';
+    if (!result.err && result.value !== null) {
+        const dt = convertTime({
+            value: result.value,
+            timeZone: state.session.timeZone,
+        });
+        result.value = dt
+            ? dt.toSQLDateTime().toDate(state.session.timeZone).getHours()
+            : null;
+    }
+    return result;
+}
+function minute(expr, state) {
+    assertArgCountParse(expr, 1);
+    const result = getValue(expr.args.value[0], state);
+    result.name = `MINUTE(${result.name})`;
+    result.type = 'longlong';
+    if (!result.err && result.value !== null) {
+        const dt = convertTime({
+            value: result.value,
+            timeZone: state.session.timeZone,
+        });
+        result.value = dt
+            ? dt.toSQLDateTime().toDate(state.session.timeZone).getMinutes()
+            : null;
+    }
+    return result;
+}
+function second(expr, state) {
+    assertArgCountParse(expr, 1);
+    const result = getValue(expr.args.value[0], state);
+    result.name = `SECOND(${result.name})`;
+    result.type = 'longlong';
+    if (!result.err && result.value !== null) {
+        const dt = convertTime({
+            value: result.value,
+            timeZone: state.session.timeZone,
+        });
+        if (dt) {
+            const d = new Date(Math.floor(dt.getTime()) * 1000);
+            result.value = d.getSeconds();
+        }
+        else {
+            result.value = null;
+        }
+    }
+    return result;
+}
+function microsecond(expr, state) {
+    assertArgCount(expr, 1);
+    const result = getValue(expr.args.value[0], state);
+    result.name = `MICROSECOND(${result.name})`;
+    result.type = 'longlong';
+    if (!result.err && result.value !== null) {
+        const dt = convertTime({
+            value: result.value,
+            timeZone: state.session.timeZone,
+        });
+        if (dt) {
+            result.value = Math.round(dt.getFraction() * 1000000);
+        }
+        else {
+            result.value = null;
+        }
+    }
+    return result;
+}
+function time(expr, state) {
+    assertArgCount(expr, 1);
+    const result = getValue(expr.args.value[0], state);
+    result.name = `TIME(${result.name})`;
+    result.type = 'time';
+    if (!result.err && result.value !== null) {
+        const dt = convertTime({
+            value: result.value,
+            timeZone: state.session.timeZone,
+        });
+        if (dt) {
+            result.value = dt;
+        }
+        else {
+            result.value = null;
+        }
+    }
+    return result;
+}
+
+function getDecimalsForString(s) {
+    return _scaleNumberString(s);
+}
+function getDecimals(result) {
+    if (result.decimals !== undefined) {
+        return result.decimals;
+    }
+    else if (result.value instanceof SQLDateTime) {
+        return result.value.getDecimals();
+    }
+    else if (result.value instanceof SQLTime) {
+        return result.value.getDecimals();
+    }
+    else {
+        switch (result.type) {
+            case 'string':
+            case 'double':
+                return 31;
+            case 'decimal':
+            case 'number':
+                if (typeof result.value === 'number') {
+                    return _scaleNumber(result.value);
+                }
+                break;
+        }
+    }
+    return 0;
+}
+function _scaleNumber(n) {
+    return _scaleNumberString(String(n));
+}
+function _scaleNumberString(s) {
+    const e = s.indexOf('e');
+    if (e !== -1) {
+        const coeff = s.slice(0, e);
+        const exp = parseInt(s.slice(e + 1), 10);
+        const dot = coeff.indexOf('.');
+        const digits = dot === -1 ? 0 : coeff.length - dot - 1;
+        return Math.max(0, digits - exp);
+    }
+    const i = s.indexOf('.');
+    return i === -1 ? 0 : s.length - i - 1;
+}
+
+function coalesce(expr, state) {
+    const arg_count = expr.args?.value?.length ?? 0;
+    if (arg_count === 0 || !Array.isArray(expr.args?.value)) {
+        throw new SQLError({ err: 'ER_PARSE_ERROR' });
+    }
+    let err = null;
+    let value = null;
+    const names = [];
+    const values = [];
+    for (const sub of expr.args.value) {
+        const result = getValue(sub, state);
+        names.push(result.name ?? '');
+        values.push(result);
+        if (result.err) {
+            err = result.err;
+            break;
+        }
+        else if (value === null && result.value !== null) {
+            value = result.value;
+        }
+    }
+    const { type } = _unionType$1(values);
+    return { err, name: `COALESCE(${names.join(', ')}`, value, type };
+}
+function ifnull(expr, state) {
+    assertArgCount(expr, 2);
+    const arg1 = getValue(expr.args.value[0], state);
+    const arg2 = getValue(expr.args.value[1], state);
+    if (arg1.err) {
+        return arg1;
+    }
+    if (arg2.err) {
+        return arg2;
+    }
+    const value = arg1.value !== null ? arg1.value : arg2.value;
+    const { type } = _unionType$1([arg1, arg2]);
+    return { err: null, name: `IFNULL(${arg1.name}, ${arg2.name})`, value, type };
+}
+function greatest(expr, state) {
+    return _compare(expr, state, 'GREATEST', _gtList, (a, b) => a > b);
+}
+function least(expr, state) {
+    return _compare(expr, state, 'LEAST', _ltList, (a, b) => a < b);
+}
+function _gtList(list, timeZone, convert) {
+    const convert_list = [];
+    let decimals = 0;
+    for (const item of list) {
+        const ret = convert(item.value, undefined);
+        if (ret) {
+            convert_list.push(ret);
+            decimals = Math.max(decimals, ret.getDecimals?.() ?? 0);
+        }
+        else {
+            decimals = Math.max(decimals, getDecimals(item));
+        }
+    }
+    let value = undefined;
+    for (const converted of convert_list) {
+        if (value === undefined || converted.gt(value)) {
+            value = converted;
+        }
+    }
+    if (value && value.getDecimals?.() !== decimals) {
+        value = convert(value, decimals) ?? '';
+    }
+    return { value: value ?? null, decimals };
+}
+function _ltList(list, timeZone, convert) {
+    const convert_list = [];
+    for (const item of list) {
+        const ret = convert(item.value, undefined);
+        if (ret) {
+            convert_list.push(ret);
+        }
+    }
+    let value = undefined;
+    let decimals = 0;
+    if (convert_list.length !== list.length) {
+        let val = undefined;
+        for (const item of list) {
+            const item_s = convertString({ value: item.value, timeZone }) ?? '';
+            if (val === undefined || item_s < val) {
+                val = item_s;
+            }
+        }
+        value = val;
+    }
+    else {
+        decimals = convert_list.reduce((memo, converted) => {
+            const dec = converted.getDecimals?.() ?? 0;
+            return Math.max(memo, dec);
+        }, 0);
+        let val = undefined;
+        for (const converted of convert_list) {
+            if (val === undefined || val.gt(converted)) {
+                val = converted;
+            }
+        }
+        if (val && val.getDecimals?.() !== decimals) {
+            value = convert(val, decimals) ?? '';
+        }
+        else {
+            value = val;
+        }
+    }
+    return { value: value ?? null, decimals };
+}
+function _unionType$1(list) {
+    let compare_type;
+    const types = list.map((e) => e.type);
+    if (types.includes('datetime')) {
+        compare_type = 'datetime';
+    }
+    else if (types.includes('date')) {
+        if (types.includes('time') &&
+            types.every((t) => t === 'date' || t === 'time' || t === 'null')) {
+            compare_type = 'datetime';
+        }
+        else {
+            compare_type = 'date';
+        }
+    }
+    else if (types.includes('time')) {
+        compare_type = 'time';
+    }
+    else if (types.includes('string')) {
+        compare_type = 'string';
+    }
+    else if (types.includes('double')) {
+        compare_type = 'double';
+    }
+    else if (types.includes('number')) {
+        compare_type = 'number';
+    }
+    else if (types.includes('longlong')) {
+        compare_type = 'longlong';
+    }
+    else if (types.every((t) => t === 'null')) {
+        compare_type = 'null';
+    }
+    else {
+        compare_type = 'string';
+    }
+    let type = compare_type;
+    if (type === 'datetime' || type === 'date') {
+        if (types.some((t) => t !== 'datetime' && t !== 'date' && t !== 'time' && t !== 'null')) {
+            type = 'string';
+        }
+    }
+    else if (type === 'time') {
+        if (types.some((t) => t !== 'time' && t !== 'null')) {
+            compare_type = 'string';
+            type = 'string';
+        }
+    }
+    return { compare_type, type };
+}
+function _compare(expr, state, functionName, dateCompare, nativeCompare) {
+    const arg_count = expr.args?.value?.length ?? 0;
+    if (arg_count < 2 || !Array.isArray(expr.args?.value)) {
+        throw new SQLError({
+            err: 'ER_WRONG_PARAMCOUNT_TO_NATIVE_FCT',
+            args: [functionName],
+        });
+    }
+    const { timeZone } = state.session;
+    let value;
+    const names = [];
+    const values = expr.args.value.map((sub) => getValue(sub, state));
+    for (const sub of values) {
+        names.push(sub.name ?? '');
+        if (sub.err) {
+            return sub;
+        }
+        if (sub.value === null) {
+            value = null;
+        }
+    }
+    const { compare_type, type } = _unionType$1(values);
+    let decimals = 0;
+    let convert_func = undefined;
+    if (value !== null) {
+        switch (compare_type) {
+            case 'datetime':
+                convert_func = convertDateTime;
+            // eslint-disable-next-line no-fallthrough
+            case 'date':
+                convert_func ??= convertDate;
+            // eslint-disable-next-line no-fallthrough
+            case 'time':
+                convert_func ??= convertTime;
+                {
+                    const ret = dateCompare(values, timeZone, (val, dec) => convert_func?.({ value: val, timeZone, decimals: dec }) ?? null);
+                    if (ret === null) {
+                        value = null;
+                    }
+                    else {
+                        decimals = ret.decimals;
+                        if (ret.value &&
+                            type === 'string' &&
+                            typeof ret.value !== 'string') {
+                            value = ret.value.toString({ timeZone, decimals });
+                        }
+                        else {
+                            value = ret.value;
+                        }
+                    }
+                }
+                break;
+            case 'longlong':
+                {
+                    let val = undefined;
+                    for (const sub of values) {
+                        if (typeof val === 'bigint' || typeof sub.value === 'bigint') {
+                            const val_big = BigInt(sub.value);
+                            if (val === undefined || nativeCompare(val_big, val)) {
+                                val = val_big;
+                            }
+                        }
+                        else {
+                            const val_num = Number(sub.value);
+                            if (val === undefined || nativeCompare(val_num, val)) {
+                                val = val_num;
+                            }
+                        }
+                    }
+                    value = val;
+                }
+                break;
+            case 'double':
+            case 'number':
+                {
+                    let val = undefined;
+                    for (const sub of values) {
+                        const val_n = Number(sub.value);
+                        if (val === undefined || nativeCompare(val_n, val)) {
+                            val = val_n;
+                        }
+                    }
+                    value = val;
+                }
+                break;
+            default:
+            case 'string':
+                {
+                    let val = undefined;
+                    for (const sub of values) {
+                        const val_s = String(sub.value);
+                        if (val === undefined || nativeCompare(val_s, val)) {
+                            val = val_s;
+                        }
+                    }
+                    value = val;
+                }
+                break;
+        }
+    }
+    return {
+        err: null,
+        value,
+        type,
+        name: `${functionName}(${names.join(', ')})`,
+        decimals,
+    };
+}
+
+function database(expr, state) {
+    assertArgCountParse(expr, 0);
+    return {
+        err: null,
+        value: state.session.getCurrentDatabase(),
+        type: 'string',
+    };
+}
+function isnull(expr, state) {
+    assertArgCount(expr, 1);
+    const result = getValue(expr.args.value[0], state);
+    result.name = `ISNULL(${result.name})`;
+    result.type = 'longlong';
+    if (!result.err) {
+        result.value = result.value === null ? 1 : 0;
+    }
+    return result;
+}
+function sleep(expr, state) {
+    assertArgCount(expr, 1);
+    const result = getValue(expr.args.value[0], state);
+    result.name = `SLEEP(${result.name})`;
+    const sleep_ms = convertNum(result.value);
+    if (sleep_ms !== null && sleep_ms > 0) {
+        result.sleep_ms = sleep_ms * 1000;
+    }
+    // SLEEP returns 0 on success in MySQL
+    result.value = 0;
+    result.type = 'longlong';
+    return result;
+}
+function not$2(expr, state) {
+    assertArgCount(expr, 1);
+    const result = getValue(expr.args.value[0], state);
+    result.name = `NOT(${result.name})`;
+    result.type = 'longlong';
+    if (!result.err && result.value !== null) {
+        const num = convertNum(result.value);
+        result.value = num ? 0 : 1;
+    }
+    return result;
+}
+function ifFunc(expr, state) {
+    assertArgCount(expr, 3);
+    const condition = getValue(expr.args.value[0], state);
+    const trueValue = getValue(expr.args.value[1], state);
+    const falseValue = getValue(expr.args.value[2], state);
+    const err = condition.err || trueValue.err || falseValue.err || null;
+    let value;
+    let type;
+    const name = `IF(${condition.name}, ${trueValue.name}, ${falseValue.name})`;
+    if (!err) {
+        const condResult = convertNum(condition.value);
+        if (condResult === null || condResult === 0) {
+            value = falseValue.value;
+        }
+        else {
+            value = trueValue.value;
+        }
+        // Use union type logic from func_comp.ts
+        const types = [trueValue.type, falseValue.type];
+        if (types.includes('datetime')) {
+            type = 'datetime';
+        }
+        else if (types.includes('date')) {
+            type = 'date';
+        }
+        else if (types.includes('time')) {
+            type = 'time';
+        }
+        else if (types.includes('string')) {
+            type = 'string';
+        }
+        else if (types.includes('double')) {
+            type = 'double';
+        }
+        else if (types.includes('number')) {
+            type = 'number';
+        }
+        else if (types.includes('longlong')) {
+            type = 'longlong';
+        }
+        else {
+            type = 'string';
+        }
+        // If temporal type mixed with non-temporal, return string
+        if (type === 'datetime' || type === 'date' || type === 'time') {
+            if (types.some((t) => t !== type && t !== 'null')) {
+                type = 'string';
+            }
+        }
+    }
+    else {
+        type = 'longlong';
+    }
+    return { err, name, value, type };
+}
+
+const methods$2 = {
+    database,
+    schema: database,
+    isnull,
+    sleep,
+    length,
+    octet_length: length,
+    char_length,
+    character_length: char_length,
+    concat,
+    left,
+    right,
+    lower,
+    lcase: lower,
+    upper,
+    ucase: upper,
+    trim,
+    ltrim,
+    rtrim,
+    reverse,
+    repeat,
+    substring,
+    substr: substring,
+    mid: substring,
+    replace,
+    ascii,
+    ord,
+    space,
+    hex,
+    unhex,
+    concat_ws,
+    lpad,
+    rpad,
+    locate,
+    instr,
+    position: locate,
+    strcmp,
+    abs,
+    ceil,
+    ceiling: ceil,
+    floor,
+    round,
+    mod,
+    pow,
+    power: pow,
+    sqrt,
+    sign,
+    bin,
+    oct,
+    pi,
+    degrees,
+    radians,
+    exp,
+    ln,
+    log,
+    log2,
+    log10,
+    acos,
+    asin,
+    atan,
+    atan2,
+    cos,
+    sin,
+    tan,
+    cot,
+    greatest,
+    least,
+    not: not$2,
+    coalesce,
+    ifnull,
+    nullif,
+    if: ifFunc,
+    now,
+    sysdate: now,
+    localtime: now,
+    localtimestamp: now,
+    current_timestamp: now,
+    from_unixtime,
+    date,
+    date_format,
+    date_add,
+    adddate: date_add,
+    date_sub,
+    subdate: date_sub,
+    datediff,
+    timestampdiff,
+    curdate,
+    current_date: curdate,
+    curtime,
+    current_time: curtime,
+    unix_timestamp,
+    year,
+    month,
+    day,
+    dayofmonth: day,
+    hour,
+    minute,
+    second,
+    dayofweek,
+    dayname,
+    monthname,
+    dayofyear,
+    week,
+    weekday,
+    quarter,
+    time,
+    microsecond,
+    last_day,
+    weekofyear,
+    yearweek,
+};
+
 function interval(expr, state) {
     const result = getValue(expr.expr, state);
     result.name = `INTERVAL ${result.name} ${expr.unit}`;
@@ -4801,7 +6940,7 @@ function plus(expr, state) {
 function not$1(expr, state) {
     const result = getValue(expr.expr, state);
     result.name = 'NOT ' + result.name;
-    result.type = 'number';
+    result.type = 'longlong';
     if (!result.err && result.value !== null) {
         result.value = convertNum(result.value) ? 0 : 1;
     }
@@ -4810,10 +6949,17 @@ function not$1(expr, state) {
 function minus$1(expr, state) {
     const result = getValue(expr.expr, state);
     result.name = '-' + result.name;
-    result.type = 'number';
-    if (!result.err && result.value !== null) {
-        const num = convertNum(result.value);
-        result.value = num !== null ? -num : null;
+    if (!result.err) {
+        if (result.value === null) {
+            result.type = 'double';
+        }
+        else {
+            const num = convertNum(result.value);
+            result.value = num !== null ? -num : null;
+            if (result.type === 'string') {
+                result.type = 'double';
+            }
+        }
     }
     return result;
 }
@@ -4905,6 +7051,36 @@ function _getSystemTimezone() {
     return Intl.DateTimeFormat().resolvedOptions().timeZone;
 }
 
+function getDatabaseFromTable(ast) {
+    if (ast.type === 'create') {
+        if (Array.isArray(ast.table)) {
+            return ast.table[0]?.db;
+        }
+        else if (ast.table) {
+            return ast.table.db ?? undefined;
+        }
+    }
+    return undefined;
+}
+function getTableFromTable(ast) {
+    if (ast.type === 'create') {
+        if (Array.isArray(ast.table)) {
+            return ast.table[0]?.table;
+        }
+        else if (ast.table) {
+            return ast.table.table;
+        }
+    }
+    return undefined;
+}
+function getDatabaseFromUpdate(ast) {
+    if (ast.type === 'update') {
+        if (Array.isArray(ast.from)) {
+            return ast.from[0]?.db;
+        }
+    }
+    return undefined;
+}
 // Helper to extract function name from node-sql-parser AST format
 function getFunctionName(nameObj) {
     if (typeof nameObj === 'string') {
@@ -4957,9 +7133,20 @@ function getValue(expr, state) {
     const type = expr?.type;
     if (!expr) ;
     else if (type === 'number') {
-        result.value =
-            typeof expr.value === 'string' ? Number(expr.value) : expr.value;
-        result.type = 'number';
+        if (typeof expr.value === 'number') {
+            result.value = expr.value;
+            result.type = Number.isInteger(result.value) ? 'longlong' : 'number';
+        }
+        else {
+            result.value = Number(expr.value);
+            if (typeof expr.value === 'string' && expr.value.includes('.')) {
+                result.type = 'number';
+                result.decimals = getDecimalsForString(expr.value);
+            }
+            else {
+                result.type = Number.isInteger(result.value) ? 'longlong' : 'number';
+            }
+        }
     }
     else if (type === 'bigint') {
         const val = toBigInt(expr.value);
@@ -4975,12 +7162,17 @@ function getValue(expr, state) {
         result.value = expr.value;
         result.name = `"${result.value}"`;
     }
+    else if (type === 'single_quote_string') {
+        result.value = expr.value;
+        result.name = `'${result.value}'`;
+    }
     else if (type === 'null') {
         result.value = null;
     }
     else if (type === 'bool') {
         result.value = expr.value ? 1 : 0;
         result.name = expr.value ? 'TRUE' : 'FALSE';
+        result.type = 'longlong';
     }
     else if (type === 'hex_string' || type === 'full_hex_string') {
         result.value = Buffer.from(expr.value, 'hex');
@@ -5101,11 +7293,23 @@ function getValue(expr, state) {
             const val = session.getVariable(name);
             if (val === undefined) {
                 result.value = null;
-                result.type = 'null';
+                result.type = 'string';
             }
             else {
                 result.value = val.value;
-                result.type = val.type;
+                // MySQL converts user variable types to blob/string types
+                if (val.type === 'string' || val.type === 'char') {
+                    result.type = 'long_blob';
+                }
+                else if (val.type === 'datetime' ||
+                    val.type === 'date' ||
+                    val.type === 'time' ||
+                    val.type === 'null') {
+                    result.type = 'medium_blob';
+                }
+                else {
+                    result.type = val.type;
+                }
             }
         }
         else {
@@ -5114,20 +7318,15 @@ function getValue(expr, state) {
     }
     else if (type === 'column_ref') {
         const colRef = expr;
-        // Handle both ColumnRefItem and ColumnRefExpr
         let columnName;
         let columnValue;
         if ('column' in colRef) {
-            // ColumnRefItem
             columnValue = colRef.column;
-            columnName =
-                typeof columnValue === 'string' ? columnValue : String(columnValue);
+            columnName = String(columnValue);
         }
         else if ('expr' in colRef && colRef.expr && 'column' in colRef.expr) {
-            // ColumnRefExpr
             columnValue = colRef.expr.column;
-            columnName =
-                typeof columnValue === 'string' ? columnValue : String(columnValue);
+            columnName = String(columnValue);
         }
         else {
             columnName = String(colRef);
@@ -5429,6 +7628,9 @@ function convertWhere(expr, state) {
         else if (type === 'double_quote_string') {
             value = `'${expr.value}'`;
         }
+        else if (type === 'single_quote_string') {
+            value = `'${expr.value}'`;
+        }
         else if (type === 'null') {
             value = null;
         }
@@ -5473,7 +7675,7 @@ function convertWhere(expr, state) {
             if ('from' in colRef && colRef.from?.key === from_key) {
                 const colRefItem = colRef;
                 const col = colRefItem.column;
-                value = typeof col === 'string' ? col : String(col);
+                value = String(col);
             }
             else {
                 err = 'unsupported';
@@ -5493,7 +7695,7 @@ function convertWhere(expr, state) {
     return { err, value };
 }
 
-async function singleDelete$1(params) {
+async function singleDelete$2(params) {
     const { dynamodb, session, ast } = params;
     const { from, where } = ast;
     let no_single = false;
@@ -5533,7 +7735,7 @@ RETURNING ALL OLD *
         throw err;
     }
 }
-async function multipleDelete$1(params) {
+async function multipleDelete$2(params) {
     const { dynamodb, list } = params;
     if (!list) {
         return { affectedRows: 0 };
@@ -5557,7 +7759,7 @@ async function multipleDelete$1(params) {
     return { affectedRows };
 }
 
-async function insertRowList$1(params) {
+async function insertRowList$2(params) {
     if (params.list.length === 0) {
         return { affectedRows: 0 };
     }
@@ -5714,18 +7916,18 @@ function _escapeItem(item) {
     return s;
 }
 
-async function getRowList$1(params) {
+async function getRowList$2(params) {
     const { list } = params;
     const source_map = {};
     const column_map = {};
     for (const from of list) {
-        const { results, column_list } = await _getFromTable$1({ ...params, from });
+        const { results, column_list } = await _getFromTable$2({ ...params, from });
         source_map[from.key] = results;
         column_map[from.key] = column_list;
     }
     return { source_map, column_map };
 }
-async function _getFromTable$1(params) {
+async function _getFromTable$2(params) {
     const { dynamodb, session, from, where } = params;
     const { table, _requestSet, _requestAll, join } = from;
     const request_columns = [..._requestSet];
@@ -5771,7 +7973,7 @@ async function _getFromTable$1(params) {
     }
 }
 
-async function singleUpdate$1(params) {
+async function singleUpdate$2(params) {
     const { dynamodb, session, ast } = params;
     const { set, from, where } = ast;
     const where_result = convertWhere(where, {
@@ -5781,7 +7983,7 @@ async function singleUpdate$1(params) {
     if (where_result.err) {
         throw new NoSingleOperationError();
     }
-    if (from.length > 1 || !where_result.value) {
+    if (!from || from.length > 1 || !where_result.value) {
         throw new NoSingleOperationError();
     }
     const value_list = set.map((object) => {
@@ -5831,7 +8033,7 @@ RETURNING MODIFIED OLD *
         throw err;
     }
 }
-async function multipleUpdate$1(params) {
+async function multipleUpdate$2(params) {
     const { dynamodb, list } = params;
     if (!list) {
         return { affectedRows: 0, changedRows: 0 };
@@ -5862,26 +8064,26 @@ async function multipleUpdate$1(params) {
     return { affectedRows, changedRows };
 }
 
-async function commit$2(_params) { }
-async function rollback$2(_params) { }
+async function commit$3(_params) { }
+async function rollback$3(_params) { }
 
 var RawEngine = /*#__PURE__*/Object.freeze({
     __proto__: null,
-    addColumn: addColumn$1,
-    commit: commit$2,
-    createIndex: createIndex$1,
-    createTable: createTable$2,
-    deleteIndex: deleteIndex$1,
-    dropTable: dropTable$2,
-    getRowList: getRowList$1,
-    getTableInfo: getTableInfo$1,
-    getTableList: getTableList$2,
-    insertRowList: insertRowList$1,
-    multipleDelete: multipleDelete$1,
-    multipleUpdate: multipleUpdate$1,
-    rollback: rollback$2,
-    singleDelete: singleDelete$1,
-    singleUpdate: singleUpdate$1
+    addColumn: addColumn$2,
+    commit: commit$3,
+    createIndex: createIndex$2,
+    createTable: createTable$3,
+    deleteIndex: deleteIndex$2,
+    dropTable: dropTable$3,
+    getRowList: getRowList$2,
+    getTableInfo: getTableInfo$2,
+    getTableList: getTableList$3,
+    insertRowList: insertRowList$2,
+    multipleDelete: multipleDelete$2,
+    multipleUpdate: multipleUpdate$2,
+    rollback: rollback$3,
+    singleDelete: singleDelete$2,
+    singleUpdate: singleUpdate$2
 });
 
 const g_tableMap = new Map();
@@ -5928,7 +8130,7 @@ function deleteTable(database, table) {
     g_tableMap.delete(`${database}.${table}`);
 }
 
-async function getTableInfo(params) {
+async function getTableInfo$1(params) {
     const { session, database, table } = params;
     const data = getTable(database, table, session);
     if (data) {
@@ -5941,10 +8143,10 @@ async function getTableInfo(params) {
     }
     throw new SQLError({ err: 'table_not_found', args: [table] });
 }
-async function getTableList$1(_params) {
+async function getTableList$2(_params) {
     return [];
 }
-async function createTable$1(params) {
+async function createTable$2(params) {
     const { session, database, table, primary_key, column_list, is_temp } = params;
     if (primary_key.length === 0) {
         throw new SQLError({
@@ -5965,7 +8167,7 @@ async function createTable$1(params) {
         saveTable(database, table, data);
     }
 }
-async function dropTable$1(params) {
+async function dropTable$2(params) {
     const { session, database, table } = params;
     if (session.getTempTable(database, table)) {
         session.deleteTempTable(database, table);
@@ -5974,14 +8176,14 @@ async function dropTable$1(params) {
         deleteTable(database, table);
     }
 }
-async function addColumn(_params) { }
-async function createIndex(_params) { }
-async function deleteIndex(_params) { }
+async function addColumn$1(_params) { }
+async function createIndex$1(_params) { }
+async function deleteIndex$1(_params) { }
 
-async function singleDelete(_params) {
+async function singleDelete$1(_params) {
     throw new NoSingleOperationError();
 }
-async function multipleDelete(params) {
+async function multipleDelete$1(params) {
     const { session, list } = params;
     if (!list) {
         return { affectedRows: 0 };
@@ -6019,7 +8221,7 @@ async function multipleDelete(params) {
     return { affectedRows };
 }
 
-async function insertRowList(params) {
+async function insertRowList$1(params) {
     const { session, database, table, list, duplicate_mode } = params;
     const data = getTable(database, table, session);
     if (list.length === 0) {
@@ -6074,18 +8276,18 @@ function _rowEqual(a, b) {
     });
 }
 
-async function getRowList(params) {
+async function getRowList$1(params) {
     const { list } = params;
     const source_map = {};
     const column_map = {};
     for (const from of list) {
-        const { row_list, column_list } = _getFromTable({ ...params, from });
+        const { row_list, column_list } = _getFromTable$1({ ...params, from });
         source_map[from.key] = row_list;
         column_map[from.key] = column_list;
     }
     return { source_map, column_map };
 }
-function _getFromTable(params) {
+function _getFromTable$1(params) {
     const { session, from } = params;
     const { db, table } = from;
     const data = getTable(db, table, session);
@@ -6098,10 +8300,10 @@ function _getFromTable(params) {
     };
 }
 
-async function singleUpdate(_params) {
+async function singleUpdate$1(_params) {
     throw new NoSingleOperationError();
 }
-async function multipleUpdate(params) {
+async function multipleUpdate$1(params) {
     const { session, list } = params;
     if (!list) {
         return { affectedRows: 0, changedRows: 0 };
@@ -6167,7 +8369,7 @@ function _makePrimaryKey(primary_key, row) {
     return JSON.stringify(key_values);
 }
 
-async function commit$1(params) {
+async function commit$2(params) {
     const { session, data } = params;
     for (const key in data) {
         const entry = data[key];
@@ -6176,9 +8378,258 @@ async function commit$1(params) {
         }
     }
 }
-async function rollback$1(_params) { }
+async function rollback$2(_params) { }
 
 var MemoryEngine = /*#__PURE__*/Object.freeze({
+    __proto__: null,
+    addColumn: addColumn$1,
+    commit: commit$2,
+    createIndex: createIndex$1,
+    createTable: createTable$2,
+    deleteIndex: deleteIndex$1,
+    dropTable: dropTable$2,
+    getRowList: getRowList$1,
+    getTableInfo: getTableInfo$1,
+    getTableList: getTableList$2,
+    insertRowList: insertRowList$1,
+    multipleDelete: multipleDelete$1,
+    multipleUpdate: multipleUpdate$1,
+    rollback: rollback$2,
+    singleDelete: singleDelete$1,
+    singleUpdate: singleUpdate$1
+});
+
+async function getTableInfo(params) {
+    const { table } = params;
+    return { table, primary_key: [], column_list: [], is_open: false };
+}
+async function getTableList$1(_params) {
+    return ['SCHEMATA', 'TABLES', 'COLUMNS'];
+}
+
+function deepClone(input) {
+    const seen = new WeakMap();
+    function _clone(value) {
+        if (value === null || typeof value !== 'object') {
+            return value;
+        }
+        const cached = seen.get(value);
+        if (cached !== undefined) {
+            return cached;
+        }
+        else if (Array.isArray(value)) {
+            const arr = [];
+            seen.set(value, arr);
+            for (const item of value) {
+                arr.push(_clone(item));
+            }
+            return arr;
+        }
+        else if (value instanceof Map) {
+            const result = new Map();
+            seen.set(value, result);
+            for (const [k, v] of value) {
+                result.set(_clone(k), _clone(v));
+            }
+            return result;
+        }
+        else if (value instanceof Set) {
+            const result = new Set();
+            seen.set(value, result);
+            for (const v of value) {
+                result.add(_clone(v));
+            }
+            return result;
+        }
+        const obj = {};
+        seen.set(value, obj);
+        for (const key in value) {
+            if (Object.prototype.hasOwnProperty.call(value, key)) {
+                obj[key] = _clone(value[key]);
+            }
+        }
+        return obj;
+    }
+    return _clone(input);
+}
+
+const CATALOG_LIST = [
+    {
+        CATALOG_NAME: { value: 'def', type: 'string' },
+        CATALOG_DESCRIPTION: { value: 'Primary catalog', type: 'string' },
+        CATALOG_OWNER: { value: 'SYSTEM', type: 'string' },
+    },
+];
+async function getRowList(params) {
+    const { list } = params;
+    const source_map = {};
+    const column_map = {};
+    for (const from of list) {
+        const { results, column_list } = await _getFromTable({ ...params, from });
+        source_map[from.key] = results;
+        column_map[from.key] = column_list;
+    }
+    return { source_map, column_map };
+}
+async function _getFromTable(params) {
+    const { dynamodb } = params;
+    const table = params.from.table.toLowerCase();
+    if (table === 'catalogs') {
+        return {
+            results: deepClone(CATALOG_LIST),
+            column_list: Object.keys(CATALOG_LIST[0]),
+        };
+    }
+    else if (table === 'schemata') {
+        const list = getDatabaseList();
+        const results = list.map(_dbToSchemata);
+        return { results, column_list: Object.keys(results[0] ?? {}) };
+    }
+    else if (table === 'tables') {
+        const list = getDatabaseList();
+        const results = [];
+        for (const database of list) {
+            const tables = await getTableList({ dynamodb, database });
+            for (const found of tables) {
+                results.push(_tableToTable(database, found));
+            }
+        }
+        return { results, column_list: Object.keys(results[0] ?? {}) };
+    }
+    else {
+        throw new SQLError({
+            err: 'ER_BAD_TABLE_ERROR',
+            args: [params.from.table],
+        });
+    }
+}
+function _dbToSchemata(database) {
+    return {
+        CATALOG_NAME: { value: 'def', type: 'string' },
+        SCHEMA_NAME: { value: database, type: 'string' },
+        DEFAULT_CHARACTER_SET_NAME: { value: 'utf8mb4', type: 'string' },
+        DEFAULT_COLLATION_NAME: { value: 'utf8mb4_0900_as_cs', type: 'string' },
+        SQL_PATH: { value: null, type: 'null' },
+        DEFAULT_ENCRYPTION: { value: 'NO', type: 'char' },
+    };
+}
+function _tableToTable(database, table) {
+    return {
+        TABLE_CATALOG: { value: 'def', type: 'string' },
+        TABLE_SCHEMA: { value: database, type: 'string' },
+        TABLE_NAME: { value: table, type: 'string' },
+        TABLE_TYPE: { value: 'BASE TABLE', type: 'string' },
+        ENGINE: { value: null, type: 'string' },
+        VERSION: { value: 10n, type: 'longlong' },
+        ROW_FORMAT: { value: 'Dynamic', type: 'string' },
+        TABLE_ROWS: { value: 0n, type: 'longlong' },
+        AVG_ROW_LENGTH: { value: 0n, type: 'longlong' },
+        DATA_LENGTH: { value: 0n, type: 'longlong' },
+        MAX_DATA_LENGTH: { value: 0n, type: 'longlong' },
+        INDEX_LENGTH: { value: 0n, type: 'longlong' },
+        DATA_FREE: { value: 0n, type: 'longlong' },
+        AUTO_INCREMENT: { value: null, type: 'string' },
+        CREATE_TIME: {
+            value: new SQLDateTime({ time: Date.now() / 1000 }),
+            type: 'datetime',
+        },
+        UPDATE_TIME: { value: null, type: 'datetime' },
+        CHECK_TIME: { value: null, type: 'datetime' },
+        TABLE_COLLATION: { value: null, type: 'string' },
+        CHECKSUM: { value: null, type: 'longlong' },
+        CREATE_OPTIONS: { value: '', type: 'string' },
+        TABLE_COMMENT: { value: '', type: 'string' },
+    };
+}
+/*
+{
+    TABLE_CATALOG: 'def',
+    TABLE_SCHEMA: '_dynamodb',
+    TABLE_NAME: 'otherother',
+    TABLE_TYPE: 'BASE TABLE',
+    ENGINE: 'InnoDB',
+    VERSION: 10n,
+    ROW_FORMAT: 'Dynamic',
+    TABLE_ROWS: 0n,
+    AVG_ROW_LENGTH: 0n,
+    DATA_LENGTH: 16384n,
+    MAX_DATA_LENGTH: 0n,
+    INDEX_LENGTH: 0n,
+    DATA_FREE: 0n,
+    AUTO_INCREMENT: null,
+    CREATE_TIME: '2025-11-25 16:43:42',
+    UPDATE_TIME: null,
+    CHECK_TIME: null,
+    TABLE_COLLATION: 'utf8mb4_0900_ai_ci',
+    CHECKSUM: null,
+    CREATE_OPTIONS: '',
+    TABLE_COMMENT: ''
+  }*/
+
+async function commit$1(_params) { }
+async function rollback$1(_params) { }
+async function createTable$1() {
+    throw new SQLError({
+        code: 'ER_DBACCESS_DENIED_ERROR',
+        args: ['user', 'information_schema'],
+    });
+}
+async function dropTable$1() {
+    throw new SQLError({
+        code: 'ER_DBACCESS_DENIED_ERROR',
+        args: ['user', 'information_schema'],
+    });
+}
+async function createIndex() {
+    throw new SQLError({
+        code: 'ER_DBACCESS_DENIED_ERROR',
+        args: ['user', 'information_schema'],
+    });
+}
+async function deleteIndex() {
+    throw new SQLError({
+        code: 'ER_DBACCESS_DENIED_ERROR',
+        args: ['user', 'information_schema'],
+    });
+}
+async function addColumn() {
+    throw new SQLError({
+        code: 'ER_DBACCESS_DENIED_ERROR',
+        args: ['user', 'information_schema'],
+    });
+}
+async function singleDelete() {
+    throw new SQLError({
+        code: 'ER_DBACCESS_DENIED_ERROR',
+        args: ['user', 'information_schema'],
+    });
+}
+async function multipleDelete() {
+    throw new SQLError({
+        code: 'ER_DBACCESS_DENIED_ERROR',
+        args: ['user', 'information_schema'],
+    });
+}
+async function singleUpdate() {
+    throw new SQLError({
+        code: 'ER_DBACCESS_DENIED_ERROR',
+        args: ['user', 'information_schema'],
+    });
+}
+async function multipleUpdate() {
+    throw new SQLError({
+        code: 'ER_DBACCESS_DENIED_ERROR',
+        args: ['user', 'information_schema'],
+    });
+}
+async function insertRowList() {
+    throw new SQLError({
+        code: 'ER_DBACCESS_DENIED_ERROR',
+        args: ['user', 'information_schema'],
+    });
+}
+
+var InformationSchemaEngine = /*#__PURE__*/Object.freeze({
     __proto__: null,
     addColumn: addColumn,
     commit: commit$1,
@@ -6245,19 +8696,16 @@ const NullEngine = {
     },
 };
 function getEngineByName(name) {
-    let ret;
     switch (name) {
         case 'raw':
-            ret = RawEngine;
-            break;
+            return RawEngine;
         case 'memory':
-            ret = MemoryEngine;
-            break;
+            return MemoryEngine;
+        case 'information_schema':
+            return InformationSchemaEngine;
         default:
-            ret = NullEngine;
-            break;
+            return NullEngine;
     }
-    return ret;
 }
 function getDatabaseError(database) {
     const error = new SQLError({ err: 'db_not_found', args: [database] });
@@ -6360,7 +8808,7 @@ function getTableError(table) {
     };
 }
 
-const BUILT_IN = ['_dynamodb'];
+const BUILT_IN = ['_dynamodb', 'information_schema'];
 const g_schemaMap = new Map();
 function getEngine(database, table, session) {
     let ret;
@@ -6368,6 +8816,9 @@ function getEngine(database, table, session) {
     const schema_table = table ? schema?.get(table) : undefined;
     if (database === '_dynamodb') {
         ret = getEngineByName('raw');
+    }
+    else if (database === 'information_schema') {
+        ret = getEngineByName('information_schema');
     }
     else if (!database) {
         ret = getDatabaseError('');
@@ -6397,6 +8848,10 @@ async function getTableList(params) {
     const { dynamodb, database } = params;
     if (database === '_dynamodb') {
         const engine = getEngineByName('raw');
+        return await engine.getTableList({ dynamodb });
+    }
+    else if (database === 'information_schema') {
+        const engine = getEngineByName('information_schema');
         return await engine.getTableList({ dynamodb });
     }
     else if (g_schemaMap.has(database)) {
@@ -6505,8 +8960,7 @@ async function dropTable(params) {
 
 async function query$9(params) {
     const { dynamodb, session, ast } = params;
-    const astWithExpr = ast;
-    const action = astWithExpr?.expr?.action?.value?.toLowerCase();
+    const action = ast?.expr?.action?.value?.toLowerCase();
     if (action === 'begin' || action === 'start') {
         startTransaction({ session, auto_commit: false });
     }
@@ -6579,7 +9033,7 @@ async function _txEach(params, callback) {
     if (transaction) {
         for (const name of transaction.getEngineNameList()) {
             const engine = getEngineByName(name);
-            const data = transaction.getData(name);
+            const data = transaction.getData(name) ?? {};
             await callback({ engine, dynamodb, session, transaction, data });
         }
         session.setTransaction(null);
@@ -6727,6 +9181,7 @@ function convertType(type, nullable) {
                 zeroFill: false,
                 protocol41: true,
             };
+        case 'decimal':
         case 'number':
             return {
                 catalog: 'def',
@@ -6856,6 +9311,54 @@ function convertType(type, nullable) {
                 zeroFill: false,
                 protocol41: true,
             };
+        case 'long_blob':
+            return {
+                catalog: 'def',
+                db: '',
+                table: '',
+                orgTable: '',
+                name: '',
+                orgName: '',
+                charsetNr: CHARSETS.UTF8_GENERAL_CI,
+                length: 150994944,
+                type: exports.Types.LONG_BLOB,
+                flags,
+                decimals: 31,
+                zeroFill: false,
+                protocol41: true,
+            };
+        case 'medium_blob':
+            return {
+                catalog: 'def',
+                db: '',
+                table: '',
+                orgTable: '',
+                name: '',
+                orgName: '',
+                charsetNr: CHARSETS.BINARY,
+                length: 16777215,
+                type: exports.Types.MEDIUM_BLOB,
+                flags,
+                decimals: 31,
+                zeroFill: false,
+                protocol41: true,
+            };
+        case 'char':
+            return {
+                catalog: 'def',
+                db: '',
+                table: '',
+                orgTable: '',
+                name: '',
+                orgName: '',
+                charsetNr: CHARSETS.UTF8_GENERAL_CI,
+                length: 255,
+                type: exports.Types.STRING,
+                flags,
+                decimals: 0,
+                zeroFill: false,
+                protocol41: true,
+            };
         case 'string':
         default:
             return {
@@ -6886,33 +9389,33 @@ function resolveReferences(ast, current_database) {
             : ast.from;
     const from = Array.isArray(fromRaw) ? fromRaw : null;
     from?.forEach?.((fromItem) => {
-        const from = fromItem;
-        if (!from.db) {
+        const fromEntry = fromItem;
+        if (!fromEntry.db) {
             if (!current_database) {
                 throw new SQLError('no_current_database');
             }
             else {
-                from.db = current_database;
+                fromEntry.db = current_database;
             }
         }
-        if (!from._requestSet) {
-            from._requestSet = new Set();
+        if (!fromEntry._requestSet) {
+            fromEntry._requestSet = new Set();
         }
-        from._requestAll = from._requestAll || false;
-        from.key = from.as || `${from.db}.${from.table}`;
-        if (from.as) {
-            table_map[from.as] = from;
+        fromEntry._requestAll = fromEntry._requestAll || false;
+        fromEntry.key = fromEntry.as || `${fromEntry.db}.${fromEntry.table}`;
+        if (fromEntry.as) {
+            table_map[fromEntry.as] = fromEntry;
         }
         else {
-            if (!table_map[from.table ?? '']) {
-                table_map[from.table ?? ''] = from;
+            if (!table_map[fromEntry.table ?? '']) {
+                table_map[fromEntry.table ?? ''] = fromEntry;
             }
-            if (!db_map[from.db]) {
-                db_map[from.db] = {};
+            if (!db_map[fromEntry.db]) {
+                db_map[fromEntry.db] = {};
             }
-            const dbEntry = db_map[from.db];
-            if (dbEntry && from.table) {
-                dbEntry[from.table] = from;
+            const dbEntry = db_map[fromEntry.db];
+            if (dbEntry && fromEntry.table) {
+                dbEntry[fromEntry.table] = fromEntry;
             }
         }
     });
@@ -6922,14 +9425,14 @@ function resolveReferences(ast, current_database) {
     const table = Array.isArray(tableRaw) ? tableRaw : null;
     table?.forEach?.((object) => {
         const obj = object;
-        const from = obj.db
+        const fromEntry = obj.db
             ? db_map[obj.db]?.[obj.table ?? '']
             : table_map[obj.table ?? ''];
-        if (!from) {
+        if (!fromEntry) {
             throw new SQLError({ err: 'table_not_found', args: [obj.table] });
         }
         else {
-            obj.from = from;
+            obj.from = fromEntry;
         }
     });
     const name_cache = {};
@@ -6974,6 +9477,17 @@ function resolveReferences(ast, current_database) {
     });
 }
 function _resolveObject(object, ast, db_map, table_map, name_cache, result_map) {
+    const fixup_object = object;
+    if (fixup_object.db &&
+        typeof fixup_object.db === 'object' &&
+        fixup_object.db.value) {
+        fixup_object.db = fixup_object.db.value;
+    }
+    if (fixup_object.table &&
+        typeof fixup_object.table === 'object' &&
+        fixup_object.table.value) {
+        fixup_object.table = fixup_object.table.value;
+    }
     const obj = object;
     if (obj.column === '*') {
         if (obj.db) {
@@ -7128,6 +9642,23 @@ function _findRows(source_map, list, where, session, row_list, from_index, start
     return output_count;
 }
 
+function hasAggregate(ast) {
+    if (Array.isArray(ast.columns)) {
+        for (const column of ast.columns) {
+            if (_hasAgg(column)) {
+                return true;
+            }
+        }
+    }
+    return false;
+}
+function formImplicitGroup(params) {
+    const { row_list } = params;
+    if (row_list[0]) {
+        return [{ ...row_list[0], '@@group': row_list }];
+    }
+    return row_list;
+}
 function formGroup(params) {
     const { groupby, ast, row_list, session } = params;
     const group_exprs = [];
@@ -7178,6 +9709,23 @@ function _unroll(list, obj) {
             _unroll(list, objMap[key]);
         }
     }
+}
+function _hasAgg(expr) {
+    if (expr.type === 'aggr_func' ||
+        ('expr' in expr && expr.expr && expr.expr.type === 'aggr_func')) {
+        return true;
+    }
+    if ('args' in expr &&
+        expr.args &&
+        'value' in expr.args &&
+        Array.isArray(expr.args.value)) {
+        for (const sub of expr.args.value) {
+            if (_hasAgg(sub)) {
+                return true;
+            }
+        }
+    }
+    return false;
 }
 
 function sort(row_list, orderby, state) {
@@ -7296,6 +9844,9 @@ async function _evaluateReturn(params) {
     if (groupby) {
         row_list = formGroup({ groupby, ast, row_list, session });
     }
+    else if (hasAggregate(ast)) {
+        row_list = formImplicitGroup({ row_list});
+    }
     for (const row of row_list) {
         const output_row = [];
         for (const column of query_columns) {
@@ -7410,10 +9961,7 @@ function _unionType(old_type, new_type) {
 
 async function query$6(params) {
     const { ast, session } = params;
-    const tableArray = Array.isArray(ast.table) ? ast.table : [ast.table];
-    const firstTable = tableArray[0];
-    const database = (firstTable && 'db' in firstTable ? firstTable.db : null) ??
-        session.getCurrentDatabase();
+    const database = getDatabaseFromTable(ast) ?? session.getCurrentDatabase();
     if (ast.keyword === 'database') {
         return await _createDatabase(params);
     }
@@ -7433,11 +9981,9 @@ async function _createDatabase(params) {
     if (!ast.database) {
         throw new SQLError('bad_database_name');
     }
-    const dbName = typeof ast.database === 'string'
-        ? ast.database
-        : getDatabaseName(ast.database);
+    const name = getDatabaseName(ast.database);
     try {
-        createDatabase(dbName);
+        createDatabase(name);
         return { affectedRows: 1 };
     }
     catch (err) {
@@ -7457,39 +10003,40 @@ async function _createDatabase(params) {
 }
 async function _createTable(params) {
     const { ast, session, dynamodb } = params;
-    const tableArray = Array.isArray(ast.table) ? ast.table : [ast.table];
-    const firstTable = tableArray[0];
-    const database = (firstTable && 'db' in firstTable ? firstTable.db : null) ??
-        session.getCurrentDatabase();
-    const table = firstTable && 'table' in firstTable ? firstTable.table : '';
+    const database = getDatabaseFromTable(ast) ?? session.getCurrentDatabase();
+    const table = getTableFromTable(ast);
+    if (!table) {
+        throw new SQLError('bad_table_name');
+    }
     const duplicate_mode = ast.ignore_replace ?? undefined;
     const column_list = [];
-    let primary_key = [];
-    ast.create_definitions?.forEach?.((defRaw) => {
-        const def = defRaw;
-        if (def.resource === 'column') {
-            column_list.push({
+    const primary_key = [];
+    for (const def of ast.create_definitions ?? []) {
+        if (def.resource === 'column' &&
+            def.column?.type === 'column_ref' &&
+            typeof def.column?.column === 'string') {
+            const col = {
                 name: def.column?.column ?? '',
                 type: def.definition?.dataType ?? 'string',
-            });
-            if (def.primary_key === 'primary key') {
-                primary_key.push({
-                    name: def.column?.column ?? '',
-                    type: def.definition?.dataType ?? 'string',
-                });
+            };
+            column_list.push(col);
+            const def_key = def;
+            if (def_key.primary_key === 'primary key') {
+                primary_key.push(col);
             }
         }
-        else if (def.constraint_type === 'primary key') {
-            primary_key =
-                def.definition?.map?.((sub) => ({
-                    name: sub.column,
-                    type: column_list.find((col) => col.name === sub.column)?.type ??
-                        'string',
-                })) ?? [];
+        else if (def.resource === 'constraint' &&
+            def.constraint_type === 'primary key') {
+            for (const sub of def.definition) {
+                if (sub.type === 'column_ref' && typeof sub.column === 'string') {
+                    const type = column_list.find((col) => col.name === sub.column)?.type ??
+                        'string';
+                    primary_key.push({ name: sub.column, type });
+                }
+            }
         }
-    });
+    }
     let list;
-    // Handle CREATE TABLE AS SELECT
     if (ast.as && ast.query_expr) {
         const opts = { ast: ast.query_expr, session, dynamodb };
         const { rows, columns } = await internalQuery(opts);
@@ -7584,8 +10131,8 @@ async function runSelect(params) {
             continue;
         }
         const { db, table } = object;
-        const engine = getEngine(db ?? undefined, table, session);
-        const opts = { dynamodb, session, database: db ?? undefined, table };
+        const engine = getEngine(db ?? '', table, session);
+        const opts = { dynamodb, session, database: db ?? '', table };
         try {
             const result = await engine.getTableInfo(opts);
             if (result?.primary_key?.length > 0) {
@@ -7674,8 +10221,8 @@ async function _runDelete(params) {
     const table = firstFrom && 'table' in firstFrom ? firstFrom.table : undefined;
     const engine = getEngine(database, table, session);
     if (ast.from.length === 1) {
-        const opts = { dynamodb, session, ast: ast };
         try {
+            const opts = { dynamodb, session, ast };
             const result = await engine.singleDelete(opts);
             return { affectedRows: result.affectedRows };
         }
@@ -7849,11 +10396,11 @@ async function _runInsert(params) {
         }
         catch (err) {
             const error = err;
-            const errStr = String(error?.message || '').toLowerCase();
+            const err_str = String(error?.message || '').toLowerCase();
             if (error?.message === 'resource_not_found' ||
                 error?.err === 'resource_not_found' ||
                 error?.name === 'ResourceNotFoundException' ||
-                errStr.includes('resource not found')) {
+                err_str.includes('resource not found')) {
                 throw new SQLError({
                     err: 'table_not_found',
                     args: error?.args || [table],
@@ -7925,12 +10472,12 @@ async function _handleAssignment(expr, params) {
     if (prefix === '@') {
         session.setVariable(left.name, result);
     }
-    else if (prefix === '@@') {
+    else if (prefix === '@@' || prefix === null) {
         if (scope === 'global') {
-            GlobalSettings$1.setGlobalVariable(typeof name === 'string' ? name : String(name), result.value);
+            GlobalSettings$1.setGlobalVariable(String(name), result.value);
         }
         else if (scope === 'session' || !scope) {
-            session.setSessionVariable(typeof name === 'string' ? name : String(name), result.value);
+            session.setSessionVariable(String(name), result.value);
         }
     }
     else {
@@ -7978,26 +10525,25 @@ async function query(params) {
     const { ast, session } = params;
     const current_database = session.getCurrentDatabase() ?? undefined;
     // Temporarily add from property for resolveReferences
-    const astExtended = ast;
-    astExtended.from = (ast.table ?? []);
-    astExtended.table = null;
-    resolveReferences(astExtended, current_database);
-    const firstFrom = astExtended.from?.[0];
-    const database = (firstFrom && 'db' in firstFrom ? firstFrom.db : null) ?? undefined;
+    ast.from = (ast.table ?? []);
+    ast.table = null;
+    resolveReferences(ast, current_database);
+    const database = getDatabaseFromUpdate(ast);
     if (!database) {
         throw new SQLError('no_current_database');
     }
     return await run(_runUpdate, {
         ...params,
-        ast: astExtended,
+        ast,
     });
 }
 async function _runUpdate(params) {
     const { ast, session, dynamodb } = params;
-    const firstFrom = ast.from?.[0];
-    const database = (firstFrom && 'db' in firstFrom ? firstFrom.db : null) ?? undefined;
-    const table = firstFrom && 'table' in firstFrom ? firstFrom.table : undefined;
-    const engine = getEngine(database, table, session);
+    if (!ast.from || !ast.from[0]) {
+        throw new SQLError('no_current_database');
+    }
+    const { db, table } = ast.from[0];
+    const engine = getEngine(db, table, session);
     if (ast.from.length === 1) {
         const opts = { dynamodb, session, ast };
         try {
@@ -8108,7 +10654,7 @@ function typeCast(value, column, options, timeZone) {
             case exports.Types.NEWDATE:
                 if (options?.dateStrings &&
                     (value instanceof SQLDateTime || value instanceof SQLDate)) {
-                    return value.toString(timeZone);
+                    return value.toString({ timeZone });
                 }
                 else if (options?.dateStrings) {
                     return String(value);
@@ -8124,13 +10670,13 @@ function typeCast(value, column, options, timeZone) {
                 }
             case exports.Types.TIME:
                 if (value instanceof SQLTime) {
-                    return value.toString(timeZone);
+                    return value.toString({ timeZone });
                 }
                 else {
-                    return typeof value === 'string' ? value : String(value);
+                    return String(value);
                 }
             case exports.Types.GEOMETRY:
-                return typeof value === 'string' ? value : String(value);
+                return String(value);
             case exports.Types.VARCHAR:
             case exports.Types.ENUM:
             case exports.Types.SET:
@@ -8140,7 +10686,7 @@ function typeCast(value, column, options, timeZone) {
                     return Buffer.isBuffer(value) ? value : Buffer.from(String(value));
                 }
                 else {
-                    return typeof value === 'string' ? value : String(value);
+                    return String(value);
                 }
             case exports.Types.JSON:
                 if (typeof value === 'object') {
@@ -8239,15 +10785,15 @@ class Query extends node_events.EventEmitter {
                     result_list.push(Object.assign({}, DEFAULT_RESULT, result));
                 }
                 else if (this._session.resultObjects) {
-                    result_list.push(this._transformResultObject(result, columns));
+                    result_list.push(this._transformResultObject(result, columns ?? []));
                 }
                 else {
-                    result_list.push(this._transformResultArray(result, columns));
+                    result_list.push(this._transformResultArray(result, columns ?? []));
                 }
                 schema_list.push(columns);
             }
             if (list.length === 1) {
-                return [result_list[0], schema_list[0] ?? []];
+                return [result_list[0], schema_list[0]];
             }
             else {
                 return [result_list, schema_list];
@@ -8266,25 +10812,25 @@ class Query extends node_events.EventEmitter {
         switch (type) {
             case 'alter':
                 await query$8({ ...params, ast });
-                return { result: DEFAULT_RESULT, columns: [] };
+                return { result: DEFAULT_RESULT, columns: undefined };
             case 'create':
                 return {
                     result: await query$6({ ...params, ast }),
-                    columns: [],
+                    columns: undefined,
                 };
             case 'delete':
                 return {
                     result: await query$5({ ...params, ast }),
-                    columns: [],
+                    columns: undefined,
                 };
             case 'drop':
                 await query$4({ ...params, ast });
-                return { result: DEFAULT_RESULT, columns: [] };
+                return { result: DEFAULT_RESULT, columns: undefined };
             case 'insert':
             case 'replace':
                 return {
                     result: await query$3({ ...params, ast }),
-                    columns: [],
+                    columns: undefined,
                 };
             case 'show': {
                 const { rows, columns } = await query$1({ ...params, ast });
@@ -8299,18 +10845,18 @@ class Query extends node_events.EventEmitter {
             }
             case 'set':
                 await query$2({ ...params, ast });
-                return { result: DEFAULT_RESULT, columns: [] };
+                return { result: DEFAULT_RESULT, columns: undefined };
             case 'update':
                 return {
                     result: await query({ ...params, ast }),
-                    columns: [],
+                    columns: undefined,
                 };
             case 'transaction':
                 await query$9({ ...params, ast });
-                return { result: DEFAULT_RESULT, columns: [] };
+                return { result: DEFAULT_RESULT, columns: undefined };
             case 'use':
                 await _useDatabase({ ast, session: this._session });
-                return { result: DEFAULT_RESULT, columns: [] };
+                return { result: DEFAULT_RESULT, columns: undefined };
             default: {
                 shared.logger.error('unsupported statement type:', type);
                 throw new SQLError({
@@ -8401,7 +10947,7 @@ async function _useDatabase(params) {
 }
 
 let g_threadId = 1;
-class Session extends node_events.EventEmitter {
+class Session extends SQLMode {
     config;
     state = 'connected';
     threadId = g_threadId++;
@@ -8419,7 +10965,6 @@ class Session extends node_events.EventEmitter {
     _collationConnection;
     _divPrecisionIncrement;
     _timeZone;
-    _sqlMode;
     _timestamp = 0;
     _insertId = 0n;
     _lastInsertId = 0n;
@@ -8428,9 +10973,6 @@ class Session extends node_events.EventEmitter {
     }
     get divPrecisionIncrement() {
         return this._divPrecisionIncrement;
-    }
-    get sqlMode() {
-        return this._sqlMode;
     }
     get timeZone() {
         return this._timeZone;
@@ -8445,7 +10987,7 @@ class Session extends node_events.EventEmitter {
         return this._timestamp;
     }
     constructor(params) {
-        super();
+        super(GlobalSettings$1.sqlMode);
         this.config = params || {};
         this.dynamodb = createDynamoDB(params);
         this.multipleStatements = Boolean(params?.multipleStatements ?? false);
@@ -8453,7 +10995,6 @@ class Session extends node_events.EventEmitter {
         this.typeCast = params?.typeCast ?? true;
         this._collationConnection = GlobalSettings$1.collationConnection;
         this._divPrecisionIncrement = GlobalSettings$1.divPrecisionIncrement;
-        this._sqlMode = GlobalSettings$1.sqlMode;
         this._timeZone = GlobalSettings$1.timeZone;
         if (params?.dateStrings) {
             this.typeCastOptions.dateStrings = true;
@@ -8536,7 +11077,7 @@ class Session extends node_events.EventEmitter {
                 this._timeZone = String(value);
                 return;
             case 'SQL_MODE':
-                this._sqlMode = String(value);
+                this.sqlMode = String(value);
                 return;
             case 'TIMESTAMP':
                 this._timestamp = Number(value);
