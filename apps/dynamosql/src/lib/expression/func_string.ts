@@ -1,6 +1,7 @@
 import { getValue } from './evaluate';
 import { convertNum, convertString } from '../helpers/sql_conversion';
 import { assertArgCount, assertArgCountParse } from '../helpers/arg_count';
+import * as crypto from 'crypto';
 
 import type { Function, ExpressionValue } from 'node-sql-parser';
 import type { EvaluationState, EvaluationResult } from './evaluate';
@@ -992,4 +993,125 @@ export function char_func(
 
   const value = String.fromCodePoint(...chars);
   return { err: null, value, type: 'string' };
+}
+
+export function md5(expr: Function, state: EvaluationState): EvaluationResult {
+  assertArgCount(expr, 1);
+  const result = getValue(expr.args.value[0], state);
+  result.name = `MD5(${result.name})`;
+  result.type = 'string';
+  if (!result.err && result.value !== null) {
+    const hash = crypto.createHash('md5');
+    hash.update(String(result.value));
+    result.value = hash.digest('hex');
+  }
+  return result;
+}
+
+export function sha1(expr: Function, state: EvaluationState): EvaluationResult {
+  assertArgCount(expr, 1);
+  const result = getValue(expr.args.value[0], state);
+  result.name = `SHA1(${result.name})`;
+  result.type = 'string';
+  if (!result.err && result.value !== null) {
+    const hash = crypto.createHash('sha1');
+    hash.update(String(result.value));
+    result.value = hash.digest('hex');
+  }
+  return result;
+}
+
+export function sha2(expr: Function, state: EvaluationState): EvaluationResult {
+  assertArgCount(expr, 2);
+  const arg1 = getValue(expr.args.value[0], state);
+  const arg2 = getValue(expr.args.value[1], state);
+
+  const err = arg1.err || arg2.err;
+  const name = `SHA2(${arg1.name}, ${arg2.name})`;
+  let value = null;
+
+  if (!err && arg1.value !== null && arg2.value !== null) {
+    const bits = Math.round(convertNum(arg2.value) ?? 0);
+    const algorithm =
+      bits === 224
+        ? 'sha224'
+        : bits === 256
+          ? 'sha256'
+          : bits === 384
+            ? 'sha384'
+            : bits === 512
+              ? 'sha512'
+              : null;
+
+    if (algorithm) {
+      const hash = crypto.createHash(algorithm);
+      hash.update(String(arg1.value));
+      value = hash.digest('hex');
+    }
+  }
+
+  return { err, name, value, type: 'string' };
+}
+
+export function to_base64(
+  expr: Function,
+  state: EvaluationState
+): EvaluationResult {
+  assertArgCount(expr, 1);
+  const result = getValue(expr.args.value[0], state);
+  result.name = `TO_BASE64(${result.name})`;
+  result.type = 'string';
+  if (!result.err && result.value !== null) {
+    const buffer = Buffer.from(String(result.value), 'utf8');
+    result.value = buffer.toString('base64');
+  }
+  return result;
+}
+
+export function from_base64(
+  expr: Function,
+  state: EvaluationState
+): EvaluationResult {
+  assertArgCount(expr, 1);
+  const result = getValue(expr.args.value[0], state);
+  result.name = `FROM_BASE64(${result.name})`;
+  result.type = 'string';
+  if (!result.err && result.value !== null) {
+    try {
+      const buffer = Buffer.from(String(result.value), 'base64');
+      result.value = buffer.toString('binary');
+    } catch {
+      result.value = null;
+    }
+  }
+  return result;
+}
+
+export function uuid(
+  _expr: Function,
+  _state: EvaluationState
+): EvaluationResult {
+  return {
+    err: null,
+    name: 'UUID()',
+    value: crypto.randomUUID(),
+    type: 'string',
+  };
+}
+
+export function is_uuid(
+  expr: Function,
+  state: EvaluationState
+): EvaluationResult {
+  assertArgCount(expr, 1);
+  const result = getValue(expr.args.value[0], state);
+  result.name = `IS_UUID(${result.name})`;
+  result.type = 'longlong';
+  if (!result.err && result.value !== null) {
+    const str = String(result.value);
+    const uuid_regex =
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    result.value = uuid_regex.test(str) ? 1 : 0;
+  }
+  return result;
 }

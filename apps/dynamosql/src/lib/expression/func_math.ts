@@ -400,3 +400,88 @@ export function cot(expr: Function, state: EvaluationState): EvaluationResult {
   }
   return result;
 }
+export function bit_count(
+  expr: Function,
+  state: EvaluationState
+): EvaluationResult {
+  assertArgCount(expr, 1);
+  const result = getValue(expr.args.value[0], state);
+  result.name = `BIT_COUNT(${result.name})`;
+  result.type = 'longlong';
+  if (!result.err && result.value !== null) {
+    const num = convertNum(result.value);
+    if (num !== null) {
+      const bigNum = BigInt(Math.round(num));
+      const unsigned = bigNum < 0n ? (1n << 64n) + bigNum : bigNum;
+      result.value = unsigned.toString(2).replace(/0/g, '').length;
+    } else {
+      result.value = null;
+    }
+  }
+  return result;
+}
+
+export function crc32(
+  expr: Function,
+  state: EvaluationState
+): EvaluationResult {
+  assertArgCount(expr, 1);
+  const result = getValue(expr.args.value[0], state);
+  result.name = `CRC32(${result.name})`;
+  result.type = 'longlong';
+  if (!result.err && result.value !== null) {
+    const str = String(result.value);
+    const buffer = Buffer.from(str, 'utf8');
+    let crc = 0xffffffff;
+    for (const byte of buffer) {
+      crc ^= byte;
+      for (let j = 0; j < 8; j++) {
+        crc = crc & 1 ? (crc >>> 1) ^ 0xedb88320 : crc >>> 1;
+      }
+    }
+    result.value = (crc ^ 0xffffffff) >>> 0;
+  }
+  return result;
+}
+
+export function conv(expr: Function, state: EvaluationState): EvaluationResult {
+  assertArgCount(expr, 3);
+  const arg1 = getValue(expr.args.value[0], state);
+  const arg2 = getValue(expr.args.value[1], state);
+  const arg3 = getValue(expr.args.value[2], state);
+
+  const err = arg1.err || arg2.err || arg3.err;
+  const name = `CONV(${arg1.name}, ${arg2.name}, ${arg3.name})`;
+  let value = null;
+
+  if (
+    !err &&
+    arg1.value !== null &&
+    arg2.value !== null &&
+    arg3.value !== null
+  ) {
+    const from_base = Math.round(convertNum(arg2.value) ?? 0);
+    const to_base = Math.round(convertNum(arg3.value) ?? 0);
+
+    if (from_base >= 2 && from_base <= 36 && to_base >= 2 && to_base <= 36) {
+      try {
+        const str = String(arg1.value).trim();
+        const is_negative = str.startsWith('-');
+        const num_str = is_negative ? str.slice(1) : str;
+        const decimal = parseInt(num_str, from_base);
+        if (!isNaN(decimal)) {
+          if (is_negative) {
+            const unsigned = (1n << 64n) + BigInt(-decimal);
+            value = unsigned.toString(to_base).toUpperCase();
+          } else {
+            value = decimal.toString(to_base).toUpperCase();
+          }
+        }
+      } catch {
+        value = null;
+      }
+    }
+  }
+
+  return { err, name, value, type: 'string' };
+}

@@ -119,4 +119,20 @@ describe('Expression', function () {
   runTests('function_utc.sql', path.join(__dirname, 'function_utc.sql'), {
     verify_field_types: true,
   });
+  runTests(
+    'function_bit_count.sql',
+    path.join(__dirname, 'function_bit_count.sql'),
+    { verify_field_types: true }
+  );
+  runTests('function_hash.sql', path.join(__dirname, 'function_hash.sql'), {
+    verify_field_types: true,
+  });
+  runTests(
+    'function_crc_conv.sql',
+    path.join(__dirname, 'function_crc_conv.sql'),
+    { verify_field_types: true }
+  );
+  runTests('function_uuid.sql', path.join(__dirname, 'function_uuid.sql'), {
+    verify_field_types: true,
+  });
 });
