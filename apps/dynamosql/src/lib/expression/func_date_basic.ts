@@ -15,7 +15,7 @@ import type { EvaluationState, EvaluationResult } from './evaluate';
 export function now(expr: Function, state: EvaluationState): EvaluationResult {
   assertArgCount(expr, 0, 1);
   let decimals = 0;
-  const name = expr.args.value[0] ? `NOW(${expr.args.value[0]})` : 'NOW()';
+  let name = 'NOW()';
   if (expr.args.value[0]) {
     if (expr.args.value[0].type === 'bool') {
       return { err: 'ER_PARSE_ERROR', type: 'datetime', value: null };
@@ -33,6 +33,7 @@ export function now(expr: Function, state: EvaluationState): EvaluationResult {
     } else if (decimals > 6) {
       return { err: 'ER_TOO_BIG_PRECISION', type: 'datetime', value: null };
     }
+    name = `NOW(${result.name ?? ''})`;
   }
   return {
     err: null,
