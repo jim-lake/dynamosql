@@ -150,7 +150,264 @@ function max(expr: AggrFunc, state: EvaluationState): EvaluationResult {
   return { err, value, type, name };
 }
 
+function stddev_pop(
+  expr: AggrFunc,
+  state: EvaluationState
+): EvaluationResult {
+  const { row, ...other } = state;
+  const group = (row?.['@@group'] ?? [{}]) as EvaluationState['row'][];
+  let err: EvaluationResult['err'] = null;
+  let name = '';
+  const values: number[] = [];
+
+  for (const group_row of group) {
+    const group_state: EvaluationState = { ...other, row: group_row };
+    const result = getValue(expr.args?.expr, group_state);
+    if (!name) {
+      name = `STDDEV_POP(${result.name})`;
+    }
+    if (result.err) {
+      err = result.err;
+      break;
+    } else if (result.value !== null) {
+      const num = convertNum(result.value);
+      if (num !== null) {
+        values.push(num);
+      }
+    }
+  }
+
+  let value: number | null = null;
+  if (err === null && values.length > 0) {
+    const mean = values.reduce((a, b) => a + b, 0) / values.length;
+    const variance =
+      values.reduce((total, val) => total + Math.pow(val - mean, 2), 0) /
+      values.length;
+    value = Math.sqrt(variance);
+  }
+
+  return { err, value, type: 'double', name };
+}
+
+function stddev_samp(
+  expr: AggrFunc,
+  state: EvaluationState
+): EvaluationResult {
+  const { row, ...other } = state;
+  const group = (row?.['@@group'] ?? [{}]) as EvaluationState['row'][];
+  let err: EvaluationResult['err'] = null;
+  let name = '';
+  const values: number[] = [];
+
+  for (const group_row of group) {
+    const group_state: EvaluationState = { ...other, row: group_row };
+    const result = getValue(expr.args?.expr, group_state);
+    if (!name) {
+      name = `STDDEV_SAMP(${result.name})`;
+    }
+    if (result.err) {
+      err = result.err;
+      break;
+    } else if (result.value !== null) {
+      const num = convertNum(result.value);
+      if (num !== null) {
+        values.push(num);
+      }
+    }
+  }
+
+  let value: number | null = null;
+  if (err === null && values.length > 1) {
+    const mean = values.reduce((a, b) => a + b, 0) / values.length;
+    const variance =
+      values.reduce((total, val) => total + Math.pow(val - mean, 2), 0) /
+      (values.length - 1);
+    value = Math.sqrt(variance);
+  }
+
+  return { err, value, type: 'double', name };
+}
+
+function var_pop(expr: AggrFunc, state: EvaluationState): EvaluationResult {
+  const { row, ...other } = state;
+  const group = (row?.['@@group'] ?? [{}]) as EvaluationState['row'][];
+  let err: EvaluationResult['err'] = null;
+  let name = '';
+  const values: number[] = [];
+
+  for (const group_row of group) {
+    const group_state: EvaluationState = { ...other, row: group_row };
+    const result = getValue(expr.args?.expr, group_state);
+    if (!name) {
+      name = `VAR_POP(${result.name})`;
+    }
+    if (result.err) {
+      err = result.err;
+      break;
+    } else if (result.value !== null) {
+      const num = convertNum(result.value);
+      if (num !== null) {
+        values.push(num);
+      }
+    }
+  }
+
+  let value: number | null = null;
+  if (err === null && values.length > 0) {
+    const mean = values.reduce((a, b) => a + b, 0) / values.length;
+    value =
+      values.reduce((total, val) => total + Math.pow(val - mean, 2), 0) /
+      values.length;
+  }
+
+  return { err, value, type: 'double', name };
+}
+
+function var_samp(expr: AggrFunc, state: EvaluationState): EvaluationResult {
+  const { row, ...other } = state;
+  const group = (row?.['@@group'] ?? [{}]) as EvaluationState['row'][];
+  let err: EvaluationResult['err'] = null;
+  let name = '';
+  const values: number[] = [];
+
+  for (const group_row of group) {
+    const group_state: EvaluationState = { ...other, row: group_row };
+    const result = getValue(expr.args?.expr, group_state);
+    if (!name) {
+      name = `VAR_SAMP(${result.name})`;
+    }
+    if (result.err) {
+      err = result.err;
+      break;
+    } else if (result.value !== null) {
+      const num = convertNum(result.value);
+      if (num !== null) {
+        values.push(num);
+      }
+    }
+  }
+
+  let value: number | null = null;
+  if (err === null && values.length > 1) {
+    const mean = values.reduce((a, b) => a + b, 0) / values.length;
+    value =
+      values.reduce((total, val) => total + Math.pow(val - mean, 2), 0) /
+      (values.length - 1);
+  }
+
+  return { err, value, type: 'double', name };
+}
+
+function bit_and(expr: AggrFunc, state: EvaluationState): EvaluationResult {
+  const { row, ...other } = state;
+  const group = (row?.['@@group'] ?? [{}]) as EvaluationState['row'][];
+  let err: EvaluationResult['err'] = null;
+  let value: bigint | null = (1n << 64n) - 1n;
+  let name = '';
+
+  for (const group_row of group) {
+    const group_state: EvaluationState = { ...other, row: group_row };
+    const result = getValue(expr.args?.expr, group_state);
+    if (!name) {
+      name = `BIT_AND(${result.name})`;
+    }
+    if (result.err) {
+      err = result.err;
+      break;
+    } else if (result.value !== null) {
+      const num = convertNum(result.value);
+      if (num !== null) {
+        let bits = BigInt(Math.trunc(num));
+        if (bits < 0n) {
+          bits = (1n << 64n) + bits;
+        }
+        value = value & bits;
+      }
+    }
+  }
+
+  return { err, value: value !== null ? Number(value) : null, type: 'longlong', name };
+}
+
+function bit_or(expr: AggrFunc, state: EvaluationState): EvaluationResult {
+  const { row, ...other } = state;
+  const group = (row?.['@@group'] ?? [{}]) as EvaluationState['row'][];
+  let err: EvaluationResult['err'] = null;
+  let value: bigint | null = 0n;
+  let name = '';
+
+  for (const group_row of group) {
+    const group_state: EvaluationState = { ...other, row: group_row };
+    const result = getValue(expr.args?.expr, group_state);
+    if (!name) {
+      name = `BIT_OR(${result.name})`;
+    }
+    if (result.err) {
+      err = result.err;
+      break;
+    } else if (result.value !== null) {
+      const num = convertNum(result.value);
+      if (num !== null) {
+        let bits = BigInt(Math.trunc(num));
+        if (bits < 0n) {
+          bits = (1n << 64n) + bits;
+        }
+        value = value | bits;
+      }
+    }
+  }
+
+  return { err, value: value !== null ? Number(value) : null, type: 'longlong', name };
+}
+
+function bit_xor(expr: AggrFunc, state: EvaluationState): EvaluationResult {
+  const { row, ...other } = state;
+  const group = (row?.['@@group'] ?? [{}]) as EvaluationState['row'][];
+  let err: EvaluationResult['err'] = null;
+  let value: bigint | null = 0n;
+  let name = '';
+
+  for (const group_row of group) {
+    const group_state: EvaluationState = { ...other, row: group_row };
+    const result = getValue(expr.args?.expr, group_state);
+    if (!name) {
+      name = `BIT_XOR(${result.name})`;
+    }
+    if (result.err) {
+      err = result.err;
+      break;
+    } else if (result.value !== null) {
+      const num = convertNum(result.value);
+      if (num !== null) {
+        let bits = BigInt(Math.trunc(num));
+        if (bits < 0n) {
+          bits = (1n << 64n) + bits;
+        }
+        value = value ^ bits;
+      }
+    }
+  }
+
+  return { err, value: value !== null ? Number(value) : null, type: 'longlong', name };
+}
+
 export const methods: Record<
   string,
   undefined | ((expr: AggrFunc, state: EvaluationState) => EvaluationResult)
-> = { sum, count, avg, min, max };
+> = {
+  sum,
+  count,
+  avg,
+  min,
+  max,
+  stddev_pop,
+  std: stddev_pop,
+  stddev: stddev_pop,
+  stddev_samp,
+  var_pop,
+  variance: var_pop,
+  var_samp,
+  bit_and,
+  bit_or,
+  bit_xor,
+};
