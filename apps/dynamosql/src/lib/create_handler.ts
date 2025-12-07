@@ -77,10 +77,7 @@ async function _createTable(
       def.column?.type === 'column_ref' &&
       typeof def.column?.column === 'string'
     ) {
-      const col = {
-        name: def.column?.column ?? '',
-        type: def.definition?.dataType ?? 'string',
-      };
+      const col = { name: def.column.column, type: def.definition.dataType };
       column_list.push(col);
       const def_key = def as ExtendedColumnDefinitionOptList;
       if (def_key.primary_key === 'primary key') {

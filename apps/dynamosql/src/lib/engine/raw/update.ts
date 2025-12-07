@@ -35,7 +35,7 @@ export async function singleUpdate(
   const value_list = set.map((object) => {
     const { value } = object;
     let ret: string | number | null | undefined;
-    const result = convertWhere(value, { session, from_key: from?.[0]?.key });
+    const result = convertWhere(value, { session, from_key: from[0]?.key });
     if (result.err) {
       throw new NoSingleOperationError();
     } else {
@@ -65,7 +65,7 @@ RETURNING MODIFIED OLD *
       const { column } = object;
       const value = value_list[i];
       if (
-        value !== escapeValue(valueToNative(resultArray?.[0]?.[column] ?? null))
+        value !== escapeValue(valueToNative(resultArray[0]?.[column] ?? null))
       ) {
         result.changedRows = 1;
       }
@@ -88,10 +88,6 @@ export async function multipleUpdate(
   params: MultiUpdateParams
 ): Promise<ChangedResult> {
   const { dynamodb, list } = params;
-
-  if (!list) {
-    return { affectedRows: 0, changedRows: 0 };
-  }
 
   let affectedRows = 0;
   let changedRows = 0;

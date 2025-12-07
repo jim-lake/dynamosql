@@ -88,7 +88,6 @@ function _is(
   // Type guard: check if rightExpr is a Value type
   if (
     typeof rightExpr === 'object' &&
-    rightExpr &&
     'value' in rightExpr &&
     !('type' in rightExpr && rightExpr.type === 'expr_list')
   ) {
@@ -165,7 +164,6 @@ function between(expr: Binary, state: EvaluationState): EvaluationResult {
   // Right side should be expr_list with 2 values
   if (
     typeof expr.right !== 'object' ||
-    !expr.right ||
     !('type' in expr.right) ||
     expr.right.type !== 'expr_list' ||
     !('value' in expr.right) ||

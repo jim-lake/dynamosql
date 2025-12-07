@@ -32,7 +32,7 @@ export async function getTableInfo(
     throw err;
   }
 
-  if (!data?.Table?.AttributeDefinitions || !data?.Table?.KeySchema) {
+  if (!data.Table?.AttributeDefinitions || !data.Table.KeySchema) {
     throw new Error('bad_data');
   }
 
@@ -163,7 +163,7 @@ async function _waitForTable(params: WaitForTableParams): Promise<void> {
 
   while (true) {
     const result = await dynamodb.getTable(table);
-    const status = result?.Table?.TableStatus;
+    const status = result.Table?.TableStatus;
     if (
       status === 'CREATING' ||
       status === 'UPDATING' ||
@@ -173,7 +173,7 @@ async function _waitForTable(params: WaitForTableParams): Promise<void> {
       continue;
     }
     if (index_name) {
-      const index = result?.Table?.GlobalSecondaryIndexes?.find(
+      const index = result.Table?.GlobalSecondaryIndexes?.find(
         (item) => item.IndexName === index_name
       );
       if (index && index.IndexStatus !== 'ACTIVE') {

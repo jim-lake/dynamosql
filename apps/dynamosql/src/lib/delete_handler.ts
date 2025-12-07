@@ -15,7 +15,7 @@ export async function query(
   const { ast, session } = params;
   const current_database = session.getCurrentDatabase() ?? undefined;
   resolveReferences(ast, current_database);
-  const firstFrom = ast.from?.[0];
+  const firstFrom = ast.from[0];
   const database =
     (firstFrom && 'db' in firstFrom ? firstFrom.db : null) ?? undefined;
   if (!database) {
@@ -28,7 +28,7 @@ async function _runDelete(
   params: HandlerParams<DeleteAST>
 ): Promise<AffectedResult> {
   const { ast, session, dynamodb } = params;
-  const firstFrom = ast.from?.[0];
+  const firstFrom = ast.from[0];
   const database =
     (firstFrom && 'db' in firstFrom ? firstFrom.db : null) ?? undefined;
   const table = firstFrom && 'table' in firstFrom ? firstFrom.table : undefined;

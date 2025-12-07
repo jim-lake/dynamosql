@@ -12,7 +12,7 @@ function sum(expr: AggrFunc, state: EvaluationState): EvaluationResult {
   let hasString = false;
   for (const group_row of group) {
     const group_state: EvaluationState = { ...other, row: group_row };
-    const result = getValue(expr.args?.expr, group_state);
+    const result = getValue(expr.args.expr, group_state);
     if (!name) {
       name = `SUM(${result.name})`;
     }
@@ -45,13 +45,13 @@ function count(expr: AggrFunc, state: EvaluationState): EvaluationResult {
   let value = 0;
   let name = '';
 
-  if (expr.args?.expr?.type === 'star') {
+  if (expr.args.expr?.type === 'star') {
     value = group.length;
     name = 'COUNT(*)';
   } else {
     for (const group_row of group) {
       const group_state: EvaluationState = { ...other, row: group_row };
-      const result = getValue(expr.args?.expr, group_state);
+      const result = getValue(expr.args.expr, group_state);
       if (!name) {
         name = `COUNT(${result.name})`;
       }
@@ -77,7 +77,7 @@ function avg(expr: AggrFunc, state: EvaluationState): EvaluationResult {
   let hasString = false;
   for (const group_row of group) {
     const group_state: EvaluationState = { ...other, row: group_row };
-    const result = getValue(expr.args?.expr, group_state);
+    const result = getValue(expr.args.expr, group_state);
     if (!name) {
       name = `AVG(${result.name})`;
     }
@@ -108,7 +108,7 @@ function min(expr: AggrFunc, state: EvaluationState): EvaluationResult {
   let name = '';
   for (const group_row of group) {
     const group_state: EvaluationState = { ...other, row: group_row };
-    const result = getValue(expr.args?.expr, group_state);
+    const result = getValue(expr.args.expr, group_state);
     if (!name) {
       name = `MIN(${result.name})`;
     }
@@ -133,7 +133,7 @@ function max(expr: AggrFunc, state: EvaluationState): EvaluationResult {
   let name = '';
   for (const group_row of group) {
     const group_state: EvaluationState = { ...other, row: group_row };
-    const result = getValue(expr.args?.expr, group_state);
+    const result = getValue(expr.args.expr, group_state);
     if (!name) {
       name = `MAX(${result.name})`;
     }
@@ -159,7 +159,7 @@ function stddev_pop(expr: AggrFunc, state: EvaluationState): EvaluationResult {
 
   for (const group_row of group) {
     const group_state: EvaluationState = { ...other, row: group_row };
-    const result = getValue(expr.args?.expr, group_state);
+    const result = getValue(expr.args.expr, group_state);
     if (!name) {
       name = `STDDEV_POP(${result.name})`;
     }
@@ -195,7 +195,7 @@ function stddev_samp(expr: AggrFunc, state: EvaluationState): EvaluationResult {
 
   for (const group_row of group) {
     const group_state: EvaluationState = { ...other, row: group_row };
-    const result = getValue(expr.args?.expr, group_state);
+    const result = getValue(expr.args.expr, group_state);
     if (!name) {
       name = `STDDEV_SAMP(${result.name})`;
     }
@@ -231,7 +231,7 @@ function var_pop(expr: AggrFunc, state: EvaluationState): EvaluationResult {
 
   for (const group_row of group) {
     const group_state: EvaluationState = { ...other, row: group_row };
-    const result = getValue(expr.args?.expr, group_state);
+    const result = getValue(expr.args.expr, group_state);
     if (!name) {
       name = `VAR_POP(${result.name})`;
     }
@@ -266,7 +266,7 @@ function var_samp(expr: AggrFunc, state: EvaluationState): EvaluationResult {
 
   for (const group_row of group) {
     const group_state: EvaluationState = { ...other, row: group_row };
-    const result = getValue(expr.args?.expr, group_state);
+    const result = getValue(expr.args.expr, group_state);
     if (!name) {
       name = `VAR_SAMP(${result.name})`;
     }
@@ -301,7 +301,7 @@ function bit_and(expr: AggrFunc, state: EvaluationState): EvaluationResult {
 
   for (const group_row of group) {
     const group_state: EvaluationState = { ...other, row: group_row };
-    const result = getValue(expr.args?.expr, group_state);
+    const result = getValue(expr.args.expr, group_state);
     if (!name) {
       name = `BIT_AND(${result.name})`;
     }
@@ -320,12 +320,7 @@ function bit_and(expr: AggrFunc, state: EvaluationState): EvaluationResult {
     }
   }
 
-  return {
-    err,
-    value: value !== null ? Number(value) : null,
-    type: 'longlong',
-    name,
-  };
+  return { err, value: Number(value), type: 'longlong', name };
 }
 
 function bit_or(expr: AggrFunc, state: EvaluationState): EvaluationResult {
@@ -337,7 +332,7 @@ function bit_or(expr: AggrFunc, state: EvaluationState): EvaluationResult {
 
   for (const group_row of group) {
     const group_state: EvaluationState = { ...other, row: group_row };
-    const result = getValue(expr.args?.expr, group_state);
+    const result = getValue(expr.args.expr, group_state);
     if (!name) {
       name = `BIT_OR(${result.name})`;
     }
@@ -356,12 +351,7 @@ function bit_or(expr: AggrFunc, state: EvaluationState): EvaluationResult {
     }
   }
 
-  return {
-    err,
-    value: value !== null ? Number(value) : null,
-    type: 'longlong',
-    name,
-  };
+  return { err, value: Number(value), type: 'longlong', name };
 }
 
 function bit_xor(expr: AggrFunc, state: EvaluationState): EvaluationResult {
@@ -373,7 +363,7 @@ function bit_xor(expr: AggrFunc, state: EvaluationState): EvaluationResult {
 
   for (const group_row of group) {
     const group_state: EvaluationState = { ...other, row: group_row };
-    const result = getValue(expr.args?.expr, group_state);
+    const result = getValue(expr.args.expr, group_state);
     if (!name) {
       name = `BIT_XOR(${result.name})`;
     }
@@ -392,12 +382,7 @@ function bit_xor(expr: AggrFunc, state: EvaluationState): EvaluationResult {
     }
   }
 
-  return {
-    err,
-    value: value !== null ? Number(value) : null,
-    type: 'longlong',
-    name,
-  };
+  return { err, value: Number(value), type: 'longlong', name };
 }
 
 export const methods: Record<

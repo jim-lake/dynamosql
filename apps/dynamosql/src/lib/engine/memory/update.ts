@@ -23,10 +23,6 @@ export async function multipleUpdate(
 ): Promise<ChangedResult> {
   const { session, list } = params;
 
-  if (!list) {
-    return { affectedRows: 0, changedRows: 0 };
-  }
-
   let affectedRows = 0;
   let changedRows = 0;
 

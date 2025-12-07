@@ -19,10 +19,6 @@ export async function multipleDelete(
 ): Promise<AffectedResult> {
   const { session, list } = params;
 
-  if (!list) {
-    return { affectedRows: 0 };
-  }
-
   let affectedRows = 0;
 
   for (const changes of list) {

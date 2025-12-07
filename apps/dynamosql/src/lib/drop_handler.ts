@@ -24,10 +24,9 @@ export async function query(
     const nameArray = Array.isArray(ast.name) ? ast.name : [ast.name];
     const firstTable = nameArray[0] as From;
     const database =
-      (firstTable && 'db' in firstTable ? firstTable.db : null) ??
+      ('db' in firstTable ? firstTable.db : null) ??
       session.getCurrentDatabase();
-    const table =
-      firstTable && 'table' in firstTable ? firstTable.table : undefined;
+    const table = 'table' in firstTable ? firstTable.table : undefined;
 
     if (!database) {
       throw new SQLError('no_current_database');

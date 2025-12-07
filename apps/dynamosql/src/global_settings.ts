@@ -71,7 +71,7 @@ function _getSystemTimezone(): string {
     const local = new Date()
       .toLocaleString('en-US', { timeZoneName: 'short' })
       .split(' ')
-      ?.pop()
+      .pop()
       ?.trim();
     if (local && local.length === 3) {
       return local;

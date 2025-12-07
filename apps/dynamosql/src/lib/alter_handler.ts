@@ -8,20 +8,18 @@ import type { Engine, ColumnDef } from './engine';
 
 export async function query(params: HandlerParams<Alter>): Promise<void> {
   const { ast, dynamodb, session } = params;
-  const firstTable = ast.table?.[0];
+  const firstTable = ast.table[0];
   const dbRaw = firstTable && 'db' in firstTable ? firstTable.db : null;
   const database = dbRaw ?? session.getCurrentDatabase();
   const table =
     firstTable && 'table' in firstTable ? firstTable.table : undefined;
   const engine = SchemaManager.getEngine(database ?? undefined, table, session);
 
-  if (ast.table && database) {
+  if (database) {
     const opts = { dynamodb, ast, engine, session };
     await TransactionManager.run(_runAlterTable, opts);
-  } else if (ast.table) {
-    throw new SQLError('no_current_database');
   } else {
-    throw new SQLError('unsupported');
+    throw new SQLError('no_current_database');
   }
 }
 
@@ -29,7 +27,7 @@ async function _runAlterTable(
   params: HandlerParams<Alter> & { engine: Engine }
 ): Promise<void> {
   const { ast, dynamodb, engine, session } = params;
-  const firstTable = ast.table?.[0];
+  const firstTable = ast.table[0];
   const table =
     firstTable && 'table' in firstTable ? firstTable.table : undefined;
 
@@ -42,7 +40,7 @@ async function _runAlterTable(
   // Process column additions
   for (const def of ast.expr) {
     if (def.resource === 'column' && def.action === 'add') {
-      const column_name = def.column?.column;
+      const column_name = def.column.column;
       const type = def.definition?.dataType;
       column_list.push({ name: column_name, type });
       const opts = {
@@ -61,7 +59,7 @@ async function _runAlterTable(
       const key_list =
         (
           def.definition as { column: string; order_by?: string }[] | undefined
-        )?.map?.((sub) => {
+        )?.map((sub) => {
           const column_def = column_list.find((col) => col.name === sub.column);
           return {
             name: sub.column,

@@ -18,7 +18,7 @@ export class DynamoDBWithCache extends DynamoDB {
   override async getTable(table: string): Promise<DescribeTableCommandOutput> {
     try {
       const result = await super.getTable(table);
-      if (result?.Table?.TableStatus === 'DELETING') {
+      if (result.Table?.TableStatus === 'DELETING') {
         this._tableCache.delete(table);
       } else {
         this._tableCache.set(table, { last_updated: Date.now(), result });

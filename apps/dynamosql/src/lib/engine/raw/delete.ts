@@ -13,7 +13,7 @@ export async function singleDelete(
   const { from, where } = ast;
 
   let no_single = false;
-  const result = convertWhere(where, { session, from_key: from?.[0]?.key });
+  const result = convertWhere(where, { session, from_key: from[0]?.key });
   if (result.err) {
     no_single = true;
   } else if (from.length > 1) {
@@ -35,7 +35,7 @@ RETURNING ALL OLD *
   try {
     const results = await dynamodb.queryQL(sql);
     const resultArray = Array.isArray(results[0]) ? results[0] : results;
-    return { affectedRows: resultArray?.length || 0 };
+    return { affectedRows: resultArray.length };
   } catch (err: unknown) {
     if (err instanceof Error) {
       if (err.name === 'ValidationException') {
@@ -53,9 +53,6 @@ export async function multipleDelete(
   params: MultiDeleteParams
 ): Promise<AffectedResult> {
   const { dynamodb, list } = params;
-  if (!list) {
-    return { affectedRows: 0 };
-  }
   let affectedRows = 0;
   for (const object of list) {
     const { table, key_list, delete_list } = object;

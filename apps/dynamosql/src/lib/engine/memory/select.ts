@@ -35,7 +35,7 @@ function _getFromTable(params: RowListParams & { from: ExtendedFrom }): {
     throw new SQLError('table_not_found');
   }
   return {
-    row_list: data.row_list ?? [],
-    column_list: data.column_list?.map((column) => column.name) || [],
+    row_list: data.row_list,
+    column_list: data.column_list.map((column) => column.name),
   };
 }
