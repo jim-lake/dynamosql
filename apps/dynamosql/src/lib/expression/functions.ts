@@ -135,14 +135,13 @@ import {
   time_to_sec,
   maketime,
 } from './func_time';
-import { coalesce, ifnull, greatest, least } from './func_comp';
+import { coalesce, ifnull, greatest, least, ifFunc } from './func_comp';
 import { nullif } from './compare';
 import {
   database,
   isnull,
   sleep,
   not,
-  ifFunc,
   user,
   version,
   connection_id,

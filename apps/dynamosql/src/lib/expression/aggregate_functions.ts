@@ -150,10 +150,7 @@ function max(expr: AggrFunc, state: EvaluationState): EvaluationResult {
   return { err, value, type, name };
 }
 
-function stddev_pop(
-  expr: AggrFunc,
-  state: EvaluationState
-): EvaluationResult {
+function stddev_pop(expr: AggrFunc, state: EvaluationState): EvaluationResult {
   const { row, ...other } = state;
   const group = (row?.['@@group'] ?? [{}]) as EvaluationState['row'][];
   let err: EvaluationResult['err'] = null;
@@ -189,10 +186,7 @@ function stddev_pop(
   return { err, value, type: 'double', name };
 }
 
-function stddev_samp(
-  expr: AggrFunc,
-  state: EvaluationState
-): EvaluationResult {
+function stddev_samp(expr: AggrFunc, state: EvaluationState): EvaluationResult {
   const { row, ...other } = state;
   const group = (row?.['@@group'] ?? [{}]) as EvaluationState['row'][];
   let err: EvaluationResult['err'] = null;
@@ -326,7 +320,12 @@ function bit_and(expr: AggrFunc, state: EvaluationState): EvaluationResult {
     }
   }
 
-  return { err, value: value !== null ? Number(value) : null, type: 'longlong', name };
+  return {
+    err,
+    value: value !== null ? Number(value) : null,
+    type: 'longlong',
+    name,
+  };
 }
 
 function bit_or(expr: AggrFunc, state: EvaluationState): EvaluationResult {
@@ -357,7 +356,12 @@ function bit_or(expr: AggrFunc, state: EvaluationState): EvaluationResult {
     }
   }
 
-  return { err, value: value !== null ? Number(value) : null, type: 'longlong', name };
+  return {
+    err,
+    value: value !== null ? Number(value) : null,
+    type: 'longlong',
+    name,
+  };
 }
 
 function bit_xor(expr: AggrFunc, state: EvaluationState): EvaluationResult {
@@ -388,7 +392,12 @@ function bit_xor(expr: AggrFunc, state: EvaluationState): EvaluationResult {
     }
   }
 
-  return { err, value: value !== null ? Number(value) : null, type: 'longlong', name };
+  return {
+    err,
+    value: value !== null ? Number(value) : null,
+    type: 'longlong',
+    name,
+  };
 }
 
 export const methods: Record<

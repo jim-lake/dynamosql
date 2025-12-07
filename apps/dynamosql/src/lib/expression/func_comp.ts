@@ -1,6 +1,7 @@
 import { getValue } from './evaluate';
 import { getDecimals } from '../helpers/decimals';
 import {
+  convertNum,
   convertString,
   convertDateTime,
   convertDate,
@@ -50,6 +51,40 @@ export function ifnull(
   const value = arg1.value !== null ? arg1.value : arg2.value;
   const { type } = _unionType([arg1, arg2]);
   return { err: null, name: `IFNULL(${arg1.name}, ${arg2.name})`, value, type };
+}
+export function ifFunc(
+  expr: Function,
+  state: EvaluationState
+): EvaluationResult {
+  assertArgCount(expr, 3);
+  const condition = getValue(expr.args.value[0], state);
+  const trueValue = getValue(expr.args.value[1], state);
+  const falseValue = getValue(expr.args.value[2], state);
+  const err = condition.err || trueValue.err || falseValue.err || null;
+
+  let value;
+  let type: EvaluationResult['type'] = 'longlong';
+  if (!err) {
+    type = _unionType([trueValue, falseValue]).type;
+    const condResult = convertNum(condition.value);
+    let result_type: string;
+    if (condResult === null || condResult === 0) {
+      value = falseValue.value;
+      result_type = falseValue.type;
+    } else {
+      value = trueValue.value;
+      result_type = trueValue.type;
+    }
+    if (result_type !== type && type === 'datetime') {
+      value = convertDateTime({ value, timeZone: state.session.timeZone });
+    }
+  }
+  return {
+    err,
+    name: `IF(${condition.name}, ${trueValue.name}, ${falseValue.name})`,
+    value,
+    type,
+  };
 }
 export function greatest(
   expr: Function,
