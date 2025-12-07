@@ -7,24 +7,29 @@ export function assertArgCount(
   min: number,
   max?: number
 ): asserts expr is Function & { args: { value: unknown[] } } {
-  if (min === 0 && !expr.args) {
-    expr.args = { type: 'expr_list', value: [] };
+  if (!expr.args) {
+    if (min === 0) {
+      expr.args = { type: 'expr_list', value: [] };
+    } else {
+      throw new SQLError({
+        err: 'ER_WRONG_PARAMCOUNT_TO_NATIVE_FCT',
+        args: [getFunctionName(expr.name).toUpperCase()],
+      });
+    }
   }
-  const arg_count = expr.args?.value?.length ?? 0;
+  if (!expr.args.value || !Array.isArray(expr.args.value)) {
+    if (min === 0) {
+      expr.args.value = [];
+    } else {
+      throw new SQLError({
+        err: 'ER_WRONG_PARAMCOUNT_TO_NATIVE_FCT',
+        args: [getFunctionName(expr.name).toUpperCase()],
+      });
+    }
+  }
+  const arg_count = expr.args.value.length;
   const expected = max ?? min;
   if (arg_count < min || arg_count > expected) {
-    throw new SQLError({
-      err: 'ER_WRONG_PARAMCOUNT_TO_NATIVE_FCT',
-      args: [getFunctionName(expr.name).toUpperCase()],
-    });
-  }
-
-  if (
-    expr.args &&
-    expr.args.value !== undefined &&
-    expr.args.value !== null &&
-    !Array.isArray(expr.args.value)
-  ) {
     throw new SQLError({
       err: 'ER_WRONG_PARAMCOUNT_TO_NATIVE_FCT',
       args: [getFunctionName(expr.name).toUpperCase()],
@@ -37,22 +42,24 @@ export function assertArgCountParse(
   min: number,
   max?: number
 ): asserts expr is Function & { args: { value: unknown[] } } {
-  if (min === 0 && !expr.args) {
-    expr.args = { type: 'expr_list', value: [] };
+  if (!expr.args) {
+    if (min === 0) {
+      expr.args = { type: 'expr_list', value: [] };
+    } else {
+      throw new SQLError({ err: 'ER_PARSE_ERROR' });
+    }
   }
-  const arg_count = expr.args?.value?.length ?? 0;
+  if (!expr.args.value || !Array.isArray(expr.args.value)) {
+    if (min === 0) {
+      expr.args.value = [];
+    } else {
+      throw new SQLError({ err: 'ER_PARSE_ERROR' });
+    }
+  }
+  const arg_count = expr.args.value.length;
   const expected = max ?? min;
 
   if (arg_count < min || arg_count > expected) {
-    throw new SQLError({ err: 'ER_PARSE_ERROR' });
-  }
-
-  if (
-    expr.args &&
-    expr.args.value !== undefined &&
-    expr.args.value !== null &&
-    !Array.isArray(expr.args.value)
-  ) {
     throw new SQLError({ err: 'ER_PARSE_ERROR' });
   }
 }

@@ -170,7 +170,7 @@ export function getValue(
     const varExpr = expr as VarExpr;
     const { prefix, members } = varExpr;
     const scope = members.length > 0 ? varExpr.name.toLowerCase() : '';
-    const name = (members?.[0] as unknown as string) ?? varExpr.name;
+    const name = (members[0] as unknown as string) ?? varExpr.name;
     result.name = prefix + (scope ? scope + '.' : '') + name;
     if (prefix === '@@') {
       let val: EvaluationValue | undefined;
@@ -251,7 +251,7 @@ export function getValue(
     if ('column' in colRef) {
       columnValue = colRef.column;
       columnName = String(columnValue);
-    } else if ('expr' in colRef && colRef.expr && 'column' in colRef.expr) {
+    } else if ('expr' in colRef && 'column' in colRef.expr) {
       columnValue = colRef.expr.column;
       columnName = String(columnValue);
     } else {
@@ -273,8 +273,8 @@ export function getValue(
           ]
         : undefined;
       const decode = _decodeCell(cell as EngineValue | null | undefined);
-      result.type = decode?.type ?? 'string';
-      result.value = decode?.value;
+      result.type = decode.type ?? 'string';
+      result.value = decode.value;
     } else {
       result.err = 'no_row_list';
       result.value = columnName;
@@ -284,7 +284,7 @@ export function getValue(
     result.err = 'unsupported';
   }
 
-  if (result.type === 'undefined' || result.type === undefined) {
+  if (result.type === 'undefined') {
     result.type = result.value === null ? 'null' : typeof result.value;
   }
   if (result.name === undefined && result.value !== undefined) {

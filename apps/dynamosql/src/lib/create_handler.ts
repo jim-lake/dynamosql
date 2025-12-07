@@ -74,8 +74,8 @@ async function _createTable(
   for (const def of ast.create_definitions ?? []) {
     if (
       def.resource === 'column' &&
-      def.column?.type === 'column_ref' &&
-      typeof def.column?.column === 'string'
+      def.column.type === 'column_ref' &&
+      typeof def.column.column === 'string'
     ) {
       const col = { name: def.column.column, type: def.definition.dataType };
       column_list.push(col);

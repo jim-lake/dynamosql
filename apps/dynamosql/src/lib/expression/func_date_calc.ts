@@ -54,9 +54,9 @@ export function datediff(
   if (!err && (expr1.value === null || expr2.value === null)) {
     value = null;
   } else if (!err) {
-    const result = convertDateTime({ value: expr1.value, timeZone })?.diff?.(
-      convertDateTime({ value: expr2.value, timeZone })
-    );
+    const dt1 = convertDateTime({ value: expr1.value, timeZone });
+    const dt2 = convertDateTime({ value: expr2.value, timeZone });
+    const result = dt1?.diff(dt2);
     value = result !== undefined ? result : null;
   }
   return { err, name, value, type: 'longlong' };

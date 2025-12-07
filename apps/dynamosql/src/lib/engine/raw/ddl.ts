@@ -176,7 +176,7 @@ async function _waitForTable(params: WaitForTableParams): Promise<void> {
       const index = result.Table?.GlobalSecondaryIndexes?.find(
         (item) => item.IndexName === index_name
       );
-      if (index && index.IndexStatus !== 'ACTIVE') {
+      if (!index || index.IndexStatus !== 'ACTIVE') {
         await sleep(LOOP_MS);
         continue;
       }

@@ -325,7 +325,7 @@ export function truncate_func(
 
 export function rand(expr: Function, state: EvaluationState): EvaluationResult {
   assertArgCount(expr, 0, 1);
-  const arg_count = expr.args.value?.length ?? 0;
+  const arg_count = expr.args.value.length;
 
   const name = 'RAND()';
   let value: number;

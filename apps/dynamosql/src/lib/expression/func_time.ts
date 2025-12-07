@@ -14,7 +14,7 @@ export function curtime(
 ): EvaluationResult {
   const result = getValue(expr.args?.value?.[0], state);
   result.name = expr.args ? `CURTIME(${result.name ?? ''})` : 'CURRENT_TIME';
-  if (!result.err && result.type) {
+  if (!result.err) {
     const decimals = typeof result.value === 'number' ? result.value : 0;
     if (decimals > 6) {
       result.err = 'ER_TOO_BIG_PRECISION';
@@ -127,9 +127,13 @@ export function utc_time(
   state: EvaluationState
 ): EvaluationResult {
   assertArgCount(expr, 0, 1);
-  const result = getValue(expr.args?.value?.[0], state);
+  const args = expr.args.value;
+  const arg = Array.isArray(args) && args.length > 0 ? args[0] : undefined;
+  const result = arg
+    ? getValue(arg, state)
+    : { err: null, value: undefined, type: 'undefined', name: '' };
   result.name = 'UTC_TIME()';
-  if (!result.err && result.type) {
+  if (!result.err) {
     const decimals = typeof result.value === 'number' ? result.value : 0;
     if (decimals > 6) {
       result.err = 'ER_TOO_BIG_PRECISION';

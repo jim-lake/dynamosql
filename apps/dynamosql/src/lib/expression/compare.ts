@@ -29,7 +29,7 @@ export function inOp(expr: Binary, state: EvaluationState): EvaluationResult {
   const names: string[] = [];
   if (left.value === null) {
     value = null;
-  } else if (expr.right?.type === 'expr_list') {
+  } else if (expr.right.type === 'expr_list') {
     const list = expr.right.value ?? [];
     for (const item of list) {
       const right = getValue(item, state);
@@ -78,8 +78,9 @@ export function nullif(
   expr: Function,
   state: EvaluationState
 ): EvaluationResult {
-  const arg1 = getValue(expr.args?.value?.[0], state);
-  const arg2 = getValue(expr.args?.value?.[1], state);
+  const args = expr.args?.value ?? [];
+  const arg1 = getValue(args[0], state);
+  const arg2 = getValue(args[1], state);
   const err = arg1.err ?? arg2.err ?? null;
   let value;
   let type = arg1.type;

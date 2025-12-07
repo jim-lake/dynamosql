@@ -14,9 +14,13 @@ import type { EvaluationState, EvaluationResult } from './evaluate';
 
 export function now(expr: Function, state: EvaluationState): EvaluationResult {
   assertArgCount(expr, 0, 1);
-  const result = getValue(expr.args?.value?.[0], state);
-  result.name = expr.args ? `NOW(${result.name ?? ''})` : 'CURRENT_TIMESTAMP';
-  if (!result.err && result.type) {
+  const args = expr.args.value;
+  const arg = Array.isArray(args) && args.length > 0 ? args[0] : undefined;
+  const result = arg
+    ? getValue(arg, state)
+    : { err: null, value: undefined, type: 'undefined', name: '' };
+  result.name = arg ? `NOW(${result.name ?? ''})` : 'CURRENT_TIMESTAMP';
+  if (!result.err) {
     const decimals = typeof result.value === 'number' ? result.value : 0;
     if (decimals > 6) {
       result.err = 'ER_TOO_BIG_PRECISION';
@@ -90,7 +94,7 @@ export function unix_timestamp(
     type: 'longlong',
     value: BigInt(Math.floor(state.session.timestamp)),
   };
-  if (expr.args?.value?.[0]) {
+  if (expr.args.value[0]) {
     const val = getValue(expr.args.value[0], state);
     if (val.err) {
       return val;
@@ -262,9 +266,13 @@ export function utc_timestamp(
   state: EvaluationState
 ): EvaluationResult {
   assertArgCount(expr, 0, 1);
-  const result = getValue(expr.args?.value?.[0], state);
+  const args = expr.args.value;
+  const arg = Array.isArray(args) && args.length > 0 ? args[0] : undefined;
+  const result = arg
+    ? getValue(arg, state)
+    : { err: null, value: undefined, type: 'undefined', name: '' };
   result.name = 'UTC_TIMESTAMP()';
-  if (!result.err && result.type) {
+  if (!result.err) {
     const decimals = typeof result.value === 'number' ? result.value : 0;
     if (decimals > 6) {
       result.err = 'ER_TOO_BIG_PRECISION';

@@ -45,7 +45,7 @@ function count(expr: AggrFunc, state: EvaluationState): EvaluationResult {
   let value = 0;
   let name = '';
 
-  if (expr.args.expr?.type === 'star') {
+  if (expr.args.expr.type === 'star') {
     value = group.length;
     name = 'COUNT(*)';
   } else {

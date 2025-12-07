@@ -46,7 +46,7 @@ export function concat(
     if (result.type === 'long_blob' || result.type === 'medium_blob') {
       has_blob = true;
     }
-    if (!err && result.err) {
+    if (result.err) {
       err = result.err;
     } else if (result.value === null) {
       value = null;
@@ -439,7 +439,7 @@ export function locate(
   const substr_result = getValue(expr.args.value[0], state);
   const str_result = getValue(expr.args.value[1], state);
   const pos_result = getValue(expr.args.value[2], state);
-  const err = substr_result.err ?? str_result.err ?? pos_result?.err ?? null;
+  const err = substr_result.err ?? str_result.err ?? pos_result.err ?? null;
   if (err || substr_result.value === null || str_result.value === null) {
     return { err, value: null, type: 'longlong' };
   }
@@ -456,7 +456,7 @@ export function locate(
       timeZone: state.session.timeZone,
     }) ?? '';
   const pos =
-    pos_result?.value !== undefined && pos_result?.value !== null
+    pos_result.value !== undefined && pos_result.value !== null
       ? (convertNum(pos_result.value) ?? 1)
       : 1;
   const posInt = Math.round(pos);
