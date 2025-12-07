@@ -95,7 +95,7 @@ export default tseslint.config(
       '@typescript-eslint/no-non-null-assertion': 0,
       '@typescript-eslint/restrict-template-expressions': 0,
       '@typescript-eslint/require-await': 0,
-      '@typescript-eslint/no-unnecessary-condition': 0,
+      '@typescript-eslint/no-unnecessary-condition': 'error',
       '@typescript-eslint/no-empty-function': 0,
       '@typescript-eslint/no-unnecessary-type-conversion': 0,
       '@typescript-eslint/no-unnecessary-type-parameters': 0,
