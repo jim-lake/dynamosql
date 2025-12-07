@@ -148,4 +148,12 @@ describe('Expression', function () {
   runTests('function_uuid.sql', path.join(__dirname, 'function_uuid.sql'), {
     verify_field_types: true,
   });
+  runTests('function_inet.sql', path.join(__dirname, 'function_inet.sql'), {
+    verify_field_types: true,
+  });
+  runTests(
+    'function_truncate_rand.sql',
+    path.join(__dirname, 'function_truncate_rand.sql'),
+    { verify_field_types: true }
+  );
 });

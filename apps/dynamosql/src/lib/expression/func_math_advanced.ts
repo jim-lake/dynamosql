@@ -276,3 +276,75 @@ export function conv(expr: Function, state: EvaluationState): EvaluationResult {
 
   return { err, name, value, type: 'string' };
 }
+
+export function truncate_func(
+  expr: Function,
+  state: EvaluationState
+): EvaluationResult {
+  assertArgCount(expr, 2);
+  const arg1 = getValue(expr.args.value[0], state);
+  if (arg1.err) {
+    return arg1;
+  }
+  const arg2 = getValue(expr.args.value[1], state);
+  if (arg2.err) {
+    return arg2;
+  }
+
+  const name = `TRUNCATE(${arg1.name}, ${arg2.name})`;
+  let value: number | null = null;
+  const err = arg1.err || arg2.err;
+  let decimals = 0;
+  let type: string = 'double';
+
+  if (arg1.value === null) {
+    type = 'double';
+  } else if (arg2.value !== null) {
+    decimals = Math.round(convertNum(arg2.value) ?? 0);
+    type = decimals < 0 ? 'longlong' : 'number';
+  } else {
+    type = 'number';
+  }
+
+  if (!err && arg1.value !== null && arg2.value !== null) {
+    const num = convertNum(arg1.value);
+    if (num !== null) {
+      const multiplier = Math.pow(10, decimals);
+      value = Math.trunc(num * multiplier) / multiplier;
+    }
+  }
+
+  return {
+    err,
+    name,
+    value,
+    type,
+    decimals: type === 'number' ? Math.max(0, decimals) : undefined,
+  };
+}
+
+export function rand(expr: Function, state: EvaluationState): EvaluationResult {
+  assertArgCount(expr, 0, 1);
+  const arg_count = expr.args?.value?.length ?? 0;
+
+  const name = 'RAND()';
+  let value: number;
+
+  if (arg_count === 1) {
+    const seed_arg = getValue(expr.args.value[0], state);
+    if (seed_arg.err) {
+      return seed_arg;
+    }
+    if (seed_arg.value !== null) {
+      const seed = Math.floor(convertNum(seed_arg.value) ?? 0);
+      const x = Math.sin(seed) * 10000;
+      value = x - Math.floor(x);
+    } else {
+      value = Math.random();
+    }
+  } else {
+    value = Math.random();
+  }
+
+  return { err: null, name, value, type: 'double' };
+}

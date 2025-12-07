@@ -310,3 +310,73 @@ export function is_uuid(
   }
   return result;
 }
+
+export function inet_aton(
+  expr: Function,
+  state: EvaluationState
+): EvaluationResult {
+  assertArgCount(expr, 1);
+  const result = getValue(expr.args.value[0], state);
+  result.name = `INET_ATON(${result.name})`;
+  result.type = 'longlong';
+  if (!result.err && result.value !== null) {
+    const str = String(result.value).trim();
+    const parts = str.split('.');
+    if (parts.length > 4 || parts.length === 0) {
+      result.value = null;
+    } else {
+      let num = 0;
+      for (let i = 0; i < parts.length - 1; i++) {
+        const part_str = parts[i];
+        if (!part_str) {
+          result.value = null;
+          return result;
+        }
+        const part = parseInt(part_str, 10);
+        if (isNaN(part) || part < 0 || part > 255) {
+          result.value = null;
+          return result;
+        }
+        num = num * 256 + part;
+      }
+      const last_str = parts[parts.length - 1];
+      if (!last_str) {
+        result.value = null;
+        return result;
+      }
+      const lastPart = parseInt(last_str, 10);
+      if (isNaN(lastPart) || lastPart < 0) {
+        result.value = null;
+        return result;
+      }
+      const shift = 4 - parts.length;
+      const maxLast = Math.pow(256, shift + 1) - 1;
+      if (lastPart > maxLast) {
+        result.value = null;
+        return result;
+      }
+      result.value = num * Math.pow(256, shift + 1) + lastPart;
+    }
+  }
+  return result;
+}
+
+export function inet_ntoa(
+  expr: Function,
+  state: EvaluationState
+): EvaluationResult {
+  assertArgCount(expr, 1);
+  const result = getValue(expr.args.value[0], state);
+  result.name = `INET_NTOA(${result.name})`;
+  result.type = 'string';
+  if (!result.err && result.value !== null) {
+    const num = convertNum(result.value);
+    if (num === null || num < 0 || num > 4294967295) {
+      result.value = null;
+    } else {
+      const n = Math.floor(num);
+      result.value = `${(n >>> 24) & 0xff}.${(n >>> 16) & 0xff}.${(n >>> 8) & 0xff}.${n & 0xff}`;
+    }
+  }
+  return result;
+}

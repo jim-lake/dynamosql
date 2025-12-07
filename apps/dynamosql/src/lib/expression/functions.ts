@@ -32,6 +32,8 @@ import {
   oct,
   bit_count,
   conv,
+  truncate_func,
+  rand,
 } from './func_math_advanced';
 import {
   length,
@@ -76,6 +78,8 @@ import {
   from_base64,
   uuid,
   is_uuid,
+  inet_aton,
+  inet_ntoa,
 } from './func_string_encoding';
 import {
   elt,
@@ -206,6 +210,8 @@ export const methods: Record<
   from_base64,
   uuid,
   is_uuid,
+  inet_aton,
+  inet_ntoa,
   abs,
   ceil,
   ceiling: ceil,
@@ -220,6 +226,8 @@ export const methods: Record<
   bit_count,
   crc32,
   conv,
+  truncate: truncate_func,
+  rand,
   oct,
   pi,
   degrees,
