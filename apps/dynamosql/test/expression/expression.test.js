@@ -166,4 +166,9 @@ describe('Expression', function () {
     path.join(__dirname, 'function_aggregate_bitwise.sql'),
     { verify_field_types: true }
   );
+  runTests(
+    'operator_control_flow.sql',
+    path.join(__dirname, 'operator_control_flow.sql'),
+    { verify_field_types: true }
+  );
 });

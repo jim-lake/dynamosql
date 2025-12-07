@@ -98,4 +98,8 @@ export type ExtendedAST =
   | Transaction;
 
 // Extended ExpressionValue that includes missing expression types
-export type ExtendedExpressionValue = ExpressionValue | VarExpr | UnaryExpr;
+export type ExtendedExpressionValue =
+  | ExpressionValue
+  | VarExpr
+  | UnaryExpr
+  | AssignExpr;

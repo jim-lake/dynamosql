@@ -95,6 +95,29 @@ export function mod(expr: Binary, state: EvaluationState): EvaluationResult {
   const right = getValue(expr.right, state);
   return modHelper(left, right, left.name + ' % ' + right.name);
 }
+
+export function intDiv(expr: Binary, state: EvaluationState): EvaluationResult {
+  const left = getValue(expr.left, state);
+  const right = getValue(expr.right, state);
+  const err = left.err || right.err;
+  const name = left.name + ' DIV ' + right.name;
+  let value: number | null = null;
+  if (!err) {
+    if (left.value === null || right.value === null) {
+      value = null;
+    } else {
+      const leftNum = convertNum(left.value);
+      const rightNum = convertNum(right.value);
+      if (leftNum === null || rightNum === null || rightNum === 0) {
+        value = null;
+      } else {
+        // MySQL DIV truncates towards zero, not towards negative infinity
+        value = Math.trunc(leftNum / rightNum);
+      }
+    }
+  }
+  return { err, value, name, type: 'longlong' };
+}
 export function modHelper(
   left: EvaluationResult,
   right: EvaluationResult,

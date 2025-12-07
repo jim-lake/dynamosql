@@ -4,7 +4,7 @@ import { getValue } from './evaluate';
 import type { Binary } from 'node-sql-parser';
 import type { EvaluationState, EvaluationResult } from './evaluate';
 
-import { plus, minus, div, mul, mod } from './math';
+import { plus, minus, div, mul, mod, intDiv } from './math';
 import { equal, notEqual, gt, lt, gte, lte, inOp, notIn } from './compare';
 
 function and(expr: Binary, state: EvaluationState): EvaluationResult {
@@ -155,6 +155,90 @@ function notLike(expr: Binary, state: EvaluationState): EvaluationResult {
   }
   return result;
 }
+
+function between(expr: Binary, state: EvaluationState): EvaluationResult {
+  const value_result = getValue(expr.left, state);
+  if (value_result.err) {
+    return value_result;
+  }
+
+  // Right side should be expr_list with 2 values
+  if (
+    typeof expr.right !== 'object' ||
+    !expr.right ||
+    !('type' in expr.right) ||
+    expr.right.type !== 'expr_list' ||
+    !('value' in expr.right) ||
+    !Array.isArray(expr.right.value) ||
+    expr.right.value.length !== 2
+  ) {
+    return {
+      err: { err: 'syntax_err', args: ['BETWEEN'] },
+      value: null,
+      name: '',
+      type: 'longlong',
+    };
+  }
+
+  const min_result = getValue(expr.right.value[0], state);
+  if (min_result.err) {
+    return min_result;
+  }
+
+  const max_result = getValue(expr.right.value[1], state);
+  if (max_result.err) {
+    return max_result;
+  }
+
+  const name = `${value_result.name} BETWEEN ${min_result.name} AND ${max_result.name}`;
+
+  if (
+    value_result.value === null ||
+    min_result.value === null ||
+    max_result.value === null
+  ) {
+    return { err: null, value: null, name, type: 'longlong' };
+  }
+
+  // Use >= and <= comparison logic
+  const gte_result = gte(
+    {
+      type: 'binary_expr',
+      operator: '>=',
+      left: expr.left,
+      right: expr.right.value[0],
+    },
+    state
+  );
+  if (gte_result.err || gte_result.value === null) {
+    return { err: gte_result.err, value: null, name, type: 'longlong' };
+  }
+
+  const lte_result = lte(
+    {
+      type: 'binary_expr',
+      operator: '<=',
+      left: expr.left,
+      right: expr.right.value[1],
+    },
+    state
+  );
+  if (lte_result.err || lte_result.value === null) {
+    return { err: lte_result.err, value: null, name, type: 'longlong' };
+  }
+
+  const value = gte_result.value && lte_result.value ? 1 : 0;
+  return { err: null, value, name, type: 'longlong' };
+}
+
+function notBetween(expr: Binary, state: EvaluationState): EvaluationResult {
+  const result = between(expr, state);
+  result.name = result.name?.replace(' BETWEEN ', ' NOT BETWEEN ') ?? '';
+  if (result.value !== null) {
+    result.value = result.value ? 0 : 1;
+  }
+  return result;
+}
 export const methods: Record<
   string,
   undefined | ((expr: Binary, state: EvaluationState) => EvaluationResult)
@@ -164,6 +248,7 @@ export const methods: Record<
   '*': mul,
   '/': div,
   '%': mod,
+  div: intDiv,
   '=': equal,
   '!=': notEqual,
   '<>': notEqual,
@@ -172,12 +257,16 @@ export const methods: Record<
   '>=': gte,
   '<=': lte,
   and,
+  '&&': and,
   or,
+  '||': or,
   xor,
   is,
   'is not': isNot,
   like,
   'not like': notLike,
+  between,
+  'not between': notBetween,
   in: inOp,
   'not in': notIn,
 };

@@ -20,7 +20,12 @@ import type {
   ColumnRef,
   Cast as CastType,
 } from 'node-sql-parser';
-import type { ExtendedExpressionValue, VarExpr, UnaryExpr } from '../ast_types';
+import type {
+  ExtendedExpressionValue,
+  VarExpr,
+  UnaryExpr,
+  AssignExpr,
+} from '../ast_types';
 import type { Session } from '../../session';
 import type { Row, EngineValue, CellValue } from '../engine';
 import type { RowWithResult } from '../handler_types';
@@ -220,6 +225,27 @@ export function getValue(
       }
     } else {
       result.err = 'unsupported';
+    }
+  } else if (type === 'assign') {
+    // Handle := assignment operator
+    const assignExpr = expr as AssignExpr;
+    const rightResult = getValue(assignExpr.right, state);
+    if (rightResult.err) {
+      result = rightResult;
+    } else {
+      const varExpr = assignExpr.left;
+      if (varExpr.prefix === '@') {
+        const name = varExpr.name;
+        session.setVariable(name, {
+          value: rightResult.value,
+          type: rightResult.type,
+        });
+        result.value = rightResult.value;
+        result.type = rightResult.type;
+        result.name = `@${name} := ${rightResult.name}`;
+      } else {
+        result.err = { err: 'syntax_err', args: [':='] };
+      }
     }
   } else if (type === 'column_ref') {
     const colRef = expr as ColumnRef & {
