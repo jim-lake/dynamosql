@@ -6,6 +6,7 @@ import {
 } from '../helpers/sql_conversion';
 import { SQLDate } from '../types/sql_date';
 import { SQLDateTime, createSQLDateTime } from '../types/sql_datetime';
+import { getFunctionName } from '../helpers/ast_helper';
 import { assertArgCount, assertArgCountParse } from '../helpers/arg_count';
 
 import type { Function } from 'node-sql-parser';
@@ -74,7 +75,8 @@ export function curdate(
     time: state.session.timestamp,
     timeZone: state.session.timeZone,
   });
-  const name = expr.args ? 'CURDATE()' : 'CURRENT_DATE';
+  const name =
+    getFunctionName(expr.name) === 'CURDATE' ? 'CURDATE()' : 'CURRENT_DATE';
   return { err: null, value, name, type: 'date' };
 }
 export function unix_timestamp(

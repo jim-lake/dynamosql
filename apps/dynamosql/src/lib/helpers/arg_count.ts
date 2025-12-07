@@ -7,9 +7,11 @@ export function assertArgCount(
   min: number,
   max?: number
 ): asserts expr is Function & { args: { value: unknown[] } } {
+  if (min === 0 && !expr.args) {
+    expr.args = { type: 'expr_list', value: [] };
+  }
   const arg_count = expr.args?.value?.length ?? 0;
   const expected = max ?? min;
-
   if (arg_count < min || arg_count > expected) {
     throw new SQLError({
       err: 'ER_WRONG_PARAMCOUNT_TO_NATIVE_FCT',
@@ -35,6 +37,9 @@ export function assertArgCountParse(
   min: number,
   max?: number
 ): asserts expr is Function & { args: { value: unknown[] } } {
+  if (min === 0 && !expr.args) {
+    expr.args = { type: 'expr_list', value: [] };
+  }
   const arg_count = expr.args?.value?.length ?? 0;
   const expected = max ?? min;
 
