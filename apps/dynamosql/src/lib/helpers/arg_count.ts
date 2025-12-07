@@ -8,7 +8,7 @@ export function assertArgCount(
   max?: number
 ): asserts expr is Function & { args: { value: unknown[] } } {
   const arg_count = expr.args?.value?.length ?? 0;
-  const expected = max === undefined ? min : max;
+  const expected = max ?? min;
 
   if (arg_count < min || arg_count > expected) {
     throw new SQLError({
@@ -36,7 +36,7 @@ export function assertArgCountParse(
   max?: number
 ): asserts expr is Function & { args: { value: unknown[] } } {
   const arg_count = expr.args?.value?.length ?? 0;
-  const expected = max === undefined ? min : max;
+  const expected = max ?? min;
 
   if (arg_count < min || arg_count > expected) {
     throw new SQLError({ err: 'ER_PARSE_ERROR' });

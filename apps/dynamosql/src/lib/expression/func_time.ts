@@ -190,7 +190,7 @@ export function maketime(
   const hour_arg = getValue(expr.args.value[0], state);
   const minute_arg = getValue(expr.args.value[1], state);
   const second_arg = getValue(expr.args.value[2], state);
-  const err = hour_arg.err || minute_arg.err || second_arg.err;
+  const err = hour_arg.err ?? minute_arg.err ?? second_arg.err;
   let value = null;
   const name = `MAKETIME(${hour_arg.name}, ${minute_arg.name}, ${second_arg.name})`;
   if (

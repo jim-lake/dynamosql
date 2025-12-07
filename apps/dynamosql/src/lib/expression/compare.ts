@@ -80,7 +80,7 @@ export function nullif(
 ): EvaluationResult {
   const arg1 = getValue(expr.args?.value?.[0], state);
   const arg2 = getValue(expr.args?.value?.[1], state);
-  const err = arg1.err || arg2.err || null;
+  const err = arg1.err ?? arg2.err ?? null;
   let value;
   let type = arg1.type;
   const name = `NULLIF(${arg1.name}, ${arg2.name})`;
@@ -164,7 +164,7 @@ function _equal(
 ): EvaluationResult {
   const left = getValue(expr.left, state);
   const right = getValue(expr.right, state);
-  const err = left.err || right.err;
+  const err = left.err ?? right.err;
   const name = (left.name ?? '') + op + (right.name ?? '');
   let value: unknown = 0;
   if (!err) {
@@ -191,7 +191,7 @@ function _gt(
 ): EvaluationResult {
   const left = getValue(expr_left, state);
   const right = getValue(expr_right, state);
-  const err = left.err || right.err;
+  const err = left.err ?? right.err;
   const name = flip
     ? (right.name ?? '') + op + (left.name ?? '')
     : (left.name ?? '') + op + (right.name ?? '');
@@ -225,7 +225,7 @@ function _gte(
 ): EvaluationResult {
   const left = getValue(expr_left, state);
   const right = getValue(expr_right, state);
-  const err = left.err || right.err;
+  const err = left.err ?? right.err;
   const name = flip
     ? (right.name ?? '') + op + (left.name ?? '')
     : (left.name ?? '') + op + (right.name ?? '');

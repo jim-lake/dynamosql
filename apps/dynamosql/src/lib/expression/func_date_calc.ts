@@ -19,7 +19,7 @@ export function date_format(
   assertArgCount(expr, 2);
   const date_arg = getValue(expr.args.value[0], state);
   const format = getValue(expr.args.value[1], state);
-  const err = date_arg.err || format.err;
+  const err = date_arg.err ?? format.err;
   let value;
   const name = `DATE_FORMAT(${date_arg.name}, ${format.name})`;
   if (!err && (date_arg.value === null || format.value === null)) {
@@ -48,7 +48,7 @@ export function datediff(
   const { timeZone } = state.session;
   const expr1 = getValue(expr.args.value[0], state);
   const expr2 = getValue(expr.args.value[1], state);
-  const err = expr1.err || expr2.err;
+  const err = expr1.err ?? expr2.err;
   let value;
   const name = `DATEDIFF(${expr1.name}, ${expr2.name})`;
   if (!err && (expr1.value === null || expr2.value === null)) {
@@ -104,7 +104,7 @@ export function date_sub(
   assertArgCountParse(expr, 2);
   const date_arg = getValue(expr.args.value[0], state);
   const interval_arg = getValue(expr.args.value[1], state);
-  let err = date_arg.err || interval_arg.err;
+  let err = date_arg.err ?? interval_arg.err;
   let value: EvaluationResult['value'] = null;
   const type: EvaluationResult['type'] = 'char';
   const name = `DATE_SUB(${date_arg.name}, ${interval_arg.name})`;
@@ -135,7 +135,7 @@ export function timestampdiff(
   const unit_arg = expr.args.value[0];
   const start_arg = getValue(expr.args.value[1], state);
   const end_arg = getValue(expr.args.value[2], state);
-  const err = start_arg.err || end_arg.err;
+  const err = start_arg.err ?? end_arg.err;
   let value = null;
   const unitValue =
     unit_arg && 'value' in unit_arg ? unit_arg.value : undefined;
@@ -253,7 +253,7 @@ export function week(expr: Function, state: EvaluationState): EvaluationResult {
     mode_arg.value !== null ? (convertNum(mode_arg.value) ?? 0) : 0
   );
   const result = {
-    err: date_arg.err || mode_arg.err,
+    err: date_arg.err ?? mode_arg.err,
     name: `WEEK(${date_arg.name}${mode_arg.value !== null ? ', ' + mode_arg.name : ''})`,
     value: null as number | null,
     type: 'longlong' as const,
@@ -348,7 +348,7 @@ export function yearweek(
   const mode_arg = getValue(expr.args.value[1], state);
   const mode = mode_arg.value !== null ? (convertNum(mode_arg.value) ?? 0) : 0;
   const result = {
-    err: date_arg.err || mode_arg.err,
+    err: date_arg.err ?? mode_arg.err,
     name: `YEARWEEK(${date_arg.name}${mode_arg.value !== null ? ', ' + mode_arg.name : ''})`,
     value: null as number | null,
     type: 'longlong' as const,
@@ -398,7 +398,7 @@ export function makedate(
   assertArgCount(expr, 2);
   const year_arg = getValue(expr.args.value[0], state);
   const dayofyear_arg = getValue(expr.args.value[1], state);
-  const err = year_arg.err || dayofyear_arg.err;
+  const err = year_arg.err ?? dayofyear_arg.err;
   let value = null;
   const name = `MAKEDATE(${year_arg.name}, ${dayofyear_arg.name})`;
   if (!err && year_arg.value !== null && dayofyear_arg.value !== null) {

@@ -62,7 +62,7 @@ export function dateFormat(date: Date, format: string): string {
     const found = cached.find(
       (part: Intl.DateTimeFormatPart) => part.type === type
     );
-    return found?.value || '';
+    return found?.value ?? '';
   }
   function _time(formatter: Intl.DateTimeFormat): string {
     return (

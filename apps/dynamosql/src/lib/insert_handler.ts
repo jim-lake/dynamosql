@@ -27,7 +27,7 @@ export async function query(
         ? 'ignore'
         : null;
 
-  const database = ast.table?.[0]?.db || session.getCurrentDatabase();
+  const database = ast.table?.[0]?.db ?? session.getCurrentDatabase();
   const table = ast.table?.[0]?.table;
   if (!database) {
     throw new SQLError('no_current_database');
@@ -121,7 +121,7 @@ async function _runInsert(
         name?: string;
         args?: unknown[];
       };
-      const err_str = String(error?.message || '').toLowerCase();
+      const err_str = String(error?.message ?? '').toLowerCase();
       if (
         error?.message === 'resource_not_found' ||
         error?.err === 'resource_not_found' ||
@@ -130,7 +130,7 @@ async function _runInsert(
       ) {
         throw new SQLError({
           err: 'table_not_found',
-          args: error?.args || [table],
+          args: error?.args ?? [table],
         });
       }
       throw err;

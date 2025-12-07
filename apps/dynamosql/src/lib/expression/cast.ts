@@ -22,7 +22,7 @@ function datetime(expr: Cast, state: EvaluationState): EvaluationResult {
     const target: CastTarget | undefined = Array.isArray(expr.target)
       ? expr.target[0]
       : expr.target;
-    const decimals = target?.length || 0;
+    const decimals = target?.length ?? 0;
     if (decimals > 6) {
       result.err = 'ER_TOO_BIG_PRECISION';
     }
@@ -54,7 +54,7 @@ function time(expr: Cast, state: EvaluationState): EvaluationResult {
     const target: CastTarget | undefined = Array.isArray(expr.target)
       ? expr.target[0]
       : expr.target;
-    const decimals = target?.length || 0;
+    const decimals = target?.length ?? 0;
     if (decimals > 6) {
       result.err = 'ER_TOO_BIG_PRECISION';
     }

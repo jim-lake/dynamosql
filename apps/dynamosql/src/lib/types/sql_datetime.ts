@@ -35,7 +35,7 @@ export class SQLDateTime {
     } else {
       this._fraction = parseFloat(
         '0.' +
-          (String(params.time).split('.')[1] || '').slice(0, 6).padEnd(6, '0')
+          (String(params.time).split('.')[1] ?? '').slice(0, 6).padEnd(6, '0')
       );
     }
     this._decimals = params.decimals ?? (this._fraction ? 6 : 0);

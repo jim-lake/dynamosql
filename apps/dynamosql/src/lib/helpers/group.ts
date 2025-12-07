@@ -52,7 +52,7 @@ export function formGroup(params: FormGroupParams): RowWithResult[] {
   }
   const count = group_exprs.length;
 
-  const group_map: Record<string, unknown> = {};
+  const group_map: Record<string, unknown[] | Record<string, unknown>> = {};
   for (const row of row_list) {
     const key_list = group_exprs.map((group) => {
       const result = getValue(group, { session, row });
@@ -61,17 +61,15 @@ export function formGroup(params: FormGroupParams): RowWithResult[] {
       }
       return result.value;
     });
-    let obj: Record<string, unknown | unknown[]> = group_map;
+    let obj: Record<string, unknown[] | Record<string, unknown>> = group_map;
     for (let i = 0; i < count; i++) {
       const key = String(key_list[i]);
       if (i + 1 === count) {
-        if (!(obj as Record<string, unknown[]>)[key]) {
-          (obj as Record<string, unknown[]>)[key] = [];
-        }
-      } else if (!obj[key]) {
-        obj[key] = {};
+        (obj as Record<string, unknown[]>)[key] ??= [];
+      } else {
+        (obj as Record<string, Record<string, unknown>>)[key] ??= {};
       }
-      obj = obj[key] as Record<string, unknown>;
+      obj = obj[key] as Record<string, unknown[] | Record<string, unknown>>;
     }
     (obj as unknown as unknown[]).push(row);
   }

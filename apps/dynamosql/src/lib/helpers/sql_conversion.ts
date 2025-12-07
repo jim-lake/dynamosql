@@ -212,7 +212,7 @@ export function convertTime(params: ConvertTimeParams): SQLTime | null {
     if (time === undefined) {
       const result = _stringToDateTime(value);
       if (result !== undefined) {
-        time = (result.time % DAY) + (result.fraction || 0);
+        time = (result.time % DAY) + (result.fraction ?? 0);
       }
     }
     if (time === undefined) {
@@ -229,9 +229,7 @@ export function convertTime(params: ConvertTimeParams): SQLTime | null {
     }
   } else if (typeof value === 'number') {
     const time = _numToTime(value);
-    if (decimals === undefined) {
-      decimals = getDecimals(value);
-    }
+    decimals ??= getDecimals(value);
     return createSQLTime({ time, decimals });
   }
   return null;
@@ -244,9 +242,9 @@ function _stringToTime(value: string): number | undefined {
     const negative = match[1];
     const days = parseInt(match[2]);
     const hours = parseInt(match[3]);
-    const mins = parseInt(match[5] || '0');
-    const secs = parseInt(match[7] || '0');
-    const fraction = parseFloat('0' + (match[8] || ''));
+    const mins = parseInt(match[5] ?? '0');
+    const secs = parseInt(match[7] ?? '0');
+    const fraction = parseFloat('0' + (match[8] ?? ''));
     ret = days * DAY + hours * HOUR + mins * MINUTE + secs + fraction;
     if (negative) {
       ret = -ret;
@@ -258,8 +256,8 @@ function _stringToTime(value: string): number | undefined {
       const negative = match[1];
       const hours = parseInt(match[2]);
       const mins = parseInt(match[3]);
-      const secs = parseInt(match[5] || '0');
-      const fraction = parseFloat('0' + (match[6] || ''));
+      const secs = parseInt(match[5] ?? '0');
+      const fraction = parseFloat('0' + (match[6] ?? ''));
       ret = hours * HOUR + mins * MINUTE + secs + fraction;
       if (negative) {
         ret = -ret;
@@ -287,8 +285,8 @@ function _stringToDateTime(value: string): ConvertTimeResult | undefined {
     const month = match[2];
     const day = match[3];
     const hour = match[5];
-    const min = match[7] || '0';
-    const sec = match[9] || '0';
+    const min = match[7] ?? '0';
+    const sec = match[9] ?? '0';
     const fraction = parseFloat('0' + match[10]);
     ret = _partsToTime('datetime', year, month, day, hour, min, sec, fraction);
   }
@@ -310,7 +308,7 @@ function _numToDateTime(number: unknown): ConvertTimeResult | undefined {
     const day = match[3];
     const hour = match[4];
     const min = match[5];
-    const sec = match[7] || '0';
+    const sec = match[7] ?? '0';
     const fraction = parseFloat('0' + match[8]);
     ret = _partsToTime('datetime', year, month, day, hour, min, sec, fraction);
   }
@@ -322,7 +320,7 @@ function _numToDateTime(number: unknown): ConvertTimeResult | undefined {
       const day = match[3];
       const hour = match[4];
       const min = match[5];
-      const sec = match[7] || '0';
+      const sec = match[7] ?? '0';
       const fraction = parseFloat('0' + match[8]);
       ret = _partsToTime(
         'datetime',
@@ -366,9 +364,9 @@ function _numToTime(number: number): number {
 export function getDecimals(value: unknown, max?: number): number {
   let ret = 0;
   if (typeof value === 'number') {
-    ret = String(value).split('.')?.[1]?.length || 0;
+    ret = String(value).split('.')?.[1]?.length ?? 0;
   } else if (typeof value === 'string') {
-    ret = value.split('.')?.[1]?.length || 0;
+    ret = value.split('.')?.[1]?.length ?? 0;
   }
   if (max !== undefined) {
     ret = Math.min(max, ret);

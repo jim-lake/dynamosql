@@ -43,20 +43,16 @@ export function resolveReferences(
         fromEntry.db = current_database;
       }
     }
-    if (!fromEntry._requestSet) {
-      fromEntry._requestSet = new Set();
-    }
-    fromEntry._requestAll = fromEntry._requestAll || false;
-    fromEntry.key = fromEntry.as || `${fromEntry.db}.${fromEntry.table}`;
+    fromEntry._requestSet ??= new Set();
+    fromEntry._requestAll = fromEntry._requestAll ?? false;
+    fromEntry.key = fromEntry.as ?? `${fromEntry.db}.${fromEntry.table}`;
     if (fromEntry.as) {
       table_map[fromEntry.as] = fromEntry;
     } else {
       if (!table_map[fromEntry.table ?? '']) {
         table_map[fromEntry.table ?? ''] = fromEntry;
       }
-      if (!db_map[fromEntry.db]) {
-        db_map[fromEntry.db] = {};
-      }
+      db_map[fromEntry.db] ??= {};
       const dbEntry = db_map[fromEntry.db];
       if (dbEntry && fromEntry.table) {
         dbEntry[fromEntry.table] = fromEntry;

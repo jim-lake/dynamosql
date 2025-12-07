@@ -50,7 +50,7 @@ export function getDatabaseName(
     return dbObj;
   }
   if (dbObj?.schema && Array.isArray(dbObj.schema)) {
-    return dbObj.schema[0]?.value || '';
+    return dbObj.schema[0]?.value ?? '';
   }
   return String(dbObj);
 }

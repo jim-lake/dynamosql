@@ -43,7 +43,7 @@ function and(expr: Binary, state: ConvertWhereState): ConvertResult {
     right.value = 1;
   }
 
-  const err = left.err || right.err;
+  const err = left.err ?? right.err;
   let value: string | number | null;
   if (!left.value || !right.value) {
     value = 0;
@@ -62,7 +62,7 @@ function and(expr: Binary, state: ConvertWhereState): ConvertResult {
 function or(expr: Binary, state: ConvertWhereState): ConvertResult {
   const left = convertWhere(expr.left, state);
   const right = convertWhere(expr.right, state);
-  let err = left.err || right.err;
+  let err = left.err ?? right.err;
   let value: string | number | null;
   if (err === 'unsupported' && state?.default_true) {
     value = 1;
@@ -91,7 +91,7 @@ function _in(expr: Binary, state: ConvertWhereState): ConvertResult {
     value = null;
   } else {
     const rightExpr = expr.right as { value?: unknown[] };
-    const count = rightExpr.value?.length || 0;
+    const count = rightExpr.value?.length ?? 0;
     const list: (string | number | null)[] = [];
     for (let i = 0; i < count; i++) {
       const right = convertWhere(
@@ -123,7 +123,7 @@ function _comparator(
   const left = convertWhere(expr.left, state);
   const right = convertWhere(expr.right, state);
 
-  const err = left.err || right.err;
+  const err = left.err ?? right.err;
   const value = `${left.value} ${op} ${right.value}`;
   return { err, value };
 }

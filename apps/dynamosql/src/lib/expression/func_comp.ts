@@ -60,7 +60,7 @@ export function ifFunc(
   const condition = getValue(expr.args.value[0], state);
   const trueValue = getValue(expr.args.value[1], state);
   const falseValue = getValue(expr.args.value[2], state);
-  const err = condition.err || trueValue.err || falseValue.err || null;
+  const err = condition.err ?? trueValue.err ?? falseValue.err ?? null;
 
   let value;
   let type: EvaluationResult['type'] = 'longlong';

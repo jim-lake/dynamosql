@@ -99,7 +99,7 @@ export function mod(expr: Binary, state: EvaluationState): EvaluationResult {
 export function intDiv(expr: Binary, state: EvaluationState): EvaluationResult {
   const left = getValue(expr.left, state);
   const right = getValue(expr.right, state);
-  const err = left.err || right.err;
+  const err = left.err ?? right.err;
   const name = left.name + ' DIV ' + right.name;
   let value: number | null = null;
   if (!err) {
@@ -123,7 +123,7 @@ export function modHelper(
   right: EvaluationResult,
   name: string
 ): EvaluationResult {
-  const err = left.err || right.err;
+  const err = left.err ?? right.err;
   let value;
   let type: string;
 
@@ -167,7 +167,7 @@ function _numBothSides(
 ): NumBothSidesResult {
   const left = getValue(expr.left, state);
   const right = getValue(expr.right, state);
-  let err = left.err || right.err;
+  let err = left.err ?? right.err;
   const name = left.name + op + right.name;
   let value;
   let left_num;

@@ -52,7 +52,7 @@ function or(expr: Binary, state: EvaluationState): EvaluationResult {
 function xor(expr: Binary, state: EvaluationState): EvaluationResult {
   const left = getValue(expr.left, state);
   const right = getValue(expr.right, state);
-  const err = left.err || right.err;
+  const err = left.err ?? right.err;
   const name = left.name + ' XOR ' + right.name;
   let value: number | null = 1;
   if (!err) {
@@ -101,11 +101,11 @@ function _is(
     } else if (rightExpr.value === false) {
       right = false;
       right_name = 'FALSE';
-    } else if (!result.err) {
-      result.err = { err: 'syntax_err', args: [op] };
+    } else {
+      result.err ??= { err: 'syntax_err', args: [op] };
     }
-  } else if (!result.err) {
-    result.err = { err: 'syntax_err', args: [op] };
+  } else {
+    result.err ??= { err: 'syntax_err', args: [op] };
   }
   result.name = `${result.name} ${op} ${right_name}`;
   if (!result.err) {
@@ -129,7 +129,7 @@ function _is(
 function like(expr: Binary, state: EvaluationState): EvaluationResult {
   const left = getValue(expr.left, state);
   const right = getValue(expr.right, state);
-  const err = left.err || right.err;
+  const err = left.err ?? right.err;
   const name = (left.name ?? '') + ' LIKE ' + (right.name ?? '');
   let value: number | null = 0;
   if (!err) {

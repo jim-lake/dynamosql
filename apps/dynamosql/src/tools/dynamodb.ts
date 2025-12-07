@@ -416,7 +416,7 @@ export class DynamoDB {
             IndexName: index_name,
             KeySchema: schema,
             Projection: {
-              ProjectionType: (projection_type ||
+              ProjectionType: (projection_type ??
                 'KEYS_ONLY') as ProjectionType,
             },
           },

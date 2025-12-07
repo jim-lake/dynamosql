@@ -170,7 +170,7 @@ export function createSQLInterval(
   const number = unit ? _convertNumber(value, unit, unit_name) : null;
   if (number !== null) {
     const force_date = unit_name in FORCE_DATE;
-    let decimals = DECIMALS[unit_name] || 0;
+    let decimals = DECIMALS[unit_name] ?? 0;
     if (!decimals && unit_name.endsWith('second')) {
       decimals = getDecimals(value, 6);
       if (typeof value === 'string' && decimals) {

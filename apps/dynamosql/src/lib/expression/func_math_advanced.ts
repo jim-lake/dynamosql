@@ -20,7 +20,7 @@ export function log(expr: Function, state: EvaluationState): EvaluationResult {
   assertArgCount(expr, 1, 2);
   const arg1 = getValue(expr.args.value[0], state);
   const arg2 = getValue(expr.args.value[1], state);
-  const err = arg1.err || arg2.err;
+  const err = arg1.err ?? arg2.err;
   let value;
   const name =
     arg2.value !== undefined
@@ -113,7 +113,7 @@ export function atan2(
   assertArgCount(expr, 2);
   const arg1 = getValue(expr.args.value[0], state);
   const arg2 = getValue(expr.args.value[1], state);
-  const err = arg1.err || arg2.err;
+  const err = arg1.err ?? arg2.err;
   let value;
   const name = `ATAN2(${arg1.name}, ${arg2.name})`;
 
@@ -241,7 +241,7 @@ export function conv(expr: Function, state: EvaluationState): EvaluationResult {
   const arg2 = getValue(expr.args.value[1], state);
   const arg3 = getValue(expr.args.value[2], state);
 
-  const err = arg1.err || arg2.err || arg3.err;
+  const err = arg1.err ?? arg2.err ?? arg3.err;
   const name = `CONV(${arg1.name}, ${arg2.name}, ${arg3.name})`;
   let value = null;
 
@@ -293,7 +293,7 @@ export function truncate_func(
 
   const name = `TRUNCATE(${arg1.name}, ${arg2.name})`;
   let value: number | null = null;
-  const err = arg1.err || arg2.err;
+  const err = arg1.err ?? arg2.err;
   let decimals = 0;
   let type = 'double';
 

@@ -89,9 +89,7 @@ async function _multipleUpdate(
           return { column: set_item.column, value: expr_result };
         });
       if (set_list.length > 0) {
-        if (!object._updateList) {
-          object._updateList = [];
-        }
+        object._updateList ??= [];
         object._updateList.push({ key, set_list });
       }
     });

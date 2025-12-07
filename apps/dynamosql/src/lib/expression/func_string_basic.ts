@@ -62,7 +62,7 @@ export function left(expr: Function, state: EvaluationState): EvaluationResult {
   const result = getValue(expr.args.value[0], state);
   const len_result = getValue(expr.args.value[1], state);
   result.name = `LEFT(${result.name ?? ''}, ${len_result.name ?? ''})`;
-  result.err = result.err || len_result.err;
+  result.err ??= len_result.err;
   result.type = 'string';
   if (!result.err && (result.value === null || len_result.value === null)) {
     result.value = null;
@@ -80,7 +80,7 @@ export function right(
   const result = getValue(expr.args.value[0], state);
   const len_result = getValue(expr.args.value[1], state);
   result.name = `RIGHT(${result.name ?? ''}, ${len_result.name ?? ''})`;
-  result.err = result.err || len_result.err;
+  result.err ??= len_result.err;
   result.type = 'string';
   if (!result.err && (result.value === null || len_result.value === null)) {
     result.value = null;
@@ -176,7 +176,7 @@ export function repeat(
   assertArgCountParse(expr, 2);
   const arg1 = getValue(expr.args.value[0], state);
   const arg2 = getValue(expr.args.value[1], state);
-  const err = arg1.err || arg2.err;
+  const err = arg1.err ?? arg2.err;
   let value;
   let type;
   const name = `REPEAT(${arg1.name}, ${arg2.name})`;
@@ -208,7 +208,7 @@ export function substring(
   const arg2 = getValue(expr.args.value[1], state);
   const hasThirdArg = expr.args.value[2] !== undefined;
   const arg3 = hasThirdArg ? getValue(expr.args.value[2], state) : null;
-  const err = arg1.err || arg2.err || (arg3?.err ?? null);
+  const err = arg1.err ?? arg2.err ?? (arg3?.err ?? null);
   let value;
   const name = hasThirdArg
     ? `SUBSTRING(${arg1.name}, ${arg2.name}, ${arg3?.name ?? ''})`
@@ -251,7 +251,7 @@ export function replace(
   const arg1 = getValue(expr.args.value[0], state);
   const arg2 = getValue(expr.args.value[1], state);
   const arg3 = getValue(expr.args.value[2], state);
-  const err = arg1.err || arg2.err || arg3.err || null;
+  const err = arg1.err ?? arg2.err ?? arg3.err ?? null;
   let value;
   const name = `REPLACE(${arg1.name}, ${arg2.name}, ${arg3.name})`;
 
@@ -366,7 +366,7 @@ export function lpad(expr: Function, state: EvaluationState): EvaluationResult {
   const str_result = getValue(expr.args.value[0], state);
   const len_result = getValue(expr.args.value[1], state);
   const pad_result = getValue(expr.args.value[2], state);
-  const err = str_result.err || len_result.err || pad_result.err || null;
+  const err = str_result.err ?? len_result.err ?? pad_result.err ?? null;
   if (
     err ||
     str_result.value === null ||
@@ -401,7 +401,7 @@ export function rpad(expr: Function, state: EvaluationState): EvaluationResult {
   const str_result = getValue(expr.args.value[0], state);
   const len_result = getValue(expr.args.value[1], state);
   const pad_result = getValue(expr.args.value[2], state);
-  const err = str_result.err || len_result.err || pad_result.err || null;
+  const err = str_result.err ?? len_result.err ?? pad_result.err ?? null;
   if (
     err ||
     str_result.value === null ||
@@ -439,7 +439,7 @@ export function locate(
   const substr_result = getValue(expr.args.value[0], state);
   const str_result = getValue(expr.args.value[1], state);
   const pos_result = getValue(expr.args.value[2], state);
-  const err = substr_result.err || str_result.err || pos_result?.err || null;
+  const err = substr_result.err ?? str_result.err ?? pos_result?.err ?? null;
   if (err || substr_result.value === null || str_result.value === null) {
     return { err, value: null, type: 'longlong' };
   }
@@ -473,7 +473,7 @@ export function instr(
   assertArgCount(expr, 2);
   const str_result = getValue(expr.args.value[0], state);
   const substr_result = getValue(expr.args.value[1], state);
-  const err = str_result.err || substr_result.err || null;
+  const err = str_result.err ?? substr_result.err ?? null;
   if (err || str_result.value === null || substr_result.value === null) {
     return { err, value: null, type: 'longlong' };
   }
@@ -489,7 +489,7 @@ export function strcmp(
   assertArgCount(expr, 2);
   const str1_result = getValue(expr.args.value[0], state);
   const str2_result = getValue(expr.args.value[1], state);
-  const err = str1_result.err || str2_result.err || null;
+  const err = str1_result.err ?? str2_result.err ?? null;
   if (err || str1_result.value === null || str2_result.value === null) {
     return { err, value: null, type: 'longlong' };
   }
@@ -524,7 +524,7 @@ export function substring_index(
   const delim_result = getValue(expr.args.value[1], state);
   const count_result = getValue(expr.args.value[2], state);
 
-  const err = str_result.err || delim_result.err || count_result.err || null;
+  const err = str_result.err ?? delim_result.err ?? count_result.err ?? null;
   if (err) {
     return { err, value: null, type: 'string' };
   }
@@ -564,10 +564,10 @@ export function insert_func(
   const newstr_result = getValue(expr.args.value[3], state);
 
   const err =
-    str_result.err ||
-    pos_result.err ||
-    len_result.err ||
-    newstr_result.err ||
+    str_result.err ??
+    pos_result.err ??
+    len_result.err ??
+    newstr_result.err ??
     null;
   if (err) {
     return { err, value: null, type: 'string' };

@@ -94,11 +94,11 @@ export function getValue(
     result.name = expr.value ? 'TRUE' : 'FALSE';
     result.type = 'longlong';
   } else if (type === 'hex_string' || type === 'full_hex_string') {
-    result.value = Buffer.from(expr.value, 'hex');
-    result.name = 'x' + expr.value.slice(0, 10);
+    result.value = Buffer.from(expr.value as string, 'hex');
+    result.name = 'x' + (expr.value as string).slice(0, 10);
     result.type = 'buffer';
   } else if (type === 'interval') {
-    const intervalFunc = Interval.interval;
+    const intervalFunc = Interval.interval as ((expr: IntervalType, state: EvaluationState) => EvaluationResult) | undefined;
     if (typeof intervalFunc === 'function') {
       result = intervalFunc(expr as IntervalType, state);
     }
@@ -108,9 +108,7 @@ export function getValue(
     const func = Functions[funcName.toLowerCase()];
     if (typeof func === 'function') {
       result = func(funcExpr, state);
-      if (!result.name) {
-        result.name = funcName + '()';
-      }
+      result.name ??= funcName + '()';
     } else {
       logger.trace('expression.getValue: unknown function:', funcName);
       result.err = { err: 'ER_SP_DOES_NOT_EXIST', args: [funcName] };
@@ -121,9 +119,7 @@ export function getValue(
     const func = AggregateFunctions[funcName.toLowerCase()];
     if (func) {
       result = func(aggrExpr, state);
-      if (!result.name) {
-        result.name = funcName + '()';
-      }
+      result.name ??= funcName + '()';
     } else {
       logger.trace('expression.getValue: unknown aggregate:', funcName);
       result.err = { err: 'ER_SP_DOES_NOT_EXIST', args: [funcName] };
@@ -133,9 +129,7 @@ export function getValue(
     const func = BinaryExpression[binExpr.operator.toLowerCase()];
     if (func) {
       result = func(binExpr, state);
-      if (!result.name) {
-        result.name = binExpr.operator;
-      }
+      result.name ??= binExpr.operator;
     } else {
       logger.trace(
         'expression.getValue: unknown binary operator:',
@@ -148,9 +142,7 @@ export function getValue(
     const func = UnaryExpression[unaryExpr.operator.toLowerCase()];
     if (func) {
       result = func(unaryExpr, state);
-      if (!result.name) {
-        result.name = unaryExpr.operator;
-      }
+      result.name ??= unaryExpr.operator;
     } else {
       logger.trace(
         'expression.getValue: unknown unanary operator:',
@@ -167,9 +159,7 @@ export function getValue(
     const func = Cast[dataType.toLowerCase()];
     if (func) {
       result = func(castExpr, state);
-      if (!result.name) {
-        result.name = `CAST(? AS ${dataType})`;
-      }
+      result.name ??= `CAST(? AS ${dataType})`;
     } else {
       logger.trace('expression.getValue: unknown cast type:', dataType);
       result.err = { err: 'ER_SP_DOES_NOT_EXIST', args: [dataType] };

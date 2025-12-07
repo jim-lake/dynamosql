@@ -51,14 +51,12 @@ function _findRows(
   }
   const { key, on, is_left } = from;
   const rows = key ? source_map[key] : undefined;
-  const row_count = rows?.length || (is_left ? 1 : 0);
+  const row_count = rows?.length ?? (is_left ? 1 : 0);
 
   let output_count = 0;
   for (let i = 0; i < row_count; i++) {
     const row_index = start_index + output_count;
-    if (!row_list[row_index]) {
-      row_list[row_index] = {} as RowWithResult;
-    }
+    row_list[row_index] ??= {} as RowWithResult;
     const row = row_list[row_index];
     if (!row) {
       continue;

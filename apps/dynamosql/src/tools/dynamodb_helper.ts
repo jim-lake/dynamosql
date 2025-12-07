@@ -247,9 +247,7 @@ export function convertSuccess(result: DynamoDBResponse): ConvertSuccessResult {
     ret = [];
     result.Responses.forEach((item, i) => {
       if (item.Error) {
-        if (!err) {
-          err = [];
-        }
+        err ??= [];
         err[i] = convertError(item.Error) as Error;
       }
       const converted = convertResult(item);

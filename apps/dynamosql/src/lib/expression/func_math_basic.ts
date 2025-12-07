@@ -111,7 +111,7 @@ export function pow(expr: Function, state: EvaluationState): EvaluationResult {
   assertArgCount(expr, 2);
   const arg1 = getValue(expr.args.value[0], state);
   const arg2 = getValue(expr.args.value[1], state);
-  const err = arg1.err || arg2.err;
+  const err = arg1.err ?? arg2.err;
   let value;
   const name = `POW(${arg1.name}, ${arg2.name})`;
 

@@ -128,8 +128,8 @@ export function soundex(
         N: '5',
         R: '6',
       };
-      let result = str[0] || '';
-      let prev = codes[str[0] || ''] || '';
+      let result = str[0] ?? '';
+      let prev = codes[str[0] ?? ''] ?? '';
       for (let i = 1; i < str.length && result.length < 4; i++) {
         const char = str[i];
         const code = char ? codes[char] : undefined;
@@ -198,7 +198,7 @@ export function sha2(expr: Function, state: EvaluationState): EvaluationResult {
   const arg1 = getValue(expr.args.value[0], state);
   const arg2 = getValue(expr.args.value[1], state);
 
-  const err = arg1.err || arg2.err;
+  const err = arg1.err ?? arg2.err;
   const name = `SHA2(${arg1.name}, ${arg2.name})`;
   let value = null;
 

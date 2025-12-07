@@ -71,7 +71,7 @@ export function find_in_set(
   const strlist_result = getValue(expr.args.value[1], state);
   const name = `FIND_IN_SET(${str_result.name}, ${strlist_result.name})`;
 
-  const err = str_result.err || strlist_result.err || null;
+  const err = str_result.err ?? strlist_result.err ?? null;
   if (err) {
     return { err, value: null, type: 'longlong' };
   }
@@ -147,11 +147,11 @@ export function export_set(
       : { err: null, value: 64 };
 
   const err =
-    bits_result.err ||
-    on_result.err ||
-    off_result.err ||
-    sep_result.err ||
-    num_bits_result.err ||
+    bits_result.err ??
+    on_result.err ??
+    off_result.err ??
+    sep_result.err ??
+    num_bits_result.err ??
     null;
   if (err) {
     return { err, value: null, type: 'string' };
@@ -191,7 +191,7 @@ export function format_func(
   const num_result = getValue(expr.args.value[0], state);
   const decimals_result = getValue(expr.args.value[1], state);
 
-  const err = num_result.err || decimals_result.err || null;
+  const err = num_result.err ?? decimals_result.err ?? null;
   if (err) {
     return { err, value: null, type: 'string' };
   }

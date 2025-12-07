@@ -123,9 +123,7 @@ async function _evaluateReturn(
       if (result.type !== column.result_type) {
         column.result_type = _unionType(column.result_type, result.type);
       }
-      if (!column.result_name) {
-        column.result_name = result.name;
-      }
+      column.result_name ??= result.name;
       if (result.value === null) {
         column.result_nullable = true;
       }
@@ -202,7 +200,7 @@ function _expandStarColumns(params: ExpandStarColumnsParams): QueryColumn[] {
               expr: {
                 type: 'column_ref',
                 db: from.as ? null : from.db,
-                table: from.as ? from.as : from.table,
+                table: from.as ?? from.table,
                 column: name,
                 from: from,
               },

@@ -89,7 +89,7 @@ export class Session extends SQLMode implements PoolConnection {
 
   constructor(params?: SessionConfig) {
     super(GlobalSettings.sqlMode);
-    this.config = params || {};
+    this.config = params ?? {};
     this.dynamodb = DynamoDB.createDynamoDB(params);
     this.multipleStatements = Boolean(params?.multipleStatements ?? false);
     this.resultObjects = Boolean(params?.resultObjects ?? true);

@@ -38,11 +38,11 @@ export async function getTableInfo(
 
   const column_list = data.Table.AttributeDefinitions.map((def) => ({
     name: def.AttributeName!,
-    type: TYPE_MAP[def.AttributeType!] || 'string',
+    type: TYPE_MAP[def.AttributeType!] ?? 'string',
   }));
   const primary_key = data.Table.KeySchema.map((key) => {
     const type =
-      column_list.find((col) => col.name === key.AttributeName)?.type ||
+      column_list.find((col) => col.name === key.AttributeName)?.type ??
       'string';
     return { name: key.AttributeName!, type };
   });
