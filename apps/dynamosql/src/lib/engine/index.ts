@@ -32,16 +32,12 @@ export interface TableInfo {
   column_list: ColumnDef[];
   is_open: boolean;
 }
-export interface EvaluationResultRow {
-  [key: string]: EvaluationResult;
-}
+export type EvaluationResultRow = Record<string, EvaluationResult>;
 export interface CellValue {
   type?: string;
   value: unknown;
 }
-export interface CellRow {
-  [column: string]: CellValue;
-}
+export type CellRow = Record<string, CellValue>;
 export type Row = CellRow | ItemRecord;
 export type EngineValue = CellValue | AttributeValue;
 export interface RowListResult {

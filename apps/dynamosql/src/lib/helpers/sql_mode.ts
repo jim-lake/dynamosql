@@ -11,12 +11,12 @@ export class SQLMode extends EventEmitter {
   public get sqlMode() {
     return this._sqlMode;
   }
-  public get modeAnsiQuotes() {
-    return this._modeAnsiQuotes;
-  }
   public set sqlMode(sql_mode: string) {
     this._sqlMode = sql_mode;
     this._parseSQLMode();
+  }
+  public get modeAnsiQuotes() {
+    return this._modeAnsiQuotes;
   }
   private _parseSQLMode() {
     const mode = this._sqlMode.toLowerCase();

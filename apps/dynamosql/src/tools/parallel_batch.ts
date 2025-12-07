@@ -1,6 +1,9 @@
 import { timesLimit } from './parallel_limit';
 
-export type BatchIter<S, T> = (list: S[], i: number) => Promise<T[] | void>;
+export type BatchIter<S, T> = (
+  list: S[],
+  i: number
+) => Promise<T[]> | Promise<void>;
 
 export async function parallelBatch<S>(
   list: S[],

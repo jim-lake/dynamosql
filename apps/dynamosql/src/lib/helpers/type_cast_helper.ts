@@ -81,7 +81,7 @@ export function typeCast(
       case Types.SET:
       case Types.VAR_STRING:
       case Types.STRING:
-        if (column.charsetNr === CHARSETS.BINARY) {
+        if (column.charsetNr === (CHARSETS.BINARY as number)) {
           return Buffer.isBuffer(value) ? value : Buffer.from(String(value));
         } else {
           return String(value);

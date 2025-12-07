@@ -272,7 +272,7 @@ function _stringToDate(value: string): ConvertTimeResult | undefined {
   let ret;
   const match = value.trim().match(DATE_REGEX);
   if (match && match[1] && match[2] && match[3]) {
-    const year = _fix2year(match[1]) as string | number;
+    const year = _fix2year(match[1]);
     const month = match[2];
     const day = match[3];
     ret = _partsToTime('date', year, month, day, 0, 0, 0);
@@ -283,7 +283,7 @@ function _stringToDateTime(value: string): ConvertTimeResult | undefined {
   let ret;
   const match = value.trim().match(DATETIME_REGEX);
   if (match && match[1] && match[2] && match[3] && match[5]) {
-    const year = _fix2year(match[1]) as string | number;
+    const year = _fix2year(match[1]);
     const month = match[2];
     const day = match[3];
     const hour = match[5];
@@ -317,7 +317,7 @@ function _numToDateTime(number: unknown): ConvertTimeResult | undefined {
   if (ret === undefined) {
     match = s.match(DATETIME2_REGEX);
     if (match && match[1] && match[2] && match[3] && match[4] && match[5]) {
-      const year = _fix2year(match[1]) as string | number;
+      const year = _fix2year(match[1]);
       const month = match[2];
       const day = match[3];
       const hour = match[4];
@@ -348,7 +348,7 @@ function _numToDateTime(number: unknown): ConvertTimeResult | undefined {
   if (ret === undefined) {
     match = s.match(DATE2_REGEX);
     if (match && match[1] && match[2] && match[3]) {
-      const year = _fix2year(match[1]) as string | number;
+      const year = _fix2year(match[1]);
       const month = match[2];
       const day = match[3];
       ret = _partsToTime('date', year, month, day, 0, 0, 0);

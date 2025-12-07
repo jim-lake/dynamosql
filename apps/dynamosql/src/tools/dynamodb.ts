@@ -45,7 +45,7 @@ const QUERY_LIMIT = 5;
 const BATCH_LIMIT = 100;
 
 interface ErrorEntry {
-  err: Error | unknown;
+  err: unknown;
   parent: unknown;
 }
 
@@ -131,7 +131,7 @@ export class DynamoDB {
   }
 
   async queryQL(
-    list: string | QueryQLParams | Array<string | QueryQLParams>
+    list: string | QueryQLParams | (string | QueryQLParams)[]
   ): Promise<ItemRecord[] | ItemRecord[][]> {
     if (!Array.isArray(list)) {
       return this._queryQL(list);

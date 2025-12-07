@@ -12,17 +12,11 @@ interface TableMapEntry {
   _requestAll?: boolean;
 }
 
-interface TableMap {
-  [key: string]: TableMapEntry;
-}
+type TableMap = Record<string, TableMapEntry>;
 
-interface DbMap {
-  [db: string]: { [table: string]: TableMapEntry };
-}
+type DbMap = Record<string, Record<string, TableMapEntry>>;
 
-interface ResultMap {
-  [key: string]: number;
-}
+type ResultMap = Record<string, number>;
 
 export function resolveReferences(
   ast: Select | Update | Delete,

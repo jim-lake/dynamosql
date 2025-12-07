@@ -12,9 +12,7 @@ export interface TxData {
   table: string;
   data: Partial<TableData>;
 }
-export interface TxMap {
-  [key: string]: TxData;
-}
+export type TxMap = Record<string, TxData>;
 
 const g_tableMap = new Map<string, TableData>();
 

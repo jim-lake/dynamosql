@@ -84,7 +84,7 @@ export function convertWhere(
         err = 'unsupported';
       }
     } else {
-      const result = getValue(expr as ExtendedExpressionValue, state);
+      const result = getValue(expr, state);
       err = result.err ? 'unsupported' : null;
       value =
         typeof result.value === 'string' ||

@@ -28,6 +28,7 @@ export function char_length(
   result.type = 'longlong';
   if (!result.err && result.value !== null) {
     const str = String(result.value);
+    // eslint-disable-next-line @typescript-eslint/no-misused-spread
     result.value = [...str].length;
   }
   return result;

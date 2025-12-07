@@ -44,7 +44,7 @@ export function getFunctionName(nameObj: string | FunctionName): string {
 
 // Helper to extract database name from node-sql-parser AST format
 export function getDatabaseName(
-  dbObj: string | { schema?: Array<{ value: string }> }
+  dbObj: string | { schema?: { value: string }[] }
 ): string {
   if (typeof dbObj === 'string') {
     return dbObj;

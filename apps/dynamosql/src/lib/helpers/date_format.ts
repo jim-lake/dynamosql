@@ -49,7 +49,10 @@ const FORMAT_SHORT_TEXT = new Intl.DateTimeFormat('en-US', {
 });
 
 export function dateFormat(date: Date, format: string): string {
-  const format_map = new Map();
+  const format_map = new Map<
+    Intl.DateTimeFormat,
+    ReturnType<Intl.DateTimeFormat['formatToParts']>
+  >();
   function _getPart(formatter: Intl.DateTimeFormat, type: string): string {
     let cached = format_map.get(formatter);
     if (!cached) {

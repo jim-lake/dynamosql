@@ -10,7 +10,7 @@ import type { HandlerParams } from '../handler_types';
 
 export interface SelectResultItem {
   key: string;
-  list: Array<{ key: EngineValue[]; row: unknown }>;
+  list: { key: EngineValue[]; row: unknown }[];
 }
 
 type SelectModifyAST = Select | UpdateAST | DeleteAST;

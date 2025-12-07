@@ -1,4 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
+/* eslint-disable @typescript-eslint/no-redundant-type-constituents */
 import type { EventEmitter } from 'node:events';
 import type { Readable, ReadableOptions } from 'node:stream';
 

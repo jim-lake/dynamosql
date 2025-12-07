@@ -25,7 +25,7 @@ import type {
   QueryListResult,
 } from './types';
 import type { AffectedResult, ChangedResult } from './lib/handler_types';
-import type { Use, Select } from 'node-sql-parser';
+import type { Use } from 'node-sql-parser';
 import type { ExtendedAST } from './lib/ast_types';
 
 const g_parser = new Parser();
@@ -150,7 +150,7 @@ export class Query extends EventEmitter {
       case 'select': {
         const { rows, columns } = await SelectHandler.query({
           ...params,
-          ast: ast as Select,
+          ast: ast,
         });
         return { result: rows, columns };
       }
@@ -214,10 +214,7 @@ export class Query extends EventEmitter {
     }
     return result;
   }
-  private _convertCell(
-    value: string | unknown | undefined,
-    column: FieldInfo
-  ): unknown {
+  private _convertCell(value: unknown, column: FieldInfo): unknown {
     if (typeof this.typeCast === 'function') {
       const { type, ...other } = column;
       return this.typeCast(

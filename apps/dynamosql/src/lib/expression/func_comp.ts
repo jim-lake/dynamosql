@@ -99,10 +99,13 @@ export function least(
   return _compare(expr, state, 'LEAST', _ltList, (a, b) => a < b);
 }
 
-type Comparable<T> = { gt(other: T): boolean; getDecimals?(): number };
+interface Comparable<T> {
+  gt(other: T): boolean;
+  getDecimals?(): number;
+}
 type ConvertFunction<T extends Comparable<T>> = (
   value: EvaluationResult['value'],
-  decimals?: number | undefined
+  decimals?: number
 ) => T | null;
 function _gtList<T extends Comparable<T>>(
   list: EvaluationResult[],

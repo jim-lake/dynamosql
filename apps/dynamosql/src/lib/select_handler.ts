@@ -15,13 +15,9 @@ import type { HandlerParams } from './handler_types';
 import type { FieldInfo } from '../types';
 import type { EvaluationResult } from './expression';
 
-export interface SourceMap {
-  [key: string]: unknown[];
-}
+export type SourceMap = Record<string, unknown[]>;
 
-interface ColumnMap {
-  [key: string]: string[];
-}
+type ColumnMap = Record<string, string[]>;
 
 interface QueryColumn {
   expr: ExtendedExpressionValue & {
@@ -48,6 +44,7 @@ export async function query(
 ): Promise<SelectResult> {
   const { rows, columns } = await internalQuery(params);
   for (const row of rows ?? []) {
+    // eslint-disable-next-line @typescript-eslint/no-for-in-array
     for (const key in row) {
       row[key] = row[key]?.value as never;
     }

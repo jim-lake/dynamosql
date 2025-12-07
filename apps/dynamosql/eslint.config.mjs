@@ -75,6 +75,36 @@ export default tseslint.config(
     },
   },
   {
+    files: ['src/**/*.ts'],
+    extends: [
+      ...tseslint.configs.recommended,
+      ...tseslint.configs.strictTypeChecked,
+      ...tseslint.configs.stylistic,
+    ],
+    languageOptions: {
+      parserOptions: {
+        project: './tsconfig.eslint.json',
+        tsconfigRootDir: import.meta.dirname,
+      },
+    },
+    rules: {
+      '@typescript-eslint/prefer-nullish-coalescing': 'error',
+      '@typescript-eslint/only-throw-error': 0,
+      '@typescript-eslint/no-base-to-string': 0,
+      '@typescript-eslint/restrict-plus-operands': 0,
+      '@typescript-eslint/no-non-null-assertion': 0,
+      '@typescript-eslint/restrict-template-expressions': 0,
+      '@typescript-eslint/require-await': 0,
+      '@typescript-eslint/no-unnecessary-condition': 0,
+      '@typescript-eslint/no-empty-function': 0,
+      '@typescript-eslint/no-unnecessary-type-conversion': 0,
+      '@typescript-eslint/no-unnecessary-type-parameters': 0,
+      '@typescript-eslint/no-unsafe-assignment': 0,
+      '@typescript-eslint/no-unsafe-member-access': 0,
+      '@typescript-eslint/no-unsafe-argument': 0,
+    },
+  },
+  {
     files: ['test/**/*.js', 'test/**/*.ts'],
     languageOptions: {
       globals: {

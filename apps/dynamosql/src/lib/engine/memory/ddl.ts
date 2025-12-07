@@ -14,7 +14,7 @@ export async function getTableInfo(
   params: TableInfoParams
 ): Promise<TableInfo> {
   const { session, database, table } = params;
-  const data = Storage.getTable(database!, table, session!);
+  const data = Storage.getTable(database, table, session);
   if (data) {
     return {
       table,

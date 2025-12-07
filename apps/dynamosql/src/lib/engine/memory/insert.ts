@@ -54,7 +54,7 @@ export async function insertRowList(
     }
   }
 
-  Storage.txSaveData(database!, table, session!, { row_list, primary_map });
+  Storage.txSaveData(database, table, session, { row_list, primary_map });
   return { affectedRows };
 }
 function _transformRow(row: EvaluationResultRow) {

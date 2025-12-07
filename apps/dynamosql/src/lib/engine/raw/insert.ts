@@ -94,7 +94,7 @@ async function _insertIgnoreReplace(
       }
       if (Array.isArray(err)) {
         let thrownError: Error | null = null;
-        (err as Array<{ Code?: string }>).forEach((item_err) => {
+        (err as { Code?: string }[]).forEach((item_err) => {
           if (item_err?.Code === 'DuplicateItem') {
             affectedRows--;
           } else if (!thrownError && item_err) {

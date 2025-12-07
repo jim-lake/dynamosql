@@ -25,7 +25,7 @@ export async function timesLimit(
     }
     function _catch(err: unknown) {
       stop = true;
-      reject(err);
+      reject(err as Error);
     }
     function _launch(index: number) {
       iter(index).then(_done, _catch);

@@ -295,7 +295,7 @@ export function truncate_func(
   let value: number | null = null;
   const err = arg1.err || arg2.err;
   let decimals = 0;
-  let type: string = 'double';
+  let type = 'double';
 
   if (arg1.value === null) {
     type = 'double';

@@ -158,7 +158,7 @@ export class SQLError extends Error {
   public readonly errno: number;
   public sqlState?: string;
   public fieldCount?: number;
-  public fatal: boolean = false;
+  public fatal = false;
   public sqlMessage?: string;
   public sql?: string;
   public index = 0;

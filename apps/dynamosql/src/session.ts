@@ -32,7 +32,7 @@ export interface SessionConfig extends DynamoDBWithCacheConstructorParams {
   multipleStatements?: boolean | undefined;
   resultObjects?: boolean | undefined;
   typeCast?: TypeCast | undefined;
-  dateStrings?: boolean | Array<'TIMESTAMP' | 'DATETIME' | 'DATE'> | undefined;
+  dateStrings?: boolean | ('TIMESTAMP' | 'DATETIME' | 'DATE')[] | undefined;
   supportBigNumbers?: boolean | undefined;
   bigNumberStrings?: boolean | undefined;
   bigintNative?: boolean | undefined;
@@ -238,7 +238,7 @@ export class Session extends SQLMode implements PoolConnection {
     done?: QueryCallback
   ): MysqlQuery {
     if (this._isReleased) {
-      done?.(new SQLError('released') as MysqlError);
+      done?.(new SQLError('released'));
       return undefined as unknown as MysqlQuery;
     }
     const opts: QueryOptions =
@@ -259,7 +259,7 @@ export class Session extends SQLMode implements PoolConnection {
     void this._run(query, done);
     return query;
   }
-  public readonly createQuery = this.query;
+  public readonly createQuery = this.query.bind(this);
   public readonly escape = SqlString.escape;
   public readonly escapeId = SqlString.escapeId;
   public readonly format = SqlString.format;
