@@ -98,7 +98,9 @@ export function getValue(
     result.name = 'x' + (expr.value as string).slice(0, 10);
     result.type = 'buffer';
   } else if (type === 'interval') {
-    const intervalFunc = Interval.interval as ((expr: IntervalType, state: EvaluationState) => EvaluationResult) | undefined;
+    const intervalFunc = Interval.interval as
+      | ((expr: IntervalType, state: EvaluationState) => EvaluationResult)
+      | undefined;
     if (typeof intervalFunc === 'function') {
       result = intervalFunc(expr as IntervalType, state);
     }

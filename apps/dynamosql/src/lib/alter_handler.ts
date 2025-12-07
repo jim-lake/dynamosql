@@ -59,7 +59,9 @@ async function _runAlterTable(
   for (const def of ast.expr) {
     if (def.resource === 'index' && def.action === 'add') {
       const key_list =
-        (def.definition as { column: string; order_by?: string }[] | undefined)?.map?.((sub) => {
+        (
+          def.definition as { column: string; order_by?: string }[] | undefined
+        )?.map?.((sub) => {
           const column_def = column_list.find((col) => col.name === sub.column);
           return {
             name: sub.column,

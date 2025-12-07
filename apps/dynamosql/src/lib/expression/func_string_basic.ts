@@ -208,7 +208,7 @@ export function substring(
   const arg2 = getValue(expr.args.value[1], state);
   const hasThirdArg = expr.args.value[2] !== undefined;
   const arg3 = hasThirdArg ? getValue(expr.args.value[2], state) : null;
-  const err = arg1.err ?? arg2.err ?? (arg3?.err ?? null);
+  const err = arg1.err ?? arg2.err ?? arg3?.err ?? null;
   let value;
   const name = hasThirdArg
     ? `SUBSTRING(${arg1.name}, ${arg2.name}, ${arg3?.name ?? ''})`
