@@ -3,6 +3,36 @@ SELECT NOW() IS NOT NULL AS result;
 SELECT CURRENT_TIMESTAMP IS NOT NULL AS result;
 SELECT NOW() = CURRENT_TIMESTAMP AS result;
 
+SELECT NOW(0) AS ignore_seconds;
+SELECT NOW(1) AS ignore_seconds;
+SELECT NOW(2) AS ignore_seconds;
+SELECT NOW(3) AS ignore_seconds;
+SELECT NOW(4) AS ignore_seconds;
+SELECT NOW(5) AS ignore_seconds;
+SELECT NOW(6) AS ignore_seconds;
+
+SELECT NOW(1.0) AS ignore_seconds;
+SELECT NOW(1.1) AS ignore_seconds;
+SELECT NOW(6.1) AS ignore_seconds;
+SELECT NOW(6.5) AS ignore_seconds;
+SELECT NOW(6.9) AS ignore_seconds;
+SELECT NOW(7) AS ignore_seconds;
+
+SELECT NOW(CAST(1.1 AS DOUBLE)) AS ignore_seconds;
+SELECT NOW(CAST(6.1 AS DOUBLE)) AS ignore_seconds;
+SELECT NOW(CAST(6.5 AS DOUBLE)) AS ignore_seconds;
+SELECT NOW(CAST(6.9 AS DOUBLE)) AS ignore_seconds;
+SELECT NOW(CAST(7 AS DOUBLE)) AS ignore_seconds;
+
+SELECT NOW("") AS ignore_seconds;
+SELECT NOW("foo") AS ignore_seconds;
+SELECT NOW(NOW()) AS ignore_seconds;
+SELECT NOW(TRUE) AS ignore_seconds;
+SELECT NOW(FALSE) AS ignore_seconds;
+SELECT NOW(NULL) AS ignore_seconds;
+SELECT NOW(-1) AS ignore_seconds;
+SELECT NOW(-2) AS ignore_seconds;
+
 -- CURDATE / CURRENT_DATE
 SELECT CURDATE() IS NOT NULL AS result;
 SELECT CURRENT_DATE IS NOT NULL AS result;

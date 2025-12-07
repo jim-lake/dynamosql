@@ -14,21 +14,32 @@ import type { EvaluationState, EvaluationResult } from './evaluate';
 
 export function now(expr: Function, state: EvaluationState): EvaluationResult {
   assertArgCount(expr, 0, 1);
-  const args = expr.args.value;
-  const arg = Array.isArray(args) && args.length > 0 ? args[0] : undefined;
-  const result = arg
-    ? getValue(arg, state)
-    : { err: null, value: undefined, type: 'undefined', name: '' };
-  result.name = arg ? `NOW(${result.name ?? ''})` : 'CURRENT_TIMESTAMP';
-  if (!result.err) {
-    const decimals = typeof result.value === 'number' ? result.value : 0;
-    if (decimals > 6) {
-      result.err = 'ER_TOO_BIG_PRECISION';
+  let decimals = 0;
+  let name: string;
+  if (expr.args.value[0]) {
+    if (expr.args.value[0].type === 'bool') {
+      return { err: 'ER_PARSE_ERROR', type: 'datetime', value: null };
     }
-    result.value = new SQLDateTime({ time: state.session.timestamp, decimals });
-    result.type = 'datetime';
+    const result = getValue(expr.args.value[0], state);
+    if (result.err) {
+      return result;
+    }
+    if (result.type !== 'longlong') {
+      return { err: 'ER_PARSE_ERROR', type: 'datetime', value: null };
+    }
+    decimals = Math.round(convertNum(result.value) ?? 0);
+    if (decimals < 0) {
+      return { err: 'ER_PARSE_ERROR', type: 'datetime', value: null };
+    } else if (decimals > 6) {
+      return { err: 'ER_TOO_BIG_PRECISION', type: 'datetime', value: null };
+    }
   }
-  return result;
+  return {
+    err: null,
+    type: 'datetime',
+    value: new SQLDateTime({ time: state.session.timestamp, decimals }),
+    name,
+  };
 }
 export function from_unixtime(
   expr: Function,
