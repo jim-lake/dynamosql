@@ -62,7 +62,9 @@ export function left(expr: Function, state: EvaluationState): EvaluationResult {
   const result = getValue(expr.args.value[0], state);
   const len_result = getValue(expr.args.value[1], state);
   result.name = `LEFT(${result.name ?? ''}, ${len_result.name ?? ''})`;
-  result.err ??= len_result.err;
+  if (result.err === null) {
+    result.err = len_result.err;
+  }
   result.type = 'string';
   if (!result.err && (result.value === null || len_result.value === null)) {
     result.value = null;

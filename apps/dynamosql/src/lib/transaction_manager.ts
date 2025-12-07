@@ -10,7 +10,7 @@ export async function query(
   params: HandlerParams<TransactionAST>
 ): Promise<void> {
   const { dynamodb, session, ast } = params;
-  const action = ast?.expr?.action?.value?.toLowerCase();
+  const action = ast.expr?.action?.value?.toLowerCase();
   if (action === 'begin' || action === 'start') {
     startTransaction({ session, auto_commit: false });
   } else if (action === 'commit') {

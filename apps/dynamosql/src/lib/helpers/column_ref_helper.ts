@@ -31,7 +31,7 @@ export function resolveReferences(
         ? ast.from
         : (ast as Update & { from?: From[] }).from;
   const from = Array.isArray(fromRaw) ? fromRaw : null;
-  from?.forEach?.((fromItem: From) => {
+  from?.forEach((fromItem: From) => {
     const fromEntry = fromItem as TableMapEntry & {
       db?: string;
       table?: string;
@@ -64,11 +64,11 @@ export function resolveReferences(
       ? ast.table
       : (ast as Select & { table?: From[] }).table;
   const table = Array.isArray(tableRaw) ? tableRaw : null;
-  table?.forEach?.((object: From & { from?: TableMapEntry }) => {
+  table?.forEach((object: From & { from?: TableMapEntry }) => {
     const obj = object as BaseFrom & { from?: TableMapEntry };
     const fromEntry = obj.db
-      ? db_map[obj.db]?.[obj.table ?? '']
-      : table_map[obj.table ?? ''];
+      ? db_map[obj.db]?.[obj.table]
+      : table_map[obj.table];
     if (!fromEntry) {
       throw new SQLError({ err: 'table_not_found', args: [obj.table] });
     } else {
@@ -94,7 +94,7 @@ export function resolveReferences(
   });
 
   const result_map: ResultMap = {};
-  columns?.forEach?.((column: unknown, i: number) => {
+  columns?.forEach((column: unknown, i: number) => {
     const col = column as {
       as?: string;
       expr?: { type?: string; column?: string };
@@ -106,7 +106,8 @@ export function resolveReferences(
     }
   });
 
-  const groupby = ast.type === 'select' ? ast.groupby?.columns : undefined;
+  const groupby =
+    ast.type === 'select' && ast.groupby ? ast.groupby.columns : undefined;
   if (groupby) {
     walkColumnRefs(groupby, (object: unknown) => {
       _resolveObject(object, ast, db_map, table_map, name_cache);
@@ -168,18 +169,18 @@ function _resolveObject(
     } else if (obj.table) {
       let found = false;
       const astFrom = (ast as { from?: TableMapEntry[] }).from;
-      astFrom?.forEach?.((from: TableMapEntry) => {
+      astFrom?.forEach((from: TableMapEntry) => {
         if (from.as === obj.table || (!from.as && from.table === obj.table)) {
           from._requestAll = true;
           found = true;
         }
       });
-      if (!found) {
+      if (found === false) {
         throw new SQLError({ err: 'table_not_found', args: [obj.table] });
       }
     } else {
       const astFrom = (ast as { from?: TableMapEntry[] }).from;
-      astFrom?.forEach?.((from: TableMapEntry) => {
+      astFrom?.forEach((from: TableMapEntry) => {
         from._requestAll = true;
       });
     }

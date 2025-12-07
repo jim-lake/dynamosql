@@ -36,7 +36,7 @@ export async function runSelect(
 
     try {
       const result = await engine.getTableInfo(opts);
-      if (result?.primary_key?.length > 0) {
+      if (result && result.primary_key.length > 0) {
         const extendedObject = object as unknown as {
           _keyList: string[];
           _requestSet: Set<string>;

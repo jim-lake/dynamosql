@@ -21,7 +21,7 @@ export async function query(params: HandlerParams<Show>): Promise<ShowResult> {
       orgName: 'Database',
     });
     const list = SchemaManager.getDatabaseList();
-    const rows = list?.map?.((item: string) => [item]);
+    const rows = list?.map((item: string) => [item]);
     return { rows, columns: [column] };
   } else if (ast.keyword === 'tables') {
     const database = session.getCurrentDatabase();
@@ -38,7 +38,7 @@ export async function query(params: HandlerParams<Show>): Promise<ShowResult> {
       orgName: name,
     });
     const list = await SchemaManager.getTableList({ dynamodb, database });
-    const rows = list?.map?.((item: string) => [item]);
+    const rows = list?.map((item: string) => [item]);
     return { rows, columns: [column] };
   } else {
     throw new SQLError('unsupported');

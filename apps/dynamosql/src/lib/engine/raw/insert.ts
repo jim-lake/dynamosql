@@ -97,12 +97,14 @@ async function _insertIgnoreReplace(
         (err as { Code?: string }[]).forEach((item_err) => {
           if (item_err.Code === 'DuplicateItem') {
             affectedRows--;
-          } else if (!thrownError) {
+          } else {
             affectedRows--;
-            thrownError = convertError(item_err) as Error;
+            if (thrownError === null) {
+              thrownError = convertError(item_err) as Error;
+            }
           }
         });
-        if (thrownError) {
+        if (thrownError !== null) {
           throw thrownError;
         }
       } else {

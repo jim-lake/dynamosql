@@ -13,7 +13,7 @@ export async function query(
   params: HandlerParams<SetStatement>
 ): Promise<void> {
   const { ast } = params;
-  const expr = ast?.expr;
+  const expr = ast.expr;
   if (Array.isArray(expr)) {
     for (const e of expr) {
       if (e && 'type' in e && e.type === 'assign') {
@@ -33,17 +33,17 @@ async function _handleAssignment(
 ): Promise<void> {
   const { session } = params;
   const { left, right } = expr;
-  if (left?.type !== 'var') {
+  if (left.type !== 'var') {
     throw new SQLError('unsupported');
   }
 
   let result: EvaluationResult;
-  if (right?.type === 'select') {
+  if (right.type === 'select') {
     const { rows } = await SelectHandler.internalQuery({
       ...params,
       ast: right as unknown as Select,
     });
-    if (rows && rows[0]?.[0]) {
+    if (rows?.[0]?.[0]) {
       result = rows[0][0];
     } else {
       result = { err: null, value: null, type: 'null' };

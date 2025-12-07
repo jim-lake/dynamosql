@@ -45,7 +45,8 @@ export function formGroup(params: FormGroupParams): RowWithResult[] {
   const group_exprs: ExtendedExpressionValue[] = [];
   for (const column of groupby.columns ?? []) {
     if (column.type === 'number') {
-      group_exprs.push(ast.columns[(column.value ?? 1) - 1]?.expr);
+      const index = typeof column.value === 'number' ? column.value : 1;
+      group_exprs.push(ast.columns[index - 1]?.expr);
     } else {
       group_exprs.push(column);
     }

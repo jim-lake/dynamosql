@@ -34,11 +34,11 @@ function constantFixup(func: ConvertFunc): ConvertFunc {
 function and(expr: Binary, state: ConvertWhereState): ConvertResult {
   const left = convertWhere(expr.left, state);
   const right = convertWhere(expr.right, state);
-  if (left.err === 'unsupported' && state?.default_true) {
+  if (left.err === 'unsupported' && state.default_true) {
     left.err = null;
     left.value = 1;
   }
-  if (right.err === 'unsupported' && state?.default_true) {
+  if (right.err === 'unsupported' && state.default_true) {
     right.err = null;
     right.value = 1;
   }
@@ -64,7 +64,7 @@ function or(expr: Binary, state: ConvertWhereState): ConvertResult {
   const right = convertWhere(expr.right, state);
   let err = left.err ?? right.err;
   let value: string | number | null;
-  if (err === 'unsupported' && state?.default_true) {
+  if (err === 'unsupported' && state.default_true) {
     value = 1;
     err = null;
   } else if (!left.value && !right.value) {
@@ -108,7 +108,7 @@ function _in(expr: Binary, state: ConvertWhereState): ConvertResult {
         list.push(right.value);
       }
     }
-    if (value === undefined) {
+    if (value === null) {
       value = `${left.value} IN (${list.join(',')})`;
     }
   }

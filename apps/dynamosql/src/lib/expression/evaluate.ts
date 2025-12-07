@@ -170,7 +170,8 @@ export function getValue(
     const varExpr = expr as VarExpr;
     const { prefix, members } = varExpr;
     const scope = members.length > 0 ? varExpr.name.toLowerCase() : '';
-    const name = (members[0] as unknown as string) ?? varExpr.name;
+    const name =
+      members.length > 0 ? (members[0] as unknown as string) : varExpr.name;
     result.name = prefix + (scope ? scope + '.' : '') + name;
     if (prefix === '@@') {
       let val: EvaluationValue | undefined;
@@ -273,7 +274,7 @@ export function getValue(
           ]
         : undefined;
       const decode = _decodeCell(cell as EngineValue | null | undefined);
-      result.type = decode.type ?? 'string';
+      result.type = decode.type;
       result.value = decode.value;
     } else {
       result.err = 'no_row_list';

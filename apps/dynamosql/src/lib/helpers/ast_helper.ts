@@ -36,7 +36,7 @@ export function getFunctionName(nameObj: string | FunctionName): string {
   if (typeof nameObj === 'string') {
     return nameObj;
   }
-  if (nameObj?.name && Array.isArray(nameObj.name)) {
+  if (nameObj.name && Array.isArray(nameObj.name)) {
     return nameObj.name.map((n) => n.value).join('.');
   }
   return String(nameObj);
@@ -49,7 +49,7 @@ export function getDatabaseName(
   if (typeof dbObj === 'string') {
     return dbObj;
   }
-  if (dbObj?.schema && Array.isArray(dbObj.schema)) {
+  if (dbObj.schema && Array.isArray(dbObj.schema)) {
     return dbObj.schema[0]?.value ?? '';
   }
   return String(dbObj);
@@ -73,7 +73,7 @@ export function walkColumnRefs(
     } else if (object && typeof object === 'object') {
       array = Object.values(object);
     }
-    array?.forEach?.((child) => {
+    array?.forEach((child) => {
       walkColumnRefs(child, cb);
     });
   }

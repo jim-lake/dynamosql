@@ -15,7 +15,7 @@ import type { EvaluationState, EvaluationResult } from './evaluate';
 export function now(expr: Function, state: EvaluationState): EvaluationResult {
   assertArgCount(expr, 0, 1);
   let decimals = 0;
-  let name: string;
+  const name = expr.args.value[0] ? `NOW(${expr.args.value[0]})` : 'NOW()';
   if (expr.args.value[0]) {
     if (expr.args.value[0].type === 'bool') {
       return { err: 'ER_PARSE_ERROR', type: 'datetime', value: null };

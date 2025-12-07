@@ -163,7 +163,12 @@ async function _waitForTable(params: WaitForTableParams): Promise<void> {
 
   while (true) {
     const result = await dynamodb.getTable(table);
-    const status = result.Table?.TableStatus;
+    const tableData = result.Table;
+    if (!tableData) {
+      await sleep(LOOP_MS);
+      continue;
+    }
+    const status = tableData.TableStatus;
     if (
       status === 'CREATING' ||
       status === 'UPDATING' ||
@@ -172,8 +177,8 @@ async function _waitForTable(params: WaitForTableParams): Promise<void> {
       await sleep(LOOP_MS);
       continue;
     }
-    if (index_name) {
-      const index = result.Table?.GlobalSecondaryIndexes?.find(
+    if (index_name !== undefined) {
+      const index = tableData.GlobalSecondaryIndexes?.find(
         (item) => item.IndexName === index_name
       );
       if (!index || index.IndexStatus !== 'ACTIVE') {

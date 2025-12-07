@@ -21,7 +21,7 @@ export function formJoin(params: FormJoinParams): RowWithResult[] {
           from_table.key
         ] = [];
       }
-      from_table.is_left = (from_table.join?.indexOf?.('LEFT') ?? -1) >= 0;
+      from_table.is_left = (from_table.join?.indexOf('LEFT') ?? -1) >= 0;
     }
   );
   const output_count = _findRows(
@@ -58,9 +58,6 @@ function _findRows(
     const row_index = start_index + output_count;
     row_list[row_index] ??= {} as RowWithResult;
     const row = row_list[row_index];
-    if (!row) {
-      continue;
-    }
 
     if (key) {
       row[key] = rows?.[i] ?? null;

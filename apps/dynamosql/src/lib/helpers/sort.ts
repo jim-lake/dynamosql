@@ -30,8 +30,8 @@ function _sort(
     const { expr } = order;
     const func = order.type !== 'DESC' ? _asc : _desc;
     const exprObj = expr as { type?: string; value?: number };
-    if (exprObj?.type === 'number') {
-      const index = (exprObj.value ?? 1) - 1;
+    if (exprObj.type === 'number') {
+      const index = typeof exprObj.value === 'number' ? exprObj.value - 1 : 0;
       const result = func(
         a['@@result']?.[index]?.value,
         b['@@result']?.[index]?.value,

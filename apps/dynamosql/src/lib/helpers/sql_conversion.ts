@@ -364,9 +364,9 @@ function _numToTime(number: number): number {
 export function getDecimals(value: unknown, max?: number): number {
   let ret = 0;
   if (typeof value === 'number') {
-    ret = String(value).split('.')?.[1]?.length ?? 0;
+    ret = String(value).split('.')[1]?.length ?? 0;
   } else if (typeof value === 'string') {
-    ret = value.split('.')?.[1]?.length ?? 0;
+    ret = value.split('.')[1]?.length ?? 0;
   }
   if (max !== undefined) {
     ret = Math.min(max, ret);

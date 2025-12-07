@@ -48,7 +48,7 @@ export function convertWhere(
       const funcExpr = expr as FunctionType;
       const funcName = getFunctionName(funcExpr.name);
       const func = Functions[funcName.toLowerCase() as keyof typeof Functions];
-      if (func && typeof func === 'function') {
+      if (func) {
         const result = func(funcExpr, state);
         if (result.err) {
           err = result.err;

@@ -12,7 +12,8 @@ export function curtime(
   expr: Function,
   state: EvaluationState
 ): EvaluationResult {
-  const result = getValue(expr.args?.value?.[0], state);
+  const firstArg = expr.args?.value ? expr.args.value[0] : undefined;
+  const result = getValue(firstArg, state);
   result.name = expr.args ? `CURTIME(${result.name ?? ''})` : 'CURRENT_TIME';
   if (!result.err) {
     const decimals = typeof result.value === 'number' ? result.value : 0;

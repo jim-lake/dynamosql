@@ -17,7 +17,8 @@ export function assertArgCount(
       });
     }
   }
-  if (!expr.args.value || !Array.isArray(expr.args.value)) {
+  const argsValue = expr.args.value;
+  if (!argsValue || !Array.isArray(argsValue)) {
     if (min === 0) {
       expr.args.value = [];
     } else {
@@ -49,7 +50,8 @@ export function assertArgCountParse(
       throw new SQLError({ err: 'ER_PARSE_ERROR' });
     }
   }
-  if (!expr.args.value || !Array.isArray(expr.args.value)) {
+  const argsValue = expr.args.value;
+  if (!argsValue || !Array.isArray(argsValue)) {
     if (min === 0) {
       expr.args.value = [];
     } else {
