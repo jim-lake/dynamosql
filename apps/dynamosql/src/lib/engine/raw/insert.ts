@@ -93,18 +93,16 @@ async function _insertIgnoreReplace(
         }
       }
       if (Array.isArray(err)) {
-        let thrownError: Error | null = null;
+        let thrownError: Error | undefined;
         (err as { Code?: string }[]).forEach((item_err) => {
           if (item_err.Code === 'DuplicateItem') {
             affectedRows--;
           } else {
             affectedRows--;
-            if (thrownError === null) {
-              thrownError = convertError(item_err) as Error;
-            }
+            thrownError ??= convertError(item_err) as Error;
           }
         });
-        if (thrownError !== null) {
+        if (thrownError) {
           throw thrownError;
         }
       } else {

@@ -2,8 +2,12 @@ import { SQLError } from '../../error';
 import { getFunctionName } from './ast_helper';
 import type { Function } from 'node-sql-parser';
 
+type FunctionWithOptionalArgs = Omit<Function, 'args'> & {
+  args?: { type?: string; value?: unknown };
+};
+
 export function assertArgCount(
-  expr: Function,
+  expr: FunctionWithOptionalArgs,
   min: number,
   max?: number
 ): asserts expr is Function & { args: { value: unknown[] } } {
@@ -21,6 +25,7 @@ export function assertArgCount(
   if (!argsValue || !Array.isArray(argsValue)) {
     if (min === 0) {
       expr.args.value = [];
+      return;
     } else {
       throw new SQLError({
         err: 'ER_WRONG_PARAMCOUNT_TO_NATIVE_FCT',
@@ -28,7 +33,7 @@ export function assertArgCount(
       });
     }
   }
-  const arg_count = expr.args.value.length;
+  const arg_count = argsValue.length;
   const expected = max ?? min;
   if (arg_count < min || arg_count > expected) {
     throw new SQLError({
@@ -39,7 +44,7 @@ export function assertArgCount(
 }
 
 export function assertArgCountParse(
-  expr: Function,
+  expr: FunctionWithOptionalArgs,
   min: number,
   max?: number
 ): asserts expr is Function & { args: { value: unknown[] } } {
@@ -54,11 +59,12 @@ export function assertArgCountParse(
   if (!argsValue || !Array.isArray(argsValue)) {
     if (min === 0) {
       expr.args.value = [];
+      return;
     } else {
       throw new SQLError({ err: 'ER_PARSE_ERROR' });
     }
   }
-  const arg_count = expr.args.value.length;
+  const arg_count = argsValue.length;
   const expected = max ?? min;
 
   if (arg_count < min || arg_count > expected) {

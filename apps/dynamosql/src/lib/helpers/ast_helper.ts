@@ -36,7 +36,7 @@ export function getFunctionName(nameObj: string | FunctionName): string {
   if (typeof nameObj === 'string') {
     return nameObj;
   }
-  if (nameObj.name && Array.isArray(nameObj.name)) {
+  if (Array.isArray(nameObj.name)) {
     return nameObj.name.map((n) => n.value).join('.');
   }
   return String(nameObj);

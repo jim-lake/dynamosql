@@ -161,7 +161,7 @@ const LOOP_MS = 250;
 async function _waitForTable(params: WaitForTableParams): Promise<void> {
   const { dynamodb, table, index_name } = params;
 
-  while (true) {
+  for (;;) {
     const result = await dynamodb.getTable(table);
     const tableData = result.Table;
     if (!tableData) {

@@ -1,5 +1,5 @@
-import * as ConvertExpression from './convert_expression';
-import * as Functions from './functions';
+import ConvertExpression from './convert_expression';
+import Functions from './functions';
 import { getValue } from '../../expression';
 import { getFunctionName } from '../ast_helper';
 
@@ -47,7 +47,7 @@ export function convertWhere(
     } else if (type === 'function') {
       const funcExpr = expr as FunctionType;
       const funcName = getFunctionName(funcExpr.name);
-      const func = Functions[funcName.toLowerCase() as keyof typeof Functions];
+      const func = Functions[funcName.toLowerCase()];
       if (func) {
         const result = func(funcExpr, state);
         if (result.err) {
@@ -60,10 +60,7 @@ export function convertWhere(
       }
     } else if (type === 'binary_expr' || type === 'unary_expr') {
       const opExpr = expr as Binary | UnaryExpr;
-      const func =
-        ConvertExpression[
-          opExpr.operator.toLowerCase() as keyof typeof ConvertExpression
-        ];
+      const func = ConvertExpression[opExpr.operator.toLowerCase()];
       if (func) {
         const result = func(opExpr, state);
         if (result.err) {

@@ -40,21 +40,24 @@ export function concat(
   assertArgCount(expr, 1, Infinity);
   let err: EvaluationResult['err'] = null;
   let value: string | null = '';
-  let has_blob = false;
-  expr.args.value.every((sub: ExpressionValue) => {
-    const result = getValue(sub, state);
-    if (result.type === 'long_blob' || result.type === 'medium_blob') {
-      has_blob = true;
-    }
+  const results = expr.args.value.map((sub: ExpressionValue) =>
+    getValue(sub, state)
+  );
+
+  for (const result of results) {
     if (result.err) {
       err = result.err;
     } else if (result.value === null) {
       value = null;
+      break;
     } else {
       value += String(result.value);
     }
-    return value !== null;
-  });
+  }
+
+  const has_blob = results.some(
+    (r) => r.type === 'long_blob' || r.type === 'medium_blob'
+  );
   return { err, value, type: has_blob ? 'long_blob' : 'string' };
 }
 export function left(expr: Function, state: EvaluationState): EvaluationResult {
@@ -62,9 +65,7 @@ export function left(expr: Function, state: EvaluationState): EvaluationResult {
   const result = getValue(expr.args.value[0], state);
   const len_result = getValue(expr.args.value[1], state);
   result.name = `LEFT(${result.name ?? ''}, ${len_result.name ?? ''})`;
-  if (result.err === null) {
-    result.err = len_result.err;
-  }
+  result.err ??= len_result.err;
   result.type = 'string';
   if (!result.err && (result.value === null || len_result.value === null)) {
     result.value = null;

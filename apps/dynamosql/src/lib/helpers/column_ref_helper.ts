@@ -18,8 +18,12 @@ type DbMap = Record<string, Record<string, TableMapEntry>>;
 
 type ResultMap = Record<string, number>;
 
+type SelectWithOptionalGroupBy = Omit<Select, 'groupby'> & {
+  groupby?: { columns?: unknown };
+};
+
 export function resolveReferences(
-  ast: Select | Update | Delete,
+  ast: SelectWithOptionalGroupBy | Update | Delete,
   current_database?: string
 ) {
   const table_map: TableMap = {};
@@ -106,12 +110,13 @@ export function resolveReferences(
     }
   });
 
-  const groupby =
-    ast.type === 'select' && ast.groupby ? ast.groupby.columns : undefined;
-  if (groupby) {
-    walkColumnRefs(groupby, (object: unknown) => {
-      _resolveObject(object, ast, db_map, table_map, name_cache);
-    });
+  if (ast.type === 'select') {
+    const groupby = ast.groupby ? ast.groupby.columns : undefined;
+    if (groupby !== undefined) {
+      walkColumnRefs(groupby, (object: unknown) => {
+        _resolveObject(object, ast, db_map, table_map, name_cache);
+      });
+    }
   }
   const orderby =
     ast.type === 'select'
@@ -127,7 +132,7 @@ export function resolveReferences(
 
 function _resolveObject(
   object: unknown,
-  ast: Select | Update | Delete,
+  ast: SelectWithOptionalGroupBy | Update | Delete,
   db_map: DbMap,
   table_map: TableMap,
   name_cache: TableMap,
@@ -167,15 +172,14 @@ function _resolveObject(
         throw new SQLError({ err: 'table_not_found', args: [obj.table] });
       }
     } else if (obj.table) {
-      let found = false;
       const astFrom = (ast as { from?: TableMapEntry[] }).from;
-      astFrom?.forEach((from: TableMapEntry) => {
-        if (from.as === obj.table || (!from.as && from.table === obj.table)) {
-          from._requestAll = true;
-          found = true;
-        }
-      });
-      if (found === false) {
+      const matchingFrom = astFrom?.find(
+        (from: TableMapEntry) =>
+          from.as === obj.table || (!from.as && from.table === obj.table)
+      );
+      if (matchingFrom) {
+        matchingFrom._requestAll = true;
+      } else {
         throw new SQLError({ err: 'table_not_found', args: [obj.table] });
       }
     } else {

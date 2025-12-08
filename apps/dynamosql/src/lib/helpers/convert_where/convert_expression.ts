@@ -108,9 +108,7 @@ function _in(expr: Binary, state: ConvertWhereState): ConvertResult {
         list.push(right.value);
       }
     }
-    if (value === null) {
-      value = `${left.value} IN (${list.join(',')})`;
-    }
+    value ??= `${left.value} IN (${list.join(',')})`;
   }
   return { err, value };
 }
@@ -227,19 +225,21 @@ const _between = constantFixup(unsupported);
 const _not = constantFixup(not);
 const _minus = constantFixup(minus);
 
-export { _equal as '=' };
-export { _notEqual as '!=' };
-export { _notEqual as '<>' };
-export { _gt as '>' };
-export { _lt as '<' };
-export { _gte as '>=' };
-export { _lte as '<=' };
-export { _and as 'and' };
-export { _or as 'or' };
-export { _inOp as 'in' };
-export { _isOp as 'is' };
-export { _isNotOp as 'is not' };
-export { _between as 'between' };
-export { _not as 'not' };
-export { _not as '!' };
-export { _minus as '-' };
+export default {
+  '=': _equal,
+  '!=': _notEqual,
+  '<>': _notEqual,
+  '>': _gt,
+  '<': _lt,
+  '>=': _gte,
+  '<=': _lte,
+  and: _and,
+  or: _or,
+  in: _inOp,
+  is: _isOp,
+  'is not': _isNotOp,
+  between: _between,
+  not: _not,
+  '!': _not,
+  '-': _minus,
+} as Record<string, ConvertFunc | undefined>;

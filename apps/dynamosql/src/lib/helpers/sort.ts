@@ -33,8 +33,8 @@ function _sort(
     if (exprObj.type === 'number') {
       const index = typeof exprObj.value === 'number' ? exprObj.value - 1 : 0;
       const result = func(
-        a['@@result']?.[index]?.value,
-        b['@@result']?.[index]?.value,
+        a['@@result'][index]?.value,
+        b['@@result'][index]?.value,
         state.columns?.[index]
       );
       if (result !== 0) {

@@ -10,8 +10,9 @@ import type { HandlerParams, AffectedResult } from './handler_types';
 import type { Engine, EvaluationResultRow } from './engine';
 import type { EvaluationResult } from './expression';
 
-interface InsertReplaceExtended extends Insert_Replace {
+interface InsertReplaceExtended extends Omit<Insert_Replace, 'values'> {
   set?: SetList[];
+  values?: Insert_Replace['values'];
 }
 
 type DuplicateMode = 'replace' | 'ignore' | null;
@@ -64,6 +65,7 @@ async function _runInsert(
   } else if (
     ast.columns &&
     ast.columns.length > 0 &&
+    ast.values &&
     ast.values.type === 'select'
   ) {
     const opts = { ast: ast.values, session, dynamodb };
@@ -121,16 +123,16 @@ async function _runInsert(
         name?: string;
         args?: unknown[];
       };
-      const err_str = String(error?.message ?? '').toLowerCase();
+      const err_str = String(error.message ?? '').toLowerCase();
       if (
-        error?.message === 'resource_not_found' ||
-        error?.err === 'resource_not_found' ||
-        error?.name === 'ResourceNotFoundException' ||
+        error.message === 'resource_not_found' ||
+        error.err === 'resource_not_found' ||
+        error.name === 'ResourceNotFoundException' ||
         err_str.includes('resource not found')
       ) {
         throw new SQLError({
           err: 'table_not_found',
-          args: error?.args ?? [table],
+          args: error.args ?? [table],
         });
       }
       throw err;
@@ -141,7 +143,7 @@ async function _runInsert(
 }
 function _checkAst(ast: InsertReplaceExtended) {
   if (ast.values?.type === 'select') {
-    if (ast.columns?.length !== ast.values.columns?.length) {
+    if (ast.columns?.length !== ast.values.columns.length) {
       throw new SQLError({ err: 'ER_WRONG_VALUE_COUNT_ON_ROW', args: [1] });
     }
   }
