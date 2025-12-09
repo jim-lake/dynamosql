@@ -99,7 +99,7 @@ export class SQLInterval {
   ): EvaluationValue {
     let old_time = datetime.getTime();
     let fraction = datetime.getFraction();
-    let type: 'datetime' | 'date' | 'time' | undefined = undefined;
+    let type: 'datetime' | 'date' | 'time';
     if (datetime instanceof SQLDateTime) {
       type = 'datetime';
     } else if (datetime instanceof SQLDate && !this._forceDate) {
@@ -138,7 +138,7 @@ export class SQLInterval {
         value = createSQLDateTime({ time, fraction, decimals });
       }
     }
-    return { type: type ?? 'datetime', value };
+    return { type, value };
   }
   add(
     datetime: SQLDateTime | SQLDate | SQLTime,
@@ -219,7 +219,7 @@ function _convertNumber(
       }
     }
   } else {
-    ret = Number(convertNum(value));
+    ret = convertNum(value);
     if (ret !== null) {
       if (unit_name !== 'second') {
         ret = Math.trunc(ret);

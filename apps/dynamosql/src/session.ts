@@ -104,7 +104,7 @@ export class Session extends SQLMode implements PoolConnection {
     if (params?.bigintNative) {
       this.typeCastOptions.bigNumType = 'bigint';
     } else if (params?.supportBigNumbers) {
-      if (params?.bigNumberStrings) {
+      if (params.bigNumberStrings) {
         this.typeCastOptions.bigNumType = 'string';
       } else {
         this.typeCastOptions.bigNumType = 'number|string';
@@ -253,7 +253,7 @@ export class Session extends SQLMode implements PoolConnection {
     }
 
     if (opts.values !== undefined) {
-      opts.sql = SqlString.format(opts.sql ?? '', opts.values);
+      opts.sql = SqlString.format(opts.sql, opts.values);
     }
     const query = new Query({ ...opts, session: this });
     void this._run(query, done);

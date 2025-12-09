@@ -75,7 +75,7 @@ async function _multipleUpdate(
     const from_key = object.key;
     const list = result_list.find((result) => result.key === from_key)?.list;
     object._updateList = [];
-    list?.forEach?.(({ key, row }) => {
+    list?.forEach(({ key, row }) => {
       const set_list = (ast.set as ExtendedSetList[])
         .filter((set_item) => set_item.from?.key === from_key)
         .map((set_item) => {
@@ -98,8 +98,8 @@ async function _multipleUpdate(
   // Update rows
   const from_list = (ast.from as ExtendedFrom[])
     .map((obj) => ({
-      database: obj.db ?? '',
-      table: obj.table ?? '',
+      database: obj.db,
+      table: obj.table,
       key_list: obj._keyList ?? [],
       update_list: obj._updateList ?? [],
     }))

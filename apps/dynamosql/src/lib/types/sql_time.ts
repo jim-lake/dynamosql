@@ -43,7 +43,7 @@ export class SQLTime {
       if (params?.timeZone) {
         const remainder = seconds - (seconds % (24 * 60 * 60));
         seconds -= remainder;
-        seconds += offsetAtTime(params?.timeZone, Date.now() / 1000) ?? 0;
+        seconds += offsetAtTime(params.timeZone, Date.now() / 1000) ?? 0;
         seconds = seconds % (24 * 60 * 60);
         seconds += remainder;
       }

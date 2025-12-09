@@ -60,7 +60,7 @@ export class Query extends EventEmitter {
     this._session = params.session;
     this.sql = params.sql;
     this.values = params.values;
-    this.typeCast = params.typeCast ?? params.session.typeCast ?? true;
+    this.typeCast = params.typeCast ?? params.session.typeCast;
     this.nestedTables = params.nestTables ?? false;
   }
   start() {}
@@ -119,7 +119,7 @@ export class Query extends EventEmitter {
   private async _singleQuery(ast: ExtendedAST): Promise<SingleQueryResult> {
     const params = { dynamodb: this._session.dynamodb, session: this._session };
 
-    const type = ast?.type;
+    const type = ast.type;
     switch (type) {
       case 'alter':
         await AlterHandler.query({ ...params, ast });
@@ -172,7 +172,7 @@ export class Query extends EventEmitter {
         logger.error('unsupported statement type:', type);
         throw new SQLError({
           err: 'unsupported_type',
-          args: [type ?? 'unknown'],
+          args: [type],
         });
       }
     }
@@ -192,10 +192,7 @@ export class Query extends EventEmitter {
         } else if (typeof this.nestedTables === 'string') {
           obj[`${column.table}${this.nestedTables}${column.name}`] = value;
         } else {
-          const tableObj = obj[column.table] as Record<string, unknown>;
-          if (!tableObj) {
-            obj[column.table] = {};
-          }
+          obj[column.table] ??= {};
           (obj[column.table] as Record<string, unknown>)[column.name] = value;
         }
       });

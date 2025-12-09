@@ -30,7 +30,7 @@ export class SQLDateTime {
       this._time -= offsetAtTime(params.timeZone, this._time) ?? 0;
     }
 
-    if (params?.fraction !== undefined) {
+    if (params.fraction !== undefined) {
       this._fraction = params.fraction;
     } else {
       this._fraction = parseFloat(

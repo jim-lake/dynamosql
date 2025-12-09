@@ -14,16 +14,8 @@ export async function query(
 ): Promise<void> {
   const { ast } = params;
   const expr = ast.expr;
-  if (Array.isArray(expr)) {
-    for (const e of expr) {
-      if (e && 'type' in e && e.type === 'assign') {
-        await _handleAssignment(e, params);
-      } else {
-        throw new SQLError('unsupported');
-      }
-    }
-  } else {
-    throw new SQLError('unsupported');
+  for (const e of expr) {
+    await _handleAssignment(e, params);
   }
 }
 
@@ -33,9 +25,6 @@ async function _handleAssignment(
 ): Promise<void> {
   const { session } = params;
   const { left, right } = expr;
-  if (left.type !== 'var') {
-    throw new SQLError('unsupported');
-  }
 
   let result: EvaluationResult;
   if (right.type === 'select') {
@@ -43,7 +32,7 @@ async function _handleAssignment(
       ...params,
       ast: right as unknown as Select,
     });
-    if (rows?.[0]?.[0]) {
+    if (rows[0]?.[0]) {
       result = rows[0][0];
     } else {
       result = { err: null, value: null, type: 'null' };

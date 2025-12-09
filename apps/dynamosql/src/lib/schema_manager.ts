@@ -121,7 +121,7 @@ export async function createTable(params: CreateTableParams): Promise<void> {
   const { session, database, table, is_temp } = params;
   const table_engine = is_temp
     ? 'memory'
-    : (params.table_engine?.toLowerCase?.() ?? 'raw');
+    : (params.table_engine?.toLowerCase() ?? 'raw');
 
   if (database === '_dynamodb' && table_engine !== 'raw') {
     throw new SQLError('access_denied');
@@ -134,19 +134,12 @@ export async function createTable(params: CreateTableParams): Promise<void> {
     throw new SQLError({ err: 'db_not_found', args: [database] });
   } else {
     const engine = Engine.getEngineByName(table_engine);
-    if (engine) {
-      await engine.createTable(params);
-      if (!is_temp) {
-        const schema = g_schemaMap.get(database);
-        if (schema) {
-          schema.set(table, { table_engine });
-        }
+    await engine.createTable(params);
+    if (!is_temp) {
+      const schema = g_schemaMap.get(database);
+      if (schema) {
+        schema.set(table, { table_engine });
       }
-    } else {
-      throw new SQLError({
-        err: 'ER_UNKNOWN_STORAGE_ENGINE',
-        args: [table_engine],
-      });
     }
   }
 }

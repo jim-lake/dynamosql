@@ -11,13 +11,18 @@ import { SQLError } from '../error';
 
 import type { Select } from 'node-sql-parser';
 import type { ExtendedExpressionValue, ExtendedFrom } from './ast_types';
-import type { HandlerParams } from './handler_types';
+import type { HandlerParams, DynamoDBClient } from './handler_types';
 import type { FieldInfo } from '../types';
 import type { EvaluationResult } from './expression';
+import type { Session } from '../session';
 
 export type SourceMap = Record<string, unknown[]>;
 
 type ColumnMap = Record<string, string[]>;
+
+type SelectWithOptionalGroupBy = Omit<Select, 'groupby'> & {
+  groupby?: Select['groupby'] | null;
+};
 
 interface QueryColumn {
   expr: ExtendedExpressionValue & {
@@ -43,7 +48,7 @@ export async function query(
   params: HandlerParams<Select>
 ): Promise<SelectResult> {
   const { rows, columns } = await internalQuery(params);
-  for (const row of rows ?? []) {
+  for (const row of rows) {
     // eslint-disable-next-line @typescript-eslint/no-for-in-array
     for (const key in row) {
       row[key] = row[key]?.value as never;
@@ -51,7 +56,10 @@ export async function query(
   }
   return { rows: rows as unknown[][], columns };
 }
-export interface InternalQueryParams extends HandlerParams<Select> {
+export interface InternalQueryParams {
+  ast: Omit<Select, 'from'> & { from?: ExtendedFrom[] };
+  session: Session;
+  dynamodb: DynamoDBClient;
   skip_resolve?: boolean;
 }
 export interface InternalQueryResult {
@@ -68,21 +76,27 @@ export async function internalQuery(
   if (!params.skip_resolve) {
     resolveReferences(ast, current_database ?? undefined);
   }
-  const from = ast?.from as unknown as ExtendedFrom[] | undefined;
+  const from = ast.from;
   let source_map: SourceMap = {};
   let column_map: ColumnMap = {};
-  if (from?.length) {
-    const db = from[0]?.db;
-    const table = from[0]?.table;
-    const engine = SchemaManager.getEngine(db, table, session);
-    const opts = { session, dynamodb, list: from, where: ast.where };
-    const result = await engine.getRowList(opts);
-    source_map = result.source_map;
-    column_map = result.column_map;
+  if (from && from.length > 0) {
+    const first = from[0];
+    if (first) {
+      const db = first.db;
+      const table = first.table;
+      const engine = SchemaManager.getEngine(db, table, session);
+      const opts = { session, dynamodb, list: from, where: ast.where };
+      const result = await engine.getRowList(opts);
+      source_map = result.source_map;
+      column_map = result.column_map;
+    }
   }
   return _evaluateReturn({ ...params, source_map, column_map });
 }
-interface EvaluateReturnParams extends HandlerParams<Select> {
+interface EvaluateReturnParams {
+  ast: SelectWithOptionalGroupBy;
+  session: Session;
+  dynamodb: DynamoDBClient;
   source_map: SourceMap;
   column_map: ColumnMap;
 }
@@ -93,7 +107,7 @@ async function _evaluateReturn(
   const query_columns = _expandStarColumns(params);
 
   const { where, groupby } = ast;
-  const from = ast.from as ExtendedFrom[];
+  const from = ast.from as ExtendedFrom[] | undefined;
   let row_list: RowWithResult[] = [];
   let sleep_ms = 0;
 
@@ -104,9 +118,9 @@ async function _evaluateReturn(
   }
 
   if (groupby) {
-    row_list = formGroup({ groupby, ast, row_list, session });
-  } else if (hasAggregate(ast)) {
-    row_list = formImplicitGroup({ ast, row_list, session });
+    row_list = formGroup({ groupby, ast: ast as Select, row_list, session });
+  } else if (hasAggregate(ast as Select)) {
+    row_list = formImplicitGroup({ ast: ast as Select, row_list, session });
   }
 
   for (const row of row_list) {
@@ -137,29 +151,34 @@ async function _evaluateReturn(
   const columns: FieldInfo[] = [];
   for (const column of query_columns) {
     const column_type = convertType(column.result_type, column.result_nullable);
-    column_type.db = column.expr?.from?.db ?? column.expr.db ?? column.db ?? '';
+    column_type.db = column.expr.from?.db ?? column.expr.db ?? column.db ?? '';
     column_type.orgName = column.result_name ?? '';
     column_type.name = column.as ?? column_type.orgName;
-    column_type.orgTable = column.expr?.from?.table ?? '';
-    column_type.table = column.expr?.from?.as ?? column_type.orgTable;
+    column_type.orgTable = column.expr.from?.table ?? '';
+    column_type.table = column.expr.from?.as ?? column_type.orgTable;
     columns.push(column_type);
   }
 
-  if (ast.orderby && row_list) {
+  if (ast.orderby) {
     sort(row_list, ast.orderby, { session, columns });
   }
 
   let start = 0;
   let end = row_list.length;
   if (ast.limit) {
-    if (ast.limit?.seperator === 'offset') {
-      start = ast.limit.value[1]?.value ?? 0;
-      end = Math.min(end, start + (ast.limit.value[0]?.value ?? 0));
-    } else if (ast.limit?.value?.length > 1) {
-      start = ast.limit.value[0]?.value ?? 0;
-      end = Math.min(end, start + (ast.limit.value[1]?.value ?? 0));
-    } else if (ast.limit) {
-      end = Math.min(end, ast.limit.value[0]?.value ?? 0);
+    if (ast.limit.seperator === 'offset') {
+      const offsetValue = ast.limit.value[1];
+      const limitValue = ast.limit.value[0];
+      start = offsetValue ? offsetValue.value : 0;
+      end = Math.min(end, start + (limitValue ? limitValue.value : 0));
+    } else if (ast.limit.value.length > 1) {
+      const offsetValue = ast.limit.value[0];
+      const limitValue = ast.limit.value[1];
+      start = offsetValue ? offsetValue.value : 0;
+      end = Math.min(end, start + (limitValue ? limitValue.value : 0));
+    } else {
+      const limitValue = ast.limit.value[0];
+      end = Math.min(end, limitValue ? limitValue.value : 0);
     }
   }
 
@@ -172,13 +191,16 @@ async function _evaluateReturn(
   return { rows, columns, row_list };
 }
 interface ExpandStarColumnsParams {
-  ast: Select;
+  ast: Omit<Select, 'columns' | 'groupby'> & {
+    columns?: Select['columns'] | null;
+    groupby?: Select['groupby'] | null;
+  };
   column_map: ColumnMap;
 }
 function _expandStarColumns(params: ExpandStarColumnsParams): QueryColumn[] {
   const { ast, column_map } = params;
   const ret: QueryColumn[] = [];
-  for (const column of ast?.columns ?? []) {
+  for (const column of ast.columns ?? []) {
     if (column?.expr?.type === 'column_ref' && column.expr.column === '*') {
       const { db, table } = column.expr;
       const from_list = Array.isArray(ast.from)
@@ -191,9 +213,9 @@ function _expandStarColumns(params: ExpandStarColumnsParams): QueryColumn[] {
           (!db && from.table === table && !from.as) ||
           (!db && from.as === table)
         ) {
-          const column_list = column_map[from.key ?? ''];
+          const column_list = column_map[from.key];
           if (column_list && !column_list.length) {
-            from._requestSet?.forEach((name: string) => column_list.push(name));
+            from._requestSet.forEach((name: string) => column_list.push(name));
           }
           column_list?.forEach((name: string) => {
             ret.push({

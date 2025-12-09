@@ -191,10 +191,10 @@ export function convertError(err: DynamoDBError): ConvertErrorResult {
     return new Error('resource_in_use');
   }
   if (err.Code === 'ValidationError' || err.name === 'ValidationError') {
-    if (err.Message?.match?.(/expected: [^\s]* actual: NULL/)) {
+    if (err.Message?.match(/expected: [^\s]* actual: NULL/)) {
       return new Error('ER_BAD_NULL_ERROR');
     }
-    if (err.Message?.match?.(/expected: [^\s]* actual:/)) {
+    if (err.Message?.match(/expected: [^\s]* actual:/)) {
       return new Error('ER_TRUNCATED_WRONG_VALUE_FOR_FIELD');
     }
     return new Error('validation');

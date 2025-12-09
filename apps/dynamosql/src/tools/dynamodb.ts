@@ -361,9 +361,9 @@ export class DynamoDB {
       AttributeType: dynamoType(column.type),
     }));
     const schema: KeySchemaElement[] = [
-      { AttributeName: primary_key?.[0]?.name, KeyType: KeyType.HASH },
+      { AttributeName: primary_key[0]?.name, KeyType: KeyType.HASH },
     ];
-    if (primary_key?.[1]) {
+    if (primary_key[1]) {
       schema.push({
         AttributeName: primary_key[1].name,
         KeyType: KeyType.RANGE,
@@ -402,9 +402,9 @@ export class DynamoDB {
       AttributeType: dynamoType(item.type),
     }));
     const schema: KeySchemaElement[] = [
-      { AttributeName: key_list?.[0]?.name, KeyType: KeyType.HASH },
+      { AttributeName: key_list[0]?.name, KeyType: KeyType.HASH },
     ];
-    if (key_list?.[1]) {
+    if (key_list[1]) {
       schema.push({ AttributeName: key_list[1].name, KeyType: KeyType.RANGE });
     }
     const input = {
@@ -457,7 +457,7 @@ export class DynamoDB {
         list?.forEach((item) => {
           results.push(item);
         });
-        if (!result?.NextToken) {
+        if (!result.NextToken) {
           break;
         }
         command.input.NextToken = result.NextToken;
