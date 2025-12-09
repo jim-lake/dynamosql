@@ -20,10 +20,6 @@ export type SourceMap = Record<string, unknown[]>;
 
 type ColumnMap = Record<string, string[]>;
 
-type SelectWithOptionalGroupBy = Omit<Select, 'groupby'> & {
-  groupby?: Select['groupby'] | null;
-};
-
 interface QueryColumn {
   expr: ExtendedExpressionValue & {
     db?: string | null;
@@ -57,7 +53,7 @@ export async function query(
   return { rows: rows as unknown[][], columns };
 }
 export interface InternalQueryParams {
-  ast: Omit<Select, 'from'> & { from?: ExtendedFrom[] };
+  ast: Select;
   session: Session;
   dynamodb: DynamoDBClient;
   skip_resolve?: boolean;
@@ -79,22 +75,20 @@ export async function internalQuery(
   const from = ast.from;
   let source_map: SourceMap = {};
   let column_map: ColumnMap = {};
-  if (from && from.length > 0) {
-    const first = from[0];
-    if (first) {
-      const db = first.db;
-      const table = first.table;
-      const engine = SchemaManager.getEngine(db, table, session);
-      const opts = { session, dynamodb, list: from, where: ast.where };
-      const result = await engine.getRowList(opts);
-      source_map = result.source_map;
-      column_map = result.column_map;
-    }
+  if (from && Array.isArray(from) && from.length > 0) {
+    const first = from[0] as ExtendedFrom;
+    const db = first.db;
+    const table = first.table;
+    const engine = SchemaManager.getEngine(db, table, session);
+    const opts = { session, dynamodb, list: from as ExtendedFrom[], where: ast.where };
+    const result = await engine.getRowList(opts);
+    source_map = result.source_map;
+    column_map = result.column_map;
   }
   return _evaluateReturn({ ...params, source_map, column_map });
 }
 interface EvaluateReturnParams {
-  ast: SelectWithOptionalGroupBy;
+  ast: Select;
   session: Session;
   dynamodb: DynamoDBClient;
   source_map: SourceMap;
@@ -107,7 +101,7 @@ async function _evaluateReturn(
   const query_columns = _expandStarColumns(params);
 
   const { where, groupby } = ast;
-  const from = ast.from as ExtendedFrom[] | undefined;
+  const from = Array.isArray(ast.from) ? (ast.from as ExtendedFrom[]) : undefined;
   let row_list: RowWithResult[] = [];
   let sleep_ms = 0;
 
@@ -117,10 +111,11 @@ async function _evaluateReturn(
     row_list = [{ 0: {} }] as unknown as RowWithResult[];
   }
 
-  if (groupby) {
-    row_list = formGroup({ groupby, ast: ast as Select, row_list, session });
-  } else if (hasAggregate(ast as Select)) {
-    row_list = formImplicitGroup({ ast: ast as Select, row_list, session });
+  // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+  if (groupby?.columns) {
+    row_list = formGroup({ groupby, ast, row_list, session });
+  } else if (hasAggregate(ast)) {
+    row_list = formImplicitGroup({ ast, row_list, session });
   }
 
   for (const row of row_list) {
