@@ -11,13 +11,21 @@ import { sort } from './helpers/sort';
 import * as SchemaManager from './schema_manager';
 
 import type { ExtendedExpressionValue, ExtendedFrom } from './ast_types';
-import type { HandlerParams, DynamoDBClient } from './handler_types';
+import type { Row } from './engine';
+import type {
+  HandlerParams,
+  DynamoDBClient,
+  SourceRow,
+  SourceRowResult,
+  SourceRowGroup,
+  SourceRowResultGroup,
+} from './handler_types';
 import type { FieldInfo } from '../types';
 import type { EvaluationResult } from './expression';
 import type { Session } from '../session';
 import type { Select } from 'node-sql-parser';
 
-export type SourceMap = Record<string, unknown[]>;
+export type SourceMap = Record<string, Row[]>;
 
 type ColumnMap = Record<string, string[]>;
 
@@ -31,10 +39,6 @@ interface QueryColumn {
   result_name?: string;
   result_nullable?: boolean;
   db?: string;
-}
-export interface RowWithResult {
-  [key: string]: unknown;
-  '@@result': EvaluationResult[];
 }
 export interface SelectResult {
   rows: unknown[][];
@@ -62,7 +66,7 @@ export interface InternalQueryParams {
 export interface InternalQueryResult {
   rows: EvaluationResult[][];
   columns: FieldInfo[];
-  row_list: RowWithResult[];
+  row_list: SourceRowResult[] | SourceRowResultGroup[];
 }
 export async function internalQuery(
   params: InternalQueryParams
@@ -117,23 +121,25 @@ async function _evaluateReturn(
   const from = Array.isArray(ast.from)
     ? (ast.from as ExtendedFrom[])
     : undefined;
-  let row_list: RowWithResult[] = [];
+  let row_list: SourceRow[] = [];
   let sleep_ms = 0;
 
   if (from) {
     row_list = formJoin({ source_map, from, where, session });
   } else {
-    row_list = [{ 0: {} }] as unknown as RowWithResult[];
+    row_list = [{ source: {} }];
   }
 
+  let grouped_list: (SourceRow | SourceRowGroup)[] = row_list;
   // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
   if (groupby?.columns) {
-    row_list = formGroup({ groupby, ast, row_list, session });
+    grouped_list = formGroup({ groupby, ast, row_list, session });
   } else if (hasAggregate(ast)) {
-    row_list = formImplicitGroup({ ast, row_list, session });
+    grouped_list = formImplicitGroup({ ast, row_list, session });
   }
 
-  for (const row of row_list) {
+  const result_list: SourceRowResult[] = [];
+  for (const row of grouped_list) {
     const output_row: EvaluationResult[] = [];
     for (const column of query_columns) {
       const result = Expression.getValue(column.expr as never, {
@@ -155,7 +161,7 @@ async function _evaluateReturn(
         sleep_ms = result.sleep_ms;
       }
     }
-    row['@@result'] = output_row;
+    result_list.push({ ...row, result: output_row });
   }
 
   const columns: FieldInfo[] = [];
@@ -170,11 +176,11 @@ async function _evaluateReturn(
   }
 
   if (ast.orderby) {
-    sort(row_list, ast.orderby, { session, columns });
+    sort(result_list, ast.orderby, { session, columns });
   }
 
   let start = 0;
-  let end = row_list.length;
+  let end = result_list.length;
   if (ast.limit) {
     if (ast.limit.seperator === 'offset') {
       const offsetValue = ast.limit.value[1];
@@ -192,13 +198,13 @@ async function _evaluateReturn(
     }
   }
 
-  row_list = row_list.slice(start, end);
-  const rows = row_list.map((row) => row['@@result']);
+  const final_list = result_list.slice(start, end);
+  const rows = final_list.map((row) => row.result);
 
   if (sleep_ms) {
     await setTimeout(sleep_ms);
   }
-  return { rows, columns, row_list };
+  return { rows, columns, row_list: final_list };
 }
 interface ExpandStarColumnsParams {
   ast: Omit<Select, 'columns' | 'groupby'> & {

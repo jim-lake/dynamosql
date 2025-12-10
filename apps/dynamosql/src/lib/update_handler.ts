@@ -10,9 +10,12 @@ import * as TransactionManager from './transaction_manager';
 
 import type { UpdateAST, ExtendedFrom, SetListWithValue } from './ast_types';
 import type { UpdateChange, EngineValue } from './engine';
-import type { HandlerParams, ChangedResult } from './handler_types';
+import type {
+  HandlerParams,
+  ChangedResult,
+  SourceRowResult,
+} from './handler_types';
 import type { RequestInfo } from './helpers/column_ref_helper';
-import type { RowWithResult } from './select_handler';
 import type { SetList } from 'node-sql-parser';
 
 interface ExtendedSetList extends SetList {
@@ -90,7 +93,7 @@ async function _multipleUpdate(
         .map((set_item) => {
           const expr_result = Expression.getValue(set_item.value, {
             session,
-            row: row as RowWithResult,
+            row: row as SourceRowResult,
           });
           if (expr_result.err) {
             throw new SQLError(expr_result.err);

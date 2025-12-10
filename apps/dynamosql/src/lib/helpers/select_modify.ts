@@ -67,17 +67,16 @@ export async function runSelect(
   const { row_list } = await internalQuery(opts);
 
   for (const object of ast.from) {
-    const extendedObject = object as unknown as {
-      key: string;
-    };
+    const extendedObject = object as unknown as { key: string };
     const from_key = extendedObject.key;
     const key_list = keyListMap.get(from_key) ?? [];
     const collection = new Map<EngineValue, unknown>();
     for (const row of row_list) {
-      const rowValue = row[from_key];
+      const rowValue =
+        from_key in row.source ? row.source[from_key] : undefined;
       const keys = key_list.map((key: string) => {
         if (rowValue && typeof rowValue === 'object' && key in rowValue) {
-          return (rowValue as Record<string, unknown>)[key];
+          return rowValue[key] as EngineValue;
         }
         return undefined;
       });

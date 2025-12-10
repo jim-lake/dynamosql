@@ -1,10 +1,21 @@
 import type { createDynamoDB } from './dynamodb';
 import type { Session } from '../session';
+import type { Row } from './engine';
+import type { EvaluationResult } from './expression';
 
-export type { SelectResult, RowWithResult } from './select_handler';
+export type { SelectResult } from './select_handler';
 export type { ShowResult } from './show_handler';
 
 export type DynamoDBClient = ReturnType<typeof createDynamoDB>;
+
+export interface SourceRow {
+  source: Record<string, Row | null>;
+}
+export type SourceRowResult = SourceRow & { result: EvaluationResult[] };
+export type SourceRowGroup = SourceRow & { group: SourceRow[] };
+export type SourceRowResultGroup = SourceRowResult & {
+  group: SourceRowResult[];
+};
 
 export interface HandlerParams<T> {
   ast: T;

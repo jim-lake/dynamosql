@@ -4,7 +4,7 @@ import { getValue } from '../expression';
 
 import type { Session } from '../../session';
 import type { FieldInfo } from '../../types';
-import type { RowWithResult } from '../handler_types';
+import type { SourceRowResult } from '../handler_types';
 import type { OrderBy } from 'node-sql-parser';
 
 export interface SortState {
@@ -13,7 +13,7 @@ export interface SortState {
 }
 
 export function sort(
-  row_list: RowWithResult[],
+  row_list: SourceRowResult[],
   orderby: OrderBy[],
   state: SortState
 ): void {
@@ -23,8 +23,8 @@ export function sort(
 function _sort(
   orderby: OrderBy[],
   state: SortState,
-  a: RowWithResult,
-  b: RowWithResult
+  a: SourceRowResult,
+  b: SourceRowResult
 ): number {
   for (const order of orderby) {
     const { expr } = order;
@@ -33,8 +33,8 @@ function _sort(
     if (exprObj.type === 'number') {
       const index = typeof exprObj.value === 'number' ? exprObj.value - 1 : 0;
       const result = func(
-        a['@@result'][index]?.value,
-        b['@@result'][index]?.value,
+        a.result[index]?.value,
+        b.result[index]?.value,
         state.columns?.[index]
       );
       if (result !== 0) {

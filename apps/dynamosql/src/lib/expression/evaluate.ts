@@ -21,8 +21,13 @@ import type {
   UnaryExpr,
   AssignExpr,
 } from '../ast_types';
-import type { Row, EngineValue, CellValue } from '../engine';
-import type { RowWithResult } from '../handler_types';
+import type { EngineValue, CellValue } from '../engine';
+import type {
+  SourceRow,
+  SourceRowResult,
+  SourceRowGroup,
+  SourceRowResultGroup,
+} from '../handler_types';
 import type {
   Function,
   AggrFunc,
@@ -34,7 +39,7 @@ import type {
 
 export interface EvaluationState {
   session: Session;
-  row?: Row | RowWithResult;
+  row?: SourceRow | SourceRowResult | SourceRowGroup | SourceRowResultGroup;
 }
 export interface EvaluationValue {
   type: string;
@@ -263,19 +268,24 @@ export function getValue(
 
     result.name = columnName;
     if (row && colRef._resultIndex !== undefined && colRef._resultIndex >= 0) {
-      const output_result = (
-        row['@@result'] as EvaluationResult[] | undefined
-      )?.[colRef._resultIndex];
+      const output_result =
+        'result' in row ? row.result[colRef._resultIndex] : undefined;
       result.value = output_result?.value;
       result.type = output_result?.type ?? 'string';
     } else if (row) {
       const fromKey = colRef.from?.key;
-      const cell = fromKey
-        ? (row as Record<string, Record<string, unknown>>)[fromKey]?.[
-            columnName
-          ]
-        : undefined;
-      const decode = _decodeCell(cell as EngineValue | null | undefined);
+      let cell: EngineValue | null | undefined;
+      if (fromKey && fromKey in row.source) {
+        const fromData = row.source[fromKey];
+        if (
+          fromData &&
+          typeof fromData === 'object' &&
+          columnName in fromData
+        ) {
+          cell = fromData[columnName] as EngineValue;
+        }
+      }
+      const decode = _decodeCell(cell);
       result.type = decode.type;
       result.value = decode.value;
     } else {

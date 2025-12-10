@@ -3,12 +3,9 @@ import { getValue } from '../expression';
 
 import type { Session } from '../../session';
 import type { ExtendedColumnRef, ExtendedExpressionValue } from '../ast_types';
-import type { RowWithResult } from '../handler_types';
+import type { SourceRow, SourceRowGroup } from '../handler_types';
 import type { ExpressionValue, Select, ValueExpr } from 'node-sql-parser';
 
-export interface RowWithResultAndGroup extends RowWithResult {
-  '@@group': Record<string, unknown>;
-}
 export interface GroupBy {
   columns: ExtendedColumnRef[] | null;
   modifiers: ValueExpr<string>[];
@@ -16,7 +13,7 @@ export interface GroupBy {
 export interface FormGroupParams {
   groupby: GroupBy;
   ast: Select;
-  row_list: RowWithResult[];
+  row_list: SourceRow[];
   session: Session;
 }
 
@@ -32,14 +29,14 @@ export function hasAggregate(ast: Select): boolean {
 }
 export function formImplicitGroup(
   params: Omit<FormGroupParams, 'groupby'>
-): RowWithResult[] {
+): SourceRowGroup[] {
   const { row_list } = params;
   if (row_list[0]) {
-    return [{ ...row_list[0], '@@group': row_list }];
+    return [{ ...row_list[0], group: row_list }];
   }
-  return row_list;
+  return [];
 }
-export function formGroup(params: FormGroupParams): RowWithResult[] {
+export function formGroup(params: FormGroupParams): SourceRowGroup[] {
   const { groupby, ast, row_list, session } = params;
 
   const group_exprs: ExtendedExpressionValue[] = [];
@@ -75,13 +72,13 @@ export function formGroup(params: FormGroupParams): RowWithResult[] {
     (obj as unknown as unknown[]).push(row);
   }
 
-  const output_list: RowWithResult[] = [];
+  const output_list: SourceRowGroup[] = [];
   _unroll(output_list, group_map);
   return output_list;
 }
-function _unroll(list: RowWithResult[], obj: unknown): void {
+function _unroll(list: SourceRowGroup[], obj: unknown): void {
   if (Array.isArray(obj)) {
-    list.push({ ...obj[0], '@@group': obj });
+    list.push({ ...obj[0], group: obj });
   } else {
     const objMap = obj as Record<string, unknown>;
     for (const key in objMap) {

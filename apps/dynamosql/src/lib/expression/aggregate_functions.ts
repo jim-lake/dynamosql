@@ -7,7 +7,7 @@ import type { AggrFunc } from 'node-sql-parser';
 
 function sum(expr: AggrFunc, state: EvaluationState): EvaluationResult {
   const { row, ...other } = state;
-  const group = (row?.['@@group'] ?? [{}]) as EvaluationState['row'][];
+  const group = row && 'group' in row ? row.group : [];
   let err: EvaluationResult['err'] = null;
   let value: number | null = 0;
   let name = '';
@@ -42,7 +42,7 @@ function sum(expr: AggrFunc, state: EvaluationState): EvaluationResult {
 }
 function count(expr: AggrFunc, state: EvaluationState): EvaluationResult {
   const { row, ...other } = state;
-  const group = (row?.['@@group'] ?? [{}]) as EvaluationState['row'][];
+  const group = row && 'group' in row ? row.group : [];
   let err: EvaluationResult['err'] = null;
   let value = 0;
   let name = '';
@@ -71,7 +71,7 @@ function count(expr: AggrFunc, state: EvaluationState): EvaluationResult {
 
 function avg(expr: AggrFunc, state: EvaluationState): EvaluationResult {
   const { row, ...other } = state;
-  const group = (row?.['@@group'] ?? [{}]) as EvaluationState['row'][];
+  const group = row && 'group' in row ? row.group : [];
   let err: EvaluationResult['err'] = null;
   let total = 0;
   let cnt = 0;
@@ -103,7 +103,7 @@ function avg(expr: AggrFunc, state: EvaluationState): EvaluationResult {
 }
 function min(expr: AggrFunc, state: EvaluationState): EvaluationResult {
   const { row, ...other } = state;
-  const group = (row?.['@@group'] ?? [{}]) as EvaluationState['row'][];
+  const group = row && 'group' in row ? row.group : [];
   let err: EvaluationResult['err'] = null;
   let value: EvaluationResult['value'] = null;
   let type: EvaluationResult['type'] = 'null';
@@ -128,7 +128,7 @@ function min(expr: AggrFunc, state: EvaluationState): EvaluationResult {
 }
 function max(expr: AggrFunc, state: EvaluationState): EvaluationResult {
   const { row, ...other } = state;
-  const group = (row?.['@@group'] ?? [{}]) as EvaluationState['row'][];
+  const group = row && 'group' in row ? row.group : [];
   let err: EvaluationResult['err'] = null;
   let value: EvaluationResult['value'] = null;
   let type: EvaluationResult['type'] = 'null';
@@ -154,7 +154,7 @@ function max(expr: AggrFunc, state: EvaluationState): EvaluationResult {
 
 function stddev_pop(expr: AggrFunc, state: EvaluationState): EvaluationResult {
   const { row, ...other } = state;
-  const group = (row?.['@@group'] ?? [{}]) as EvaluationState['row'][];
+  const group = row && 'group' in row ? row.group : [];
   let err: EvaluationResult['err'] = null;
   let name = '';
   const values: number[] = [];
@@ -190,7 +190,7 @@ function stddev_pop(expr: AggrFunc, state: EvaluationState): EvaluationResult {
 
 function stddev_samp(expr: AggrFunc, state: EvaluationState): EvaluationResult {
   const { row, ...other } = state;
-  const group = (row?.['@@group'] ?? [{}]) as EvaluationState['row'][];
+  const group = row && 'group' in row ? row.group : [];
   let err: EvaluationResult['err'] = null;
   let name = '';
   const values: number[] = [];
@@ -226,7 +226,7 @@ function stddev_samp(expr: AggrFunc, state: EvaluationState): EvaluationResult {
 
 function var_pop(expr: AggrFunc, state: EvaluationState): EvaluationResult {
   const { row, ...other } = state;
-  const group = (row?.['@@group'] ?? [{}]) as EvaluationState['row'][];
+  const group = row && 'group' in row ? row.group : [];
   let err: EvaluationResult['err'] = null;
   let name = '';
   const values: number[] = [];
@@ -261,7 +261,7 @@ function var_pop(expr: AggrFunc, state: EvaluationState): EvaluationResult {
 
 function var_samp(expr: AggrFunc, state: EvaluationState): EvaluationResult {
   const { row, ...other } = state;
-  const group = (row?.['@@group'] ?? [{}]) as EvaluationState['row'][];
+  const group = row && 'group' in row ? row.group : [];
   let err: EvaluationResult['err'] = null;
   let name = '';
   const values: number[] = [];
@@ -296,7 +296,7 @@ function var_samp(expr: AggrFunc, state: EvaluationState): EvaluationResult {
 
 function bit_and(expr: AggrFunc, state: EvaluationState): EvaluationResult {
   const { row, ...other } = state;
-  const group = (row?.['@@group'] ?? [{}]) as EvaluationState['row'][];
+  const group = row && 'group' in row ? row.group : [];
   let err: EvaluationResult['err'] = null;
   let value: bigint | null = (1n << 64n) - 1n;
   let name = '';
@@ -327,7 +327,7 @@ function bit_and(expr: AggrFunc, state: EvaluationState): EvaluationResult {
 
 function bit_or(expr: AggrFunc, state: EvaluationState): EvaluationResult {
   const { row, ...other } = state;
-  const group = (row?.['@@group'] ?? [{}]) as EvaluationState['row'][];
+  const group = row && 'group' in row ? row.group : [];
   let err: EvaluationResult['err'] = null;
   let value: bigint | null = 0n;
   let name = '';
@@ -358,7 +358,7 @@ function bit_or(expr: AggrFunc, state: EvaluationState): EvaluationResult {
 
 function bit_xor(expr: AggrFunc, state: EvaluationState): EvaluationResult {
   const { row, ...other } = state;
-  const group = (row?.['@@group'] ?? [{}]) as EvaluationState['row'][];
+  const group = row && 'group' in row ? row.group : [];
   let err: EvaluationResult['err'] = null;
   let value: bigint | null = 0n;
   let name = '';
