@@ -8,7 +8,7 @@
   ],
   "scripts": {
     "build": "rollup -c",
-    "lint": "eslint src test examples",
+    "lint": "eslint src test examples --fix",
     "lint:single": "eslint",
     "pretty": "prettier -u --write \"**/*\" --log-level warn",
     "ts:check": "tsc --noEmit",
