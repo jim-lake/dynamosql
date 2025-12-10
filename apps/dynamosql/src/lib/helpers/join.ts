@@ -1,9 +1,10 @@
-import { getValue } from '../expression';
 import { SQLError } from '../../error';
+import { getValue } from '../expression';
+
 import type { Session } from '../../session';
-import type { From, Binary, Function } from 'node-sql-parser';
 import type { ExtendedExpressionValue } from '../ast_types';
 import type { SourceMap, RowWithResult } from '../select_handler';
+import type { From, Binary, Function } from 'node-sql-parser';
 
 export interface FormJoinParams {
   source_map: SourceMap;

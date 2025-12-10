@@ -1,9 +1,10 @@
-import { getValue } from './evaluate';
-import { convertNum, convertString } from '../helpers/sql_conversion';
 import { assertArgCount, assertArgCountParse } from '../helpers/arg_count';
+import { convertNum, convertString } from '../helpers/sql_conversion';
 
-import type { Function, ExpressionValue } from 'node-sql-parser';
+import { getValue } from './evaluate';
+
 import type { EvaluationState, EvaluationResult } from './evaluate';
+import type { Function, ExpressionValue } from 'node-sql-parser';
 
 export function length(
   expr: Function,

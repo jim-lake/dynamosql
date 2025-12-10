@@ -1,13 +1,15 @@
 import { logger } from '@dynamosql/shared';
+
+import { SQLError } from '../error';
+import GlobalSettings from '../global_settings';
+
 import * as Expression from './expression';
 import * as SelectHandler from './select_handler';
-import GlobalSettings from '../global_settings';
-import { SQLError } from '../error';
 
-import type { Select } from 'node-sql-parser';
-import type { HandlerParams } from './handler_types';
-import type { EvaluationResult } from './expression';
 import type { AssignExpr, SetStatement } from './ast_types';
+import type { EvaluationResult } from './expression';
+import type { HandlerParams } from './handler_types';
+import type { Select } from 'node-sql-parser';
 
 export async function query(
   params: HandlerParams<SetStatement>

@@ -1,18 +1,18 @@
+import { SQLError } from '../../../error';
 import {
   escapeValue,
   escapeIdentifier,
   convertError,
 } from '../../../tools/dynamodb_helper';
 import { trackFirstSeen } from '../../../tools/util';
-import { SQLError } from '../../../error';
 
+import type { NativeType } from '../../../tools/dynamodb';
 import type {
   EvaluationResultRow,
   InsertParams,
   AffectedResult,
 } from '../index';
 import type { DescribeTableCommandOutput } from '@aws-sdk/client-dynamodb';
-import type { NativeType } from '../../../tools/dynamodb';
 
 export async function insertRowList(
   params: InsertParams

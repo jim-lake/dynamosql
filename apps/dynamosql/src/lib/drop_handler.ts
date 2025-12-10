@@ -1,9 +1,11 @@
-import * as SchemaManager from './schema_manager';
 import { logger } from '@dynamosql/shared';
+
 import { SQLError } from '../error';
 
-import type { Drop, From } from 'node-sql-parser';
+import * as SchemaManager from './schema_manager';
+
 import type { HandlerParams } from './handler_types';
+import type { Drop, From } from 'node-sql-parser';
 
 interface DropExtended extends Drop {
   prefix?: string;

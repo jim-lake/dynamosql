@@ -1,11 +1,12 @@
 import { convertNum, convertDateTime } from '../helpers/sql_conversion';
-import { getValue } from './evaluate';
-import { SQLDateTime } from '../types/sql_datetime';
 import { SQLDate } from '../types/sql_date';
+import { SQLDateTime } from '../types/sql_datetime';
 import { SQLTime } from '../types/sql_time';
 
-import type { Binary, ExpressionValue, Function } from 'node-sql-parser';
+import { getValue } from './evaluate';
+
 import type { EvaluationState, EvaluationResult } from './evaluate';
+import type { Binary, ExpressionValue, Function } from 'node-sql-parser';
 
 export function equal(expr: Binary, state: EvaluationState): EvaluationResult {
   return _equal(expr, state, ' = ');

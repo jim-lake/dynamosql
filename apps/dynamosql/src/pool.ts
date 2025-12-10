@@ -1,8 +1,10 @@
 import { EventEmitter } from 'node:events';
+
 import * as SqlString from 'sqlstring';
 
 import * as Session from './session';
 
+import type { SessionConfig } from './session';
 import type {
   Query,
   PoolConnection,
@@ -11,7 +13,6 @@ import type {
   QueryOptions,
   QueryCallback,
 } from './types';
-import type { SessionConfig } from './session';
 
 export type PoolConfig = SessionConfig;
 export function createPool(args?: PoolConfig) {

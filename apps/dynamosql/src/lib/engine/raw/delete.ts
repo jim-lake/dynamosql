@@ -1,10 +1,11 @@
-import { convertWhere } from '../../helpers/convert_where';
-import { escapeIdentifier } from '../../../tools/dynamodb_helper';
 import { logger } from '@dynamosql/shared';
-import { NoSingleOperationError } from '../../../error';
 
-import type { DeleteParams, MultiDeleteParams, AffectedResult } from '../index';
+import { NoSingleOperationError } from '../../../error';
+import { escapeIdentifier } from '../../../tools/dynamodb_helper';
+import { convertWhere } from '../../helpers/convert_where';
+
 import type { KeyValue } from '../../../tools/dynamodb';
+import type { DeleteParams, MultiDeleteParams, AffectedResult } from '../index';
 
 export async function singleDelete(
   params: DeleteParams

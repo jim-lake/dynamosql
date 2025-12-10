@@ -1,9 +1,10 @@
-import { getValue } from './evaluate';
-import { convertNum } from '../helpers/sql_conversion';
 import { assertArgCount } from '../helpers/arg_count';
+import { convertNum } from '../helpers/sql_conversion';
 
-import type { Function } from 'node-sql-parser';
+import { getValue } from './evaluate';
+
 import type { EvaluationState, EvaluationResult } from './evaluate';
+import type { Function } from 'node-sql-parser';
 
 export function elt(expr: Function, state: EvaluationState): EvaluationResult {
   assertArgCount(expr, 2, Infinity);

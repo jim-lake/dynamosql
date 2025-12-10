@@ -1,20 +1,21 @@
 import { setTimeout } from 'node:timers/promises';
 
-import * as Expression from './expression';
-import * as SchemaManager from './schema_manager';
-import { convertType } from './helpers/column_type_helper';
-import { resolveReferences } from './helpers/column_ref_helper';
-import { formJoin } from './helpers/join';
-import { formGroup, formImplicitGroup, hasAggregate } from './helpers/group';
-import { sort } from './helpers/sort';
 import { SQLError } from '../error';
 
-import type { Select } from 'node-sql-parser';
+import * as Expression from './expression';
+import { resolveReferences } from './helpers/column_ref_helper';
+import { convertType } from './helpers/column_type_helper';
+import { formGroup, formImplicitGroup, hasAggregate } from './helpers/group';
+import { formJoin } from './helpers/join';
+import { sort } from './helpers/sort';
+import * as SchemaManager from './schema_manager';
+
 import type { ExtendedExpressionValue, ExtendedFrom } from './ast_types';
 import type { HandlerParams, DynamoDBClient } from './handler_types';
 import type { FieldInfo } from '../types';
 import type { EvaluationResult } from './expression';
 import type { Session } from '../session';
+import type { Select } from 'node-sql-parser';
 
 export type SourceMap = Record<string, unknown[]>;
 

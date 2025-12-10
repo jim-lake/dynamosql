@@ -1,11 +1,12 @@
 import { logger } from '@dynamosql/shared';
-import { convertWhere } from '../../helpers/convert_where';
-import { escapeIdentifier } from '../../../tools/dynamodb_helper';
-import { SQLError } from '../../../error';
 
-import type { RowListParams, RowListResult } from '../index';
-import type { ExtendedFrom } from '../../ast_types';
+import { SQLError } from '../../../error';
+import { escapeIdentifier } from '../../../tools/dynamodb_helper';
+import { convertWhere } from '../../helpers/convert_where';
+
 import type { ItemRecord } from '../../../tools/dynamodb';
+import type { ExtendedFrom } from '../../ast_types';
+import type { RowListParams, RowListResult } from '../index';
 
 export async function getRowList(
   params: RowListParams

@@ -1,19 +1,20 @@
-import * as RawEngine from './raw';
-import * as MemoryEngine from './memory';
-import * as InformationSchemaEngine from './information_schema';
 import { SQLError } from '../../error';
 
-import type { Binary, Function } from 'node-sql-parser';
+import * as InformationSchemaEngine from './information_schema';
+import * as MemoryEngine from './memory';
+import * as RawEngine from './raw';
+
+import type { Session } from '../../session';
+import type { AttributeValue, ItemRecord } from '../../tools/dynamodb';
 import type { ExtendedFrom, UpdateAST, DeleteAST } from '../ast_types';
+import type { EvaluationResult } from '../expression';
 import type {
   DynamoDBClient,
   ChangedResult,
   AffectedResult,
 } from '../handler_types';
-import type { Session } from '../../session';
-import type { EvaluationResult } from '../expression';
 import type { Transaction } from '../transaction_manager';
-import type { AttributeValue, ItemRecord } from '../../tools/dynamodb';
+import type { Binary, Function } from 'node-sql-parser';
 
 export type {
   DynamoDBClient,

@@ -1,19 +1,20 @@
-import ConvertExpression from './convert_expression';
-import Functions from './functions';
 import { getValue } from '../../expression';
 import { getFunctionName } from '../ast_helper';
 
-import type {
-  Function as FunctionType,
-  Binary,
-  ColumnRefItem,
-} from 'node-sql-parser';
+import ConvertExpression from './convert_expression';
+import Functions from './functions';
+
+import type { Session } from '../../../session';
 import type {
   ExtendedExpressionValue,
   UnaryExpr,
   ExtendedColumnRef,
 } from '../../ast_types';
-import type { Session } from '../../../session';
+import type {
+  Function as FunctionType,
+  Binary,
+  ColumnRefItem,
+} from 'node-sql-parser';
 
 export interface ConvertWhereState {
   session: Session;

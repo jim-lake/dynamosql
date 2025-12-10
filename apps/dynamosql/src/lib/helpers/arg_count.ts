@@ -1,5 +1,7 @@
 import { SQLError } from '../../error';
+
 import { getFunctionName } from './ast_helper';
+
 import type { Function } from 'node-sql-parser';
 
 type FunctionWithOptionalArgs = Omit<Function, 'args'> & {

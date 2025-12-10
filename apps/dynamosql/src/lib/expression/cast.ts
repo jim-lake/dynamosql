@@ -4,9 +4,11 @@ import {
   convertTime,
   convertBigInt,
 } from '../helpers/sql_conversion';
+
 import { getValue } from './evaluate';
-import type { Cast } from 'node-sql-parser';
+
 import type { EvaluationState, EvaluationResult } from './evaluate';
+import type { Cast } from 'node-sql-parser';
 
 interface CastTarget {
   dataType: string;

@@ -1,4 +1,4 @@
-import { getValue } from './evaluate';
+import { assertArgCount, assertArgCountParse } from '../helpers/arg_count';
 import { getDecimals } from '../helpers/decimals';
 import {
   convertNum,
@@ -7,10 +7,11 @@ import {
   convertDate,
   convertTime,
 } from '../helpers/sql_conversion';
-import { assertArgCount, assertArgCountParse } from '../helpers/arg_count';
 
-import type { Function } from 'node-sql-parser';
+import { getValue } from './evaluate';
+
 import type { EvaluationState, EvaluationResult } from './evaluate';
+import type { Function } from 'node-sql-parser';
 
 export function coalesce(
   expr: Function,

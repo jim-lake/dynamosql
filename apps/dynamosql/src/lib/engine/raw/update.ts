@@ -1,12 +1,14 @@
 import { logger } from '@dynamosql/shared';
-import { convertWhere } from '../../helpers/convert_where';
+
+import { NoSingleOperationError } from '../../../error';
 import {
   escapeIdentifier,
   escapeValue,
   valueToNative,
 } from '../../../tools/dynamodb_helper';
-import { NoSingleOperationError } from '../../../error';
+import { convertWhere } from '../../helpers/convert_where';
 
+import type { SetRowByKeys } from '../../../tools/dynamodb';
 import type {
   MultiUpdateParams,
   UpdateParams,
@@ -14,7 +16,6 @@ import type {
   CellValue,
 } from '../index';
 import type { AttributeValue } from '@aws-sdk/client-dynamodb';
-import type { SetRowByKeys } from '../../../tools/dynamodb';
 
 export async function singleUpdate(
   params: UpdateParams

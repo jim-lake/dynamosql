@@ -1,5 +1,5 @@
-import type { Function as FunctionType } from 'node-sql-parser';
 import type { ConvertResult, ConvertWhereState } from './convert_where';
+import type { Function as FunctionType } from 'node-sql-parser';
 
 type ConvertFunc = (
   expr: FunctionType,

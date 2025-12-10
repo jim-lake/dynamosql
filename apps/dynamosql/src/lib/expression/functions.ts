@@ -1,20 +1,38 @@
-import type { Function } from 'node-sql-parser';
-import type { EvaluationState, EvaluationResult } from './evaluate';
-
+import { nullif } from './compare';
+import { coalesce, ifnull, greatest, least, ifFunc } from './func_comp';
 import {
-  abs,
-  ceil,
-  floor,
-  round,
-  mod,
-  pow,
-  sqrt,
-  sign,
-  pi,
-  degrees,
-  radians,
-  exp,
-} from './func_math_basic';
+  now,
+  from_unixtime,
+  date,
+  curdate,
+  unix_timestamp,
+  year,
+  month,
+  day,
+  dayofweek,
+  dayofyear,
+  weekday,
+  quarter,
+  utc_date,
+  utc_timestamp,
+  from_days,
+  to_days,
+  to_seconds,
+} from './func_date_basic';
+import {
+  date_format,
+  datediff,
+  date_add,
+  date_sub,
+  timestampdiff,
+  dayname,
+  monthname,
+  week,
+  last_day,
+  weekofyear,
+  yearweek,
+  makedate,
+} from './func_date_calc';
 import {
   ln,
   log,
@@ -35,6 +53,38 @@ import {
   truncate_func,
   rand,
 } from './func_math_advanced';
+import {
+  abs,
+  ceil,
+  floor,
+  round,
+  mod,
+  pow,
+  sqrt,
+  sign,
+  pi,
+  degrees,
+  radians,
+  exp,
+} from './func_math_basic';
+import {
+  database,
+  isnull,
+  sleep,
+  not,
+  user,
+  version,
+  connection_id,
+} from './func_misc';
+import {
+  elt,
+  field,
+  find_in_set,
+  make_set,
+  export_set,
+  format_func,
+  char_func,
+} from './func_string_advanced';
 import {
   length,
   concat,
@@ -82,48 +132,6 @@ import {
   inet_ntoa,
 } from './func_string_encoding';
 import {
-  elt,
-  field,
-  find_in_set,
-  make_set,
-  export_set,
-  format_func,
-  char_func,
-} from './func_string_advanced';
-import {
-  now,
-  from_unixtime,
-  date,
-  curdate,
-  unix_timestamp,
-  year,
-  month,
-  day,
-  dayofweek,
-  dayofyear,
-  weekday,
-  quarter,
-  utc_date,
-  utc_timestamp,
-  from_days,
-  to_days,
-  to_seconds,
-} from './func_date_basic';
-import {
-  date_format,
-  datediff,
-  date_add,
-  date_sub,
-  timestampdiff,
-  dayname,
-  monthname,
-  week,
-  last_day,
-  weekofyear,
-  yearweek,
-  makedate,
-} from './func_date_calc';
-import {
   curtime,
   time,
   hour,
@@ -135,17 +143,9 @@ import {
   time_to_sec,
   maketime,
 } from './func_time';
-import { coalesce, ifnull, greatest, least, ifFunc } from './func_comp';
-import { nullif } from './compare';
-import {
-  database,
-  isnull,
-  sleep,
-  not,
-  user,
-  version,
-  connection_id,
-} from './func_misc';
+
+import type { EvaluationState, EvaluationResult } from './evaluate';
+import type { Function } from 'node-sql-parser';
 
 export const methods: Record<
   string,

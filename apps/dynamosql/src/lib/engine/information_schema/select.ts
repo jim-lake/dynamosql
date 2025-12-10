@@ -1,10 +1,10 @@
 import { SQLError } from '../../../error';
+import { deepClone } from '../../../tools/clone';
 import { getDatabaseList, getTableList } from '../../schema_manager';
 import { SQLDateTime } from '../../types/sql_datetime';
-import { deepClone } from '../../../tools/clone';
 
-import type { RowListParams, Row } from '../index';
 import type { ExtendedFrom } from '../../ast_types';
+import type { RowListParams, Row } from '../index';
 
 const CATALOG_LIST = [
   {

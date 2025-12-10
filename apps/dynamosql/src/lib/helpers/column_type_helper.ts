@@ -1,5 +1,6 @@
 import { CHARSETS, FIELD_FLAGS } from '../../constants/mysql';
 import { Types } from '../../types';
+
 import type { FieldInfo } from '../../types';
 
 export function convertType(type?: string, nullable?: boolean): FieldInfo {

@@ -1,14 +1,16 @@
-import * as Expression from './expression';
-import * as SchemaManager from './schema_manager';
-import * as TransactionManager from './transaction_manager';
-import * as SelectHandler from './select_handler';
 import { logger } from '@dynamosql/shared';
+
 import { SQLError } from '../error';
 
-import type { Insert_Replace, SetList } from 'node-sql-parser';
-import type { HandlerParams, AffectedResult } from './handler_types';
+import * as Expression from './expression';
+import * as SchemaManager from './schema_manager';
+import * as SelectHandler from './select_handler';
+import * as TransactionManager from './transaction_manager';
+
 import type { Engine, EvaluationResultRow } from './engine';
 import type { EvaluationResult } from './expression';
+import type { HandlerParams, AffectedResult } from './handler_types';
+import type { Insert_Replace, SetList } from 'node-sql-parser';
 
 interface InsertReplaceExtended extends Omit<Insert_Replace, 'values'> {
   set?: SetList[];

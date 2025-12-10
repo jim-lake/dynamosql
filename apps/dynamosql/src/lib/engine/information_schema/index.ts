@@ -1,4 +1,5 @@
 import { SQLError } from '../../../error';
+
 import type { ChangedResult, AffectedResult } from '../index';
 
 export * from './ddl';

@@ -1,9 +1,8 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 /* eslint-disable @typescript-eslint/no-redundant-type-constituents */
+import type { SQLError } from './error';
 import type { EventEmitter } from 'node:events';
 import type { Readable, ReadableOptions } from 'node:stream';
-
-import type { SQLError } from './error';
 
 export type MysqlError = SQLError;
 

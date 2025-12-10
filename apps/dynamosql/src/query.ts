@@ -1,21 +1,24 @@
 import { EventEmitter } from 'node:events';
+
 import { logger } from '@dynamosql/shared';
 import { Parser } from 'node-sql-parser/build/mysql';
+
+import { SQLError } from './error';
 import * as AlterHandler from './lib/alter_handler';
 import * as CreateHandler from './lib/create_handler';
 import * as DeleteHandler from './lib/delete_handler';
 import * as DropHandler from './lib/drop_handler';
+import { typeCast } from './lib/helpers/type_cast_helper';
 import * as InsertHandler from './lib/insert_handler';
 import * as SelectHandler from './lib/select_handler';
 import * as SetHandler from './lib/set_handler';
 import * as ShowHandler from './lib/show_handler';
-import * as UpdateHandler from './lib/update_handler';
 import * as TransactionManager from './lib/transaction_manager';
-import { typeCast } from './lib/helpers/type_cast_helper';
-import { SQLError } from './error';
+import * as UpdateHandler from './lib/update_handler';
 import { Types } from './types';
 
-import type { Readable, ReadableOptions } from 'node:stream';
+import type { ExtendedAST } from './lib/ast_types';
+import type { AffectedResult, ChangedResult } from './lib/handler_types';
 import type { Session } from './session';
 import type {
   FieldInfo,
@@ -24,9 +27,8 @@ import type {
   TypeCast,
   QueryListResult,
 } from './types';
-import type { AffectedResult, ChangedResult } from './lib/handler_types';
 import type { Use } from 'node-sql-parser';
-import type { ExtendedAST } from './lib/ast_types';
+import type { Readable, ReadableOptions } from 'node:stream';
 
 const g_parser = new Parser();
 

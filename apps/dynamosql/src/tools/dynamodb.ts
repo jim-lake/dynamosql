@@ -7,14 +7,9 @@ import {
   CreateTableCommand,
   DeleteTableCommand,
   DescribeTableCommand,
-  DescribeTableCommandOutput,
   ListTablesCommand,
   UpdateTableCommand,
   KeyType,
-  KeySchemaElement,
-  ReturnValuesOnConditionCheckFailure,
-  BillingMode,
-  ProjectionType,
 } from '@aws-sdk/client-dynamodb';
 
 import {
@@ -31,9 +26,16 @@ import {
 import { parallelBatch } from './parallel_batch';
 import { parallelLimit } from './parallel_limit';
 
-import type { DynamoDBClientConfig } from '@aws-sdk/client-dynamodb';
-import type { AwsCredentialIdentity } from '@aws-sdk/types';
 import type { KeyValue, ItemRecord, NativeType } from './dynamodb_helper';
+import type {
+  DynamoDBClientConfig,
+  DescribeTableCommandOutput,
+  KeySchemaElement,
+  ReturnValuesOnConditionCheckFailure,
+  BillingMode,
+  ProjectionType,
+} from '@aws-sdk/client-dynamodb';
+import type { AwsCredentialIdentity } from '@aws-sdk/types';
 
 export type {
   AttributeValue,

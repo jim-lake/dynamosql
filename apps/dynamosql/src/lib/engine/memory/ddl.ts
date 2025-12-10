@@ -1,4 +1,7 @@
+import { SQLError } from '../../../error';
+
 import * as Storage from './storage';
+
 import type {
   TableInfoParams,
   TableInfo,
@@ -8,7 +11,6 @@ import type {
   IndexParams,
   AddColumnParams,
 } from '../index';
-import { SQLError } from '../../../error';
 
 export async function getTableInfo(
   params: TableInfoParams

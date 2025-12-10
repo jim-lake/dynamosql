@@ -1,5 +1,7 @@
 import { logger } from '@dynamosql/shared';
+
 import { SQLError } from '../../../error';
+
 import type {
   TableInfoParams,
   TableInfo,

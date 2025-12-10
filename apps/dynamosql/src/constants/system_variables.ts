@@ -1,4 +1,4 @@
-import { Types } from '../types';
+import type { Types } from '../types';
 
 export const SYSTEM_VARIABLE_TYPES = {
   COLLATION_CONNECTION: 'VAR_STRING',

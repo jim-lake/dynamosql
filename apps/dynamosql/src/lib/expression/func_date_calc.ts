@@ -1,16 +1,17 @@
-import { getValue } from './evaluate';
+import { assertArgCount, assertArgCountParse } from '../helpers/arg_count';
+import { dateFormat } from '../helpers/date_format';
 import {
   convertNum,
   convertDateTime,
   convertDateTimeOrDate,
 } from '../helpers/sql_conversion';
-import { dateFormat } from '../helpers/date_format';
 import { SQLDate } from '../types/sql_date';
 import { SQLInterval } from '../types/sql_interval';
-import { assertArgCount, assertArgCountParse } from '../helpers/arg_count';
 
-import type { Function } from 'node-sql-parser';
+import { getValue } from './evaluate';
+
 import type { EvaluationState, EvaluationResult } from './evaluate';
+import type { Function } from 'node-sql-parser';
 
 export function date_format(
   expr: Function,

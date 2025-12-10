@@ -1,12 +1,15 @@
-import * as Storage from './storage';
 import { logger } from '@dynamosql/shared';
+
+import { SQLError, NoSingleOperationError } from '../../../error';
+
+import * as Storage from './storage';
+
 import type {
   DeleteParams,
   MultiDeleteParams,
   AffectedResult,
   CellValue,
 } from '../index';
-import { SQLError, NoSingleOperationError } from '../../../error';
 
 export async function singleDelete(
   _params: DeleteParams

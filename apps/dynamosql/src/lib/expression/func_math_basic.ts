@@ -1,10 +1,11 @@
-import { getValue } from './evaluate';
-import { convertNum } from '../helpers/sql_conversion';
 import { assertArgCount, assertArgCountParse } from '../helpers/arg_count';
+import { convertNum } from '../helpers/sql_conversion';
+
+import { getValue } from './evaluate';
 import { modHelper } from './math';
 
-import type { Function } from 'node-sql-parser';
 import type { EvaluationState, EvaluationResult } from './evaluate';
+import type { Function } from 'node-sql-parser';
 
 export function abs(expr: Function, state: EvaluationState): EvaluationResult {
   assertArgCount(expr, 1);

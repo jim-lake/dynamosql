@@ -1,5 +1,6 @@
-import { SQLDateTime } from './sql_datetime';
 import { offsetAtTime } from '../helpers/timezone';
+
+import { SQLDateTime } from './sql_datetime';
 
 const MINUTE = 60;
 const HOUR = MINUTE * 60;

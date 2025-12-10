@@ -1,7 +1,7 @@
-import { SQLDateTime } from '../types/sql_datetime';
-import { SQLDate } from '../types/sql_date';
-import { createSQLTime, SQLTime } from '../types/sql_time';
 import { toBigInt } from '../../tools/safe_convert';
+import { SQLDate } from '../types/sql_date';
+import { SQLDateTime } from '../types/sql_datetime';
+import { createSQLTime, SQLTime } from '../types/sql_time';
 
 const MINUTE = 60;
 const HOUR = 60 * MINUTE;

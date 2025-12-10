@@ -1,10 +1,11 @@
-import * as SchemaManager from './schema_manager';
-import * as TransactionManager from './transaction_manager';
 import { SQLError } from '../error';
 
-import type { Alter } from 'node-sql-parser';
-import type { HandlerParams } from './handler_types';
+import * as SchemaManager from './schema_manager';
+import * as TransactionManager from './transaction_manager';
+
 import type { Engine, ColumnDef } from './engine';
+import type { HandlerParams } from './handler_types';
+import type { Alter } from 'node-sql-parser';
 
 export async function query(params: HandlerParams<Alter>): Promise<void> {
   const { ast, dynamodb, session } = params;

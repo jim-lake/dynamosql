@@ -1,10 +1,10 @@
-import { getValue } from '../expression';
 import { SQLError } from '../../error';
+import { getValue } from '../expression';
 
-import type { ExpressionValue, Select, ValueExpr } from 'node-sql-parser';
 import type { Session } from '../../session';
 import type { ExtendedColumnRef, ExtendedExpressionValue } from '../ast_types';
 import type { RowWithResult } from '../handler_types';
+import type { ExpressionValue, Select, ValueExpr } from 'node-sql-parser';
 
 export interface RowWithResultAndGroup extends RowWithResult {
   '@@group': Record<string, unknown>;

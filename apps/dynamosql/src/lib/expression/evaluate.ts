@@ -1,17 +1,28 @@
+import { logger } from '@dynamosql/shared';
+
+import GlobalSettings from '../../global_settings';
+import { mapToObject } from '../../tools/dynamodb_helper';
+import { toBigInt } from '../../tools/safe_convert';
+import { getFunctionName } from '../helpers/ast_helper';
+import { getDecimalsForString } from '../helpers/decimals';
+
 import { methods as AggregateFunctions } from './aggregate_functions';
 import { methods as BinaryExpression } from './binary_expression';
 import { methods as Cast } from './cast';
 import { methods as Functions } from './functions';
 import { methods as Interval } from './interval';
 import { methods as UnaryExpression } from './unary_expression';
-import GlobalSettings from '../../global_settings';
-import { mapToObject } from '../../tools/dynamodb_helper';
-import { logger } from '@dynamosql/shared';
-import { getFunctionName } from '../helpers/ast_helper';
-import { getDecimalsForString } from '../helpers/decimals';
-import { toBigInt } from '../../tools/safe_convert';
-import { SQLError } from '../../error';
 
+import type { SQLError } from '../../error';
+import type { Session } from '../../session';
+import type {
+  ExtendedExpressionValue,
+  VarExpr,
+  UnaryExpr,
+  AssignExpr,
+} from '../ast_types';
+import type { Row, EngineValue, CellValue } from '../engine';
+import type { RowWithResult } from '../handler_types';
 import type {
   Function,
   AggrFunc,
@@ -20,15 +31,6 @@ import type {
   ColumnRef,
   Cast as CastType,
 } from 'node-sql-parser';
-import type {
-  ExtendedExpressionValue,
-  VarExpr,
-  UnaryExpr,
-  AssignExpr,
-} from '../ast_types';
-import type { Session } from '../../session';
-import type { Row, EngineValue, CellValue } from '../engine';
-import type { RowWithResult } from '../handler_types';
 
 export interface EvaluationState {
   session: Session;

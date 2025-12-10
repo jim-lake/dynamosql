@@ -1,16 +1,15 @@
-import * as SchemaManager from './schema_manager';
-import * as TransactionManager from './transaction_manager';
-import { makeEngineGroups } from './helpers/engine_groups';
-import {
-  resolveReferences,
-  type RequestInfo,
-} from './helpers/column_ref_helper';
-import { runSelect } from './helpers/select_modify';
 import { SQLError, NoSingleOperationError } from '../error';
 
+import { resolveReferences } from './helpers/column_ref_helper';
+import { makeEngineGroups } from './helpers/engine_groups';
+import { runSelect } from './helpers/select_modify';
+import * as SchemaManager from './schema_manager';
+import * as TransactionManager from './transaction_manager';
+
 import type { DeleteAST } from './ast_types';
-import type { HandlerParams, AffectedResult } from './handler_types';
 import type { EngineValue } from './engine';
+import type { HandlerParams, AffectedResult } from './handler_types';
+import type { RequestInfo } from './helpers/column_ref_helper';
 
 export async function query(
   params: HandlerParams<DeleteAST>

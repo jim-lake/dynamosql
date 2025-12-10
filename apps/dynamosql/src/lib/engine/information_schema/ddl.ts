@@ -1,5 +1,6 @@
-import type { TableInfoParams, TableInfo, TableListParams } from '../index';
 import { SQLError } from '../../../error';
+
+import type { TableInfoParams, TableInfo, TableListParams } from '../index';
 
 export async function getTableInfo(
   params: TableInfoParams

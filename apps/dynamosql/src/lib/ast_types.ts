@@ -1,3 +1,5 @@
+import type { EngineValue } from './engine';
+import type { EvaluationResult } from './expression';
 import type {
   Use,
   Select,
@@ -12,8 +14,6 @@ import type {
   ColumnDefinitionOptList,
   Update,
 } from 'node-sql-parser';
-import type { EvaluationResult } from './expression';
-import type { EngineValue } from './engine';
 
 // Missing statement types that node-sql-parser returns but doesn't type
 

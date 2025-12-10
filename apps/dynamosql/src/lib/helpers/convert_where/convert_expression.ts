@@ -1,9 +1,10 @@
 import { getValue } from '../../expression';
+
 import { convertWhere } from './convert_where';
 
-import type { Binary } from 'node-sql-parser';
-import type { ExtendedExpressionValue, UnaryExpr } from '../../ast_types';
 import type { ConvertWhereState, ConvertResult } from './convert_where';
+import type { ExtendedExpressionValue, UnaryExpr } from '../../ast_types';
+import type { Binary } from 'node-sql-parser';
 
 type ConvertFunc = (
   expr: ExtendedExpressionValue,

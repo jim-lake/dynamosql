@@ -1,20 +1,22 @@
-import * as SelectHandler from './select_handler';
-import * as SchemaManager from './schema_manager';
-import { trackFirstSeen } from '../tools/util';
 import { logger } from '@dynamosql/shared';
+
 import { SQLError } from '../error';
+import { trackFirstSeen } from '../tools/util';
+
 import {
   getDatabaseName,
   getDatabaseFromTable,
   getTableFromTable,
 } from './helpers/ast_helper';
+import * as SchemaManager from './schema_manager';
+import * as SelectHandler from './select_handler';
 
-import type { Create } from 'node-sql-parser';
 import type { ExtendedColumnDefinitionOptList } from './ast_types';
 import type { ColumnDef, KeyDef, EvaluationResultRow } from './engine';
 import type { HandlerParams, AffectedResult } from './handler_types';
 import type { FieldInfo } from '../types';
 import type { EvaluationResult } from './expression';
+import type { Create } from 'node-sql-parser';
 
 export async function query(
   params: HandlerParams<Create>

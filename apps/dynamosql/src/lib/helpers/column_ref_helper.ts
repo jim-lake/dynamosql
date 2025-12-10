@@ -1,5 +1,6 @@
-import { walkColumnRefs } from './ast_helper';
 import { SQLError } from '../../error';
+
+import { walkColumnRefs } from './ast_helper';
 
 import type { Select, Update, Delete, From, BaseFrom } from 'node-sql-parser';
 

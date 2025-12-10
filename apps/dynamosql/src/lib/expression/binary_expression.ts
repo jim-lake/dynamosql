@@ -1,11 +1,11 @@
 import { convertBooleanValue } from '../helpers/sql_conversion';
-import { getValue } from './evaluate';
 
-import type { Binary } from 'node-sql-parser';
-import type { EvaluationState, EvaluationResult } from './evaluate';
-
-import { plus, minus, div, mul, mod, intDiv } from './math';
 import { equal, notEqual, gt, lt, gte, lte, inOp, notIn } from './compare';
+import { getValue } from './evaluate';
+import { plus, minus, div, mul, mod, intDiv } from './math';
+
+import type { EvaluationState, EvaluationResult } from './evaluate';
+import type { Binary } from 'node-sql-parser';
 
 function and(expr: Binary, state: EvaluationState): EvaluationResult {
   const left = getValue(expr.left, state);

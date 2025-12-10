@@ -1,11 +1,11 @@
-import { getValue } from '../expression';
 import { SQLError } from '../../error';
 import { Types } from '../../types';
+import { getValue } from '../expression';
 
-import type { OrderBy } from 'node-sql-parser';
 import type { Session } from '../../session';
-import type { RowWithResult } from '../handler_types';
 import type { FieldInfo } from '../../types';
+import type { RowWithResult } from '../handler_types';
+import type { OrderBy } from 'node-sql-parser';
 
 export interface SortState {
   session: Session;

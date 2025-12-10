@@ -1,7 +1,7 @@
 import * as Engine from './engine';
 
-import type { DynamoDBWithCache } from './dynamodb';
 import type { Transaction as TransactionAST } from './ast_types';
+import type { DynamoDBWithCache } from './dynamodb';
 import type { HandlerParams } from './handler_types';
 import type { Session } from '../session';
 import type { CommitParams } from './engine';

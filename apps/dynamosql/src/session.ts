@@ -1,13 +1,16 @@
 import * as SqlString from 'sqlstring';
 
-import { SQLMode } from './lib/helpers/sql_mode';
-import * as DynamoDB from './lib/dynamodb';
-import { SQLError } from './error';
-import { Query } from './query';
-import GlobalSettings from './global_settings';
 import { SYSTEM_VARIABLE_TYPES } from './constants/system_variables';
+import { SQLError } from './error';
+import GlobalSettings from './global_settings';
+import * as DynamoDB from './lib/dynamodb';
+import { SQLMode } from './lib/helpers/sql_mode';
 import { offsetAtTime } from './lib/helpers/timezone';
+import { Query } from './query';
 
+import type { DynamoDBWithCacheConstructorParams } from './lib/dynamodb';
+import type { EvaluationValue } from './lib/expression';
+import type { Transaction } from './lib/transaction_manager';
 import type {
   TypeCast,
   PoolConnection,
@@ -16,9 +19,6 @@ import type {
   QueryCallback,
   Query as MysqlQuery,
 } from './types';
-import type { DynamoDBWithCacheConstructorParams } from './lib/dynamodb';
-import type { EvaluationValue } from './lib/expression';
-import type { Transaction } from './lib/transaction_manager';
 
 let g_threadId = 1;
 

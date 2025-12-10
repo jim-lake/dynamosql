@@ -1,12 +1,12 @@
 import { CHARSETS } from '../../constants/mysql';
-import { Types } from '../../types';
 import { toBigInt } from '../../tools/safe_convert';
+import { Types } from '../../types';
 import { SQLDate } from '../types/sql_date';
 import { SQLDateTime } from '../types/sql_datetime';
 import { SQLTime } from '../types/sql_time';
 
-import type { FieldInfo } from '../../types';
 import type { TypeCastOptions } from '../../session';
+import type { FieldInfo } from '../../types';
 
 export function typeCast(
   value: unknown,

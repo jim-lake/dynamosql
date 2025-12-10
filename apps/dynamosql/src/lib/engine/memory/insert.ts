@@ -1,5 +1,6 @@
-import * as Storage from './storage';
 import { SQLError } from '../../../error';
+
+import * as Storage from './storage';
 
 import type {
   EvaluationResultRow,

@@ -1,6 +1,8 @@
-import * as Engine from './engine';
 import { logger } from '@dynamosql/shared';
+
 import { SQLError } from '../error';
+
+import * as Engine from './engine';
 
 import type { Session } from '../session';
 import type {

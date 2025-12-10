@@ -1,21 +1,19 @@
+import { SQLError, NoSingleOperationError } from '../error';
+
 import * as Expression from './expression';
+import { getDatabaseFromUpdate } from './helpers/ast_helper';
+import { resolveReferences } from './helpers/column_ref_helper';
+import { makeEngineGroups } from './helpers/engine_groups';
+import { runSelect } from './helpers/select_modify';
 import * as SchemaManager from './schema_manager';
 import * as TransactionManager from './transaction_manager';
 
-import { getDatabaseFromUpdate } from './helpers/ast_helper';
-import { makeEngineGroups } from './helpers/engine_groups';
-import {
-  resolveReferences,
-  type RequestInfo,
-} from './helpers/column_ref_helper';
-import { runSelect } from './helpers/select_modify';
-import { SQLError, NoSingleOperationError } from '../error';
-
-import type { SetList } from 'node-sql-parser';
 import type { UpdateAST, ExtendedFrom } from './ast_types';
-import type { HandlerParams, ChangedResult } from './handler_types';
 import type { UpdateChange } from './engine';
+import type { HandlerParams, ChangedResult } from './handler_types';
+import type { RequestInfo } from './helpers/column_ref_helper';
 import type { RowWithResult } from './select_handler';
+import type { SetList } from 'node-sql-parser';
 
 interface ExtendedSetList extends SetList {
   from?: { key?: string };

@@ -1,6 +1,5 @@
-import type { FunctionName } from 'node-sql-parser';
-
 import type { ExtendedAST } from '../ast_types';
+import type { FunctionName } from 'node-sql-parser';
 
 export function getDatabaseFromTable(ast: ExtendedAST): string | undefined {
   if (ast.type === 'create') {

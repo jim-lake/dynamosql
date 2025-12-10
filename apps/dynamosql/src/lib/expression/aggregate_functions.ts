@@ -1,7 +1,9 @@
-import { getValue } from './evaluate';
 import { convertNum } from '../helpers/sql_conversion';
-import type { AggrFunc } from 'node-sql-parser';
+
+import { getValue } from './evaluate';
+
 import type { EvaluationState, EvaluationResult } from './evaluate';
+import type { AggrFunc } from 'node-sql-parser';
 
 function sum(expr: AggrFunc, state: EvaluationState): EvaluationResult {
   const { row, ...other } = state;

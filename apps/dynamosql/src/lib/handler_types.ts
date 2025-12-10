@@ -1,5 +1,4 @@
-import { createDynamoDB } from './dynamodb';
-
+import type { createDynamoDB } from './dynamodb';
 import type { Session } from '../session';
 
 export type { SelectResult, RowWithResult } from './select_handler';

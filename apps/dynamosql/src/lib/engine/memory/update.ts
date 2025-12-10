@@ -1,7 +1,10 @@
 import { logger } from '@dynamosql/shared';
-import * as Storage from './storage';
+
 import { SQLError, NoSingleOperationError } from '../../../error';
 
+import * as Storage from './storage';
+
+import type { EvaluationResult } from '../../expression';
 import type {
   MultiUpdateParams,
   UpdateParams,
@@ -10,7 +13,6 @@ import type {
   CellRow,
   ColumnDef,
 } from '../index';
-import type { EvaluationResult } from '../../expression';
 
 export async function singleUpdate(
   _params: UpdateParams
