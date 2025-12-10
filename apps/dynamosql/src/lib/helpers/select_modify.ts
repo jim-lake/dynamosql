@@ -12,6 +12,7 @@ import type { Select } from 'node-sql-parser';
 
 export interface SelectResultItem {
   key: string;
+  key_list: string[];
   list: { key: EngineValue[]; row: unknown }[];
 }
 
@@ -28,6 +29,7 @@ export async function runSelect(
   }
 
   // Get table info for all tables
+  const keyListMap = new Map<string, string[]>();
   for (const object of ast.from) {
     if (!('db' in object) || !('table' in object) || !('key' in object)) {
       continue;
@@ -39,14 +41,12 @@ export async function runSelect(
     try {
       const result = await engine.getTableInfo(opts);
       if (result.primary_key.length > 0) {
-        const extendedObject = object as unknown as { _keyList: string[] };
-        extendedObject._keyList = result.primary_key.map(
+        const key_list = result.primary_key.map(
           (pkKey: { name: string }) => pkKey.name
         );
+        keyListMap.set(key, key_list);
         const requestSet = requestSets.get(key);
-        extendedObject._keyList.forEach((keyName: string) =>
-          requestSet?.add(keyName)
-        );
+        key_list.forEach((keyName: string) => requestSet?.add(keyName));
       } else {
         throw new SQLError('bad_schema');
       }
@@ -69,10 +69,9 @@ export async function runSelect(
   for (const object of ast.from) {
     const extendedObject = object as unknown as {
       key: string;
-      _keyList: string[];
     };
     const from_key = extendedObject.key;
-    const key_list = extendedObject._keyList;
+    const key_list = keyListMap.get(from_key) ?? [];
     const collection = new Map<EngineValue, unknown>();
     for (const row of row_list) {
       const rowValue = row[from_key];
@@ -86,7 +85,7 @@ export async function runSelect(
         _addCollection(collection, keys as EngineValue[], row);
       }
     }
-    const result: SelectResultItem = { key: from_key, list: [] };
+    const result: SelectResultItem = { key: from_key, key_list, list: [] };
     result_list.push(result);
     collection.forEach((value0: unknown, key0: EngineValue) => {
       if (key_list.length > 1) {

@@ -73,13 +73,14 @@ async function _multipleDelete(
 
   for (const object of ast.table) {
     const from_key = object.from.key;
-    const list = result_list.find((result) => result.key === from_key)?.list;
+    const found = result_list.find((result) => result.key === from_key);
+    const list = found?.list;
 
     if (list && list.length > 0) {
       from_list.push({
         database: object.from.db,
         table: object.from.table,
-        key_list: object.from._keyList,
+        key_list: found.key_list,
         delete_list: list.map((i) => i.key),
       });
     }

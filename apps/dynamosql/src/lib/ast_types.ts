@@ -53,7 +53,6 @@ export type ExtendedFrom = From & {
   key: string;
   as?: string;
   join?: string;
-  _keyList?: string[];
 };
 export interface AssignExpr {
   type: 'assign';
