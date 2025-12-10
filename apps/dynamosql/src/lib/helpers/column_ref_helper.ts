@@ -8,8 +8,6 @@ interface TableMapEntry {
   table?: string;
   as?: string;
   key?: string;
-  _requestSet?: Set<string>;
-  _requestAll?: boolean;
 }
 
 type TableMap = Record<string, TableMapEntry>;
@@ -22,10 +20,17 @@ type SelectWithOptionalGroupBy = Omit<Select, 'groupby'> & {
   groupby?: { columns?: unknown };
 };
 
+export interface RequestInfo {
+  requestSets: Map<string, Set<string>>;
+  requestAll: Map<string, boolean>;
+}
+
 export function resolveReferences(
   ast: SelectWithOptionalGroupBy | Update | Delete,
   current_database?: string
-) {
+): RequestInfo {
+  const requestSets = new Map<string, Set<string>>();
+  const requestAll = new Map<string, boolean>();
   const table_map: TableMap = {};
   const db_map: DbMap = {};
   const fromRaw =
@@ -47,9 +52,9 @@ export function resolveReferences(
         fromEntry.db = current_database;
       }
     }
-    fromEntry._requestSet ??= new Set();
-    fromEntry._requestAll = fromEntry._requestAll ?? false;
     fromEntry.key = fromEntry.as ?? `${fromEntry.db}.${fromEntry.table}`;
+    requestSets.set(fromEntry.key, new Set());
+    requestAll.set(fromEntry.key, false);
     if (fromEntry.as) {
       table_map[fromEntry.as] = fromEntry;
     } else {
@@ -86,15 +91,39 @@ export function resolveReferences(
   const where = ast.where;
   [from, columns, where].forEach((item: unknown) => {
     walkColumnRefs(item, (object: unknown) => {
-      _resolveObject(object, ast, db_map, table_map, name_cache);
+      _resolveObject(
+        object,
+        ast,
+        db_map,
+        table_map,
+        name_cache,
+        requestSets,
+        requestAll
+      );
     });
   });
 
   set?.forEach((item) => {
     walkColumnRefs(item, (object: unknown) => {
-      _resolveObject(object, ast, db_map, table_map, name_cache);
+      _resolveObject(
+        object,
+        ast,
+        db_map,
+        table_map,
+        name_cache,
+        requestSets,
+        requestAll
+      );
     });
-    _resolveObject(item, ast, db_map, table_map, name_cache);
+    _resolveObject(
+      item,
+      ast,
+      db_map,
+      table_map,
+      name_cache,
+      requestSets,
+      requestAll
+    );
   });
 
   const result_map: ResultMap = {};
@@ -114,7 +143,15 @@ export function resolveReferences(
     const groupby = ast.groupby ? ast.groupby.columns : undefined;
     if (groupby !== undefined) {
       walkColumnRefs(groupby, (object: unknown) => {
-        _resolveObject(object, ast, db_map, table_map, name_cache);
+        _resolveObject(
+          object,
+          ast,
+          db_map,
+          table_map,
+          name_cache,
+          requestSets,
+          requestAll
+        );
       });
     }
   }
@@ -125,9 +162,20 @@ export function resolveReferences(
   const having = ast.type === 'select' ? ast.having : undefined;
   [orderby, having].forEach((item: unknown) => {
     walkColumnRefs(item, (object: unknown) => {
-      _resolveObject(object, ast, db_map, table_map, name_cache, result_map);
+      _resolveObject(
+        object,
+        ast,
+        db_map,
+        table_map,
+        name_cache,
+        requestSets,
+        requestAll,
+        result_map
+      );
     });
   });
+
+  return { requestSets, requestAll };
 }
 
 function _resolveObject(
@@ -136,6 +184,8 @@ function _resolveObject(
   db_map: DbMap,
   table_map: TableMap,
   name_cache: TableMap,
+  requestSets: Map<string, Set<string>>,
+  requestAll: Map<string, boolean>,
   result_map?: ResultMap
 ) {
   const fixup_object = object as {
@@ -166,8 +216,8 @@ function _resolveObject(
   if (obj.column === '*') {
     if (obj.db) {
       const from = db_map[obj.db]?.[obj.table ?? ''];
-      if (from) {
-        from._requestAll = true;
+      if (from?.key) {
+        requestAll.set(from.key, true);
       } else {
         throw new SQLError({ err: 'table_not_found', args: [obj.table] });
       }
@@ -177,15 +227,17 @@ function _resolveObject(
         (from: TableMapEntry) =>
           from.as === obj.table || (!from.as && from.table === obj.table)
       );
-      if (matchingFrom) {
-        matchingFrom._requestAll = true;
+      if (matchingFrom?.key) {
+        requestAll.set(matchingFrom.key, true);
       } else {
         throw new SQLError({ err: 'table_not_found', args: [obj.table] });
       }
     } else {
       const astFrom = (ast as { from?: TableMapEntry[] }).from;
       astFrom?.forEach((from: TableMapEntry) => {
-        from._requestAll = true;
+        if (from.key) {
+          requestAll.set(from.key, true);
+        }
       });
     }
   } else {
@@ -209,7 +261,9 @@ function _resolveObject(
     }
     if (from) {
       obj.from = from;
-      from._requestSet?.add(obj.column ?? '');
+      if (from.key && obj.column) {
+        requestSets.get(from.key)?.add(obj.column);
+      }
       if (add_cache && obj.column) {
         name_cache[obj.column] = from;
       }

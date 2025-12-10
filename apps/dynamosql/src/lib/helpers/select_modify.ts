@@ -7,6 +7,7 @@ import type { Select } from 'node-sql-parser';
 import type { UpdateAST, DeleteAST } from '../ast_types';
 import type { EngineValue } from '../engine';
 import type { HandlerParams } from '../handler_types';
+import type { RequestInfo } from './column_ref_helper';
 
 export interface SelectResultItem {
   key: string;
@@ -16,9 +17,9 @@ export interface SelectResultItem {
 type SelectModifyAST = Select | UpdateAST | DeleteAST;
 
 export async function runSelect(
-  params: HandlerParams<SelectModifyAST>
+  params: HandlerParams<SelectModifyAST> & RequestInfo
 ): Promise<SelectResultItem[]> {
-  const { dynamodb, session, ast } = params;
+  const { dynamodb, session, ast, requestSets } = params;
   const result_list: SelectResultItem[] = [];
 
   if (!ast.from || !Array.isArray(ast.from)) {
@@ -27,25 +28,23 @@ export async function runSelect(
 
   // Get table info for all tables
   for (const object of ast.from) {
-    if (!('db' in object) || !('table' in object)) {
+    if (!('db' in object) || !('table' in object) || !('key' in object)) {
       continue;
     }
-    const { db, table } = object;
-    const engine = getEngine(db ?? '', table, session);
-    const opts = { dynamodb, session, database: db ?? '', table };
+    const { db, table, key } = object;
+    const engine = getEngine(db, table, session);
+    const opts = { dynamodb, session, database: db, table };
 
     try {
       const result = await engine.getTableInfo(opts);
       if (result.primary_key.length > 0) {
-        const extendedObject = object as unknown as {
-          _keyList: string[];
-          _requestSet: Set<string>;
-        };
+        const extendedObject = object as unknown as { _keyList: string[] };
         extendedObject._keyList = result.primary_key.map(
-          (key: { name: string }) => key.name
+          (pkKey: { name: string }) => pkKey.name
         );
-        extendedObject._keyList.forEach((key: string) =>
-          extendedObject._requestSet.add(key)
+        const requestSet = requestSets.get(key);
+        extendedObject._keyList.forEach((keyName: string) =>
+          requestSet?.add(keyName)
         );
       } else {
         throw new SQLError('bad_schema');

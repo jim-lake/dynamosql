@@ -100,6 +100,8 @@ export interface RowListParams {
   session: Session;
   list: ExtendedFrom[];
   where?: Binary | Function | null;
+  requestSets: Map<string, Set<string>>;
+  requestAll: Map<string, boolean>;
 }
 export interface DeleteChange {
   database: string;

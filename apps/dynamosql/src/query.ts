@@ -170,10 +170,7 @@ export class Query extends EventEmitter {
         return { result: DEFAULT_RESULT, columns: undefined };
       default: {
         logger.error('unsupported statement type:', type);
-        throw new SQLError({
-          err: 'unsupported_type',
-          args: [type],
-        });
+        throw new SQLError({ err: 'unsupported_type', args: [type] });
       }
     }
   }

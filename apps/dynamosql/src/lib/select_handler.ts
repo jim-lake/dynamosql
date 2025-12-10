@@ -69,8 +69,12 @@ export async function internalQuery(
   const { ast, session, dynamodb } = params;
 
   const current_database = session.getCurrentDatabase();
+  let requestSets = new Map<string, Set<string>>();
+  let requestAll = new Map<string, boolean>();
   if (!params.skip_resolve) {
-    resolveReferences(ast, current_database ?? undefined);
+    const requestInfo = resolveReferences(ast, current_database ?? undefined);
+    requestSets = requestInfo.requestSets;
+    requestAll = requestInfo.requestAll;
   }
   const from = ast.from;
   let source_map: SourceMap = {};
@@ -80,12 +84,19 @@ export async function internalQuery(
     const db = first.db;
     const table = first.table;
     const engine = SchemaManager.getEngine(db, table, session);
-    const opts = { session, dynamodb, list: from as ExtendedFrom[], where: ast.where };
+    const opts = {
+      session,
+      dynamodb,
+      list: from as ExtendedFrom[],
+      where: ast.where,
+      requestSets,
+      requestAll,
+    };
     const result = await engine.getRowList(opts);
     source_map = result.source_map;
     column_map = result.column_map;
   }
-  return _evaluateReturn({ ...params, source_map, column_map });
+  return _evaluateReturn({ ...params, source_map, column_map, requestSets });
 }
 interface EvaluateReturnParams {
   ast: Select;
@@ -93,6 +104,7 @@ interface EvaluateReturnParams {
   dynamodb: DynamoDBClient;
   source_map: SourceMap;
   column_map: ColumnMap;
+  requestSets: Map<string, Set<string>>;
 }
 async function _evaluateReturn(
   params: EvaluateReturnParams
@@ -101,7 +113,9 @@ async function _evaluateReturn(
   const query_columns = _expandStarColumns(params);
 
   const { where, groupby } = ast;
-  const from = Array.isArray(ast.from) ? (ast.from as ExtendedFrom[]) : undefined;
+  const from = Array.isArray(ast.from)
+    ? (ast.from as ExtendedFrom[])
+    : undefined;
   let row_list: RowWithResult[] = [];
   let sleep_ms = 0;
 
@@ -191,9 +205,10 @@ interface ExpandStarColumnsParams {
     groupby?: Select['groupby'] | null;
   };
   column_map: ColumnMap;
+  requestSets: Map<string, Set<string>>;
 }
 function _expandStarColumns(params: ExpandStarColumnsParams): QueryColumn[] {
-  const { ast, column_map } = params;
+  const { ast, column_map, requestSets } = params;
   const ret: QueryColumn[] = [];
   for (const column of ast.columns ?? []) {
     if (column?.expr?.type === 'column_ref' && column.expr.column === '*') {
@@ -210,7 +225,8 @@ function _expandStarColumns(params: ExpandStarColumnsParams): QueryColumn[] {
         ) {
           const column_list = column_map[from.key];
           if (column_list && !column_list.length) {
-            from._requestSet.forEach((name: string) => column_list.push(name));
+            const requestSet = requestSets.get(from.key);
+            requestSet?.forEach((name: string) => column_list.push(name));
           }
           column_list?.forEach((name: string) => {
             ret.push({

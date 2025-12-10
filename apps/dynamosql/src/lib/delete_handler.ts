@@ -1,7 +1,10 @@
 import * as SchemaManager from './schema_manager';
 import * as TransactionManager from './transaction_manager';
 import { makeEngineGroups } from './helpers/engine_groups';
-import { resolveReferences } from './helpers/column_ref_helper';
+import {
+  resolveReferences,
+  type RequestInfo,
+} from './helpers/column_ref_helper';
 import { runSelect } from './helpers/select_modify';
 import { SQLError, NoSingleOperationError } from '../error';
 
@@ -14,18 +17,21 @@ export async function query(
 ): Promise<AffectedResult> {
   const { ast, session } = params;
   const current_database = session.getCurrentDatabase() ?? undefined;
-  resolveReferences(ast, current_database);
+  const requestInfo = resolveReferences(ast, current_database);
   const firstFrom = ast.from[0];
   const database =
     (firstFrom && 'db' in firstFrom ? firstFrom.db : null) ?? undefined;
   if (!database) {
     throw new SQLError('no_current_database');
   }
-  return await TransactionManager.run(_runDelete, params);
+  return await TransactionManager.run(_runDelete, {
+    ...params,
+    ...requestInfo,
+  });
 }
 
 async function _runDelete(
-  params: HandlerParams<DeleteAST>
+  params: HandlerParams<DeleteAST> & RequestInfo
 ): Promise<AffectedResult> {
   const { ast, session, dynamodb } = params;
   const firstFrom = ast.from[0];
@@ -51,15 +57,13 @@ async function _runDelete(
 }
 
 async function _multipleDelete(
-  params: HandlerParams<DeleteAST>
+  params: HandlerParams<DeleteAST> & RequestInfo
 ): Promise<AffectedResult> {
   const { dynamodb, session, ast } = params;
   let affectedRows = 0;
 
   // Get rows to delete
-  const result_list = await runSelect(
-    params as unknown as HandlerParams<DeleteAST>
-  );
+  const result_list = await runSelect(params);
 
   const from_list: {
     database: string;

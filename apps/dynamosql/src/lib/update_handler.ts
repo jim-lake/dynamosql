@@ -4,7 +4,10 @@ import * as TransactionManager from './transaction_manager';
 
 import { getDatabaseFromUpdate } from './helpers/ast_helper';
 import { makeEngineGroups } from './helpers/engine_groups';
-import { resolveReferences } from './helpers/column_ref_helper';
+import {
+  resolveReferences,
+  type RequestInfo,
+} from './helpers/column_ref_helper';
 import { runSelect } from './helpers/select_modify';
 import { SQLError, NoSingleOperationError } from '../error';
 
@@ -26,19 +29,20 @@ export async function query(
   // Temporarily add from property for resolveReferences
   ast.from = (ast.table ?? []) as ExtendedFrom[];
   ast.table = null;
-  resolveReferences(ast, current_database);
+  const requestInfo = resolveReferences(ast, current_database);
   const database = getDatabaseFromUpdate(ast);
   if (!database) {
     throw new SQLError('no_current_database');
   }
   return await TransactionManager.run(_runUpdate, {
     ...params,
+    ...requestInfo,
     ast,
-  } as HandlerParams<UpdateAST>);
+  });
 }
 
 async function _runUpdate(
-  params: HandlerParams<UpdateAST>
+  params: HandlerParams<UpdateAST> & RequestInfo
 ): Promise<ChangedResult> {
   const { ast, session, dynamodb } = params;
   if (!ast.from || !ast.from[0]) {
@@ -62,7 +66,7 @@ async function _runUpdate(
 }
 
 async function _multipleUpdate(
-  params: HandlerParams<UpdateAST>
+  params: HandlerParams<UpdateAST> & RequestInfo
 ): Promise<ChangedResult> {
   const { dynamodb, session, ast } = params;
   let affectedRows = 0;

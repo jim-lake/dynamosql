@@ -23,17 +23,19 @@ export async function getRowList(
 async function _getFromTable(
   params: RowListParams & { from: ExtendedFrom }
 ): Promise<{ results: ItemRecord[]; column_list: string[] }> {
-  const { dynamodb, session, from, where } = params;
-  const { table, _requestSet, _requestAll, join } = from;
-  const request_columns = [..._requestSet];
+  const { dynamodb, session, from, where, requestSets, requestAll } = params;
+  const { table } = from;
+  const requestSet = requestSets.get(from.key) ?? new Set<string>();
+  const isRequestAll = requestAll.get(from.key) ?? false;
+  const request_columns = [...requestSet];
   const columns =
-    _requestAll || request_columns.length === 0
+    isRequestAll || request_columns.length === 0
       ? '*'
       : request_columns.map(escapeIdentifier).join(',');
   let sql = `SELECT ${columns} FROM ${escapeIdentifier(table)}`;
   // Don't push down WHERE clause for LEFT JOIN tables (right side of join)
   // The WHERE clause must be applied after the join
-  const is_left_join = join ? join.indexOf('LEFT') >= 0 : false;
+  const is_left_join = from.join ? from.join.indexOf('LEFT') >= 0 : false;
   const where_result =
     where && !is_left_join
       ? convertWhere(where, { session, from_key: from.key, default_true: true })
@@ -49,7 +51,7 @@ async function _getFromTable(
       : (results as ItemRecord[]);
     let column_list: string[];
 
-    if (_requestAll) {
+    if (isRequestAll) {
       const response_set = new Set<string>();
       for (const result of result_array) {
         for (const key in result) {

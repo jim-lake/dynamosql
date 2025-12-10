@@ -54,8 +54,6 @@ export type ExtendedFrom = From & {
   key: string;
   as?: string;
   join?: string;
-  _requestSet: Set<string>;
-  _requestAll: boolean;
   _updateList?: { key: EngineValue[]; set_list: SetListWithValue[] }[];
   _keyList?: string[];
 };
