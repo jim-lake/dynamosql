@@ -102,7 +102,7 @@ export async function dropDatabase(params: DropDatabaseParams): Promise<void> {
     for (const table of schema.keys()) {
       const engine = getEngine(database, table, session);
       try {
-        await engine.dropTable({ ...params, table } as never);
+        await engine.dropTable({ ...params, table });
         schema.delete(table);
       } catch (err) {
         logger.error('dropDatabase: table:', table, 'drop err:', err);
@@ -155,11 +155,11 @@ export async function dropTable(params: DropTableParams): Promise<void> {
   const { session, database, table } = params;
   if (database === '_dynamodb') {
     const engine = Engine.getEngineByName('raw');
-    await engine.dropTable(params as never);
+    await engine.dropTable(params);
   } else if (_findTable(database, table, session)) {
     const engine = getEngine(database, table, session);
     try {
-      await engine.dropTable(params as never);
+      await engine.dropTable(params);
       const schema = g_schemaMap.get(database);
       schema?.delete(table);
     } catch (err) {

@@ -142,7 +142,7 @@ async function _evaluateReturn(
   for (const row of grouped_list) {
     const output_row: EvaluationResult[] = [];
     for (const column of query_columns) {
-      const result = Expression.getValue(column.expr as never, {
+      const result = Expression.getValue(column.expr, {
         session,
         row,
       });
