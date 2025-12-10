@@ -1,4 +1,3 @@
-import type { EngineValue } from './engine';
 import type { EvaluationResult } from './expression';
 import type {
   Use,
@@ -54,7 +53,6 @@ export type ExtendedFrom = From & {
   key: string;
   as?: string;
   join?: string;
-  _updateList?: { key: EngineValue[]; set_list: SetListWithValue[] }[];
   _keyList?: string[];
 };
 export interface AssignExpr {

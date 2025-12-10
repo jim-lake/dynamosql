@@ -8,8 +8,8 @@ import { runSelect } from './helpers/select_modify';
 import * as SchemaManager from './schema_manager';
 import * as TransactionManager from './transaction_manager';
 
-import type { UpdateAST, ExtendedFrom } from './ast_types';
-import type { UpdateChange } from './engine';
+import type { UpdateAST, ExtendedFrom, SetListWithValue } from './ast_types';
+import type { UpdateChange, EngineValue } from './engine';
 import type { HandlerParams, ChangedResult } from './handler_types';
 import type { RequestInfo } from './helpers/column_ref_helper';
 import type { RowWithResult } from './select_handler';
@@ -73,10 +73,16 @@ async function _multipleUpdate(
   // Get rows to update
   const result_list = await runSelect(params);
 
+  const updateListMap = new Map<
+    string,
+    { key: EngineValue[]; set_list: SetListWithValue[] }[]
+  >();
+
   (ast.from as ExtendedFrom[]).forEach((object) => {
     const from_key = object.key;
     const list = result_list.find((result) => result.key === from_key)?.list;
-    object._updateList = [];
+    const updateList: { key: EngineValue[]; set_list: SetListWithValue[] }[] =
+      [];
     list?.forEach(({ key, row }) => {
       const set_list = (ast.set as ExtendedSetList[])
         .filter((set_item) => set_item.from?.key === from_key)
@@ -91,10 +97,10 @@ async function _multipleUpdate(
           return { column: set_item.column, value: expr_result };
         });
       if (set_list.length > 0) {
-        object._updateList ??= [];
-        object._updateList.push({ key, set_list });
+        updateList.push({ key, set_list });
       }
     });
+    updateListMap.set(from_key, updateList);
   });
 
   // Update rows
@@ -103,7 +109,7 @@ async function _multipleUpdate(
       database: obj.db,
       table: obj.table,
       key_list: obj._keyList ?? [],
-      update_list: obj._updateList ?? [],
+      update_list: updateListMap.get(obj.key) ?? [],
     }))
     .filter((obj) => obj.update_list.length > 0);
 
