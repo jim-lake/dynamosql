@@ -288,21 +288,12 @@ function _resolveObject(
       }
     }
     if (from) {
+      columnRefMap.set(object as ColumnRef, { from });
       if (from.key) {
         if (obj.column) {
           requestSets.get(from.key)?.add(obj.column);
         }
-        columnRefMap.set(object as ColumnRef, { from });
-        // Also store in setListMap for SET clause items
         setListMap.set(object, from.key);
-      } else {
-        // from exists but no key - store the from object anyway
-        columnRefMap.set(object as ColumnRef, { from });
-        // Try to use the from object's properties to construct a key
-        const key = from.as ?? `${from.db}.${from.table}`;
-        if (key) {
-          setListMap.set(object, key);
-        }
       }
       if (add_cache && obj.column) {
         name_cache[obj.column] = from;
