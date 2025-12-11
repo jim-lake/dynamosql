@@ -21,6 +21,7 @@ import type {
   SourceRowResult,
 } from './handler_types';
 import type { RequestInfo } from './helpers/column_ref_helper';
+import type { From } from 'node-sql-parser';
 
 export async function query(
   params: HandlerParams<UpdateAST>
@@ -77,13 +78,12 @@ async function _multipleUpdate(
   const result_list = await runSelect(params);
 
   const updateListMap = new Map<
-    string,
+    From,
     { key: EngineValue[]; set_list: SetListWithValue[] }[]
   >();
 
   (ast.from as ExtendedFrom[]).forEach((object) => {
-    const from_key = object.key;
-    const found = result_list.find((result) => result.key === from_key);
+    const found = result_list.find((result) => result.from === object);
     const list = found?.list;
     const updateList: { key: EngineValue[]; set_list: SetListWithValue[] }[] =
       [];
@@ -109,18 +109,18 @@ async function _multipleUpdate(
         updateList.push({ key, set_list });
       }
     });
-    updateListMap.set(from_key, updateList);
+    updateListMap.set(object, updateList);
   });
 
   // Update rows
   const from_list = (ast.from as ExtendedFrom[])
     .map((obj) => {
-      const found = result_list.find((result) => result.key === obj.key);
+      const found = result_list.find((result) => result.from === obj);
       return {
         database: obj.db,
         table: obj.table,
         key_list: found?.key_list ?? [],
-        update_list: updateListMap.get(obj.key) ?? [],
+        update_list: updateListMap.get(obj) ?? [],
       };
     })
     .filter((obj) => obj.update_list.length > 0);

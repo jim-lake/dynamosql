@@ -8,10 +8,10 @@ import type { UpdateAST, DeleteAST } from '../ast_types';
 import type { EngineValue } from '../engine';
 import type { HandlerParams } from '../handler_types';
 import type { RequestInfo } from './column_ref_helper';
-import type { Select } from 'node-sql-parser';
+import type { Select, From } from 'node-sql-parser';
 
 export interface SelectResultItem {
-  key: string;
+  from: From;
   key_list: string[];
   list: { key: EngineValue[]; row: unknown }[];
 }
@@ -29,12 +29,15 @@ export async function runSelect(
   }
 
   // Get table info for all tables
-  const keyListMap = new Map<string, string[]>();
+  const keyListMap = new Map<From, string[]>();
   for (const object of ast.from) {
-    if (!('db' in object) || !('table' in object) || !('key' in object)) {
+    if (!('db' in object) || !('table' in object)) {
       continue;
     }
-    const { db, table, key } = object;
+    const { db, table } = object;
+    if (!db || !table) {
+      continue;
+    }
     const engine = getEngine(db, table, session);
     const opts = { dynamodb, session, database: db, table };
 
@@ -44,8 +47,8 @@ export async function runSelect(
         const key_list = result.primary_key.map(
           (pkKey: { name: string }) => pkKey.name
         );
-        keyListMap.set(key, key_list);
-        const requestSet = requestSets.get(key);
+        keyListMap.set(object, key_list);
+        const requestSet = requestSets.get(object);
         key_list.forEach((keyName: string) => requestSet?.add(keyName));
       } else {
         throw new SQLError('bad_schema');
@@ -68,13 +71,10 @@ export async function runSelect(
   const { row_list } = await internalQuery(opts);
 
   for (const object of ast.from) {
-    const extendedObject = object as unknown as { key: string };
-    const from_key = extendedObject.key;
-    const key_list = keyListMap.get(from_key) ?? [];
+    const key_list = keyListMap.get(object) ?? [];
     const collection = new Map<EngineValue, unknown>();
     for (const row of row_list) {
-      const rowValue =
-        from_key in row.source ? row.source[from_key] : undefined;
+      const rowValue = row.source.get(object);
       const keys = key_list.map((key: string) => {
         if (rowValue && typeof rowValue === 'object' && key in rowValue) {
           return rowValue[key] as EngineValue;
@@ -85,7 +85,7 @@ export async function runSelect(
         _addCollection(collection, keys as EngineValue[], row);
       }
     }
-    const result: SelectResultItem = { key: from_key, key_list, list: [] };
+    const result: SelectResultItem = { from: object, key_list, list: [] };
     result_list.push(result);
     collection.forEach((value0: unknown, key0: EngineValue) => {
       if (key_list.length > 1) {

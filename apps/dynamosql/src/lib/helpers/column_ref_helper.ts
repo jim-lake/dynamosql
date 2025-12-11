@@ -31,12 +31,12 @@ type SelectWithOptionalGroupBy = Omit<Select, 'groupby'> & {
 
 export interface ColumnRefInfo {
   resultIndex?: number;
-  from?: TableMapEntry;
+  from?: From;
 }
 
 export interface RequestInfo {
-  requestSets: Map<string, Set<string>>;
-  requestAll: Map<string, boolean>;
+  requestSets: Map<From, Set<string>>;
+  requestAll: Map<From, boolean>;
   columnRefMap: Map<ColumnRef, ColumnRefInfo>;
   setListMap: Map<SetList, From>;
 }
@@ -45,8 +45,8 @@ export function resolveReferences(
   ast: SelectWithOptionalGroupBy | Update | Delete,
   current_database?: string
 ): RequestInfo {
-  const requestSets = new Map<string, Set<string>>();
-  const requestAll = new Map<string, boolean>();
+  const requestSets = new Map<From, Set<string>>();
+  const requestAll = new Map<From, boolean>();
   const columnRefMap = new Map<ColumnRef, ColumnRefInfo>();
   const setListMap = new Map<SetList, From>();
   const table_map: TableMap = {};
@@ -70,9 +70,8 @@ export function resolveReferences(
         fromEntry.db = current_database;
       }
     }
-    fromEntry.key = fromEntry.as ?? `${fromEntry.db}.${fromEntry.table}`;
-    requestSets.set(fromEntry.key, new Set());
-    requestAll.set(fromEntry.key, false);
+    requestSets.set(fromItem, new Set());
+    requestAll.set(fromItem, false);
     if (fromEntry.as) {
       table_map[fromEntry.as] = fromEntry;
     } else {
@@ -212,8 +211,8 @@ function _resolveObject(
   db_map: DbMap,
   table_map: TableMap,
   name_cache: TableMap,
-  requestSets: Map<string, Set<string>>,
-  requestAll: Map<string, boolean>,
+  requestSets: Map<From, Set<string>>,
+  requestAll: Map<From, boolean>,
   columnRefMap: Map<ColumnRef, ColumnRefInfo>,
   setListMap: Map<SetList, From>,
   result_map?: ResultMap
@@ -245,28 +244,26 @@ function _resolveObject(
   if (obj.column === '*') {
     if (obj.db) {
       const from = db_map[obj.db]?.[obj.table ?? ''];
-      if (from?.key) {
-        requestAll.set(from.key, true);
+      if (from) {
+        requestAll.set(from as From, true);
       } else {
         throw new SQLError({ err: 'table_not_found', args: [obj.table] });
       }
     } else if (obj.table) {
-      const astFrom = (ast as { from?: TableMapEntry[] }).from;
-      const matchingFrom = astFrom?.find(
-        (from: TableMapEntry) =>
-          from.as === obj.table || (!from.as && from.table === obj.table)
-      );
-      if (matchingFrom?.key) {
-        requestAll.set(matchingFrom.key, true);
+      const astFrom = (ast as { from?: From[] }).from;
+      const matchingFrom = astFrom?.find((from: From) => {
+        const f = from as TableMapEntry;
+        return f.as === obj.table || (!f.as && f.table === obj.table);
+      });
+      if (matchingFrom) {
+        requestAll.set(matchingFrom, true);
       } else {
         throw new SQLError({ err: 'table_not_found', args: [obj.table] });
       }
     } else {
-      const astFrom = (ast as { from?: TableMapEntry[] }).from;
-      astFrom?.forEach((from: TableMapEntry) => {
-        if (from.key) {
-          requestAll.set(from.key, true);
-        }
+      const astFrom = (ast as { from?: From[] }).from;
+      astFrom?.forEach((from: From) => {
+        requestAll.set(from, true);
       });
     }
   } else {
@@ -289,13 +286,11 @@ function _resolveObject(
       }
     }
     if (from) {
-      columnRefMap.set(object as ColumnRef, { from });
-      if (from.key) {
-        if (obj.column) {
-          requestSets.get(from.key)?.add(obj.column);
-        }
-        setListMap.set(object as SetList, from as From);
+      columnRefMap.set(object as ColumnRef, { from: from as From });
+      if (obj.column) {
+        requestSets.get(from as From)?.add(obj.column);
       }
+      setListMap.set(object as SetList, from as From);
       if (add_cache && obj.column) {
         name_cache[obj.column] = from;
       }

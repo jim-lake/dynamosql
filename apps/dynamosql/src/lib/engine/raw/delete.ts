@@ -14,11 +14,7 @@ export async function singleDelete(
   const { from, where } = ast;
 
   let no_single = false;
-  const result = convertWhere(where, {
-    session,
-    from_key: from[0]?.key,
-    columnRefMap,
-  });
+  const result = convertWhere(where, { session, from: from[0], columnRefMap });
   if (result.err) {
     no_single = true;
   } else if (from.length > 1) {

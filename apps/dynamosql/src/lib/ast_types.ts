@@ -45,7 +45,6 @@ export interface SetListWithValue {
 export type ExtendedFrom = From & {
   db: string;
   table: string;
-  key: string;
   as?: string;
   join?: string;
 };

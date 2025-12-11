@@ -24,11 +24,11 @@ import type { FieldInfo } from '../types';
 import type { EvaluationResult } from './expression';
 import type { Session } from '../session';
 import type { ColumnRefInfo } from './helpers/column_ref_helper';
-import type { Select, ColumnRef } from 'node-sql-parser';
+import type { Select, ColumnRef, From } from 'node-sql-parser';
 
-export type SourceMap = Record<string, Row[]>;
+export type SourceMap = Map<From, Row[]>;
 
-type ColumnMap = Record<string, string[]>;
+type ColumnMap = Map<From, string[]>;
 
 interface QueryColumn {
   expr: ExtendedExpressionValue & {
@@ -76,8 +76,8 @@ export async function internalQuery(
   const { ast, session, dynamodb } = params;
 
   const current_database = session.getCurrentDatabase();
-  let requestSets = new Map<string, Set<string>>();
-  let requestAll = new Map<string, boolean>();
+  let requestSets = new Map<From, Set<string>>();
+  let requestAll = new Map<From, boolean>();
   let columnRefMap = params.columnRefMap ?? new Map();
   if (!params.skip_resolve) {
     const requestInfo = resolveReferences(ast, current_database ?? undefined);
@@ -86,8 +86,8 @@ export async function internalQuery(
     columnRefMap = requestInfo.columnRefMap;
   }
   const from = ast.from;
-  let source_map: SourceMap = {};
-  let column_map: ColumnMap = {};
+  let source_map: SourceMap = new Map();
+  let column_map: ColumnMap = new Map();
   if (from && Array.isArray(from) && from.length > 0) {
     const first = from[0] as ExtendedFrom;
     const db = first.db;
@@ -120,7 +120,7 @@ interface EvaluateReturnParams {
   dynamodb: DynamoDBClient;
   source_map: SourceMap;
   column_map: ColumnMap;
-  requestSets: Map<string, Set<string>>;
+  requestSets: Map<From, Set<string>>;
   columnRefMap: Map<ColumnRef, ColumnRefInfo>;
 }
 async function _evaluateReturn(
@@ -139,7 +139,7 @@ async function _evaluateReturn(
   if (from) {
     row_list = formJoin({ source_map, from, where, session, columnRefMap });
   } else {
-    row_list = [{ source: {} }];
+    row_list = [{ source: new Map() }];
   }
 
   let grouped_list: (SourceRow | SourceRowGroup)[] = row_list;
@@ -185,7 +185,7 @@ async function _evaluateReturn(
     let fromInfo = null;
     if (column.expr.type === 'column_ref') {
       const refInfo = columnRefMap.get(column.expr as ColumnRef);
-      fromInfo = refInfo?.from;
+      fromInfo = refInfo?.from as ExtendedFrom | undefined;
     }
 
     column_type.db = fromInfo?.db ?? column.expr.db ?? column.db ?? '';
@@ -233,7 +233,7 @@ interface ExpandStarColumnsParams {
     groupby?: Select['groupby'] | null;
   };
   column_map: ColumnMap;
-  requestSets: Map<string, Set<string>>;
+  requestSets: Map<From, Set<string>>;
   columnRefMap: Map<ColumnRef, ColumnRefInfo>;
 }
 function _expandStarColumns(params: ExpandStarColumnsParams): QueryColumn[] {
@@ -252,9 +252,9 @@ function _expandStarColumns(params: ExpandStarColumnsParams): QueryColumn[] {
           (!db && from.table === table && !from.as) ||
           (!db && from.as === table)
         ) {
-          const column_list = column_map[from.key];
+          const column_list = column_map.get(from);
           if (column_list && !column_list.length) {
-            const requestSet = requestSets.get(from.key);
+            const requestSet = requestSets.get(from);
             requestSet?.forEach((name: string) => column_list.push(name));
           }
           column_list?.forEach((name: string) => {
@@ -265,14 +265,7 @@ function _expandStarColumns(params: ExpandStarColumnsParams): QueryColumn[] {
               column: name,
             } as ColumnRef;
             // Add to columnRefMap so it can be looked up later
-            columnRefMap.set(colRef, {
-              from: {
-                db: from.db,
-                table: from.table,
-                as: from.as,
-                key: from.key,
-              },
-            });
+            columnRefMap.set(colRef, { from });
             ret.push({ expr: colRef, as: null });
           });
         }

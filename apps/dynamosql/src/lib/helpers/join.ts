@@ -18,11 +18,9 @@ export interface FormJoinParams {
 export function formJoin(params: FormJoinParams): SourceRow[] {
   const { source_map, from, where, session, columnRefMap } = params;
   const row_list: SourceRow[] = [];
-  from.forEach(
-    (from_table: From & { key?: string; is_left?: boolean; join?: string }) => {
-      from_table.is_left = (from_table.join?.indexOf('LEFT') ?? -1) >= 0;
-    }
-  );
+  from.forEach((from_table: From & { is_left?: boolean; join?: string }) => {
+    from_table.is_left = (from_table.join?.indexOf('LEFT') ?? -1) >= 0;
+  });
   const output_count = _findRows(
     source_map,
     from,
@@ -38,7 +36,7 @@ export function formJoin(params: FormJoinParams): SourceRow[] {
 }
 function _findRows(
   source_map: SourceMap,
-  list: (From & { key?: string; on?: unknown; is_left?: boolean })[],
+  list: (From & { on?: unknown; is_left?: boolean })[],
   where: Binary | Function | null,
   session: Session,
   row_list: SourceRow[],
@@ -50,26 +48,26 @@ function _findRows(
   if (!from) {
     throw new SQLError('Invalid from index');
   }
-  const { key, on, is_left } = from;
-  const rows = key ? source_map[key] : undefined;
+  const { on, is_left } = from;
+  const rows = source_map.get(from);
   const row_count = rows?.length ?? (is_left ? 1 : 0);
 
   let output_count = 0;
   for (let i = 0; i < row_count; i++) {
     const row_index = start_index + output_count;
-    row_list[row_index] ??= { source: {} };
+    row_list[row_index] ??= { source: new Map() };
     const row = row_list[row_index];
 
-    if (key && rows) {
-      row.source[key] = rows[i] ?? null;
+    if (rows) {
+      row.source.set(from, rows[i] ?? null);
     }
     for (let j = 0; output_count > 0 && j < from_index; j++) {
-      const from_key = list[j]?.key;
+      const prevFrom = list[j];
       const startRow = row_list[start_index];
-      if (from_key && startRow && from_key in startRow.source) {
-        const value = startRow.source[from_key];
+      if (prevFrom && startRow) {
+        const value = startRow.source.get(prevFrom);
         if (value !== undefined) {
-          row.source[from_key] = value;
+          row.source.set(prevFrom, value);
         }
       }
     }
@@ -88,9 +86,7 @@ function _findRows(
       }
     }
     if (skip && is_left && output_count === 0 && i + 1 === row_count) {
-      if (key) {
-        row.source[key] = null;
-      }
+      row.source.set(from, null);
       skip = false;
     }
 

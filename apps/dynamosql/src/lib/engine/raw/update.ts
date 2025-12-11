@@ -25,7 +25,7 @@ export async function singleUpdate(
 
   const where_result = convertWhere(where, {
     session,
-    from_key: from?.[0]?.key,
+    from: from?.[0],
     columnRefMap,
   });
   if (where_result.err) {
@@ -39,7 +39,7 @@ export async function singleUpdate(
     let ret: string | number | null | undefined;
     const result = convertWhere(value, {
       session,
-      from_key: from[0]?.key,
+      from: from[0],
       columnRefMap,
     });
     if (result.err) {

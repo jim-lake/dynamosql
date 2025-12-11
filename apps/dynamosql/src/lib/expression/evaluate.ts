@@ -273,10 +273,10 @@ export function getValue(
       result.value = output_result?.value;
       result.type = output_result?.type ?? 'string';
     } else if (row) {
-      const fromKey = refInfo?.from?.key;
+      const from = refInfo?.from;
       let cell: EngineValue | null | undefined;
-      if (fromKey && fromKey in row.source) {
-        const fromData = row.source[fromKey];
+      if (from) {
+        const fromData = row.source.get(from);
         if (
           fromData &&
           typeof fromData === 'object' &&

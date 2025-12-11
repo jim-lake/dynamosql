@@ -12,20 +12,16 @@ import type {
   Binary,
   ColumnRef,
   ColumnRefItem,
+  From,
 } from 'node-sql-parser';
 
 export interface ConvertWhereState {
   session: Session;
-  from_key?: string;
+  from?: From;
   default_true?: boolean;
   columnRefMap?: Map<ColumnRef, ColumnRefInfo>;
 }
 
-export interface ConvertWhereState {
-  session: Session;
-  from_key?: string;
-  default_true?: boolean;
-}
 export interface ConvertResult {
   err: string | null;
   value: string | number | null;
@@ -34,7 +30,7 @@ export function convertWhere(
   expr: ExtendedExpressionValue | Binary | FunctionType | null | undefined,
   state: ConvertWhereState
 ): ConvertResult {
-  const { from_key } = state;
+  const { from } = state;
   let err: string | null = null;
   let value: string | number | null = null;
 
@@ -80,7 +76,7 @@ export function convertWhere(
     } else if (type === 'column_ref') {
       const colRef = expr as ColumnRef;
       const refInfo = state.columnRefMap?.get(colRef);
-      if (refInfo?.from?.key === from_key) {
+      if (refInfo?.from === from) {
         const colRefItem = colRef as ColumnRefItem;
         const col = colRefItem.column;
         value = String(col);

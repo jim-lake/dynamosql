@@ -4,22 +4,20 @@ import * as Storage from './storage';
 
 import type { ExtendedFrom } from '../../ast_types';
 import type { RowListParams, Row } from '../index';
+import type { From } from 'node-sql-parser';
 
 export async function getRowList(
   params: RowListParams
-): Promise<{
-  source_map: Record<string, Row[]>;
-  column_map: Record<string, string[]>;
-}> {
+): Promise<{ source_map: Map<From, Row[]>; column_map: Map<From, string[]> }> {
   const { list } = params;
 
-  const source_map: Record<string, Row[]> = {};
-  const column_map: Record<string, string[]> = {};
+  const source_map = new Map<From, Row[]>();
+  const column_map = new Map<From, string[]>();
 
   for (const from of list) {
     const { row_list, column_list } = _getFromTable({ ...params, from });
-    source_map[from.key] = row_list;
-    column_map[from.key] = column_list;
+    source_map.set(from, row_list);
+    column_map.set(from, column_list);
   }
 
   return { source_map, column_map };

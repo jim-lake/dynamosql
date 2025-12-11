@@ -15,7 +15,7 @@ import type {
 } from '../handler_types';
 import type { ColumnRefInfo } from '../helpers/column_ref_helper';
 import type { Transaction } from '../transaction_manager';
-import type { Binary, Function, ColumnRef } from 'node-sql-parser';
+import type { Binary, Function, ColumnRef, From } from 'node-sql-parser';
 
 export type {
   DynamoDBClient,
@@ -43,8 +43,8 @@ export type CellRow = Record<string, CellValue>;
 export type Row = CellRow | ItemRecord;
 export type EngineValue = CellValue | AttributeValue;
 export interface RowListResult {
-  source_map: Record<string, Row[]>;
-  column_map: Record<string, string[]>;
+  source_map: Map<From, Row[]>;
+  column_map: Map<From, string[]>;
 }
 export interface TableData<T = Row> {
   database: string;
@@ -102,8 +102,8 @@ export interface RowListParams {
   session: Session;
   list: ExtendedFrom[];
   where?: Binary | Function | null;
-  requestSets: Map<string, Set<string>>;
-  requestAll: Map<string, boolean>;
+  requestSets: Map<From, Set<string>>;
+  requestAll: Map<From, boolean>;
   columnRefMap: Map<ColumnRef, ColumnRefInfo>;
 }
 export interface DeleteChange {

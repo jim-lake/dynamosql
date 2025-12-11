@@ -12,12 +12,12 @@ export async function getRowList(
   params: RowListParams
 ): Promise<RowListResult> {
   const { list } = params;
-  const source_map: RowListResult['source_map'] = {};
-  const column_map: RowListResult['column_map'] = {};
+  const source_map: RowListResult['source_map'] = new Map();
+  const column_map: RowListResult['column_map'] = new Map();
   for (const from of list) {
     const { results, column_list } = await _getFromTable({ ...params, from });
-    source_map[from.key] = results;
-    column_map[from.key] = column_list;
+    source_map.set(from, results);
+    column_map.set(from, column_list);
   }
   return { source_map, column_map };
 }
@@ -34,8 +34,8 @@ async function _getFromTable(
     columnRefMap,
   } = params;
   const { table } = from;
-  const requestSet = requestSets.get(from.key) ?? new Set<string>();
-  const isRequestAll = requestAll.get(from.key) ?? false;
+  const requestSet = requestSets.get(from) ?? new Set<string>();
+  const isRequestAll = requestAll.get(from) ?? false;
   const request_columns = [...requestSet];
   const columns =
     isRequestAll || request_columns.length === 0
@@ -47,12 +47,7 @@ async function _getFromTable(
   const is_left_join = from.join ? from.join.indexOf('LEFT') >= 0 : false;
   const where_result =
     where && !is_left_join
-      ? convertWhere(where, {
-          session,
-          from_key: from.key,
-          default_true: true,
-          columnRefMap,
-        })
+      ? convertWhere(where, { session, from, default_true: true, columnRefMap })
       : null;
   if (!where_result?.err && where_result?.value) {
     sql += ' WHERE ' + where_result.value;
