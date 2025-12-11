@@ -10,8 +10,8 @@ import { formJoin } from './helpers/join';
 import { sort } from './helpers/sort';
 import * as SchemaManager from './schema_manager';
 
-import type { ExtendedExpressionValue, ExtendedFrom } from './ast_types';
-import type { Row } from './engine';
+import type { ExtendedExpressionValue } from './ast_types';
+import type { Row, FromJoin } from './engine';
 import type {
   HandlerParams,
   DynamoDBClient,
@@ -24,11 +24,15 @@ import type { FieldInfo } from '../types';
 import type { EvaluationResult } from './expression';
 import type { Session } from '../session';
 import type { ColumnRefInfo } from './helpers/column_ref_helper';
-import type { Select, ColumnRef, From } from 'node-sql-parser';
+import type { Select, ColumnRef, From, BaseFrom } from 'node-sql-parser';
 
 export type SourceMap = Map<From, Row[]>;
 
 type ColumnMap = Map<From, string[]>;
+
+function isBaseFrom(from: From): from is BaseFrom {
+  return 'table' in from && typeof from.table === 'string';
+}
 
 interface QueryColumn {
   expr: ExtendedExpressionValue & {
@@ -89,14 +93,17 @@ export async function internalQuery(
   let source_map: SourceMap = new Map();
   let column_map: ColumnMap = new Map();
   if (from && Array.isArray(from) && from.length > 0) {
-    const first = from[0] as ExtendedFrom;
+    const first = from[0];
+    if (!first || !isBaseFrom(first)) {
+      throw new SQLError('Invalid from clause');
+    }
     const db = first.db;
     const table = first.table;
     const engine = SchemaManager.getEngine(db ?? undefined, table, session);
     const opts = {
       session,
       dynamodb,
-      list: from as ExtendedFrom[],
+      list: from as FromJoin[],
       where: ast.where,
       requestSets,
       requestAll,
@@ -130,9 +137,7 @@ async function _evaluateReturn(
   const query_columns = _expandStarColumns({ ...params, ast, columnRefMap });
 
   const { where, groupby } = ast;
-  const from = Array.isArray(ast.from)
-    ? (ast.from as ExtendedFrom[])
-    : undefined;
+  const from = Array.isArray(ast.from) ? ast.from : undefined;
   let row_list: SourceRow[] = [];
   let sleep_ms = 0;
 
@@ -182,10 +187,12 @@ async function _evaluateReturn(
     const column_type = convertType(column.result_type, column.result_nullable);
 
     // Get table info from columnRefMap if this is a column_ref
-    let fromInfo = null;
+    let fromInfo: BaseFrom | null = null;
     if (column.expr.type === 'column_ref') {
       const refInfo = columnRefMap.get(column.expr as ColumnRef);
-      fromInfo = refInfo?.from as ExtendedFrom | undefined;
+      if (refInfo?.from && isBaseFrom(refInfo.from)) {
+        fromInfo = refInfo.from;
+      }
     }
 
     column_type.db = fromInfo?.db ?? column.expr.db ?? column.db ?? '';
@@ -242,10 +249,11 @@ function _expandStarColumns(params: ExpandStarColumnsParams): QueryColumn[] {
   for (const column of ast.columns ?? []) {
     if (column?.expr?.type === 'column_ref' && column.expr.column === '*') {
       const { db, table } = column.expr;
-      const from_list = Array.isArray(ast.from)
-        ? (ast.from as ExtendedFrom[])
-        : [];
+      const from_list = Array.isArray(ast.from) ? ast.from : [];
       for (const from of from_list) {
+        if (!isBaseFrom(from)) {
+          continue;
+        }
         if (
           (!db && !table) ||
           (db && from.db === db && from.table === table && !from.as) ||

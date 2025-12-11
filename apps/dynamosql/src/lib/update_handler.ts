@@ -10,7 +10,6 @@ import * as TransactionManager from './transaction_manager';
 
 import type {
   UpdateAST,
-  ExtendedFrom,
   SetListWithValue,
   ExtendedExpressionValue,
 } from './ast_types';
@@ -21,7 +20,11 @@ import type {
   SourceRowResult,
 } from './handler_types';
 import type { RequestInfo } from './helpers/column_ref_helper';
-import type { From } from 'node-sql-parser';
+import type { From, BaseFrom } from 'node-sql-parser';
+
+function isBaseFrom(from: From): from is BaseFrom {
+  return 'table' in from && typeof from.table === 'string';
+}
 
 export async function query(
   params: HandlerParams<UpdateAST>
@@ -29,7 +32,7 @@ export async function query(
   const { ast, session } = params;
   const current_database = session.getCurrentDatabase() ?? undefined;
   // Temporarily add from property for resolveReferences
-  ast.from = (ast.table ?? []) as ExtendedFrom[];
+  ast.from = ast.table ?? [];
   ast.table = null;
   const requestInfo = resolveReferences(ast, current_database);
   const database = getDatabaseFromUpdate(ast);
@@ -49,13 +52,17 @@ async function _runUpdate(
   if (!ast.from || !ast.from[0]) {
     throw new SQLError('no_current_database');
   }
-  const { db, table } = ast.from[0];
+  const firstFrom = ast.from[0];
+  if (!isBaseFrom(firstFrom)) {
+    throw new SQLError('Invalid from clause');
+  }
+  const { db, table } = firstFrom;
   const engine = SchemaManager.getEngine(db ?? undefined, table, session);
   if (ast.from.length === 1) {
     const opts = {
       dynamodb,
       session,
-      from: ast.from[0],
+      from: firstFrom,
       set: ast.set,
       where: ast.where,
       columnRefMap,
@@ -87,7 +94,7 @@ async function _multipleUpdate(
     { key: EngineValue[]; set_list: SetListWithValue[] }[]
   >();
 
-  (ast.from as ExtendedFrom[]).forEach((object) => {
+  ast.from?.forEach((object) => {
     const found = result_list.find((result) => result.from === object);
     const list = found?.list;
     const updateList: { key: EngineValue[]; set_list: SetListWithValue[] }[] =
@@ -118,7 +125,8 @@ async function _multipleUpdate(
   });
 
   // Update rows
-  const from_list = (ast.from as ExtendedFrom[])
+  const from_list = (ast.from ?? [])
+    .filter(isBaseFrom)
     .map((obj) => {
       const found = result_list.find((result) => result.from === obj);
       return {

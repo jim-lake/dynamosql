@@ -1,7 +1,5 @@
 import type { EvaluationResult } from './expression';
 import type {
-  BaseFrom,
-  Join,
   Use,
   Select,
   Insert_Replace,
@@ -21,10 +19,10 @@ export type ExtendedColumnDefinitionOptList = ColumnDefinitionOptList & {
   primary_key?: 'key' | 'primary key';
 };
 export interface UpdateAST extends Update {
-  from?: ExtendedFrom[];
+  from?: From[];
 }
 export interface DeleteAST extends Delete {
-  from: ExtendedFrom[];
+  from: From[];
 }
 export interface Show {
   type: 'show';
@@ -44,7 +42,6 @@ export interface SetListWithValue {
   column: string;
   value: EvaluationResult;
 }
-export type ExtendedFrom = BaseFrom & Partial<Join>;
 export interface AssignExpr {
   type: 'assign';
   left: VarExpr;

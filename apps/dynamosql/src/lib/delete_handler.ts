@@ -10,6 +10,11 @@ import type { DeleteAST } from './ast_types';
 import type { EngineValue } from './engine';
 import type { HandlerParams, AffectedResult } from './handler_types';
 import type { RequestInfo } from './helpers/column_ref_helper';
+import type { BaseFrom, From } from 'node-sql-parser';
+
+function isBaseFrom(from: From): from is BaseFrom {
+  return 'table' in from && typeof from.table === 'string';
+}
 
 export async function query(
   params: HandlerParams<DeleteAST>
@@ -34,12 +39,14 @@ async function _runDelete(
 ): Promise<AffectedResult> {
   const { ast, session, dynamodb, columnRefMap } = params;
   const firstFrom = ast.from[0];
-  const database =
-    (firstFrom && 'db' in firstFrom ? firstFrom.db : null) ?? undefined;
-  const table = firstFrom && 'table' in firstFrom ? firstFrom.table : undefined;
+  if (!firstFrom || !isBaseFrom(firstFrom)) {
+    throw new SQLError('Invalid from clause');
+  }
+  const database = firstFrom.db ?? undefined;
+  const table = firstFrom.table;
   const engine = SchemaManager.getEngine(database, table, session);
 
-  if (firstFrom && ast.from.length === 1) {
+  if (ast.from.length === 1) {
     try {
       const opts = {
         dynamodb,
@@ -80,10 +87,13 @@ async function _multipleDelete(
   for (const object of ast.table) {
     const found = result_list.find((result) => result.from === object.from);
     const list = found?.list;
+    if (!isBaseFrom(object.from)) {
+      continue;
+    }
 
     if (list && list.length > 0) {
       from_list.push({
-        database: object.from.db,
+        database: object.from.db ?? '',
         table: object.from.table,
         key_list: found.key_list,
         delete_list: list.map((i) => i.key),
