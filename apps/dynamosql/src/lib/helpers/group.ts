@@ -2,12 +2,18 @@ import { SQLError } from '../../error';
 import { getValue } from '../expression';
 
 import type { Session } from '../../session';
-import type { ExtendedColumnRef, ExtendedExpressionValue } from '../ast_types';
+import type { ExtendedExpressionValue } from '../ast_types';
+import type { ColumnRefInfo } from './column_ref_helper';
 import type { SourceRow, SourceRowGroup } from '../handler_types';
-import type { ExpressionValue, Select, ValueExpr } from 'node-sql-parser';
+import type {
+  ExpressionValue,
+  Select,
+  ValueExpr,
+  ColumnRef,
+} from 'node-sql-parser';
 
 export interface GroupBy {
-  columns: ExtendedColumnRef[] | null;
+  columns: ExpressionValue[] | null;
   modifiers: ValueExpr<string>[];
 }
 export interface FormGroupParams {
@@ -15,6 +21,7 @@ export interface FormGroupParams {
   ast: Select;
   row_list: SourceRow[];
   session: Session;
+  columnRefMap: Map<ColumnRef, ColumnRefInfo>;
 }
 
 export function hasAggregate(ast: Select): boolean {
@@ -37,7 +44,7 @@ export function formImplicitGroup(
   return [];
 }
 export function formGroup(params: FormGroupParams): SourceRowGroup[] {
-  const { groupby, ast, row_list, session } = params;
+  const { groupby, ast, row_list, session, columnRefMap } = params;
 
   const group_exprs: ExtendedExpressionValue[] = [];
   for (const column of groupby.columns ?? []) {
@@ -53,7 +60,7 @@ export function formGroup(params: FormGroupParams): SourceRowGroup[] {
   const group_map: Record<string, unknown[] | Record<string, unknown>> = {};
   for (const row of row_list) {
     const key_list = group_exprs.map((group) => {
-      const result = getValue(group, { session, row });
+      const result = getValue(group, { session, row, columnRefMap });
       if (result.err) {
         throw new SQLError(result.err);
       }

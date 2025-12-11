@@ -8,7 +8,12 @@ import { runSelect } from './helpers/select_modify';
 import * as SchemaManager from './schema_manager';
 import * as TransactionManager from './transaction_manager';
 
-import type { UpdateAST, ExtendedFrom, SetListWithValue } from './ast_types';
+import type {
+  UpdateAST,
+  ExtendedFrom,
+  SetListWithValue,
+  ExtendedExpressionValue,
+} from './ast_types';
 import type { UpdateChange, EngineValue } from './engine';
 import type {
   HandlerParams,
@@ -16,11 +21,6 @@ import type {
   SourceRowResult,
 } from './handler_types';
 import type { RequestInfo } from './helpers/column_ref_helper';
-import type { SetList } from 'node-sql-parser';
-
-interface ExtendedSetList extends SetList {
-  from?: { key?: string };
-}
 
 export async function query(
   params: HandlerParams<UpdateAST>
@@ -45,14 +45,14 @@ export async function query(
 async function _runUpdate(
   params: HandlerParams<UpdateAST> & RequestInfo
 ): Promise<ChangedResult> {
-  const { ast, session, dynamodb } = params;
+  const { ast, session, dynamodb, columnRefMap } = params;
   if (!ast.from || !ast.from[0]) {
     throw new SQLError('no_current_database');
   }
   const { db, table } = ast.from[0];
   const engine = SchemaManager.getEngine(db, table, session);
   if (ast.from.length === 1) {
-    const opts = { dynamodb, session, ast };
+    const opts = { dynamodb, session, ast, columnRefMap };
     try {
       return await engine.singleUpdate(opts);
     } catch (err) {
@@ -69,7 +69,7 @@ async function _runUpdate(
 async function _multipleUpdate(
   params: HandlerParams<UpdateAST> & RequestInfo
 ): Promise<ChangedResult> {
-  const { dynamodb, session, ast } = params;
+  const { dynamodb, session, ast, columnRefMap, setListMap } = params;
   let affectedRows = 0;
   let changedRows = 0;
 
@@ -88,17 +88,22 @@ async function _multipleUpdate(
     const updateList: { key: EngineValue[]; set_list: SetListWithValue[] }[] =
       [];
     list?.forEach(({ key, row }) => {
-      const set_list = (ast.set as ExtendedSetList[])
-        .filter((set_item) => set_item.from?.key === from_key)
+      const set_list = (ast.set as unknown[])
+        .filter((set_item) => setListMap.get(set_item) === from_key)
         .map((set_item) => {
-          const expr_result = Expression.getValue(set_item.value, {
+          const item = set_item as {
+            column: string;
+            value: ExtendedExpressionValue;
+          };
+          const expr_result = Expression.getValue(item.value, {
             session,
             row: row as SourceRowResult,
+            columnRefMap,
           });
           if (expr_result.err) {
             throw new SQLError(expr_result.err);
           }
-          return { column: set_item.column, value: expr_result };
+          return { column: item.column, value: expr_result };
         });
       if (set_list.length > 0) {
         updateList.push({ key, set_list });

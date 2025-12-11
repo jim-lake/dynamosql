@@ -28,6 +28,7 @@ import type {
   SourceRowGroup,
   SourceRowResultGroup,
 } from '../handler_types';
+import type { ColumnRefInfo } from '../helpers/column_ref_helper';
 import type {
   Function,
   AggrFunc,
@@ -40,6 +41,7 @@ import type {
 export interface EvaluationState {
   session: Session;
   row?: SourceRow | SourceRowResult | SourceRowGroup | SourceRowResultGroup;
+  columnRefMap?: Map<ColumnRef, ColumnRefInfo>;
 }
 export interface EvaluationValue {
   type: string;
@@ -248,10 +250,7 @@ export function getValue(
       }
     }
   } else if (type === 'column_ref') {
-    const colRef = expr as ColumnRef & {
-      _resultIndex?: number;
-      from?: { key: string };
-    };
+    const colRef = expr as ColumnRef;
 
     let columnName: string;
     let columnValue: unknown;
@@ -267,13 +266,14 @@ export function getValue(
     }
 
     result.name = columnName;
-    if (row && colRef._resultIndex !== undefined && colRef._resultIndex >= 0) {
+    const refInfo = state.columnRefMap?.get(colRef);
+    if (row && refInfo?.resultIndex !== undefined && refInfo.resultIndex >= 0) {
       const output_result =
-        'result' in row ? row.result[colRef._resultIndex] : undefined;
+        'result' in row ? row.result[refInfo.resultIndex] : undefined;
       result.value = output_result?.value;
       result.type = output_result?.type ?? 'string';
     } else if (row) {
-      const fromKey = colRef.from?.key;
+      const fromKey = refInfo?.from?.key;
       let cell: EngineValue | null | undefined;
       if (fromKey && fromKey in row.source) {
         const fromData = row.source[fromKey];

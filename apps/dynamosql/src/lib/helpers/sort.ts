@@ -2,14 +2,16 @@ import { SQLError } from '../../error';
 import { Types } from '../../types';
 import { getValue } from '../expression';
 
+import type { ColumnRefInfo } from './column_ref_helper';
 import type { Session } from '../../session';
 import type { FieldInfo } from '../../types';
 import type { SourceRowResult } from '../handler_types';
-import type { OrderBy } from 'node-sql-parser';
+import type { OrderBy, ColumnRef } from 'node-sql-parser';
 
 export interface SortState {
   session: Session;
   columns?: FieldInfo[];
+  columnRefMap?: Map<ColumnRef, ColumnRefInfo>;
 }
 
 export function sort(

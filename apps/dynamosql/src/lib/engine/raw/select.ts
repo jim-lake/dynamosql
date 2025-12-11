@@ -24,7 +24,15 @@ export async function getRowList(
 async function _getFromTable(
   params: RowListParams & { from: ExtendedFrom }
 ): Promise<{ results: ItemRecord[]; column_list: string[] }> {
-  const { dynamodb, session, from, where, requestSets, requestAll } = params;
+  const {
+    dynamodb,
+    session,
+    from,
+    where,
+    requestSets,
+    requestAll,
+    columnRefMap,
+  } = params;
   const { table } = from;
   const requestSet = requestSets.get(from.key) ?? new Set<string>();
   const isRequestAll = requestAll.get(from.key) ?? false;
@@ -39,7 +47,12 @@ async function _getFromTable(
   const is_left_join = from.join ? from.join.indexOf('LEFT') >= 0 : false;
   const where_result =
     where && !is_left_join
-      ? convertWhere(where, { session, from_key: from.key, default_true: true })
+      ? convertWhere(where, {
+          session,
+          from_key: from.key,
+          default_true: true,
+          columnRefMap,
+        })
       : null;
   if (!where_result?.err && where_result?.value) {
     sql += ' WHERE ' + where_result.value;

@@ -5,16 +5,21 @@ import ConvertExpression from './convert_expression';
 import Functions from './functions';
 
 import type { Session } from '../../../session';
-import type {
-  ExtendedExpressionValue,
-  UnaryExpr,
-  ExtendedColumnRef,
-} from '../../ast_types';
+import type { ExtendedExpressionValue, UnaryExpr } from '../../ast_types';
+import type { ColumnRefInfo } from '../column_ref_helper';
 import type {
   Function as FunctionType,
   Binary,
+  ColumnRef,
   ColumnRefItem,
 } from 'node-sql-parser';
+
+export interface ConvertWhereState {
+  session: Session;
+  from_key?: string;
+  default_true?: boolean;
+  columnRefMap?: Map<ColumnRef, ColumnRefInfo>;
+}
 
 export interface ConvertWhereState {
   session: Session;
@@ -73,9 +78,10 @@ export function convertWhere(
         err = 'unsupported';
       }
     } else if (type === 'column_ref') {
-      const colRef = expr as ExtendedColumnRef;
-      if ('from' in colRef && colRef.from?.key === from_key) {
-        const colRefItem = colRef as ColumnRefItem & { from?: { key: string } };
+      const colRef = expr as ColumnRef;
+      const refInfo = state.columnRefMap?.get(colRef);
+      if (refInfo?.from?.key === from_key) {
+        const colRefItem = colRef as ColumnRefItem;
         const col = colRefItem.column;
         value = String(col);
       } else {

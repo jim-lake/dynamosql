@@ -9,7 +9,6 @@ import type {
   Drop,
   From,
   ExpressionValue,
-  ColumnRef,
   ColumnDefinitionOptList,
   Update,
 } from 'node-sql-parser';
@@ -38,10 +37,6 @@ export interface VarExpr {
   members: ExpressionValue[];
   prefix: string | null;
 }
-
-export type ExtendedColumnRef =
-  | (ColumnRef & { _resultIndex?: number; from?: { key: string } })
-  | { type: 'number'; value: number; _resultIndex?: number };
 
 export interface SetListWithValue {
   column: string;

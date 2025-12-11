@@ -10,11 +10,15 @@ import type { DeleteParams, MultiDeleteParams, AffectedResult } from '../index';
 export async function singleDelete(
   params: DeleteParams
 ): Promise<AffectedResult> {
-  const { dynamodb, session, ast } = params;
+  const { dynamodb, session, ast, columnRefMap } = params;
   const { from, where } = ast;
 
   let no_single = false;
-  const result = convertWhere(where, { session, from_key: from[0]?.key });
+  const result = convertWhere(where, {
+    session,
+    from_key: from[0]?.key,
+    columnRefMap,
+  });
   if (result.err) {
     no_single = true;
   } else if (from.length > 1) {

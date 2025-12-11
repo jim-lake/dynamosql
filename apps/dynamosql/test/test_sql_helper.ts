@@ -189,7 +189,10 @@ function _checkEqual(name, i, left, right) {
       const l_time = Date.parse('2020-01-01 ' + left);
       const r_time = Date.parse('2020-01-01 ' + right);
       const delta = Math.abs(l_time - r_time);
-      expect(delta, `delta results[${i}].${name} left: ${left} (${l_time}) right: ${right} (${r_time}) < 2000`).to.be.lt(2000);
+      expect(
+        delta,
+        `delta results[${i}].${name} left: ${left} (${l_time}) right: ${right} (${r_time}) < 2000`
+      ).to.be.lt(2000);
     } else if (left.length >= 19) {
       const l_time = Date.parse(left);
       const r_time = Date.parse(right);

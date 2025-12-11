@@ -3,18 +3,20 @@ import { getValue } from '../expression';
 
 import type { Session } from '../../session';
 import type { ExtendedExpressionValue } from '../ast_types';
+import type { ColumnRefInfo } from './column_ref_helper';
 import type { SourceRow } from '../handler_types';
 import type { SourceMap } from '../select_handler';
-import type { From, Binary, Function } from 'node-sql-parser';
+import type { From, Binary, Function, ColumnRef } from 'node-sql-parser';
 
 export interface FormJoinParams {
   source_map: SourceMap;
   from: From[];
   where: Binary | Function | null;
   session: Session;
+  columnRefMap: Map<ColumnRef, ColumnRefInfo>;
 }
 export function formJoin(params: FormJoinParams): SourceRow[] {
-  const { source_map, from, where, session } = params;
+  const { source_map, from, where, session, columnRefMap } = params;
   const row_list: SourceRow[] = [];
   from.forEach(
     (from_table: From & { key?: string; is_left?: boolean; join?: string }) => {
@@ -28,7 +30,8 @@ export function formJoin(params: FormJoinParams): SourceRow[] {
     session,
     row_list,
     0,
-    0
+    0,
+    columnRefMap
   );
   row_list.length = output_count;
   return row_list;
@@ -40,7 +43,8 @@ function _findRows(
   session: Session,
   row_list: SourceRow[],
   from_index: number,
-  start_index: number
+  start_index: number,
+  columnRefMap: Map<ColumnRef, ColumnRefInfo>
 ): number {
   const from = list[from_index];
   if (!from) {
@@ -72,7 +76,11 @@ function _findRows(
 
     let skip = false;
     if (on) {
-      const result = getValue(on as ExtendedExpressionValue, { session, row });
+      const result = getValue(on as ExtendedExpressionValue, {
+        session,
+        row,
+        columnRefMap,
+      });
       if (result.err) {
         throw new SQLError(result.err);
       } else if (!result.value) {
@@ -96,11 +104,12 @@ function _findRows(
           session,
           row_list,
           next_from,
-          start_index + output_count
+          start_index + output_count,
+          columnRefMap
         );
         output_count += result_count;
       } else if (where) {
-        const result = getValue(where, { session, row });
+        const result = getValue(where, { session, row, columnRefMap });
         if (result.err) {
           throw new SQLError(result.err);
         } else if (result.value) {

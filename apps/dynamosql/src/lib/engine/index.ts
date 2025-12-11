@@ -13,8 +13,9 @@ import type {
   ChangedResult,
   AffectedResult,
 } from '../handler_types';
+import type { ColumnRefInfo } from '../helpers/column_ref_helper';
 import type { Transaction } from '../transaction_manager';
-import type { Binary, Function } from 'node-sql-parser';
+import type { Binary, Function, ColumnRef } from 'node-sql-parser';
 
 export type {
   DynamoDBClient,
@@ -103,6 +104,7 @@ export interface RowListParams {
   where?: Binary | Function | null;
   requestSets: Map<string, Set<string>>;
   requestAll: Map<string, boolean>;
+  columnRefMap: Map<ColumnRef, ColumnRefInfo>;
 }
 export interface DeleteChange {
   database: string;
@@ -114,6 +116,7 @@ export interface DeleteParams {
   dynamodb: DynamoDBClient;
   session: Session;
   ast: DeleteAST;
+  columnRefMap: Map<ColumnRef, ColumnRefInfo>;
 }
 export interface MultiDeleteParams {
   dynamodb: DynamoDBClient;
@@ -138,6 +141,7 @@ export interface UpdateParams {
   dynamodb: DynamoDBClient;
   session: Session;
   ast: UpdateAST;
+  columnRefMap: Map<ColumnRef, ColumnRefInfo>;
 }
 export interface MultiUpdateParams {
   dynamodb: DynamoDBClient;

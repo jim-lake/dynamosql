@@ -2,7 +2,14 @@ import { SQLError } from '../../error';
 
 import { walkColumnRefs } from './ast_helper';
 
-import type { Select, Update, Delete, From, BaseFrom } from 'node-sql-parser';
+import type {
+  Select,
+  Update,
+  Delete,
+  From,
+  BaseFrom,
+  ColumnRef,
+} from 'node-sql-parser';
 
 interface TableMapEntry {
   db?: string;
@@ -21,9 +28,16 @@ type SelectWithOptionalGroupBy = Omit<Select, 'groupby'> & {
   groupby?: { columns?: unknown };
 };
 
+export interface ColumnRefInfo {
+  resultIndex?: number;
+  from?: TableMapEntry;
+}
+
 export interface RequestInfo {
   requestSets: Map<string, Set<string>>;
   requestAll: Map<string, boolean>;
+  columnRefMap: Map<ColumnRef, ColumnRefInfo>;
+  setListMap: Map<unknown, string>; // Maps SetList items to their fromKey
 }
 
 export function resolveReferences(
@@ -32,6 +46,8 @@ export function resolveReferences(
 ): RequestInfo {
   const requestSets = new Map<string, Set<string>>();
   const requestAll = new Map<string, boolean>();
+  const columnRefMap = new Map<ColumnRef, ColumnRefInfo>();
+  const setListMap = new Map<unknown, string>();
   const table_map: TableMap = {};
   const db_map: DbMap = {};
   const fromRaw =
@@ -99,7 +115,9 @@ export function resolveReferences(
         table_map,
         name_cache,
         requestSets,
-        requestAll
+        requestAll,
+        columnRefMap,
+        setListMap
       );
     });
   });
@@ -113,7 +131,9 @@ export function resolveReferences(
         table_map,
         name_cache,
         requestSets,
-        requestAll
+        requestAll,
+        columnRefMap,
+        setListMap
       );
     });
     _resolveObject(
@@ -123,7 +143,9 @@ export function resolveReferences(
       table_map,
       name_cache,
       requestSets,
-      requestAll
+      requestAll,
+      columnRefMap,
+      setListMap
     );
   });
 
@@ -151,7 +173,9 @@ export function resolveReferences(
           table_map,
           name_cache,
           requestSets,
-          requestAll
+          requestAll,
+          columnRefMap,
+          setListMap
         );
       });
     }
@@ -171,12 +195,14 @@ export function resolveReferences(
         name_cache,
         requestSets,
         requestAll,
+        columnRefMap,
+        setListMap,
         result_map
       );
     });
   });
 
-  return { requestSets, requestAll };
+  return { requestSets, requestAll, columnRefMap, setListMap };
 }
 
 function _resolveObject(
@@ -187,6 +213,8 @@ function _resolveObject(
   name_cache: TableMap,
   requestSets: Map<string, Set<string>>,
   requestAll: Map<string, boolean>,
+  columnRefMap: Map<ColumnRef, ColumnRefInfo>,
+  setListMap: Map<unknown, string>,
   result_map?: ResultMap
 ) {
   const fixup_object = object as {
@@ -212,7 +240,6 @@ function _resolveObject(
     db?: string;
     table?: string;
     from?: TableMapEntry;
-    _resultIndex?: number;
   };
   if (obj.column === '*') {
     if (obj.db) {
@@ -253,7 +280,7 @@ function _resolveObject(
     } else {
       const index = result_map?.[obj.column ?? ''];
       if (index !== undefined && index >= 0) {
-        obj._resultIndex = index;
+        columnRefMap.set(object as ColumnRef, { resultIndex: index });
       } else {
         const cached = name_cache[obj.column ?? ''];
         const astFrom = (ast as { from?: TableMapEntry[] }).from;
@@ -261,14 +288,26 @@ function _resolveObject(
       }
     }
     if (from) {
-      obj.from = from;
-      if (from.key && obj.column) {
-        requestSets.get(from.key)?.add(obj.column);
+      if (from.key) {
+        if (obj.column) {
+          requestSets.get(from.key)?.add(obj.column);
+        }
+        columnRefMap.set(object as ColumnRef, { from });
+        // Also store in setListMap for SET clause items
+        setListMap.set(object, from.key);
+      } else {
+        // from exists but no key - store the from object anyway
+        columnRefMap.set(object as ColumnRef, { from });
+        // Try to use the from object's properties to construct a key
+        const key = from.as ?? `${from.db}.${from.table}`;
+        if (key) {
+          setListMap.set(object, key);
+        }
       }
       if (add_cache && obj.column) {
         name_cache[obj.column] = from;
       }
-    } else if (obj._resultIndex === undefined) {
+    } else if (!columnRefMap.has(object as ColumnRef)) {
       if (obj.db && !db_map[obj.db]) {
         throw new SQLError({ err: 'db_not_found', args: [obj.db] });
       } else if (obj.table) {

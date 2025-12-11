@@ -32,7 +32,7 @@ export async function query(
 async function _runDelete(
   params: HandlerParams<DeleteAST> & RequestInfo
 ): Promise<AffectedResult> {
-  const { ast, session, dynamodb } = params;
+  const { ast, session, dynamodb, columnRefMap } = params;
   const firstFrom = ast.from[0];
   const database =
     (firstFrom && 'db' in firstFrom ? firstFrom.db : null) ?? undefined;
@@ -41,7 +41,7 @@ async function _runDelete(
 
   if (ast.from.length === 1) {
     try {
-      const opts = { dynamodb, session, ast };
+      const opts = { dynamodb, session, ast, columnRefMap };
       const result = await engine.singleDelete(opts);
       return { affectedRows: result.affectedRows };
     } catch (err) {

@@ -23,7 +23,8 @@ import type {
 import type { FieldInfo } from '../types';
 import type { EvaluationResult } from './expression';
 import type { Session } from '../session';
-import type { Select } from 'node-sql-parser';
+import type { ColumnRefInfo } from './helpers/column_ref_helper';
+import type { Select, ColumnRef } from 'node-sql-parser';
 
 export type SourceMap = Record<string, Row[]>;
 
@@ -62,6 +63,7 @@ export interface InternalQueryParams {
   session: Session;
   dynamodb: DynamoDBClient;
   skip_resolve?: boolean;
+  columnRefMap?: Map<ColumnRef, ColumnRefInfo>;
 }
 export interface InternalQueryResult {
   rows: EvaluationResult[][];
@@ -76,10 +78,12 @@ export async function internalQuery(
   const current_database = session.getCurrentDatabase();
   let requestSets = new Map<string, Set<string>>();
   let requestAll = new Map<string, boolean>();
+  let columnRefMap = params.columnRefMap ?? new Map();
   if (!params.skip_resolve) {
     const requestInfo = resolveReferences(ast, current_database ?? undefined);
     requestSets = requestInfo.requestSets;
     requestAll = requestInfo.requestAll;
+    columnRefMap = requestInfo.columnRefMap;
   }
   const from = ast.from;
   let source_map: SourceMap = {};
@@ -96,12 +100,19 @@ export async function internalQuery(
       where: ast.where,
       requestSets,
       requestAll,
+      columnRefMap,
     };
     const result = await engine.getRowList(opts);
     source_map = result.source_map;
     column_map = result.column_map;
   }
-  return _evaluateReturn({ ...params, source_map, column_map, requestSets });
+  return _evaluateReturn({
+    ...params,
+    source_map,
+    column_map,
+    requestSets,
+    columnRefMap,
+  });
 }
 interface EvaluateReturnParams {
   ast: Select;
@@ -110,12 +121,13 @@ interface EvaluateReturnParams {
   source_map: SourceMap;
   column_map: ColumnMap;
   requestSets: Map<string, Set<string>>;
+  columnRefMap: Map<ColumnRef, ColumnRefInfo>;
 }
 async function _evaluateReturn(
   params: EvaluateReturnParams
 ): Promise<InternalQueryResult> {
-  const { session, source_map, ast } = params;
-  const query_columns = _expandStarColumns(params);
+  const { session, source_map, ast, columnRefMap } = params;
+  const query_columns = _expandStarColumns({ ...params, ast, columnRefMap });
 
   const { where, groupby } = ast;
   const from = Array.isArray(ast.from)
@@ -125,7 +137,7 @@ async function _evaluateReturn(
   let sleep_ms = 0;
 
   if (from) {
-    row_list = formJoin({ source_map, from, where, session });
+    row_list = formJoin({ source_map, from, where, session, columnRefMap });
   } else {
     row_list = [{ source: {} }];
   }
@@ -133,9 +145,9 @@ async function _evaluateReturn(
   let grouped_list: (SourceRow | SourceRowGroup)[] = row_list;
   // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
   if (groupby?.columns) {
-    grouped_list = formGroup({ groupby, ast, row_list, session });
+    grouped_list = formGroup({ groupby, ast, row_list, session, columnRefMap });
   } else if (hasAggregate(ast)) {
-    grouped_list = formImplicitGroup({ ast, row_list, session });
+    grouped_list = formImplicitGroup({ ast, row_list, session, columnRefMap });
   }
 
   const result_list: SourceRowResult[] = [];
@@ -145,6 +157,7 @@ async function _evaluateReturn(
       const result = Expression.getValue(column.expr, {
         session,
         row,
+        columnRefMap,
       });
       if (result.err) {
         throw new SQLError(result.err);
@@ -167,16 +180,24 @@ async function _evaluateReturn(
   const columns: FieldInfo[] = [];
   for (const column of query_columns) {
     const column_type = convertType(column.result_type, column.result_nullable);
-    column_type.db = column.expr.from?.db ?? column.expr.db ?? column.db ?? '';
+
+    // Get table info from columnRefMap if this is a column_ref
+    let fromInfo = null;
+    if (column.expr.type === 'column_ref') {
+      const refInfo = columnRefMap.get(column.expr as ColumnRef);
+      fromInfo = refInfo?.from;
+    }
+
+    column_type.db = fromInfo?.db ?? column.expr.db ?? column.db ?? '';
     column_type.orgName = column.result_name ?? '';
     column_type.name = column.as ?? column_type.orgName;
-    column_type.orgTable = column.expr.from?.table ?? '';
-    column_type.table = column.expr.from?.as ?? column_type.orgTable;
+    column_type.orgTable = fromInfo?.table ?? '';
+    column_type.table = fromInfo?.as ?? column_type.orgTable;
     columns.push(column_type);
   }
 
   if (ast.orderby) {
-    sort(result_list, ast.orderby, { session, columns });
+    sort(result_list, ast.orderby, { session, columns, columnRefMap });
   }
 
   let start = 0;
@@ -213,9 +234,10 @@ interface ExpandStarColumnsParams {
   };
   column_map: ColumnMap;
   requestSets: Map<string, Set<string>>;
+  columnRefMap: Map<ColumnRef, ColumnRefInfo>;
 }
 function _expandStarColumns(params: ExpandStarColumnsParams): QueryColumn[] {
-  const { ast, column_map, requestSets } = params;
+  const { ast, column_map, requestSets, columnRefMap } = params;
   const ret: QueryColumn[] = [];
   for (const column of ast.columns ?? []) {
     if (column?.expr?.type === 'column_ref' && column.expr.column === '*') {
@@ -236,16 +258,22 @@ function _expandStarColumns(params: ExpandStarColumnsParams): QueryColumn[] {
             requestSet?.forEach((name: string) => column_list.push(name));
           }
           column_list?.forEach((name: string) => {
-            ret.push({
-              expr: {
-                type: 'column_ref',
-                db: from.as ? null : from.db,
-                table: from.as ?? from.table,
-                column: name,
-                from: from,
+            const colRef = {
+              type: 'column_ref',
+              db: from.as ? null : from.db,
+              table: from.as ?? from.table,
+              column: name,
+            } as ColumnRef;
+            // Add to columnRefMap so it can be looked up later
+            columnRefMap.set(colRef, {
+              from: {
+                db: from.db,
+                table: from.table,
+                as: from.as,
+                key: from.key,
               },
-              as: null,
             });
+            ret.push({ expr: colRef, as: null });
           });
         }
       }

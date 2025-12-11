@@ -21,7 +21,7 @@ type SelectModifyAST = Select | UpdateAST | DeleteAST;
 export async function runSelect(
   params: HandlerParams<SelectModifyAST> & RequestInfo
 ): Promise<SelectResultItem[]> {
-  const { dynamodb, session, ast, requestSets } = params;
+  const { dynamodb, session, ast, requestSets, columnRefMap } = params;
   const result_list: SelectResultItem[] = [];
 
   if (!ast.from || !Array.isArray(ast.from)) {
@@ -62,6 +62,7 @@ export async function runSelect(
     session,
     ast: ast as unknown as Select,
     skip_resolve: true,
+    columnRefMap,
   };
 
   const { row_list } = await internalQuery(opts);
