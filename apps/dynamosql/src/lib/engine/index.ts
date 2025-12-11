@@ -6,7 +6,6 @@ import * as RawEngine from './raw';
 
 import type { Session } from '../../session';
 import type { AttributeValue, ItemRecord } from '../../tools/dynamodb';
-import type { UpdateAST, DeleteAST } from '../ast_types';
 import type { EvaluationResult } from '../expression';
 import type {
   DynamoDBClient,
@@ -22,6 +21,7 @@ import type {
   ColumnRef,
   BaseFrom,
   From,
+  SetList,
 } from 'node-sql-parser';
 
 export type {
@@ -123,7 +123,8 @@ export interface DeleteChange {
 export interface DeleteParams {
   dynamodb: DynamoDBClient;
   session: Session;
-  ast: DeleteAST;
+  from: BaseFrom;
+  where: Binary | Function | null;
   columnRefMap: Map<ColumnRef, ColumnRefInfo>;
 }
 export interface MultiDeleteParams {
@@ -148,7 +149,9 @@ export interface UpdateChange {
 export interface UpdateParams {
   dynamodb: DynamoDBClient;
   session: Session;
-  ast: UpdateAST;
+  set: SetList[];
+  from: BaseFrom;
+  where: Binary | Function | null;
   columnRefMap: Map<ColumnRef, ColumnRefInfo>;
 }
 export interface MultiUpdateParams {

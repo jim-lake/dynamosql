@@ -39,9 +39,15 @@ async function _runDelete(
   const table = firstFrom && 'table' in firstFrom ? firstFrom.table : undefined;
   const engine = SchemaManager.getEngine(database, table, session);
 
-  if (ast.from.length === 1) {
+  if (firstFrom && ast.from.length === 1) {
     try {
-      const opts = { dynamodb, session, ast, columnRefMap };
+      const opts = {
+        dynamodb,
+        session,
+        from: firstFrom,
+        where: ast.where,
+        columnRefMap,
+      };
       const result = await engine.singleDelete(opts);
       return { affectedRows: result.affectedRows };
     } catch (err) {

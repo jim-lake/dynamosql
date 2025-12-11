@@ -10,25 +10,15 @@ import type { DeleteParams, MultiDeleteParams, AffectedResult } from '../index';
 export async function singleDelete(
   params: DeleteParams
 ): Promise<AffectedResult> {
-  const { dynamodb, session, ast, columnRefMap } = params;
-  const { from, where } = ast;
+  const { dynamodb, session, from, where, columnRefMap } = params;
 
-  let no_single = false;
-  const result = convertWhere(where, { session, from: from[0], columnRefMap });
-  if (result.err) {
-    no_single = true;
-  } else if (from.length > 1) {
-    no_single = true;
-  } else if (!result.value) {
-    no_single = true;
-  }
-
-  if (no_single) {
+  const result = convertWhere(where, { session, from, columnRefMap });
+  if (result.err || !result.value) {
     throw new NoSingleOperationError();
   }
 
   const sql = `
-DELETE FROM ${escapeIdentifier(from[0]?.table ?? '')}
+DELETE FROM ${escapeIdentifier(from.table)}
 WHERE ${result.value}
 RETURNING ALL OLD *
 `;

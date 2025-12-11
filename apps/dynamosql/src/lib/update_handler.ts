@@ -42,7 +42,6 @@ export async function query(
     ast,
   });
 }
-
 async function _runUpdate(
   params: HandlerParams<UpdateAST> & RequestInfo
 ): Promise<ChangedResult> {
@@ -53,7 +52,14 @@ async function _runUpdate(
   const { db, table } = ast.from[0];
   const engine = SchemaManager.getEngine(db ?? undefined, table, session);
   if (ast.from.length === 1) {
-    const opts = { dynamodb, session, ast, columnRefMap };
+    const opts = {
+      dynamodb,
+      session,
+      from: ast.from[0],
+      set: ast.set,
+      where: ast.where,
+      columnRefMap,
+    };
     try {
       return await engine.singleUpdate(opts);
     } catch (err) {
@@ -66,7 +72,6 @@ async function _runUpdate(
     return await _multipleUpdate(params);
   }
 }
-
 async function _multipleUpdate(
   params: HandlerParams<UpdateAST> & RequestInfo
 ): Promise<ChangedResult> {

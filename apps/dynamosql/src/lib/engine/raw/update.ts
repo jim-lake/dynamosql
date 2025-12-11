@@ -20,28 +20,16 @@ import type { AttributeValue } from '@aws-sdk/client-dynamodb';
 export async function singleUpdate(
   params: UpdateParams
 ): Promise<ChangedResult> {
-  const { dynamodb, session, ast, columnRefMap } = params;
-  const { set, from, where } = ast;
+  const { dynamodb, session, set, from, where, columnRefMap } = params;
 
-  const where_result = convertWhere(where, {
-    session,
-    from: from?.[0],
-    columnRefMap,
-  });
-  if (where_result.err) {
-    throw new NoSingleOperationError();
-  }
-  if (!from || from.length > 1 || !where_result.value) {
+  const where_result = convertWhere(where, { session, from, columnRefMap });
+  if (where_result.err || !where_result.value) {
     throw new NoSingleOperationError();
   }
   const value_list = set.map((object) => {
     const { value } = object;
     let ret: string | number | null | undefined;
-    const result = convertWhere(value, {
-      session,
-      from: from[0],
-      columnRefMap,
-    });
+    const result = convertWhere(value, { session, from, columnRefMap });
     if (result.err) {
       throw new NoSingleOperationError();
     } else {
@@ -55,7 +43,7 @@ export async function singleUpdate(
     .join(', ');
 
   const sql = `
-UPDATE ${escapeIdentifier(from[0]?.table ?? '')}
+UPDATE ${escapeIdentifier(from.table)}
 SET ${sets}
 WHERE ${where_result.value}
 RETURNING MODIFIED OLD *
