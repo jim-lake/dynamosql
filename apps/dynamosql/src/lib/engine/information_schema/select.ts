@@ -3,9 +3,8 @@ import { deepClone } from '../../../tools/clone';
 import { getDatabaseList, getTableList } from '../../schema_manager';
 import { SQLDateTime } from '../../types/sql_datetime';
 
-import type { ExtendedFrom } from '../../ast_types';
 import type { RowListParams, Row } from '../index';
-import type { From } from 'node-sql-parser';
+import type { BaseFrom } from 'node-sql-parser';
 
 const CATALOG_LIST = [
   {
@@ -17,10 +16,13 @@ const CATALOG_LIST = [
 
 export async function getRowList(
   params: RowListParams
-): Promise<{ source_map: Map<From, Row[]>; column_map: Map<From, string[]> }> {
+): Promise<{
+  source_map: Map<BaseFrom, Row[]>;
+  column_map: Map<BaseFrom, string[]>;
+}> {
   const { list } = params;
-  const source_map = new Map<From, Row[]>();
-  const column_map = new Map<From, string[]>();
+  const source_map = new Map<BaseFrom, Row[]>();
+  const column_map = new Map<BaseFrom, string[]>();
 
   for (const from of list) {
     const { results, column_list } = await _getFromTable({ ...params, from });
@@ -30,7 +32,7 @@ export async function getRowList(
   return { source_map, column_map };
 }
 async function _getFromTable(
-  params: RowListParams & { from: ExtendedFrom }
+  params: RowListParams & { from: BaseFrom }
 ): Promise<{ results: Row[]; column_list: string[] }> {
   const { dynamodb } = params;
   const table = params.from.table.toLowerCase();

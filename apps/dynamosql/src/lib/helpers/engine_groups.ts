@@ -4,7 +4,7 @@ import type { Session } from '../../session';
 import type { Engine } from '../engine';
 
 interface DatabaseTableObject {
-  database: string;
+  database: string | null | undefined;
   table: string;
 }
 interface EngineGroup<T> {
@@ -18,7 +18,11 @@ export function makeEngineGroups<T extends DatabaseTableObject>(
   const ret: EngineGroup<T>[] = [];
   for (const obj of list) {
     const { database, table } = obj;
-    const engine = SchemaManager.getEngine(database, table, session);
+    const engine = SchemaManager.getEngine(
+      database ?? undefined,
+      table,
+      session
+    );
     const found = ret.find((group) => group.engine === engine);
     if (found) {
       found.list.push(obj);

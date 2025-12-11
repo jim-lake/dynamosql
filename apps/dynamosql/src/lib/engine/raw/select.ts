@@ -5,15 +5,15 @@ import { escapeIdentifier } from '../../../tools/dynamodb_helper';
 import { convertWhere } from '../../helpers/convert_where';
 
 import type { ItemRecord } from '../../../tools/dynamodb';
-import type { ExtendedFrom } from '../../ast_types';
-import type { RowListParams, RowListResult } from '../index';
+import type { FromJoin, Row, RowListParams, RowListResult } from '../index';
+import type { BaseFrom } from 'node-sql-parser';
 
 export async function getRowList(
   params: RowListParams
 ): Promise<RowListResult> {
   const { list } = params;
-  const source_map: RowListResult['source_map'] = new Map();
-  const column_map: RowListResult['column_map'] = new Map();
+  const source_map: RowListResult['source_map'] = new Map<BaseFrom, Row[]>();
+  const column_map: RowListResult['column_map'] = new Map<BaseFrom, string[]>();
   for (const from of list) {
     const { results, column_list } = await _getFromTable({ ...params, from });
     source_map.set(from, results);
@@ -22,7 +22,7 @@ export async function getRowList(
   return { source_map, column_map };
 }
 async function _getFromTable(
-  params: RowListParams & { from: ExtendedFrom }
+  params: RowListParams & { from: FromJoin }
 ): Promise<{ results: ItemRecord[]; column_list: string[] }> {
   const {
     dynamodb,

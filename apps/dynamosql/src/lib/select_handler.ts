@@ -92,7 +92,7 @@ export async function internalQuery(
     const first = from[0] as ExtendedFrom;
     const db = first.db;
     const table = first.table;
-    const engine = SchemaManager.getEngine(db, table, session);
+    const engine = SchemaManager.getEngine(db ?? undefined, table, session);
     const opts = {
       session,
       dynamodb,

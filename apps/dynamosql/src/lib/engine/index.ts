@@ -6,7 +6,7 @@ import * as RawEngine from './raw';
 
 import type { Session } from '../../session';
 import type { AttributeValue, ItemRecord } from '../../tools/dynamodb';
-import type { ExtendedFrom, UpdateAST, DeleteAST } from '../ast_types';
+import type { UpdateAST, DeleteAST } from '../ast_types';
 import type { EvaluationResult } from '../expression';
 import type {
   DynamoDBClient,
@@ -15,7 +15,14 @@ import type {
 } from '../handler_types';
 import type { ColumnRefInfo } from '../helpers/column_ref_helper';
 import type { Transaction } from '../transaction_manager';
-import type { Binary, Function, ColumnRef, From } from 'node-sql-parser';
+import type {
+  Join,
+  Binary,
+  Function,
+  ColumnRef,
+  BaseFrom,
+  From,
+} from 'node-sql-parser';
 
 export type {
   DynamoDBClient,
@@ -43,8 +50,8 @@ export type CellRow = Record<string, CellValue>;
 export type Row = CellRow | ItemRecord;
 export type EngineValue = CellValue | AttributeValue;
 export interface RowListResult {
-  source_map: Map<From, Row[]>;
-  column_map: Map<From, string[]>;
+  source_map: Map<BaseFrom, Row[]>;
+  column_map: Map<BaseFrom, string[]>;
 }
 export interface TableData<T = Row> {
   database: string;
@@ -97,10 +104,11 @@ export interface AddColumnParams {
   table: string;
   column: ColumnDef;
 }
+export type FromJoin = BaseFrom & Partial<Join>;
 export interface RowListParams {
   dynamodb: DynamoDBClient;
   session: Session;
-  list: ExtendedFrom[];
+  list: FromJoin[];
   where?: Binary | Function | null;
   requestSets: Map<From, Set<string>>;
   requestAll: Map<From, boolean>;

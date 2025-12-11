@@ -1,5 +1,7 @@
 import type { EvaluationResult } from './expression';
 import type {
+  BaseFrom,
+  Join,
   Use,
   Select,
   Insert_Replace,
@@ -42,12 +44,7 @@ export interface SetListWithValue {
   column: string;
   value: EvaluationResult;
 }
-export type ExtendedFrom = From & {
-  db: string;
-  table: string;
-  as?: string;
-  join?: string;
-};
+export type ExtendedFrom = BaseFrom & Partial<Join>;
 export interface AssignExpr {
   type: 'assign';
   left: VarExpr;

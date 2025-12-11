@@ -51,7 +51,7 @@ async function _runUpdate(
     throw new SQLError('no_current_database');
   }
   const { db, table } = ast.from[0];
-  const engine = SchemaManager.getEngine(db, table, session);
+  const engine = SchemaManager.getEngine(db ?? undefined, table, session);
   if (ast.from.length === 1) {
     const opts = { dynamodb, session, ast, columnRefMap };
     try {
@@ -117,7 +117,7 @@ async function _multipleUpdate(
     .map((obj) => {
       const found = result_list.find((result) => result.from === obj);
       return {
-        database: obj.db,
+        database: obj.db ?? '',
         table: obj.table,
         key_list: found?.key_list ?? [],
         update_list: updateListMap.get(obj) ?? [],

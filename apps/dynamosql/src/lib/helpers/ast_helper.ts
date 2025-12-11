@@ -24,7 +24,7 @@ export function getTableFromTable(ast: ExtendedAST): string | undefined {
 export function getDatabaseFromUpdate(ast: ExtendedAST): string | undefined {
   if (ast.type === 'update') {
     if (Array.isArray(ast.from)) {
-      return ast.from[0]?.db;
+      return ast.from[0]?.db ?? '';
     }
   }
   return undefined;
