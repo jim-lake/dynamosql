@@ -7,6 +7,7 @@ import type {
   Update,
   Delete,
   From,
+  SetList,
   BaseFrom,
   ColumnRef,
 } from 'node-sql-parser';
@@ -37,7 +38,7 @@ export interface RequestInfo {
   requestSets: Map<string, Set<string>>;
   requestAll: Map<string, boolean>;
   columnRefMap: Map<ColumnRef, ColumnRefInfo>;
-  setListMap: Map<unknown, string>; // Maps SetList items to their fromKey
+  setListMap: Map<SetList, From>;
 }
 
 export function resolveReferences(
@@ -47,7 +48,7 @@ export function resolveReferences(
   const requestSets = new Map<string, Set<string>>();
   const requestAll = new Map<string, boolean>();
   const columnRefMap = new Map<ColumnRef, ColumnRefInfo>();
-  const setListMap = new Map<unknown, string>();
+  const setListMap = new Map<SetList, From>();
   const table_map: TableMap = {};
   const db_map: DbMap = {};
   const fromRaw =
@@ -214,7 +215,7 @@ function _resolveObject(
   requestSets: Map<string, Set<string>>,
   requestAll: Map<string, boolean>,
   columnRefMap: Map<ColumnRef, ColumnRefInfo>,
-  setListMap: Map<unknown, string>,
+  setListMap: Map<SetList, From>,
   result_map?: ResultMap
 ) {
   const fixup_object = object as {
@@ -293,7 +294,7 @@ function _resolveObject(
         if (obj.column) {
           requestSets.get(from.key)?.add(obj.column);
         }
-        setListMap.set(object, from.key);
+        setListMap.set(object as SetList, from as From);
       }
       if (add_cache && obj.column) {
         name_cache[obj.column] = from;

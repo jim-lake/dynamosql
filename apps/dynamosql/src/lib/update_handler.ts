@@ -88,8 +88,8 @@ async function _multipleUpdate(
     const updateList: { key: EngineValue[]; set_list: SetListWithValue[] }[] =
       [];
     list?.forEach(({ key, row }) => {
-      const set_list = (ast.set as unknown[])
-        .filter((set_item) => setListMap.get(set_item) === from_key)
+      const set_list = ast.set
+        .filter((set_item) => setListMap.get(set_item) === object)
         .map((set_item) => {
           const item = set_item as {
             column: string;
