@@ -18,7 +18,7 @@ export function convertType(type?: string, nullable?: boolean): FieldInfo {
         length: 23,
         type: Types.DOUBLE,
         flags: flags | FIELD_FLAGS.BINARY,
-        decimals: 6,
+        decimals: 31,
         zeroFill: false,
         protocol41: true,
       };

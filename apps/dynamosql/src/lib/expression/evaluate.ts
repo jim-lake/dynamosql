@@ -75,9 +75,14 @@ export function getValue(
       result.type = Number.isInteger(result.value) ? 'longlong' : 'number';
     } else {
       result.value = Number(expr.value);
-      if (typeof expr.value === 'string' && expr.value.includes('.')) {
-        result.type = 'number';
-        result.decimals = getDecimalsForString(expr.value);
+      if (typeof expr.value === 'string') {
+        if (expr.value.includes('e')) {
+          result.type = 'double';
+          result.decimals = 31;
+        } else if (expr.value.includes('.')) {
+          result.type = 'number';
+          result.decimals = getDecimalsForString(expr.value);
+        }
       } else {
         result.type = Number.isInteger(result.value) ? 'longlong' : 'number';
       }
