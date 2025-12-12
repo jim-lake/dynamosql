@@ -21,7 +21,7 @@ export default [
       file: 'dist/dynamosql.js',
       format: 'cjs',
       sourcemap: true,
-      sourcemapExcludeSources: (source) => source.includes('src/vendor/'),
+      sourcemapExcludeSources: true,
     },
     plugins: [
       resolve({ preferBuiltins: true }),

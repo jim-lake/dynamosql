@@ -248,7 +248,6 @@ function _astify(sql: string): ExtendedAST[] {
   let list: ExtendedAST[] = [];
   try {
     const result = g_parser.astify(sql, { database: 'MySQL' });
-    logger.inspect(result);
     if (Array.isArray(result)) {
       list = result as ExtendedAST[];
     } else {

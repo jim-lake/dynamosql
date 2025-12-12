@@ -27,12 +27,11 @@ async function _handleAssignment(
 ): Promise<void> {
   const { session } = params;
   const { left, right } = expr;
-
   let result: EvaluationResult;
-  if (right.type === 'select') {
+  if ('ast' in right) {
     const { rows } = await SelectHandler.internalQuery({
       ...params,
-      ast: right as unknown as Select,
+      ast: right.ast,
     });
     if (rows[0]?.[0]) {
       result = rows[0][0];

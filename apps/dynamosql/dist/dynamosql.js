@@ -11741,10 +11741,10 @@ async function _handleAssignment(expr, params) {
     const { session } = params;
     const { left, right } = expr;
     let result;
-    if (right.type === 'select') {
+    if ('ast' in right) {
         const { rows } = await internalQuery({
             ...params,
-            ast: right,
+            ast: right.ast,
         });
         if (rows[0]?.[0]) {
             result = rows[0][0];
