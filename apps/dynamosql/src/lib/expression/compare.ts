@@ -167,19 +167,21 @@ function _convertCompare(
     return [left_num, right_num];
   }
 
+  let left_str: string;
   if (left_val instanceof SQLDateTime) {
-    left_val = left_val.toString({ timeZone });
+    left_str = left_val.toString({ timeZone });
   } else {
-    left_val = String(left_val).trimEnd();
+    left_str = String(left_val).trimEnd();
   }
 
+  let right_str: string;
   if (right_val instanceof SQLDateTime) {
-    right_val = right_val.toString({ timeZone });
+    right_str = right_val.toString({ timeZone });
   } else {
-    right_val = String(right_val).trimEnd();
+    right_str = String(right_val).trimEnd();
   }
 
-  return [left_val as string, right_val as string];
+  return [left_str, right_str];
 }
 function _equal(
   expr: Binary,

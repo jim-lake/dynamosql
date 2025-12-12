@@ -202,7 +202,7 @@ async function _evaluateReturn(
     // Get table info from columnRefMap if this is a column_ref
     let fromInfo: BaseFrom | null = null;
     if (column.expr.type === 'column_ref') {
-      const refInfo = columnRefMap.get(column.expr as ColumnRef);
+      const refInfo = columnRefMap.get(column.expr);
       if (refInfo?.from && _isBaseFrom(refInfo.from)) {
         fromInfo = refInfo.from;
       }

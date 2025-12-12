@@ -11,7 +11,6 @@ import type {
   Function as FunctionType,
   Binary,
   ColumnRef,
-  ColumnRefItem,
   From,
 } from 'node-sql-parser';
 
@@ -74,11 +73,10 @@ export function convertWhere(
         err = 'unsupported';
       }
     } else if (type === 'column_ref') {
-      const colRef = expr as ColumnRef;
+      const colRef = expr;
       const refInfo = state.columnRefMap?.get(colRef);
       if (refInfo?.from === from) {
-        const colRefItem = colRef as ColumnRefItem;
-        const col = colRefItem.column;
+        const col = colRef.column;
         value = String(col);
       } else {
         err = 'unsupported';

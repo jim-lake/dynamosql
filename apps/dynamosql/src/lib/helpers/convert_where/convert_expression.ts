@@ -3,7 +3,7 @@ import { getValue } from '../../expression';
 import { convertWhere } from './convert_where';
 
 import type { ConvertWhereState, ConvertResult } from './convert_where';
-import type { ExpressionValue, UnaryExpr } from 'node-sql-parser';
+import type { ExpressionValue } from 'node-sql-parser';
 import type { Binary } from 'node-sql-parser';
 
 type ConvertFunc = (
@@ -88,12 +88,12 @@ function _in(expr: Binary, state: ConvertWhereState): ConvertResult {
     err = left.err;
   } else if (left.value === null) {
     value = null;
-  } else {
-    const rightExpr = expr.right as { value?: unknown[] };
-    const count = rightExpr.value?.length ?? 0;
+  } else if (expr.right.type === 'expr_list') {
+    const rightExpr = expr.right;
+    const count = rightExpr.value.length;
     const list: (string | number | boolean | null)[] = [];
     for (let i = 0; i < count; i++) {
-      const right = convertWhere(rightExpr.value![i] as ExpressionValue, state);
+      const right = convertWhere(rightExpr.value[i], state);
       if (right.err) {
         err = right.err;
         break;
@@ -163,12 +163,12 @@ function _is(
   let right: string | undefined;
   let err = left.err;
   if (!err) {
-    const rightExpr = expr.right as { value?: unknown };
-    if (rightExpr.value === null) {
+    const rightExpr = expr.right;
+    if (rightExpr.type === 'null') {
       right = 'NULL';
-    } else if (rightExpr.value === true) {
+    } else if (rightExpr.type === 'bool' && rightExpr.value === true) {
       right = 'TRUE';
-    } else if (rightExpr.value === false) {
+    } else if (rightExpr.type === 'bool' && rightExpr.value === false) {
       right = 'FALSE';
     } else {
       err = 'syntax_err';
@@ -179,8 +179,10 @@ function _is(
 }
 
 function not(expr: ExpressionValue, state: ConvertWhereState): ConvertResult {
-  const unaryExpr = expr as UnaryExpr;
-  const result = convertWhere(unaryExpr.expr, state);
+  if (expr.type !== 'unary_expr') {
+    return { err: 'syntax_err', value: null };
+  }
+  const result = convertWhere(expr.expr, state);
   if (!result.err) {
     result.value = 'NOT ' + result.value;
   }
@@ -188,8 +190,10 @@ function not(expr: ExpressionValue, state: ConvertWhereState): ConvertResult {
 }
 
 function minus(expr: ExpressionValue, state: ConvertWhereState): ConvertResult {
-  const unaryExpr = expr as UnaryExpr;
-  const result = convertWhere(unaryExpr.expr, state);
+  if (expr.type !== 'unary_expr') {
+    return { err: 'syntax_err', value: null };
+  }
+  const result = convertWhere(expr.expr, state);
   if (!result.err) {
     result.value = '-' + result.value;
   }

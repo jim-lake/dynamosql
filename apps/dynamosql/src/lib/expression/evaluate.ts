@@ -252,20 +252,9 @@ export function getValue(
       }
     }
   } else if (type === 'column_ref') {
-    const colRef = expr as ColumnRef;
-
-    let columnName: string;
-    let columnValue: unknown;
-
-    if ('column' in colRef) {
-      columnValue = colRef.column;
-      columnName = String(columnValue);
-    } else if ('expr' in colRef && 'column' in colRef.expr) {
-      columnValue = colRef.expr.column;
-      columnName = String(columnValue);
-    } else {
-      columnName = String(colRef);
-    }
+    const colRef = expr;
+    const columnValue = colRef.column;
+    const columnName = String(columnValue);
 
     result.name = columnName;
     const refInfo = state.columnRefMap?.get(colRef);

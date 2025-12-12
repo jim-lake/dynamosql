@@ -104,8 +104,8 @@ export async function runSelect(
         value0.forEach((value1: SourceRowResult, key1: EngineValue) => {
           result.list.push({ key: [key0, key1], row: value1 });
         });
-      } else {
-        result.list.push({ key: [key0], row: value0 as SourceRowResult });
+      } else if (!(value0 instanceof Map)) {
+        result.list.push({ key: [key0], row: value0 });
       }
     });
   }
