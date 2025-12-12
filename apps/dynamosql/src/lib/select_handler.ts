@@ -24,6 +24,7 @@ import type { FieldInfo } from '../types';
 import type { EvaluationResult } from './expression';
 import type { Session } from '../session';
 import type { ColumnRefInfo } from './helpers/column_ref_helper';
+import type { SelectModifyAST } from './helpers/select_modify';
 import type { Select, ColumnRef, From, BaseFrom } from 'node-sql-parser';
 
 export type SourceMap = Map<From, Row[]>;
@@ -63,7 +64,7 @@ export async function query(
   return { rows: rows as unknown[][], columns };
 }
 export interface InternalQueryParams {
-  ast: Select;
+  ast: SelectModifyAST;
   session: Session;
   dynamodb: DynamoDBClient;
   skip_resolve?: boolean;
@@ -89,7 +90,7 @@ export async function internalQuery(
     requestAll = requestInfo.requestAll;
     columnRefMap = requestInfo.columnRefMap;
   }
-  const from = ast.from;
+  const from = ast.type === 'update' ? ast.table : ast.from;
   let source_map: SourceMap = new Map();
   let column_map: ColumnMap = new Map();
   if (from && Array.isArray(from) && from.length > 0) {
@@ -122,7 +123,7 @@ export async function internalQuery(
   });
 }
 interface EvaluateReturnParams {
-  ast: Select;
+  ast: SelectModifyAST;
   session: Session;
   dynamodb: DynamoDBClient;
   source_map: SourceMap;
@@ -137,7 +138,7 @@ async function _evaluateReturn(
   const query_columns = _expandStarColumns({ ...params, ast, columnRefMap });
 
   const { where, groupby } = ast;
-  const from = Array.isArray(ast.from) ? ast.from : undefined;
+  const from = ast.type === 'update' ? ast.table : ast.from;
   let row_list: SourceRow[] = [];
   let sleep_ms = 0;
 
@@ -148,7 +149,7 @@ async function _evaluateReturn(
   }
 
   let grouped_list: (SourceRow | SourceRowGroup)[] = row_list;
-  // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+
   if (groupby?.columns) {
     grouped_list = formGroup({ groupby, ast, row_list, session, columnRefMap });
   } else if (hasAggregate(ast)) {

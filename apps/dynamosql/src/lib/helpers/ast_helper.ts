@@ -27,8 +27,8 @@ export function getTableFromTable(ast: ExtendedAST): string | undefined {
 }
 export function getDatabaseFromUpdate(ast: ExtendedAST): string | undefined {
   if (ast.type === 'update') {
-    if (Array.isArray(ast.from) && ast.from[0] && isBaseFrom(ast.from[0])) {
-      return ast.from[0].db ?? '';
+    if (Array.isArray(ast.table) && ast.table[0] && isBaseFrom(ast.table[0])) {
+      return ast.table[0].db ?? '';
     }
   }
   return undefined;

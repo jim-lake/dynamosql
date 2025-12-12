@@ -1,7 +1,15 @@
 import * as SqlString from 'sqlstring';
 import { EventEmitter } from 'node:events';
-import { ReadableOptions, Readable } from 'node:stream';
 import { AwsCredentialIdentity } from '@aws-sdk/types';
+import { ReadableOptions, Readable } from 'node:stream';
+
+interface DynamoDBConstructorParams {
+    namespace?: string;
+    region?: string;
+    credentials?: AwsCredentialIdentity;
+}
+
+type DynamoDBWithCacheConstructorParams = DynamoDBConstructorParams;
 
 interface IndexError extends Error {
     index?: number;
@@ -140,20 +148,12 @@ interface OkPacket {
     protocol41: boolean;
 }
 
-interface DynamoDBConstructorParams {
-    namespace?: string;
-    region?: string;
-    credentials?: AwsCredentialIdentity;
-}
-
-type DynamoDBWithCacheConstructorParams = DynamoDBConstructorParams;
-
 interface SessionConfig extends DynamoDBWithCacheConstructorParams {
     database?: string | undefined;
     multipleStatements?: boolean | undefined;
     resultObjects?: boolean | undefined;
     typeCast?: TypeCast | undefined;
-    dateStrings?: boolean | Array<'TIMESTAMP' | 'DATETIME' | 'DATE'> | undefined;
+    dateStrings?: boolean | ('TIMESTAMP' | 'DATETIME' | 'DATE')[] | undefined;
     supportBigNumbers?: boolean | undefined;
     bigNumberStrings?: boolean | undefined;
     bigintNative?: boolean | undefined;

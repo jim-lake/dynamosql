@@ -4,11 +4,10 @@ import { SQLError } from '../../error';
 import { getEngine } from '../schema_manager';
 import { internalQuery } from '../select_handler';
 
-import type { UpdateAST, DeleteAST } from '../ast_types';
 import type { EngineValue } from '../engine';
 import type { HandlerParams } from '../handler_types';
 import type { RequestInfo } from './column_ref_helper';
-import type { Select, From } from 'node-sql-parser';
+import type { Select, Delete, From, Update } from 'node-sql-parser';
 
 export interface SelectResultItem {
   from: From;
@@ -16,7 +15,7 @@ export interface SelectResultItem {
   list: { key: EngineValue[]; row: unknown }[];
 }
 
-type SelectModifyAST = Select | UpdateAST | DeleteAST;
+export type SelectModifyAST = Select | Update | Delete;
 
 export async function runSelect(
   params: HandlerParams<SelectModifyAST> & RequestInfo
@@ -24,13 +23,15 @@ export async function runSelect(
   const { dynamodb, session, ast, requestSets, columnRefMap } = params;
   const result_list: SelectResultItem[] = [];
 
-  if (!ast.from || !Array.isArray(ast.from)) {
+  const from_list = ast.type === 'update' ? ast.table : ast.from;
+
+  if (!from_list || !Array.isArray(from_list)) {
     return result_list;
   }
 
   // Get table info for all tables
   const keyListMap = new Map<From, string[]>();
-  for (const object of ast.from) {
+  for (const object of from_list) {
     if (!('db' in object) || !('table' in object)) {
       continue;
     }
@@ -60,17 +61,11 @@ export async function runSelect(
   }
 
   // Run the select query
-  const opts = {
-    dynamodb,
-    session,
-    ast: ast as unknown as Select,
-    skip_resolve: true,
-    columnRefMap,
-  };
+  const opts = { dynamodb, session, ast, skip_resolve: true, columnRefMap };
 
   const { row_list } = await internalQuery(opts);
 
-  for (const object of ast.from) {
+  for (const object of from_list) {
     const key_list = keyListMap.get(object) ?? [];
     const collection = new Map<EngineValue, unknown>();
     for (const row of row_list) {

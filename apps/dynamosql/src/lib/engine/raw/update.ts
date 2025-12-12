@@ -48,7 +48,6 @@ SET ${sets}
 WHERE ${where_result.value}
 RETURNING MODIFIED OLD *
 `;
-
   try {
     const results = await dynamodb.queryQL(sql);
     const resultArray = (

@@ -1,0 +1,26 @@
+{
+  "name": "node-sql-parser",
+  "version": "5.3.13-vendor",
+  "description": "simple node sql parser, vendered for modification",
+  "private": true,
+  "main": "index.js",
+  "types": "types.d.ts",
+  "files": [
+    "ast/",
+    "build",
+    "lib",
+    "umd/",
+    "index.d.ts",
+    "index.js",
+    "index.js.map",
+    "LICENSE",
+    "package.json",
+    "README.md",
+    "types.d.ts"
+  ],
+  "license": "Apache-2.0",
+  "dependencies": {
+    "@types/pegjs": "^0.10.0",
+    "big-integer": "^1.6.48"
+  }
+}

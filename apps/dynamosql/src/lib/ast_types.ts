@@ -18,12 +18,6 @@ import type {
 export type ExtendedColumnDefinitionOptList = ColumnDefinitionOptList & {
   primary_key?: 'key' | 'primary key';
 };
-export interface UpdateAST extends Update {
-  from?: From[];
-}
-export interface DeleteAST extends Delete {
-  from: From[];
-}
 export interface Show {
   type: 'show';
   keyword: string;
@@ -71,8 +65,8 @@ export type ExtendedAST =
   | Use
   | Select
   | Insert_Replace
-  | UpdateAST
-  | DeleteAST
+  | Update
+  | Delete
   | Alter
   | Create
   | Drop

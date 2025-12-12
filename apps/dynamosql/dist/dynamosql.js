@@ -5,6 +5,7 @@ var node_events = require('node:events');
 var clientDynamodb = require('@aws-sdk/client-dynamodb');
 var shared = require('@dynamosql/shared');
 var require$$0 = require('big-integer');
+var crypto = require('node:crypto');
 var promises = require('node:timers/promises');
 
 function _interopNamespaceDefault(e) {
@@ -25,720 +26,18 @@ function _interopNamespaceDefault(e) {
 }
 
 var SqlString__namespace = /*#__PURE__*/_interopNamespaceDefault(SqlString);
+var crypto__namespace = /*#__PURE__*/_interopNamespaceDefault(crypto);
 
-class SQLMode extends node_events.EventEmitter {
-    _sqlMode;
-    _modeAnsiQuotes = false;
-    constructor(sql_mode) {
-        super();
-        this._sqlMode = sql_mode;
-        this._parseSQLMode();
-    }
-    get sqlMode() {
-        return this._sqlMode;
-    }
-    get modeAnsiQuotes() {
-        return this._modeAnsiQuotes;
-    }
-    set sqlMode(sql_mode) {
-        this._sqlMode = sql_mode;
-        this._parseSQLMode();
-    }
-    _parseSQLMode() {
-        const mode = this._sqlMode.toLowerCase();
-        this._modeAnsiQuotes = mode.includes('ansi_quotes');
-    }
-}
-
-class NativeObjectClass {
-    toString() {
-        return JSON.stringify(this);
-    }
-}
-function mapToObject(obj) {
-    const ret = new NativeObjectClass();
-    for (const [key, value] of Object.entries(obj)) {
-        ret[key] = valueToNative(value);
-    }
-    return ret;
-}
-function valueToNative(value) {
-    if (value === null) {
-        return null;
-    }
-    else if (typeof value === 'object') {
-        if (value.NULL) {
-            return null;
-        }
-        else if (value.N) {
-            return parseFloat(value.N);
-        }
-        else if (Array.isArray(value.L)) {
-            return value.L.map(valueToNative);
-        }
-        else if (value.M) {
-            return mapToObject(value.M);
-        }
-        else {
-            return value.S ?? value.B ?? value.BOOL ?? null;
-        }
-    }
-    return null;
-}
-function nativeToValue(obj) {
-    if (obj === null) {
-        return { NULL: true };
-    }
-    else if (obj instanceof Uint8Array) {
-        return { B: obj };
-    }
-    else if (Array.isArray(obj)) {
-        return { L: obj.map(nativeToValue) };
-    }
-    else if (typeof obj === 'object') {
-        const M = {};
-        for (const key in obj) {
-            if (obj[key]) {
-                M[key] = nativeToValue(obj[key]);
-            }
-        }
-        return { M };
-    }
-    else if (typeof obj === 'number') {
-        return { N: String(obj) };
-    }
-    else if (typeof obj === 'boolean') {
-        return { BOOL: obj };
-    }
-    else {
-        return { S: String(obj) };
-    }
-}
-function convertValueToPQL(value) {
-    let ret;
-    if (value === null) {
-        ret = 'NULL';
-    }
-    else if (typeof value === 'object') {
-        if (value.S !== undefined) {
-            ret = "'" + escapeString(value.S) + "'";
-        }
-        else if (value.N !== undefined) {
-            ret = String(value.N);
-        }
-        else {
-            ret = "'" + escapeString(String(value)) + "'";
-        }
-    }
-    else {
-        ret = "'" + escapeString(String(value)) + "'";
-    }
-    return ret;
-}
-function escapeIdentifier(string) {
-    return '"' + string.replace('"', '""') + '"';
-}
-function escapeString(string) {
-    let ret = '';
-    for (let i = 0; i < string.length; i++) {
-        const c = string.charCodeAt(i);
-        if (c < 32) {
-            ret += '\\x' + c.toString(16);
-        }
-        else if (c === 39) {
-            ret += "''";
-        }
-        else {
-            ret += string[i];
-        }
-    }
-    return ret;
-}
-function escapeValue(value, type) {
-    let s;
-    if (value === null) {
-        s = 'NULL';
-    }
-    else if (Array.isArray(value)) {
-        s = '[ ';
-        s += value.map((v) => escapeValue(v)).join(', ');
-        s += ' ]';
-    }
-    else if (typeof value === 'object') {
-        s = '{ ';
-        s += Object.keys(value)
-            .map((key) => `'${key}': ${escapeValue(value[key])}`)
-            .join(', ');
-        s += ' }';
-    }
-    else if (typeof value === 'number') {
-        s = String(value);
-    }
-    else if (value !== undefined) {
-        s = "'" + escapeString(String(value)) + "'";
-    }
-    else {
-        s = 'undefined';
-    }
-    return s;
-}
-function convertError(err) {
-    if (err.name === 'ConditionalCheckFailedException' && err.Item) {
-        return new Error('cond_fail');
-    }
-    if (err.Code === 'ConditionalCheckFailed') {
-        return new Error('cond_fail');
-    }
-    if (err.name === 'ResourceNotFoundException' ||
-        err.Code === 'ResourceNotFound' ||
-        (err.message && String(err.message).includes('resource not found'))) {
-        return new Error('resource_not_found');
-    }
-    if (err.name === 'ResourceInUseException' ||
-        (err.message && String(err.message).includes('resource in use'))) {
-        return new Error('resource_in_use');
-    }
-    if (err.Code === 'ValidationError' || err.name === 'ValidationError') {
-        if (err.Message?.match?.(/expected: [^\s]* actual: NULL/)) {
-            return new Error('ER_BAD_NULL_ERROR');
-        }
-        if (err.Message?.match?.(/expected: [^\s]* actual:/)) {
-            return new Error('ER_TRUNCATED_WRONG_VALUE_FOR_FIELD');
-        }
-        return new Error('validation');
-    }
-    return err;
-}
-function isDynamoDBResponse(value) {
-    return value !== null && typeof value === 'object';
-}
-function isDynamoDBError(value) {
-    return value !== null && typeof value === 'object';
-}
-function safeConvertSuccess(result) {
-    if (!isDynamoDBResponse(result)) {
-        return [null, null];
-    }
-    return convertSuccess(result);
-}
-function safeConvertError(err) {
-    if (!isDynamoDBError(err)) {
-        return err;
-    }
-    return convertError(err);
-}
-function convertSuccess(result) {
-    let err = null;
-    let ret = null;
-    if (result.Responses && Array.isArray(result.Responses)) {
-        ret = [];
-        result.Responses.forEach((item, i) => {
-            if (item.Error) {
-                if (!err) {
-                    err = [];
-                }
-                err[i] = convertError(item.Error);
-            }
-            const converted = convertResult(item);
-            if (converted?.[0]) {
-                ret[i] = converted[0];
-            }
-        });
-    }
-    else {
-        ret = convertResult(result);
-    }
-    return [err, ret];
-}
-function convertResult(result) {
-    if (result.Items) {
-        return result.Items;
-    }
-    if (result.Item) {
-        return [result.Item];
-    }
-    return null;
-}
-function dynamoType(type) {
-    let ret = type;
-    if (type === 'string') {
-        ret = 'S';
-    }
-    else if (type === 'VARCHAR') {
-        ret = 'S';
-    }
-    else if (type === 'INT') {
-        ret = 'N';
-    }
-    else if (type === 'number') {
-        ret = 'N';
-    }
-    else if (type === 'blob') {
-        ret = 'B';
-    }
-    return ret;
-}
-const NAMESPACE_REGEX = /\b(FROM|UPDATE|INTO|DELETE\s+FROM)\s+(["`]?)([A-Za-z0-9_.-]+)(\2)/gi;
-function namespacePartiQL(sql, namespace) {
-    if (namespace) {
-        return sql.replaceAll(NAMESPACE_REGEX, (_, kw, quote, name) => `${kw} "${namespace}${name}"`);
-    }
-    else {
-        return sql;
-    }
-}
-
-async function timesLimit(length, limit, iter) {
-    if (length <= 0) {
-        return;
-    }
-    let i = 0;
-    let running = 0;
-    let stop = false;
-    return new Promise((resolve, reject) => {
-        function _done() {
-            if (!stop) {
-                running--;
-                if (i >= length && running === 0) {
-                    resolve();
-                }
-                else {
-                    _loopLaunch();
-                }
-            }
-        }
-        function _catch(err) {
-            stop = true;
-            reject(err);
-        }
-        function _launch(index) {
-            iter(index).then(_done, _catch);
-        }
-        function _loopLaunch() {
-            while (!stop && i < length && running < limit) {
-                running++;
-                const index = i++;
-                _launch(index);
-            }
-        }
-        _loopLaunch();
-    });
-}
-async function parallelLimit(list, limit, iter) {
-    const results = [];
-    await timesLimit(list.length, limit, async (i) => {
-        results[i] = await iter(list[i], i);
-    });
-    return results;
-}
-
-async function parallelBatch(list, batchSize, limit, iter) {
-    const batch_count = Math.ceil(list.length / batchSize);
-    const results = [];
-    await timesLimit(batch_count, limit, async (i) => {
-        const start = i * batchSize;
-        const batch = list.slice(start, start + batchSize);
-        const batch_result = await iter(batch, i);
-        if (batch_result) {
-            for (let j = 0; j < batch_result.length; j++) {
-                results[i + j] = batch_result[j];
-            }
-        }
-    });
-    return results;
-}
-
-const QUERY_LIMIT = 5;
-const BATCH_LIMIT = 100;
-class DynamoDB {
-    client;
-    namespace;
-    constructor(params) {
-        const opts = {
-            region: params?.region ??
-                process.env.AWS_REGION ??
-                process.env.AWS_DEFAULT_REGION,
-        };
-        if (params?.credentials) {
-            opts.credentials = params.credentials;
-        }
-        this.client = new clientDynamodb.DynamoDBClient(opts);
-        this.namespace = params?.namespace ?? '';
-    }
-    async queryQL(list) {
-        if (!Array.isArray(list)) {
-            return this._queryQL(list);
-        }
-        else {
-            return parallelLimit(list, QUERY_LIMIT, async (item) => {
-                return this._queryQL(item);
-            });
-        }
-    }
-    async _queryQL(params) {
-        const sql = namespacePartiQL(typeof params === 'string' ? params : params.sql, this.namespace);
-        const returnVal = typeof params === 'string' ? 'NONE' : (params.return ?? 'NONE');
-        const input = {
-            Statement: sql,
-            ReturnValuesOnConditionCheckFailure: returnVal,
-        };
-        const command = new clientDynamodb.ExecuteStatementCommand(input);
-        return this._pagedSend(command);
-    }
-    async batchQL(params) {
-        const list = Array.isArray(params) ? params : params.list;
-        const returnVal = Array.isArray(params)
-            ? 'NONE'
-            : (params.return ?? 'NONE');
-        const input = {
-            Statements: list.map((sql) => ({
-                Statement: namespacePartiQL(sql, this.namespace),
-                ReturnValuesOnConditionCheckFailure: returnVal,
-            })),
-        };
-        const command = new clientDynamodb.BatchExecuteStatementCommand(input);
-        try {
-            const result = await this.client.send(command);
-            const [err, ret] = convertSuccess(result);
-            if (err) {
-                throw err;
-            }
-            return ret ?? [];
-        }
-        catch (err) {
-            const converted = safeConvertSuccess(err);
-            if (converted[0]) {
-                throw converted[0];
-            }
-            if (converted[1]) {
-                return converted[1];
-            }
-            throw safeConvertError(err);
-        }
-    }
-    async transactionQL(params) {
-        const list = Array.isArray(params) ? params : params.list;
-        const returnVal = Array.isArray(params)
-            ? 'NONE'
-            : (params.return ?? 'NONE');
-        const input = {
-            TransactStatements: list.map((sql) => ({
-                Statement: namespacePartiQL(sql, this.namespace),
-                ReturnValuesOnConditionCheckFailure: returnVal,
-            })),
-        };
-        const command = new clientDynamodb.ExecuteTransactionCommand(input);
-        try {
-            const result = await this.client.send(command);
-            const [err, ret] = convertSuccess(result);
-            if (err) {
-                throw err;
-            }
-            return ret ?? [];
-        }
-        catch (err) {
-            const converted = safeConvertSuccess(err);
-            if (converted[0]) {
-                throw converted[0];
-            }
-            if (converted[1]) {
-                return converted[1];
-            }
-            throw safeConvertError(err);
-        }
-    }
-    async deleteItems(params) {
-        const { table, key_list, list } = params;
-        const prefix = `DELETE FROM ${escapeIdentifier(table)} WHERE `;
-        return parallelBatch(list, BATCH_LIMIT, QUERY_LIMIT, async (batch) => {
-            const sql_list = [];
-            for (const item of batch) {
-                const cond = key_list
-                    .map((key, j) => {
-                    const value = item[j];
-                    if (value === undefined) {
-                        throw TypeError('missing value for key ' + key);
-                    }
-                    return `${escapeIdentifier(key)} = ${convertValueToPQL(value)}`;
-                })
-                    .join(' AND ');
-                sql_list.push(prefix + cond);
-            }
-            return this.transactionQL(sql_list);
-        });
-    }
-    async updateItems(params) {
-        const { table, key_list, list } = params;
-        const prefix = `UPDATE ${escapeIdentifier(table)} SET `;
-        return parallelBatch(list, BATCH_LIMIT, QUERY_LIMIT, async (batch) => {
-            const sql_list = [];
-            for (const item of batch) {
-                const sets = item.set_list
-                    .map((object) => {
-                    const { column, value } = object;
-                    return `${escapeIdentifier(column)} = ${escapeValue(value)}`;
-                })
-                    .join(', ');
-                const cond = ' WHERE ' +
-                    key_list
-                        .map((key, j) => {
-                        const value = item.key[j];
-                        if (value === undefined) {
-                            throw TypeError('missing value for key ' + key);
-                        }
-                        return `${escapeIdentifier(key)} = ${convertValueToPQL(value)}`;
-                    })
-                        .join(' AND ');
-                sql_list.push(prefix + sets + cond);
-            }
-            return this.transactionQL(sql_list);
-        });
-    }
-    async putItems(params) {
-        const { list } = params;
-        const table = `${this.namespace}${params.table}`;
-        const err_list = [];
-        try {
-            await parallelBatch(list, BATCH_LIMIT, QUERY_LIMIT, async (batch, i) => {
-                const input = {
-                    TransactItems: batch.map((item) => {
-                        const value = nativeToValue(item);
-                        return {
-                            Put: { TableName: table, Item: 'M' in value ? value.M : {} },
-                        };
-                    }),
-                };
-                const command = new clientDynamodb.TransactWriteItemsCommand(input);
-                try {
-                    await this.client.send(command);
-                }
-                catch (err) {
-                    const start = i * BATCH_LIMIT;
-                    if (err &&
-                        typeof err === 'object' &&
-                        'name' in err &&
-                        err.name === 'TransactionCanceledException' &&
-                        'CancellationReasons' in err &&
-                        Array.isArray(err.CancellationReasons)) {
-                        err.CancellationReasons.forEach((cancel_err, j) => {
-                            err_list[start + j] = {
-                                err: safeConvertError(cancel_err),
-                                parent: cancel_err,
-                            };
-                        });
-                    }
-                    else {
-                        err_list[start] = { err: safeConvertError(err), parent: err };
-                    }
-                    throw err;
-                }
-            });
-        }
-        catch {
-            throw err_list;
-        }
-    }
-    async getTableList() {
-        const namespace_len = this.namespace.length;
-        const command = new clientDynamodb.ListTablesCommand({ Limit: 100 });
-        const results = [];
-        for (;;) {
-            const result = await this.client.send(command);
-            if (result.TableNames) {
-                for (const table of result.TableNames) {
-                    if (namespace_len === 0) {
-                        results.push(table);
-                    }
-                    else if (table.startsWith(this.namespace)) {
-                        results.push(table.substring(namespace_len));
-                    }
-                }
-            }
-            if (!result.LastEvaluatedTableName) {
-                break;
-            }
-            command.input.ExclusiveStartTableName = result.LastEvaluatedTableName;
-        }
-        return results;
-    }
-    async getTable(raw_table) {
-        const table = `${this.namespace}${raw_table}`;
-        const command = new clientDynamodb.DescribeTableCommand({ TableName: table });
-        try {
-            return await this.client.send(command);
-        }
-        catch (err) {
-            throw safeConvertError(err);
-        }
-    }
-    async createTable(params) {
-        const { billing_mode, column_list, primary_key } = params;
-        const table = `${this.namespace}${params.table}`;
-        const defs = column_list.map((column) => ({
-            AttributeName: column.name,
-            AttributeType: dynamoType(column.type),
-        }));
-        const schema = [
-            { AttributeName: primary_key?.[0]?.name, KeyType: clientDynamodb.KeyType.HASH },
-        ];
-        if (primary_key?.[1]) {
-            schema.push({
-                AttributeName: primary_key[1].name,
-                KeyType: clientDynamodb.KeyType.RANGE,
-            });
-        }
-        const input = {
-            TableName: table,
-            BillingMode: (billing_mode ?? 'PAY_PER_REQUEST'),
-            AttributeDefinitions: defs,
-            KeySchema: schema,
-        };
-        const command = new clientDynamodb.CreateTableCommand(input);
-        try {
-            await this.client.send(command);
-        }
-        catch (err) {
-            throw safeConvertError(err);
-        }
-    }
-    async deleteTable(raw_table) {
-        const table = `${this.namespace}${raw_table}`;
-        const command = new clientDynamodb.DeleteTableCommand({ TableName: table });
-        try {
-            await this.client.send(command);
-        }
-        catch (err) {
-            throw safeConvertError(err);
-        }
-    }
-    async createIndex(params) {
-        const { index_name, key_list, projection_type } = params;
-        const table = `${this.namespace}${params.table}`;
-        const defs = key_list.map((item) => ({
-            AttributeName: item.name,
-            AttributeType: dynamoType(item.type),
-        }));
-        const schema = [
-            { AttributeName: key_list?.[0]?.name, KeyType: clientDynamodb.KeyType.HASH },
-        ];
-        if (key_list?.[1]) {
-            schema.push({ AttributeName: key_list[1].name, KeyType: clientDynamodb.KeyType.RANGE });
-        }
-        const input = {
-            TableName: table,
-            AttributeDefinitions: defs,
-            GlobalSecondaryIndexUpdates: [
-                {
-                    Create: {
-                        IndexName: index_name,
-                        KeySchema: schema,
-                        Projection: {
-                            ProjectionType: (projection_type ||
-                                'KEYS_ONLY'),
-                        },
-                    },
-                },
-            ],
-        };
-        const command = new clientDynamodb.UpdateTableCommand(input);
-        try {
-            await this.client.send(command);
-        }
-        catch (err) {
-            throw safeConvertError(err);
-        }
-    }
-    async deleteIndex(params) {
-        const { index_name } = params;
-        const table = `${this.namespace}${params.table}`;
-        const input = {
-            TableName: table,
-            GlobalSecondaryIndexUpdates: [{ Delete: { IndexName: index_name } }],
-        };
-        const command = new clientDynamodb.UpdateTableCommand(input);
-        try {
-            await this.client.send(command);
-        }
-        catch (err) {
-            throw safeConvertError(err);
-        }
-    }
-    async _pagedSend(command) {
-        const results = [];
-        for (;;) {
-            try {
-                const result = await this.client.send(command);
-                const list = convertSuccess(result)[1];
-                list?.forEach((item) => {
-                    results.push(item);
-                });
-                if (!result?.NextToken) {
-                    break;
-                }
-                command.input.NextToken = result.NextToken;
-            }
-            catch (err) {
-                if (err && typeof err === 'object' && 'Item' in err && err.Item) {
-                    results.push(err.Item);
-                }
-                throw safeConvertError(err);
-            }
-        }
-        return results;
-    }
-}
-
-class DynamoDBWithCache extends DynamoDB {
-    _tableCache = new Map();
-    async getTable(table) {
-        try {
-            const result = await super.getTable(table);
-            if (result?.Table?.TableStatus === 'DELETING') {
-                this._tableCache.delete(table);
-            }
-            else {
-                this._tableCache.set(table, { last_updated: Date.now(), result });
-            }
-            return result;
-        }
-        catch (err) {
-            if (err instanceof Error && err.message === 'resource_not_found') {
-                this._tableCache.delete(table);
-            }
-            throw err;
-        }
-    }
-    async getTableCached(table) {
-        const result = this._tableCache.get(table)?.result;
-        if (result) {
-            return result;
-        }
-        else {
-            return this.getTable(table);
-        }
-    }
-    async createTable(params) {
-        this._tableCache.delete(params.table);
-        try {
-            await super.createTable(params);
-        }
-        finally {
-            this._tableCache.delete(params.table);
-        }
-    }
-    async deleteTable(table) {
-        this._tableCache.delete(table);
-        try {
-            await super.deleteTable(table);
-        }
-        finally {
-            this._tableCache.delete(table);
-        }
-    }
-}
-function createDynamoDB(params) {
-    return new DynamoDBWithCache(params);
-}
+const SYSTEM_VARIABLE_TYPES = {
+    COLLATION_CONNECTION: 'VAR_STRING',
+    DIV_PRECISION_INCREMENT: 'LONGLONG',
+    SQL_MODE: 'VAR_STRING',
+    SYSTEM_TIME_ZONE: 'VAR_STRING',
+    TIME_ZONE: 'VAR_STRING',
+    LAST_INSERT_ID: 'LONGLONG',
+    INSERT_ID: 'LONGLONG',
+    TIMESTAMP: 'DOUBLE',
+};
 
 var CLIENT_FLAGS;
 (function (CLIENT_FLAGS) {
@@ -2642,161 +1941,790 @@ class NoSingleOperationError extends Error {
     }
 }
 
-var commonjsGlobal = typeof globalThis !== 'undefined' ? globalThis : typeof window !== 'undefined' ? window : typeof global !== 'undefined' ? global : typeof self !== 'undefined' ? self : {};
-
-var mysql = {};
-
-var hasRequiredMysql;
-
-function requireMysql () {
-	if (hasRequiredMysql) return mysql;
-	hasRequiredMysql = 1;
-	(function (exports) {
-		!function(r,t){for(var e in t)r[e]=t[e];}(exports,function(r){var t={};function e(n){if(t[n])return t[n].exports;var o=t[n]={i:n,l:false,exports:{}};return r[n].call(o.exports,o,o.exports,e),o.l=true,o.exports}return e.m=r,e.c=t,e.d=function(r,t,n){e.o(r,t)||Object.defineProperty(r,t,{enumerable:true,get:n});},e.r=function(r){"undefined"!=typeof Symbol&&Symbol.toStringTag&&Object.defineProperty(r,Symbol.toStringTag,{value:"Module"}),Object.defineProperty(r,"__esModule",{value:true});},e.t=function(r,t){if(1&t&&(r=e(r)),8&t)return r;if(4&t&&"object"==typeof r&&r&&r.__esModule)return r;var n=Object.create(null);if(e.r(n),Object.defineProperty(n,"default",{enumerable:true,value:r}),2&t&&"string"!=typeof r)for(var o in r)e.d(n,o,function(t){return r[t]}.bind(null,o));return n},e.n=function(r){var t=r&&r.__esModule?function(){return r.default}:function(){return r};return e.d(t,"a",t),t},e.o=function(r,t){return Object.prototype.hasOwnProperty.call(r,t)},e.p="",e(e.s=1)}([function(r,t,e){var n=e(2);function o(r,t,e,n){this.message=r,this.expected=t,this.found=e,this.location=n,this.name="SyntaxError","function"==typeof Error.captureStackTrace&&Error.captureStackTrace(this,o);}!function(r,t){function e(){this.constructor=r;}e.prototype=t.prototype,r.prototype=new e;}(o,Error),o.buildMessage=function(r,t){var e={literal:function(r){return '"'+o(r.text)+'"'},class:function(r){var t,e="";for(t=0;t<r.parts.length;t++)e+=r.parts[t]instanceof Array?s(r.parts[t][0])+"-"+s(r.parts[t][1]):s(r.parts[t]);return "["+(r.inverted?"^":"")+e+"]"},any:function(r){return "any character"},end:function(r){return "end of input"},other:function(r){return r.description}};function n(r){return r.charCodeAt(0).toString(16).toUpperCase()}function o(r){return r.replace(/\\/g,"\\\\").replace(/"/g,'\\"').replace(/\0/g,"\\0").replace(/\t/g,"\\t").replace(/\n/g,"\\n").replace(/\r/g,"\\r").replace(/[\x00-\x0F]/g,(function(r){return "\\x0"+n(r)})).replace(/[\x10-\x1F\x7F-\x9F]/g,(function(r){return "\\x"+n(r)}))}function s(r){return r.replace(/\\/g,"\\\\").replace(/\]/g,"\\]").replace(/\^/g,"\\^").replace(/-/g,"\\-").replace(/\0/g,"\\0").replace(/\t/g,"\\t").replace(/\n/g,"\\n").replace(/\r/g,"\\r").replace(/[\x00-\x0F]/g,(function(r){return "\\x0"+n(r)})).replace(/[\x10-\x1F\x7F-\x9F]/g,(function(r){return "\\x"+n(r)}))}return "Expected "+function(r){var t,n,o,s=new Array(r.length);for(t=0;t<r.length;t++)s[t]=(o=r[t],e[o.type](o));if(s.sort(),s.length>0){for(t=1,n=1;t<s.length;t++)s[t-1]!==s[t]&&(s[n]=s[t],n++);s.length=n;}switch(s.length){case 1:return s[0];case 2:return s[0]+" or "+s[1];default:return s.slice(0,-1).join(", ")+", or "+s[s.length-1]}}(r)+" but "+function(r){return r?'"'+o(r)+'"':"end of input"}(t)+" found."},r.exports={SyntaxError:o,parse:function(r,t){t=void 0!==t?t:{};var e,s={},u={start:ac},a=ac,i=function(r,t){return fv(r,t)},c=function(r,t){return {...r,order_by:t&&t.toLowerCase()}},l=function(r,t){return fv(r,t,1)},f=tc("IF",true),b="IDENTIFIED",p=tc("IDENTIFIED",false),v=tc("WITH",true),d=tc("BY",true),y=tc("RANDOM",true),w=tc("PASSWORD",true),L=tc("AS",true),C=function(r,t){return fv(r,t)},h=tc("role",true),m=tc("NONE",true),E=tc("SSL",true),A=tc("X509",true),T=tc("CIPHER",true),_=tc("ISSUER",true),g=tc("SUBJECT",true),I=function(r,t){return t.prefix=r.toLowerCase(),t},S=tc("REQUIRE",true),N=tc("MAX_QUERIES_PER_HOUR",true),O=tc("MAX_UPDATES_PER_HOUR",true),R=tc("MAX_CONNECTIONS_PER_HOUR",true),x=tc("MAX_USER_CONNECTIONS",true),j=tc("EXPIRE",true),k=tc("DEFAULT",true),U=tc("NEVER",true),D=tc("HISTORY",true),M=tc("REUSE",false),P=tc("CURRENT",true),G=tc("OPTIONAL",true),F=tc("FAILED_LOGIN_ATTEMPTS",true),H=tc("PASSWORD_LOCK_TIME",true),Y=tc("UNBOUNDED",true),B=tc("ACCOUNT",true),$=tc("LOCK",true),W=tc("UNLOCK",true),q=tc("ATTRIBUTE",true),V=tc("CASCADED",true),X=tc("LOCAL",true),K=tc("CHECK",true),Q=tc("OPTION",false),z=tc("ALGORITHM",true),Z=tc("UNDEFINED",true),J=tc("MERGE",true),rr=tc("TEMPTABLE",true),tr=tc("SQL",true),er=tc("SECURITY",true),nr=tc("DEFINER",true),or=tc("INVOKER",true),sr=function(r,t){return fv(r,t)},ur=tc("AUTO_INCREMENT",true),ar=tc("UNIQUE",true),ir=tc("KEY",true),cr=tc("PRIMARY",true),lr=tc("@",false),fr=function(){return cv("=",{type:"origin",value:"definer"},{type:"function",name:{name:[{type:"default",value:"current_user"}]},args:{type:"expr_list",value:[]}})},br=tc("BEFORE",true),pr=tc("AFTER",true),vr=tc("FOR",true),dr=tc("EACH",true),yr=tc("ROW",true),wr=tc("STATEMENT",true),Lr=tc("FOLLOWS",true),Cr=tc("PRECEDES",true),hr=tc("COLUMN_FORMAT",true),mr=tc("FIXED",true),Er=tc("DYNAMIC",true),Ar=tc("STORAGE",true),Tr=tc("DISK",true),_r=tc("MEMORY",true),gr=tc("GENERATED",true),Ir=tc("ALWAYS",true),Sr=tc("STORED",true),Nr=tc("VIRTUAL",true),Or=tc("if",true),Rr=tc("exists",true),xr=tc("first",true),jr=tc("after",true),kr=tc("LESS",true),Ur=tc("THAN",true),Dr=tc("DROP",true),Mr=tc("TRUNCATE",true),Pr=tc("DISCARD",true),Gr=tc("IMPORT",true),Fr=tc("COALESCE",true),Hr=tc("ANALYZE",true),Yr=tc("TABLESPACE",true),Br=tc("INSTANT",true),$r=tc("INPLACE",true),Wr=tc("COPY",true),qr=tc("SHARED",true),Vr=tc("EXCLUSIVE",true),Xr=tc("CHANGE",true),Kr=tc("FOREIGN",true),Qr=tc("CONSTRAINT",true),zr=tc("NOCHECK",true),Zr=tc("NOT",true),Jr=tc("REPLICATION",true),rt=tc("FOREIGN KEY",true),tt=tc("ENFORCED",true),et=tc("MATCH FULL",true),nt=tc("MATCH PARTIAL",true),ot=tc("MATCH SIMPLE",true),st=tc("RESTRICT",true),ut=tc("CASCADE",true),at=tc("SET NULL",true),it=tc("NO ACTION",true),ct=tc("SET DEFAULT",true),lt=tc("CHARACTER",true),ft=tc("SET",true),bt=tc("CHARSET",true),pt=tc("COLLATE",true),vt=tc("AVG_ROW_LENGTH",true),dt=tc("KEY_BLOCK_SIZE",true),yt=tc("MAX_ROWS",true),wt=tc("MIN_ROWS",true),Lt=tc("STATS_SAMPLE_PAGES",true),Ct=tc("CHECKSUM",false),ht=tc("DELAY_KEY_WRITE",false),mt=/^[01]/,Et=ec(["0","1"],false,false),At=tc("CONNECTION",true),Tt=tc("ENGINE_ATTRIBUTE",true),_t=tc("SECONDARY_ENGINE_ATTRIBUTE",true),gt=tc("DATA",true),It=tc("INDEX",true),St=tc("DIRECTORY",true),Nt=tc("COMPRESSION",true),Ot=tc("'",false),Rt=tc("ZLIB",true),xt=tc("LZ4",true),jt=tc("ENGINE",true),kt=function(r,t,e){return {keyword:r.toLowerCase(),symbol:t,value:e.toUpperCase()}},Ut=tc("ROW_FORMAT",true),Dt=tc("COMPRESSED",true),Mt=tc("REDUNDANT",true),Pt=tc("COMPACT",true),Gt=tc("READ",true),Ft=tc("LOW_PRIORITY",true),Ht=tc("WRITE",true),Yt=function(r,t){return fv(r,t)},Bt=tc("BINARY",true),$t=tc("MASTER",true),Wt=tc("LOGS",true),qt=tc("TRIGGERS",true),Vt=tc("STATUS",true),Xt=tc("PROCESSLIST",true),Kt=tc("PROCEDURE",true),Qt=tc("FUNCTION",true),zt=tc("BINLOG",true),Zt=tc("EVENTS",true),Jt=tc("COLLATION",true),re=tc("DATABASES",true),te=tc("COLUMNS",true),ee=tc("INDEXES",true),ne=tc("EVENT",true),oe=tc("GRANTS",true),se=tc("SERIALIZABLE",true),ue=tc("REPEATABLE",true),ae=tc("COMMITTED",true),ie=tc("UNCOMMITTED",true),ce=function(r){return {type:"origin",value:"read "+r.toLowerCase()}},le=tc("ISOLATION",true),fe=tc("LEVEL",true),be=tc("ONLY",true),pe=tc("DEFERRABLE",true),ve=tc("commit",true),de=tc("rollback",true),ye=tc("begin",true),we=tc("WORK",true),Le=tc("TRANSACTION",true),Ce=tc("start",true),he=tc("transaction",true),me=tc("FIELDS",true),Ee=tc("TERMINATED",true),Ae=tc("OPTIONALLY",true),Te=tc("ENCLOSED",true),_e=tc("ESCAPED",true),ge=tc("STARTING",true),Ie=tc("LINES",true),Se=tc("LOAD",true),Ne=tc("CONCURRENT",true),Oe=tc("INFILE",true),Re=tc("INTO",true),xe=tc("TABLE",true),je=tc("ROWS",true),ke=tc("VIEW",true),Ue=tc("GRANT",true),De=tc("OPTION",true),Me=function(r){return {type:"origin",value:Array.isArray(r)?r[0]:r}},Pe=tc("ROUTINE",true),Ge=tc("EXECUTE",true),Fe=tc("ADMIN",true),He=tc("GRANT",false),Ye=tc("PROXY",false),Be=tc("(",false),$e=tc(")",false),We=/^[0-9]/,qe=ec([["0","9"]],false,false),Ve=tc("IN",true),Xe=tc("SHARE",true),Ke=tc("MODE",true),Qe=tc("WAIT",true),ze=tc("NOWAIT",true),Ze=tc("SKIP",true),Je=tc("LOCKED",true),rn=tc("NATURAL",true),tn=tc("LANGUAGE",true),en=tc("QUERY",true),nn=tc("EXPANSION",true),on=tc("BOOLEAN",true),sn=tc("MATCH",true),un=tc("AGAINST",false),an=tc("OUTFILE",true),cn=tc("DUMPFILE",true),ln=tc("BTREE",true),fn=tc("HASH",true),bn=tc("PARSER",true),pn=tc("VISIBLE",true),vn=tc("INVISIBLE",true),dn=tc("LATERAL",true),yn=/^[_0-9]/,wn=ec(["_",["0","9"]],false,false),Ln=tc("ROLLUP",true),Cn=tc("?",false),hn=tc("=",false),mn=tc("DUPLICATE",true),En=function(r,t){return bv(r,t)},An=function(r){return r[0]+" "+r[2]},Tn=tc(">=",false),_n=tc(">",false),gn=tc("<=",false),In=tc("<>",false),Sn=tc("<",false),Nn=tc("!=",false),On=tc("ESCAPE",true),Rn=tc("+",false),xn=tc("-",false),jn=tc("*",false),kn=tc("/",false),Un=tc("%",false),Dn=tc("||",false),Mn=tc("div",true),Pn=tc("mod",true),Gn=tc("&",false),Fn=tc(">>",false),Hn=tc("<<",false),Yn=tc("^",false),Bn=tc("|",false),$n=tc("!",false),Wn=tc("~",false),qn=tc("?|",false),Vn=tc("?&",false),Xn=tc("#-",false),Kn=tc("#>>",false),Qn=tc("#>",false),zn=tc("@>",false),Zn=tc("<@",false),Jn=function(r){return  true===sv[r.toUpperCase()]},ro=tc('"',false),to=/^[^"]/,eo=ec(['"'],true,false),no=/^[^']/,oo=ec(["'"],true,false),so=tc("`",false),uo=/^[^`\\]/,ao=ec(["`","\\"],true,false),io=function(r,t){return r+t.join("")},co=/^[A-Za-z_\u4E00-\u9FA5\xC0-\u017F]/,lo=ec([["A","Z"],["a","z"],"_",["一","龥"],["À","ſ"]],false,false),fo=/^[A-Za-z0-9_$\x80-\uFFFF]/,bo=ec([["A","Z"],["a","z"],["0","9"],"_","$",["","￿"]],false,false),po=/^[A-Za-z0-9_:\u4E00-\u9FA5\xC0-\u017F]/,vo=ec([["A","Z"],["a","z"],["0","9"],"_",":",["一","龥"],["À","ſ"]],false,false),yo=tc(":",false),wo=tc("NOW",true),Lo=tc("OVER",true),Co=tc("WINDOW",true),ho=tc("FOLLOWING",true),mo=tc("PRECEDING",true),Eo=tc("SEPARATOR",true),Ao=tc("YEAR_MONTH",true),To=tc("DAY_HOUR",true),_o=tc("DAY_MINUTE",true),go=tc("DAY_SECOND",true),Io=tc("DAY_MICROSECOND",true),So=tc("HOUR_MINUTE",true),No=tc("HOUR_SECOND",true),Oo=tc("HOUR_MICROSECOND",true),Ro=tc("MINUTE_SECOND",true),xo=tc("MINUTE_MICROSECOND",true),jo=tc("SECOND_MICROSECOND",true),ko=tc("TIMEZONE_HOUR",true),Uo=tc("TIMEZONE_MINUTE",true),Do=tc("CENTURY",true),Mo=tc("DAY",true),Po=tc("DATE",true),Go=tc("DECADE",true),Fo=tc("DOW",true),Ho=tc("DOY",true),Yo=tc("EPOCH",true),Bo=tc("HOUR",true),$o=tc("ISODOW",true),Wo=tc("ISOWEEK",true),qo=tc("ISOYEAR",true),Vo=tc("MICROSECONDS",true),Xo=tc("MILLENNIUM",true),Ko=tc("MILLISECONDS",true),Qo=tc("MINUTE",true),zo=tc("MONTH",true),Zo=tc("QUARTER",true),Jo=tc("SECOND",true),rs=tc("TIME",true),ts=tc("TIMEZONE",true),es=tc("WEEK",true),ns=tc("YEAR",true),os=tc("DATE_TRUNC",true),ss=tc("BOTH",true),us=tc("LEADING",true),as=tc("TRAILING",true),is=tc("trim",true),cs=tc("convert",true),ls=tc("binary",true),fs=tc("_binary",true),bs=tc("_latin1",true),ps=tc("X",true),vs=/^[0-9A-Fa-f]/,ds=ec([["0","9"],["A","F"],["a","f"]],false,false),ys=tc("b",true),ws=tc("0x",true),Ls=tc("N",true),Cs=function(r,t){return {type:r.toLowerCase(),value:t[1].join("")}},hs=/^[^"\\\0-\x1F\x7F]/,ms=ec(['"',"\\",["\0",""],""],true,false),Es=/^[\n]/,As=ec(["\n"],false,false),Ts=/^[^'\\]/,_s=ec(["'","\\"],true,false),gs=tc("\\'",false),Is=tc('\\"',false),Ss=tc("\\\\",false),Ns=tc("\\/",false),Os=tc("\\b",false),Rs=tc("\\f",false),xs=tc("\\n",false),js=tc("\\r",false),ks=tc("\\t",false),Us=tc("\\u",false),Ds=tc("\\",false),Ms=tc("''",false),Ps=tc('""',false),Gs=tc("``",false),Fs=/^[\n\r]/,Hs=ec(["\n","\r"],false,false),Ys=tc(".",false),Bs=/^[0-9a-fA-F]/,$s=ec([["0","9"],["a","f"],["A","F"]],false,false),Ws=/^[eE]/,qs=ec(["e","E"],false,false),Vs=/^[+\-]/,Xs=ec(["+","-"],false,false),Ks=tc("NULL",true),Qs=tc("NOT NULL",true),zs=tc("TRUE",true),Zs=tc("TO",true),Js=tc("FALSE",true),ru=tc("SHOW",true),tu=tc("USE",true),eu=tc("ALTER",true),nu=tc("SELECT",true),ou=tc("UPDATE",true),su=tc("CREATE",true),uu=tc("TEMPORARY",true),au=tc("DELETE",true),iu=tc("INSERT",true),cu=tc("RECURSIVE",true),lu=tc("REPLACE",true),fu=tc("RENAME",true),bu=tc("IGNORE",true),pu=tc("EXPLAIN",true),vu=tc("PARTITION",true),du=tc("FROM",true),yu=tc("TRIGGER",true),wu=tc("TABLES",true),Lu=tc("DATABASE",true),Cu=tc("SCHEMA",true),hu=tc("ON",true),mu=tc("LEFT",true),Eu=tc("RIGHT",true),Au=tc("FULL",true),Tu=tc("INNER",true),_u=tc("CROSS",true),gu=tc("JOIN",true),Iu=tc("OUTER",true),Su=tc("UNION",true),Nu=tc("MINUS",true),Ou=tc("INTERSECT",true),Ru=tc("EXCEPT",true),xu=tc("VALUES",true),ju=tc("USING",true),ku=tc("WHERE",true),Uu=tc("GO",true),Du=tc("GROUP",true),Mu=tc("ORDER",true),Pu=tc("HAVING",true),Gu=tc("LIMIT",true),Fu=tc("OFFSET",true),Hu=tc("ASC",true),Yu=tc("DESC",true),Bu=tc("DESCRIBE",true),$u=tc("ALL",true),Wu=tc("DISTINCT",true),qu=tc("BETWEEN",true),Vu=tc("IS",true),Xu=tc("LIKE",true),Ku=tc("RLIKE",true),Qu=tc("REGEXP",true),zu=tc("EXISTS",true),Zu=tc("AND",true),Ju=tc("OR",true),ra=tc("COUNT",true),ta=tc("GROUP_CONCAT",true),ea=tc("MAX",true),na=tc("MIN",true),oa=tc("SUM",true),sa=tc("AVG",true),ua=tc("EXTRACT",true),aa=tc("CALL",true),ia=tc("CASE",true),ca=tc("WHEN",true),la=tc("THEN",true),fa=tc("ELSE",true),ba=tc("END",true),pa=tc("CAST",true),va=tc("VARBINARY",true),da=tc("BIT",true),ya=tc("CHAR",true),wa=tc("VARCHAR",true),La=tc("NUMERIC",true),Ca=tc("DECIMAL",true),ha=tc("SIGNED",true),ma=tc("UNSIGNED",true),Ea=tc("INT",true),Aa=tc("ZEROFILL",true),Ta=tc("INTEGER",true),_a=tc("JSON",true),ga=tc("SMALLINT",true),Ia=tc("MEDIUMINT",true),Sa=tc("TINYINT",true),Na=tc("TINYTEXT",true),Oa=tc("TEXT",true),Ra=tc("MEDIUMTEXT",true),xa=tc("LONGTEXT",true),ja=tc("BIGINT",true),ka=tc("ENUM",true),Ua=tc("FLOAT",true),Da=tc("DOUBLE",true),Ma=tc("DATETIME",true),Pa=tc("TIMESTAMP",true),Ga=tc("USER",true),Fa=tc("CURRENT_DATE",true),Ha=(tc("INTERVAL",true)),Ya=tc("MICROSECOND",true),Ba=tc("CURRENT_TIME",true),$a=tc("CURRENT_TIMESTAMP",true),Wa=tc("CURRENT_USER",true),qa=tc("SESSION_USER",true),Va=tc("SYSTEM_USER",true),Xa=tc("GLOBAL",true),Ka=tc("SESSION",true),Qa=tc("PERSIST",true),za=tc("PERSIST_ONLY",true),Za=tc("GEOMETRY",true),Ja=tc("POINT",true),ri=tc("LINESTRING",true),ti=tc("POLYGON",true),ei=tc("MULTIPOINT",true),ni=tc("MULTILINESTRING",true),oi=tc("MULTIPOLYGON",true),si=tc("GEOMETRYCOLLECTION",true),ui=tc("@@",false),ai=tc("$",false),ii=tc("return",true),ci=tc(":=",false),li=tc("DUAL",true),fi=tc("ADD",true),bi=tc("COLUMN",true),pi=tc("MODIFY",true),vi=tc("FULLTEXT",true),di=tc("SPATIAL",true),yi=tc("COMMENT",true),wi=tc("REFERENCES",true),Li=tc("SQL_CALC_FOUND_ROWS",true),Ci=tc("SQL_CACHE",true),hi=tc("SQL_NO_CACHE",true),mi=tc("SQL_SMALL_RESULT",true),Ei=tc("SQL_BIG_RESULT",true),Ai=tc("SQL_BUFFER_RESULT",true),Ti=tc(",",false),_i=tc("[",false),gi=tc("]",false),Ii=tc(";",false),Si=tc("->",false),Ni=tc("->>",false),Oi=tc("&&",false),Ri=tc("XOR",true),xi=tc("/*",false),ji=tc("*/",false),ki=tc("--",false),Ui=tc("#",false),Di={type:"any"},Mi=/^[ \t\n\r]/,Pi=ec([" ","\t","\n","\r"],false,false),Gi=function(r,t,e){return {type:"assign",left:r,symbol:t,right:e}},Fi=tc("boolean",true),Hi=tc("blob",true),Yi=tc("tinyblob",true),Bi=tc("mediumblob",true),$i=tc("longblob",true),Wi=function(r,t){return {dataType:r,...t||{}}},qi=tc("ARRAY",true),Vi=/^[0-6]/,Xi=ec([["0","6"]],false,false),Ki=0,Qi=0,zi=[{line:1,column:1}],Zi=0,Ji=[],rc=0;if("startRule"in t){if(!(t.startRule in u))throw new Error("Can't start parsing from rule \""+t.startRule+'".');a=u[t.startRule];}function tc(r,t){return {type:"literal",text:r,ignoreCase:t}}function ec(r,t,e){return {type:"class",parts:r,inverted:t,ignoreCase:e}}function nc(t){var e,n=zi[t];if(n)return n;for(e=t-1;!zi[e];)e--;for(n={line:(n=zi[e]).line,column:n.column};e<t;)10===r.charCodeAt(e)?(n.line++,n.column=1):n.column++,e++;return zi[t]=n,n}function oc(r,t){var e=nc(r),n=nc(t);return {start:{offset:r,line:e.line,column:e.column},end:{offset:t,line:n.line,column:n.column}}}function sc(r){Ki<Zi||(Ki>Zi&&(Zi=Ki,Ji=[]),Ji.push(r));}function uc(r,t,e){return new o(o.buildMessage(r,t),r,t,e)}function ac(){var r,t,e,n,o,u,a,i;if(r=Ki,(t=ic())!==s)if(Up()!==s){for(e=[],n=Ki,(o=Up())!==s&&(u=Ib())!==s&&(a=Up())!==s&&(i=ic())!==s?n=o=[o,u,a,i]:(Ki=n,n=s);n!==s;)e.push(n),n=Ki,(o=Up())!==s&&(u=Ib())!==s&&(a=Up())!==s&&(i=ic())!==s?n=o=[o,u,a,i]:(Ki=n,n=s);e!==s?(Qi=r,r=t=function(r,t){if(!t||0===t.length)return r;delete r.tableList,delete r.columnList;let e=r;for(let r=0;r<t.length;r++)delete t[r][3].tableList,delete t[r][3].columnList,e.go_next=t[r][3],e.go="go",e=e.go_next;return {tableList:Array.from(wv),columnList:vv(Lv),ast:r}}(t,e)):(Ki=r,r=s);}else Ki=r,r=s;else Ki=r,r=s;return r}function ic(){var r,t;return r=Ki,Up()!==s&&(t=function(){var r,t,e,n,o,u,a,i;if(r=Ki,(t=lc())!==s){for(e=[],n=Ki,(o=Up())!==s&&(u=Rp())!==s&&(a=Up())!==s&&(i=lc())!==s?n=o=[o,u,a,i]:(Ki=n,n=s);n!==s;)e.push(n),n=Ki,(o=Up())!==s&&(u=Rp())!==s&&(a=Up())!==s&&(i=lc())!==s?n=o=[o,u,a,i]:(Ki=n,n=s);e!==s?(Qi=r,t=function(r,t){const e=r&&r.ast||r,n=t&&t.length&&t[0].length>=4?[e]:e;for(let r=0;r<t.length;r++)t[r][3]&&0!==t[r][3].length&&n.push(t[r][3]&&t[r][3].ast||t[r][3]);return {tableList:Array.from(wv),columnList:vv(Lv),ast:n}}(t,e),r=t):(Ki=r,r=s);}else Ki=r,r=s;return r}())!==s?(Qi=r,r=t):(Ki=r,r=s),r}function cc(){var t;return (t=function(){var r,t,e,n,o,u,a;r=Ki,(t=rb())!==s&&Up()!==s&&(e=yb())!==s&&Up()!==s?((n=Tc())===s&&(n=null),n!==s&&Up()!==s&&(o=vl())!==s?(Qi=r,i=t,c=e,f=n,(b=o)&&b.forEach(r=>wv.add(`${i}::${r.db}::${r.table}`)),t={tableList:Array.from(wv),columnList:vv(Lv),ast:{type:i.toLowerCase(),keyword:c.toLowerCase(),prefix:f,name:b}},r=t):(Ki=r,r=s)):(Ki=r,r=s);var i,c,f,b;r===s&&(r=Ki,(t=rb())!==s&&Up()!==s&&(e=fp())!==s&&Up()!==s?((n=Tc())===s&&(n=null),n!==s&&Up()!==s&&(o=vl())!==s&&Up()!==s?((u=Dc())===s&&(u=null),u!==s?(Qi=r,t=function(r,t,e,n,o){return {tableList:Array.from(wv),columnList:vv(Lv),ast:{type:r.toLowerCase(),keyword:t.toLowerCase(),prefix:e,name:n,options:o&&[{type:"origin",value:o}]}}}(t,e,n,o,u),r=t):(Ki=r,r=s)):(Ki=r,r=s)):(Ki=r,r=s),r===s&&(r=Ki,(t=rb())!==s&&Up()!==s&&(e=Lp())!==s&&Up()!==s&&(n=ef())!==s&&Up()!==s&&(o=mb())!==s&&Up()!==s&&(u=Ll())!==s&&Up()!==s?((a=function(){var r,t,e,n,o,u;r=Ki,(t=Sc())===s&&(t=Nc());if(t!==s){for(e=[],n=Ki,(o=Up())!==s?((u=Sc())===s&&(u=Nc()),u!==s?n=o=[o,u]:(Ki=n,n=s)):(Ki=n,n=s);n!==s;)e.push(n),n=Ki,(o=Up())!==s?((u=Sc())===s&&(u=Nc()),u!==s?n=o=[o,u]:(Ki=n,n=s)):(Ki=n,n=s);e!==s?(Qi=r,t=l(t,e),r=t):(Ki=r,r=s);}else Ki=r,r=s;return r}())===s&&(a=null),a!==s&&Up()!==s?(Qi=r,t=function(r,t,e,n,o){return {tableList:Array.from(wv),columnList:vv(Lv),ast:{type:r.toLowerCase(),keyword:t.toLowerCase(),name:e,table:n,options:o}}}(t,e,n,u,a),r=t):(Ki=r,r=s)):(Ki=r,r=s),r===s&&(r=Ki,(t=rb())!==s&&Up()!==s?((e=Cb())===s&&(e=hb()),e!==s&&Up()!==s?((n=Tc())===s&&(n=null),n!==s&&Up()!==s&&(o=wf())!==s?(Qi=r,t=function(r,t,e,n){return {tableList:Array.from(wv),columnList:vv(Lv),ast:{type:r.toLowerCase(),keyword:t.toLowerCase(),prefix:e,name:n}}}(t,e,n,o),r=t):(Ki=r,r=s)):(Ki=r,r=s)):(Ki=r,r=s),r===s&&(r=Ki,(t=rb())!==s&&Up()!==s&&(e=wb())!==s&&Up()!==s?((n=Tc())===s&&(n=null),n!==s&&Up()!==s&&(o=yl())!==s?(Qi=r,t=function(r,t,e,n){return {tableList:Array.from(wv),columnList:vv(Lv),ast:{type:r.toLowerCase(),keyword:t.toLowerCase(),prefix:e,name:[{schema:n.db,trigger:n.table}]}}}(t,e,n,o),r=t):(Ki=r,r=s)):(Ki=r,r=s)))));return r}())===s&&(t=function(){var t;(t=function(){var r,t,e,n,o,u,a,c,l,f;r=Ki,(t=ob())!==s&&Up()!==s?((e=sb())===s&&(e=null),e!==s&&Up()!==s&&yb()!==s&&Up()!==s?((n=vc())===s&&(n=null),n!==s&&Up()!==s&&(o=Ll())!==s&&Up()!==s&&(u=function r(){var t,e;(t=function(){var r,t;r=Ki,Db()!==s&&Up()!==s&&(t=vl())!==s?(Qi=r,r={type:"like",table:t}):(Ki=r,r=s);return r}())===s&&(t=Ki,Np()!==s&&Up()!==s&&(e=r())!==s&&Up()!==s&&Op()!==s?(Qi=t,(n=e).parentheses=true,t=n):(Ki=t,t=s));var n;return t}())!==s?(Qi=r,b=t,p=e,v=n,y=u,(d=o)&&wv.add(`create::${d.db}::${d.table}`),t={tableList:Array.from(wv),columnList:vv(Lv),ast:{type:b[0].toLowerCase(),keyword:"table",temporary:p&&p[0].toLowerCase(),if_not_exists:v,table:[d],like:y}},r=t):(Ki=r,r=s)):(Ki=r,r=s)):(Ki=r,r=s);var b,p,v,d,y;r===s&&(r=Ki,(t=ob())!==s&&Up()!==s?((e=sb())===s&&(e=null),e!==s&&Up()!==s&&yb()!==s&&Up()!==s?((n=vc())===s&&(n=null),n!==s&&Up()!==s&&(o=Ll())!==s&&Up()!==s?((u=function(){var r,t,e,n,o,u,a,i,c;if(r=Ki,(t=Np())!==s)if(Up()!==s)if((e=Cc())!==s){for(n=[],o=Ki,(u=Up())!==s&&(a=Ip())!==s&&(i=Up())!==s&&(c=Cc())!==s?o=u=[u,a,i,c]:(Ki=o,o=s);o!==s;)n.push(o),o=Ki,(u=Up())!==s&&(a=Ip())!==s&&(i=Up())!==s&&(c=Cc())!==s?o=u=[u,a,i,c]:(Ki=o,o=s);n!==s&&(o=Up())!==s&&(u=Op())!==s?(Qi=r,t=sr(e,n),r=t):(Ki=r,r=s);}else Ki=r,r=s;else Ki=r,r=s;else Ki=r,r=s;return r}())===s&&(u=null),u!==s&&Up()!==s?((a=function(){var r,t,e,n,o,u,a,c;if(r=Ki,(t=Gc())!==s){for(e=[],n=Ki,(o=Up())!==s?((u=Ip())===s&&(u=null),u!==s&&(a=Up())!==s&&(c=Gc())!==s?n=o=[o,u,a,c]:(Ki=n,n=s)):(Ki=n,n=s);n!==s;)e.push(n),n=Ki,(o=Up())!==s?((u=Ip())===s&&(u=null),u!==s&&(a=Up())!==s&&(c=Gc())!==s?n=o=[o,u,a,c]:(Ki=n,n=s)):(Ki=n,n=s);e!==s?(Qi=r,t=i(t,e),r=t):(Ki=r,r=s);}else Ki=r,r=s;return r}())===s&&(a=null),a!==s&&Up()!==s?((c=lb())===s&&(c=ib()),c===s&&(c=null),c!==s&&Up()!==s?((l=db())===s&&(l=null),l!==s&&Up()!==s?((f=bc())===s&&(f=null),f!==s?(Qi=r,t=function(r,t,e,n,o,s,u,a,i){return n&&wv.add(`create::${n.db}::${n.table}`),{tableList:Array.from(wv),columnList:vv(Lv),ast:{type:r[0].toLowerCase(),keyword:"table",temporary:t&&t[0].toLowerCase(),if_not_exists:e,table:[n],ignore_replace:u&&u[0].toLowerCase(),as:a&&a[0].toLowerCase(),query_expr:i&&i.ast,create_definitions:o,table_options:s}}}(t,e,n,o,u,a,c,l,f),r=t):(Ki=r,r=s)):(Ki=r,r=s)):(Ki=r,r=s)):(Ki=r,r=s)):(Ki=r,r=s)):(Ki=r,r=s)):(Ki=r,r=s)):(Ki=r,r=s));return r}())===s&&(t=function(){var t,e,n,o,u,a,i,c,l,f,b;t=Ki,(e=ob())!==s&&Up()!==s?((n=Ec())===s&&(n=null),n!==s&&Up()!==s&&wb()!==s&&Up()!==s?((o=vc())===s&&(o=null),o!==s&&Up()!==s&&(u=Ll())!==s&&Up()!==s&&(a=function(){var t;"before"===r.substr(Ki,6).toLowerCase()?(t=r.substr(Ki,6),Ki+=6):(t=s,0===rc&&sc(br));t===s&&("after"===r.substr(Ki,5).toLowerCase()?(t=r.substr(Ki,5),Ki+=5):(t=s,0===rc&&sc(pr)));return t}())!==s&&Up()!==s&&(i=function(){var r,t;r=Ki,(t=ab())===s&&(t=nb())===s&&(t=ub());t!==s&&(Qi=r,t={keyword:t[0].toLowerCase()});return r=t}())!==s&&Up()!==s&&mb()!==s&&Up()!==s&&(c=Ll())!==s&&Up()!==s&&(l=function(){var t,e,n,o;t=Ki,"for"===r.substr(Ki,3).toLowerCase()?(e=r.substr(Ki,3),Ki+=3):(e=s,0===rc&&sc(vr));e!==s&&Up()!==s?("each"===r.substr(Ki,4).toLowerCase()?(n=r.substr(Ki,4),Ki+=4):(n=s,0===rc&&sc(dr)),n===s&&(n=null),n!==s&&Up()!==s?("row"===r.substr(Ki,3).toLowerCase()?(o=r.substr(Ki,3),Ki+=3):(o=s,0===rc&&sc(yr)),o===s&&("statement"===r.substr(Ki,9).toLowerCase()?(o=r.substr(Ki,9),Ki+=9):(o=s,0===rc&&sc(wr))),o!==s?(Qi=t,u=e,i=o,e={keyword:(a=n)?`${u.toLowerCase()} ${a.toLowerCase()}`:u.toLowerCase(),args:i.toLowerCase()},t=e):(Ki=t,t=s)):(Ki=t,t=s)):(Ki=t,t=s);var u,a,i;return t}())!==s&&Up()!==s?((f=function(){var t,e,n;t=Ki,"follows"===r.substr(Ki,7).toLowerCase()?(e=r.substr(Ki,7),Ki+=7):(e=s,0===rc&&sc(Lr));e===s&&("precedes"===r.substr(Ki,8).toLowerCase()?(e=r.substr(Ki,8),Ki+=8):(e=s,0===rc&&sc(Cr)));e!==s&&Up()!==s&&(n=af())!==s?(Qi=t,t=e={keyword:e,trigger:n}):(Ki=t,t=s);return t}())===s&&(f=null),f!==s&&Up()!==s&&(b=function(){var r,t;r=Ki,vb()!==s&&Up()!==s&&(t=Il())!==s?(Qi=r,r={type:"set",expr:t}):(Ki=r,r=s);return r}())!==s?(Qi=t,p=e,v=n,d=o,y=u,w=a,L=i,C=c,h=l,m=f,E=b,e={tableList:Array.from(wv),columnList:vv(Lv),ast:{type:p[0].toLowerCase(),definer:v,keyword:"trigger",for_each:h,if_not_exists:d,trigger:y,time:w,events:[L],order:m,table:C,execute:E}},t=e):(Ki=t,t=s)):(Ki=t,t=s)):(Ki=t,t=s)):(Ki=t,t=s);var p,v,d,y,w,L,C,h,m,E;return t}())===s&&(t=function(){var r,t,e,n,o,u,a,c,l,f,b,p;r=Ki,(t=ob())!==s&&Up()!==s?((e=Ep())===s&&(e=hp())===s&&(e=mp()),e===s&&(e=null),e!==s&&Up()!==s&&(n=Lp())!==s&&Up()!==s&&(o=af())!==s&&Up()!==s?((u=fl())===s&&(u=null),u!==s&&Up()!==s&&(a=mb())!==s&&Up()!==s&&(c=Ll())!==s&&Up()!==s&&Np()!==s&&Up()!==s&&(l=function(){var r,t,e,n,o,u,a,c;if(r=Ki,(t=pc())!==s){for(e=[],n=Ki,(o=Up())!==s&&(u=Ip())!==s&&(a=Up())!==s&&(c=pc())!==s?n=o=[o,u,a,c]:(Ki=n,n=s);n!==s;)e.push(n),n=Ki,(o=Up())!==s&&(u=Ip())!==s&&(a=Up())!==s&&(c=pc())!==s?n=o=[o,u,a,c]:(Ki=n,n=s);e!==s?(Qi=r,t=i(t,e),r=t):(Ki=r,r=s);}else Ki=r,r=s;return r}())!==s&&Up()!==s&&Op()!==s&&Up()!==s?((f=bl())===s&&(f=null),f!==s&&Up()!==s?((b=Sc())===s&&(b=null),b!==s&&Up()!==s?((p=Nc())===s&&(p=null),p!==s&&Up()!==s?(Qi=r,v=t,d=e,y=n,w=o,L=u,C=a,h=c,m=l,E=f,A=b,T=p,t={tableList:Array.from(wv),columnList:vv(Lv),ast:{type:v[0].toLowerCase(),index_type:d&&d.toLowerCase(),keyword:y.toLowerCase(),index:w,on_kw:C[0].toLowerCase(),table:h,index_columns:m,index_using:L,index_options:E,algorithm_option:A,lock_option:T}},r=t):(Ki=r,r=s)):(Ki=r,r=s)):(Ki=r,r=s)):(Ki=r,r=s)):(Ki=r,r=s)):(Ki=r,r=s);var v,d,y,w,L,C,h,m,E,A,T;return r}())===s&&(t=function(){var r,t,e,n,o,u;r=Ki,(t=ob())!==s&&Up()!==s?((e=Cb())===s&&(e=hb()),e!==s&&Up()!==s?((n=vc())===s&&(n=null),n!==s&&Up()!==s&&(o=Xp())!==s&&Up()!==s?((u=function(){var r,t,e,n,o,u;if(r=Ki,(t=Pc())!==s){for(e=[],n=Ki,(o=Up())!==s&&(u=Pc())!==s?n=o=[o,u]:(Ki=n,n=s);n!==s;)e.push(n),n=Ki,(o=Up())!==s&&(u=Pc())!==s?n=o=[o,u]:(Ki=n,n=s);e!==s?(Qi=r,t=l(t,e),r=t):(Ki=r,r=s);}else Ki=r,r=s;return r}())===s&&(u=null),u!==s?(Qi=r,t=function(r,t,e,n,o){const s=t.toLowerCase();return {tableList:Array.from(wv),columnList:vv(Lv),ast:{type:r[0].toLowerCase(),keyword:s,if_not_exists:e,[s]:{db:n.schema,schema:n.name},create_definitions:o}}}(t,e,n,o,u),r=t):(Ki=r,r=s)):(Ki=r,r=s)):(Ki=r,r=s)):(Ki=r,r=s);return r}())===s&&(t=function(){var t,e,n,o,u,a,i,c,l,f,b,p,v,d,y,w,L,C,h,m,E;t=Ki,(e=ob())!==s&&Up()!==s?(n=Ki,(o=Fb())!==s&&(u=Up())!==s&&(a=ib())!==s?n=o=[o,u,a]:(Ki=n,n=s),n===s&&(n=null),n!==s&&(o=Up())!==s?(u=Ki,"algorithm"===r.substr(Ki,9).toLowerCase()?(a=r.substr(Ki,9),Ki+=9):(a=s,0===rc&&sc(z)),a!==s&&(i=Up())!==s&&(c=dp())!==s&&(l=Up())!==s?("undefined"===r.substr(Ki,9).toLowerCase()?(f=r.substr(Ki,9),Ki+=9):(f=s,0===rc&&sc(Z)),f===s&&("merge"===r.substr(Ki,5).toLowerCase()?(f=r.substr(Ki,5),Ki+=5):(f=s,0===rc&&sc(J)),f===s&&("temptable"===r.substr(Ki,9).toLowerCase()?(f=r.substr(Ki,9),Ki+=9):(f=s,0===rc&&sc(rr)))),f!==s?u=a=[a,i,c,l,f]:(Ki=u,u=s)):(Ki=u,u=s),u===s&&(u=null),u!==s&&(a=Up())!==s?((i=Ec())===s&&(i=null),i!==s&&(c=Up())!==s?(l=Ki,"sql"===r.substr(Ki,3).toLowerCase()?(f=r.substr(Ki,3),Ki+=3):(f=s,0===rc&&sc(tr)),f!==s&&(b=Up())!==s?("security"===r.substr(Ki,8).toLowerCase()?(p=r.substr(Ki,8),Ki+=8):(p=s,0===rc&&sc(er)),p!==s&&(v=Up())!==s?("definer"===r.substr(Ki,7).toLowerCase()?(d=r.substr(Ki,7),Ki+=7):(d=s,0===rc&&sc(nr)),d===s&&("invoker"===r.substr(Ki,7).toLowerCase()?(d=r.substr(Ki,7),Ki+=7):(d=s,0===rc&&sc(or))),d!==s?l=f=[f,b,p,v,d]:(Ki=l,l=s)):(Ki=l,l=s)):(Ki=l,l=s),l===s&&(l=null),l!==s&&(f=Up())!==s&&(b=fp())!==s&&(p=Up())!==s&&(v=Ll())!==s&&(d=Up())!==s?(y=Ki,(w=Np())!==s&&(L=Up())!==s&&(C=nf())!==s&&(h=Up())!==s&&(m=Op())!==s?y=w=[w,L,C,h,m]:(Ki=y,y=s),y===s&&(y=null),y!==s&&(w=Up())!==s&&(L=db())!==s&&(C=Up())!==s&&(h=el())!==s&&(m=Up())!==s?((E=function(){var t,e,n,o,u;t=Ki,(e=gb())!==s&&Up()!==s?("cascaded"===r.substr(Ki,8).toLowerCase()?(n=r.substr(Ki,8),Ki+=8):(n=s,0===rc&&sc(V)),n===s&&("local"===r.substr(Ki,5).toLowerCase()?(n=r.substr(Ki,5),Ki+=5):(n=s,0===rc&&sc(X))),n!==s&&Up()!==s?("check"===r.substr(Ki,5).toLowerCase()?(o=r.substr(Ki,5),Ki+=5):(o=s,0===rc&&sc(K)),o!==s&&Up()!==s?("OPTION"===r.substr(Ki,6)?(u="OPTION",Ki+=6):(u=s,0===rc&&sc(Q)),u!==s?(Qi=t,e=`with ${n.toLowerCase()} check option`,t=e):(Ki=t,t=s)):(Ki=t,t=s)):(Ki=t,t=s)):(Ki=t,t=s);t===s&&(t=Ki,(e=gb())!==s&&Up()!==s?("check"===r.substr(Ki,5).toLowerCase()?(n=r.substr(Ki,5),Ki+=5):(n=s,0===rc&&sc(K)),n!==s&&Up()!==s?("OPTION"===r.substr(Ki,6)?(o="OPTION",Ki+=6):(o=s,0===rc&&sc(Q)),o!==s?(Qi=t,t=e="with check option"):(Ki=t,t=s)):(Ki=t,t=s)):(Ki=t,t=s));return t}())===s&&(E=null),E!==s?(Qi=t,A=e,T=n,_=u,g=i,I=l,N=y,O=h,R=E,(S=v).view=S.table,delete S.table,e={tableList:Array.from(wv),columnList:vv(Lv),ast:{type:A[0].toLowerCase(),keyword:"view",replace:T&&"or replace",algorithm:_&&_[4],definer:g,sql_security:I&&I[4],columns:N&&N[2],select:O,view:S,with:R}},t=e):(Ki=t,t=s)):(Ki=t,t=s)):(Ki=t,t=s)):(Ki=t,t=s)):(Ki=t,t=s)):(Ki=t,t=s)):(Ki=t,t=s);var A,T,_,g,I,S,N,O,R;return t}())===s&&(t=function(){var t,e,n,o,u,a,i,c,l,f,b;t=Ki,(e=ob())!==s&&Up()!==s&&ap()!==s&&Up()!==s?((n=vc())===s&&(n=null),n!==s&&Up()!==s&&(o=function(){var r,t,e,n,o,u,a,i;if(r=Ki,(t=dc())!==s){for(e=[],n=Ki,(o=Up())!==s&&(u=Ip())!==s&&(a=Up())!==s&&(i=dc())!==s?n=o=[o,u,a,i]:(Ki=n,n=s);n!==s;)e.push(n),n=Ki,(o=Up())!==s&&(u=Ip())!==s&&(a=Up())!==s&&(i=dc())!==s?n=o=[o,u,a,i]:(Ki=n,n=s);e!==s?(Qi=r,t=C(t,e),r=t):(Ki=r,r=s);}else Ki=r,r=s;return r}())!==s&&Up()!==s?((u=function(){var t,e,n;t=Ki,zf()!==s&&Up()!==s?("role"===r.substr(Ki,4).toLowerCase()?(e=r.substr(Ki,4),Ki+=4):(e=s,0===rc&&sc(h)),e!==s&&Up()!==s&&(n=Vc())!==s?(Qi=t,t={keyword:"default role",value:n}):(Ki=t,t=s)):(Ki=t,t=s);return t}())===s&&(u=null),u!==s&&Up()!==s?((a=function(){var t,e,n;t=Ki,"require"===r.substr(Ki,7).toLowerCase()?(e=r.substr(Ki,7),Ki+=7):(e=s,0===rc&&sc(S));e!==s&&Up()!==s&&(n=function(){var r,t,e,n,o,u,a,i;if(r=Ki,(t=yc())!==s){for(e=[],n=Ki,(o=Up())!==s&&(u=Gb())!==s&&(a=Up())!==s&&(i=yc())!==s?n=o=[o,u,a,i]:(Ki=n,n=s);n!==s;)e.push(n),n=Ki,(o=Up())!==s&&(u=Gb())!==s&&(a=Up())!==s&&(i=yc())!==s?n=o=[o,u,a,i]:(Ki=n,n=s);e!==s?(Qi=r,t=bv(t,e),r=t):(Ki=r,r=s);}else Ki=r,r=s;return r}())!==s?(Qi=t,t=e={keyword:"require",value:n}):(Ki=t,t=s);return t}())===s&&(a=null),a!==s&&Up()!==s?((i=function(){var r,t,e,n,o,u,a;if(r=Ki,(t=gb())!==s)if(Up()!==s)if((e=wc())!==s){for(n=[],o=Ki,(u=Up())!==s&&(a=wc())!==s?o=u=[u,a]:(Ki=o,o=s);o!==s;)n.push(o),o=Ki,(u=Up())!==s&&(a=wc())!==s?o=u=[u,a]:(Ki=o,o=s);n!==s?(Qi=r,t=function(r,t){const e=[r];if(t)for(const r of t)e.push(r[1]);return {keyword:"with",value:e}}(e,n),r=t):(Ki=r,r=s);}else Ki=r,r=s;else Ki=r,r=s;else Ki=r,r=s;return r}())===s&&(i=null),i!==s&&Up()!==s?((c=function(){var r,t,e,n,o,u;if(r=Ki,(t=Lc())!==s){for(e=[],n=Ki,(o=Up())!==s&&(u=Lc())!==s?n=o=[o,u]:(Ki=n,n=s);n!==s;)e.push(n),n=Ki,(o=Up())!==s&&(u=Lc())!==s?n=o=[o,u]:(Ki=n,n=s);e!==s?(Qi=r,t=fv(t,e,1),r=t):(Ki=r,r=s);}else Ki=r,r=s;return r}())===s&&(c=null),c!==s&&Up()!==s?((l=function(){var t,e,n;t=Ki,"account"===r.substr(Ki,7).toLowerCase()?(e=r.substr(Ki,7),Ki+=7):(e=s,0===rc&&sc(B));e!==s&&Up()!==s?("lock"===r.substr(Ki,4).toLowerCase()?(n=r.substr(Ki,4),Ki+=4):(n=s,0===rc&&sc($)),n===s&&("unlock"===r.substr(Ki,6).toLowerCase()?(n=r.substr(Ki,6),Ki+=6):(n=s,0===rc&&sc(W))),n!==s?(Qi=t,e=function(r){const t={type:"origin",value:r.toLowerCase(),prefix:"account"};return t}(n),t=e):(Ki=t,t=s)):(Ki=t,t=s);return t}())===s&&(l=null),l!==s&&Up()!==s?((f=Pp())===s&&(f=null),f!==s&&Up()!==s?((b=function(){var t,e,n;t=Ki,"attribute"===r.substr(Ki,9).toLowerCase()?(e=r.substr(Ki,9),Ki+=9):(e=s,0===rc&&sc(q));e!==s&&Up()!==s&&(n=Ff())!==s?(Qi=t,(o=n).prefix="attribute",t=e=o):(Ki=t,t=s);var o;return t}())===s&&(b=null),b!==s?(Qi=t,p=e,v=n,d=o,y=u,w=a,L=i,m=c,E=l,A=f,T=b,e={tableList:Array.from(wv),columnList:vv(Lv),ast:{type:p[0].toLowerCase(),keyword:"user",if_not_exists:v,user:d,default_role:y,require:w,resource_options:L,password_options:m,lock_option:E,comment:A,attribute:T}},t=e):(Ki=t,t=s)):(Ki=t,t=s)):(Ki=t,t=s)):(Ki=t,t=s)):(Ki=t,t=s)):(Ki=t,t=s)):(Ki=t,t=s)):(Ki=t,t=s)):(Ki=t,t=s);var p,v,d,y,w,L,m,E,A,T;return t}());return t}())===s&&(t=function(){var t,e,n,o;t=Ki,(e=function(){var t,e,n,o;t=Ki,"truncate"===r.substr(Ki,8).toLowerCase()?(e=r.substr(Ki,8),Ki+=8):(e=s,0===rc&&sc(Mr));e!==s?(n=Ki,rc++,o=Lf(),rc--,o===s?n=void 0:(Ki=n,n=s),n!==s?(Qi=t,t=e="TRUNCATE"):(Ki=t,t=s)):(Ki=t,t=s);return t}())!==s&&Up()!==s?((n=yb())===s&&(n=null),n!==s&&Up()!==s&&(o=vl())!==s?(Qi=t,u=e,a=n,(i=o)&&i.forEach(r=>wv.add(`${u}::${r.db}::${r.table}`)),e={tableList:Array.from(wv),columnList:vv(Lv),ast:{type:u.toLowerCase(),keyword:a&&a.toLowerCase()||"table",name:i}},t=e):(Ki=t,t=s)):(Ki=t,t=s);var u,a,i;return t}())===s&&(t=function(){var r,t,e;r=Ki,(t=cb())!==s&&Up()!==s&&yb()!==s&&Up()!==s&&(e=function(){var r,t,e,n,o,u,a,i;if(r=Ki,(t=ll())!==s){for(e=[],n=Ki,(o=Up())!==s&&(u=Ip())!==s&&(a=Up())!==s&&(i=ll())!==s?n=o=[o,u,a,i]:(Ki=n,n=s);n!==s;)e.push(n),n=Ki,(o=Up())!==s&&(u=Ip())!==s&&(a=Up())!==s&&(i=ll())!==s?n=o=[o,u,a,i]:(Ki=n,n=s);e!==s?(Qi=r,t=sr(t,e),r=t):(Ki=r,r=s);}else Ki=r,r=s;return r}())!==s?(Qi=r,(n=e).forEach(r=>r.forEach(r=>r.table&&wv.add(`rename::${r.db}::${r.table}`))),t={tableList:Array.from(wv),columnList:vv(Lv),ast:{type:"rename",table:n}},r=t):(Ki=r,r=s);var n;return r}())===s&&(t=function(){var t,e,n;t=Ki,(e=function(){var t,e,n,o;t=Ki,"call"===r.substr(Ki,4).toLowerCase()?(e=r.substr(Ki,4),Ki+=4):(e=s,0===rc&&sc(aa));e!==s?(n=Ki,rc++,o=Lf(),rc--,o===s?n=void 0:(Ki=n,n=s),n!==s?(Qi=t,t=e="CALL"):(Ki=t,t=s)):(Ki=t,t=s);return t}())!==s&&Up()!==s&&(n=function(){var r;(r=Kp())===s&&(r=Qp());return r}())!==s?(Qi=t,o=n,e={tableList:Array.from(wv),columnList:vv(Lv),ast:{type:"call",expr:o}},t=e):(Ki=t,t=s);var o;return t}())===s&&(t=function(){var t,e,n;t=Ki,(e=function(){var t,e,n,o;t=Ki,"use"===r.substr(Ki,3).toLowerCase()?(e=r.substr(Ki,3),Ki+=3):(e=s,0===rc&&sc(tu));e!==s?(n=Ki,rc++,o=Lf(),rc--,o===s?n=void 0:(Ki=n,n=s),n!==s?t=e=[e,n]:(Ki=t,t=s)):(Ki=t,t=s);return t}())!==s&&Up()!==s&&(n=af())!==s?(Qi=t,o=n,wv.add(`use::${o}::null`),e={tableList:Array.from(wv),columnList:vv(Lv),ast:{type:"use",db:o}},t=e):(Ki=t,t=s);var o;return t}())===s&&(t=function(){var r,t,e,n;r=Ki,(t=tb())!==s&&Up()!==s&&yb()!==s&&Up()!==s&&(e=Ll())!==s&&Up()!==s&&(n=function(){var r,t,e,n,o,u,a,i;if(r=Ki,(t=gc())!==s){for(e=[],n=Ki,(o=Up())!==s&&(u=Ip())!==s&&(a=Up())!==s&&(i=gc())!==s?n=o=[o,u,a,i]:(Ki=n,n=s);n!==s;)e.push(n),n=Ki,(o=Up())!==s&&(u=Ip())!==s&&(a=Up())!==s&&(i=gc())!==s?n=o=[o,u,a,i]:(Ki=n,n=s);e!==s?(Qi=r,t=sr(t,e),r=t):(Ki=r,r=s);}else Ki=r,r=s;return r}())!==s?(Qi=r,o=e,u=n,wv.add(`alter::${o.db}::${o.table}`),t={tableList:Array.from(wv),columnList:vv(Lv),ast:{type:"alter",table:[o],expr:u}},r=t):(Ki=r,r=s);var o,u;return r}())===s&&(t=function(){var t,e,n,o;t=Ki,(e=vb())!==s&&Up()!==s?((n=function(){var t,e,n,o;t=Ki,"global"===r.substr(Ki,6).toLowerCase()?(e=r.substr(Ki,6),Ki+=6):(e=s,0===rc&&sc(Xa));e!==s?(n=Ki,rc++,o=Lf(),rc--,o===s?n=void 0:(Ki=n,n=s),n!==s?(Qi=t,t=e="GLOBAL"):(Ki=t,t=s)):(Ki=t,t=s);return t}())===s&&(n=function(){var t,e,n,o;t=Ki,"session"===r.substr(Ki,7).toLowerCase()?(e=r.substr(Ki,7),Ki+=7):(e=s,0===rc&&sc(Ka));e!==s?(n=Ki,rc++,o=Lf(),rc--,o===s?n=void 0:(Ki=n,n=s),n!==s?(Qi=t,t=e="SESSION"):(Ki=t,t=s)):(Ki=t,t=s);return t}())===s&&(n=function(){var t,e,n,o;t=Ki,"local"===r.substr(Ki,5).toLowerCase()?(e=r.substr(Ki,5),Ki+=5):(e=s,0===rc&&sc(X));e!==s?(n=Ki,rc++,o=Lf(),rc--,o===s?n=void 0:(Ki=n,n=s),n!==s?(Qi=t,t=e="LOCAL"):(Ki=t,t=s)):(Ki=t,t=s);return t}())===s&&(n=function(){var t,e,n,o;t=Ki,"persist"===r.substr(Ki,7).toLowerCase()?(e=r.substr(Ki,7),Ki+=7):(e=s,0===rc&&sc(Qa));e!==s?(n=Ki,rc++,o=Lf(),rc--,o===s?n=void 0:(Ki=n,n=s),n!==s?(Qi=t,t=e="PERSIST"):(Ki=t,t=s)):(Ki=t,t=s);return t}())===s&&(n=function(){var t,e,n,o;t=Ki,"persist_only"===r.substr(Ki,12).toLowerCase()?(e=r.substr(Ki,12),Ki+=12):(e=s,0===rc&&sc(za));e!==s?(n=Ki,rc++,o=Lf(),rc--,o===s?n=void 0:(Ki=n,n=s),n!==s?(Qi=t,t=e="PERSIST_ONLY"):(Ki=t,t=s)):(Ki=t,t=s);return t}()),n===s&&(n=null),n!==s&&Up()!==s&&(o=function(){var r,t,e,n,o,u,a,i;if(r=Ki,(t=Bp())!==s){for(e=[],n=Ki,(o=Up())!==s&&(u=Ip())!==s&&(a=Up())!==s&&(i=Bp())!==s?n=o=[o,u,a,i]:(Ki=n,n=s);n!==s;)e.push(n),n=Ki,(o=Up())!==s&&(u=Ip())!==s&&(a=Up())!==s&&(i=Bp())!==s?n=o=[o,u,a,i]:(Ki=n,n=s);e!==s?(Qi=r,t=Yt(t,e),r=t):(Ki=r,r=s);}else Ki=r,r=s;return r}())!==s?(Qi=t,u=n,(a=o).keyword=u,e={tableList:Array.from(wv),columnList:vv(Lv),ast:{type:"set",keyword:u,expr:a}},t=e):(Ki=t,t=s)):(Ki=t,t=s);var u,a;return t}())===s&&(t=function(){var t,e,n;t=Ki,(e=function(){var t,e,n,o;t=Ki,"lock"===r.substr(Ki,4).toLowerCase()?(e=r.substr(Ki,4),Ki+=4):(e=s,0===rc&&sc($));e!==s?(n=Ki,rc++,o=Lf(),rc--,o===s?n=void 0:(Ki=n,n=s),n!==s?t=e=[e,n]:(Ki=t,t=s)):(Ki=t,t=s);return t}())!==s&&Up()!==s&&Lb()!==s&&Up()!==s&&(n=function(){var r,t,e,n,o,u,a,i;if(r=Ki,(t=Fc())!==s){for(e=[],n=Ki,(o=Up())!==s&&(u=Ip())!==s&&(a=Up())!==s&&(i=Fc())!==s?n=o=[o,u,a,i]:(Ki=n,n=s);n!==s;)e.push(n),n=Ki,(o=Up())!==s&&(u=Ip())!==s&&(a=Up())!==s&&(i=Fc())!==s?n=o=[o,u,a,i]:(Ki=n,n=s);e!==s?(Qi=r,t=Yt(t,e),r=t):(Ki=r,r=s);}else Ki=r,r=s;return r}())!==s?(Qi=t,o=n,e={tableList:Array.from(wv),columnList:vv(Lv),ast:{type:"lock",keyword:"tables",tables:o}},t=e):(Ki=t,t=s);var o;return t}())===s&&(t=function(){var t,e;t=Ki,(e=function(){var t,e,n,o;t=Ki,"unlock"===r.substr(Ki,6).toLowerCase()?(e=r.substr(Ki,6),Ki+=6):(e=s,0===rc&&sc(W));e!==s?(n=Ki,rc++,o=Lf(),rc--,o===s?n=void 0:(Ki=n,n=s),n!==s?t=e=[e,n]:(Ki=t,t=s)):(Ki=t,t=s);return t}())!==s&&Up()!==s&&Lb()!==s?(Qi=t,e={tableList:Array.from(wv),columnList:vv(Lv),ast:{type:"unlock",keyword:"tables"}},t=e):(Ki=t,t=s);return t}())===s&&(t=function(){var t,e,n,o,u,a,i,c,l;t=Ki,(e=Jf())!==s&&Up()!==s?("binary"===r.substr(Ki,6).toLowerCase()?(n=r.substr(Ki,6),Ki+=6):(n=s,0===rc&&sc(Bt)),n===s&&("master"===r.substr(Ki,6).toLowerCase()?(n=r.substr(Ki,6),Ki+=6):(n=s,0===rc&&sc($t))),n!==s&&(o=Up())!==s?("logs"===r.substr(Ki,4).toLowerCase()?(u=r.substr(Ki,4),Ki+=4):(u=s,0===rc&&sc(Wt)),u!==s?(Qi=t,f=n,e={tableList:Array.from(wv),columnList:vv(Lv),ast:{type:"show",suffix:"logs",keyword:f.toLowerCase()}},t=e):(Ki=t,t=s)):(Ki=t,t=s)):(Ki=t,t=s);var f;t===s&&(t=Ki,(e=Jf())!==s&&Up()!==s&&(n=Lb())!==s?(Qi=t,wv.add("show::null::null"),e={tableList:Array.from(wv),columnList:vv(Lv),ast:{type:"show",keyword:"tables"}},t=e):(Ki=t,t=s),t===s&&(t=Ki,(e=Jf())!==s&&Up()!==s?("triggers"===r.substr(Ki,8).toLowerCase()?(n=r.substr(Ki,8),Ki+=8):(n=s,0===rc&&sc(qt)),n===s&&("status"===r.substr(Ki,6).toLowerCase()?(n=r.substr(Ki,6),Ki+=6):(n=s,0===rc&&sc(Vt)),n===s&&("processlist"===r.substr(Ki,11).toLowerCase()?(n=r.substr(Ki,11),Ki+=11):(n=s,0===rc&&sc(Xt)))),n!==s?(Qi=t,d=n,e={tableList:Array.from(wv),columnList:vv(Lv),ast:{type:"show",keyword:d.toLowerCase()}},t=e):(Ki=t,t=s)):(Ki=t,t=s),t===s&&(t=Ki,(e=Jf())!==s&&Up()!==s?("procedure"===r.substr(Ki,9).toLowerCase()?(n=r.substr(Ki,9),Ki+=9):(n=s,0===rc&&sc(Kt)),n===s&&("function"===r.substr(Ki,8).toLowerCase()?(n=r.substr(Ki,8),Ki+=8):(n=s,0===rc&&sc(Qt))),n!==s&&(o=Up())!==s?("status"===r.substr(Ki,6).toLowerCase()?(u=r.substr(Ki,6),Ki+=6):(u=s,0===rc&&sc(Vt)),u!==s?(Qi=t,e=function(r){return {tableList:Array.from(wv),columnList:vv(Lv),ast:{type:"show",keyword:r.toLowerCase(),suffix:"status"}}}(n),t=e):(Ki=t,t=s)):(Ki=t,t=s)):(Ki=t,t=s),t===s&&(t=Ki,(e=Jf())!==s&&Up()!==s?("binlog"===r.substr(Ki,6).toLowerCase()?(n=r.substr(Ki,6),Ki+=6):(n=s,0===rc&&sc(zt)),n!==s&&(o=Up())!==s?("events"===r.substr(Ki,6).toLowerCase()?(u=r.substr(Ki,6),Ki+=6):(u=s,0===rc&&sc(Zt)),u!==s&&(a=Up())!==s?((i=Kl())===s&&(i=null),i!==s&&Up()!==s?((c=cl())===s&&(c=null),c!==s&&Up()!==s?((l=gl())===s&&(l=null),l!==s?(Qi=t,b=i,p=c,v=l,e={tableList:Array.from(wv),columnList:vv(Lv),ast:{type:"show",suffix:"events",keyword:"binlog",in:b,from:p,limit:v}},t=e):(Ki=t,t=s)):(Ki=t,t=s)):(Ki=t,t=s)):(Ki=t,t=s)):(Ki=t,t=s)):(Ki=t,t=s),t===s&&(t=Ki,(e=Jf())!==s&&Up()!==s?(n=Ki,"character"===r.substr(Ki,9).toLowerCase()?(o=r.substr(Ki,9),Ki+=9):(o=s,0===rc&&sc(lt)),o!==s&&(u=Up())!==s?("set"===r.substr(Ki,3).toLowerCase()?(a=r.substr(Ki,3),Ki+=3):(a=s,0===rc&&sc(ft)),a!==s?n=o=[o,u,a]:(Ki=n,n=s)):(Ki=n,n=s),n===s&&("collation"===r.substr(Ki,9).toLowerCase()?(n=r.substr(Ki,9),Ki+=9):(n=s,0===rc&&sc(Jt)),n===s&&("databases"===r.substr(Ki,9).toLowerCase()?(n=r.substr(Ki,9),Ki+=9):(n=s,0===rc&&sc(re)))),n!==s&&(o=Up())!==s?((u=Xl())===s&&(u=hl()),u===s&&(u=null),u!==s?(Qi=t,e=function(r,t){let e=Array.isArray(r)&&r||[r];return {tableList:Array.from(wv),columnList:vv(Lv),ast:{type:"show",suffix:e[2]&&e[2].toLowerCase(),keyword:e[0].toLowerCase(),expr:t}}}(n,u),t=e):(Ki=t,t=s)):(Ki=t,t=s)):(Ki=t,t=s),t===s&&(t=Ki,(e=Jf())!==s&&Up()!==s?("columns"===r.substr(Ki,7).toLowerCase()?(n=r.substr(Ki,7),Ki+=7):(n=s,0===rc&&sc(te)),n===s&&("indexes"===r.substr(Ki,7).toLowerCase()?(n=r.substr(Ki,7),Ki+=7):(n=s,0===rc&&sc(ee)),n===s&&("index"===r.substr(Ki,5).toLowerCase()?(n=r.substr(Ki,5),Ki+=5):(n=s,0===rc&&sc(It)))),n!==s&&(o=Up())!==s&&(u=cl())!==s?(Qi=t,e=function(r,t){return {tableList:Array.from(wv),columnList:vv(Lv),ast:{type:"show",keyword:r.toLowerCase(),from:t}}}(n,u),t=e):(Ki=t,t=s)):(Ki=t,t=s),t===s&&(t=Ki,(e=Jf())!==s&&Up()!==s&&(n=ob())!==s&&(o=Up())!==s?((u=fp())===s&&(u=yb())===s&&("event"===r.substr(Ki,5).toLowerCase()?(u=r.substr(Ki,5),Ki+=5):(u=s,0===rc&&sc(ne)),u===s&&(u=wb())===s&&("procedure"===r.substr(Ki,9).toLowerCase()?(u=r.substr(Ki,9),Ki+=9):(u=s,0===rc&&sc(Kt)))),u!==s&&(a=Up())!==s&&(i=Ll())!==s?(Qi=t,e=function(r,t){const e=r.toLowerCase();return {tableList:Array.from(wv),columnList:vv(Lv),ast:{type:"show",keyword:"create",suffix:e,[e]:t}}}(u,i),t=e):(Ki=t,t=s)):(Ki=t,t=s),t===s&&(t=function(){var t,e,n,o;t=Ki,(e=Jf())!==s&&Up()!==s?("grants"===r.substr(Ki,6).toLowerCase()?(n=r.substr(Ki,6),Ki+=6):(n=s,0===rc&&sc(oe)),n!==s&&Up()!==s?((o=function(){var t,e,n,o,u,a,i;t=Ki,"for"===r.substr(Ki,3).toLowerCase()?(e=r.substr(Ki,3),Ki+=3):(e=s,0===rc&&sc(vr));e!==s&&Up()!==s&&(n=af())!==s&&Up()!==s?(o=Ki,(u=bp())!==s&&(a=Up())!==s&&(i=af())!==s?o=u=[u,a,i]:(Ki=o,o=s),o===s&&(o=null),o!==s&&(u=Up())!==s?((a=function(){var r,t;r=Ki,_b()!==s&&Up()!==s&&(t=function(){var r,t,e,n,o,u,a,i;if(r=Ki,(t=af())!==s){for(e=[],n=Ki,(o=Up())!==s&&(u=Ip())!==s&&(a=Up())!==s&&(i=af())!==s?n=o=[o,u,a,i]:(Ki=n,n=s);n!==s;)e.push(n),n=Ki,(o=Up())!==s&&(u=Ip())!==s&&(a=Up())!==s&&(i=af())!==s?n=o=[o,u,a,i]:(Ki=n,n=s);e!==s?(Qi=r,t=Yt(t,e),r=t):(Ki=r,r=s);}else Ki=r,r=s;return r}())!==s?(Qi=r,r=t):(Ki=r,r=s);return r}())===s&&(a=null),a!==s?(Qi=t,l=a,e={user:n,host:(c=o)&&c[2],role_list:l},t=e):(Ki=t,t=s)):(Ki=t,t=s)):(Ki=t,t=s);var c,l;return t}())===s&&(o=null),o!==s?(Qi=t,u=o,e={tableList:Array.from(wv),columnList:vv(Lv),ast:{type:"show",keyword:"grants",for:u}},t=e):(Ki=t,t=s)):(Ki=t,t=s)):(Ki=t,t=s);var u;return t}()))))))));var b,p,v;var d;return t}())===s&&(t=function(){var t,e,n;t=Ki,(e=Ob())===s&&(e=function(){var t,e,n,o;t=Ki,"describe"===r.substr(Ki,8).toLowerCase()?(e=r.substr(Ki,8),Ki+=8):(e=s,0===rc&&sc(Bu));e!==s?(n=Ki,rc++,o=Lf(),rc--,o===s?n=void 0:(Ki=n,n=s),n!==s?(Qi=t,t=e="DESCRIBE"):(Ki=t,t=s)):(Ki=t,t=s);return t}());e!==s&&Up()!==s&&(n=af())!==s?(Qi=t,o=n,e={tableList:Array.from(wv),columnList:vv(Lv),ast:{type:"desc",table:o}},t=e):(Ki=t,t=s);var o;return t}())===s&&(t=function(){var t,e,n,o,u,a,i,c,l;t=Ki,"grant"===r.substr(Ki,5).toLowerCase()?(e=r.substr(Ki,5),Ki+=5):(e=s,0===rc&&sc(Ue));e!==s&&Up()!==s&&(n=function(){var r,t,e,n,o,u,a,i;if(r=Ki,(t=Wc())!==s){for(e=[],n=Ki,(o=Up())!==s&&(u=Ip())!==s&&(a=Up())!==s&&(i=Wc())!==s?n=o=[o,u,a,i]:(Ki=n,n=s);n!==s;)e.push(n),n=Ki,(o=Up())!==s&&(u=Ip())!==s&&(a=Up())!==s&&(i=Wc())!==s?n=o=[o,u,a,i]:(Ki=n,n=s);e!==s?(Qi=r,t=C(t,e),r=t):(Ki=r,r=s);}else Ki=r,r=s;return r}())!==s&&Up()!==s&&(o=mb())!==s&&Up()!==s?((u=function(){var t,e;t=Ki,(e=yb())===s&&("function"===r.substr(Ki,8).toLowerCase()?(e=r.substr(Ki,8),Ki+=8):(e=s,0===rc&&sc(Qt)),e===s&&("procedure"===r.substr(Ki,9).toLowerCase()?(e=r.substr(Ki,9),Ki+=9):(e=s,0===rc&&sc(Kt))));e!==s&&(Qi=t,e={type:"origin",value:e.toUpperCase()});return t=e}())===s&&(u=null),u!==s&&Up()!==s&&(a=function(){var r,t,e,n,o;r=Ki,t=Ki,(e=af())===s&&(e=Sp());e!==s&&(n=Up())!==s&&(o=gp())!==s?t=e=[e,n,o]:(Ki=t,t=s);t===s&&(t=null);t!==s&&(e=Up())!==s?((n=af())===s&&(n=Sp()),n!==s?(Qi=r,a=n,t={prefix:(u=t)&&u[0],name:a},r=t):(Ki=r,r=s)):(Ki=r,r=s);var u,a;return r}())!==s&&Up()!==s&&(i=Zf())!==s&&Up()!==s&&(c=Vc())!==s&&Up()!==s?((l=function(){var t,e,n;t=Ki,gb()!==s&&Up()!==s?("grant"===r.substr(Ki,5).toLowerCase()?(e=r.substr(Ki,5),Ki+=5):(e=s,0===rc&&sc(Ue)),e!==s&&Up()!==s?("option"===r.substr(Ki,6).toLowerCase()?(n=r.substr(Ki,6),Ki+=6):(n=s,0===rc&&sc(De)),n!==s?(Qi=t,t={type:"origin",value:"with grant option"}):(Ki=t,t=s)):(Ki=t,t=s)):(Ki=t,t=s);return t}())===s&&(l=null),l!==s?(Qi=t,f=n,b=u,p=a,v=i,d=c,y=l,e={tableList:Array.from(wv),columnList:vv(Lv),ast:{type:"grant",keyword:"priv",objects:f,on:{object_type:b,priv_level:[p]},to_from:v[0],user_or_roles:d,with:y}},t=e):(Ki=t,t=s)):(Ki=t,t=s)):(Ki=t,t=s);var f,b,p,v,d,y;t===s&&(t=Ki,"GRANT"===r.substr(Ki,5)?(e="GRANT",Ki+=5):(e=s,0===rc&&sc(He)),e!==s&&Up()!==s?("PROXY"===r.substr(Ki,5)?(n="PROXY",Ki+=5):(n=s,0===rc&&sc(Ye)),n!==s&&Up()!==s&&(o=mb())!==s&&Up()!==s&&(u=qc())!==s&&Up()!==s&&(a=Zf())!==s&&Up()!==s&&(i=Vc())!==s&&Up()!==s?((c=Xc())===s&&(c=null),c!==s?(Qi=t,e=function(r,t,e,n){return {tableList:Array.from(wv),columnList:vv(Lv),ast:{type:"grant",keyword:"proxy",objects:[{priv:{type:"origin",value:"proxy"}}],on:r,to_from:t[0],user_or_roles:e,with:n}}}(u,a,i,c),t=e):(Ki=t,t=s)):(Ki=t,t=s)):(Ki=t,t=s),t===s&&(t=Ki,"GRANT"===r.substr(Ki,5)?(e="GRANT",Ki+=5):(e=s,0===rc&&sc(He)),e!==s&&Up()!==s&&(n=function(){var r,t,e,n,o,u,a,i;if(r=Ki,(t=af())!==s){for(e=[],n=Ki,(o=Up())!==s&&(u=Ip())!==s&&(a=Up())!==s&&(i=af())!==s?n=o=[o,u,a,i]:(Ki=n,n=s);n!==s;)e.push(n),n=Ki,(o=Up())!==s&&(u=Ip())!==s&&(a=Up())!==s&&(i=af())!==s?n=o=[o,u,a,i]:(Ki=n,n=s);e!==s?(Qi=r,t=C(t,e),r=t):(Ki=r,r=s);}else Ki=r,r=s;return r}())!==s&&Up()!==s&&(o=Zf())!==s&&Up()!==s&&(u=Vc())!==s&&Up()!==s?((a=Xc())===s&&(a=null),a!==s?(Qi=t,e=function(r,t,e,n){return {tableList:Array.from(wv),columnList:vv(Lv),ast:{type:"grant",keyword:"role",objects:r.map(r=>({priv:{type:"string",value:r}})),to_from:t[0],user_or_roles:e,with:n}}}(n,o,u,a),t=e):(Ki=t,t=s)):(Ki=t,t=s)));return t}())===s&&(t=function(){var t,e,n;t=Ki,(e=function(){var t,e,n,o;t=Ki,"explain"===r.substr(Ki,7).toLowerCase()?(e=r.substr(Ki,7),Ki+=7):(e=s,0===rc&&sc(pu));e!==s?(n=Ki,rc++,o=Lf(),rc--,o===s?n=void 0:(Ki=n,n=s),n!==s?t=e=[e,n]:(Ki=t,t=s)):(Ki=t,t=s);return t}())!==s&&Up()!==s&&(n=el())!==s?(Qi=t,o=n,e={tableList:Array.from(wv),columnList:vv(Lv),ast:{type:"explain",expr:o}},t=e):(Ki=t,t=s);var o;return t}())===s&&(t=function(){var t,e,n,o;t=Ki,"commit"===r.substr(Ki,6).toLowerCase()?(e=r.substr(Ki,6),Ki+=6):(e=s,0===rc&&sc(ve));e===s&&("rollback"===r.substr(Ki,8).toLowerCase()?(e=r.substr(Ki,8),Ki+=8):(e=s,0===rc&&sc(de)));e!==s&&(Qi=t,e={type:"transaction",expr:{action:{type:"origin",value:e}}});(t=e)===s&&(t=Ki,"begin"===r.substr(Ki,5).toLowerCase()?(e=r.substr(Ki,5),Ki+=5):(e=s,0===rc&&sc(ye)),e!==s&&Up()!==s?("work"===r.substr(Ki,4).toLowerCase()?(n=r.substr(Ki,4),Ki+=4):(n=s,0===rc&&sc(we)),n===s&&("transaction"===r.substr(Ki,11).toLowerCase()?(n=r.substr(Ki,11),Ki+=11):(n=s,0===rc&&sc(Le))),n===s&&(n=null),n!==s&&Up()!==s?((o=Yc())===s&&(o=null),o!==s?(Qi=t,e=function(r,t){return {type:"transaction",expr:{action:{type:"origin",value:"begin"},keyword:r,modes:t}}}(n,o),t=e):(Ki=t,t=s)):(Ki=t,t=s)):(Ki=t,t=s),t===s&&(t=Ki,"start"===r.substr(Ki,5).toLowerCase()?(e=r.substr(Ki,5),Ki+=5):(e=s,0===rc&&sc(Ce)),e!==s&&Up()!==s?("transaction"===r.substr(Ki,11).toLowerCase()?(n=r.substr(Ki,11),Ki+=11):(n=s,0===rc&&sc(he)),n!==s&&Up()!==s?((o=Yc())===s&&(o=null),o!==s?(Qi=t,e=function(r,t){return {type:"transaction",expr:{action:{type:"origin",value:"start"},keyword:r,modes:t}}}(n,o),t=e):(Ki=t,t=s)):(Ki=t,t=s)):(Ki=t,t=s)));return t}())===s&&(t=function(){var t,e,n,o,u,a,i,c,l,f,b,p,v,y,w,L,C,h,m,E,A,T,_,g,I;t=Ki,"load"===r.substr(Ki,4).toLowerCase()?(e=r.substr(Ki,4),Ki+=4):(e=s,0===rc&&sc(Se));e!==s&&Up()!==s?("data"===r.substr(Ki,4).toLowerCase()?(n=r.substr(Ki,4),Ki+=4):(n=s,0===rc&&sc(gt)),n!==s&&Up()!==s?("low_priority"===r.substr(Ki,12).toLowerCase()?(o=r.substr(Ki,12),Ki+=12):(o=s,0===rc&&sc(Ft)),o===s&&("concurrent"===r.substr(Ki,10).toLowerCase()?(o=r.substr(Ki,10),Ki+=10):(o=s,0===rc&&sc(Ne))),o===s&&(o=null),o!==s&&Up()!==s?("local"===r.substr(Ki,5).toLowerCase()?(u=r.substr(Ki,5),Ki+=5):(u=s,0===rc&&sc(X)),u===s&&(u=null),u!==s&&Up()!==s?("infile"===r.substr(Ki,6).toLowerCase()?(a=r.substr(Ki,6),Ki+=6):(a=s,0===rc&&sc(Oe)),a!==s&&Up()!==s&&(i=sf())!==s&&Up()!==s?((c=xl())===s&&(c=null),c!==s&&Up()!==s?("into"===r.substr(Ki,4).toLowerCase()?(l=r.substr(Ki,4),Ki+=4):(l=s,0===rc&&sc(Re)),l!==s&&Up()!==s?("table"===r.substr(Ki,5).toLowerCase()?(f=r.substr(Ki,5),Ki+=5):(f=s,0===rc&&sc(xe)),f!==s&&Up()!==s&&(b=Ll())!==s&&Up()!==s?((p=Ol())===s&&(p=null),p!==s&&Up()!==s?(v=Ki,(y=Mc())!==s&&(w=Up())!==s&&(L=sf())!==s?v=y=[y,w,L]:(Ki=v,v=s),v===s&&(v=null),v!==s&&(y=Up())!==s?((w=function(){var t,e,n,o,u,a,i,c,l,f,b,p;t=Ki,"fields"===r.substr(Ki,6).toLowerCase()?(e=r.substr(Ki,6),Ki+=6):(e=s,0===rc&&sc(me));e===s&&("columns"===r.substr(Ki,7).toLowerCase()?(e=r.substr(Ki,7),Ki+=7):(e=s,0===rc&&sc(te)));e!==s&&Up()!==s?(n=Ki,"terminated"===r.substr(Ki,10).toLowerCase()?(o=r.substr(Ki,10),Ki+=10):(o=s,0===rc&&sc(Ee)),o!==s&&(u=Up())!==s?("by"===r.substr(Ki,2).toLowerCase()?(a=r.substr(Ki,2),Ki+=2):(a=s,0===rc&&sc(d)),a!==s&&(i=Up())!==s&&(c=sf())!==s?n=o=[o,u,a,i,c]:(Ki=n,n=s)):(Ki=n,n=s),n===s&&(n=null),n!==s&&(o=Up())!==s?(u=Ki,"optionally"===r.substr(Ki,10).toLowerCase()?(a=r.substr(Ki,10),Ki+=10):(a=s,0===rc&&sc(Ae)),a===s&&(a=null),a!==s&&(i=Up())!==s?("enclosed"===r.substr(Ki,8).toLowerCase()?(c=r.substr(Ki,8),Ki+=8):(c=s,0===rc&&sc(Te)),c!==s&&(l=Up())!==s?("by"===r.substr(Ki,2).toLowerCase()?(f=r.substr(Ki,2),Ki+=2):(f=s,0===rc&&sc(d)),f!==s&&(b=Up())!==s&&(p=sf())!==s?u=a=[a,i,c,l,f,b,p]:(Ki=u,u=s)):(Ki=u,u=s)):(Ki=u,u=s),u===s&&(u=null),u!==s&&(a=Up())!==s?(i=Ki,"escaped"===r.substr(Ki,7).toLowerCase()?(c=r.substr(Ki,7),Ki+=7):(c=s,0===rc&&sc(_e)),c!==s&&(l=Up())!==s?("by"===r.substr(Ki,2).toLowerCase()?(f=r.substr(Ki,2),Ki+=2):(f=s,0===rc&&sc(d)),f!==s&&(b=Up())!==s&&(p=sf())!==s?i=c=[c,l,f,b,p]:(Ki=i,i=s)):(Ki=i,i=s),i===s&&(i=null),i!==s?(Qi=t,v=e,w=u,L=i,(y=n)&&(y[4].prefix="TERMINATED BY"),w&&(w[6].prefix=(w[0]&&"OPTIONALLY"===w[0].toUpperCase()?"OPTIONALLY ":"")+"ENCLOSED BY"),L&&(L[4].prefix="ESCAPED BY"),e={keyword:v,terminated:y&&y[4],enclosed:w&&w[6],escaped:L&&L[4]},t=e):(Ki=t,t=s)):(Ki=t,t=s)):(Ki=t,t=s)):(Ki=t,t=s);var v,y,w,L;return t}())===s&&(w=null),w!==s&&(L=Up())!==s?((C=function(){var t,e,n,o;t=Ki,"lines"===r.substr(Ki,5).toLowerCase()?(e=r.substr(Ki,5),Ki+=5):(e=s,0===rc&&sc(Ie));e!==s&&Up()!==s?((n=Bc())===s&&(n=null),n!==s&&Up()!==s?((o=Bc())===s&&(o=null),o!==s?(Qi=t,e=function(r,t,e){if(t&&e&&t.type===e.type)throw new Error("LINES cannot be specified twice");return t&&Reflect.deleteProperty(t,"type"),e&&Reflect.deleteProperty(e,"type"),{keyword:r,...t||{},...e||{}}}(e,n,o),t=e):(Ki=t,t=s)):(Ki=t,t=s)):(Ki=t,t=s);return t}())===s&&(C=null),C!==s&&Up()!==s?(h=Ki,(m=lb())!==s&&(E=Up())!==s&&(A=$f())!==s&&(T=Up())!==s?("lines"===r.substr(Ki,5).toLowerCase()?(_=r.substr(Ki,5),Ki+=5):(_=s,0===rc&&sc(Ie)),_===s&&("rows"===r.substr(Ki,4).toLowerCase()?(_=r.substr(Ki,4),Ki+=4):(_=s,0===rc&&sc(je))),_!==s?h=m=[m,E,A,T,_]:(Ki=h,h=s)):(Ki=h,h=s),h===s&&(h=null),h!==s&&(m=Up())!==s?((E=ol())===s&&(E=null),E!==s&&(A=Up())!==s?(T=Ki,(_=vb())!==s&&(g=Up())!==s&&(I=Il())!==s?T=_=[_,g,I]:(Ki=T,T=s),T===s&&(T=null),T!==s?(Qi=t,N=E,O=T,e={type:"load_data",mode:o,local:u,file:i,replace_ignore:c,table:b,partition:p,character_set:v,fields:w,lines:C,ignore:(S=h)&&{count:S[2],suffix:S[4]},column:N,set:O&&O[2]},t=e):(Ki=t,t=s)):(Ki=t,t=s)):(Ki=t,t=s)):(Ki=t,t=s)):(Ki=t,t=s)):(Ki=t,t=s)):(Ki=t,t=s)):(Ki=t,t=s)):(Ki=t,t=s)):(Ki=t,t=s)):(Ki=t,t=s)):(Ki=t,t=s)):(Ki=t,t=s)):(Ki=t,t=s)):(Ki=t,t=s);var S,N,O;return t}()),t}function lc(){var r;return (r=bc())===s&&(r=function(){var r,t,e,n,o,u,a,i;r=Ki,(t=Up())!==s?((e=Qc())===s&&(e=null),e!==s&&Up()!==s&&nb()!==s&&Up()!==s&&(n=vl())!==s&&Up()!==s&&vb()!==s&&Up()!==s&&(o=Il())!==s&&Up()!==s?((u=hl())===s&&(u=null),u!==s&&Up()!==s?((a=Al())===s&&(a=null),a!==s&&Up()!==s?((i=gl())===s&&(i=null),i!==s?(Qi=r,t=function(r,t,e,n,o,s){const u={};return t&&t.forEach(r=>{const{db:t,as:e,table:n,join:o}=r,s=o?"select":"update";t&&(u[n]=t),n&&wv.add(`${s}::${t}::${n}`);}),e&&e.forEach(r=>{if(r.table){const t=pv(r.table);wv.add(`update::${u[t]||null}::${t}`);}Lv.add(`update::${r.table}::${r.column}`);}),{tableList:Array.from(wv),columnList:vv(Lv),ast:{with:r,type:"update",table:t,set:e,where:n,orderby:o,limit:s}}}(e,n,o,u,a,i),r=t):(Ki=r,r=s)):(Ki=r,r=s)):(Ki=r,r=s)):(Ki=r,r=s)):(Ki=r,r=s);return r}())===s&&(r=function(){var r,t,e,n,o,u,a,i,c;r=Ki,(t=xl())!==s&&Up()!==s?((e=lb())===s&&(e=null),e!==s&&Up()!==s?((n=bb())===s&&(n=null),n!==s&&Up()!==s&&(o=Ll())!==s&&Up()!==s?((u=Ol())===s&&(u=null),u!==s&&Up()!==s&&Np()!==s&&Up()!==s&&(a=nf())!==s&&Up()!==s&&Op()!==s&&Up()!==s&&(i=Nl())!==s&&Up()!==s?((c=Rl())===s&&(c=null),c!==s?(Qi=r,t=function(r,t,e,n,o,s,u,a){if(n&&(wv.add(`insert::${n.db}::${n.table}`),n.as=null),s){let r=n&&n.table||null;Array.isArray(u.values)&&u.values.forEach((r,t)=>{if(r.value.length!=s.length)throw new Error("Error: column count doesn't match value count at row "+(t+1))}),s.forEach(t=>Lv.add(`insert::${r}::${t}`));}const i=[t,e].filter(r=>r).map(r=>r[0]&&r[0].toLowerCase()).join(" ");return {tableList:Array.from(wv),columnList:vv(Lv),ast:{type:r,table:[n],columns:s,values:u,partition:o,prefix:i,on_duplicate_update:a}}}(t,e,n,o,u,a,i,c),r=t):(Ki=r,r=s)):(Ki=r,r=s)):(Ki=r,r=s)):(Ki=r,r=s)):(Ki=r,r=s);return r}())===s&&(r=function(){var r,t,e,n,o,u,a,i;r=Ki,(t=xl())!==s&&Up()!==s?((e=lb())===s&&(e=null),e!==s&&Up()!==s?((n=bb())===s&&(n=null),n!==s&&Up()!==s&&(o=Ll())!==s&&Up()!==s?((u=Ol())===s&&(u=null),u!==s&&Up()!==s&&(a=Nl())!==s&&Up()!==s?((i=Rl())===s&&(i=null),i!==s?(Qi=r,t=function(r,t,e,n,o,s,u){n&&(wv.add(`insert::${n.db}::${n.table}`),Lv.add(`insert::${n.table}::(.*)`),n.as=null);const a=[t,e].filter(r=>r).map(r=>r[0]&&r[0].toLowerCase()).join(" ");return {tableList:Array.from(wv),columnList:vv(Lv),ast:{type:r,table:[n],columns:null,values:s,partition:o,prefix:a,on_duplicate_update:u}}}(t,e,n,o,u,a,i),r=t):(Ki=r,r=s)):(Ki=r,r=s)):(Ki=r,r=s)):(Ki=r,r=s)):(Ki=r,r=s);return r}())===s&&(r=function(){var r,t,e,n,o,u,a,i;r=Ki,(t=xl())!==s&&Up()!==s?((e=lb())===s&&(e=null),e!==s&&Up()!==s?((n=bb())===s&&(n=null),n!==s&&Up()!==s&&(o=Ll())!==s&&Up()!==s?((u=Ol())===s&&(u=null),u!==s&&Up()!==s&&vb()!==s&&Up()!==s&&(a=Il())!==s&&Up()!==s?((i=Rl())===s&&(i=null),i!==s?(Qi=r,t=function(r,t,e,n,o,s,u){n&&(wv.add(`insert::${n.db}::${n.table}`),Lv.add(`insert::${n.table}::(.*)`),n.as=null);const a=[t,e].filter(r=>r).map(r=>r[0]&&r[0].toLowerCase()).join(" ");return {tableList:Array.from(wv),columnList:vv(Lv),ast:{type:r,table:[n],columns:null,partition:o,prefix:a,set:s,on_duplicate_update:u}}}(t,e,n,o,u,a,i),r=t):(Ki=r,r=s)):(Ki=r,r=s)):(Ki=r,r=s)):(Ki=r,r=s)):(Ki=r,r=s);return r}())===s&&(r=function(){var r,t,e,n,o,u,a,i;r=Ki,(t=Up())!==s?((e=Qc())===s&&(e=null),e!==s&&Up()!==s&&ub()!==s&&Up()!==s?((n=vl())===s&&(n=null),n!==s&&Up()!==s&&(o=cl())!==s&&Up()!==s?((u=hl())===s&&(u=null),u!==s&&Up()!==s?((a=Al())===s&&(a=null),a!==s&&Up()!==s?((i=gl())===s&&(i=null),i!==s?(Qi=r,t=function(r,t,e,n,o,s){if(e){(Array.isArray(e)?e:e.expr).forEach(r=>{const{db:t,as:e,table:n,join:o}=r,s=o?"select":"delete";n&&wv.add(`${s}::${t}::${n}`),o||Lv.add(`delete::${n}::(.*)`);});}if(null===t&&1===e.length){const r=e[0];t=[{db:r.db,table:r.table,as:r.as,addition:true}];}return {tableList:Array.from(wv),columnList:vv(Lv),ast:{with:r,type:"delete",table:t,from:e,where:n,orderby:o,limit:s}}}(e,n,o,u,a,i),r=t):(Ki=r,r=s)):(Ki=r,r=s)):(Ki=r,r=s)):(Ki=r,r=s)):(Ki=r,r=s)):(Ki=r,r=s);return r}())===s&&(r=cc())===s&&(r=function(){var r,t;r=[],t=Yp();for(;t!==s;)r.push(t),t=Yp();return r}()),r}function fc(){var t,e,n,o;return t=Ki,(e=function(){var t,e,n,o;t=Ki,"union"===r.substr(Ki,5).toLowerCase()?(e=r.substr(Ki,5),Ki+=5):(e=s,0===rc&&sc(Su));e!==s?(n=Ki,rc++,o=Lf(),rc--,o===s?n=void 0:(Ki=n,n=s),n!==s?t=e=[e,n]:(Ki=t,t=s)):(Ki=t,t=s);return t}())!==s&&Up()!==s?((n=Rb())===s&&(n=xb()),n===s&&(n=null),n!==s?(Qi=t,t=e=(o=n)?"union "+o.toLowerCase():"union"):(Ki=t,t=s)):(Ki=t,t=s),t===s&&(t=Ki,(e=function(){var t,e,n,o;t=Ki,"minus"===r.substr(Ki,5).toLowerCase()?(e=r.substr(Ki,5),Ki+=5):(e=s,0===rc&&sc(Nu));e!==s?(n=Ki,rc++,o=Lf(),rc--,o===s?n=void 0:(Ki=n,n=s),n!==s?t=e=[e,n]:(Ki=t,t=s)):(Ki=t,t=s);return t}())!==s&&(Qi=t,e="minus"),(t=e)===s&&(t=Ki,(e=function(){var t,e,n,o;t=Ki,"intersect"===r.substr(Ki,9).toLowerCase()?(e=r.substr(Ki,9),Ki+=9):(e=s,0===rc&&sc(Ou));e!==s?(n=Ki,rc++,o=Lf(),rc--,o===s?n=void 0:(Ki=n,n=s),n!==s?t=e=[e,n]:(Ki=t,t=s)):(Ki=t,t=s);return t}())!==s&&(Qi=t,e="intersect"),(t=e)===s&&(t=Ki,(e=function(){var t,e,n,o;t=Ki,"except"===r.substr(Ki,6).toLowerCase()?(e=r.substr(Ki,6),Ki+=6):(e=s,0===rc&&sc(Ru));e!==s?(n=Ki,rc++,o=Lf(),rc--,o===s?n=void 0:(Ki=n,n=s),n!==s?t=e=[e,n]:(Ki=t,t=s)):(Ki=t,t=s);return t}())!==s&&(Qi=t,e="except"),t=e))),t}function bc(){var r,t,e,n,o,u,a,i;if(r=Ki,(t=Kc())!==s){for(e=[],n=Ki,(o=Up())!==s&&(u=fc())!==s&&(a=Up())!==s&&(i=Kc())!==s?n=o=[o,u,a,i]:(Ki=n,n=s);n!==s;)e.push(n),n=Ki,(o=Up())!==s&&(u=fc())!==s&&(a=Up())!==s&&(i=Kc())!==s?n=o=[o,u,a,i]:(Ki=n,n=s);e!==s&&(n=Up())!==s?((o=Al())===s&&(o=null),o!==s&&(u=Up())!==s?((a=gl())===s&&(a=null),a!==s?(Qi=r,r=t=function(r,t,e,n){let o=r;for(let r=0;r<t.length;r++)o._next=t[r][3],o.set_op=t[r][1],o=o._next;return e&&(r._orderby=e),n&&(r._limit=n),{tableList:Array.from(wv),columnList:vv(Lv),ast:r}}(t,e,o,a)):(Ki=r,r=s)):(Ki=r,r=s)):(Ki=r,r=s);}else Ki=r,r=s;return r}function pc(){var r,t,e;return r=Ki,(t=Fl())!==s&&Up()!==s?((e=Nb())===s&&(e=Ob()),e===s&&(e=null),e!==s?(Qi=r,r=t=c(t,e)):(Ki=r,r=s)):(Ki=r,r=s),r===s&&(r=function(){var r,t,e;r=Ki,(t=ef())!==s&&Up()!==s?((e=Nb())===s&&(e=Ob()),e===s&&(e=null),e!==s?(Qi=r,t=c(t,e),r=t):(Ki=r,r=s)):(Ki=r,r=s);return r}()),r}function vc(){var t,e;return t=Ki,"if"===r.substr(Ki,2).toLowerCase()?(e=r.substr(Ki,2),Ki+=2):(e=s,0===rc&&sc(f)),e!==s&&Up()!==s&&Pb()!==s&&Up()!==s&&Mb()!==s?(Qi=t,t=e="IF NOT EXISTS"):(Ki=t,t=s),t}function dc(){var t,e,n;return t=Ki,(e=qc())!==s&&Up()!==s?((n=function(){var t,e,n,o,u,a,i,c,l;return t=Ki,r.substr(Ki,10)===b?(e=b,Ki+=10):(e=s,0===rc&&sc(p)),e!==s&&Up()!==s?(n=Ki,"with"===r.substr(Ki,4).toLowerCase()?(o=r.substr(Ki,4),Ki+=4):(o=s,0===rc&&sc(v)),o!==s&&(u=Up())!==s&&(a=af())!==s?n=o=[o,u,a]:(Ki=n,n=s),n===s&&(n=null),n!==s&&(o=Up())!==s?("by"===r.substr(Ki,2).toLowerCase()?(u=r.substr(Ki,2),Ki+=2):(u=s,0===rc&&sc(d)),u!==s&&(a=Up())!==s?("random"===r.substr(Ki,6).toLowerCase()?(i=r.substr(Ki,6),Ki+=6):(i=s,0===rc&&sc(y)),i!==s&&Up()!==s?("password"===r.substr(Ki,8).toLowerCase()?(c=r.substr(Ki,8),Ki+=8):(c=s,0===rc&&sc(w)),c!==s?(Qi=t,t=e={keyword:["identified",(l=n)&&l[0].toLowerCase()].filter(r=>r).join(" "),auth_plugin:l&&l[2],value:{prefix:"by",type:"origin",value:"random password"}}):(Ki=t,t=s)):(Ki=t,t=s)):(Ki=t,t=s)):(Ki=t,t=s)):(Ki=t,t=s),t===s&&(t=Ki,r.substr(Ki,10)===b?(e=b,Ki+=10):(e=s,0===rc&&sc(p)),e!==s&&Up()!==s?(n=Ki,"with"===r.substr(Ki,4).toLowerCase()?(o=r.substr(Ki,4),Ki+=4):(o=s,0===rc&&sc(v)),o!==s&&(u=Up())!==s&&(a=af())!==s?n=o=[o,u,a]:(Ki=n,n=s),n===s&&(n=null),n!==s&&(o=Up())!==s?("by"===r.substr(Ki,2).toLowerCase()?(u=r.substr(Ki,2),Ki+=2):(u=s,0===rc&&sc(d)),u!==s&&(a=Up())!==s&&(i=Ff())!==s?(Qi=t,t=e=function(r,t){return t.prefix="by",{keyword:["identified",r&&r[0].toLowerCase()].filter(r=>r).join(" "),auth_plugin:r&&r[2],value:t}}(n,i)):(Ki=t,t=s)):(Ki=t,t=s)):(Ki=t,t=s),t===s&&(t=Ki,r.substr(Ki,10)===b?(e=b,Ki+=10):(e=s,0===rc&&sc(p)),e!==s&&Up()!==s?("with"===r.substr(Ki,4).toLowerCase()?(n=r.substr(Ki,4),Ki+=4):(n=s,0===rc&&sc(v)),n!==s&&(o=Up())!==s&&(u=af())!==s&&(a=Up())!==s?("as"===r.substr(Ki,2).toLowerCase()?(i=r.substr(Ki,2),Ki+=2):(i=s,0===rc&&sc(L)),i!==s&&Up()!==s&&(c=Ff())!==s?(Qi=t,t=e=function(r,t){return t.prefix="as",{keyword:"identified with",auth_plugin:r&&r[2],value:t}}(u,c)):(Ki=t,t=s)):(Ki=t,t=s)):(Ki=t,t=s))),t}())===s&&(n=null),n!==s?(Qi=t,t=e={user:e,auth_option:n}):(Ki=t,t=s)):(Ki=t,t=s),t}function yc(){var t,e,n;return t=Ki,"none"===r.substr(Ki,4).toLowerCase()?(e=r.substr(Ki,4),Ki+=4):(e=s,0===rc&&sc(m)),e===s&&("ssl"===r.substr(Ki,3).toLowerCase()?(e=r.substr(Ki,3),Ki+=3):(e=s,0===rc&&sc(E)),e===s&&("x509"===r.substr(Ki,4).toLowerCase()?(e=r.substr(Ki,4),Ki+=4):(e=s,0===rc&&sc(A)))),e!==s&&(Qi=t,e={type:"origin",value:e}),(t=e)===s&&(t=Ki,"cipher"===r.substr(Ki,6).toLowerCase()?(e=r.substr(Ki,6),Ki+=6):(e=s,0===rc&&sc(T)),e===s&&("issuer"===r.substr(Ki,6).toLowerCase()?(e=r.substr(Ki,6),Ki+=6):(e=s,0===rc&&sc(_)),e===s&&("subject"===r.substr(Ki,7).toLowerCase()?(e=r.substr(Ki,7),Ki+=7):(e=s,0===rc&&sc(g)))),e!==s&&Up()!==s&&(n=Ff())!==s?(Qi=t,t=e=I(e,n)):(Ki=t,t=s)),t}function wc(){var t,e,n;return t=Ki,"max_queries_per_hour"===r.substr(Ki,20).toLowerCase()?(e=r.substr(Ki,20),Ki+=20):(e=s,0===rc&&sc(N)),e===s&&("max_updates_per_hour"===r.substr(Ki,20).toLowerCase()?(e=r.substr(Ki,20),Ki+=20):(e=s,0===rc&&sc(O)),e===s&&("max_connections_per_hour"===r.substr(Ki,24).toLowerCase()?(e=r.substr(Ki,24),Ki+=24):(e=s,0===rc&&sc(R)),e===s&&("max_user_connections"===r.substr(Ki,20).toLowerCase()?(e=r.substr(Ki,20),Ki+=20):(e=s,0===rc&&sc(x))))),e!==s&&Up()!==s&&(n=$f())!==s?(Qi=t,t=e=I(e,n)):(Ki=t,t=s),t}function Lc(){var t,e,n,o,u,a;return t=Ki,"password"===r.substr(Ki,8).toLowerCase()?(e=r.substr(Ki,8),Ki+=8):(e=s,0===rc&&sc(w)),e!==s&&Up()!==s?("expire"===r.substr(Ki,6).toLowerCase()?(n=r.substr(Ki,6),Ki+=6):(n=s,0===rc&&sc(j)),n!==s&&Up()!==s?("default"===r.substr(Ki,7).toLowerCase()?(o=r.substr(Ki,7),Ki+=7):(o=s,0===rc&&sc(k)),o===s&&("never"===r.substr(Ki,5).toLowerCase()?(o=r.substr(Ki,5),Ki+=5):(o=s,0===rc&&sc(U)),o===s&&(o=Dl())),o!==s?(Qi=t,t=e={keyword:"password expire",value:"string"==typeof(a=o)?{type:"origin",value:a}:a}):(Ki=t,t=s)):(Ki=t,t=s)):(Ki=t,t=s),t===s&&(t=Ki,"password"===r.substr(Ki,8).toLowerCase()?(e=r.substr(Ki,8),Ki+=8):(e=s,0===rc&&sc(w)),e!==s&&Up()!==s?("history"===r.substr(Ki,7).toLowerCase()?(n=r.substr(Ki,7),Ki+=7):(n=s,0===rc&&sc(D)),n!==s&&Up()!==s?("default"===r.substr(Ki,7).toLowerCase()?(o=r.substr(Ki,7),Ki+=7):(o=s,0===rc&&sc(k)),o===s&&(o=$f()),o!==s?(Qi=t,t=e=function(r){return {keyword:"password history",value:"string"==typeof r?{type:"origin",value:r}:r}}(o)):(Ki=t,t=s)):(Ki=t,t=s)):(Ki=t,t=s),t===s&&(t=Ki,"password"===r.substr(Ki,8).toLowerCase()?(e=r.substr(Ki,8),Ki+=8):(e=s,0===rc&&sc(w)),e!==s&&Up()!==s?("REUSE"===r.substr(Ki,5)?(n="REUSE",Ki+=5):(n=s,0===rc&&sc(M)),n!==s&&Up()!==s&&(o=Dl())!==s?(Qi=t,t=e=function(r){return {keyword:"password reuse",value:r}}(o)):(Ki=t,t=s)):(Ki=t,t=s),t===s&&(t=Ki,"password"===r.substr(Ki,8).toLowerCase()?(e=r.substr(Ki,8),Ki+=8):(e=s,0===rc&&sc(w)),e!==s&&Up()!==s?("require"===r.substr(Ki,7).toLowerCase()?(n=r.substr(Ki,7),Ki+=7):(n=s,0===rc&&sc(S)),n!==s&&Up()!==s?("current"===r.substr(Ki,7).toLowerCase()?(o=r.substr(Ki,7),Ki+=7):(o=s,0===rc&&sc(P)),o!==s&&Up()!==s?("default"===r.substr(Ki,7).toLowerCase()?(u=r.substr(Ki,7),Ki+=7):(u=s,0===rc&&sc(k)),u===s&&("optional"===r.substr(Ki,8).toLowerCase()?(u=r.substr(Ki,8),Ki+=8):(u=s,0===rc&&sc(G))),u!==s?(Qi=t,t=e=function(r){return {keyword:"password require current",value:{type:"origin",value:r}}}(u)):(Ki=t,t=s)):(Ki=t,t=s)):(Ki=t,t=s)):(Ki=t,t=s),t===s&&(t=Ki,"failed_login_attempts"===r.substr(Ki,21).toLowerCase()?(e=r.substr(Ki,21),Ki+=21):(e=s,0===rc&&sc(F)),e!==s&&Up()!==s&&(n=$f())!==s?(Qi=t,t=e=function(r){return {keyword:"failed_login_attempts",value:r}}(n)):(Ki=t,t=s),t===s&&(t=Ki,"password_lock_time"===r.substr(Ki,18).toLowerCase()?(e=r.substr(Ki,18),Ki+=18):(e=s,0===rc&&sc(H)),e!==s&&Up()!==s?((n=$f())===s&&("unbounded"===r.substr(Ki,9).toLowerCase()?(n=r.substr(Ki,9),Ki+=9):(n=s,0===rc&&sc(Y))),n!==s?(Qi=t,t=e=function(r){return {keyword:"password_lock_time",value:"string"==typeof r?{type:"origin",value:r}:r}}(n)):(Ki=t,t=s)):(Ki=t,t=s)))))),t}function Cc(){var r;return (r=xc())===s&&(r=mc())===s&&(r=Oc())===s&&(r=Rc()),r}function hc(){var t,e,n,o,u;return t=Ki,(e=function(){var t,e;t=Ki,(e=function(){var t,e,n,o;t=Ki,"not null"===r.substr(Ki,8).toLowerCase()?(e=r.substr(Ki,8),Ki+=8):(e=s,0===rc&&sc(Qs));e!==s?(n=Ki,rc++,o=Lf(),rc--,o===s?n=void 0:(Ki=n,n=s),n!==s?t=e=[e,n]:(Ki=t,t=s)):(Ki=t,t=s);return t}())!==s&&(Qi=t,e={type:"not null",value:"not null"});return t=e}())===s&&(e=Gf()),e!==s&&(Qi=t,(u=e)&&!u.value&&(u.value="null"),e={nullable:u}),(t=e)===s&&(t=Ki,(e=function(){var r,t;r=Ki,zf()!==s&&Up()!==s&&(t=Fl())!==s?(Qi=r,r={type:"default",value:t}):(Ki=r,r=s);return r}())!==s&&(Qi=t,e={default_val:e}),(t=e)===s&&(t=Ki,"auto_increment"===r.substr(Ki,14).toLowerCase()?(e=r.substr(Ki,14),Ki+=14):(e=s,0===rc&&sc(ur)),e!==s&&(Qi=t,e={auto_increment:e.toLowerCase()}),(t=e)===s&&(t=Ki,"unique"===r.substr(Ki,6).toLowerCase()?(e=r.substr(Ki,6),Ki+=6):(e=s,0===rc&&sc(ar)),e!==s&&Up()!==s?("key"===r.substr(Ki,3).toLowerCase()?(n=r.substr(Ki,3),Ki+=3):(n=s,0===rc&&sc(ir)),n===s&&(n=null),n!==s?(Qi=t,t=e=function(r){const t=["unique"];return r&&t.push(r),{unique:t.join(" ").toLowerCase("")}}(n)):(Ki=t,t=s)):(Ki=t,t=s),t===s&&(t=Ki,"primary"===r.substr(Ki,7).toLowerCase()?(e=r.substr(Ki,7),Ki+=7):(e=s,0===rc&&sc(cr)),e===s&&(e=null),e!==s&&Up()!==s?("key"===r.substr(Ki,3).toLowerCase()?(n=r.substr(Ki,3),Ki+=3):(n=s,0===rc&&sc(ir)),n!==s?(Qi=t,t=e=function(r){const t=[];return r&&t.push("primary"),t.push("key"),{primary_key:t.join(" ").toLowerCase("")}}(e)):(Ki=t,t=s)):(Ki=t,t=s),t===s&&(t=Ki,(e=Pp())!==s&&(Qi=t,e={comment:e}),(t=e)===s&&(t=Ki,(e=Ac())!==s&&(Qi=t,e={collate:e}),(t=e)===s&&(t=Ki,(e=function(){var t,e,n;t=Ki,"column_format"===r.substr(Ki,13).toLowerCase()?(e=r.substr(Ki,13),Ki+=13):(e=s,0===rc&&sc(hr));e!==s&&Up()!==s?("fixed"===r.substr(Ki,5).toLowerCase()?(n=r.substr(Ki,5),Ki+=5):(n=s,0===rc&&sc(mr)),n===s&&("dynamic"===r.substr(Ki,7).toLowerCase()?(n=r.substr(Ki,7),Ki+=7):(n=s,0===rc&&sc(Er)),n===s&&("default"===r.substr(Ki,7).toLowerCase()?(n=r.substr(Ki,7),Ki+=7):(n=s,0===rc&&sc(k)))),n!==s?(Qi=t,e={type:"column_format",value:n.toLowerCase()},t=e):(Ki=t,t=s)):(Ki=t,t=s);return t}())!==s&&(Qi=t,e={column_format:e}),(t=e)===s&&(t=Ki,(e=function(){var t,e,n;t=Ki,"storage"===r.substr(Ki,7).toLowerCase()?(e=r.substr(Ki,7),Ki+=7):(e=s,0===rc&&sc(Ar));e!==s&&Up()!==s?("disk"===r.substr(Ki,4).toLowerCase()?(n=r.substr(Ki,4),Ki+=4):(n=s,0===rc&&sc(Tr)),n===s&&("memory"===r.substr(Ki,6).toLowerCase()?(n=r.substr(Ki,6),Ki+=6):(n=s,0===rc&&sc(_r))),n!==s?(Qi=t,e={type:"storage",value:n.toLowerCase()},t=e):(Ki=t,t=s)):(Ki=t,t=s);return t}())!==s&&(Qi=t,e={storage:e}),(t=e)===s&&(t=Ki,(e=kc())!==s&&(Qi=t,e={reference_definition:e}),(t=e)===s&&(t=Ki,(e=function(){var t,e,n,o,u,a,i,c;t=Ki,(e=jc())===s&&(e=null);e!==s&&Up()!==s?("check"===r.substr(Ki,5).toLowerCase()?(n=r.substr(Ki,5),Ki+=5):(n=s,0===rc&&sc(K)),n!==s&&Up()!==s&&Np()!==s&&Up()!==s&&(o=Hl())!==s&&Up()!==s&&Op()!==s&&Up()!==s?(u=Ki,(a=Pb())===s&&(a=null),a!==s&&(i=Up())!==s?("enforced"===r.substr(Ki,8).toLowerCase()?(c=r.substr(Ki,8),Ki+=8):(c=s,0===rc&&sc(tt)),c!==s?u=a=[a,i,c]:(Ki=u,u=s)):(Ki=u,u=s),u===s&&(u=null),u!==s?(Qi=t,e=function(r,t,e,n){const o=[];return n&&o.push(n[0],n[2]),{constraint_type:t.toLowerCase(),keyword:r&&r.keyword,constraint:r&&r.constraint,definition:[e],enforced:o.filter(r=>r).join(" ").toLowerCase(),resource:"constraint"}}(e,n,o,u),t=e):(Ki=t,t=s)):(Ki=t,t=s)):(Ki=t,t=s);return t}())!==s&&(Qi=t,e={check:e}),(t=e)===s&&(t=Ki,(e=Mc())!==s&&Up()!==s?((n=dp())===s&&(n=null),n!==s&&Up()!==s&&(o=sf())!==s?(Qi=t,t=e=function(r,t,e){return {character_set:{type:r,value:e,symbol:t}}}(e,n,o)):(Ki=t,t=s)):(Ki=t,t=s),t===s&&(t=Ki,(e=function(){var t,e,n,o,u,a,i,c;t=Ki,e=Ki,(n=function(){var t,e,n,o,u;t=Ki,e=Ki,"generated"===r.substr(Ki,9).toLowerCase()?(n=r.substr(Ki,9),Ki+=9):(n=s,0===rc&&sc(gr));n!==s&&(o=Up())!==s?("always"===r.substr(Ki,6).toLowerCase()?(u=r.substr(Ki,6),Ki+=6):(u=s,0===rc&&sc(Ir)),u!==s?e=n=[n,o,u]:(Ki=e,e=s)):(Ki=e,e=s);e!==s&&(Qi=t,e=e.join("").toLowerCase());return t=e}())===s&&(n=null);n!==s&&(o=Up())!==s?("as"===r.substr(Ki,2).toLowerCase()?(u=r.substr(Ki,2),Ki+=2):(u=s,0===rc&&sc(L)),u!==s?e=n=[n,o,u]:(Ki=e,e=s)):(Ki=e,e=s);if(e!==s)if((n=Up())!==s)if((o=Np())!==s)if((u=Up())!==s)if((a=Pf())===s&&(a=Fl()),a!==s)if(Up()!==s)if(Op()!==s)if(Up()!==s){for(i=[],"stored"===r.substr(Ki,6).toLowerCase()?(c=r.substr(Ki,6),Ki+=6):(c=s,0===rc&&sc(Sr)),c===s&&("virtual"===r.substr(Ki,7).toLowerCase()?(c=r.substr(Ki,7),Ki+=7):(c=s,0===rc&&sc(Nr)));c!==s;)i.push(c),"stored"===r.substr(Ki,6).toLowerCase()?(c=r.substr(Ki,6),Ki+=6):(c=s,0===rc&&sc(Sr)),c===s&&("virtual"===r.substr(Ki,7).toLowerCase()?(c=r.substr(Ki,7),Ki+=7):(c=s,0===rc&&sc(Nr)));i!==s?(Qi=t,l=i,e={type:"generated",expr:a,value:e.filter(r=>"string"==typeof r).join(" ").toLowerCase(),storage_type:l&&l[0]&&l[0].toLowerCase()},t=e):(Ki=t,t=s);}else Ki=t,t=s;else Ki=t,t=s;else Ki=t,t=s;else Ki=t,t=s;else Ki=t,t=s;else Ki=t,t=s;else Ki=t,t=s;else Ki=t,t=s;var l;return t}())!==s&&(Qi=t,e={generated:e}),t=e)))))))))))),t}function mc(){var r,t,e,n,o,u,a;return r=Ki,(t=ef())!==s&&Up()!==s&&(e=rv())!==s&&Up()!==s?((n=function(){var r,t,e,n,o,u;if(r=Ki,(t=hc())!==s)if(Up()!==s){for(e=[],n=Ki,(o=Up())!==s&&(u=hc())!==s?n=o=[o,u]:(Ki=n,n=s);n!==s;)e.push(n),n=Ki,(o=Up())!==s&&(u=hc())!==s?n=o=[o,u]:(Ki=n,n=s);e!==s?(Qi=r,r=t=function(r,t){let e=r;for(let r=0;r<t.length;r++)e={...e,...t[r][1]};return e}(t,e)):(Ki=r,r=s);}else Ki=r,r=s;else Ki=r,r=s;return r}())===s&&(n=null),n!==s?(Qi=r,o=t,u=e,a=n,Lv.add(`create::${o.table}::${o.column}`),r=t={column:o,definition:u,resource:"column",...a||{}}):(Ki=r,r=s)):(Ki=r,r=s),r}function Ec(){var t,e,n,o,u;return t=Ki,"definer"===r.substr(Ki,7).toLowerCase()?(e=r.substr(Ki,7),Ki+=7):(e=s,0===rc&&sc(nr)),e!==s&&Up()!==s&&dp()!==s&&Up()!==s?((n=pf())===s&&(n=Ff()),n!==s&&Up()!==s?(64===r.charCodeAt(Ki)?(o="@",Ki++):(o=s,0===rc&&sc(lr)),o!==s&&Up()!==s?((u=pf())===s&&(u=Ff()),u!==s?(Qi=t,t=e=function(r,t){const e=cv("@",r,t);return cv("=",{type:"origin",value:"definer"},e)}(n,u)):(Ki=t,t=s)):(Ki=t,t=s)):(Ki=t,t=s)):(Ki=t,t=s),t===s&&(t=Ki,"definer"===r.substr(Ki,7).toLowerCase()?(e=r.substr(Ki,7),Ki+=7):(e=s,0===rc&&sc(nr)),e!==s&&Up()!==s&&dp()!==s&&Up()!==s&&(n=lp())!==s&&Up()!==s&&(o=Np())!==s&&Up()!==s&&(u=Op())!==s?(Qi=t,t=e=fr()):(Ki=t,t=s),t===s&&(t=Ki,"definer"===r.substr(Ki,7).toLowerCase()?(e=r.substr(Ki,7),Ki+=7):(e=s,0===rc&&sc(nr)),e!==s&&Up()!==s&&dp()!==s&&Up()!==s&&(n=lp())!==s?(Qi=t,t=e=fr()):(Ki=t,t=s))),t}function Ac(){var t,e,n;return t=Ki,function(){var t,e,n,o;t=Ki,"collate"===r.substr(Ki,7).toLowerCase()?(e=r.substr(Ki,7),Ki+=7):(e=s,0===rc&&sc(pt));e!==s?(n=Ki,rc++,o=Lf(),rc--,o===s?n=void 0:(Ki=n,n=s),n!==s?(Qi=t,t=e="COLLATE"):(Ki=t,t=s)):(Ki=t,t=s);return t}()!==s&&Up()!==s?((e=dp())===s&&(e=null),e!==s&&Up()!==s&&(n=af())!==s?(Qi=t,t={type:"collate",keyword:"collate",collate:{name:n,symbol:e}}):(Ki=t,t=s)):(Ki=t,t=s),t}function Tc(){var t,e,n;return t=Ki,"if"===r.substr(Ki,2).toLowerCase()?(e=r.substr(Ki,2),Ki+=2):(e=s,0===rc&&sc(Or)),e!==s&&Up()!==s?("exists"===r.substr(Ki,6).toLowerCase()?(n=r.substr(Ki,6),Ki+=6):(n=s,0===rc&&sc(Rr)),n!==s?(Qi=t,t=e="if exists"):(Ki=t,t=s)):(Ki=t,t=s),t}function _c(){var t,e,n;return t=Ki,"first"===r.substr(Ki,5).toLowerCase()?(e=r.substr(Ki,5),Ki+=5):(e=s,0===rc&&sc(xr)),e!==s&&(Qi=t,e={keyword:e}),(t=e)===s&&(t=Ki,"after"===r.substr(Ki,5).toLowerCase()?(e=r.substr(Ki,5),Ki+=5):(e=s,0===rc&&sc(jr)),e!==s&&Up()!==s&&(n=ef())!==s?(Qi=t,t=e=function(r,t){return {keyword:r,expr:t}}(e,n)):(Ki=t,t=s)),t}function gc(){var t,e,n;return (t=function(){var r,t;r=Ki,yp()!==s&&Up()!==s&&(t=xc())!==s?(Qi=r,r={action:"add",create_definitions:t,resource:"constraint",type:"alter"}):(Ki=r,r=s);return r}())===s&&(t=function(){var t,e,n,o;t=Ki,(e=rb())!==s&&Up()!==s?("check"===r.substr(Ki,5).toLowerCase()?(n=r.substr(Ki,5),Ki+=5):(n=s,0===rc&&sc(K)),n!==s&&Up()!==s&&(o=wf())!==s?(Qi=t,e={action:"drop",constraint:o,keyword:n.toLowerCase(),resource:"constraint",type:"alter"},t=e):(Ki=t,t=s)):(Ki=t,t=s);t===s&&(t=Ki,(e=rb())!==s&&Up()!==s?("constraint"===r.substr(Ki,10).toLowerCase()?(n=r.substr(Ki,10),Ki+=10):(n=s,0===rc&&sc(Qr)),n!==s&&Up()!==s&&(o=wf())!==s?(Qi=t,e=function(r,t){return {action:"drop",constraint:t,keyword:r.toLowerCase(),resource:"constraint",type:"alter"}}(n,o),t=e):(Ki=t,t=s)):(Ki=t,t=s));return t}())===s&&(t=function(){var t,e,n,o,u,a;t=Ki,(e=rb())!==s&&Up()!==s?("primary"===r.substr(Ki,7).toLowerCase()?(n=r.substr(Ki,7),Ki+=7):(n=s,0===rc&&sc(cr)),n!==s&&(o=Up())!==s&&(u=Cp())!==s?(Qi=t,t=e={action:"drop",key:"",keyword:"primary key",resource:"key",type:"alter"}):(Ki=t,t=s)):(Ki=t,t=s);t===s&&(t=Ki,(e=rb())!==s&&Up()!==s?(n=Ki,"foreign"===r.substr(Ki,7).toLowerCase()?(o=r.substr(Ki,7),Ki+=7):(o=s,0===rc&&sc(Kr)),o===s&&(o=null),o!==s&&(u=Up())!==s&&(a=Cp())!==s?n=o=[o,u,a]:(Ki=n,n=s),n===s&&(n=Lp()),n!==s&&(o=Up())!==s&&(u=af())!==s?(Qi=t,e=function(r,t){const e=Array.isArray(r)?"key":"index";return {action:"drop",[e]:t,keyword:Array.isArray(r)?""+[r[0],r[2]].filter(r=>r).join(" ").toLowerCase():r.toLowerCase(),resource:e,type:"alter"}}(n,u),t=e):(Ki=t,t=s)):(Ki=t,t=s));return t}())===s&&(t=function(){var t,e,n,o;t=Ki,gb()!==s&&Up()!==s?("check"===r.substr(Ki,5).toLowerCase()?(e=r.substr(Ki,5),Ki+=5):(e=s,0===rc&&sc(K)),e!==s&&Up()!==s?("check"===r.substr(Ki,5).toLowerCase()?(n=r.substr(Ki,5),Ki+=5):(n=s,0===rc&&sc(K)),n!==s&&Up()!==s&&Tp()!==s&&Up()!==s&&(o=wf())!==s?(Qi=t,t={action:"with",constraint:o,keyword:"check check",resource:"constraint",type:"alter"}):(Ki=t,t=s)):(Ki=t,t=s)):(Ki=t,t=s);return t}())===s&&(t=function(){var t,e,n;t=Ki,"nocheck"===r.substr(Ki,7).toLowerCase()?(e=r.substr(Ki,7),Ki+=7):(e=s,0===rc&&sc(zr));e!==s&&Up()!==s&&Tp()!==s&&Up()!==s&&(n=wf())!==s?(Qi=t,t=e={action:"nocheck",constraint:n,resource:"constraint",type:"alter"}):(Ki=t,t=s);return t}())===s&&(t=function(){var r,t,e,n,o;r=Ki,(t=yp())!==s&&Up()!==s&&(e=wp())!==s&&Up()!==s&&(n=mc())!==s&&Up()!==s?((o=_c())===s&&(o=null),o!==s?(Qi=r,u=e,a=n,i=o,t={action:"add",...a,keyword:u,suffix:i,resource:"column",type:"alter"},r=t):(Ki=r,r=s)):(Ki=r,r=s);var u,a,i;r===s&&(r=Ki,(t=yp())!==s&&Up()!==s&&(e=mc())!==s&&Up()!==s?((n=_c())===s&&(n=null),n!==s?(Qi=r,t=function(r,t){return {action:"add",...r,suffix:t,resource:"column",type:"alter"}}(e,n),r=t):(Ki=r,r=s)):(Ki=r,r=s));return r}())===s&&(t=function(){var r,t,e,n;r=Ki,(t=rb())!==s&&Up()!==s&&(e=wp())!==s&&Up()!==s&&(n=ef())!==s?(Qi=r,r=t={action:"drop",column:n,keyword:e,resource:"column",type:"alter"}):(Ki=r,r=s);r===s&&(r=Ki,(t=rb())!==s&&Up()!==s&&(e=ef())!==s?(Qi=r,t=function(r){return {action:"drop",column:r,resource:"column",type:"alter"}}(e),r=t):(Ki=r,r=s));return r}())===s&&(t=function(){var t,e,n,o,u;t=Ki,(e=function(){var t,e,n,o;t=Ki,"modify"===r.substr(Ki,6).toLowerCase()?(e=r.substr(Ki,6),Ki+=6):(e=s,0===rc&&sc(pi));e!==s?(n=Ki,rc++,o=Lf(),rc--,o===s?n=void 0:(Ki=n,n=s),n!==s?(Qi=t,t=e="MODIFY"):(Ki=t,t=s)):(Ki=t,t=s);return t}())!==s&&Up()!==s?((n=wp())===s&&(n=null),n!==s&&Up()!==s&&(o=mc())!==s&&Up()!==s?((u=_c())===s&&(u=null),u!==s?(Qi=t,a=o,i=u,e={action:"modify",keyword:n,...a,suffix:i,resource:"column",type:"alter"},t=e):(Ki=t,t=s)):(Ki=t,t=s)):(Ki=t,t=s);var a,i;return t}())===s&&(t=function(){var r,t,e;r=Ki,(t=yp())!==s&&Up()!==s&&(e=Oc())!==s?(Qi=r,n=e,t={action:"add",type:"alter",...n},r=t):(Ki=r,r=s);var n;return r}())===s&&(t=function(){var r,t,e;r=Ki,(t=yp())!==s&&Up()!==s&&(e=Rc())!==s?(Qi=r,n=e,t={action:"add",type:"alter",...n},r=t):(Ki=r,r=s);var n;return r}())===s&&(t=function(){var r,t,e,n,o;r=Ki,(t=cb())!==s&&Up()!==s&&wp()!==s&&Up()!==s&&(e=ef())!==s&&Up()!==s?((n=Zf())===s&&(n=db()),n===s&&(n=null),n!==s&&Up()!==s&&(o=ef())!==s?(Qi=r,a=o,t={action:"rename",type:"alter",resource:"column",keyword:"column",old_column:e,prefix:(u=n)&&u[0].toLowerCase(),column:a},r=t):(Ki=r,r=s)):(Ki=r,r=s);var u,a;return r}())===s&&(t=function(){var r,t,e,n;r=Ki,(t=cb())!==s&&Up()!==s?((e=Zf())===s&&(e=db()),e===s&&(e=null),e!==s&&Up()!==s&&(n=af())!==s?(Qi=r,u=n,t={action:"rename",type:"alter",resource:"table",keyword:(o=e)&&o[0].toLowerCase(),table:u},r=t):(Ki=r,r=s)):(Ki=r,r=s);var o,u;return r}())===s&&(t=Sc())===s&&(t=Nc())===s&&(t=function(){var t,e,n,o,u,a;t=Ki,"change"===r.substr(Ki,6).toLowerCase()?(e=r.substr(Ki,6),Ki+=6):(e=s,0===rc&&sc(Xr));e!==s&&Up()!==s?((n=wp())===s&&(n=null),n!==s&&Up()!==s&&(o=ef())!==s&&Up()!==s&&(u=mc())!==s&&Up()!==s?((a=_c())===s&&(a=null),a!==s?(Qi=t,i=n,c=u,l=a,e={action:"change",old_column:o,...c,keyword:i,resource:"column",type:"alter",suffix:l},t=e):(Ki=t,t=s)):(Ki=t,t=s)):(Ki=t,t=s);var i,c,l;return t}())===s&&(t=function(){var t,e,n,o,u;t=Ki,"drop"===r.substr(Ki,4).toLowerCase()?(e=r.substr(Ki,4),Ki+=4):(e=s,0===rc&&sc(Dr));e===s&&("truncate"===r.substr(Ki,8).toLowerCase()?(e=r.substr(Ki,8),Ki+=8):(e=s,0===rc&&sc(Mr)),e===s&&("discard"===r.substr(Ki,7).toLowerCase()?(e=r.substr(Ki,7),Ki+=7):(e=s,0===rc&&sc(Pr)),e===s&&("import"===r.substr(Ki,6).toLowerCase()?(e=r.substr(Ki,6),Ki+=6):(e=s,0===rc&&sc(Gr)),e===s&&("coalesce"===r.substr(Ki,8).toLowerCase()?(e=r.substr(Ki,8),Ki+=8):(e=s,0===rc&&sc(Fr)),e===s&&("analyze"===r.substr(Ki,7).toLowerCase()?(e=r.substr(Ki,7),Ki+=7):(e=s,0===rc&&sc(Hr)),e===s&&("check"===r.substr(Ki,5).toLowerCase()?(e=r.substr(Ki,5),Ki+=5):(e=s,0===rc&&sc(K))))))));e!==s&&Up()!==s&&(n=fb())!==s&&Up()!==s&&(o=ol())!==s&&Up()!==s?("tablespace"===r.substr(Ki,10).toLowerCase()?(u=r.substr(Ki,10),Ki+=10):(u=s,0===rc&&sc(Yr)),u===s&&(u=null),u!==s?(Qi=t,e=function(r,t,e,n){const o={action:r.toLowerCase(),keyword:t,resource:"partition",type:"alter",partitions:e};return n&&(o.suffix={keyword:n}),o}(e,n,o,u),t=e):(Ki=t,t=s)):(Ki=t,t=s);t===s&&(t=Ki,(e=yp())!==s&&Up()!==s&&(n=fb())!==s&&Up()!==s&&(o=Np())!==s&&Up()!==s&&(u=function(){var r,t,e,n,o,u,a,c;if(r=Ki,(t=Ic())!==s){for(e=[],n=Ki,(o=Up())!==s&&(u=Ip())!==s&&(a=Up())!==s&&(c=Ic())!==s?n=o=[o,u,a,c]:(Ki=n,n=s);n!==s;)e.push(n),n=Ki,(o=Up())!==s&&(u=Ip())!==s&&(a=Up())!==s&&(c=Ic())!==s?n=o=[o,u,a,c]:(Ki=n,n=s);e!==s?(Qi=r,t=i(t,e),r=t):(Ki=r,r=s);}else Ki=r,r=s;return r}())!==s&&Up()!==s&&Op()!==s?(Qi=t,t=e={action:"add",keyword:n,resource:"partition",type:"alter",partitions:u}):(Ki=t,t=s));return t}())===s&&(t=Ki,(e=Gc())!==s&&(Qi=t,(n=e).resource=n.keyword,n[n.keyword]=n.value,delete n.value,e={type:"alter",...n}),t=e),t}function Ic(){var t,e,n,o,u;return t=Ki,fb()!==s&&Up()!==s&&(e=sf())!==s&&Up()!==s&&Tb()!==s&&Up()!==s?("less"===r.substr(Ki,4).toLowerCase()?(n=r.substr(Ki,4),Ki+=4):(n=s,0===rc&&sc(kr)),n!==s&&Up()!==s?("than"===r.substr(Ki,4).toLowerCase()?(o=r.substr(Ki,4),Ki+=4):(o=s,0===rc&&sc(Ur)),o!==s&&Up()!==s&&Np()!==s&&Up()!==s&&(u=$f())!==s&&Up()!==s&&Op()!==s?(Qi=t,t={name:e,value:{type:"less than",expr:u,parentheses:true}}):(Ki=t,t=s)):(Ki=t,t=s)):(Ki=t,t=s),t}function Sc(){var t,e,n,o;return t=Ki,"algorithm"===r.substr(Ki,9).toLowerCase()?(e=r.substr(Ki,9),Ki+=9):(e=s,0===rc&&sc(z)),e!==s&&Up()!==s?((n=dp())===s&&(n=null),n!==s&&Up()!==s?("default"===r.substr(Ki,7).toLowerCase()?(o=r.substr(Ki,7),Ki+=7):(o=s,0===rc&&sc(k)),o===s&&("instant"===r.substr(Ki,7).toLowerCase()?(o=r.substr(Ki,7),Ki+=7):(o=s,0===rc&&sc(Br)),o===s&&("inplace"===r.substr(Ki,7).toLowerCase()?(o=r.substr(Ki,7),Ki+=7):(o=s,0===rc&&sc($r)),o===s&&("copy"===r.substr(Ki,4).toLowerCase()?(o=r.substr(Ki,4),Ki+=4):(o=s,0===rc&&sc(Wr))))),o!==s?(Qi=t,t=e={type:"alter",keyword:"algorithm",resource:"algorithm",symbol:n,algorithm:o}):(Ki=t,t=s)):(Ki=t,t=s)):(Ki=t,t=s),t}function Nc(){var t,e,n,o;return t=Ki,"lock"===r.substr(Ki,4).toLowerCase()?(e=r.substr(Ki,4),Ki+=4):(e=s,0===rc&&sc($)),e!==s&&Up()!==s?((n=dp())===s&&(n=null),n!==s&&Up()!==s?("default"===r.substr(Ki,7).toLowerCase()?(o=r.substr(Ki,7),Ki+=7):(o=s,0===rc&&sc(k)),o===s&&("none"===r.substr(Ki,4).toLowerCase()?(o=r.substr(Ki,4),Ki+=4):(o=s,0===rc&&sc(m)),o===s&&("shared"===r.substr(Ki,6).toLowerCase()?(o=r.substr(Ki,6),Ki+=6):(o=s,0===rc&&sc(qr)),o===s&&("exclusive"===r.substr(Ki,9).toLowerCase()?(o=r.substr(Ki,9),Ki+=9):(o=s,0===rc&&sc(Vr))))),o!==s?(Qi=t,t=e={type:"alter",keyword:"lock",resource:"lock",symbol:n,lock:o}):(Ki=t,t=s)):(Ki=t,t=s)):(Ki=t,t=s),t}function Oc(){var r,t,e,n,o,u,a,i;return r=Ki,(t=Lp())===s&&(t=Cp()),t!==s&&Up()!==s?((e=df())===s&&(e=null),e!==s&&Up()!==s?((n=fl())===s&&(n=null),n!==s&&Up()!==s&&(o=rl())!==s&&Up()!==s?((u=bl())===s&&(u=null),u!==s&&Up()!==s?(Qi=r,a=n,i=u,r=t={index:e,definition:o,keyword:t.toLowerCase(),index_type:a,resource:"index",index_options:i}):(Ki=r,r=s)):(Ki=r,r=s)):(Ki=r,r=s)):(Ki=r,r=s),r}function Rc(){var r,t,e,n,o,u,a,i,c;return r=Ki,(t=hp())===s&&(t=mp()),t!==s&&Up()!==s?((e=Lp())===s&&(e=Cp()),e===s&&(e=null),e!==s&&Up()!==s?((n=df())===s&&(n=null),n!==s&&Up()!==s&&(o=Zc())!==s&&Up()!==s?((u=bl())===s&&(u=null),u!==s?(Qi=r,a=t,c=u,r=t={index:n,definition:o,keyword:(i=e)&&`${a.toLowerCase()} ${i.toLowerCase()}`||a.toLowerCase(),index_options:c,resource:"index"}):(Ki=r,r=s)):(Ki=r,r=s)):(Ki=r,r=s)):(Ki=r,r=s),r}function xc(){var t;return (t=function(){var t,e,n,o,u,a,i,c;t=Ki,(e=jc())===s&&(e=null);e!==s&&Up()!==s?(n=Ki,"primary"===r.substr(Ki,7).toLowerCase()?(o=r.substr(Ki,7),Ki+=7):(o=s,0===rc&&sc(cr)),o!==s&&(u=Up())!==s?("key"===r.substr(Ki,3).toLowerCase()?(a=r.substr(Ki,3),Ki+=3):(a=s,0===rc&&sc(ir)),a!==s?n=o=[o,u,a]:(Ki=n,n=s)):(Ki=n,n=s),n!==s&&(o=Up())!==s?((u=fl())===s&&(u=null),u!==s&&(a=Up())!==s&&(i=rl())!==s&&Up()!==s?((c=bl())===s&&(c=null),c!==s?(Qi=t,f=n,b=u,p=i,v=c,e={constraint:(l=e)&&l.constraint,definition:p,constraint_type:`${f[0].toLowerCase()} ${f[2].toLowerCase()}`,keyword:l&&l.keyword,index_type:b,resource:"constraint",index_options:v},t=e):(Ki=t,t=s)):(Ki=t,t=s)):(Ki=t,t=s)):(Ki=t,t=s);var l,f,b,p,v;return t}())===s&&(t=function(){var r,t,e,n,o,u,a,i;r=Ki,(t=jc())===s&&(t=null);t!==s&&Up()!==s&&(e=Ep())!==s&&Up()!==s?((n=Lp())===s&&(n=Cp()),n===s&&(n=null),n!==s&&Up()!==s?((o=df())===s&&(o=null),o!==s&&Up()!==s?((u=fl())===s&&(u=null),u!==s&&Up()!==s&&(a=rl())!==s&&Up()!==s?((i=bl())===s&&(i=null),i!==s?(Qi=r,l=e,f=n,b=o,p=u,v=a,d=i,t={constraint:(c=t)&&c.constraint,definition:v,constraint_type:f&&`${l.toLowerCase()} ${f.toLowerCase()}`||l.toLowerCase(),keyword:c&&c.keyword,index_type:p,index:b,resource:"constraint",index_options:d},r=t):(Ki=r,r=s)):(Ki=r,r=s)):(Ki=r,r=s)):(Ki=r,r=s)):(Ki=r,r=s);var c,l,f,b,p,v,d;return r}())===s&&(t=function(){var t,e,n,o,u,a;t=Ki,(e=jc())===s&&(e=null);e!==s&&Up()!==s?("foreign key"===r.substr(Ki,11).toLowerCase()?(n=r.substr(Ki,11),Ki+=11):(n=s,0===rc&&sc(rt)),n!==s&&Up()!==s?((o=df())===s&&(o=null),o!==s&&Up()!==s&&(u=Zc())!==s&&Up()!==s?((a=kc())===s&&(a=null),a!==s?(Qi=t,c=n,l=o,f=u,b=a,e={constraint:(i=e)&&i.constraint,definition:f,constraint_type:c,keyword:i&&i.keyword,index:l,resource:"constraint",reference_definition:b},t=e):(Ki=t,t=s)):(Ki=t,t=s)):(Ki=t,t=s)):(Ki=t,t=s);var i,c,l,f,b;return t}())===s&&(t=function(){var t,e,n,o,u,a,i,c,l,f;t=Ki,(e=jc())===s&&(e=null);e!==s&&Up()!==s?("check"===r.substr(Ki,5).toLowerCase()?(n=r.substr(Ki,5),Ki+=5):(n=s,0===rc&&sc(K)),n!==s&&Up()!==s?(o=Ki,"not"===r.substr(Ki,3).toLowerCase()?(u=r.substr(Ki,3),Ki+=3):(u=s,0===rc&&sc(Zr)),u!==s&&(a=Up())!==s?("for"===r.substr(Ki,3).toLowerCase()?(i=r.substr(Ki,3),Ki+=3):(i=s,0===rc&&sc(vr)),i!==s&&(c=Up())!==s?("replication"===r.substr(Ki,11).toLowerCase()?(l=r.substr(Ki,11),Ki+=11):(l=s,0===rc&&sc(Jr)),l!==s&&(f=Up())!==s?o=u=[u,a,i,c,l,f]:(Ki=o,o=s)):(Ki=o,o=s)):(Ki=o,o=s),o===s&&(o=null),o!==s&&(u=Np())!==s&&(a=Up())!==s&&(i=Hl())!==s&&(c=Up())!==s&&(l=Op())!==s?(Qi=t,b=e,p=o,v=i,e={constraint_type:n.toLowerCase(),keyword:b&&b.keyword,constraint:b&&b.constraint,index_type:p&&{keyword:"not for replication"},definition:[v],resource:"constraint"},t=e):(Ki=t,t=s)):(Ki=t,t=s)):(Ki=t,t=s);var b,p,v;return t}()),t}function jc(){var r,t,e,n;return r=Ki,(t=Tp())!==s&&Up()!==s?((e=af())===s&&(e=null),e!==s?(Qi=r,n=e,r=t={keyword:t.toLowerCase(),constraint:n}):(Ki=r,r=s)):(Ki=r,r=s),r}function kc(){var t,e,n,o,u,a,i,c,l,f;return t=Ki,(e=_p())!==s&&Up()!==s&&(n=vl())!==s&&Up()!==s&&(o=Zc())!==s&&Up()!==s?("match full"===r.substr(Ki,10).toLowerCase()?(u=r.substr(Ki,10),Ki+=10):(u=s,0===rc&&sc(et)),u===s&&("match partial"===r.substr(Ki,13).toLowerCase()?(u=r.substr(Ki,13),Ki+=13):(u=s,0===rc&&sc(nt)),u===s&&("match simple"===r.substr(Ki,12).toLowerCase()?(u=r.substr(Ki,12),Ki+=12):(u=s,0===rc&&sc(ot)))),u===s&&(u=null),u!==s&&Up()!==s?((a=Uc())===s&&(a=null),a!==s&&Up()!==s?((i=Uc())===s&&(i=null),i!==s?(Qi=t,c=u,l=a,f=i,t=e={definition:o,table:n,keyword:e.toLowerCase(),match:c&&c.toLowerCase(),on_action:[l,f].filter(r=>r)}):(Ki=t,t=s)):(Ki=t,t=s)):(Ki=t,t=s)):(Ki=t,t=s),t===s&&(t=Ki,(e=Uc())!==s&&(Qi=t,e={on_action:[e]}),t=e),t}function Uc(){var t,e,n,o;return t=Ki,mb()!==s&&Up()!==s?((e=ub())===s&&(e=nb()),e!==s&&Up()!==s&&(n=function(){var t,e,n;t=Ki,(e=cp())!==s&&Up()!==s&&Np()!==s&&Up()!==s?((n=Ul())===s&&(n=null),n!==s&&Up()!==s&&Op()!==s?(Qi=t,t=e={type:"function",name:{name:[{type:"origin",value:e}]},args:n}):(Ki=t,t=s)):(Ki=t,t=s);t===s&&(t=Ki,(e=Dc())===s&&("set null"===r.substr(Ki,8).toLowerCase()?(e=r.substr(Ki,8),Ki+=8):(e=s,0===rc&&sc(at)),e===s&&("no action"===r.substr(Ki,9).toLowerCase()?(e=r.substr(Ki,9),Ki+=9):(e=s,0===rc&&sc(it)),e===s&&("set default"===r.substr(Ki,11).toLowerCase()?(e=r.substr(Ki,11),Ki+=11):(e=s,0===rc&&sc(ct)),e===s&&(e=cp())))),e!==s&&(Qi=t,e={type:"origin",value:e.toLowerCase()}),t=e);return t}())!==s?(Qi=t,o=n,t={type:"on "+e[0].toLowerCase(),value:o}):(Ki=t,t=s)):(Ki=t,t=s),t}function Dc(){var t,e;return t=Ki,"restrict"===r.substr(Ki,8).toLowerCase()?(e=r.substr(Ki,8),Ki+=8):(e=s,0===rc&&sc(st)),e===s&&("cascade"===r.substr(Ki,7).toLowerCase()?(e=r.substr(Ki,7),Ki+=7):(e=s,0===rc&&sc(ut))),e!==s&&(Qi=t,e=e.toLowerCase()),t=e}function Mc(){var t,e,n;return t=Ki,"character"===r.substr(Ki,9).toLowerCase()?(e=r.substr(Ki,9),Ki+=9):(e=s,0===rc&&sc(lt)),e!==s&&Up()!==s?("set"===r.substr(Ki,3).toLowerCase()?(n=r.substr(Ki,3),Ki+=3):(n=s,0===rc&&sc(ft)),n!==s?(Qi=t,t=e="CHARACTER SET"):(Ki=t,t=s)):(Ki=t,t=s),t}function Pc(){var t,e,n,o,u,a,i,c,l;return t=Ki,(e=zf())===s&&(e=null),e!==s&&Up()!==s?((n=Mc())===s&&("charset"===r.substr(Ki,7).toLowerCase()?(n=r.substr(Ki,7),Ki+=7):(n=s,0===rc&&sc(bt)),n===s&&("collate"===r.substr(Ki,7).toLowerCase()?(n=r.substr(Ki,7),Ki+=7):(n=s,0===rc&&sc(pt)))),n!==s&&Up()!==s?((o=dp())===s&&(o=null),o!==s&&Up()!==s&&(u=sf())!==s?(Qi=t,i=n,c=o,l=u,t=e={keyword:(a=e)&&`${a[0].toLowerCase()} ${i.toLowerCase()}`||i.toLowerCase(),symbol:c,value:l}):(Ki=t,t=s)):(Ki=t,t=s)):(Ki=t,t=s),t}function Gc(){var t,e,n,o,u,a,i,c,l;return t=Ki,"auto_increment"===r.substr(Ki,14).toLowerCase()?(e=r.substr(Ki,14),Ki+=14):(e=s,0===rc&&sc(ur)),e===s&&("avg_row_length"===r.substr(Ki,14).toLowerCase()?(e=r.substr(Ki,14),Ki+=14):(e=s,0===rc&&sc(vt)),e===s&&("key_block_size"===r.substr(Ki,14).toLowerCase()?(e=r.substr(Ki,14),Ki+=14):(e=s,0===rc&&sc(dt)),e===s&&("max_rows"===r.substr(Ki,8).toLowerCase()?(e=r.substr(Ki,8),Ki+=8):(e=s,0===rc&&sc(yt)),e===s&&("min_rows"===r.substr(Ki,8).toLowerCase()?(e=r.substr(Ki,8),Ki+=8):(e=s,0===rc&&sc(wt)),e===s&&("stats_sample_pages"===r.substr(Ki,18).toLowerCase()?(e=r.substr(Ki,18),Ki+=18):(e=s,0===rc&&sc(Lt))))))),e!==s&&Up()!==s?((n=dp())===s&&(n=null),n!==s&&Up()!==s&&(o=$f())!==s?(Qi=t,c=n,l=o,t=e={keyword:e.toLowerCase(),symbol:c,value:l.value}):(Ki=t,t=s)):(Ki=t,t=s),t===s&&(t=Ki,"CHECKSUM"===r.substr(Ki,8)?(e="CHECKSUM",Ki+=8):(e=s,0===rc&&sc(Ct)),e===s&&("DELAY_KEY_WRITE"===r.substr(Ki,15)?(e="DELAY_KEY_WRITE",Ki+=15):(e=s,0===rc&&sc(ht))),e!==s&&Up()!==s&&(n=dp())!==s&&Up()!==s?(mt.test(r.charAt(Ki))?(o=r.charAt(Ki),Ki++):(o=s,0===rc&&sc(Et)),o!==s?(Qi=t,t=e=function(r,t,e){return {keyword:r.toLowerCase(),symbol:t,value:e}}(e,n,o)):(Ki=t,t=s)):(Ki=t,t=s),t===s&&(t=Pc())===s&&(t=Ki,(e=Ap())===s&&("connection"===r.substr(Ki,10).toLowerCase()?(e=r.substr(Ki,10),Ki+=10):(e=s,0===rc&&sc(At)),e===s&&("engine_attribute"===r.substr(Ki,16).toLowerCase()?(e=r.substr(Ki,16),Ki+=16):(e=s,0===rc&&sc(Tt)),e===s&&("secondary_engine_attribute"===r.substr(Ki,26).toLowerCase()?(e=r.substr(Ki,26),Ki+=26):(e=s,0===rc&&sc(_t))))),e!==s&&Up()!==s?((n=dp())===s&&(n=null),n!==s&&Up()!==s&&(o=Ff())!==s?(Qi=t,t=e=function(r,t,e){return {keyword:r.toLowerCase(),symbol:t,value:`'${e.value}'`}}(e,n,o)):(Ki=t,t=s)):(Ki=t,t=s),t===s&&(t=Ki,"data"===r.substr(Ki,4).toLowerCase()?(e=r.substr(Ki,4),Ki+=4):(e=s,0===rc&&sc(gt)),e===s&&("index"===r.substr(Ki,5).toLowerCase()?(e=r.substr(Ki,5),Ki+=5):(e=s,0===rc&&sc(It))),e!==s&&Up()!==s?("directory"===r.substr(Ki,9).toLowerCase()?(n=r.substr(Ki,9),Ki+=9):(n=s,0===rc&&sc(St)),n!==s&&Up()!==s?((o=dp())===s&&(o=null),o!==s&&(u=Up())!==s&&(a=Ff())!==s?(Qi=t,t=e=function(r,t,e){return {keyword:r.toLowerCase()+" directory",symbol:t,value:`'${e.value}'`}}(e,o,a)):(Ki=t,t=s)):(Ki=t,t=s)):(Ki=t,t=s),t===s&&(t=Ki,"compression"===r.substr(Ki,11).toLowerCase()?(e=r.substr(Ki,11),Ki+=11):(e=s,0===rc&&sc(Nt)),e!==s&&Up()!==s?((n=dp())===s&&(n=null),n!==s&&Up()!==s?(o=Ki,39===r.charCodeAt(Ki)?(u="'",Ki++):(u=s,0===rc&&sc(Ot)),u!==s?("zlib"===r.substr(Ki,4).toLowerCase()?(a=r.substr(Ki,4),Ki+=4):(a=s,0===rc&&sc(Rt)),a===s&&("lz4"===r.substr(Ki,3).toLowerCase()?(a=r.substr(Ki,3),Ki+=3):(a=s,0===rc&&sc(xt)),a===s&&("none"===r.substr(Ki,4).toLowerCase()?(a=r.substr(Ki,4),Ki+=4):(a=s,0===rc&&sc(m)))),a!==s?(39===r.charCodeAt(Ki)?(i="'",Ki++):(i=s,0===rc&&sc(Ot)),i!==s?o=u=[u,a,i]:(Ki=o,o=s)):(Ki=o,o=s)):(Ki=o,o=s),o!==s?(Qi=t,t=e=function(r,t,e){return {keyword:r.toLowerCase(),symbol:t,value:e.join("").toUpperCase()}}(e,n,o)):(Ki=t,t=s)):(Ki=t,t=s)):(Ki=t,t=s),t===s&&(t=Ki,"engine"===r.substr(Ki,6).toLowerCase()?(e=r.substr(Ki,6),Ki+=6):(e=s,0===rc&&sc(jt)),e!==s&&Up()!==s?((n=dp())===s&&(n=null),n!==s&&Up()!==s&&(o=wf())!==s?(Qi=t,t=e=kt(e,n,o)):(Ki=t,t=s)):(Ki=t,t=s),t===s&&(t=Ki,"row_format"===r.substr(Ki,10).toLowerCase()?(e=r.substr(Ki,10),Ki+=10):(e=s,0===rc&&sc(Ut)),e!==s&&Up()!==s?((n=dp())===s&&(n=null),n!==s&&Up()!==s?("default"===r.substr(Ki,7).toLowerCase()?(o=r.substr(Ki,7),Ki+=7):(o=s,0===rc&&sc(k)),o===s&&("dynamic"===r.substr(Ki,7).toLowerCase()?(o=r.substr(Ki,7),Ki+=7):(o=s,0===rc&&sc(Er)),o===s&&("fixed"===r.substr(Ki,5).toLowerCase()?(o=r.substr(Ki,5),Ki+=5):(o=s,0===rc&&sc(mr)),o===s&&("compressed"===r.substr(Ki,10).toLowerCase()?(o=r.substr(Ki,10),Ki+=10):(o=s,0===rc&&sc(Dt)),o===s&&("redundant"===r.substr(Ki,9).toLowerCase()?(o=r.substr(Ki,9),Ki+=9):(o=s,0===rc&&sc(Mt)),o===s&&("compact"===r.substr(Ki,7).toLowerCase()?(o=r.substr(Ki,7),Ki+=7):(o=s,0===rc&&sc(Pt))))))),o!==s?(Qi=t,t=e=kt(e,n,o)):(Ki=t,t=s)):(Ki=t,t=s)):(Ki=t,t=s))))))),t}function Fc(){var t,e,n,o,u;return t=Ki,(e=yl())!==s&&Up()!==s&&(n=function(){var t,e,n;return t=Ki,"read"===r.substr(Ki,4).toLowerCase()?(e=r.substr(Ki,4),Ki+=4):(e=s,0===rc&&sc(Gt)),e!==s&&Up()!==s?("local"===r.substr(Ki,5).toLowerCase()?(n=r.substr(Ki,5),Ki+=5):(n=s,0===rc&&sc(X)),n===s&&(n=null),n!==s?(Qi=t,t=e={type:"read",suffix:n&&"local"}):(Ki=t,t=s)):(Ki=t,t=s),t===s&&(t=Ki,"low_priority"===r.substr(Ki,12).toLowerCase()?(e=r.substr(Ki,12),Ki+=12):(e=s,0===rc&&sc(Ft)),e===s&&(e=null),e!==s&&Up()!==s?("write"===r.substr(Ki,5).toLowerCase()?(n=r.substr(Ki,5),Ki+=5):(n=s,0===rc&&sc(Ht)),n!==s?(Qi=t,t=e={type:"write",prefix:e&&"low_priority"}):(Ki=t,t=s)):(Ki=t,t=s)),t}())!==s?(Qi=t,o=e,u=n,wv.add(`lock::${o.db}::${o.table}`),t=e={table:o,lock_type:u}):(Ki=t,t=s),t}function Hc(){var t,e,n,o;return t=Ki,"isolation"===r.substr(Ki,9).toLowerCase()?(e=r.substr(Ki,9),Ki+=9):(e=s,0===rc&&sc(le)),e!==s&&Up()!==s?("level"===r.substr(Ki,5).toLowerCase()?(n=r.substr(Ki,5),Ki+=5):(n=s,0===rc&&sc(fe)),n!==s&&Up()!==s&&(o=function(){var t,e,n;return t=Ki,"serializable"===r.substr(Ki,12).toLowerCase()?(e=r.substr(Ki,12),Ki+=12):(e=s,0===rc&&sc(se)),e!==s&&(Qi=t,e={type:"origin",value:"serializable"}),(t=e)===s&&(t=Ki,"repeatable"===r.substr(Ki,10).toLowerCase()?(e=r.substr(Ki,10),Ki+=10):(e=s,0===rc&&sc(ue)),e!==s&&Up()!==s?("read"===r.substr(Ki,4).toLowerCase()?(n=r.substr(Ki,4),Ki+=4):(n=s,0===rc&&sc(Gt)),n!==s?(Qi=t,t=e={type:"origin",value:"repeatable read"}):(Ki=t,t=s)):(Ki=t,t=s),t===s&&(t=Ki,"read"===r.substr(Ki,4).toLowerCase()?(e=r.substr(Ki,4),Ki+=4):(e=s,0===rc&&sc(Gt)),e!==s&&Up()!==s?("committed"===r.substr(Ki,9).toLowerCase()?(n=r.substr(Ki,9),Ki+=9):(n=s,0===rc&&sc(ae)),n===s&&("uncommitted"===r.substr(Ki,11).toLowerCase()?(n=r.substr(Ki,11),Ki+=11):(n=s,0===rc&&sc(ie))),n!==s?(Qi=t,t=e=ce(n)):(Ki=t,t=s)):(Ki=t,t=s))),t}())!==s?(Qi=t,t=e={type:"origin",value:"isolation level "+o.value}):(Ki=t,t=s)):(Ki=t,t=s),t===s&&(t=Ki,"read"===r.substr(Ki,4).toLowerCase()?(e=r.substr(Ki,4),Ki+=4):(e=s,0===rc&&sc(Gt)),e!==s&&Up()!==s?("write"===r.substr(Ki,5).toLowerCase()?(n=r.substr(Ki,5),Ki+=5):(n=s,0===rc&&sc(Ht)),n===s&&("only"===r.substr(Ki,4).toLowerCase()?(n=r.substr(Ki,4),Ki+=4):(n=s,0===rc&&sc(be))),n!==s?(Qi=t,t=e=ce(n)):(Ki=t,t=s)):(Ki=t,t=s),t===s&&(t=Ki,(e=Pb())===s&&(e=null),e!==s&&Up()!==s?("deferrable"===r.substr(Ki,10).toLowerCase()?(n=r.substr(Ki,10),Ki+=10):(n=s,0===rc&&sc(pe)),n!==s?(Qi=t,t=e={type:"origin",value:e?"not deferrable":"deferrable"}):(Ki=t,t=s)):(Ki=t,t=s))),t}function Yc(){var r,t,e,n,o,u,a,c;if(r=Ki,(t=Hc())!==s){for(e=[],n=Ki,(o=Up())!==s&&(u=Ip())!==s&&(a=Up())!==s&&(c=Hc())!==s?n=o=[o,u,a,c]:(Ki=n,n=s);n!==s;)e.push(n),n=Ki,(o=Up())!==s&&(u=Ip())!==s&&(a=Up())!==s&&(c=Hc())!==s?n=o=[o,u,a,c]:(Ki=n,n=s);e!==s?(Qi=r,r=t=i(t,e)):(Ki=r,r=s);}else Ki=r,r=s;return r}function Bc(){var t,e,n,o,u,a;return t=Ki,"starting"===r.substr(Ki,8).toLowerCase()?(e=r.substr(Ki,8),Ki+=8):(e=s,0===rc&&sc(ge)),e===s&&("terminated"===r.substr(Ki,10).toLowerCase()?(e=r.substr(Ki,10),Ki+=10):(e=s,0===rc&&sc(Ee))),e!==s&&Up()!==s?("by"===r.substr(Ki,2).toLowerCase()?(n=r.substr(Ki,2),Ki+=2):(n=s,0===rc&&sc(d)),n!==s&&Up()!==s&&(o=sf())!==s?(Qi=t,u=e,(a=o).prefix=u.toUpperCase()+" BY",t=e={type:u.toLowerCase(),[u.toLowerCase()]:a}):(Ki=t,t=s)):(Ki=t,t=s),t}function $c(){var t;return (t=function(){var t,e,n,o,u;return t=Ki,(e=Rb())===s&&(e=tb())===s&&(e=Ki,(n=ob())!==s&&(o=Up())!==s?("view"===r.substr(Ki,4).toLowerCase()?(u=r.substr(Ki,4),Ki+=4):(u=s,0===rc&&sc(ke)),u!==s?e=n=[n,o,u]:(Ki=e,e=s)):(Ki=e,e=s),e===s&&(e=ob())===s&&(e=ub())===s&&(e=rb())===s&&(e=Ki,"grant"===r.substr(Ki,5).toLowerCase()?(n=r.substr(Ki,5),Ki+=5):(n=s,0===rc&&sc(Ue)),n!==s&&(o=Up())!==s?("option"===r.substr(Ki,6).toLowerCase()?(u=r.substr(Ki,6),Ki+=6):(u=s,0===rc&&sc(De)),u!==s?e=n=[n,o,u]:(Ki=e,e=s)):(Ki=e,e=s),e===s&&(e=Lp())===s&&(e=ab())===s&&(e=_p())===s&&(e=eb())===s&&(e=Ki,(n=Jf())!==s&&(o=Up())!==s&&(u=fp())!==s?e=n=[n,o,u]:(Ki=e,e=s),e===s&&(e=wb())===s&&(e=nb())))),e!==s&&(Qi=t,e=Me(e)),t=e}())===s&&(t=function(){var t,e,n,o,u;return t=Ki,e=Ki,(n=tb())!==s&&(o=Up())!==s?("routine"===r.substr(Ki,7).toLowerCase()?(u=r.substr(Ki,7),Ki+=7):(u=s,0===rc&&sc(Pe)),u!==s?e=n=[n,o,u]:(Ki=e,e=s)):(Ki=e,e=s),e===s&&("execute"===r.substr(Ki,7).toLowerCase()?(e=r.substr(Ki,7),Ki+=7):(e=s,0===rc&&sc(Ge)),e===s&&(e=Ki,"grant"===r.substr(Ki,5).toLowerCase()?(n=r.substr(Ki,5),Ki+=5):(n=s,0===rc&&sc(Ue)),n!==s&&(o=Up())!==s?("option"===r.substr(Ki,6).toLowerCase()?(u=r.substr(Ki,6),Ki+=6):(u=s,0===rc&&sc(De)),u!==s?e=n=[n,o,u]:(Ki=e,e=s)):(Ki=e,e=s),e===s&&(e=Ki,(n=ob())!==s&&(o=Up())!==s?("routine"===r.substr(Ki,7).toLowerCase()?(u=r.substr(Ki,7),Ki+=7):(u=s,0===rc&&sc(Pe)),u!==s?e=n=[n,o,u]:(Ki=e,e=s)):(Ki=e,e=s)))),e!==s&&(Qi=t,e=Me(e)),t=e}()),t}function Wc(){var r,t,e,n,o,u,a,i,c;return r=Ki,(t=$c())!==s&&Up()!==s?(e=Ki,(n=Np())!==s&&(o=Up())!==s&&(u=ml())!==s&&(a=Up())!==s&&(i=Op())!==s?e=n=[n,o,u,a,i]:(Ki=e,e=s),e===s&&(e=null),e!==s?(Qi=r,r=t={priv:t,columns:(c=e)&&c[2]}):(Ki=r,r=s)):(Ki=r,r=s),r}function qc(){var t,e,n,o,u,a,i;return t=Ki,(e=af())!==s&&Up()!==s?(n=Ki,64===r.charCodeAt(Ki)?(o="@",Ki++):(o=s,0===rc&&sc(lr)),o!==s&&(u=Up())!==s&&(a=af())!==s?n=o=[o,u,a]:(Ki=n,n=s),n===s&&(n=null),n!==s?(Qi=t,t=e={name:{type:"single_quote_string",value:e},host:(i=n)?{type:"single_quote_string",value:i[2]}:null}):(Ki=t,t=s)):(Ki=t,t=s),t}function Vc(){var r,t,e,n,o,u,a,i;if(r=Ki,(t=qc())!==s){for(e=[],n=Ki,(o=Up())!==s&&(u=Ip())!==s&&(a=Up())!==s&&(i=qc())!==s?n=o=[o,u,a,i]:(Ki=n,n=s);n!==s;)e.push(n),n=Ki,(o=Up())!==s&&(u=Ip())!==s&&(a=Up())!==s&&(i=qc())!==s?n=o=[o,u,a,i]:(Ki=n,n=s);e!==s?(Qi=r,r=t=C(t,e)):(Ki=r,r=s);}else Ki=r,r=s;return r}function Xc(){var t,e,n;return t=Ki,gb()!==s&&Up()!==s?("admin"===r.substr(Ki,5).toLowerCase()?(e=r.substr(Ki,5),Ki+=5):(e=s,0===rc&&sc(Fe)),e!==s&&Up()!==s?("option"===r.substr(Ki,6).toLowerCase()?(n=r.substr(Ki,6),Ki+=6):(n=s,0===rc&&sc(De)),n!==s?(Qi=t,t={type:"origin",value:"with admin option"}):(Ki=t,t=s)):(Ki=t,t=s)):(Ki=t,t=s),t}function Kc(){var t,e,n,o,u,a,i;return (t=el())===s&&(t=Ki,e=Ki,40===r.charCodeAt(Ki)?(n="(",Ki++):(n=s,0===rc&&sc(Be)),n!==s&&(o=Up())!==s&&(u=Kc())!==s&&(a=Up())!==s?(41===r.charCodeAt(Ki)?(i=")",Ki++):(i=s,0===rc&&sc($e)),i!==s?e=n=[n,o,u,a,i]:(Ki=e,e=s)):(Ki=e,e=s),e!==s&&(Qi=t,e={...e[2],parentheses_symbol:true}),t=e),t}function Qc(){var t,e,n,o,u,a,i,c,l,f,b,p,v;if(t=Ki,gb()!==s)if(Up()!==s)if((e=zc())!==s){for(n=[],o=Ki,(u=Up())!==s&&(a=Ip())!==s&&(i=Up())!==s&&(c=zc())!==s?o=u=[u,a,i,c]:(Ki=o,o=s);o!==s;)n.push(o),o=Ki,(u=Up())!==s&&(a=Ip())!==s&&(i=Up())!==s&&(c=zc())!==s?o=u=[u,a,i,c]:(Ki=o,o=s);n!==s?(Qi=t,t=sr(e,n)):(Ki=t,t=s);}else Ki=t,t=s;else Ki=t,t=s;else Ki=t,t=s;if(t===s)if(t=Ki,Up()!==s)if(gb()!==s)if((e=Up())!==s)if((n=function(){var t,e,n,o;t=Ki,"recursive"===r.substr(Ki,9).toLowerCase()?(e=r.substr(Ki,9),Ki+=9):(e=s,0===rc&&sc(cu));e!==s?(n=Ki,rc++,o=Lf(),rc--,o===s?n=void 0:(Ki=n,n=s),n!==s?t=e=[e,n]:(Ki=t,t=s)):(Ki=t,t=s);return t}())!==s)if((o=Up())!==s)if((u=zc())!==s){for(a=[],i=Ki,(c=Up())!==s&&(l=Ip())!==s&&(f=Up())!==s&&(b=zc())!==s?i=c=[c,l,f,b]:(Ki=i,i=s);i!==s;)a.push(i),i=Ki,(c=Up())!==s&&(l=Ip())!==s&&(f=Up())!==s&&(b=zc())!==s?i=c=[c,l,f,b]:(Ki=i,i=s);a!==s?(Qi=t,v=a,(p=u).recursive=true,t=fv(p,v)):(Ki=t,t=s);}else Ki=t,t=s;else Ki=t,t=s;else Ki=t,t=s;else Ki=t,t=s;else Ki=t,t=s;else Ki=t,t=s;return t}function zc(){var r,t,e,n,o,u,a;return r=Ki,(t=Ff())===s&&(t=wf())===s&&(t=Ll()),t!==s&&Up()!==s?((e=Zc())===s&&(e=null),e!==s&&Up()!==s&&db()!==s&&Up()!==s&&Np()!==s&&Up()!==s?((n=jl())===s&&(n=bc()),n!==s&&Up()!==s&&Op()!==s?(Qi=r,u=e,a=n,"string"==typeof(o=t)&&(o={type:"default",value:o}),o.table&&(o={type:"default",value:o.table}),r=t={name:o,stmt:a,columns:u}):(Ki=r,r=s)):(Ki=r,r=s)):(Ki=r,r=s),r}function Zc(){var r,t;return r=Ki,Np()!==s&&Up()!==s&&(t=function(){var r;(r=ml())===s&&(r=function(){var r,t,e,n,o,u,a,i;if(r=Ki,(t=Pf())!==s){for(e=[],n=Ki,(o=Up())!==s&&(u=Ip())!==s&&(a=Up())!==s&&(i=Pf())!==s?n=o=[o,u,a,i]:(Ki=n,n=s);n!==s;)e.push(n),n=Ki,(o=Up())!==s&&(u=Ip())!==s&&(a=Up())!==s&&(i=Pf())!==s?n=o=[o,u,a,i]:(Ki=n,n=s);e!==s?(Qi=r,t=sr(t,e),r=t):(Ki=r,r=s);}else Ki=r,r=s;return r}());return r}())!==s&&Up()!==s&&Op()!==s?(Qi=r,r=t):(Ki=r,r=s),r}function Jc(){var t,e,n,o,u,a,i;if(t=Ki,(e=vf())!==s)if(Up()!==s)if((n=Np())!==s)if(Up()!==s){if(o=[],We.test(r.charAt(Ki))?(u=r.charAt(Ki),Ki++):(u=s,0===rc&&sc(qe)),u!==s)for(;u!==s;)o.push(u),We.test(r.charAt(Ki))?(u=r.charAt(Ki),Ki++):(u=s,0===rc&&sc(qe));else o=s;o!==s&&(u=Up())!==s&&Op()!==s&&Up()!==s?((a=Nb())===s&&(a=Ob()),a===s&&(a=null),a!==s?(Qi=t,i=a,t=e={type:"column_ref",column:e,suffix:`(${parseInt(o.join(""),10)})`,order_by:i,...av()}):(Ki=t,t=s)):(Ki=t,t=s);}else Ki=t,t=s;else Ki=t,t=s;else Ki=t,t=s;else Ki=t,t=s;return t===s&&(t=Ki,(e=vf())!==s&&Up()!==s?((n=Nb())===s&&(n=Ob()),n===s&&(n=null),n!==s?(Qi=t,t=e=function(r,t){return {type:"column_ref",column:r,order_by:t,...av()}}(e,n)):(Ki=t,t=s)):(Ki=t,t=s)),t}function rl(){var r,t,e;return r=Ki,Np()!==s&&Up()!==s?((t=function(){var r,t,e,n,o,u,a,i;if(r=Ki,(t=Jc())!==s){for(e=[],n=Ki,(o=Up())!==s&&(u=Ip())!==s&&(a=Up())!==s&&(i=Jc())!==s?n=o=[o,u,a,i]:(Ki=n,n=s);n!==s;)e.push(n),n=Ki,(o=Up())!==s&&(u=Ip())!==s&&(a=Up())!==s&&(i=Jc())!==s?n=o=[o,u,a,i]:(Ki=n,n=s);e!==s?(Qi=r,r=t=sr(t,e)):(Ki=r,r=s);}else Ki=r,r=s;return r}())===s&&(t=Ul()),t!==s&&Up()!==s&&Op()!==s?(Qi=r,r=(e=t).type?e.value:e):(Ki=r,r=s)):(Ki=r,r=s),r}function tl(){var t,e,n,o;return t=Ki,(e=function(){var t,e,n,o,u,a;return t=Ki,e=Ki,"for"===r.substr(Ki,3).toLowerCase()?(n=r.substr(Ki,3),Ki+=3):(n=s,0===rc&&sc(vr)),n!==s&&(o=Up())!==s&&(u=nb())!==s?e=n=[n,o,u]:(Ki=e,e=s),e!==s&&(Qi=t,e=`${(a=e)[0]} ${a[2][0]}`),t=e}())===s&&(e=function(){var t,e,n,o,u,a,i,c,l,f;return t=Ki,e=Ki,"lock"===r.substr(Ki,4).toLowerCase()?(n=r.substr(Ki,4),Ki+=4):(n=s,0===rc&&sc($)),n!==s&&(o=Up())!==s?("in"===r.substr(Ki,2).toLowerCase()?(u=r.substr(Ki,2),Ki+=2):(u=s,0===rc&&sc(Ve)),u!==s&&(a=Up())!==s?("share"===r.substr(Ki,5).toLowerCase()?(i=r.substr(Ki,5),Ki+=5):(i=s,0===rc&&sc(Xe)),i!==s&&(c=Up())!==s?("mode"===r.substr(Ki,4).toLowerCase()?(l=r.substr(Ki,4),Ki+=4):(l=s,0===rc&&sc(Ke)),l!==s?e=n=[n,o,u,a,i,c,l]:(Ki=e,e=s)):(Ki=e,e=s)):(Ki=e,e=s)):(Ki=e,e=s),e!==s&&(Qi=t,e=`${(f=e)[0]} ${f[2]} ${f[4]} ${f[6]}`),t=e}()),e!==s&&Up()!==s?((n=function(){var t,e,n,o,u,a,i;return t=Ki,e=Ki,"wait"===r.substr(Ki,4).toLowerCase()?(n=r.substr(Ki,4),Ki+=4):(n=s,0===rc&&sc(Qe)),n!==s&&(o=Up())!==s&&(u=$f())!==s?e=n=[n,o,u]:(Ki=e,e=s),e!==s&&(Qi=t,e=`${(a=e)[0]} ${a[2].value}`),(t=e)===s&&("nowait"===r.substr(Ki,6).toLowerCase()?(t=r.substr(Ki,6),Ki+=6):(t=s,0===rc&&sc(ze)),t===s&&(t=Ki,e=Ki,"skip"===r.substr(Ki,4).toLowerCase()?(n=r.substr(Ki,4),Ki+=4):(n=s,0===rc&&sc(Ze)),n!==s&&(o=Up())!==s?("locked"===r.substr(Ki,6).toLowerCase()?(u=r.substr(Ki,6),Ki+=6):(u=s,0===rc&&sc(Je)),u!==s?e=n=[n,o,u]:(Ki=e,e=s)):(Ki=e,e=s),e!==s&&(Qi=t,e=`${(i=e)[0]} ${i[2]}`),t=e)),t}())===s&&(n=null),n!==s?(Qi=t,t=e=e+((o=n)?" "+o:"")):(Ki=t,t=s)):(Ki=t,t=s),t}function el(){var t,e,n,o,u,a,i,c,l,f,b,p,v,d,y,w,L;return t=Ki,Up()!==s?((e=Qc())===s&&(e=null),e!==s&&Up()!==s&&eb()!==s&&Dp()!==s?((n=function(){var r,t,e,n,o,u;if(r=Ki,(t=nl())!==s){for(e=[],n=Ki,(o=Up())!==s&&(u=nl())!==s?n=o=[o,u]:(Ki=n,n=s);n!==s;)e.push(n),n=Ki,(o=Up())!==s&&(u=nl())!==s?n=o=[o,u]:(Ki=n,n=s);e!==s?(Qi=r,t=function(r,t){const e=[r];for(let r=0,n=t.length;r<n;++r)e.push(t[r][1]);return e}(t,e),r=t):(Ki=r,r=s);}else Ki=r,r=s;return r}())===s&&(n=null),n!==s&&Up()!==s?((o=xb())===s&&(o=null),o!==s&&Up()!==s&&(u=ol())!==s&&Up()!==s?((a=il())===s&&(a=null),a!==s&&Up()!==s?((i=cl())===s&&(i=null),i!==s&&Up()!==s?((c=il())===s&&(c=null),c!==s&&Up()!==s?((l=hl())===s&&(l=null),l!==s&&Up()!==s?((f=function(){var t,e,n,o;t=Ki,(e=function(){var t,e,n,o;t=Ki,"group"===r.substr(Ki,5).toLowerCase()?(e=r.substr(Ki,5),Ki+=5):(e=s,0===rc&&sc(Du));e!==s?(n=Ki,rc++,o=Lf(),rc--,o===s?n=void 0:(Ki=n,n=s),n!==s?t=e=[e,n]:(Ki=t,t=s)):(Ki=t,t=s);return t}())!==s&&Up()!==s&&Sb()!==s&&Up()!==s&&(n=Ul())!==s&&Up()!==s?((o=function(){var t,e;t=Ki,gb()!==s&&Up()!==s?("rollup"===r.substr(Ki,6).toLowerCase()?(e=r.substr(Ki,6),Ki+=6):(e=s,0===rc&&sc(Ln)),e!==s?(Qi=t,t={type:"origin",value:"with rollup"}):(Ki=t,t=s)):(Ki=t,t=s);return t}())===s&&(o=null),o!==s?(Qi=t,u=o,e={columns:n.value,modifiers:[u]},t=e):(Ki=t,t=s)):(Ki=t,t=s);var u;return t}())===s&&(f=null),f!==s&&Up()!==s?((b=function(){var t,e;t=Ki,function(){var t,e,n,o;t=Ki,"having"===r.substr(Ki,6).toLowerCase()?(e=r.substr(Ki,6),Ki+=6):(e=s,0===rc&&sc(Pu));e!==s?(n=Ki,rc++,o=Lf(),rc--,o===s?n=void 0:(Ki=n,n=s),n!==s?t=e=[e,n]:(Ki=t,t=s)):(Ki=t,t=s);return t}()!==s&&Up()!==s&&(e=Yl())!==s?(Qi=t,t=e):(Ki=t,t=s);return t}())===s&&(b=null),b!==s&&Up()!==s?((p=Al())===s&&(p=null),p!==s&&Up()!==s?((v=Ac())===s&&(v=null),v!==s&&Up()!==s?((d=gl())===s&&(d=null),d!==s&&Up()!==s?((y=tl())===s&&(y=null),y!==s&&Up()!==s?((w=function(){var t,e,n;t=Ki,"window"===r.substr(Ki,6).toLowerCase()?(e=r.substr(Ki,6),Ki+=6):(e=s,0===rc&&sc(Co));e!==s&&Up()!==s&&(n=function(){var r,t,e,n,o,u,a,i;if(r=Ki,(t=Tf())!==s){for(e=[],n=Ki,(o=Up())!==s&&(u=Ip())!==s&&(a=Up())!==s&&(i=Tf())!==s?n=o=[o,u,a,i]:(Ki=n,n=s);n!==s;)e.push(n),n=Ki,(o=Up())!==s&&(u=Ip())!==s&&(a=Up())!==s&&(i=Tf())!==s?n=o=[o,u,a,i]:(Ki=n,n=s);e!==s?(Qi=r,t=fv(t,e),r=t):(Ki=r,r=s);}else Ki=r,r=s;return r}())!==s?(Qi=t,t=e={keyword:"window",type:"window",expr:n}):(Ki=t,t=s);return t}())===s&&(w=null),w!==s&&Up()!==s?((L=il())===s&&(L=null),L!==s?(Qi=t,t=function(r,t,e,n,o,s,u,a,i,c,l,f,b,p,v,d){if(o&&u||o&&d||u&&d||o&&u&&d)throw new Error("A given SQL statement can contain at most one INTO clause");if(s){(Array.isArray(s)?s:s.expr).forEach(r=>r.table&&wv.add(`select::${r.db}::${r.table}`));}return {with:r,type:"select",options:t,distinct:e,columns:n,into:{...o||u||d||{},position:(o?"column":u&&"from")||d&&"end"},from:s,where:a,groupby:i,having:c,orderby:l,limit:b,locking_read:p&&p,window:v,collate:f,...av()}}(e,n,o,u,a,i,c,l,f,b,p,v,d,y,w,L)):(Ki=t,t=s)):(Ki=t,t=s)):(Ki=t,t=s)):(Ki=t,t=s)):(Ki=t,t=s)):(Ki=t,t=s)):(Ki=t,t=s)):(Ki=t,t=s)):(Ki=t,t=s)):(Ki=t,t=s)):(Ki=t,t=s)):(Ki=t,t=s)):(Ki=t,t=s)):(Ki=t,t=s)):(Ki=t,t=s)):(Ki=t,t=s),t}function nl(){var t,e;return t=Ki,(e=function(){var t;"sql_calc_found_rows"===r.substr(Ki,19).toLowerCase()?(t=r.substr(Ki,19),Ki+=19):(t=s,0===rc&&sc(Li));return t}())===s&&((e=function(){var t;"sql_cache"===r.substr(Ki,9).toLowerCase()?(t=r.substr(Ki,9),Ki+=9):(t=s,0===rc&&sc(Ci));return t}())===s&&(e=function(){var t;"sql_no_cache"===r.substr(Ki,12).toLowerCase()?(t=r.substr(Ki,12),Ki+=12):(t=s,0===rc&&sc(hi));return t}()),e===s&&(e=function(){var t;"sql_big_result"===r.substr(Ki,14).toLowerCase()?(t=r.substr(Ki,14),Ki+=14):(t=s,0===rc&&sc(Ei));return t}())===s&&(e=function(){var t;"sql_small_result"===r.substr(Ki,16).toLowerCase()?(t=r.substr(Ki,16),Ki+=16):(t=s,0===rc&&sc(mi));return t}())===s&&(e=function(){var t;"sql_buffer_result"===r.substr(Ki,17).toLowerCase()?(t=r.substr(Ki,17),Ki+=17):(t=s,0===rc&&sc(Ai));return t}())),e!==s&&(Qi=t,e=e),t=e}function ol(){var r,t,e,n,o,u,a,i;if(r=Ki,(t=Rb())===s&&(t=Ki,(e=Sp())!==s?(n=Ki,rc++,o=Lf(),rc--,o===s?n=void 0:(Ki=n,n=s),n!==s?t=e=[e,n]:(Ki=t,t=s)):(Ki=t,t=s),t===s&&(t=Sp())),t!==s){for(e=[],n=Ki,(o=Up())!==s&&(u=Ip())!==s&&(a=Up())!==s&&(i=ul())!==s?n=o=[o,u,a,i]:(Ki=n,n=s);n!==s;)e.push(n),n=Ki,(o=Up())!==s&&(u=Ip())!==s&&(a=Up())!==s&&(i=ul())!==s?n=o=[o,u,a,i]:(Ki=n,n=s);e!==s?(Qi=r,r=t=function(r,t){Lv.add("select::null::(.*)");const e={expr:{type:"column_ref",table:null,column:"*"},as:null,...av()};return t&&t.length>0?fv(e,t):[e]}(0,e)):(Ki=r,r=s);}else Ki=r,r=s;if(r===s)if(r=Ki,(t=ul())!==s){for(e=[],n=Ki,(o=Up())!==s&&(u=Ip())!==s&&(a=Up())!==s&&(i=ul())!==s?n=o=[o,u,a,i]:(Ki=n,n=s);n!==s;)e.push(n),n=Ki,(o=Up())!==s&&(u=Ip())!==s&&(a=Up())!==s&&(i=ul())!==s?n=o=[o,u,a,i]:(Ki=n,n=s);e!==s?(Qi=r,r=t=sr(t,e)):(Ki=r,r=s);}else Ki=r,r=s;return r}function sl(){var t,e,n,o,u,a,i;return t=Ki,"match"===r.substr(Ki,5).toLowerCase()?(e=r.substr(Ki,5),Ki+=5):(e=s,0===rc&&sc(sn)),e!==s&&Up()!==s&&Np()!==s&&Up()!==s&&(n=ml())!==s&&Up()!==s&&Op()!==s&&Up()!==s?("AGAINST"===r.substr(Ki,7)?(o="AGAINST",Ki+=7):(o=s,0===rc&&sc(un)),o!==s&&Up()!==s&&Np()!==s&&Up()!==s&&(u=Fl())!==s&&Up()!==s?((a=function(){var t,e,n,o,u,a,i;return t=Ki,kb()!==s&&Up()!==s?("natural"===r.substr(Ki,7).toLowerCase()?(e=r.substr(Ki,7),Ki+=7):(e=s,0===rc&&sc(rn)),e!==s&&Up()!==s?("language"===r.substr(Ki,8).toLowerCase()?(n=r.substr(Ki,8),Ki+=8):(n=s,0===rc&&sc(tn)),n!==s&&Up()!==s?("mode"===r.substr(Ki,4).toLowerCase()?(o=r.substr(Ki,4),Ki+=4):(o=s,0===rc&&sc(Ke)),o!==s&&Up()!==s?("with"===r.substr(Ki,4).toLowerCase()?(u=r.substr(Ki,4),Ki+=4):(u=s,0===rc&&sc(v)),u!==s&&Up()!==s?("query"===r.substr(Ki,5).toLowerCase()?(a=r.substr(Ki,5),Ki+=5):(a=s,0===rc&&sc(en)),a!==s&&Up()!==s?("expansion"===r.substr(Ki,9).toLowerCase()?(i=r.substr(Ki,9),Ki+=9):(i=s,0===rc&&sc(nn)),i!==s?(Qi=t,t={type:"origin",value:"IN NATURAL LANGUAGE MODE WITH QUERY EXPANSION"}):(Ki=t,t=s)):(Ki=t,t=s)):(Ki=t,t=s)):(Ki=t,t=s)):(Ki=t,t=s)):(Ki=t,t=s)):(Ki=t,t=s),t===s&&(t=Ki,kb()!==s&&Up()!==s?("natural"===r.substr(Ki,7).toLowerCase()?(e=r.substr(Ki,7),Ki+=7):(e=s,0===rc&&sc(rn)),e!==s&&Up()!==s?("language"===r.substr(Ki,8).toLowerCase()?(n=r.substr(Ki,8),Ki+=8):(n=s,0===rc&&sc(tn)),n!==s&&Up()!==s?("mode"===r.substr(Ki,4).toLowerCase()?(o=r.substr(Ki,4),Ki+=4):(o=s,0===rc&&sc(Ke)),o!==s?(Qi=t,t={type:"origin",value:"IN NATURAL LANGUAGE MODE"}):(Ki=t,t=s)):(Ki=t,t=s)):(Ki=t,t=s)):(Ki=t,t=s),t===s&&(t=Ki,kb()!==s&&Up()!==s?("boolean"===r.substr(Ki,7).toLowerCase()?(e=r.substr(Ki,7),Ki+=7):(e=s,0===rc&&sc(on)),e!==s&&Up()!==s?("mode"===r.substr(Ki,4).toLowerCase()?(n=r.substr(Ki,4),Ki+=4):(n=s,0===rc&&sc(Ke)),n!==s?(Qi=t,t={type:"origin",value:"IN BOOLEAN MODE"}):(Ki=t,t=s)):(Ki=t,t=s)):(Ki=t,t=s),t===s&&(t=Ki,gb()!==s&&Up()!==s?("query"===r.substr(Ki,5).toLowerCase()?(e=r.substr(Ki,5),Ki+=5):(e=s,0===rc&&sc(en)),e!==s&&Up()!==s?("expansion"===r.substr(Ki,9).toLowerCase()?(n=r.substr(Ki,9),Ki+=9):(n=s,0===rc&&sc(nn)),n!==s?(Qi=t,t={type:"origin",value:"WITH QUERY EXPANSION"}):(Ki=t,t=s)):(Ki=t,t=s)):(Ki=t,t=s)))),t}())===s&&(a=null),a!==s&&Up()!==s&&Op()!==s&&Up()!==s?((i=al())===s&&(i=null),i!==s?(Qi=t,t=e={against:"against",columns:n,expr:u,match:"match",mode:a,type:"fulltext_search",as:i}):(Ki=t,t=s)):(Ki=t,t=s)):(Ki=t,t=s)):(Ki=t,t=s),t}function ul(){var r,t,e,n,o,u,a,i;return r=Ki,(t=sl())!==s&&(Qi=r,t=function(r){const{as:t,...e}=r;return {expr:e,as:t}}(t)),(r=t)===s&&(r=Ki,(t=af())!==s&&(e=Up())!==s&&(n=gp())!==s&&(o=Up())!==s&&(u=af())!==s&&Up()!==s&&gp()!==s&&Up()!==s&&Sp()!==s?(Qi=r,a=t,i=u,Lv.add(`select::${a}::${i}::(.*)`),r=t={expr:{type:"column_ref",db:a,table:i,column:"*"},as:null,...av()}):(Ki=r,r=s),r===s&&(r=Ki,t=Ki,(e=af())!==s&&(n=Up())!==s&&(o=gp())!==s?t=e=[e,n,o]:(Ki=t,t=s),t===s&&(t=null),t!==s&&(e=Up())!==s&&(n=Sp())!==s?(Qi=r,r=t=function(r){const t=r&&r[0]||null;return Lv.add(`select::${t}::(.*)`),{expr:{type:"column_ref",table:t,column:"*"},as:null,...av()}}(t)):(Ki=r,r=s),r===s&&(r=Ki,(t=function(){var r,t,e,n;r=Ki,(t=Zp())===s&&(t=Jp());t!==s&&Up()!==s&&(e=vp())!==s&&Up()!==s&&(n=$p())!==s?(Qi=r,t=Gi(t,e,n),r=t):(Ki=r,r=s);return r}())!==s&&(e=Up())!==s?((n=al())===s&&(n=null),n!==s?(Qi=r,r=t={expr:t,as:n}):(Ki=r,r=s)):(Ki=r,r=s),r===s&&(r=Ki,(t=function(){var r,t,e,n,o,u,a,i;if(r=Ki,(t=Fl())!==s){for(e=[],n=Ki,(o=Up())!==s?((u=Gb())===s&&(u=Fb())===s&&(u=kp()),u!==s&&(a=Up())!==s&&(i=Fl())!==s?n=o=[o,u,a,i]:(Ki=n,n=s)):(Ki=n,n=s);n!==s;)e.push(n),n=Ki,(o=Up())!==s?((u=Gb())===s&&(u=Fb())===s&&(u=kp()),u!==s&&(a=Up())!==s&&(i=Fl())!==s?n=o=[o,u,a,i]:(Ki=n,n=s)):(Ki=n,n=s);e!==s?(Qi=r,t=function(r,t){const e=r.ast;if(e&&"select"===e.type&&(!(r.parentheses_symbol||r.parentheses||r.ast.parentheses||r.ast.parentheses_symbol)||1!==e.columns.length||"*"===e.columns[0].expr.column))throw new Error("invalid column clause with select statement");if(!t||0===t.length)return r;const n=t.length;let o=t[n-1][3];for(let e=n-1;e>=0;e--){const n=0===e?r:t[e-1][3];o=cv(t[e][1],n,o);}return o}(t,e),r=t):(Ki=r,r=s);}else Ki=r,r=s;return r}())!==s&&(e=Up())!==s?((n=al())===s&&(n=null),n!==s?(Qi=r,r=t=function(r,t){return "double_quote_string"!==r.type&&"single_quote_string"!==r.type||Lv.add("select::null::"+r.value),{expr:r,as:t}}(t,n)):(Ki=r,r=s)):(Ki=r,r=s))))),r}function al(){var r,t,e;return r=Ki,(t=db())!==s&&Up()!==s&&(e=function(){var r,t;r=Ki,(t=wf())!==s?(Qi=Ki,(function(r){if(true===sv[r.toUpperCase()])throw new Error("Error: "+JSON.stringify(r)+" is a reserved word, can not as alias clause");return  false}(t)?s:void 0)!==s?(Qi=r,r=t=t):(Ki=r,r=s)):(Ki=r,r=s);r===s&&(r=Ki,(t=lf())!==s&&(Qi=r,t=t),r=t);return r}())!==s?(Qi=r,r=t=e):(Ki=r,r=s),r===s&&(r=Ki,(t=db())===s&&(t=null),t!==s&&Up()!==s&&(e=af())!==s?(Qi=r,r=t=e):(Ki=r,r=s)),r}function il(){var t,e,n;return t=Ki,bb()!==s&&Up()!==s&&(e=function(){var r,t,e,n,o,u,a,c;if(r=Ki,(t=Zp())!==s){for(e=[],n=Ki,(o=Up())!==s&&(u=Ip())!==s&&(a=Up())!==s&&(c=Zp())!==s?n=o=[o,u,a,c]:(Ki=n,n=s);n!==s;)e.push(n),n=Ki,(o=Up())!==s&&(u=Ip())!==s&&(a=Up())!==s&&(c=Zp())!==s?n=o=[o,u,a,c]:(Ki=n,n=s);e!==s?(Qi=r,t=i(t,e),r=t):(Ki=r,r=s);}else Ki=r,r=s;return r}())!==s?(Qi=t,t={keyword:"var",type:"into",expr:e}):(Ki=t,t=s),t===s&&(t=Ki,bb()!==s&&Up()!==s?("outfile"===r.substr(Ki,7).toLowerCase()?(e=r.substr(Ki,7),Ki+=7):(e=s,0===rc&&sc(an)),e===s&&("dumpfile"===r.substr(Ki,8).toLowerCase()?(e=r.substr(Ki,8),Ki+=8):(e=s,0===rc&&sc(cn))),e===s&&(e=null),e!==s&&Up()!==s?((n=Ff())===s&&(n=af()),n!==s?(Qi=t,t={keyword:e,type:"into",expr:n}):(Ki=t,t=s)):(Ki=t,t=s)):(Ki=t,t=s)),t}function cl(){var r,t;return r=Ki,pb()!==s&&Up()!==s&&(t=vl())!==s?(Qi=r,r=t):(Ki=r,r=s),r}function ll(){var r,t,e;return r=Ki,(t=Ll())!==s&&Up()!==s&&Zf()!==s&&Up()!==s&&(e=Ll())!==s?(Qi=r,r=t=[t,e]):(Ki=r,r=s),r}function fl(){var t,e;return t=Ki,_b()!==s&&Up()!==s?("btree"===r.substr(Ki,5).toLowerCase()?(e=r.substr(Ki,5),Ki+=5):(e=s,0===rc&&sc(ln)),e===s&&("hash"===r.substr(Ki,4).toLowerCase()?(e=r.substr(Ki,4),Ki+=4):(e=s,0===rc&&sc(fn))),e!==s?(Qi=t,t={keyword:"using",type:e.toLowerCase()}):(Ki=t,t=s)):(Ki=t,t=s),t}function bl(){var r,t,e,n,o,u;if(r=Ki,(t=pl())!==s){for(e=[],n=Ki,(o=Up())!==s&&(u=pl())!==s?n=o=[o,u]:(Ki=n,n=s);n!==s;)e.push(n),n=Ki,(o=Up())!==s&&(u=pl())!==s?n=o=[o,u]:(Ki=n,n=s);e!==s?(Qi=r,r=t=function(r,t){const e=[r];for(let r=0;r<t.length;r++)e.push(t[r][1]);return e}(t,e)):(Ki=r,r=s);}else Ki=r,r=s;return r}function pl(){var t,e,n,o,u,a;return t=Ki,(e=function(){var t,e,n,o;t=Ki,"key_block_size"===r.substr(Ki,14).toLowerCase()?(e=r.substr(Ki,14),Ki+=14):(e=s,0===rc&&sc(dt));e!==s?(n=Ki,rc++,o=Lf(),rc--,o===s?n=void 0:(Ki=n,n=s),n!==s?(Qi=t,t=e="KEY_BLOCK_SIZE"):(Ki=t,t=s)):(Ki=t,t=s);return t}())!==s&&Up()!==s?((n=dp())===s&&(n=null),n!==s&&Up()!==s&&(o=$f())!==s?(Qi=t,u=n,a=o,t=e={type:e.toLowerCase(),symbol:u,expr:a}):(Ki=t,t=s)):(Ki=t,t=s),t===s&&(t=fl())===s&&(t=Ki,"with"===r.substr(Ki,4).toLowerCase()?(e=r.substr(Ki,4),Ki+=4):(e=s,0===rc&&sc(v)),e!==s&&Up()!==s?("parser"===r.substr(Ki,6).toLowerCase()?(n=r.substr(Ki,6),Ki+=6):(n=s,0===rc&&sc(bn)),n!==s&&Up()!==s&&(o=wf())!==s?(Qi=t,t=e={type:"with parser",expr:o}):(Ki=t,t=s)):(Ki=t,t=s),t===s&&(t=Ki,"visible"===r.substr(Ki,7).toLowerCase()?(e=r.substr(Ki,7),Ki+=7):(e=s,0===rc&&sc(pn)),e===s&&("invisible"===r.substr(Ki,9).toLowerCase()?(e=r.substr(Ki,9),Ki+=9):(e=s,0===rc&&sc(vn))),e!==s&&(Qi=t,e=function(r){return {type:r.toLowerCase(),expr:r.toLowerCase()}}(e)),(t=e)===s&&(t=Pp()))),t}function vl(){var r,t,e,n,o,u,a,i,c,l,f,b;if(r=Ki,(t=yl())!==s){for(e=[],n=dl();n!==s;)e.push(n),n=dl();e!==s?(Qi=r,f=t,(b=e).unshift(f),b.forEach(r=>{const{table:t,as:e}=r;Cv[t]=t,e&&(Cv[e]=t),dv(Lv);}),r=t=b):(Ki=r,r=s);}else Ki=r,r=s;if(r===s){if(r=Ki,t=[],(e=Np())!==s)for(;e!==s;)t.push(e),e=Np();else t=s;if(t!==s)if((e=Up())!==s)if((n=yl())!==s){for(o=[],u=dl();u!==s;)o.push(u),u=dl();if(o!==s)if((u=Up())!==s){if(a=[],(i=Op())!==s)for(;i!==s;)a.push(i),i=Op();else a=s;if(a!==s)if((i=Up())!==s){for(c=[],l=dl();l!==s;)c.push(l),l=dl();c!==s?(Qi=r,r=t=function(r,t,e,n,o){if(r.length!==n.length)throw new Error(`parentheses not match in from clause: ${r.length} != ${n.length}`);return e.unshift(t),e.forEach(r=>{const{table:t,as:e}=r;Cv[t]=t,e&&(Cv[e]=t),dv(Lv);}),o.forEach(r=>{const{table:t,as:e}=r;Cv[t]=t,e&&(Cv[e]=t),dv(Lv);}),{expr:e,parentheses:{length:n.length},joins:o}}(t,n,o,a,c)):(Ki=r,r=s);}else Ki=r,r=s;else Ki=r,r=s;}else Ki=r,r=s;else Ki=r,r=s;}else Ki=r,r=s;else Ki=r,r=s;else Ki=r,r=s;}return r}function dl(){var r,t,e;return r=Ki,Up()!==s&&(t=Ip())!==s&&Up()!==s&&(e=yl())!==s?(Qi=r,r=e):(Ki=r,r=s),r===s&&(r=Ki,Up()!==s&&(t=function(){var r,t,e,n,o,u,a,i,c,l,f;if(r=Ki,(t=wl())!==s)if(Up()!==s)if((e=yl())===s&&(e=vl()),e!==s)if(Up()!==s)if((n=_b())!==s)if(Up()!==s)if(Np()!==s)if(Up()!==s)if((o=sf())!==s){for(u=[],a=Ki,(i=Up())!==s&&(c=Ip())!==s&&(l=Up())!==s&&(f=sf())!==s?a=i=[i,c,l,f]:(Ki=a,a=s);a!==s;)u.push(a),a=Ki,(i=Up())!==s&&(c=Ip())!==s&&(l=Up())!==s&&(f=sf())!==s?a=i=[i,c,l,f]:(Ki=a,a=s);u!==s&&(a=Up())!==s&&(i=Op())!==s?(Qi=r,b=t,v=o,d=u,(p=e).join=b,p.using=fv(v,d),r=t=p):(Ki=r,r=s);}else Ki=r,r=s;else Ki=r,r=s;else Ki=r,r=s;else Ki=r,r=s;else Ki=r,r=s;else Ki=r,r=s;else Ki=r,r=s;else Ki=r,r=s;else Ki=r,r=s;var b,p,v,d;r===s&&(r=Ki,(t=wl())!==s&&Up()!==s?((e=yl())===s&&(e=vl()),e!==s&&Up()!==s?((n=Cl())===s&&(n=null),n!==s?(Qi=r,t=function(r,t,e){return t.join=r,t.on=e,t}(t,e,n),r=t):(Ki=r,r=s)):(Ki=r,r=s)):(Ki=r,r=s),r===s&&(r=Ki,(t=wl())===s&&(t=fc()),t!==s&&Up()!==s&&(e=Np())!==s&&Up()!==s&&(n=bc())!==s&&Up()!==s&&Op()!==s&&Up()!==s?((o=al())===s&&(o=null),o!==s&&(u=Up())!==s?((a=Cl())===s&&(a=null),a!==s?(Qi=r,t=function(r,t,e,n){return t.parentheses=true,{expr:t,as:e,join:r,on:n}}(t,n,o,a),r=t):(Ki=r,r=s)):(Ki=r,r=s)):(Ki=r,r=s)));return r}())!==s?(Qi=r,r=t):(Ki=r,r=s)),r}function yl(){var t,e,n,o,u,a,i;return t=Ki,(e=function(){var t;"dual"===r.substr(Ki,4).toLowerCase()?(t=r.substr(Ki,4),Ki+=4):(t=s,0===rc&&sc(li));return t}())!==s&&(Qi=t,e={type:"dual"}),(t=e)===s&&(t=Ki,(e=Ll())!==s&&Up()!==s?((n=al())===s&&(n=null),n!==s?(Qi=t,i=n,t=e="var"===(a=e).type?(a.as=i,a):{db:a.db,table:a.table,as:i,...av()}):(Ki=t,t=s)):(Ki=t,t=s),t===s&&(t=Ki,(e=Np())!==s&&Up()!==s&&(n=Ll())!==s&&Up()!==s?((o=al())===s&&(o=null),o!==s&&Up()!==s&&Op()!==s?(Qi=t,t=e=function(r,t,e){return "var"===r.type?(r.as=t,r.parentheses=true,r):{db:r.db,table:r.table,as:t,parentheses:true}}(n,o)):(Ki=t,t=s)):(Ki=t,t=s),t===s&&(t=Ki,(e=jl())!==s&&Up()!==s?((n=al())===s&&(n=null),n!==s?(Qi=t,t=e=function(r,t){return {expr:{type:"values",values:r,prefix:"row"},as:t}}(e,n)):(Ki=t,t=s)):(Ki=t,t=s),t===s&&(t=Ki,"lateral"===r.substr(Ki,7).toLowerCase()?(e=r.substr(Ki,7),Ki+=7):(e=s,0===rc&&sc(dn)),e===s&&(e=null),e!==s&&Up()!==s&&(n=Np())!==s&&Up()!==s?((o=bc())===s&&(o=jl()),o!==s&&Up()!==s&&Op()!==s&&Up()!==s?((u=al())===s&&(u=null),u!==s?(Qi=t,t=e=function(r,t,e){Array.isArray(t)&&(t={type:"values",values:t,prefix:"row"}),t.parentheses=true;const n={expr:t,as:e};return r&&(n.prefix=r),n}(e,o,u)):(Ki=t,t=s)):(Ki=t,t=s)):(Ki=t,t=s))))),t}function wl(){var t,e,n,o;return t=Ki,(e=function(){var t,e,n,o;t=Ki,"left"===r.substr(Ki,4).toLowerCase()?(e=r.substr(Ki,4),Ki+=4):(e=s,0===rc&&sc(mu));e!==s?(n=Ki,rc++,o=Lf(),rc--,o===s?n=void 0:(Ki=n,n=s),n!==s?t=e=[e,n]:(Ki=t,t=s)):(Ki=t,t=s);return t}())!==s&&(n=Up())!==s?((o=Ab())===s&&(o=null),o!==s&&Up()!==s&&Eb()!==s?(Qi=t,t=e="LEFT JOIN"):(Ki=t,t=s)):(Ki=t,t=s),t===s&&(t=Ki,(e=function(){var t,e,n,o;t=Ki,"right"===r.substr(Ki,5).toLowerCase()?(e=r.substr(Ki,5),Ki+=5):(e=s,0===rc&&sc(Eu));e!==s?(n=Ki,rc++,o=Lf(),rc--,o===s?n=void 0:(Ki=n,n=s),n!==s?t=e=[e,n]:(Ki=t,t=s)):(Ki=t,t=s);return t}())!==s&&(n=Up())!==s?((o=Ab())===s&&(o=null),o!==s&&Up()!==s&&Eb()!==s?(Qi=t,t=e="RIGHT JOIN"):(Ki=t,t=s)):(Ki=t,t=s),t===s&&(t=Ki,(e=function(){var t,e,n,o;t=Ki,"full"===r.substr(Ki,4).toLowerCase()?(e=r.substr(Ki,4),Ki+=4):(e=s,0===rc&&sc(Au));e!==s?(n=Ki,rc++,o=Lf(),rc--,o===s?n=void 0:(Ki=n,n=s),n!==s?t=e=[e,n]:(Ki=t,t=s)):(Ki=t,t=s);return t}())!==s&&(n=Up())!==s?((o=Ab())===s&&(o=null),o!==s&&Up()!==s&&Eb()!==s?(Qi=t,t=e="FULL JOIN"):(Ki=t,t=s)):(Ki=t,t=s),t===s&&(t=Ki,(e=function(){var t,e,n,o;t=Ki,"cross"===r.substr(Ki,5).toLowerCase()?(e=r.substr(Ki,5),Ki+=5):(e=s,0===rc&&sc(_u));e!==s?(n=Ki,rc++,o=Lf(),rc--,o===s?n=void 0:(Ki=n,n=s),n!==s?t=e=[e,n]:(Ki=t,t=s)):(Ki=t,t=s);return t}())!==s&&(n=Up())!==s&&(o=Eb())!==s?(Qi=t,t=e="CROSS JOIN"):(Ki=t,t=s),t===s&&(t=Ki,e=Ki,(n=function(){var t,e,n,o;t=Ki,"inner"===r.substr(Ki,5).toLowerCase()?(e=r.substr(Ki,5),Ki+=5):(e=s,0===rc&&sc(Tu));e!==s?(n=Ki,rc++,o=Lf(),rc--,o===s?n=void 0:(Ki=n,n=s),n!==s?t=e=[e,n]:(Ki=t,t=s)):(Ki=t,t=s);return t}())!==s&&(o=Up())!==s?e=n=[n,o]:(Ki=e,e=s),e===s&&(e=null),e!==s&&(n=Eb())!==s?(Qi=t,t=e="INNER JOIN"):(Ki=t,t=s))))),t}function Ll(){var t,e,n,o,u,a,i,c,l;if(t=Ki,e=[],yn.test(r.charAt(Ki))?(n=r.charAt(Ki),Ki++):(n=s,0===rc&&sc(wn)),n!==s)for(;n!==s;)e.push(n),yn.test(r.charAt(Ki))?(n=r.charAt(Ki),Ki++):(n=s,0===rc&&sc(wn));else e=s;return e!==s&&(n=uf())!==s?(o=Ki,(u=Up())!==s&&(a=gp())!==s&&(i=Up())!==s&&(c=uf())!==s?o=u=[u,a,i,c]:(Ki=o,o=s),o===s&&(o=null),o!==s?(Qi=t,t=e=function(r,t,e){const n=`${r.join("")}${t}`,o={db:null,table:n};return null!==e&&(o.db=n,o.table=e[3]),o}(e,n,o)):(Ki=t,t=s)):(Ki=t,t=s),t===s&&(t=Ki,(e=af())!==s?(n=Ki,(o=Up())!==s&&(u=gp())!==s&&(a=Up())!==s&&(i=uf())!==s?n=o=[o,u,a,i]:(Ki=n,n=s),n===s&&(n=null),n!==s?(Qi=t,t=e=function(r,t){const e={db:null,table:r};return null!==t&&(e.db=r,e.table=t[3]),e}(e,n)):(Ki=t,t=s)):(Ki=t,t=s),t===s&&(t=Ki,(e=Zp())!==s&&(Qi=t,(l=e).db=null,l.table=l.name,e=l),t=e)),t}function Cl(){var r,t;return r=Ki,mb()!==s&&Up()!==s&&(t=Hl())!==s?(Qi=r,r=t):(Ki=r,r=s),r}function hl(){var t,e;return t=Ki,function(){var t,e,n,o;t=Ki,"where"===r.substr(Ki,5).toLowerCase()?(e=r.substr(Ki,5),Ki+=5):(e=s,0===rc&&sc(ku));e!==s?(n=Ki,rc++,o=Lf(),rc--,o===s?n=void 0:(Ki=n,n=s),n!==s?t=e=[e,n]:(Ki=t,t=s)):(Ki=t,t=s);return t}()!==s&&Up()!==s&&(e=Yl())!==s?(Qi=t,t=e):(Ki=t,t=s),t}function ml(){var r,t,e,n,o,u,a,i;if(r=Ki,(t=ef())!==s){for(e=[],n=Ki,(o=Up())!==s&&(u=Ip())!==s&&(a=Up())!==s&&(i=ef())!==s?n=o=[o,u,a,i]:(Ki=n,n=s);n!==s;)e.push(n),n=Ki,(o=Up())!==s&&(u=Ip())!==s&&(a=Up())!==s&&(i=ef())!==s?n=o=[o,u,a,i]:(Ki=n,n=s);e!==s?(Qi=r,r=t=sr(t,e)):(Ki=r,r=s);}else Ki=r,r=s;return r}function El(){var r,t;return r=Ki,fb()!==s&&Up()!==s&&Sb()!==s&&Up()!==s&&(t=ol())!==s?(Qi=r,r=t):(Ki=r,r=s),r}function Al(){var t,e;return t=Ki,function(){var t,e,n,o;t=Ki,"order"===r.substr(Ki,5).toLowerCase()?(e=r.substr(Ki,5),Ki+=5):(e=s,0===rc&&sc(Mu));e!==s?(n=Ki,rc++,o=Lf(),rc--,o===s?n=void 0:(Ki=n,n=s),n!==s?t=e=[e,n]:(Ki=t,t=s)):(Ki=t,t=s);return t}()!==s&&Up()!==s&&Sb()!==s&&Up()!==s&&(e=function(){var r,t,e,n,o,u,a,i;if(r=Ki,(t=Tl())!==s){for(e=[],n=Ki,(o=Up())!==s&&(u=Ip())!==s&&(a=Up())!==s&&(i=Tl())!==s?n=o=[o,u,a,i]:(Ki=n,n=s);n!==s;)e.push(n),n=Ki,(o=Up())!==s&&(u=Ip())!==s&&(a=Up())!==s&&(i=Tl())!==s?n=o=[o,u,a,i]:(Ki=n,n=s);e!==s?(Qi=r,t=sr(t,e),r=t):(Ki=r,r=s);}else Ki=r,r=s;return r}())!==s?(Qi=t,t=e):(Ki=t,t=s),t}function Tl(){var r,t,e;return r=Ki,(t=Fl())!==s&&Up()!==s?((e=Ob())===s&&(e=Nb()),e===s&&(e=null),e!==s?(Qi=r,r=t={expr:t,type:e}):(Ki=r,r=s)):(Ki=r,r=s),r}function _l(){var t,e;return (t=$f())===s&&(t=mf())===s&&(t=Ki,63===r.charCodeAt(Ki)?(e="?",Ki++):(e=s,0===rc&&sc(Cn)),e!==s&&(Qi=t,e={type:"origin",value:"?"}),t=e),t}function gl(){var t,e,n,o,u,a;return t=Ki,function(){var t,e,n,o;t=Ki,"limit"===r.substr(Ki,5).toLowerCase()?(e=r.substr(Ki,5),Ki+=5):(e=s,0===rc&&sc(Gu));e!==s?(n=Ki,rc++,o=Lf(),rc--,o===s?n=void 0:(Ki=n,n=s),n!==s?t=e=[e,n]:(Ki=t,t=s)):(Ki=t,t=s);return t}()!==s&&Up()!==s&&(e=_l())!==s&&Up()!==s?(n=Ki,(o=Ip())===s&&(o=function(){var t,e,n,o;t=Ki,"offset"===r.substr(Ki,6).toLowerCase()?(e=r.substr(Ki,6),Ki+=6):(e=s,0===rc&&sc(Fu));e!==s?(n=Ki,rc++,o=Lf(),rc--,o===s?n=void 0:(Ki=n,n=s),n!==s?(Qi=t,t=e="OFFSET"):(Ki=t,t=s)):(Ki=t,t=s);return t}()),o!==s&&(u=Up())!==s&&(a=_l())!==s?n=o=[o,u,a]:(Ki=n,n=s),n===s&&(n=null),n!==s?(Qi=t,t=function(r,t){const e=[r];return t&&e.push(t[2]),{seperator:t&&t[0]&&t[0].toLowerCase()||"",value:e,...av()}}(e,n)):(Ki=t,t=s)):(Ki=t,t=s),t}function Il(){var r,t,e,n,o,u,a,i;if(r=Ki,(t=Sl())!==s){for(e=[],n=Ki,(o=Up())!==s&&(u=Ip())!==s&&(a=Up())!==s&&(i=Sl())!==s?n=o=[o,u,a,i]:(Ki=n,n=s);n!==s;)e.push(n),n=Ki,(o=Up())!==s&&(u=Ip())!==s&&(a=Up())!==s&&(i=Sl())!==s?n=o=[o,u,a,i]:(Ki=n,n=s);e!==s?(Qi=r,r=t=sr(t,e)):(Ki=r,r=s);}else Ki=r,r=s;return r}function Sl(){var t,e,n,o,u,a,i,c,l;return t=Ki,e=Ki,(n=af())!==s&&(o=Up())!==s&&(u=gp())!==s?e=n=[n,o,u]:(Ki=e,e=s),e===s&&(e=null),e!==s&&(n=Up())!==s&&(o=vf())!==s&&(u=Up())!==s?(61===r.charCodeAt(Ki)?(a="=",Ki++):(a=s,0===rc&&sc(hn)),a!==s&&Up()!==s&&(i=Fl())!==s?(Qi=t,t=e={column:o,value:i,table:(l=e)&&l[0]}):(Ki=t,t=s)):(Ki=t,t=s),t===s&&(t=Ki,e=Ki,(n=af())!==s&&(o=Up())!==s&&(u=gp())!==s?e=n=[n,o,u]:(Ki=e,e=s),e===s&&(e=null),e!==s&&(n=Up())!==s&&(o=vf())!==s&&(u=Up())!==s?(61===r.charCodeAt(Ki)?(a="=",Ki++):(a=s,0===rc&&sc(hn)),a!==s&&Up()!==s&&(i=Tb())!==s&&Up()!==s&&Np()!==s&&Up()!==s&&(c=ef())!==s&&Up()!==s&&Op()!==s?(Qi=t,t=e=function(r,t,e){return {column:t,value:e,table:r&&r[0],keyword:"values"}}(e,o,c)):(Ki=t,t=s)):(Ki=t,t=s)),t}function Nl(){var r,t;return (r=jl())===s&&(r=Ki,(t=bc())!==s&&(Qi=r,t=t.ast),r=t),r}function Ol(){var r,t,e,n,o,u,a,i,c;if(r=Ki,fb()!==s)if(Up()!==s)if((t=Np())!==s)if(Up()!==s)if((e=wf())!==s){for(n=[],o=Ki,(u=Up())!==s&&(a=Ip())!==s&&(i=Up())!==s&&(c=wf())!==s?o=u=[u,a,i,c]:(Ki=o,o=s);o!==s;)n.push(o),o=Ki,(u=Up())!==s&&(a=Ip())!==s&&(i=Up())!==s&&(c=wf())!==s?o=u=[u,a,i,c]:(Ki=o,o=s);n!==s&&(o=Up())!==s&&(u=Op())!==s?(Qi=r,r=C(e,n)):(Ki=r,r=s);}else Ki=r,r=s;else Ki=r,r=s;else Ki=r,r=s;else Ki=r,r=s;else Ki=r,r=s;return r===s&&(r=Ki,fb()!==s&&Up()!==s&&(t=kl())!==s?(Qi=r,r=t):(Ki=r,r=s)),r}function Rl(){var t,e,n;return t=Ki,mb()!==s&&Up()!==s?("duplicate"===r.substr(Ki,9).toLowerCase()?(e=r.substr(Ki,9),Ki+=9):(e=s,0===rc&&sc(mn)),e!==s&&Up()!==s&&Cp()!==s&&Up()!==s&&nb()!==s&&Up()!==s&&(n=Il())!==s?(Qi=t,t={keyword:"on duplicate key update",set:n}):(Ki=t,t=s)):(Ki=t,t=s),t}function xl(){var r,t;return r=Ki,(t=ab())!==s&&(Qi=r,t="insert"),(r=t)===s&&(r=Ki,(t=ib())!==s&&(Qi=r,t="replace"),r=t),r}function jl(){var r,t;return r=Ki,Tb()!==s&&Up()!==s&&(t=function(){var r,t,e,n,o,u,a,i;if(r=Ki,(t=kl())!==s){for(e=[],n=Ki,(o=Up())!==s&&(u=Ip())!==s&&(a=Up())!==s&&(i=kl())!==s?n=o=[o,u,a,i]:(Ki=n,n=s);n!==s;)e.push(n),n=Ki,(o=Up())!==s&&(u=Ip())!==s&&(a=Up())!==s&&(i=kl())!==s?n=o=[o,u,a,i]:(Ki=n,n=s);e!==s?(Qi=r,t=sr(t,e),r=t):(Ki=r,r=s);}else Ki=r,r=s;return r}())!==s?(Qi=r,r={type:"values",values:t}):(Ki=r,r=s),r}function kl(){var t,e,n,o,u;return t=Ki,"row"===r.substr(Ki,3).toLowerCase()?(e=r.substr(Ki,3),Ki+=3):(e=s,0===rc&&sc(yr)),e===s&&(e=null),e!==s&&Up()!==s&&Np()!==s&&Up()!==s&&(n=Ul())!==s&&Up()!==s&&Op()!==s?(Qi=t,o=e,(u=n).prefix=o&&o.toLowerCase(),t=e=u):(Ki=t,t=s),t}function Ul(){var r,t,e,n,o,u,a,i;if(r=Ki,(t=Fl())!==s){for(e=[],n=Ki,(o=Up())!==s&&(u=Ip())!==s&&(a=Up())!==s&&(i=Fl())!==s?n=o=[o,u,a,i]:(Ki=n,n=s);n!==s;)e.push(n),n=Ki,(o=Up())!==s&&(u=Ip())!==s&&(a=Up())!==s&&(i=Fl())!==s?n=o=[o,u,a,i]:(Ki=n,n=s);e!==s?(Qi=r,r=t=function(r,t){const e={type:"expr_list"};return e.value=fv(r,t),e}(t,e)):(Ki=r,r=s);}else Ki=r,r=s;return r}function Dl(){var t,e,n;return t=Ki,ip()!==s&&Up()!==s&&(e=Fl())!==s&&Up()!==s&&(n=function(){var t;(t=function(){var t,e,n,o;t=Ki,"year"===r.substr(Ki,4).toLowerCase()?(e=r.substr(Ki,4),Ki+=4):(e=s,0===rc&&sc(ns));e!==s?(n=Ki,rc++,o=Lf(),rc--,o===s?n=void 0:(Ki=n,n=s),n!==s?(Qi=t,t=e="YEAR"):(Ki=t,t=s)):(Ki=t,t=s);return t}())===s&&(t=function(){var t,e,n,o;t=Ki,"quarter"===r.substr(Ki,7).toLowerCase()?(e=r.substr(Ki,7),Ki+=7):(e=s,0===rc&&sc(Zo));e!==s?(n=Ki,rc++,o=Lf(),rc--,o===s?n=void 0:(Ki=n,n=s),n!==s?(Qi=t,t=e="QUARTER"):(Ki=t,t=s)):(Ki=t,t=s);return t}())===s&&(t=function(){var t,e,n,o;t=Ki,"month"===r.substr(Ki,5).toLowerCase()?(e=r.substr(Ki,5),Ki+=5):(e=s,0===rc&&sc(zo));e!==s?(n=Ki,rc++,o=Lf(),rc--,o===s?n=void 0:(Ki=n,n=s),n!==s?(Qi=t,t=e="MONTH"):(Ki=t,t=s)):(Ki=t,t=s);return t}())===s&&(t=function(){var t,e,n,o;t=Ki,"week"===r.substr(Ki,4).toLowerCase()?(e=r.substr(Ki,4),Ki+=4):(e=s,0===rc&&sc(es));e!==s?(n=Ki,rc++,o=Lf(),rc--,o===s?n=void 0:(Ki=n,n=s),n!==s?(Qi=t,t=e="WEEK"):(Ki=t,t=s)):(Ki=t,t=s);return t}())===s&&(t=function(){var t,e,n,o;t=Ki,"day"===r.substr(Ki,3).toLowerCase()?(e=r.substr(Ki,3),Ki+=3):(e=s,0===rc&&sc(Mo));e!==s?(n=Ki,rc++,o=Lf(),rc--,o===s?n=void 0:(Ki=n,n=s),n!==s?(Qi=t,t=e="DAY"):(Ki=t,t=s)):(Ki=t,t=s);return t}())===s&&(t=function(){var t,e,n,o;t=Ki,"hour"===r.substr(Ki,4).toLowerCase()?(e=r.substr(Ki,4),Ki+=4):(e=s,0===rc&&sc(Bo));e!==s?(n=Ki,rc++,o=Lf(),rc--,o===s?n=void 0:(Ki=n,n=s),n!==s?(Qi=t,t=e="HOUR"):(Ki=t,t=s)):(Ki=t,t=s);return t}())===s&&(t=function(){var t,e,n,o;t=Ki,"minute"===r.substr(Ki,6).toLowerCase()?(e=r.substr(Ki,6),Ki+=6):(e=s,0===rc&&sc(Qo));e!==s?(n=Ki,rc++,o=Lf(),rc--,o===s?n=void 0:(Ki=n,n=s),n!==s?(Qi=t,t=e="MINUTE"):(Ki=t,t=s)):(Ki=t,t=s);return t}())===s&&(t=function(){var t,e,n,o;t=Ki,"second"===r.substr(Ki,6).toLowerCase()?(e=r.substr(Ki,6),Ki+=6):(e=s,0===rc&&sc(Jo));e!==s?(n=Ki,rc++,o=Lf(),rc--,o===s?n=void 0:(Ki=n,n=s),n!==s?(Qi=t,t=e="SECOND"):(Ki=t,t=s)):(Ki=t,t=s);return t}())===s&&(t=function(){var t,e,n,o;t=Ki,"microsecond"===r.substr(Ki,11).toLowerCase()?(e=r.substr(Ki,11),Ki+=11):(e=s,0===rc&&sc(Ya));e!==s?(n=Ki,rc++,o=Lf(),rc--,o===s?n=void 0:(Ki=n,n=s),n!==s?(Qi=t,t=e="MICROSECOND"):(Ki=t,t=s)):(Ki=t,t=s);return t}())===s&&(t=function(){var t,e,n,o;t=Ki,"second_microsecond"===r.substr(Ki,18).toLowerCase()?(e=r.substr(Ki,18),Ki+=18):(e=s,0===rc&&sc(jo));e!==s?(n=Ki,rc++,o=Lf(),rc--,o===s?n=void 0:(Ki=n,n=s),n!==s?(Qi=t,t=e="SECOND_MICROSECOND"):(Ki=t,t=s)):(Ki=t,t=s);return t}())===s&&(t=function(){var t,e,n,o;t=Ki,"minute_microsecond"===r.substr(Ki,18).toLowerCase()?(e=r.substr(Ki,18),Ki+=18):(e=s,0===rc&&sc(xo));e!==s?(n=Ki,rc++,o=Lf(),rc--,o===s?n=void 0:(Ki=n,n=s),n!==s?(Qi=t,t=e="MINUTE_MICROSECOND"):(Ki=t,t=s)):(Ki=t,t=s);return t}())===s&&(t=function(){var t,e,n,o;t=Ki,"minute_second"===r.substr(Ki,13).toLowerCase()?(e=r.substr(Ki,13),Ki+=13):(e=s,0===rc&&sc(Ro));e!==s?(n=Ki,rc++,o=Lf(),rc--,o===s?n=void 0:(Ki=n,n=s),n!==s?(Qi=t,t=e="MINUTE_SECOND"):(Ki=t,t=s)):(Ki=t,t=s);return t}())===s&&(t=function(){var t,e,n,o;t=Ki,"hour_microsecond"===r.substr(Ki,16).toLowerCase()?(e=r.substr(Ki,16),Ki+=16):(e=s,0===rc&&sc(Oo));e!==s?(n=Ki,rc++,o=Lf(),rc--,o===s?n=void 0:(Ki=n,n=s),n!==s?(Qi=t,t=e="HOUR_MICROSECOND"):(Ki=t,t=s)):(Ki=t,t=s);return t}())===s&&(t=function(){var t,e,n,o;t=Ki,"hour_second"===r.substr(Ki,11).toLowerCase()?(e=r.substr(Ki,11),Ki+=11):(e=s,0===rc&&sc(No));e!==s?(n=Ki,rc++,o=Lf(),rc--,o===s?n=void 0:(Ki=n,n=s),n!==s?(Qi=t,t=e="HOUR_SECOND"):(Ki=t,t=s)):(Ki=t,t=s);return t}())===s&&(t=function(){var t,e,n,o;t=Ki,"hour_minute"===r.substr(Ki,11).toLowerCase()?(e=r.substr(Ki,11),Ki+=11):(e=s,0===rc&&sc(So));e!==s?(n=Ki,rc++,o=Lf(),rc--,o===s?n=void 0:(Ki=n,n=s),n!==s?(Qi=t,t=e="HOUR_MINUTE"):(Ki=t,t=s)):(Ki=t,t=s);return t}())===s&&(t=function(){var t,e,n,o;t=Ki,"day_microsecond"===r.substr(Ki,15).toLowerCase()?(e=r.substr(Ki,15),Ki+=15):(e=s,0===rc&&sc(Io));e!==s?(n=Ki,rc++,o=Lf(),rc--,o===s?n=void 0:(Ki=n,n=s),n!==s?(Qi=t,t=e="DAY_MICROSECOND"):(Ki=t,t=s)):(Ki=t,t=s);return t}())===s&&(t=function(){var t,e,n,o;t=Ki,"day_second"===r.substr(Ki,10).toLowerCase()?(e=r.substr(Ki,10),Ki+=10):(e=s,0===rc&&sc(go));e!==s?(n=Ki,rc++,o=Lf(),rc--,o===s?n=void 0:(Ki=n,n=s),n!==s?(Qi=t,t=e="DAY_SECOND"):(Ki=t,t=s)):(Ki=t,t=s);return t}())===s&&(t=function(){var t,e,n,o;t=Ki,"day_minute"===r.substr(Ki,10).toLowerCase()?(e=r.substr(Ki,10),Ki+=10):(e=s,0===rc&&sc(_o));e!==s?(n=Ki,rc++,o=Lf(),rc--,o===s?n=void 0:(Ki=n,n=s),n!==s?(Qi=t,t=e="DAY_MINUTE"):(Ki=t,t=s)):(Ki=t,t=s);return t}())===s&&(t=function(){var t,e,n,o;t=Ki,"day_hour"===r.substr(Ki,8).toLowerCase()?(e=r.substr(Ki,8),Ki+=8):(e=s,0===rc&&sc(To));e!==s?(n=Ki,rc++,o=Lf(),rc--,o===s?n=void 0:(Ki=n,n=s),n!==s?(Qi=t,t=e="DAY_HOUR"):(Ki=t,t=s)):(Ki=t,t=s);return t}())===s&&(t=function(){var t,e,n,o;t=Ki,"year_month"===r.substr(Ki,10).toLowerCase()?(e=r.substr(Ki,10),Ki+=10):(e=s,0===rc&&sc(Ao));e!==s?(n=Ki,rc++,o=Lf(),rc--,o===s?n=void 0:(Ki=n,n=s),n!==s?(Qi=t,t=e="YEAR_MONTH"):(Ki=t,t=s)):(Ki=t,t=s);return t}());return t}())!==s?(Qi=t,t={type:"interval",expr:e,unit:n.toLowerCase()}):(Ki=t,t=s),t}function Ml(){var r,t,e,n,o,u;if(r=Ki,(t=Pl())!==s)if(Up()!==s){for(e=[],n=Ki,(o=Up())!==s&&(u=Pl())!==s?n=o=[o,u]:(Ki=n,n=s);n!==s;)e.push(n),n=Ki,(o=Up())!==s&&(u=Pl())!==s?n=o=[o,u]:(Ki=n,n=s);e!==s?(Qi=r,r=t=l(t,e)):(Ki=r,r=s);}else Ki=r,r=s;else Ki=r,r=s;return r}function Pl(){var t,e,n;return t=Ki,function(){var t,e,n,o;t=Ki,"when"===r.substr(Ki,4).toLowerCase()?(e=r.substr(Ki,4),Ki+=4):(e=s,0===rc&&sc(ca));e!==s?(n=Ki,rc++,o=Lf(),rc--,o===s?n=void 0:(Ki=n,n=s),n!==s?t=e=[e,n]:(Ki=t,t=s)):(Ki=t,t=s);return t}()!==s&&Up()!==s&&(e=Yl())!==s&&Up()!==s&&function(){var t,e,n,o;t=Ki,"then"===r.substr(Ki,4).toLowerCase()?(e=r.substr(Ki,4),Ki+=4):(e=s,0===rc&&sc(la));e!==s?(n=Ki,rc++,o=Lf(),rc--,o===s?n=void 0:(Ki=n,n=s),n!==s?t=e=[e,n]:(Ki=t,t=s)):(Ki=t,t=s);return t}()!==s&&Up()!==s&&(n=Fl())!==s?(Qi=t,t={type:"when",cond:e,result:n}):(Ki=t,t=s),t}function Gl(){var t,e;return t=Ki,function(){var t,e,n,o;t=Ki,"else"===r.substr(Ki,4).toLowerCase()?(e=r.substr(Ki,4),Ki+=4):(e=s,0===rc&&sc(fa));e!==s?(n=Ki,rc++,o=Lf(),rc--,o===s?n=void 0:(Ki=n,n=s),n!==s?t=e=[e,n]:(Ki=t,t=s)):(Ki=t,t=s);return t}()!==s&&Up()!==s&&(e=Fl())!==s?(Qi=t,t={type:"else",result:e}):(Ki=t,t=s),t}function Fl(){var r;return (r=function(){var r,t,e,n,o,u,a,i;if(r=Ki,(t=Bl())!==s){for(e=[],n=Ki,(o=Dp())!==s&&(u=Fb())!==s&&(a=Up())!==s&&(i=Bl())!==s?n=o=[o,u,a,i]:(Ki=n,n=s);n!==s;)e.push(n),n=Ki,(o=Dp())!==s&&(u=Fb())!==s&&(a=Up())!==s&&(i=Bl())!==s?n=o=[o,u,a,i]:(Ki=n,n=s);e!==s?(Qi=r,t=En(t,e),r=t):(Ki=r,r=s);}else Ki=r,r=s;return r}())===s&&(r=bc()),r}function Hl(){var r,t,e,n,o,u,a,i;if(r=Ki,(t=Fl())!==s){for(e=[],n=Ki,(o=Up())!==s?((u=Gb())===s&&(u=Fb()),u!==s&&(a=Up())!==s&&(i=Fl())!==s?n=o=[o,u,a,i]:(Ki=n,n=s)):(Ki=n,n=s);n!==s;)e.push(n),n=Ki,(o=Up())!==s?((u=Gb())===s&&(u=Fb()),u!==s&&(a=Up())!==s&&(i=Fl())!==s?n=o=[o,u,a,i]:(Ki=n,n=s)):(Ki=n,n=s);e!==s?(Qi=r,r=t=function(r,t){const e=t.length;let n=r;for(let r=0;r<e;++r)n=cv(t[r][1],n,t[r][3]);return n}(t,e)):(Ki=r,r=s);}else Ki=r,r=s;return r}function Yl(){var r,t,e,n,o,u,a,i;if(r=Ki,(t=Fl())!==s){for(e=[],n=Ki,(o=Up())!==s?((u=Gb())===s&&(u=Fb())===s&&(u=Ip())===s&&(u=kp()),u!==s&&(a=Up())!==s&&(i=Fl())!==s?n=o=[o,u,a,i]:(Ki=n,n=s)):(Ki=n,n=s);n!==s;)e.push(n),n=Ki,(o=Up())!==s?((u=Gb())===s&&(u=Fb())===s&&(u=Ip())===s&&(u=kp()),u!==s&&(a=Up())!==s&&(i=Fl())!==s?n=o=[o,u,a,i]:(Ki=n,n=s)):(Ki=n,n=s);e!==s?(Qi=r,r=t=function(r,t){const e=t.length;let n=r,o="";for(let r=0;r<e;++r)","===t[r][1]?(o=",",Array.isArray(n)||(n=[n]),n.push(t[r][3])):n=cv(t[r][1],n,t[r][3]);if(","===o){const r={type:"expr_list"};return r.value=Array.isArray(n)?n:[n],r}return n}(t,e)):(Ki=r,r=s);}else Ki=r,r=s;return r}function Bl(){var r,t,e,n,o,u,a,i;if(r=Ki,(t=$l())!==s){for(e=[],n=Ki,(o=Dp())!==s&&(u=Gb())!==s&&(a=Up())!==s&&(i=$l())!==s?n=o=[o,u,a,i]:(Ki=n,n=s);n!==s;)e.push(n),n=Ki,(o=Dp())!==s&&(u=Gb())!==s&&(a=Up())!==s&&(i=$l())!==s?n=o=[o,u,a,i]:(Ki=n,n=s);e!==s?(Qi=r,r=t=bv(t,e)):(Ki=r,r=s);}else Ki=r,r=s;return r}function $l(){var r,t;return (r=Wl())===s&&(r=function(){var r,t,e;r=Ki,(t=function(){var r,t,e,n,o;r=Ki,t=Ki,(e=Pb())!==s&&(n=Up())!==s&&(o=Mb())!==s?t=e=[e,n,o]:(Ki=t,t=s);t!==s&&(Qi=r,t=An(t));(r=t)===s&&(r=Mb());return r}())!==s&&Up()!==s&&Np()!==s&&Up()!==s&&(e=bc())!==s&&Up()!==s&&Op()!==s?(Qi=r,n=t,(o=e).parentheses=true,t=iv(n,o),r=t):(Ki=r,r=s);var n,o;return r}())===s&&(r=Ki,Pb()!==s&&Up()!==s&&(t=$l())!==s?(Qi=r,r=iv("NOT",t)):(Ki=r,r=s)),r}function Wl(){var t,e,n;return t=Ki,(e=Ql())!==s&&Up()!==s?((n=function(){var t;(t=function(){var r,t,e,n,o,u,a;r=Ki,t=[],e=Ki,(n=Up())!==s&&(o=ql())!==s&&(u=Up())!==s&&(a=Ql())!==s?e=n=[n,o,u,a]:(Ki=e,e=s);if(e!==s)for(;e!==s;)t.push(e),e=Ki,(n=Up())!==s&&(o=ql())!==s&&(u=Up())!==s&&(a=Ql())!==s?e=n=[n,o,u,a]:(Ki=e,e=s);else t=s;t!==s&&(e=Up())!==s?((n=Kl())===s&&(n=null),n!==s?(Qi=r,r=t={type:"arithmetic",tail:t,in:n}):(Ki=r,r=s)):(Ki=r,r=s);return r}())===s&&(t=Kl())===s&&(t=function(){var r,t,e,n;r=Ki,(t=function(){var r,t,e,n,o;r=Ki,t=Ki,(e=Pb())!==s&&(n=Up())!==s&&(o=jb())!==s?t=e=[e,n,o]:(Ki=t,t=s);t!==s&&(Qi=r,t=An(t));(r=t)===s&&(r=jb());return r}())!==s&&Up()!==s&&(e=Ql())!==s&&Up()!==s&&Gb()!==s&&Up()!==s&&(n=Ql())!==s?(Qi=r,r=t={op:t,right:{type:"expr_list",value:[e,n]}}):(Ki=r,r=s);return r}())===s&&(t=function(){var r,t,e,n,o;r=Ki,(t=Ub())!==s&&(e=Up())!==s&&(n=Ql())!==s?(Qi=r,r=t={op:"IS",right:n}):(Ki=r,r=s);r===s&&(r=Ki,t=Ki,(e=Ub())!==s&&(n=Up())!==s&&(o=Pb())!==s?t=e=[e,n,o]:(Ki=t,t=s),t!==s&&(e=Up())!==s&&(n=Ql())!==s?(Qi=r,t=function(r){return {op:"IS NOT",right:r}}(n),r=t):(Ki=r,r=s));return r}())===s&&(t=Xl())===s&&(t=function(){var t,e,n,o;t=Ki,(e=function(){var t,e,n;t=Ki,(e=Pb())===s&&(e=null);e!==s&&Up()!==s?((n=function(){var t,e,n,o;t=Ki,"regexp"===r.substr(Ki,6).toLowerCase()?(e=r.substr(Ki,6),Ki+=6):(e=s,0===rc&&sc(Qu));e!==s?(n=Ki,rc++,o=Lf(),rc--,o===s?n=void 0:(Ki=n,n=s),n!==s?(Qi=t,t=e="REGEXP"):(Ki=t,t=s)):(Ki=t,t=s);return t}())===s&&(n=function(){var t,e,n,o;t=Ki,"rlike"===r.substr(Ki,5).toLowerCase()?(e=r.substr(Ki,5),Ki+=5):(e=s,0===rc&&sc(Ku));e!==s?(n=Ki,rc++,o=Lf(),rc--,o===s?n=void 0:(Ki=n,n=s),n!==s?(Qi=t,t=e="RLIKE"):(Ki=t,t=s)):(Ki=t,t=s);return t}()),n!==s?(Qi=t,u=n,t=e=(o=e)?`${o} ${u}`:u):(Ki=t,t=s)):(Ki=t,t=s);var o,u;return t}())!==s&&Up()!==s?("binary"===r.substr(Ki,6).toLowerCase()?(n=r.substr(Ki,6),Ki+=6):(n=s,0===rc&&sc(Bt)),n===s&&(n=null),n!==s&&Up()!==s?((o=kf())===s&&(o=Ff())===s&&(o=ef()),o!==s?(Qi=t,u=e,t=e={op:(a=n)?`${u} ${a}`:u,right:o}):(Ki=t,t=s)):(Ki=t,t=s)):(Ki=t,t=s);var u,a;return t}());return t}())===s&&(n=null),n!==s?(Qi=t,t=e=function(r,t){if(null===t)return r;if("arithmetic"===t.type){if(!t.in)return bv(r,t.tail);const e=bv(r,t.tail);return cv(t.in.op,e,t.in.right)}return cv(t.op,r,t.right)}(e,n)):(Ki=t,t=s)):(Ki=t,t=s),t===s&&(t=Ff())===s&&(t=ef()),t}function ql(){var t;return ">="===r.substr(Ki,2)?(t=">=",Ki+=2):(t=s,0===rc&&sc(Tn)),t===s&&(62===r.charCodeAt(Ki)?(t=">",Ki++):(t=s,0===rc&&sc(_n)),t===s&&("<="===r.substr(Ki,2)?(t="<=",Ki+=2):(t=s,0===rc&&sc(gn)),t===s&&("<>"===r.substr(Ki,2)?(t="<>",Ki+=2):(t=s,0===rc&&sc(In)),t===s&&(60===r.charCodeAt(Ki)?(t="<",Ki++):(t=s,0===rc&&sc(Sn)),t===s&&(61===r.charCodeAt(Ki)?(t="=",Ki++):(t=s,0===rc&&sc(hn)),t===s&&("!="===r.substr(Ki,2)?(t="!=",Ki+=2):(t=s,0===rc&&sc(Nn)))))))),t}function Vl(){var r,t,e,n,o;return r=Ki,t=Ki,(e=Pb())!==s&&(n=Up())!==s&&(o=kb())!==s?t=e=[e,n,o]:(Ki=t,t=s),t!==s&&(Qi=r,t=An(t)),(r=t)===s&&(r=kb()),r}function Xl(){var t,e,n,o,u,a,i;return t=Ki,(e=function(){var r,t,e,n,o;return r=Ki,t=Ki,(e=Pb())!==s&&(n=Up())!==s&&(o=Db())!==s?t=e=[e,n,o]:(Ki=t,t=s),t!==s&&(Qi=r,t=An(t)),(r=t)===s&&(r=Db()),r}())!==s&&Up()!==s?((n=Pf())===s&&(n=mf())===s&&(n=Wl()),n!==s&&Up()!==s?((o=function(){var t,e,n;return t=Ki,"escape"===r.substr(Ki,6).toLowerCase()?(e=r.substr(Ki,6),Ki+=6):(e=s,0===rc&&sc(On)),e!==s&&Up()!==s&&(n=Ff())!==s?(Qi=t,t=e={type:"ESCAPE",value:n}):(Ki=t,t=s),t}())===s&&(o=null),o!==s?(Qi=t,u=e,a=n,(i=o)&&(a.escape=i),t=e={op:u,right:a}):(Ki=t,t=s)):(Ki=t,t=s)):(Ki=t,t=s),t}function Kl(){var r,t,e,n;return r=Ki,(t=Vl())!==s&&Up()!==s&&(e=Np())!==s&&Up()!==s&&(n=Ul())!==s&&Up()!==s&&Op()!==s?(Qi=r,r=t={op:t,right:n}):(Ki=r,r=s),r===s&&(r=Ki,(t=Vl())!==s&&Up()!==s?((e=Zp())===s&&(e=ef())===s&&(e=Ff()),e!==s?(Qi=r,r=t=function(r,t){return {op:r,right:t}}(t,e)):(Ki=r,r=s)):(Ki=r,r=s)),r}function Ql(){var r,t,e,n,o,u,a,i;if(r=Ki,(t=Zl())!==s){for(e=[],n=Ki,(o=Up())!==s&&(u=zl())!==s&&(a=Up())!==s&&(i=Zl())!==s?n=o=[o,u,a,i]:(Ki=n,n=s);n!==s;)e.push(n),n=Ki,(o=Up())!==s&&(u=zl())!==s&&(a=Up())!==s&&(i=Zl())!==s?n=o=[o,u,a,i]:(Ki=n,n=s);e!==s?(Qi=r,r=t=function(r,t){if(t&&t.length&&"column_ref"===r.type&&"*"===r.column)throw new Error(JSON.stringify({message:"args could not be star column in additive expr",...av()}));return bv(r,t)}(t,e)):(Ki=r,r=s);}else Ki=r,r=s;return r}function zl(){var t;return 43===r.charCodeAt(Ki)?(t="+",Ki++):(t=s,0===rc&&sc(Rn)),t===s&&(45===r.charCodeAt(Ki)?(t="-",Ki++):(t=s,0===rc&&sc(xn))),t}function Zl(){var r,t,e,n,o,u,a,i;if(r=Ki,(t=rf())!==s){for(e=[],n=Ki,(o=Up())!==s?((u=Jl())===s&&(u=kp()),u!==s&&(a=Up())!==s&&(i=rf())!==s?n=o=[o,u,a,i]:(Ki=n,n=s)):(Ki=n,n=s);n!==s;)e.push(n),n=Ki,(o=Up())!==s?((u=Jl())===s&&(u=kp()),u!==s&&(a=Up())!==s&&(i=rf())!==s?n=o=[o,u,a,i]:(Ki=n,n=s)):(Ki=n,n=s);e!==s?(Qi=r,r=t=bv(t,e)):(Ki=r,r=s);}else Ki=r,r=s;return r}function Jl(){var t,e;return 42===r.charCodeAt(Ki)?(t="*",Ki++):(t=s,0===rc&&sc(jn)),t===s&&(47===r.charCodeAt(Ki)?(t="/",Ki++):(t=s,0===rc&&sc(kn)),t===s&&(37===r.charCodeAt(Ki)?(t="%",Ki++):(t=s,0===rc&&sc(Un)),t===s&&("||"===r.substr(Ki,2)?(t="||",Ki+=2):(t=s,0===rc&&sc(Dn)),t===s&&(t=Ki,"div"===r.substr(Ki,3).toLowerCase()?(e=r.substr(Ki,3),Ki+=3):(e=s,0===rc&&sc(Mn)),e===s&&("mod"===r.substr(Ki,3).toLowerCase()?(e=r.substr(Ki,3),Ki+=3):(e=s,0===rc&&sc(Pn))),e!==s&&(Qi=t,e=e.toUpperCase()),(t=e)===s&&(38===r.charCodeAt(Ki)?(t="&",Ki++):(t=s,0===rc&&sc(Gn)),t===s&&(">>"===r.substr(Ki,2)?(t=">>",Ki+=2):(t=s,0===rc&&sc(Fn)),t===s&&("<<"===r.substr(Ki,2)?(t="<<",Ki+=2):(t=s,0===rc&&sc(Hn)),t===s&&(94===r.charCodeAt(Ki)?(t="^",Ki++):(t=s,0===rc&&sc(Yn)),t===s&&(124===r.charCodeAt(Ki)?(t="|",Ki++):(t=s,0===rc&&sc(Bn))))))))))),t}function rf(){var t,e,n,o,u;return (t=function(){var t,e,n,o,u,a,i,c;if(t=Ki,(e=tf())!==s)if(Up()!==s){for(n=[],o=Ki,(u=Up())!==s?("?|"===r.substr(Ki,2)?(a="?|",Ki+=2):(a=s,0===rc&&sc(qn)),a===s&&("?&"===r.substr(Ki,2)?(a="?&",Ki+=2):(a=s,0===rc&&sc(Vn)),a===s&&(63===r.charCodeAt(Ki)?(a="?",Ki++):(a=s,0===rc&&sc(Cn)),a===s&&("#-"===r.substr(Ki,2)?(a="#-",Ki+=2):(a=s,0===rc&&sc(Xn)),a===s&&("#>>"===r.substr(Ki,3)?(a="#>>",Ki+=3):(a=s,0===rc&&sc(Kn)),a===s&&("#>"===r.substr(Ki,2)?(a="#>",Ki+=2):(a=s,0===rc&&sc(Qn)),a===s&&(a=jp())===s&&(a=xp())===s&&("@>"===r.substr(Ki,2)?(a="@>",Ki+=2):(a=s,0===rc&&sc(zn)),a===s&&("<@"===r.substr(Ki,2)?(a="<@",Ki+=2):(a=s,0===rc&&sc(Zn))))))))),a!==s&&(i=Up())!==s&&(c=tf())!==s?o=u=[u,a,i,c]:(Ki=o,o=s)):(Ki=o,o=s);o!==s;)n.push(o),o=Ki,(u=Up())!==s?("?|"===r.substr(Ki,2)?(a="?|",Ki+=2):(a=s,0===rc&&sc(qn)),a===s&&("?&"===r.substr(Ki,2)?(a="?&",Ki+=2):(a=s,0===rc&&sc(Vn)),a===s&&(63===r.charCodeAt(Ki)?(a="?",Ki++):(a=s,0===rc&&sc(Cn)),a===s&&("#-"===r.substr(Ki,2)?(a="#-",Ki+=2):(a=s,0===rc&&sc(Xn)),a===s&&("#>>"===r.substr(Ki,3)?(a="#>>",Ki+=3):(a=s,0===rc&&sc(Kn)),a===s&&("#>"===r.substr(Ki,2)?(a="#>",Ki+=2):(a=s,0===rc&&sc(Qn)),a===s&&(a=jp())===s&&(a=xp())===s&&("@>"===r.substr(Ki,2)?(a="@>",Ki+=2):(a=s,0===rc&&sc(zn)),a===s&&("<@"===r.substr(Ki,2)?(a="<@",Ki+=2):(a=s,0===rc&&sc(Zn))))))))),a!==s&&(i=Up())!==s&&(c=tf())!==s?o=u=[u,a,i,c]:(Ki=o,o=s)):(Ki=o,o=s);n!==s?(Qi=t,l=e,e=(f=n)&&0!==f.length?bv(l,f):l,t=e):(Ki=t,t=s);}else Ki=t,t=s;else Ki=t,t=s;var l,f;return t}())===s&&(t=Ki,(e=function(){var t;33===r.charCodeAt(Ki)?(t="!",Ki++):(t=s,0===rc&&sc($n));t===s&&(45===r.charCodeAt(Ki)?(t="-",Ki++):(t=s,0===rc&&sc(xn)),t===s&&(43===r.charCodeAt(Ki)?(t="+",Ki++):(t=s,0===rc&&sc(Rn)),t===s&&(126===r.charCodeAt(Ki)?(t="~",Ki++):(t=s,0===rc&&sc(Wn)))));return t}())!==s?(n=Ki,(o=Up())!==s&&(u=rf())!==s?n=o=[o,u]:(Ki=n,n=s),n!==s?(Qi=t,t=e=iv(e,n[1])):(Ki=t,t=s)):(Ki=t,t=s)),t}function tf(){var t,e,n,o;return (t=Dl())===s&&(t=function(){var t;(t=function(){var t,e,n,o;t=Ki,(e=function(){var t,e,n,o;t=Ki,"count"===r.substr(Ki,5).toLowerCase()?(e=r.substr(Ki,5),Ki+=5):(e=s,0===rc&&sc(ra));e!==s?(n=Ki,rc++,o=Lf(),rc--,o===s?n=void 0:(Ki=n,n=s),n!==s?(Qi=t,t=e="COUNT"):(Ki=t,t=s)):(Ki=t,t=s);return t}())===s&&(e=function(){var t,e,n,o;t=Ki,"group_concat"===r.substr(Ki,12).toLowerCase()?(e=r.substr(Ki,12),Ki+=12):(e=s,0===rc&&sc(ta));e!==s?(n=Ki,rc++,o=Lf(),rc--,o===s?n=void 0:(Ki=n,n=s),n!==s?(Qi=t,t=e="GROUP_CONCAT"):(Ki=t,t=s)):(Ki=t,t=s);return t}());e!==s&&Up()!==s&&Np()!==s&&Up()!==s&&(n=function(){var t,e,n,o,u;t=Ki,(e=function(){var t,e;t=Ki,42===r.charCodeAt(Ki)?(e="*",Ki++):(e=s,0===rc&&sc(jn));e!==s&&(Qi=t,e={type:"star",value:"*"});return t=e}())!==s&&(Qi=t,e={expr:e,...av()});(t=e)===s&&(t=Ki,(e=xb())===s&&(e=null),e!==s&&Up()!==s&&(n=Yl())!==s&&Up()!==s?((o=Al())===s&&(o=null),o!==s&&Up()!==s?((u=function(){var t,e,n;t=Ki,"separator"===r.substr(Ki,9).toLowerCase()?(e=r.substr(Ki,9),Ki+=9):(e=s,0===rc&&sc(Eo));e===s&&(e=null);e!==s&&Up()!==s&&(n=Ff())!==s?(Qi=t,t=e={keyword:e,value:n}):(Ki=t,t=s);return t}())===s&&(u=null),u!==s?(Qi=t,e={distinct:e,expr:n,orderby:o,separator:u,...av()},t=e):(Ki=t,t=s)):(Ki=t,t=s)):(Ki=t,t=s));return t}())!==s&&Up()!==s&&Op()!==s&&Up()!==s?((o=Af())===s&&(o=null),o!==s?(Qi=t,e={type:"aggr_func",name:e,args:n,over:o,...av()},t=e):(Ki=t,t=s)):(Ki=t,t=s);return t}())===s&&(t=function(){var t,e,n,o;t=Ki,(e=function(){var t;(t=function(){var t,e,n,o;t=Ki,"sum"===r.substr(Ki,3).toLowerCase()?(e=r.substr(Ki,3),Ki+=3):(e=s,0===rc&&sc(oa));e!==s?(n=Ki,rc++,o=Lf(),rc--,o===s?n=void 0:(Ki=n,n=s),n!==s?(Qi=t,t=e="SUM"):(Ki=t,t=s)):(Ki=t,t=s);return t}())===s&&(t=function(){var t,e,n,o;t=Ki,"max"===r.substr(Ki,3).toLowerCase()?(e=r.substr(Ki,3),Ki+=3):(e=s,0===rc&&sc(ea));e!==s?(n=Ki,rc++,o=Lf(),rc--,o===s?n=void 0:(Ki=n,n=s),n!==s?(Qi=t,t=e="MAX"):(Ki=t,t=s)):(Ki=t,t=s);return t}())===s&&(t=function(){var t,e,n,o;t=Ki,"min"===r.substr(Ki,3).toLowerCase()?(e=r.substr(Ki,3),Ki+=3):(e=s,0===rc&&sc(na));e!==s?(n=Ki,rc++,o=Lf(),rc--,o===s?n=void 0:(Ki=n,n=s),n!==s?(Qi=t,t=e="MIN"):(Ki=t,t=s)):(Ki=t,t=s);return t}())===s&&(t=function(){var t,e,n,o;t=Ki,"avg"===r.substr(Ki,3).toLowerCase()?(e=r.substr(Ki,3),Ki+=3):(e=s,0===rc&&sc(sa));e!==s?(n=Ki,rc++,o=Lf(),rc--,o===s?n=void 0:(Ki=n,n=s),n!==s?(Qi=t,t=e="AVG"):(Ki=t,t=s)):(Ki=t,t=s);return t}());return t}())!==s&&Up()!==s&&Np()!==s&&Up()!==s&&(n=Hl())!==s&&Up()!==s&&Op()!==s&&Up()!==s?((o=Af())===s&&(o=null),o!==s?(Qi=t,e={type:"aggr_func",name:e,args:{expr:n},over:o,...av()},t=e):(Ki=t,t=s)):(Ki=t,t=s);return t}());return t}())===s&&(t=sl())===s&&(t=kf())===s&&(t=function(){var r,t,e,n,o,u,a;r=Ki,(t=$b())!==s&&Up()!==s&&Np()!==s&&Up()!==s&&(e=Fl())!==s&&Up()!==s&&db()!==s&&Up()!==s&&(n=ev())!==s&&Up()!==s&&(o=Mc())!==s&&Up()!==s&&(u=sf())!==s&&Up()!==s&&Op()!==s?(Qi=r,t=function(r,t,e,n,o){const{dataType:s,length:u}=e;let a=s;return void 0!==u&&(a=`${a}(${u})`),{type:"cast",keyword:r.toLowerCase(),expr:t,symbol:"as",target:[{dataType:a,suffix:[{type:"origin",value:n},o]}]}}(t,e,n,o,u),r=t):(Ki=r,r=s);r===s&&(r=Ki,(t=$b())!==s&&Up()!==s&&Np()!==s&&Up()!==s&&(e=Fl())!==s&&Up()!==s&&db()!==s&&Up()!==s&&(n=rv())!==s&&Up()!==s&&(o=Op())!==s?(Qi=r,i=e,c=n,t={type:"cast",keyword:t.toLowerCase(),expr:i,symbol:"as",target:[c]},r=t):(Ki=r,r=s),r===s&&(r=Ki,(t=$b())!==s&&Up()!==s&&Np()!==s&&Up()!==s&&(e=Fl())!==s&&Up()!==s&&db()!==s&&Up()!==s&&(n=Vb())!==s&&Up()!==s&&(o=Np())!==s&&Up()!==s&&(u=Wf())!==s&&Up()!==s&&Op()!==s&&Up()!==s&&(a=Op())!==s?(Qi=r,t=function(r,t,e){return {type:"cast",keyword:r.toLowerCase(),expr:t,symbol:"as",target:[{dataType:"DECIMAL("+e+")"}]}}(t,e,u),r=t):(Ki=r,r=s),r===s&&(r=Ki,(t=$b())!==s&&Up()!==s&&Np()!==s&&Up()!==s&&(e=Fl())!==s&&Up()!==s&&db()!==s&&Up()!==s&&(n=Vb())!==s&&Up()!==s&&(o=Np())!==s&&Up()!==s&&(u=Wf())!==s&&Up()!==s&&Ip()!==s&&Up()!==s&&(a=Wf())!==s&&Up()!==s&&Op()!==s&&Up()!==s&&Op()!==s?(Qi=r,t=function(r,t,e,n){return {type:"cast",keyword:r.toLowerCase(),expr:t,symbol:"as",target:[{dataType:"DECIMAL("+e+", "+n+")"}]}}(t,e,u,a),r=t):(Ki=r,r=s),r===s&&(r=Ki,(t=$b())!==s&&Up()!==s&&Np()!==s&&Up()!==s&&(e=Fl())!==s&&Up()!==s&&db()!==s&&Up()!==s&&(n=Df())!==s&&Up()!==s?((o=Kb())===s&&(o=null),o!==s&&Up()!==s&&(u=Op())!==s?(Qi=r,t=function(r,t,e,n){return {type:"cast",keyword:r.toLowerCase(),expr:t,symbol:"as",target:[{dataType:[e,n].filter(Boolean).join(" ")}]}}(t,e,n,o),r=t):(Ki=r,r=s)):(Ki=r,r=s)))));var i,c;return r}())===s&&(t=function(){var r,t,e,n,o,u,a,i;return r=Ki,Yb()!==s&&Up()!==s&&(t=Ml())!==s&&Up()!==s?((e=Gl())===s&&(e=null),e!==s&&Up()!==s&&(n=Bb())!==s&&Up()!==s?((o=Yb())===s&&(o=null),o!==s?(Qi=r,a=t,(i=e)&&a.push(i),r={type:"case",expr:null,args:a}):(Ki=r,r=s)):(Ki=r,r=s)):(Ki=r,r=s),r===s&&(r=Ki,Yb()!==s&&Up()!==s&&(t=Fl())!==s&&Up()!==s&&(e=Ml())!==s&&Up()!==s?((n=Gl())===s&&(n=null),n!==s&&Up()!==s&&(o=Bb())!==s&&Up()!==s?((u=Yb())===s&&(u=null),u!==s?(Qi=r,r=function(r,t,e){return e&&t.push(e),{type:"case",expr:r,args:t}}(t,e,n)):(Ki=r,r=s)):(Ki=r,r=s)):(Ki=r,r=s)),r}())===s&&(t=Mf())===s&&(t=ef())===s&&(t=$f())===s&&(t=mf())===s&&(t=Ki,Np()!==s&&(e=Up())!==s&&(n=Yl())!==s&&Up()!==s&&Op()!==s?(Qi=t,(o=n).parentheses=true,t=o):(Ki=t,t=s),t===s&&(t=Zp())===s&&(t=Ki,Up()!==s?(63===r.charCodeAt(Ki)?(e="?",Ki++):(e=s,0===rc&&sc(Cn)),e!==s?(Qi=t,t={type:"origin",value:e}):(Ki=t,t=s)):(Ki=t,t=s))),t}function ef(){var r,t,e,n,o,u,a,i,c,l,f,b,p,v,d,y,w;return r=Ki,(t=wf())===s&&(t=pf()),t!==s&&(e=Up())!==s&&(n=gp())!==s&&(o=Up())!==s?((u=wf())===s&&(u=pf()),u!==s&&(a=Up())!==s&&(i=gp())!==s&&(c=Up())!==s&&(l=vf())!==s?(f=Ki,(b=Up())!==s&&(p=Ac())!==s?f=b=[b,p]:(Ki=f,f=s),f===s&&(f=null),f!==s?(Qi=r,v=t,d=u,y=l,w=f,Lv.add(`select::${"object"==typeof v?v.value:v}::${"object"==typeof d?d.value:d}::${y}`),r=t={type:"column_ref",db:v,table:d,column:y,collate:w&&w[1],...av()}):(Ki=r,r=s)):(Ki=r,r=s)):(Ki=r,r=s),r===s&&(r=Ki,(t=wf())===s&&(t=pf()),t!==s&&(e=Up())!==s&&(n=gp())!==s&&(o=Up())!==s&&(u=vf())!==s?(a=Ki,(i=Up())!==s&&(c=Ac())!==s?a=i=[i,c]:(Ki=a,a=s),a===s&&(a=null),a!==s?(Qi=r,r=t=function(r,t,e){return Lv.add(`select::${"object"==typeof r?r.value:r}::${t}`),{type:"column_ref",table:r,column:t,collate:e&&e[1],...av()}}(t,u,a)):(Ki=r,r=s)):(Ki=r,r=s),r===s&&(r=Ki,t=Ki,(e=af())!==s&&(n=Up())!==s&&(o=gp())!==s?t=e=[e,n,o]:(Ki=t,t=s),t===s&&(t=null),t!==s&&(e=Up())!==s&&(n=Sp())!==s?(Qi=r,r=t=function(r){const t=r&&r[0]||null;return Lv.add(`select::${t}::(.*)`),{expr:{type:"column_ref",table:t,column:"*"},as:null,...av()}}(t)):(Ki=r,r=s),r===s&&(r=Ki,(t=df())!==s?(e=Ki,(n=Up())!==s&&(o=Ac())!==s?e=n=[n,o]:(Ki=e,e=s),e===s&&(e=null),e!==s?(Qi=r,r=t=function(r,t){return Lv.add("select::null::"+r),{type:"column_ref",table:null,column:r,collate:t&&t[1],...av()}}(t,e)):(Ki=r,r=s)):(Ki=r,r=s)))),r}function nf(){var r,t,e,n,o,u,a,i;if(r=Ki,(t=df())!==s){for(e=[],n=Ki,(o=Up())!==s&&(u=Ip())!==s&&(a=Up())!==s&&(i=df())!==s?n=o=[o,u,a,i]:(Ki=n,n=s);n!==s;)e.push(n),n=Ki,(o=Up())!==s&&(u=Ip())!==s&&(a=Up())!==s&&(i=df())!==s?n=o=[o,u,a,i]:(Ki=n,n=s);e!==s?(Qi=r,r=t=sr(t,e)):(Ki=r,r=s);}else Ki=r,r=s;return r}function of(){var r,t;return r=Ki,(t=wf())!==s&&(Qi=r,t={type:"default",value:t}),r=t}function sf(){var r;return (r=of())===s&&(r=cf()),r}function uf(){var r;return (r=wf())===s&&(r=lf()),r}function af(){var r,t;return r=Ki,(t=wf())!==s?(Qi=Ki,(Jn(t)?s:void 0)!==s?(Qi=r,r=t=t):(Ki=r,r=s)):(Ki=r,r=s),r===s&&(r=lf()),r}function cf(){var r;return (r=ff())===s&&(r=bf())===s&&(r=pf()),r}function lf(){var r,t;return r=Ki,(t=ff())===s&&(t=bf())===s&&(t=pf()),t!==s&&(Qi=r,t=t.value),r=t}function ff(){var t,e,n,o;if(t=Ki,34===r.charCodeAt(Ki)?(e='"',Ki++):(e=s,0===rc&&sc(ro)),e!==s){if(n=[],to.test(r.charAt(Ki))?(o=r.charAt(Ki),Ki++):(o=s,0===rc&&sc(eo)),o!==s)for(;o!==s;)n.push(o),to.test(r.charAt(Ki))?(o=r.charAt(Ki),Ki++):(o=s,0===rc&&sc(eo));else n=s;n!==s?(34===r.charCodeAt(Ki)?(o='"',Ki++):(o=s,0===rc&&sc(ro)),o!==s?(Qi=t,t=e={type:"double_quote_string",value:n.join("")}):(Ki=t,t=s)):(Ki=t,t=s);}else Ki=t,t=s;return t}function bf(){var t,e,n,o;if(t=Ki,39===r.charCodeAt(Ki)?(e="'",Ki++):(e=s,0===rc&&sc(Ot)),e!==s){for(n=[],no.test(r.charAt(Ki))?(o=r.charAt(Ki),Ki++):(o=s,0===rc&&sc(oo));o!==s;)n.push(o),no.test(r.charAt(Ki))?(o=r.charAt(Ki),Ki++):(o=s,0===rc&&sc(oo));n!==s?(39===r.charCodeAt(Ki)?(o="'",Ki++):(o=s,0===rc&&sc(Ot)),o!==s?(Qi=t,t=e={type:"single_quote_string",value:n.join("")}):(Ki=t,t=s)):(Ki=t,t=s);}else Ki=t,t=s;return t}function pf(){var t,e,n,o;if(t=Ki,96===r.charCodeAt(Ki)?(e="`",Ki++):(e=s,0===rc&&sc(so)),e!==s){if(n=[],uo.test(r.charAt(Ki))?(o=r.charAt(Ki),Ki++):(o=s,0===rc&&sc(ao)),o===s&&(o=Bf()),o!==s)for(;o!==s;)n.push(o),uo.test(r.charAt(Ki))?(o=r.charAt(Ki),Ki++):(o=s,0===rc&&sc(ao)),o===s&&(o=Bf());else n=s;n!==s?(96===r.charCodeAt(Ki)?(o="`",Ki++):(o=s,0===rc&&sc(so)),o!==s?(Qi=t,t=e={type:"backticks_quote_string",value:n.join("")}):(Ki=t,t=s)):(Ki=t,t=s);}else Ki=t,t=s;return t}function vf(){var r,t;return r=Ki,(t=yf())!==s&&(Qi=r,t=t),(r=t)===s&&(r=lf()),r}function df(){var r,t;return r=Ki,(t=yf())!==s?(Qi=Ki,(Jn(t)?s:void 0)!==s?(Qi=r,r=t=t):(Ki=r,r=s)):(Ki=r,r=s),r===s&&(r=Ki,(t=pf())!==s&&(Qi=r,t=t.value),r=t),r}function yf(){var r,t,e,n;if(r=Ki,(t=Lf())!==s){for(e=[],n=hf();n!==s;)e.push(n),n=hf();e!==s?(Qi=r,r=t=io(t,e)):(Ki=r,r=s);}else Ki=r,r=s;if(r===s)if(r=Ki,(t=Xf())!==s){if(e=[],(n=hf())!==s)for(;n!==s;)e.push(n),n=hf();else e=s;e!==s?(Qi=r,r=t=io(t,e)):(Ki=r,r=s);}else Ki=r,r=s;return r}function wf(){var r,t,e,n;if(r=Ki,(t=Lf())!==s){for(e=[],n=Cf();n!==s;)e.push(n),n=Cf();e!==s?(Qi=r,r=t=io(t,e)):(Ki=r,r=s);}else Ki=r,r=s;return r}function Lf(){var t;return co.test(r.charAt(Ki))?(t=r.charAt(Ki),Ki++):(t=s,0===rc&&sc(lo)),t}function Cf(){var t;return fo.test(r.charAt(Ki))?(t=r.charAt(Ki),Ki++):(t=s,0===rc&&sc(bo)),t}function hf(){var t;return po.test(r.charAt(Ki))?(t=r.charAt(Ki),Ki++):(t=s,0===rc&&sc(vo)),t}function mf(){var t,e,n,o;return t=Ki,e=Ki,58===r.charCodeAt(Ki)?(n=":",Ki++):(n=s,0===rc&&sc(yo)),n!==s&&(o=wf())!==s?e=n=[n,o]:(Ki=e,e=s),e!==s&&(Qi=t,e={type:"param",value:e[1]}),t=e}function Ef(){var t,e,n,o,u,a,i,c,l;return t=Ki,mb()!==s&&Up()!==s&&nb()!==s&&Up()!==s&&(e=cp())!==s&&Up()!==s?(n=Ki,(o=Np())!==s&&(u=Up())!==s?((a=Ul())===s&&(a=null),a!==s&&(i=Up())!==s&&(c=Op())!==s?n=o=[o,u,a,i,c]:(Ki=n,n=s)):(Ki=n,n=s),n===s&&(n=null),n!==s?(Qi=t,t={type:"on update",keyword:e,parentheses:!!(l=n),expr:l?l[2]:null}):(Ki=t,t=s)):(Ki=t,t=s),t===s&&(t=Ki,mb()!==s&&Up()!==s&&nb()!==s&&Up()!==s?("now"===r.substr(Ki,3).toLowerCase()?(e=r.substr(Ki,3),Ki+=3):(e=s,0===rc&&sc(wo)),e!==s&&Up()!==s&&(n=Np())!==s&&(o=Up())!==s&&(u=Op())!==s?(Qi=t,t=function(r){return {type:"on update",keyword:r,parentheses:true}}(e)):(Ki=t,t=s)):(Ki=t,t=s)),t}function Af(){var t,e,n;return t=Ki,"over"===r.substr(Ki,4).toLowerCase()?(e=r.substr(Ki,4),Ki+=4):(e=s,0===rc&&sc(Lo)),e!==s&&Up()!==s&&(n=_f())!==s?(Qi=t,t=e={type:"window",as_window_specification:n}):(Ki=t,t=s),t===s&&(t=Ef()),t}function Tf(){var r,t,e;return r=Ki,(t=wf())!==s&&Up()!==s&&db()!==s&&Up()!==s&&(e=_f())!==s?(Qi=r,r=t={name:t,as_window_specification:e}):(Ki=r,r=s),r}function _f(){var r,t;return (r=wf())===s&&(r=Ki,Np()!==s&&Up()!==s?((t=function(){var r,t,e,n;r=Ki,(t=El())===s&&(t=null);t!==s&&Up()!==s?((e=Al())===s&&(e=null),e!==s&&Up()!==s?((n=function(){var r,t,e,n,o;r=Ki,(t=op())!==s&&Up()!==s?((e=gf())===s&&(e=If()),e!==s?(Qi=r,r=t={type:"rows",expr:e}):(Ki=r,r=s)):(Ki=r,r=s);r===s&&(r=Ki,(t=op())!==s&&Up()!==s&&(e=jb())!==s&&Up()!==s&&(n=If())!==s&&Up()!==s&&Gb()!==s&&Up()!==s&&(o=gf())!==s?(Qi=r,t=cv(e,{type:"origin",value:"rows"},{type:"expr_list",value:[n,o]}),r=t):(Ki=r,r=s));return r}())===s&&(n=null),n!==s?(Qi=r,r=t={name:null,partitionby:t,orderby:e,window_frame_clause:n}):(Ki=r,r=s)):(Ki=r,r=s)):(Ki=r,r=s);return r}())===s&&(t=null),t!==s&&Up()!==s&&Op()!==s?(Qi=r,r={window_specification:t||{},parentheses:true}):(Ki=r,r=s)):(Ki=r,r=s)),r}function gf(){var t,e,n,o;return t=Ki,(e=Nf())!==s&&Up()!==s?("following"===r.substr(Ki,9).toLowerCase()?(n=r.substr(Ki,9),Ki+=9):(n=s,0===rc&&sc(ho)),n!==s?(Qi=t,(o=e).value+=" FOLLOWING",t=e=o):(Ki=t,t=s)):(Ki=t,t=s),t===s&&(t=Sf()),t}function If(){var t,e,n,o,u;return t=Ki,(e=Nf())!==s&&Up()!==s?("preceding"===r.substr(Ki,9).toLowerCase()?(n=r.substr(Ki,9),Ki+=9):(n=s,0===rc&&sc(mo)),n===s&&("following"===r.substr(Ki,9).toLowerCase()?(n=r.substr(Ki,9),Ki+=9):(n=s,0===rc&&sc(ho))),n!==s?(Qi=t,u=n,(o=e).value+=" "+u.toUpperCase(),t=e=o):(Ki=t,t=s)):(Ki=t,t=s),t===s&&(t=Sf()),t}function Sf(){var t,e,n;return t=Ki,"current"===r.substr(Ki,7).toLowerCase()?(e=r.substr(Ki,7),Ki+=7):(e=s,0===rc&&sc(P)),e!==s&&Up()!==s?("row"===r.substr(Ki,3).toLowerCase()?(n=r.substr(Ki,3),Ki+=3):(n=s,0===rc&&sc(yr)),n!==s?(Qi=t,t=e={type:"origin",value:"current row",...av()}):(Ki=t,t=s)):(Ki=t,t=s),t}function Nf(){var t,e;return t=Ki,"unbounded"===r.substr(Ki,9).toLowerCase()?(e=r.substr(Ki,9),Ki+=9):(e=s,0===rc&&sc(Y)),e!==s&&(Qi=t,e={type:"origin",value:e.toUpperCase(),...av()}),(t=e)===s&&(t=$f()),t}function Of(){var t,e;return t=Ki,"year_month"===r.substr(Ki,10).toLowerCase()?(e=r.substr(Ki,10),Ki+=10):(e=s,0===rc&&sc(Ao)),e===s&&("day_hour"===r.substr(Ki,8).toLowerCase()?(e=r.substr(Ki,8),Ki+=8):(e=s,0===rc&&sc(To)),e===s&&("day_minute"===r.substr(Ki,10).toLowerCase()?(e=r.substr(Ki,10),Ki+=10):(e=s,0===rc&&sc(_o)),e===s&&("day_second"===r.substr(Ki,10).toLowerCase()?(e=r.substr(Ki,10),Ki+=10):(e=s,0===rc&&sc(go)),e===s&&("day_microsecond"===r.substr(Ki,15).toLowerCase()?(e=r.substr(Ki,15),Ki+=15):(e=s,0===rc&&sc(Io)),e===s&&("hour_minute"===r.substr(Ki,11).toLowerCase()?(e=r.substr(Ki,11),Ki+=11):(e=s,0===rc&&sc(So)),e===s&&("hour_second"===r.substr(Ki,11).toLowerCase()?(e=r.substr(Ki,11),Ki+=11):(e=s,0===rc&&sc(No)),e===s&&("hour_microsecond"===r.substr(Ki,16).toLowerCase()?(e=r.substr(Ki,16),Ki+=16):(e=s,0===rc&&sc(Oo)),e===s&&("minute_second"===r.substr(Ki,13).toLowerCase()?(e=r.substr(Ki,13),Ki+=13):(e=s,0===rc&&sc(Ro)),e===s&&("minute_microsecond"===r.substr(Ki,18).toLowerCase()?(e=r.substr(Ki,18),Ki+=18):(e=s,0===rc&&sc(xo)),e===s&&("second_microsecond"===r.substr(Ki,18).toLowerCase()?(e=r.substr(Ki,18),Ki+=18):(e=s,0===rc&&sc(jo)),e===s&&("timezone_hour"===r.substr(Ki,13).toLowerCase()?(e=r.substr(Ki,13),Ki+=13):(e=s,0===rc&&sc(ko)),e===s&&("timezone_minute"===r.substr(Ki,15).toLowerCase()?(e=r.substr(Ki,15),Ki+=15):(e=s,0===rc&&sc(Uo)),e===s&&("century"===r.substr(Ki,7).toLowerCase()?(e=r.substr(Ki,7),Ki+=7):(e=s,0===rc&&sc(Do)),e===s&&("day"===r.substr(Ki,3).toLowerCase()?(e=r.substr(Ki,3),Ki+=3):(e=s,0===rc&&sc(Mo)),e===s&&("date"===r.substr(Ki,4).toLowerCase()?(e=r.substr(Ki,4),Ki+=4):(e=s,0===rc&&sc(Po)),e===s&&("decade"===r.substr(Ki,6).toLowerCase()?(e=r.substr(Ki,6),Ki+=6):(e=s,0===rc&&sc(Go)),e===s&&("dow"===r.substr(Ki,3).toLowerCase()?(e=r.substr(Ki,3),Ki+=3):(e=s,0===rc&&sc(Fo)),e===s&&("doy"===r.substr(Ki,3).toLowerCase()?(e=r.substr(Ki,3),Ki+=3):(e=s,0===rc&&sc(Ho)),e===s&&("epoch"===r.substr(Ki,5).toLowerCase()?(e=r.substr(Ki,5),Ki+=5):(e=s,0===rc&&sc(Yo)),e===s&&("hour"===r.substr(Ki,4).toLowerCase()?(e=r.substr(Ki,4),Ki+=4):(e=s,0===rc&&sc(Bo)),e===s&&("isodow"===r.substr(Ki,6).toLowerCase()?(e=r.substr(Ki,6),Ki+=6):(e=s,0===rc&&sc($o)),e===s&&("isoweek"===r.substr(Ki,7).toLowerCase()?(e=r.substr(Ki,7),Ki+=7):(e=s,0===rc&&sc(Wo)),e===s&&("isoyear"===r.substr(Ki,7).toLowerCase()?(e=r.substr(Ki,7),Ki+=7):(e=s,0===rc&&sc(qo)),e===s&&("microseconds"===r.substr(Ki,12).toLowerCase()?(e=r.substr(Ki,12),Ki+=12):(e=s,0===rc&&sc(Vo)),e===s&&("millennium"===r.substr(Ki,10).toLowerCase()?(e=r.substr(Ki,10),Ki+=10):(e=s,0===rc&&sc(Xo)),e===s&&("milliseconds"===r.substr(Ki,12).toLowerCase()?(e=r.substr(Ki,12),Ki+=12):(e=s,0===rc&&sc(Ko)),e===s&&("minute"===r.substr(Ki,6).toLowerCase()?(e=r.substr(Ki,6),Ki+=6):(e=s,0===rc&&sc(Qo)),e===s&&("month"===r.substr(Ki,5).toLowerCase()?(e=r.substr(Ki,5),Ki+=5):(e=s,0===rc&&sc(zo)),e===s&&("quarter"===r.substr(Ki,7).toLowerCase()?(e=r.substr(Ki,7),Ki+=7):(e=s,0===rc&&sc(Zo)),e===s&&("second"===r.substr(Ki,6).toLowerCase()?(e=r.substr(Ki,6),Ki+=6):(e=s,0===rc&&sc(Jo)),e===s&&("time"===r.substr(Ki,4).toLowerCase()?(e=r.substr(Ki,4),Ki+=4):(e=s,0===rc&&sc(rs)),e===s&&("timezone"===r.substr(Ki,8).toLowerCase()?(e=r.substr(Ki,8),Ki+=8):(e=s,0===rc&&sc(ts)),e===s&&("week"===r.substr(Ki,4).toLowerCase()?(e=r.substr(Ki,4),Ki+=4):(e=s,0===rc&&sc(es)),e===s&&("year"===r.substr(Ki,4).toLowerCase()?(e=r.substr(Ki,4),Ki+=4):(e=s,0===rc&&sc(ns)))))))))))))))))))))))))))))))))))),e!==s&&(Qi=t,e=e),t=e}function Rf(){var t,e,n,o,u,a,i,c;return t=Ki,(e=Hb())!==s&&Up()!==s&&Np()!==s&&Up()!==s&&(n=Of())!==s&&Up()!==s&&pb()!==s&&Up()!==s?((o=up())===s&&(o=ip())===s&&(o=sp())===s&&(o=ep()),o!==s&&Up()!==s&&(u=Fl())!==s&&Up()!==s&&Op()!==s?(Qi=t,a=n,i=o,c=u,t=e={type:e.toLowerCase(),args:{field:a,cast_type:i,source:c},...av()}):(Ki=t,t=s)):(Ki=t,t=s),t===s&&(t=Ki,(e=Hb())!==s&&Up()!==s&&Np()!==s&&Up()!==s&&(n=Of())!==s&&Up()!==s&&pb()!==s&&Up()!==s&&(o=Fl())!==s&&Up()!==s&&(u=Op())!==s?(Qi=t,t=e=function(r,t,e){return {type:r.toLowerCase(),args:{field:t,source:e},...av()}}(e,n,o)):(Ki=t,t=s),t===s&&(t=Ki,"date_trunc"===r.substr(Ki,10).toLowerCase()?(e=r.substr(Ki,10),Ki+=10):(e=s,0===rc&&sc(os)),e!==s&&Up()!==s&&Np()!==s&&Up()!==s&&(n=Fl())!==s&&Up()!==s&&Ip()!==s&&Up()!==s&&(o=Of())!==s&&Up()!==s&&(u=Op())!==s?(Qi=t,t=e=function(r,t){return {type:"function",name:{name:[{type:"origin",value:"date_trunc"}]},args:{type:"expr_list",value:[r,{type:"origin",value:t}]},over:null,...av()}}(n,o)):(Ki=t,t=s))),t}function xf(){var t,e,n;return t=Ki,(e=function(){var t;return "both"===r.substr(Ki,4).toLowerCase()?(t=r.substr(Ki,4),Ki+=4):(t=s,0===rc&&sc(ss)),t===s&&("leading"===r.substr(Ki,7).toLowerCase()?(t=r.substr(Ki,7),Ki+=7):(t=s,0===rc&&sc(us)),t===s&&("trailing"===r.substr(Ki,8).toLowerCase()?(t=r.substr(Ki,8),Ki+=8):(t=s,0===rc&&sc(as)))),t}())===s&&(e=null),e!==s&&Up()!==s?((n=Fl())===s&&(n=null),n!==s&&Up()!==s&&pb()!==s?(Qi=t,t=e=function(r,t,e){let n=[];return r&&n.push({type:"origin",value:r}),t&&n.push(t),n.push({type:"origin",value:"from"}),{type:"expr_list",value:n}}(e,n)):(Ki=t,t=s)):(Ki=t,t=s),t}function jf(){var t,e,n,o;return t=Ki,"trim"===r.substr(Ki,4).toLowerCase()?(e=r.substr(Ki,4),Ki+=4):(e=s,0===rc&&sc(is)),e!==s&&Up()!==s&&Np()!==s&&Up()!==s?((n=xf())===s&&(n=null),n!==s&&Up()!==s&&(o=Fl())!==s&&Up()!==s&&Op()!==s?(Qi=t,t=e=function(r,t){let e=r||{type:"expr_list",value:[]};return e.value.push(t),{type:"function",name:{name:[{type:"origin",value:"trim"}]},args:e,...av()}}(n,o)):(Ki=t,t=s)):(Ki=t,t=s),t}function kf(){var t,e,n,o,u,a,i,c;return (t=Rf())===s&&(t=jf())===s&&(t=Ki,"convert"===r.substr(Ki,7).toLowerCase()?(e=r.substr(Ki,7),Ki+=7):(e=s,0===rc&&sc(cs)),e!==s&&Up()!==s&&(n=Np())!==s&&Up()!==s&&(o=function(){var r,t,e,n,o,u;return r=Ki,(t=Wp())!==s&&Up()!==s&&Ip()!==s&&Up()!==s?((e=ev())===s&&(e=ov()),e!==s&&Up()!==s&&(n=Mc())!==s&&Up()!==s&&(o=sf())!==s?(Qi=r,r=t=function(r,t,e,n){const{dataType:o,length:s}=t;let u=o;return void 0!==s&&(u=`${u}(${s})`),{type:"expr_list",value:[r,{type:"origin",value:u,suffix:{prefix:e,...n}}]}}(t,e,n,o)):(Ki=r,r=s)):(Ki=r,r=s),r===s&&(r=Ki,(t=Wp())!==s&&Up()!==s&&Ip()!==s&&Up()!==s?((e=Df())===s&&(e=rv()),e!==s?(Qi=r,r=t={type:"expr_list",value:[t,{type:"datatype",..."string"==typeof(u=e)?{dataType:u}:u}]}):(Ki=r,r=s)):(Ki=r,r=s),r===s&&(r=Ki,(t=Yl())!==s&&Up()!==s&&_b()!==s&&Up()!==s&&(e=wf())!==s?(Qi=r,r=t=function(r,t){return r.suffix="USING "+t.toUpperCase(),{type:"expr_list",value:[r]}}(t,e)):(Ki=r,r=s))),r}())!==s&&(u=Up())!==s&&Op()!==s?(Qi=t,t=e={type:"function",name:{name:[{type:"origin",value:"convert"}]},args:o,...av()}):(Ki=t,t=s),t===s&&(t=Ki,(e=function(){var t;(t=Uf())===s&&(t=lp())===s&&(t=ap())===s&&(t=function(){var t,e,n,o;t=Ki,"session_user"===r.substr(Ki,12).toLowerCase()?(e=r.substr(Ki,12),Ki+=12):(e=s,0===rc&&sc(qa));e!==s?(n=Ki,rc++,o=Lf(),rc--,o===s?n=void 0:(Ki=n,n=s),n!==s?(Qi=t,t=e="SESSION_USER"):(Ki=t,t=s)):(Ki=t,t=s);return t}())===s&&(t=function(){var t,e,n,o;t=Ki,"system_user"===r.substr(Ki,11).toLowerCase()?(e=r.substr(Ki,11),Ki+=11):(e=s,0===rc&&sc(Va));e!==s?(n=Ki,rc++,o=Lf(),rc--,o===s?n=void 0:(Ki=n,n=s),n!==s?(Qi=t,t=e="SYSTEM_USER"):(Ki=t,t=s)):(Ki=t,t=s);return t}());return t}())!==s&&Up()!==s&&(n=Np())!==s&&Up()!==s?((o=Ul())===s&&(o=null),o!==s&&(u=Up())!==s&&Op()!==s&&Up()!==s?((a=Af())===s&&(a=null),a!==s?(Qi=t,t=e=function(r,t,e){return {type:"function",name:{name:[{type:"default",value:r}]},args:t||{type:"expr_list",value:[]},over:e,...av()}}(e,o,a)):(Ki=t,t=s)):(Ki=t,t=s)):(Ki=t,t=s),t===s&&(t=Ki,(e=Uf())!==s&&Up()!==s?((n=Ef())===s&&(n=null),n!==s?(Qi=t,t=e={type:"function",name:{name:[{type:"origin",value:e}]},over:n,...av()}):(Ki=t,t=s)):(Ki=t,t=s),t===s&&(t=Ki,(e=Xp())!==s?(Qi=Ki,(!uv[(c=e).name[0]&&c.name[0].value.toLowerCase()]?void 0:s)!==s&&(n=Up())!==s&&Np()!==s&&(o=Up())!==s?((u=Yl())===s&&(u=null),u!==s&&Up()!==s&&Op()!==s&&(a=Up())!==s?((i=Af())===s&&(i=null),i!==s?(Qi=t,t=e=function(r,t,e){return t&&"expr_list"!==t.type&&(t={type:"expr_list",value:[t]}),(r.name[0]&&"TIMESTAMPDIFF"===r.name[0].value.toUpperCase()||r.name[0]&&"TIMESTAMPADD"===r.name[0].value.toUpperCase())&&t.value&&t.value[0]&&(t.value[0]={type:"origin",value:t.value[0].column}),{type:"function",name:r,args:t||{type:"expr_list",value:[]},over:e,...av()}}(e,u,i)):(Ki=t,t=s)):(Ki=t,t=s)):(Ki=t,t=s)):(Ki=t,t=s))))),t}function Uf(){var t;return (t=function(){var t,e,n,o;t=Ki,"current_date"===r.substr(Ki,12).toLowerCase()?(e=r.substr(Ki,12),Ki+=12):(e=s,0===rc&&sc(Fa));e!==s?(n=Ki,rc++,o=Lf(),rc--,o===s?n=void 0:(Ki=n,n=s),n!==s?(Qi=t,t=e="CURRENT_DATE"):(Ki=t,t=s)):(Ki=t,t=s);return t}())===s&&(t=function(){var t,e,n,o;t=Ki,"current_time"===r.substr(Ki,12).toLowerCase()?(e=r.substr(Ki,12),Ki+=12):(e=s,0===rc&&sc(Ba));e!==s?(n=Ki,rc++,o=Lf(),rc--,o===s?n=void 0:(Ki=n,n=s),n!==s?(Qi=t,t=e="CURRENT_TIME"):(Ki=t,t=s)):(Ki=t,t=s);return t}())===s&&(t=cp()),t}function Df(){var t;return (t=function(){var t,e,n,o;t=Ki,"signed"===r.substr(Ki,6).toLowerCase()?(e=r.substr(Ki,6),Ki+=6):(e=s,0===rc&&sc(ha));e!==s?(n=Ki,rc++,o=Lf(),rc--,o===s?n=void 0:(Ki=n,n=s),n!==s?(Qi=t,t=e="SIGNED"):(Ki=t,t=s)):(Ki=t,t=s);return t}())===s&&(t=function(){var t,e,n,o;t=Ki,"unsigned"===r.substr(Ki,8).toLowerCase()?(e=r.substr(Ki,8),Ki+=8):(e=s,0===rc&&sc(ma));e!==s?(n=Ki,rc++,o=Lf(),rc--,o===s?n=void 0:(Ki=n,n=s),n!==s?(Qi=t,t=e="UNSIGNED"):(Ki=t,t=s)):(Ki=t,t=s);return t}()),t}function Mf(){var t,e,n,o,u,a,i,c,l;return t=Ki,"binary"===r.substr(Ki,6).toLowerCase()?(e=r.substr(Ki,6),Ki+=6):(e=s,0===rc&&sc(ls)),e===s&&("_binary"===r.substr(Ki,7).toLowerCase()?(e=r.substr(Ki,7),Ki+=7):(e=s,0===rc&&sc(fs))),e===s&&(e=null),e!==s&&Up()!==s&&(n=Ff())!==s?(o=Ki,(u=Up())!==s&&(a=Ac())!==s?o=u=[u,a]:(Ki=o,o=s),o===s&&(o=null),o!==s?(Qi=t,c=n,l=o,(i=e)&&(c.prefix=i.toLowerCase()),l&&(c.suffix={collate:l[1]}),t=e=c):(Ki=t,t=s)):(Ki=t,t=s),t===s&&(t=function(){var t,e;t=Ki,(e=function(){var t,e,n,o;t=Ki,"true"===r.substr(Ki,4).toLowerCase()?(e=r.substr(Ki,4),Ki+=4):(e=s,0===rc&&sc(zs));e!==s?(n=Ki,rc++,o=Lf(),rc--,o===s?n=void 0:(Ki=n,n=s),n!==s?t=e=[e,n]:(Ki=t,t=s)):(Ki=t,t=s);return t}())!==s&&(Qi=t,e={type:"bool",value:true});(t=e)===s&&(t=Ki,(e=function(){var t,e,n,o;t=Ki,"false"===r.substr(Ki,5).toLowerCase()?(e=r.substr(Ki,5),Ki+=5):(e=s,0===rc&&sc(Js));e!==s?(n=Ki,rc++,o=Lf(),rc--,o===s?n=void 0:(Ki=n,n=s),n!==s?t=e=[e,n]:(Ki=t,t=s)):(Ki=t,t=s);return t}())!==s&&(Qi=t,e={type:"bool",value:false}),t=e);return t}())===s&&(t=Gf())===s&&(t=function(){var t,e,n,o,u,a;t=Ki,(e=sp())===s&&(e=ep())===s&&(e=up())===s&&(e=np());if(e!==s)if(Up()!==s){if(n=Ki,39===r.charCodeAt(Ki)?(o="'",Ki++):(o=s,0===rc&&sc(Ot)),o!==s){for(u=[],a=Yf();a!==s;)u.push(a),a=Yf();u!==s?(39===r.charCodeAt(Ki)?(a="'",Ki++):(a=s,0===rc&&sc(Ot)),a!==s?n=o=[o,u,a]:(Ki=n,n=s)):(Ki=n,n=s);}else Ki=n,n=s;n!==s?(Qi=t,e=Cs(e,n),t=e):(Ki=t,t=s);}else Ki=t,t=s;else Ki=t,t=s;if(t===s)if(t=Ki,(e=sp())===s&&(e=ep())===s&&(e=up())===s&&(e=np()),e!==s)if(Up()!==s){if(n=Ki,34===r.charCodeAt(Ki)?(o='"',Ki++):(o=s,0===rc&&sc(ro)),o!==s){for(u=[],a=Hf();a!==s;)u.push(a),a=Hf();u!==s?(34===r.charCodeAt(Ki)?(a='"',Ki++):(a=s,0===rc&&sc(ro)),a!==s?n=o=[o,u,a]:(Ki=n,n=s)):(Ki=n,n=s);}else Ki=n,n=s;n!==s?(Qi=t,e=Cs(e,n),t=e):(Ki=t,t=s);}else Ki=t,t=s;else Ki=t,t=s;return t}()),t}function Pf(){var r;return (r=Mf())===s&&(r=$f()),r}function Gf(){var t,e;return t=Ki,(e=function(){var t,e,n,o;t=Ki,"null"===r.substr(Ki,4).toLowerCase()?(e=r.substr(Ki,4),Ki+=4):(e=s,0===rc&&sc(Ks));e!==s?(n=Ki,rc++,o=Lf(),rc--,o===s?n=void 0:(Ki=n,n=s),n!==s?t=e=[e,n]:(Ki=t,t=s)):(Ki=t,t=s);return t}())!==s&&(Qi=t,e={type:"null",value:null}),t=e}function Ff(){var t,e,n,o,u,a,i,c;if(t=Ki,"_binary"===r.substr(Ki,7).toLowerCase()?(e=r.substr(Ki,7),Ki+=7):(e=s,0===rc&&sc(fs)),e===s&&("_latin1"===r.substr(Ki,7).toLowerCase()?(e=r.substr(Ki,7),Ki+=7):(e=s,0===rc&&sc(bs))),e===s&&(e=null),e!==s)if((n=Up())!==s)if("x"===r.substr(Ki,1).toLowerCase()?(o=r.charAt(Ki),Ki++):(o=s,0===rc&&sc(ps)),o!==s){if(u=Ki,39===r.charCodeAt(Ki)?(a="'",Ki++):(a=s,0===rc&&sc(Ot)),a!==s){for(i=[],vs.test(r.charAt(Ki))?(c=r.charAt(Ki),Ki++):(c=s,0===rc&&sc(ds));c!==s;)i.push(c),vs.test(r.charAt(Ki))?(c=r.charAt(Ki),Ki++):(c=s,0===rc&&sc(ds));i!==s?(39===r.charCodeAt(Ki)?(c="'",Ki++):(c=s,0===rc&&sc(Ot)),c!==s?u=a=[a,i,c]:(Ki=u,u=s)):(Ki=u,u=s);}else Ki=u,u=s;u!==s?(Qi=t,t=e={type:"hex_string",prefix:e,value:u[1].join("")}):(Ki=t,t=s);}else Ki=t,t=s;else Ki=t,t=s;else Ki=t,t=s;if(t===s){if(t=Ki,"_binary"===r.substr(Ki,7).toLowerCase()?(e=r.substr(Ki,7),Ki+=7):(e=s,0===rc&&sc(fs)),e===s&&("_latin1"===r.substr(Ki,7).toLowerCase()?(e=r.substr(Ki,7),Ki+=7):(e=s,0===rc&&sc(bs))),e===s&&(e=null),e!==s)if((n=Up())!==s)if("b"===r.substr(Ki,1).toLowerCase()?(o=r.charAt(Ki),Ki++):(o=s,0===rc&&sc(ys)),o!==s){if(u=Ki,39===r.charCodeAt(Ki)?(a="'",Ki++):(a=s,0===rc&&sc(Ot)),a!==s){for(i=[],vs.test(r.charAt(Ki))?(c=r.charAt(Ki),Ki++):(c=s,0===rc&&sc(ds));c!==s;)i.push(c),vs.test(r.charAt(Ki))?(c=r.charAt(Ki),Ki++):(c=s,0===rc&&sc(ds));i!==s?(39===r.charCodeAt(Ki)?(c="'",Ki++):(c=s,0===rc&&sc(Ot)),c!==s?u=a=[a,i,c]:(Ki=u,u=s)):(Ki=u,u=s);}else Ki=u,u=s;u!==s?(Qi=t,t=e=function(r,t,e){return {type:"bit_string",prefix:r,value:e[1].join("")}}(e,0,u)):(Ki=t,t=s);}else Ki=t,t=s;else Ki=t,t=s;else Ki=t,t=s;if(t===s){if(t=Ki,"_binary"===r.substr(Ki,7).toLowerCase()?(e=r.substr(Ki,7),Ki+=7):(e=s,0===rc&&sc(fs)),e===s&&("_latin1"===r.substr(Ki,7).toLowerCase()?(e=r.substr(Ki,7),Ki+=7):(e=s,0===rc&&sc(bs))),e===s&&(e=null),e!==s)if((n=Up())!==s)if("0x"===r.substr(Ki,2).toLowerCase()?(o=r.substr(Ki,2),Ki+=2):(o=s,0===rc&&sc(ws)),o!==s){for(u=[],vs.test(r.charAt(Ki))?(a=r.charAt(Ki),Ki++):(a=s,0===rc&&sc(ds));a!==s;)u.push(a),vs.test(r.charAt(Ki))?(a=r.charAt(Ki),Ki++):(a=s,0===rc&&sc(ds));u!==s?(Qi=t,t=e=function(r,t,e){return {type:"full_hex_string",prefix:r,value:e.join("")}}(e,0,u)):(Ki=t,t=s);}else Ki=t,t=s;else Ki=t,t=s;else Ki=t,t=s;if(t===s){if(t=Ki,"n"===r.substr(Ki,1).toLowerCase()?(e=r.charAt(Ki),Ki++):(e=s,0===rc&&sc(Ls)),e!==s){if(n=Ki,39===r.charCodeAt(Ki)?(o="'",Ki++):(o=s,0===rc&&sc(Ot)),o!==s){for(u=[],a=Yf();a!==s;)u.push(a),a=Yf();u!==s?(39===r.charCodeAt(Ki)?(a="'",Ki++):(a=s,0===rc&&sc(Ot)),a!==s?n=o=[o,u,a]:(Ki=n,n=s)):(Ki=n,n=s);}else Ki=n,n=s;n!==s?(Qi=t,t=e=function(r,t){return {type:"natural_string",value:t[1].join("")}}(0,n)):(Ki=t,t=s);}else Ki=t,t=s;if(t===s){if(t=Ki,e=Ki,39===r.charCodeAt(Ki)?(n="'",Ki++):(n=s,0===rc&&sc(Ot)),n!==s){for(o=[],u=Yf();u!==s;)o.push(u),u=Yf();o!==s?(39===r.charCodeAt(Ki)?(u="'",Ki++):(u=s,0===rc&&sc(Ot)),u!==s?e=n=[n,o,u]:(Ki=e,e=s)):(Ki=e,e=s);}else Ki=e,e=s;if(e!==s&&(Qi=t,e=function(r){return {type:"single_quote_string",value:r[1].join("")}}(e)),(t=e)===s){if(t=Ki,e=Ki,34===r.charCodeAt(Ki)?(n='"',Ki++):(n=s,0===rc&&sc(ro)),n!==s){for(o=[],u=Hf();u!==s;)o.push(u),u=Hf();o!==s?(34===r.charCodeAt(Ki)?(u='"',Ki++):(u=s,0===rc&&sc(ro)),u!==s?e=n=[n,o,u]:(Ki=e,e=s)):(Ki=e,e=s);}else Ki=e,e=s;e!==s&&(Qi=t,e=function(r){return {type:"double_quote_string",value:r[1].join("")}}(e)),t=e;}}}}}return t}function Hf(){var t;return hs.test(r.charAt(Ki))?(t=r.charAt(Ki),Ki++):(t=s,0===rc&&sc(ms)),t===s&&(t=Bf())===s&&(Es.test(r.charAt(Ki))?(t=r.charAt(Ki),Ki++):(t=s,0===rc&&sc(As))),t}function Yf(){var t;return Ts.test(r.charAt(Ki))?(t=r.charAt(Ki),Ki++):(t=s,0===rc&&sc(_s)),t===s&&(t=Bf()),t}function Bf(){var t,e,n,o,u,a,i,c,l,f;return t=Ki,"\\'"===r.substr(Ki,2)?(e="\\'",Ki+=2):(e=s,0===rc&&sc(gs)),e!==s&&(Qi=t,e="\\'"),(t=e)===s&&(t=Ki,'\\"'===r.substr(Ki,2)?(e='\\"',Ki+=2):(e=s,0===rc&&sc(Is)),e!==s&&(Qi=t,e='\\"'),(t=e)===s&&(t=Ki,"\\\\"===r.substr(Ki,2)?(e="\\\\",Ki+=2):(e=s,0===rc&&sc(Ss)),e!==s&&(Qi=t,e="\\\\"),(t=e)===s&&(t=Ki,"\\/"===r.substr(Ki,2)?(e="\\/",Ki+=2):(e=s,0===rc&&sc(Ns)),e!==s&&(Qi=t,e="\\/"),(t=e)===s&&(t=Ki,"\\b"===r.substr(Ki,2)?(e="\\b",Ki+=2):(e=s,0===rc&&sc(Os)),e!==s&&(Qi=t,e="\b"),(t=e)===s&&(t=Ki,"\\f"===r.substr(Ki,2)?(e="\\f",Ki+=2):(e=s,0===rc&&sc(Rs)),e!==s&&(Qi=t,e="\f"),(t=e)===s&&(t=Ki,"\\n"===r.substr(Ki,2)?(e="\\n",Ki+=2):(e=s,0===rc&&sc(xs)),e!==s&&(Qi=t,e="\n"),(t=e)===s&&(t=Ki,"\\r"===r.substr(Ki,2)?(e="\\r",Ki+=2):(e=s,0===rc&&sc(js)),e!==s&&(Qi=t,e="\r"),(t=e)===s&&(t=Ki,"\\t"===r.substr(Ki,2)?(e="\\t",Ki+=2):(e=s,0===rc&&sc(ks)),e!==s&&(Qi=t,e="\t"),(t=e)===s&&(t=Ki,"\\u"===r.substr(Ki,2)?(e="\\u",Ki+=2):(e=s,0===rc&&sc(Us)),e!==s&&(n=Qf())!==s&&(o=Qf())!==s&&(u=Qf())!==s&&(a=Qf())!==s?(Qi=t,i=n,c=o,l=u,f=a,t=e=String.fromCharCode(parseInt("0x"+i+c+l+f))):(Ki=t,t=s),t===s&&(t=Ki,92===r.charCodeAt(Ki)?(e="\\",Ki++):(e=s,0===rc&&sc(Ds)),e!==s&&(Qi=t,e="\\"),(t=e)===s&&(t=Ki,"''"===r.substr(Ki,2)?(e="''",Ki+=2):(e=s,0===rc&&sc(Ms)),e!==s&&(Qi=t,e="''"),(t=e)===s&&(t=Ki,'""'===r.substr(Ki,2)?(e='""',Ki+=2):(e=s,0===rc&&sc(Ps)),e!==s&&(Qi=t,e='""'),(t=e)===s&&(t=Ki,"``"===r.substr(Ki,2)?(e="``",Ki+=2):(e=s,0===rc&&sc(Gs)),e!==s&&(Qi=t,e="``"),t=e))))))))))))),t}function $f(){var r,t,e;return r=Ki,(t=function(){var r,t,e,n;r=Ki,(t=Wf())!==s&&(e=qf())!==s&&(n=Vf())!==s?(Qi=r,r=t={type:"bigint",value:t+e+n}):(Ki=r,r=s);r===s&&(r=Ki,(t=Wf())!==s&&(e=qf())!==s?(Qi=r,t=function(r,t){const e=r+t;if(lv(r))return {type:"bigint",value:e};const n=t.length>=1?t.length-1:0;return parseFloat(e).toFixed(n)}(t,e),r=t):(Ki=r,r=s),r===s&&(r=Ki,(t=Wf())!==s&&(e=Vf())!==s?(Qi=r,t=function(r,t){return {type:"bigint",value:r+t}}(t,e),r=t):(Ki=r,r=s),r===s&&(r=Ki,(t=Wf())!==s&&(Qi=r,t=function(r){return lv(r)?{type:"bigint",value:r}:parseFloat(r)}(t)),r=t)));return r}())!==s&&(Qi=r,t=(e=t)&&"bigint"===e.type?e:{type:"number",value:e}),r=t}function Wf(){var t,e,n;return (t=Xf())===s&&(t=Kf())===s&&(t=Ki,45===r.charCodeAt(Ki)?(e="-",Ki++):(e=s,0===rc&&sc(xn)),e===s&&(43===r.charCodeAt(Ki)?(e="+",Ki++):(e=s,0===rc&&sc(Rn))),e!==s&&(n=Xf())!==s?(Qi=t,t=e=e+n):(Ki=t,t=s),t===s&&(t=Ki,45===r.charCodeAt(Ki)?(e="-",Ki++):(e=s,0===rc&&sc(xn)),e===s&&(43===r.charCodeAt(Ki)?(e="+",Ki++):(e=s,0===rc&&sc(Rn))),e!==s&&(n=Kf())!==s?(Qi=t,t=e=function(r,t){return r+t}(e,n)):(Ki=t,t=s))),t}function qf(){var t,e,n,o;return t=Ki,46===r.charCodeAt(Ki)?(e=".",Ki++):(e=s,0===rc&&sc(Ys)),e!==s?((n=Xf())===s&&(n=null),n!==s?(Qi=t,t=e=(o=n)?"."+o:""):(Ki=t,t=s)):(Ki=t,t=s),t}function Vf(){var t,e,n;return t=Ki,(e=function(){var t,e,n;t=Ki,Ws.test(r.charAt(Ki))?(e=r.charAt(Ki),Ki++):(e=s,0===rc&&sc(qs));e!==s?(Vs.test(r.charAt(Ki))?(n=r.charAt(Ki),Ki++):(n=s,0===rc&&sc(Xs)),n===s&&(n=null),n!==s?(Qi=t,t=e=e+(null!==(o=n)?o:"")):(Ki=t,t=s)):(Ki=t,t=s);var o;return t}())!==s&&(n=Xf())!==s?(Qi=t,t=e=e+n):(Ki=t,t=s),t}function Xf(){var r,t,e;if(r=Ki,t=[],(e=Kf())!==s)for(;e!==s;)t.push(e),e=Kf();else t=s;return t!==s&&(Qi=r,t=t.join("")),r=t}function Kf(){var t;return We.test(r.charAt(Ki))?(t=r.charAt(Ki),Ki++):(t=s,0===rc&&sc(qe)),t}function Qf(){var t;return Bs.test(r.charAt(Ki))?(t=r.charAt(Ki),Ki++):(t=s,0===rc&&sc($s)),t}function zf(){var t,e,n,o;return t=Ki,"default"===r.substr(Ki,7).toLowerCase()?(e=r.substr(Ki,7),Ki+=7):(e=s,0===rc&&sc(k)),e!==s?(n=Ki,rc++,o=Lf(),rc--,o===s?n=void 0:(Ki=n,n=s),n!==s?t=e=[e,n]:(Ki=t,t=s)):(Ki=t,t=s),t}function Zf(){var t,e,n,o;return t=Ki,"to"===r.substr(Ki,2).toLowerCase()?(e=r.substr(Ki,2),Ki+=2):(e=s,0===rc&&sc(Zs)),e!==s?(n=Ki,rc++,o=Lf(),rc--,o===s?n=void 0:(Ki=n,n=s),n!==s?t=e=[e,n]:(Ki=t,t=s)):(Ki=t,t=s),t}function Jf(){var t,e,n,o;return t=Ki,"show"===r.substr(Ki,4).toLowerCase()?(e=r.substr(Ki,4),Ki+=4):(e=s,0===rc&&sc(ru)),e!==s?(n=Ki,rc++,o=Lf(),rc--,o===s?n=void 0:(Ki=n,n=s),n!==s?t=e=[e,n]:(Ki=t,t=s)):(Ki=t,t=s),t}function rb(){var t,e,n,o;return t=Ki,"drop"===r.substr(Ki,4).toLowerCase()?(e=r.substr(Ki,4),Ki+=4):(e=s,0===rc&&sc(Dr)),e!==s?(n=Ki,rc++,o=Lf(),rc--,o===s?n=void 0:(Ki=n,n=s),n!==s?(Qi=t,t=e="DROP"):(Ki=t,t=s)):(Ki=t,t=s),t}function tb(){var t,e,n,o;return t=Ki,"alter"===r.substr(Ki,5).toLowerCase()?(e=r.substr(Ki,5),Ki+=5):(e=s,0===rc&&sc(eu)),e!==s?(n=Ki,rc++,o=Lf(),rc--,o===s?n=void 0:(Ki=n,n=s),n!==s?t=e=[e,n]:(Ki=t,t=s)):(Ki=t,t=s),t}function eb(){var t,e,n,o;return t=Ki,"select"===r.substr(Ki,6).toLowerCase()?(e=r.substr(Ki,6),Ki+=6):(e=s,0===rc&&sc(nu)),e!==s?(n=Ki,rc++,o=Lf(),rc--,o===s?n=void 0:(Ki=n,n=s),n!==s?t=e=[e,n]:(Ki=t,t=s)):(Ki=t,t=s),t}function nb(){var t,e,n,o;return t=Ki,"update"===r.substr(Ki,6).toLowerCase()?(e=r.substr(Ki,6),Ki+=6):(e=s,0===rc&&sc(ou)),e!==s?(n=Ki,rc++,o=Lf(),rc--,o===s?n=void 0:(Ki=n,n=s),n!==s?t=e=[e,n]:(Ki=t,t=s)):(Ki=t,t=s),t}function ob(){var t,e,n,o;return t=Ki,"create"===r.substr(Ki,6).toLowerCase()?(e=r.substr(Ki,6),Ki+=6):(e=s,0===rc&&sc(su)),e!==s?(n=Ki,rc++,o=Lf(),rc--,o===s?n=void 0:(Ki=n,n=s),n!==s?t=e=[e,n]:(Ki=t,t=s)):(Ki=t,t=s),t}function sb(){var t,e,n,o;return t=Ki,"temporary"===r.substr(Ki,9).toLowerCase()?(e=r.substr(Ki,9),Ki+=9):(e=s,0===rc&&sc(uu)),e!==s?(n=Ki,rc++,o=Lf(),rc--,o===s?n=void 0:(Ki=n,n=s),n!==s?t=e=[e,n]:(Ki=t,t=s)):(Ki=t,t=s),t}function ub(){var t,e,n,o;return t=Ki,"delete"===r.substr(Ki,6).toLowerCase()?(e=r.substr(Ki,6),Ki+=6):(e=s,0===rc&&sc(au)),e!==s?(n=Ki,rc++,o=Lf(),rc--,o===s?n=void 0:(Ki=n,n=s),n!==s?t=e=[e,n]:(Ki=t,t=s)):(Ki=t,t=s),t}function ab(){var t,e,n,o;return t=Ki,"insert"===r.substr(Ki,6).toLowerCase()?(e=r.substr(Ki,6),Ki+=6):(e=s,0===rc&&sc(iu)),e!==s?(n=Ki,rc++,o=Lf(),rc--,o===s?n=void 0:(Ki=n,n=s),n!==s?t=e=[e,n]:(Ki=t,t=s)):(Ki=t,t=s),t}function ib(){var t,e,n,o;return t=Ki,"replace"===r.substr(Ki,7).toLowerCase()?(e=r.substr(Ki,7),Ki+=7):(e=s,0===rc&&sc(lu)),e!==s?(n=Ki,rc++,o=Lf(),rc--,o===s?n=void 0:(Ki=n,n=s),n!==s?t=e=[e,n]:(Ki=t,t=s)):(Ki=t,t=s),t}function cb(){var t,e,n,o;return t=Ki,"rename"===r.substr(Ki,6).toLowerCase()?(e=r.substr(Ki,6),Ki+=6):(e=s,0===rc&&sc(fu)),e!==s?(n=Ki,rc++,o=Lf(),rc--,o===s?n=void 0:(Ki=n,n=s),n!==s?t=e=[e,n]:(Ki=t,t=s)):(Ki=t,t=s),t}function lb(){var t,e,n,o;return t=Ki,"ignore"===r.substr(Ki,6).toLowerCase()?(e=r.substr(Ki,6),Ki+=6):(e=s,0===rc&&sc(bu)),e!==s?(n=Ki,rc++,o=Lf(),rc--,o===s?n=void 0:(Ki=n,n=s),n!==s?t=e=[e,n]:(Ki=t,t=s)):(Ki=t,t=s),t}function fb(){var t,e,n,o;return t=Ki,"partition"===r.substr(Ki,9).toLowerCase()?(e=r.substr(Ki,9),Ki+=9):(e=s,0===rc&&sc(vu)),e!==s?(n=Ki,rc++,o=Lf(),rc--,o===s?n=void 0:(Ki=n,n=s),n!==s?(Qi=t,t=e="PARTITION"):(Ki=t,t=s)):(Ki=t,t=s),t}function bb(){var t,e,n,o;return t=Ki,"into"===r.substr(Ki,4).toLowerCase()?(e=r.substr(Ki,4),Ki+=4):(e=s,0===rc&&sc(Re)),e!==s?(n=Ki,rc++,o=Lf(),rc--,o===s?n=void 0:(Ki=n,n=s),n!==s?t=e=[e,n]:(Ki=t,t=s)):(Ki=t,t=s),t}function pb(){var t,e,n,o;return t=Ki,"from"===r.substr(Ki,4).toLowerCase()?(e=r.substr(Ki,4),Ki+=4):(e=s,0===rc&&sc(du)),e!==s?(n=Ki,rc++,o=Lf(),rc--,o===s?n=void 0:(Ki=n,n=s),n!==s?t=e=[e,n]:(Ki=t,t=s)):(Ki=t,t=s),t}function vb(){var t,e,n,o;return t=Ki,"set"===r.substr(Ki,3).toLowerCase()?(e=r.substr(Ki,3),Ki+=3):(e=s,0===rc&&sc(ft)),e!==s?(n=Ki,rc++,o=Lf(),rc--,o===s?n=void 0:(Ki=n,n=s),n!==s?(Qi=t,t=e="SET"):(Ki=t,t=s)):(Ki=t,t=s),t}function db(){var t,e,n,o;return t=Ki,"as"===r.substr(Ki,2).toLowerCase()?(e=r.substr(Ki,2),Ki+=2):(e=s,0===rc&&sc(L)),e!==s?(n=Ki,rc++,o=Lf(),rc--,o===s?n=void 0:(Ki=n,n=s),n!==s?t=e=[e,n]:(Ki=t,t=s)):(Ki=t,t=s),t}function yb(){var t,e,n,o;return t=Ki,"table"===r.substr(Ki,5).toLowerCase()?(e=r.substr(Ki,5),Ki+=5):(e=s,0===rc&&sc(xe)),e!==s?(n=Ki,rc++,o=Lf(),rc--,o===s?n=void 0:(Ki=n,n=s),n!==s?(Qi=t,t=e="TABLE"):(Ki=t,t=s)):(Ki=t,t=s),t}function wb(){var t,e,n,o;return t=Ki,"trigger"===r.substr(Ki,7).toLowerCase()?(e=r.substr(Ki,7),Ki+=7):(e=s,0===rc&&sc(yu)),e!==s?(n=Ki,rc++,o=Lf(),rc--,o===s?n=void 0:(Ki=n,n=s),n!==s?(Qi=t,t=e="TRIGGER"):(Ki=t,t=s)):(Ki=t,t=s),t}function Lb(){var t,e,n,o;return t=Ki,"tables"===r.substr(Ki,6).toLowerCase()?(e=r.substr(Ki,6),Ki+=6):(e=s,0===rc&&sc(wu)),e!==s?(n=Ki,rc++,o=Lf(),rc--,o===s?n=void 0:(Ki=n,n=s),n!==s?(Qi=t,t=e="TABLES"):(Ki=t,t=s)):(Ki=t,t=s),t}function Cb(){var t,e,n,o;return t=Ki,"database"===r.substr(Ki,8).toLowerCase()?(e=r.substr(Ki,8),Ki+=8):(e=s,0===rc&&sc(Lu)),e!==s?(n=Ki,rc++,o=Lf(),rc--,o===s?n=void 0:(Ki=n,n=s),n!==s?(Qi=t,t=e="DATABASE"):(Ki=t,t=s)):(Ki=t,t=s),t}function hb(){var t,e,n,o;return t=Ki,"schema"===r.substr(Ki,6).toLowerCase()?(e=r.substr(Ki,6),Ki+=6):(e=s,0===rc&&sc(Cu)),e!==s?(n=Ki,rc++,o=Lf(),rc--,o===s?n=void 0:(Ki=n,n=s),n!==s?(Qi=t,t=e="SCHEMA"):(Ki=t,t=s)):(Ki=t,t=s),t}function mb(){var t,e,n,o;return t=Ki,"on"===r.substr(Ki,2).toLowerCase()?(e=r.substr(Ki,2),Ki+=2):(e=s,0===rc&&sc(hu)),e!==s?(n=Ki,rc++,o=Lf(),rc--,o===s?n=void 0:(Ki=n,n=s),n!==s?t=e=[e,n]:(Ki=t,t=s)):(Ki=t,t=s),t}function Eb(){var t,e,n,o;return t=Ki,"join"===r.substr(Ki,4).toLowerCase()?(e=r.substr(Ki,4),Ki+=4):(e=s,0===rc&&sc(gu)),e!==s?(n=Ki,rc++,o=Lf(),rc--,o===s?n=void 0:(Ki=n,n=s),n!==s?t=e=[e,n]:(Ki=t,t=s)):(Ki=t,t=s),t}function Ab(){var t,e,n,o;return t=Ki,"outer"===r.substr(Ki,5).toLowerCase()?(e=r.substr(Ki,5),Ki+=5):(e=s,0===rc&&sc(Iu)),e!==s?(n=Ki,rc++,o=Lf(),rc--,o===s?n=void 0:(Ki=n,n=s),n!==s?t=e=[e,n]:(Ki=t,t=s)):(Ki=t,t=s),t}function Tb(){var t,e,n,o;return t=Ki,"values"===r.substr(Ki,6).toLowerCase()?(e=r.substr(Ki,6),Ki+=6):(e=s,0===rc&&sc(xu)),e!==s?(n=Ki,rc++,o=Lf(),rc--,o===s?n=void 0:(Ki=n,n=s),n!==s?t=e=[e,n]:(Ki=t,t=s)):(Ki=t,t=s),t}function _b(){var t,e,n,o;return t=Ki,"using"===r.substr(Ki,5).toLowerCase()?(e=r.substr(Ki,5),Ki+=5):(e=s,0===rc&&sc(ju)),e!==s?(n=Ki,rc++,o=Lf(),rc--,o===s?n=void 0:(Ki=n,n=s),n!==s?t=e=[e,n]:(Ki=t,t=s)):(Ki=t,t=s),t}function gb(){var t,e,n,o;return t=Ki,"with"===r.substr(Ki,4).toLowerCase()?(e=r.substr(Ki,4),Ki+=4):(e=s,0===rc&&sc(v)),e!==s?(n=Ki,rc++,o=Lf(),rc--,o===s?n=void 0:(Ki=n,n=s),n!==s?t=e=[e,n]:(Ki=t,t=s)):(Ki=t,t=s),t}function Ib(){var t,e,n,o;return t=Ki,"go"===r.substr(Ki,2).toLowerCase()?(e=r.substr(Ki,2),Ki+=2):(e=s,0===rc&&sc(Uu)),e!==s?(n=Ki,rc++,o=Lf(),rc--,o===s?n=void 0:(Ki=n,n=s),n!==s?(Qi=t,t=e="GO"):(Ki=t,t=s)):(Ki=t,t=s),t}function Sb(){var t,e,n,o;return t=Ki,"by"===r.substr(Ki,2).toLowerCase()?(e=r.substr(Ki,2),Ki+=2):(e=s,0===rc&&sc(d)),e!==s?(n=Ki,rc++,o=Lf(),rc--,o===s?n=void 0:(Ki=n,n=s),n!==s?t=e=[e,n]:(Ki=t,t=s)):(Ki=t,t=s),t}function Nb(){var t,e,n,o;return t=Ki,"asc"===r.substr(Ki,3).toLowerCase()?(e=r.substr(Ki,3),Ki+=3):(e=s,0===rc&&sc(Hu)),e!==s?(n=Ki,rc++,o=Lf(),rc--,o===s?n=void 0:(Ki=n,n=s),n!==s?(Qi=t,t=e="ASC"):(Ki=t,t=s)):(Ki=t,t=s),t}function Ob(){var t,e,n,o;return t=Ki,"desc"===r.substr(Ki,4).toLowerCase()?(e=r.substr(Ki,4),Ki+=4):(e=s,0===rc&&sc(Yu)),e!==s?(n=Ki,rc++,o=Lf(),rc--,o===s?n=void 0:(Ki=n,n=s),n!==s?(Qi=t,t=e="DESC"):(Ki=t,t=s)):(Ki=t,t=s),t}function Rb(){var t,e,n,o;return t=Ki,"all"===r.substr(Ki,3).toLowerCase()?(e=r.substr(Ki,3),Ki+=3):(e=s,0===rc&&sc($u)),e!==s?(n=Ki,rc++,o=Lf(),rc--,o===s?n=void 0:(Ki=n,n=s),n!==s?(Qi=t,t=e="ALL"):(Ki=t,t=s)):(Ki=t,t=s),t}function xb(){var t,e,n,o;return t=Ki,"distinct"===r.substr(Ki,8).toLowerCase()?(e=r.substr(Ki,8),Ki+=8):(e=s,0===rc&&sc(Wu)),e!==s?(n=Ki,rc++,o=Lf(),rc--,o===s?n=void 0:(Ki=n,n=s),n!==s?(Qi=t,t=e="DISTINCT"):(Ki=t,t=s)):(Ki=t,t=s),t}function jb(){var t,e,n,o;return t=Ki,"between"===r.substr(Ki,7).toLowerCase()?(e=r.substr(Ki,7),Ki+=7):(e=s,0===rc&&sc(qu)),e!==s?(n=Ki,rc++,o=Lf(),rc--,o===s?n=void 0:(Ki=n,n=s),n!==s?(Qi=t,t=e="BETWEEN"):(Ki=t,t=s)):(Ki=t,t=s),t}function kb(){var t,e,n,o;return t=Ki,"in"===r.substr(Ki,2).toLowerCase()?(e=r.substr(Ki,2),Ki+=2):(e=s,0===rc&&sc(Ve)),e!==s?(n=Ki,rc++,o=Lf(),rc--,o===s?n=void 0:(Ki=n,n=s),n!==s?(Qi=t,t=e="IN"):(Ki=t,t=s)):(Ki=t,t=s),t}function Ub(){var t,e,n,o;return t=Ki,"is"===r.substr(Ki,2).toLowerCase()?(e=r.substr(Ki,2),Ki+=2):(e=s,0===rc&&sc(Vu)),e!==s?(n=Ki,rc++,o=Lf(),rc--,o===s?n=void 0:(Ki=n,n=s),n!==s?(Qi=t,t=e="IS"):(Ki=t,t=s)):(Ki=t,t=s),t}function Db(){var t,e,n,o;return t=Ki,"like"===r.substr(Ki,4).toLowerCase()?(e=r.substr(Ki,4),Ki+=4):(e=s,0===rc&&sc(Xu)),e!==s?(n=Ki,rc++,o=Lf(),rc--,o===s?n=void 0:(Ki=n,n=s),n!==s?(Qi=t,t=e="LIKE"):(Ki=t,t=s)):(Ki=t,t=s),t}function Mb(){var t,e,n,o;return t=Ki,"exists"===r.substr(Ki,6).toLowerCase()?(e=r.substr(Ki,6),Ki+=6):(e=s,0===rc&&sc(zu)),e!==s?(n=Ki,rc++,o=Lf(),rc--,o===s?n=void 0:(Ki=n,n=s),n!==s?(Qi=t,t=e="EXISTS"):(Ki=t,t=s)):(Ki=t,t=s),t}function Pb(){var t,e,n,o;return t=Ki,"not"===r.substr(Ki,3).toLowerCase()?(e=r.substr(Ki,3),Ki+=3):(e=s,0===rc&&sc(Zr)),e!==s?(n=Ki,rc++,o=Lf(),rc--,o===s?n=void 0:(Ki=n,n=s),n!==s?(Qi=t,t=e="NOT"):(Ki=t,t=s)):(Ki=t,t=s),t}function Gb(){var t,e,n,o;return t=Ki,"and"===r.substr(Ki,3).toLowerCase()?(e=r.substr(Ki,3),Ki+=3):(e=s,0===rc&&sc(Zu)),e!==s?(n=Ki,rc++,o=Lf(),rc--,o===s?n=void 0:(Ki=n,n=s),n!==s?(Qi=t,t=e="AND"):(Ki=t,t=s)):(Ki=t,t=s),t}function Fb(){var t,e,n,o;return t=Ki,"or"===r.substr(Ki,2).toLowerCase()?(e=r.substr(Ki,2),Ki+=2):(e=s,0===rc&&sc(Ju)),e!==s?(n=Ki,rc++,o=Lf(),rc--,o===s?n=void 0:(Ki=n,n=s),n!==s?(Qi=t,t=e="OR"):(Ki=t,t=s)):(Ki=t,t=s),t}function Hb(){var t,e,n,o;return t=Ki,"extract"===r.substr(Ki,7).toLowerCase()?(e=r.substr(Ki,7),Ki+=7):(e=s,0===rc&&sc(ua)),e!==s?(n=Ki,rc++,o=Lf(),rc--,o===s?n=void 0:(Ki=n,n=s),n!==s?(Qi=t,t=e="EXTRACT"):(Ki=t,t=s)):(Ki=t,t=s),t}function Yb(){var t,e,n,o;return t=Ki,"case"===r.substr(Ki,4).toLowerCase()?(e=r.substr(Ki,4),Ki+=4):(e=s,0===rc&&sc(ia)),e!==s?(n=Ki,rc++,o=Lf(),rc--,o===s?n=void 0:(Ki=n,n=s),n!==s?t=e=[e,n]:(Ki=t,t=s)):(Ki=t,t=s),t}function Bb(){var t,e,n,o;return t=Ki,"end"===r.substr(Ki,3).toLowerCase()?(e=r.substr(Ki,3),Ki+=3):(e=s,0===rc&&sc(ba)),e!==s?(n=Ki,rc++,o=Lf(),rc--,o===s?n=void 0:(Ki=n,n=s),n!==s?t=e=[e,n]:(Ki=t,t=s)):(Ki=t,t=s),t}function $b(){var t,e,n,o;return t=Ki,"cast"===r.substr(Ki,4).toLowerCase()?(e=r.substr(Ki,4),Ki+=4):(e=s,0===rc&&sc(pa)),e!==s?(n=Ki,rc++,o=Lf(),rc--,o===s?n=void 0:(Ki=n,n=s),n!==s?(Qi=t,t=e="CAST"):(Ki=t,t=s)):(Ki=t,t=s),t}function Wb(){var t,e,n,o;return t=Ki,"bit"===r.substr(Ki,3).toLowerCase()?(e=r.substr(Ki,3),Ki+=3):(e=s,0===rc&&sc(da)),e!==s?(n=Ki,rc++,o=Lf(),rc--,o===s?n=void 0:(Ki=n,n=s),n!==s?(Qi=t,t=e="BIT"):(Ki=t,t=s)):(Ki=t,t=s),t}function qb(){var t,e,n,o;return t=Ki,"numeric"===r.substr(Ki,7).toLowerCase()?(e=r.substr(Ki,7),Ki+=7):(e=s,0===rc&&sc(La)),e!==s?(n=Ki,rc++,o=Lf(),rc--,o===s?n=void 0:(Ki=n,n=s),n!==s?(Qi=t,t=e="NUMERIC"):(Ki=t,t=s)):(Ki=t,t=s),t}function Vb(){var t,e,n,o;return t=Ki,"decimal"===r.substr(Ki,7).toLowerCase()?(e=r.substr(Ki,7),Ki+=7):(e=s,0===rc&&sc(Ca)),e!==s?(n=Ki,rc++,o=Lf(),rc--,o===s?n=void 0:(Ki=n,n=s),n!==s?(Qi=t,t=e="DECIMAL"):(Ki=t,t=s)):(Ki=t,t=s),t}function Xb(){var t,e,n,o;return t=Ki,"int"===r.substr(Ki,3).toLowerCase()?(e=r.substr(Ki,3),Ki+=3):(e=s,0===rc&&sc(Ea)),e!==s?(n=Ki,rc++,o=Lf(),rc--,o===s?n=void 0:(Ki=n,n=s),n!==s?(Qi=t,t=e="INT"):(Ki=t,t=s)):(Ki=t,t=s),t}function Kb(){var t,e,n,o;return t=Ki,"integer"===r.substr(Ki,7).toLowerCase()?(e=r.substr(Ki,7),Ki+=7):(e=s,0===rc&&sc(Ta)),e!==s?(n=Ki,rc++,o=Lf(),rc--,o===s?n=void 0:(Ki=n,n=s),n!==s?(Qi=t,t=e="INTEGER"):(Ki=t,t=s)):(Ki=t,t=s),t}function Qb(){var t,e,n,o;return t=Ki,"smallint"===r.substr(Ki,8).toLowerCase()?(e=r.substr(Ki,8),Ki+=8):(e=s,0===rc&&sc(ga)),e!==s?(n=Ki,rc++,o=Lf(),rc--,o===s?n=void 0:(Ki=n,n=s),n!==s?(Qi=t,t=e="SMALLINT"):(Ki=t,t=s)):(Ki=t,t=s),t}function zb(){var t,e,n,o;return t=Ki,"mediumint"===r.substr(Ki,9).toLowerCase()?(e=r.substr(Ki,9),Ki+=9):(e=s,0===rc&&sc(Ia)),e!==s?(n=Ki,rc++,o=Lf(),rc--,o===s?n=void 0:(Ki=n,n=s),n!==s?(Qi=t,t=e="MEDIUMINT"):(Ki=t,t=s)):(Ki=t,t=s),t}function Zb(){var t,e,n,o;return t=Ki,"tinyint"===r.substr(Ki,7).toLowerCase()?(e=r.substr(Ki,7),Ki+=7):(e=s,0===rc&&sc(Sa)),e!==s?(n=Ki,rc++,o=Lf(),rc--,o===s?n=void 0:(Ki=n,n=s),n!==s?(Qi=t,t=e="TINYINT"):(Ki=t,t=s)):(Ki=t,t=s),t}function Jb(){var t,e,n,o;return t=Ki,"bigint"===r.substr(Ki,6).toLowerCase()?(e=r.substr(Ki,6),Ki+=6):(e=s,0===rc&&sc(ja)),e!==s?(n=Ki,rc++,o=Lf(),rc--,o===s?n=void 0:(Ki=n,n=s),n!==s?(Qi=t,t=e="BIGINT"):(Ki=t,t=s)):(Ki=t,t=s),t}function rp(){var t,e,n,o;return t=Ki,"float"===r.substr(Ki,5).toLowerCase()?(e=r.substr(Ki,5),Ki+=5):(e=s,0===rc&&sc(Ua)),e!==s?(n=Ki,rc++,o=Lf(),rc--,o===s?n=void 0:(Ki=n,n=s),n!==s?(Qi=t,t=e="FLOAT"):(Ki=t,t=s)):(Ki=t,t=s),t}function tp(){var t,e,n,o;return t=Ki,"double"===r.substr(Ki,6).toLowerCase()?(e=r.substr(Ki,6),Ki+=6):(e=s,0===rc&&sc(Da)),e!==s?(n=Ki,rc++,o=Lf(),rc--,o===s?n=void 0:(Ki=n,n=s),n!==s?(Qi=t,t=e="DOUBLE"):(Ki=t,t=s)):(Ki=t,t=s),t}function ep(){var t,e,n,o;return t=Ki,"date"===r.substr(Ki,4).toLowerCase()?(e=r.substr(Ki,4),Ki+=4):(e=s,0===rc&&sc(Po)),e!==s?(n=Ki,rc++,o=Lf(),rc--,o===s?n=void 0:(Ki=n,n=s),n!==s?(Qi=t,t=e="DATE"):(Ki=t,t=s)):(Ki=t,t=s),t}function np(){var t,e,n,o;return t=Ki,"datetime"===r.substr(Ki,8).toLowerCase()?(e=r.substr(Ki,8),Ki+=8):(e=s,0===rc&&sc(Ma)),e!==s?(n=Ki,rc++,o=Lf(),rc--,o===s?n=void 0:(Ki=n,n=s),n!==s?(Qi=t,t=e="DATETIME"):(Ki=t,t=s)):(Ki=t,t=s),t}function op(){var t,e,n,o;return t=Ki,"rows"===r.substr(Ki,4).toLowerCase()?(e=r.substr(Ki,4),Ki+=4):(e=s,0===rc&&sc(je)),e!==s?(n=Ki,rc++,o=Lf(),rc--,o===s?n=void 0:(Ki=n,n=s),n!==s?(Qi=t,t=e="ROWS"):(Ki=t,t=s)):(Ki=t,t=s),t}function sp(){var t,e,n,o;return t=Ki,"time"===r.substr(Ki,4).toLowerCase()?(e=r.substr(Ki,4),Ki+=4):(e=s,0===rc&&sc(rs)),e!==s?(n=Ki,rc++,o=Lf(),rc--,o===s?n=void 0:(Ki=n,n=s),n!==s?(Qi=t,t=e="TIME"):(Ki=t,t=s)):(Ki=t,t=s),t}function up(){var t,e,n,o;return t=Ki,"timestamp"===r.substr(Ki,9).toLowerCase()?(e=r.substr(Ki,9),Ki+=9):(e=s,0===rc&&sc(Pa)),e!==s?(n=Ki,rc++,o=Lf(),rc--,o===s?n=void 0:(Ki=n,n=s),n!==s?(Qi=t,t=e="TIMESTAMP"):(Ki=t,t=s)):(Ki=t,t=s),t}function ap(){var t,e,n,o;return t=Ki,"user"===r.substr(Ki,4).toLowerCase()?(e=r.substr(Ki,4),Ki+=4):(e=s,0===rc&&sc(Ga)),e!==s?(n=Ki,rc++,o=Lf(),rc--,o===s?n=void 0:(Ki=n,n=s),n!==s?(Qi=t,t=e="USER"):(Ki=t,t=s)):(Ki=t,t=s),t}function ip(){var t,e,n,o;return t=Ki,"interval"===r.substr(Ki,8).toLowerCase()?(e=r.substr(Ki,8),Ki+=8):(e=s,0===rc&&sc(Ha)),e!==s?(n=Ki,rc++,o=Lf(),rc--,o===s?n=void 0:(Ki=n,n=s),n!==s?(Qi=t,t=e="INTERVAL"):(Ki=t,t=s)):(Ki=t,t=s),t}function cp(){var t,e,n,o;return t=Ki,"current_timestamp"===r.substr(Ki,17).toLowerCase()?(e=r.substr(Ki,17),Ki+=17):(e=s,0===rc&&sc($a)),e!==s?(n=Ki,rc++,o=Lf(),rc--,o===s?n=void 0:(Ki=n,n=s),n!==s?(Qi=t,t=e="CURRENT_TIMESTAMP"):(Ki=t,t=s)):(Ki=t,t=s),t}function lp(){var t,e,n,o;return t=Ki,"current_user"===r.substr(Ki,12).toLowerCase()?(e=r.substr(Ki,12),Ki+=12):(e=s,0===rc&&sc(Wa)),e!==s?(n=Ki,rc++,o=Lf(),rc--,o===s?n=void 0:(Ki=n,n=s),n!==s?(Qi=t,t=e="CURRENT_USER"):(Ki=t,t=s)):(Ki=t,t=s),t}function fp(){var t,e,n,o;return t=Ki,"view"===r.substr(Ki,4).toLowerCase()?(e=r.substr(Ki,4),Ki+=4):(e=s,0===rc&&sc(ke)),e!==s?(n=Ki,rc++,o=Lf(),rc--,o===s?n=void 0:(Ki=n,n=s),n!==s?(Qi=t,t=e="VIEW"):(Ki=t,t=s)):(Ki=t,t=s),t}function bp(){var t;return 64===r.charCodeAt(Ki)?(t="@",Ki++):(t=s,0===rc&&sc(lr)),t}function pp(){var t;return (t=function(){var t;return "@@"===r.substr(Ki,2)?(t="@@",Ki+=2):(t=s,0===rc&&sc(ui)),t}())===s&&(t=bp())===s&&(t=function(){var t;return 36===r.charCodeAt(Ki)?(t="$",Ki++):(t=s,0===rc&&sc(ai)),t}()),t}function vp(){var t;return ":="===r.substr(Ki,2)?(t=":=",Ki+=2):(t=s,0===rc&&sc(ci)),t}function dp(){var t;return 61===r.charCodeAt(Ki)?(t="=",Ki++):(t=s,0===rc&&sc(hn)),t}function yp(){var t,e,n,o;return t=Ki,"add"===r.substr(Ki,3).toLowerCase()?(e=r.substr(Ki,3),Ki+=3):(e=s,0===rc&&sc(fi)),e!==s?(n=Ki,rc++,o=Lf(),rc--,o===s?n=void 0:(Ki=n,n=s),n!==s?(Qi=t,t=e="ADD"):(Ki=t,t=s)):(Ki=t,t=s),t}function wp(){var t,e,n,o;return t=Ki,"column"===r.substr(Ki,6).toLowerCase()?(e=r.substr(Ki,6),Ki+=6):(e=s,0===rc&&sc(bi)),e!==s?(n=Ki,rc++,o=Lf(),rc--,o===s?n=void 0:(Ki=n,n=s),n!==s?(Qi=t,t=e="COLUMN"):(Ki=t,t=s)):(Ki=t,t=s),t}function Lp(){var t,e,n,o;return t=Ki,"index"===r.substr(Ki,5).toLowerCase()?(e=r.substr(Ki,5),Ki+=5):(e=s,0===rc&&sc(It)),e!==s?(n=Ki,rc++,o=Lf(),rc--,o===s?n=void 0:(Ki=n,n=s),n!==s?(Qi=t,t=e="INDEX"):(Ki=t,t=s)):(Ki=t,t=s),t}function Cp(){var t,e,n,o;return t=Ki,"key"===r.substr(Ki,3).toLowerCase()?(e=r.substr(Ki,3),Ki+=3):(e=s,0===rc&&sc(ir)),e!==s?(n=Ki,rc++,o=Lf(),rc--,o===s?n=void 0:(Ki=n,n=s),n!==s?(Qi=t,t=e="KEY"):(Ki=t,t=s)):(Ki=t,t=s),t}function hp(){var t,e,n,o;return t=Ki,"fulltext"===r.substr(Ki,8).toLowerCase()?(e=r.substr(Ki,8),Ki+=8):(e=s,0===rc&&sc(vi)),e!==s?(n=Ki,rc++,o=Lf(),rc--,o===s?n=void 0:(Ki=n,n=s),n!==s?(Qi=t,t=e="FULLTEXT"):(Ki=t,t=s)):(Ki=t,t=s),t}function mp(){var t,e,n,o;return t=Ki,"spatial"===r.substr(Ki,7).toLowerCase()?(e=r.substr(Ki,7),Ki+=7):(e=s,0===rc&&sc(di)),e!==s?(n=Ki,rc++,o=Lf(),rc--,o===s?n=void 0:(Ki=n,n=s),n!==s?(Qi=t,t=e="SPATIAL"):(Ki=t,t=s)):(Ki=t,t=s),t}function Ep(){var t,e,n,o;return t=Ki,"unique"===r.substr(Ki,6).toLowerCase()?(e=r.substr(Ki,6),Ki+=6):(e=s,0===rc&&sc(ar)),e!==s?(n=Ki,rc++,o=Lf(),rc--,o===s?n=void 0:(Ki=n,n=s),n!==s?(Qi=t,t=e="UNIQUE"):(Ki=t,t=s)):(Ki=t,t=s),t}function Ap(){var t,e,n,o;return t=Ki,"comment"===r.substr(Ki,7).toLowerCase()?(e=r.substr(Ki,7),Ki+=7):(e=s,0===rc&&sc(yi)),e!==s?(n=Ki,rc++,o=Lf(),rc--,o===s?n=void 0:(Ki=n,n=s),n!==s?(Qi=t,t=e="COMMENT"):(Ki=t,t=s)):(Ki=t,t=s),t}function Tp(){var t,e,n,o;return t=Ki,"constraint"===r.substr(Ki,10).toLowerCase()?(e=r.substr(Ki,10),Ki+=10):(e=s,0===rc&&sc(Qr)),e!==s?(n=Ki,rc++,o=Lf(),rc--,o===s?n=void 0:(Ki=n,n=s),n!==s?(Qi=t,t=e="CONSTRAINT"):(Ki=t,t=s)):(Ki=t,t=s),t}function _p(){var t,e,n,o;return t=Ki,"references"===r.substr(Ki,10).toLowerCase()?(e=r.substr(Ki,10),Ki+=10):(e=s,0===rc&&sc(wi)),e!==s?(n=Ki,rc++,o=Lf(),rc--,o===s?n=void 0:(Ki=n,n=s),n!==s?(Qi=t,t=e="REFERENCES"):(Ki=t,t=s)):(Ki=t,t=s),t}function gp(){var t;return 46===r.charCodeAt(Ki)?(t=".",Ki++):(t=s,0===rc&&sc(Ys)),t}function Ip(){var t;return 44===r.charCodeAt(Ki)?(t=",",Ki++):(t=s,0===rc&&sc(Ti)),t}function Sp(){var t;return 42===r.charCodeAt(Ki)?(t="*",Ki++):(t=s,0===rc&&sc(jn)),t}function Np(){var t;return 40===r.charCodeAt(Ki)?(t="(",Ki++):(t=s,0===rc&&sc(Be)),t}function Op(){var t;return 41===r.charCodeAt(Ki)?(t=")",Ki++):(t=s,0===rc&&sc($e)),t}function Rp(){var t;return 59===r.charCodeAt(Ki)?(t=";",Ki++):(t=s,0===rc&&sc(Ii)),t}function xp(){var t;return "->"===r.substr(Ki,2)?(t="->",Ki+=2):(t=s,0===rc&&sc(Si)),t}function jp(){var t;return "->>"===r.substr(Ki,3)?(t="->>",Ki+=3):(t=s,0===rc&&sc(Ni)),t}function kp(){var t;return (t=function(){var t;return "||"===r.substr(Ki,2)?(t="||",Ki+=2):(t=s,0===rc&&sc(Dn)),t}())===s&&(t=function(){var t;return "&&"===r.substr(Ki,2)?(t="&&",Ki+=2):(t=s,0===rc&&sc(Oi)),t}())===s&&(t=function(){var t,e,n,o;return t=Ki,"xor"===r.substr(Ki,3).toLowerCase()?(e=r.substr(Ki,3),Ki+=3):(e=s,0===rc&&sc(Ri)),e!==s?(n=Ki,rc++,o=Lf(),rc--,o===s?n=void 0:(Ki=n,n=s),n!==s?(Qi=t,t=e="XOR"):(Ki=t,t=s)):(Ki=t,t=s),t}()),t}function Up(){var r,t;for(r=[],(t=Fp())===s&&(t=Mp());t!==s;)r.push(t),(t=Fp())===s&&(t=Mp());return r}function Dp(){var r,t;if(r=[],(t=Fp())===s&&(t=Mp()),t!==s)for(;t!==s;)r.push(t),(t=Fp())===s&&(t=Mp());else r=s;return r}function Mp(){var t;return (t=function(){var t,e,n,o,u,a;t=Ki,"/*"===r.substr(Ki,2)?(e="/*",Ki+=2):(e=s,0===rc&&sc(xi));if(e!==s){for(n=[],o=Ki,u=Ki,rc++,"*/"===r.substr(Ki,2)?(a="*/",Ki+=2):(a=s,0===rc&&sc(ji)),rc--,a===s?u=void 0:(Ki=u,u=s),u!==s&&(a=Gp())!==s?o=u=[u,a]:(Ki=o,o=s);o!==s;)n.push(o),o=Ki,u=Ki,rc++,"*/"===r.substr(Ki,2)?(a="*/",Ki+=2):(a=s,0===rc&&sc(ji)),rc--,a===s?u=void 0:(Ki=u,u=s),u!==s&&(a=Gp())!==s?o=u=[u,a]:(Ki=o,o=s);n!==s?("*/"===r.substr(Ki,2)?(o="*/",Ki+=2):(o=s,0===rc&&sc(ji)),o!==s?t=e=[e,n,o]:(Ki=t,t=s)):(Ki=t,t=s);}else Ki=t,t=s;return t}())===s&&(t=function(){var t,e,n,o,u,a;t=Ki,"--"===r.substr(Ki,2)?(e="--",Ki+=2):(e=s,0===rc&&sc(ki));if(e!==s){for(n=[],o=Ki,u=Ki,rc++,a=Hp(),rc--,a===s?u=void 0:(Ki=u,u=s),u!==s&&(a=Gp())!==s?o=u=[u,a]:(Ki=o,o=s);o!==s;)n.push(o),o=Ki,u=Ki,rc++,a=Hp(),rc--,a===s?u=void 0:(Ki=u,u=s),u!==s&&(a=Gp())!==s?o=u=[u,a]:(Ki=o,o=s);n!==s?t=e=[e,n]:(Ki=t,t=s);}else Ki=t,t=s;return t}())===s&&(t=function(){var t,e,n,o,u,a;t=Ki,35===r.charCodeAt(Ki)?(e="#",Ki++):(e=s,0===rc&&sc(Ui));if(e!==s){for(n=[],o=Ki,u=Ki,rc++,a=Hp(),rc--,a===s?u=void 0:(Ki=u,u=s),u!==s&&(a=Gp())!==s?o=u=[u,a]:(Ki=o,o=s);o!==s;)n.push(o),o=Ki,u=Ki,rc++,a=Hp(),rc--,a===s?u=void 0:(Ki=u,u=s),u!==s&&(a=Gp())!==s?o=u=[u,a]:(Ki=o,o=s);n!==s?t=e=[e,n]:(Ki=t,t=s);}else Ki=t,t=s;return t}()),t}function Pp(){var r,t,e,n,o,u,a;return r=Ki,(t=Ap())!==s&&Up()!==s?((e=dp())===s&&(e=null),e!==s&&Up()!==s&&(n=Ff())!==s?(Qi=r,u=e,a=n,r=t={type:(o=t).toLowerCase(),keyword:o.toLowerCase(),symbol:u,value:a}):(Ki=r,r=s)):(Ki=r,r=s),r}function Gp(){var t;return r.length>Ki?(t=r.charAt(Ki),Ki++):(t=s,0===rc&&sc(Di)),t}function Fp(){var t;return Mi.test(r.charAt(Ki))?(t=r.charAt(Ki),Ki++):(t=s,0===rc&&sc(Pi)),t}function Hp(){var t,e;if((t=function(){var t,e;t=Ki,rc++,r.length>Ki?(e=r.charAt(Ki),Ki++):(e=s,0===rc&&sc(Di));rc--,e===s?t=void 0:(Ki=t,t=s);return t}())===s)if(t=[],Fs.test(r.charAt(Ki))?(e=r.charAt(Ki),Ki++):(e=s,0===rc&&sc(Hs)),e!==s)for(;e!==s;)t.push(e),Fs.test(r.charAt(Ki))?(e=r.charAt(Ki),Ki++):(e=s,0===rc&&sc(Hs));else t=s;return t}function Yp(){var t,e;return t=Ki,Qi=Ki,yv=[],(void 0)!==s&&Up()!==s?((e=Bp())===s&&(e=function(){var t,e;t=Ki,function(){var t;return "return"===r.substr(Ki,6).toLowerCase()?(t=r.substr(Ki,6),Ki+=6):(t=s,0===rc&&sc(ii)),t}()!==s&&Up()!==s&&(e=$p())!==s?(Qi=t,t={type:"return",expr:e}):(Ki=t,t=s);return t}()),e!==s?(Qi=t,t={stmt:e,vars:yv}):(Ki=t,t=s)):(Ki=t,t=s),t}function Bp(){var r,t,e,n;return r=Ki,(t=Zp())===s&&(t=Jp()),t!==s&&Up()!==s?((e=vp())===s&&(e=dp()),e!==s&&Up()!==s&&(n=$p())!==s?(Qi=r,r=t=Gi(t,e,n)):(Ki=r,r=s)):(Ki=r,r=s),r}function $p(){var t;return (t=Kc())===s&&(t=function(){var r,t,e,n,o;r=Ki,(t=Zp())!==s&&Up()!==s&&(e=wl())!==s&&Up()!==s&&(n=Zp())!==s&&Up()!==s&&(o=Cl())!==s?(Qi=r,r=t={type:"join",ltable:t,rtable:n,op:e,on:o}):(Ki=r,r=s);return r}())===s&&(t=Wp())===s&&(t=function(){var t,e;t=Ki,function(){var t;return 91===r.charCodeAt(Ki)?(t="[",Ki++):(t=s,0===rc&&sc(_i)),t}()!==s&&Up()!==s&&(e=zp())!==s&&Up()!==s&&function(){var t;return 93===r.charCodeAt(Ki)?(t="]",Ki++):(t=s,0===rc&&sc(gi)),t}()!==s?(Qi=t,t={type:"array",value:e}):(Ki=t,t=s);return t}()),t}function Wp(){var r,t,e,n,o,u,a,i;if(r=Ki,(t=qp())!==s){for(e=[],n=Ki,(o=Up())!==s&&(u=zl())!==s&&(a=Up())!==s&&(i=qp())!==s?n=o=[o,u,a,i]:(Ki=n,n=s);n!==s;)e.push(n),n=Ki,(o=Up())!==s&&(u=zl())!==s&&(a=Up())!==s&&(i=qp())!==s?n=o=[o,u,a,i]:(Ki=n,n=s);e!==s?(Qi=r,r=t=En(t,e)):(Ki=r,r=s);}else Ki=r,r=s;return r}function qp(){var r,t,e,n,o,u,a,i;if(r=Ki,(t=Vp())!==s){for(e=[],n=Ki,(o=Up())!==s&&(u=Jl())!==s&&(a=Up())!==s&&(i=Vp())!==s?n=o=[o,u,a,i]:(Ki=n,n=s);n!==s;)e.push(n),n=Ki,(o=Up())!==s&&(u=Jl())!==s&&(a=Up())!==s&&(i=Vp())!==s?n=o=[o,u,a,i]:(Ki=n,n=s);e!==s?(Qi=r,r=t=En(t,e)):(Ki=r,r=s);}else Ki=r,r=s;return r}function Vp(){var r,t,e;return (r=Kp())===s&&(r=Pf())===s&&(r=Zp())===s&&(r=ef())===s&&(r=Qp())===s&&(r=mf())===s&&(r=Ki,Np()!==s&&Up()!==s&&(t=Wp())!==s&&Up()!==s&&Op()!==s?(Qi=r,(e=t).parentheses=true,r=e):(Ki=r,r=s)),r}function Xp(){var r,t,e,n,o,u,a;return r=Ki,(t=of())===s&&(t=pf()),t!==s?(e=Ki,(n=Up())!==s&&(o=gp())!==s&&(u=Up())!==s?((a=of())===s&&(a=pf()),a!==s?e=n=[n,o,u,a]:(Ki=e,e=s)):(Ki=e,e=s),e===s&&(e=null),e!==s?(Qi=r,r=t=function(r,t){const e={name:[r]};return null!==t&&(e.schema=r,e.name=[t[3]]),e}(t,e)):(Ki=r,r=s)):(Ki=r,r=s),r}function Kp(){var r,t,e;return r=Ki,(t=Xp())!==s&&Up()!==s&&Np()!==s&&Up()!==s?((e=zp())===s&&(e=null),e!==s&&Up()!==s&&Op()!==s?(Qi=r,r=t={type:"function",name:t,args:{type:"expr_list",value:e},...av()}):(Ki=r,r=s)):(Ki=r,r=s),r}function Qp(){var r,t;return r=Ki,(t=Xp())!==s&&(Qi=r,t={type:"function",name:t,args:null,...av()}),r=t}function zp(){var r,t,e,n,o,u,a,i;if(r=Ki,(t=Vp())!==s){for(e=[],n=Ki,(o=Up())!==s&&(u=Ip())!==s&&(a=Up())!==s&&(i=Vp())!==s?n=o=[o,u,a,i]:(Ki=n,n=s);n!==s;)e.push(n),n=Ki,(o=Up())!==s&&(u=Ip())!==s&&(a=Up())!==s&&(i=Vp())!==s?n=o=[o,u,a,i]:(Ki=n,n=s);e!==s?(Qi=r,r=t=sr(t,e)):(Ki=r,r=s);}else Ki=r,r=s;return r}function Zp(){var r,t,e,n,o;return r=Ki,(t=pp())!==s&&(e=Jp())!==s?(Qi=r,n=t,o=e,r=t={type:"var",...o,prefix:n}):(Ki=r,r=s),r}function Jp(){var t,e,n,o,u;return t=Ki,(e=wf())!==s&&(n=function(){var t,e,n,o,u;t=Ki,e=[],n=Ki,46===r.charCodeAt(Ki)?(o=".",Ki++):(o=s,0===rc&&sc(Ys));o!==s&&(u=wf())!==s?n=o=[o,u]:(Ki=n,n=s);for(;n!==s;)e.push(n),n=Ki,46===r.charCodeAt(Ki)?(o=".",Ki++):(o=s,0===rc&&sc(Ys)),o!==s&&(u=wf())!==s?n=o=[o,u]:(Ki=n,n=s);e!==s&&(Qi=t,e=function(r){const t=[];for(let e=0;e<r.length;e++)t.push(r[e][1]);return t}(e));return t=e}())!==s?(Qi=t,o=e,u=n,yv.push(o),t=e={type:"var",name:o,members:u,prefix:null}):(Ki=t,t=s),t===s&&(t=Ki,(e=$f())!==s&&(Qi=t,e={type:"var",name:e.value,members:[],quoted:null,prefix:null}),t=e),t}function rv(){var t;return (t=ev())===s&&(t=function(){var t,e,n,o,u,a,i,c,l,f,b,p;t=Ki,(e=qb())===s&&(e=Vb())===s&&(e=Xb())===s&&(e=Kb())===s&&(e=Qb())===s&&(e=zb())===s&&(e=Zb())===s&&(e=Jb())===s&&(e=rp())===s&&(e=tp())===s&&(e=Wb());if(e!==s)if((n=Up())!==s)if((o=Np())!==s)if((u=Up())!==s){if(a=[],We.test(r.charAt(Ki))?(i=r.charAt(Ki),Ki++):(i=s,0===rc&&sc(qe)),i!==s)for(;i!==s;)a.push(i),We.test(r.charAt(Ki))?(i=r.charAt(Ki),Ki++):(i=s,0===rc&&sc(qe));else a=s;if(a!==s)if((i=Up())!==s){if(c=Ki,(l=Ip())!==s)if((f=Up())!==s){if(b=[],We.test(r.charAt(Ki))?(p=r.charAt(Ki),Ki++):(p=s,0===rc&&sc(qe)),p!==s)for(;p!==s;)b.push(p),We.test(r.charAt(Ki))?(p=r.charAt(Ki),Ki++):(p=s,0===rc&&sc(qe));else b=s;b!==s?c=l=[l,f,b]:(Ki=c,c=s);}else Ki=c,c=s;else Ki=c,c=s;c===s&&(c=null),c!==s&&(l=Up())!==s&&(f=Op())!==s&&(b=Up())!==s?((p=nv())===s&&(p=null),p!==s?(Qi=t,v=c,d=p,e={dataType:e,length:parseInt(a.join(""),10),scale:v&&parseInt(v[2].join(""),10),parentheses:true,suffix:d},t=e):(Ki=t,t=s)):(Ki=t,t=s);}else Ki=t,t=s;else Ki=t,t=s;}else Ki=t,t=s;else Ki=t,t=s;else Ki=t,t=s;else Ki=t,t=s;var v,d;if(t===s){if(t=Ki,(e=qb())===s&&(e=Vb())===s&&(e=Xb())===s&&(e=Kb())===s&&(e=Qb())===s&&(e=zb())===s&&(e=Zb())===s&&(e=Jb())===s&&(e=rp())===s&&(e=tp())===s&&(e=Wb()),e!==s){if(n=[],We.test(r.charAt(Ki))?(o=r.charAt(Ki),Ki++):(o=s,0===rc&&sc(qe)),o!==s)for(;o!==s;)n.push(o),We.test(r.charAt(Ki))?(o=r.charAt(Ki),Ki++):(o=s,0===rc&&sc(qe));else n=s;n!==s&&(o=Up())!==s?((u=nv())===s&&(u=null),u!==s?(Qi=t,e=function(r,t,e){return {dataType:r,length:parseInt(t.join(""),10),suffix:e}}(e,n,u),t=e):(Ki=t,t=s)):(Ki=t,t=s);}else Ki=t,t=s;t===s&&(t=Ki,(e=qb())===s&&(e=Vb())===s&&(e=Xb())===s&&(e=Kb())===s&&(e=Qb())===s&&(e=zb())===s&&(e=Zb())===s&&(e=Jb())===s&&(e=rp())===s&&(e=tp())===s&&(e=Wb()),e!==s&&(n=Up())!==s?((o=nv())===s&&(o=null),o!==s&&(u=Up())!==s?(Qi=t,e=function(r,t){return {dataType:r,suffix:t}}(e,o),t=e):(Ki=t,t=s)):(Ki=t,t=s));}return t}())===s&&(t=ov())===s&&(t=function(){var t,e;t=Ki,(e=function(){var t,e,n,o;return t=Ki,"json"===r.substr(Ki,4).toLowerCase()?(e=r.substr(Ki,4),Ki+=4):(e=s,0===rc&&sc(_a)),e!==s?(n=Ki,rc++,o=Lf(),rc--,o===s?n=void 0:(Ki=n,n=s),n!==s?(Qi=t,t=e="JSON"):(Ki=t,t=s)):(Ki=t,t=s),t}())!==s&&(Qi=t,e={dataType:e});return t=e}())===s&&(t=function(){var t,e,n;t=Ki,(e=function(){var t,e,n,o;return t=Ki,"tinytext"===r.substr(Ki,8).toLowerCase()?(e=r.substr(Ki,8),Ki+=8):(e=s,0===rc&&sc(Na)),e!==s?(n=Ki,rc++,o=Lf(),rc--,o===s?n=void 0:(Ki=n,n=s),n!==s?(Qi=t,t=e="TINYTEXT"):(Ki=t,t=s)):(Ki=t,t=s),t}())===s&&(e=function(){var t,e,n,o;return t=Ki,"text"===r.substr(Ki,4).toLowerCase()?(e=r.substr(Ki,4),Ki+=4):(e=s,0===rc&&sc(Oa)),e!==s?(n=Ki,rc++,o=Lf(),rc--,o===s?n=void 0:(Ki=n,n=s),n!==s?(Qi=t,t=e="TEXT"):(Ki=t,t=s)):(Ki=t,t=s),t}())===s&&(e=function(){var t,e,n,o;return t=Ki,"mediumtext"===r.substr(Ki,10).toLowerCase()?(e=r.substr(Ki,10),Ki+=10):(e=s,0===rc&&sc(Ra)),e!==s?(n=Ki,rc++,o=Lf(),rc--,o===s?n=void 0:(Ki=n,n=s),n!==s?(Qi=t,t=e="MEDIUMTEXT"):(Ki=t,t=s)):(Ki=t,t=s),t}())===s&&(e=function(){var t,e,n,o;return t=Ki,"longtext"===r.substr(Ki,8).toLowerCase()?(e=r.substr(Ki,8),Ki+=8):(e=s,0===rc&&sc(xa)),e!==s?(n=Ki,rc++,o=Lf(),rc--,o===s?n=void 0:(Ki=n,n=s),n!==s?(Qi=t,t=e="LONGTEXT"):(Ki=t,t=s)):(Ki=t,t=s),t}());e!==s?((n=tv())===s&&(n=null),n!==s?(Qi=t,e=Wi(e,n),t=e):(Ki=t,t=s)):(Ki=t,t=s);return t}())===s&&(t=function(){var t,e,n;t=Ki,(e=function(){var t,e,n,o;return t=Ki,"enum"===r.substr(Ki,4).toLowerCase()?(e=r.substr(Ki,4),Ki+=4):(e=s,0===rc&&sc(ka)),e!==s?(n=Ki,rc++,o=Lf(),rc--,o===s?n=void 0:(Ki=n,n=s),n!==s?(Qi=t,t=e="ENUM"):(Ki=t,t=s)):(Ki=t,t=s),t}())===s&&(e=vb());e!==s&&Up()!==s&&(n=kl())!==s?(Qi=t,o=e,(u=n).parentheses=true,t=e={dataType:o,expr:u}):(Ki=t,t=s);var o,u;return t}())===s&&(t=function(){var t,e;t=Ki,"boolean"===r.substr(Ki,7).toLowerCase()?(e=r.substr(Ki,7),Ki+=7):(e=s,0===rc&&sc(Fi));e!==s&&(Qi=t,e={dataType:"BOOLEAN"});return t=e}())===s&&(t=function(){var t,e,n;t=Ki,(e=function(){var t,e,n,o;return t=Ki,"binary"===r.substr(Ki,6).toLowerCase()?(e=r.substr(Ki,6),Ki+=6):(e=s,0===rc&&sc(Bt)),e!==s?(n=Ki,rc++,o=Lf(),rc--,o===s?n=void 0:(Ki=n,n=s),n!==s?(Qi=t,t=e="BINARY"):(Ki=t,t=s)):(Ki=t,t=s),t}())===s&&(e=function(){var t,e,n,o;return t=Ki,"varbinary"===r.substr(Ki,9).toLowerCase()?(e=r.substr(Ki,9),Ki+=9):(e=s,0===rc&&sc(va)),e!==s?(n=Ki,rc++,o=Lf(),rc--,o===s?n=void 0:(Ki=n,n=s),n!==s?(Qi=t,t=e="VARBINARY"):(Ki=t,t=s)):(Ki=t,t=s),t}());e!==s&&Up()!==s?((n=tv())===s&&(n=null),n!==s?(Qi=t,e=Wi(e,n),t=e):(Ki=t,t=s)):(Ki=t,t=s);return t}())===s&&(t=function(){var t,e;t=Ki,"blob"===r.substr(Ki,4).toLowerCase()?(e=r.substr(Ki,4),Ki+=4):(e=s,0===rc&&sc(Hi));e===s&&("tinyblob"===r.substr(Ki,8).toLowerCase()?(e=r.substr(Ki,8),Ki+=8):(e=s,0===rc&&sc(Yi)),e===s&&("mediumblob"===r.substr(Ki,10).toLowerCase()?(e=r.substr(Ki,10),Ki+=10):(e=s,0===rc&&sc(Bi)),e===s&&("longblob"===r.substr(Ki,8).toLowerCase()?(e=r.substr(Ki,8),Ki+=8):(e=s,0===rc&&sc($i)))));e!==s&&(Qi=t,e={dataType:e.toUpperCase()});return t=e}())===s&&(t=function(){var t,e;t=Ki,(e=function(){var t,e,n,o;return t=Ki,"geometry"===r.substr(Ki,8).toLowerCase()?(e=r.substr(Ki,8),Ki+=8):(e=s,0===rc&&sc(Za)),e!==s?(n=Ki,rc++,o=Lf(),rc--,o===s?n=void 0:(Ki=n,n=s),n!==s?(Qi=t,t=e="GEOMETRY"):(Ki=t,t=s)):(Ki=t,t=s),t}())===s&&(e=function(){var t,e,n,o;return t=Ki,"point"===r.substr(Ki,5).toLowerCase()?(e=r.substr(Ki,5),Ki+=5):(e=s,0===rc&&sc(Ja)),e!==s?(n=Ki,rc++,o=Lf(),rc--,o===s?n=void 0:(Ki=n,n=s),n!==s?(Qi=t,t=e="POINT"):(Ki=t,t=s)):(Ki=t,t=s),t}())===s&&(e=function(){var t,e,n,o;return t=Ki,"linestring"===r.substr(Ki,10).toLowerCase()?(e=r.substr(Ki,10),Ki+=10):(e=s,0===rc&&sc(ri)),e!==s?(n=Ki,rc++,o=Lf(),rc--,o===s?n=void 0:(Ki=n,n=s),n!==s?(Qi=t,t=e="LINESTRING"):(Ki=t,t=s)):(Ki=t,t=s),t}())===s&&(e=function(){var t,e,n,o;return t=Ki,"polygon"===r.substr(Ki,7).toLowerCase()?(e=r.substr(Ki,7),Ki+=7):(e=s,0===rc&&sc(ti)),e!==s?(n=Ki,rc++,o=Lf(),rc--,o===s?n=void 0:(Ki=n,n=s),n!==s?(Qi=t,t=e="POLYGON"):(Ki=t,t=s)):(Ki=t,t=s),t}())===s&&(e=function(){var t,e,n,o;return t=Ki,"multipoint"===r.substr(Ki,10).toLowerCase()?(e=r.substr(Ki,10),Ki+=10):(e=s,0===rc&&sc(ei)),e!==s?(n=Ki,rc++,o=Lf(),rc--,o===s?n=void 0:(Ki=n,n=s),n!==s?(Qi=t,t=e="MULTIPOINT"):(Ki=t,t=s)):(Ki=t,t=s),t}())===s&&(e=function(){var t,e,n,o;return t=Ki,"multilinestring"===r.substr(Ki,15).toLowerCase()?(e=r.substr(Ki,15),Ki+=15):(e=s,0===rc&&sc(ni)),e!==s?(n=Ki,rc++,o=Lf(),rc--,o===s?n=void 0:(Ki=n,n=s),n!==s?(Qi=t,t=e="MULTILINESTRING"):(Ki=t,t=s)):(Ki=t,t=s),t}())===s&&(e=function(){var t,e,n,o;return t=Ki,"multipolygon"===r.substr(Ki,12).toLowerCase()?(e=r.substr(Ki,12),Ki+=12):(e=s,0===rc&&sc(oi)),e!==s?(n=Ki,rc++,o=Lf(),rc--,o===s?n=void 0:(Ki=n,n=s),n!==s?(Qi=t,t=e="MULTIPOLYGON"):(Ki=t,t=s)):(Ki=t,t=s),t}())===s&&(e=function(){var t,e,n,o;return t=Ki,"geometrycollection"===r.substr(Ki,18).toLowerCase()?(e=r.substr(Ki,18),Ki+=18):(e=s,0===rc&&sc(si)),e!==s?(n=Ki,rc++,o=Lf(),rc--,o===s?n=void 0:(Ki=n,n=s),n!==s?(Qi=t,t=e="GEOMETRYCOLLECTION"):(Ki=t,t=s)):(Ki=t,t=s),t}());e!==s&&(Qi=t,e={dataType:e});return t=e}()),t}function tv(){var t,e,n,o,u;if(t=Ki,Np()!==s)if(Up()!==s){if(e=[],We.test(r.charAt(Ki))?(n=r.charAt(Ki),Ki++):(n=s,0===rc&&sc(qe)),n!==s)for(;n!==s;)e.push(n),We.test(r.charAt(Ki))?(n=r.charAt(Ki),Ki++):(n=s,0===rc&&sc(qe));else e=s;e!==s&&(n=Up())!==s&&Op()!==s&&Up()!==s?((o=nv())===s&&(o=null),o!==s?(Qi=t,u=o,t={length:parseInt(e.join(""),10),parentheses:true,suffix:u}):(Ki=t,t=s)):(Ki=t,t=s);}else Ki=t,t=s;else Ki=t,t=s;return t}function ev(){var t,e,n,o,u,a,i,c,l,f,b;if(t=Ki,(e=function(){var t,e,n,o;return t=Ki,"char"===r.substr(Ki,4).toLowerCase()?(e=r.substr(Ki,4),Ki+=4):(e=s,0===rc&&sc(ya)),e!==s?(n=Ki,rc++,o=Lf(),rc--,o===s?n=void 0:(Ki=n,n=s),n!==s?(Qi=t,t=e="CHAR"):(Ki=t,t=s)):(Ki=t,t=s),t}())===s&&(e=function(){var t,e,n,o;return t=Ki,"varchar"===r.substr(Ki,7).toLowerCase()?(e=r.substr(Ki,7),Ki+=7):(e=s,0===rc&&sc(wa)),e!==s?(n=Ki,rc++,o=Lf(),rc--,o===s?n=void 0:(Ki=n,n=s),n!==s?(Qi=t,t=e="VARCHAR"):(Ki=t,t=s)):(Ki=t,t=s),t}()),e!==s){if(n=Ki,(o=Up())!==s)if((u=Np())!==s)if((a=Up())!==s){if(i=[],We.test(r.charAt(Ki))?(c=r.charAt(Ki),Ki++):(c=s,0===rc&&sc(qe)),c!==s)for(;c!==s;)i.push(c),We.test(r.charAt(Ki))?(c=r.charAt(Ki),Ki++):(c=s,0===rc&&sc(qe));else i=s;i!==s&&(c=Up())!==s&&(l=Op())!==s&&(f=Up())!==s?("array"===r.substr(Ki,5).toLowerCase()?(b=r.substr(Ki,5),Ki+=5):(b=s,0===rc&&sc(qi)),b===s&&(b=null),b!==s?n=o=[o,u,a,i,c,l,f,b]:(Ki=n,n=s)):(Ki=n,n=s);}else Ki=n,n=s;else Ki=n,n=s;else Ki=n,n=s;n===s&&(n=null),n!==s?(Qi=t,t=e=function(r,t){const e={dataType:r};return t&&(e.length=parseInt(t[3].join(""),10),e.parentheses=true,e.suffix=t[7]&&["ARRAY"]),e}(e,n)):(Ki=t,t=s);}else Ki=t,t=s;return t}function nv(){var t,e,n;return t=Ki,(e=Df())===s&&(e=null),e!==s&&Up()!==s?((n=function(){var t,e,n,o;return t=Ki,"zerofill"===r.substr(Ki,8).toLowerCase()?(e=r.substr(Ki,8),Ki+=8):(e=s,0===rc&&sc(Aa)),e!==s?(n=Ki,rc++,o=Lf(),rc--,o===s?n=void 0:(Ki=n,n=s),n!==s?(Qi=t,t=e="ZEROFILL"):(Ki=t,t=s)):(Ki=t,t=s),t}())===s&&(n=null),n!==s?(Qi=t,t=e=function(r,t){const e=[];return r&&e.push(r),t&&e.push(t),e}(e,n)):(Ki=t,t=s)):(Ki=t,t=s),t}function ov(){var t,e,n,o,u,a,i,c,l,f,b;return t=Ki,(e=ep())===s&&(e=np())===s&&(e=sp())===s&&(e=up())===s&&(e=function(){var t,e,n,o;return t=Ki,"year"===r.substr(Ki,4).toLowerCase()?(e=r.substr(Ki,4),Ki+=4):(e=s,0===rc&&sc(ns)),e!==s?(n=Ki,rc++,o=Lf(),rc--,o===s?n=void 0:(Ki=n,n=s),n!==s?(Qi=t,t=e="YEAR"):(Ki=t,t=s)):(Ki=t,t=s),t}()),e!==s?(n=Ki,(o=Up())!==s&&(u=Np())!==s&&(a=Up())!==s?(Vi.test(r.charAt(Ki))?(i=r.charAt(Ki),Ki++):(i=s,0===rc&&sc(Xi)),i!==s&&(c=Up())!==s&&(l=Op())!==s&&(f=Up())!==s?((b=nv())===s&&(b=null),b!==s?n=o=[o,u,a,i,c,l,f,b]:(Ki=n,n=s)):(Ki=n,n=s)):(Ki=n,n=s),n===s&&(n=null),n!==s?(Qi=t,t=e=function(r,t){const e={dataType:r};return t&&(e.length=parseInt(t[3],10),e.parentheses=true,e.suffix=t[7]),e}(e,n)):(Ki=t,t=s)):(Ki=t,t=s),t}const sv={ALTER:true,ALL:true,ADD:true,AND:true,AS:true,ASC:true,ANALYZE:true,ACCESSIBLE:true,BEFORE:true,BETWEEN:true,BIGINT:true,BLOB:true,BOTH:true,BY:true,BOOLEAN:true,CALL:true,CASCADE:true,CASE:true,CHAR:true,CHECK:true,COLLATE:true,CONDITION:true,CONSTRAINT:true,CONTINUE:true,CONVERT:true,CREATE:true,CROSS:true,CURRENT_DATE:true,CURRENT_TIME:true,CURRENT_TIMESTAMP:true,CURRENT_USER:true,CURSOR:true,DATABASE:true,DATABASES:true,DAY_HOUR:true,DAY_MICROSECOND:true,DAY_MINUTE:true,DAY_SECOND:true,DEC:true,DECIMAL:true,DECLARE:true,DEFAULT:true,DELAYED:true,DELETE:true,DESC:true,DESCRIBE:true,DETERMINISTIC:true,DISTINCT:true,DISTINCTROW:true,DIV:true,DROP:true,DOUBLE:true,DUAL:true,ELSE:true,EACH:true,ELSEIF:true,ENCLOSED:true,ESCAPED:true,EXCEPT:true,EXISTS:true,EXIT:true,EXPLAIN:true,FALSE:true,FULL:true,FROM:true,FETCH:true,FLOAT:true,FLOAT4:true,FLOAT8:true,FOR:true,FORCE:true,FOREIGN:true,FULLTEXT:true,FUNCTION:true,GENERATED:true,GET:true,GO:true,GRANT:true,GROUP:true,GROUPING:true,GROUPS:true,HAVING:true,HIGH_PRIORITY:true,HOUR_MICROSECOND:true,HOUR_MINUTE:true,HOUR_SECOND:true,IGNORE:true,IN:true,INNER:true,INFILE:true,INOUT:true,INSENSITIVE:true,INSERT:true,INTERSECT:true,INT:true,INT1:true,INT2:true,INT3:true,INT4:true,INT8:true,INTEGER:true,INTERVAL:true,INTO:true,IO_AFTER_GTIDS:true,IO_BEFORE_GTIDS:true,IS:true,ITERATE:true,JOIN:true,JSON_TABLE:true,KEY:true,KEYS:true,KILL:true,LAG:true,LAST_VALUE:true,LATERAL:true,LEAD:true,LEADING:true,LEAVE:true,LEFT:true,LIKE:true,LIMIT:true,LINEAR:true,LINES:true,LOAD:true,LOCALTIME:true,LOCALTIMESTAMP:true,LOCK:true,LONG:true,LONGBLOB:true,LONGTEXT:true,LOOP:true,LOW_PRIORITY:true,MASTER_BIND:true,MATCH:true,MAXVALUE:true,MEDIUMBLOB:true,MEDIUMINT:true,MEDIUMTEXT:true,MIDDLEINT:true,MINUTE_MICROSECOND:true,MINUTE_SECOND:true,MINUS:true,MOD:true,MODIFIES:true,NATURAL:true,NOT:true,NO_WRITE_TO_BINLOG:true,NTH_VALUE:true,NTILE:true,NULL:true,NUMERIC:true,OF:true,ON:true,OPTIMIZE:true,OPTIMIZER_COSTS:true,OPTION:true,OPTIONALLY:true,OR:true,ORDER:true,OUT:true,OUTER:true,OUTFILE:true,OVER:true,PARTITION:true,PERCENT_RANK:true,PRECISION:true,PRIMARY:true,PROCEDURE:true,PURGE:true,RANGE:true,RANK:true,READ:true,READS:true,READ_WRITE:true,REAL:true,RECURSIVE:true,REFERENCES:true,REGEXP:true,RELEASE:true,RENAME:true,REPEAT:true,REPLACE:true,REQUIRE:true,RESIGNAL:true,RESTRICT:true,RETURN:true,REVOKE:true,RIGHT:true,RLIKE:true,ROW:true,ROWS:true,ROW_NUMBER:true,SCHEMA:true,SCHEMAS:true,SELECT:true,SENSITIVE:true,SEPARATOR:true,SET:true,SHOW:true,SIGNAL:true,SMALLINT:true,SPATIAL:true,SPECIFIC:true,SQL:true,SQLEXCEPTION:true,SQLSTATE:true,SQLWARNING:true,SQL_BIG_RESULT:true,SSL:true,STARTING:true,STORED:true,STRAIGHT_JOIN:true,TABLE:true,TERMINATED:true,THEN:true,TINYBLOB:true,TINYINT:true,TINYTEXT:true,TO:true,TRAILING:true,TRIGGER:true,TRUE:true,UNION:true,UNIQUE:true,UNLOCK:true,UNSIGNED:true,UPDATE:true,USAGE:true,USE:true,USING:true,UTC_DATE:true,UTC_TIME:true,UTC_TIMESTAMP:true,VALUES:true,VARBINARY:true,VARCHAR:true,VARCHARACTER:true,VARYING:true,VIRTUAL:true,WHEN:true,WHERE:true,WHILE:true,WINDOW:true,WITH:true,WRITE:true,XOR:true,YEAR_MONTH:true,ZEROFILL:true},uv={avg:true,sum:true,count:true,convert:true,max:true,min:true,group_concat:true,std:true,variance:true,current_date:true,current_time:true,current_timestamp:true,current_user:true,user:true,session_user:true,system_user:true};function av(){return t.includeLocations?{loc:oc(Qi,Ki)}:{}}function iv(r,t){return {type:"unary_expr",operator:r,expr:t}}function cv(r,t,e){return {type:"binary_expr",operator:r,left:t,right:e,...av()}}function lv(r){const t=n(Number.MAX_SAFE_INTEGER);return !(n(r)<t)}function fv(r,t,e=3){const n=[r];for(let r=0;r<t.length;r++)delete t[r][e].tableList,delete t[r][e].columnList,n.push(t[r][e]);return n}function bv(r,t){let e=r;for(let r=0;r<t.length;r++)e=cv(t[r][1],e,t[r][3]);return e}function pv(r){const t=Cv[r];return t||(r||null)}function vv(r){const t=new Set;for(let e of r.keys()){const r=e.split("::");if(!r){t.add(e);break}r&&r[1]&&(r[1]=pv(r[1])),t.add(r.join("::"));}return Array.from(t)}function dv(r){const t=vv(r);r.clear(),t.forEach(t=>r.add(t));}let yv=[];const wv=new Set,Lv=new Set,Cv={};if((e=a())!==s&&Ki===r.length)return e;throw e!==s&&Ki<r.length&&sc({type:"end"}),uc(Ji,Zi<r.length?r.charAt(Zi):null,Zi<r.length?oc(Zi,Zi+1):oc(Zi,Zi))}};},function(r,t,e){r.exports=e(3);},function(r,t){r.exports=require$$0;},function(r,t,e){e.r(t),e.d(t,"Parser",(function(){return Ft})),e.d(t,"util",(function(){return n}));var n={};function o(r){return (o="function"==typeof Symbol&&"symbol"==typeof Symbol.iterator?function(r){return typeof r}:function(r){return r&&"function"==typeof Symbol&&r.constructor===Symbol&&r!==Symbol.prototype?"symbol":typeof r})(r)}e.r(n),e.d(n,"arrayStructTypeToSQL",(function(){return T})),e.d(n,"autoIncrementToSQL",(function(){return N})),e.d(n,"columnOrderListToSQL",(function(){return O})),e.d(n,"commonKeywordArgsToSQL",(function(){return S})),e.d(n,"commonOptionConnector",(function(){return a})),e.d(n,"connector",(function(){return i})),e.d(n,"commonTypeValue",(function(){return h})),e.d(n,"commentToSQL",(function(){return _})),e.d(n,"createBinaryExpr",(function(){return l})),e.d(n,"createValueExpr",(function(){return c})),e.d(n,"dataTypeToSQL",(function(){return A})),e.d(n,"DEFAULT_OPT",(function(){return s})),e.d(n,"escape",(function(){return f})),e.d(n,"literalToSQL",(function(){return C})),e.d(n,"columnIdentifierToSql",(function(){return d})),e.d(n,"getParserOpt",(function(){return b})),e.d(n,"identifierToSql",(function(){return y})),e.d(n,"onPartitionsToSQL",(function(){return E})),e.d(n,"replaceParams",(function(){return m})),e.d(n,"returningToSQL",(function(){return I})),e.d(n,"hasVal",(function(){return L})),e.d(n,"setParserOpt",(function(){return p})),e.d(n,"toUpper",(function(){return w})),e.d(n,"topToSQL",(function(){return v})),e.d(n,"triggerEventToSQL",(function(){return g}));var s={database:"mysql",type:"table",trimQuery:true,parseOptions:{includeLocations:false}},u=s;function a(r,t,e){if(e)return r?"".concat(r.toUpperCase()," ").concat(t(e)):t(e)}function i(r,t){if(t)return "".concat(r.toUpperCase()," ").concat(t)}function c(r){var t=o(r);if(Array.isArray(r))return {type:"expr_list",value:r.map(c)};if(null===r)return {type:"null",value:null};switch(t){case "boolean":return {type:"bool",value:r};case "string":return {type:"string",value:r};case "number":return {type:"number",value:r};default:throw new Error('Cannot convert value "'.concat(t,'" to SQL'))}}function l(r,t,e){var n={operator:r,type:"binary_expr"};return n.left=t.type?t:c(t),"BETWEEN"===r||"NOT BETWEEN"===r?(n.right={type:"expr_list",value:[c(e[0]),c(e[1])]},n):(n.right=e.type?e:c(e),n)}function f(r){return r}function b(){return u}function p(r){u=r;}function v(r){if(r){var t=r.value,e=r.percent,n=r.parentheses?"(".concat(t,")"):t,o="TOP ".concat(n);return e?"".concat(o," ").concat(e.toUpperCase()):o}}function d(r){var t=b().database;if(r)switch(t&&t.toLowerCase()){case "athena":case "db2":case "postgresql":case "redshift":case "snowflake":case "noql":case "trino":case "sqlite":return '"'.concat(r,'"');case "transactsql":return "[".concat(r,"]");case "mysql":case "mariadb":case "bigquery":default:return "`".concat(r,"`")}}function y(r,t,e){if(true===t)return "'".concat(r,"'");if(r){if("*"===r)return r;if(e)return "".concat(e).concat(r).concat(e);var n=b().database;switch(n&&n.toLowerCase()){case "mysql":case "mariadb":return "`".concat(r,"`");case "athena":case "postgresql":case "redshift":case "snowflake":case "trino":case "noql":case "sqlite":return '"'.concat(r,'"');case "transactsql":return "[".concat(r,"]");case "bigquery":case "db2":return r;default:return "`".concat(r,"`")}}}function w(r){if(r)return r.toUpperCase()}function L(r){return r}function C(r){if(r){var t=r.prefix,e=r.type,n=r.parentheses,s=r.suffix,u=r.value,a="object"===o(r)?u:r;switch(e){case "backticks_quote_string":a="`".concat(u,"`");break;case "string":a="'".concat(u,"'");break;case "regex_string":a='r"'.concat(u,'"');break;case "hex_string":a="X'".concat(u,"'");break;case "full_hex_string":a="0x".concat(u);break;case "natural_string":a="N'".concat(u,"'");break;case "bit_string":a="b'".concat(u,"'");break;case "double_quote_string":a='"'.concat(u,'"');break;case "single_quote_string":a="'".concat(u,"'");break;case "boolean":case "bool":a=u?"TRUE":"FALSE";break;case "null":a="NULL";break;case "star":a="*";break;case "param":a="".concat(t||":").concat(u),t=null;break;case "origin":a=u.toUpperCase();break;case "date":case "datetime":case "time":case "timestamp":a="".concat(e.toUpperCase()," '").concat(u,"'");break;case "var_string":a="N'".concat(u,"'");break;case "unicode_string":a="U&'".concat(u,"'");}var i=[];return t&&i.push(w(t)),i.push(a),s&&("string"==typeof s&&i.push(s),"object"===o(s)&&(s.collate?i.push(bt(s.collate)):i.push(C(s)))),a=i.join(" "),n?"(".concat(a,")"):a}}function h(r){if(!r)return [];var t=r.type,e=r.symbol,n=r.value;return [t.toUpperCase(),e,"string"==typeof n?n.toUpperCase():C(n)].filter(L)}function m(r,t){return function r(t,e){return Object.keys(t).filter((function(r){var e=t[r];return Array.isArray(e)||"object"===o(e)&&null!==e})).forEach((function(n){var s=t[n];if("object"!==o(s)||"param"!==s.type)return r(s,e);if(void 0===e[s.value])throw new Error("no value for parameter :".concat(s.value," found"));return t[n]=c(e[s.value]),null})),t}(JSON.parse(JSON.stringify(r)),t)}function E(r){var t=r.type,e=r.partitions;return [w(t),"(".concat(e.map((function(r){if("range"!==r.type)return C(r);var t=r.start,e=r.end,n=r.symbol;return "".concat(C(t)," ").concat(w(n)," ").concat(C(e))})).join(", "),")")].join(" ")}function A(r){var t=r.schema,e=r.dataType,n=r.length,o=r.parentheses,s=r.scale,u=r.suffix,a="";null!=n&&(a=s?"".concat(n,", ").concat(s):n),o&&(a="(".concat(a,")")),u&&u.length&&(a+=" ".concat(u.join(" ")));var i=t?"".concat(t,"."):"";return "".concat(i).concat(e).concat(a)}function T(r){if(r){var t=r.dataType,e=r.definition,n=r.anglebracket,o=w(t);if("ARRAY"!==o&&"STRUCT"!==o)return o;var s=e&&e.map((function(r){return [r.field_name,T(r.field_type)].filter(L).join(" ")})).join(", ");return n?"".concat(o,"<").concat(s,">"):"".concat(o," ").concat(s)}}function _(r){if(r){var t=[],e=r.keyword,n=r.symbol,o=r.value;return t.push(e.toUpperCase()),n&&t.push(n),t.push(C(o)),t.join(" ")}}function g(r){return r.map((function(r){var t=r.keyword,e=r.args,n=[w(t)];if(e){var o=e.keyword,s=e.columns;n.push(w(o),s.map(Ct).join(", "));}return n.join(" ")})).join(" OR ")}function I(r){return r?["RETURNING",r.columns.map(gt).filter(L).join(", ")].join(" "):""}function S(r){return r?[w(r.keyword),w(r.args)]:[]}function N(r){if(r){if("string"==typeof r){var t=b().database;switch(t&&t.toLowerCase()){case "sqlite":return "AUTOINCREMENT";default:return "AUTO_INCREMENT"}}var e=r.keyword,n=r.seed,o=r.increment,s=r.parentheses,u=w(e);return s&&(u+="(".concat(C(n),", ").concat(C(o),")")),u}}function O(r){if(r)return r.map(At).filter(L).join(", ")}function R(r){return function(r){if(Array.isArray(r))return x(r)}(r)||function(r){if("undefined"!=typeof Symbol&&null!=r[Symbol.iterator]||null!=r["@@iterator"])return Array.from(r)}(r)||function(r,t){if(r){if("string"==typeof r)return x(r,t);var e={}.toString.call(r).slice(8,-1);return "Object"===e&&r.constructor&&(e=r.constructor.name),"Map"===e||"Set"===e?Array.from(r):"Arguments"===e||/^(?:Ui|I)nt(?:8|16|32)(?:Clamped)?Array$/.test(e)?x(r,t):void 0}}(r)||function(){throw new TypeError("Invalid attempt to spread non-iterable instance.\nIn order to be iterable, non-array objects must have a [Symbol.iterator]() method.")}()}function x(r,t){(null==t||t>r.length)&&(t=r.length);for(var e=0,n=Array(t);e<t;e++)n[e]=r[e];return n}function j(r){if(!r)return [];var t=r.keyword,e=r.type;return [t.toUpperCase(),w(e)]}function k(r){if(r){var t=r.type,e=r.expr,n=r.symbol,o=t.toUpperCase(),s=[];switch(s.push(o),o){case "KEY_BLOCK_SIZE":n&&s.push(n),s.push(C(e));break;case "BTREE":case "HASH":s.length=0,s.push.apply(s,R(j(r)));break;case "WITH PARSER":s.push(e);break;case "VISIBLE":case "INVISIBLE":break;case "COMMENT":s.shift(),s.push(_(r));break;case "DATA_COMPRESSION":s.push(n,w(e.value),E(e.on));break;default:s.push(n,C(e));}return s.filter(L).join(" ")}}function U(r){return r?r.map(k):[]}function D(r){var t=r.constraint_type,e=r.index_type,n=r.index_options,o=void 0===n?[]:n,s=r.definition,u=r.on,a=r.with,i=[];if(i.push.apply(i,R(j(e))),s&&s.length){var c="CHECK"===w(t)?"(".concat(ct(s[0]),")"):"(".concat(s.map((function(r){return ct(r)})).join(", "),")");i.push(c);}return i.push(U(o).join(" ")),a&&i.push("WITH (".concat(U(a).join(", "),")")),u&&i.push("ON [".concat(u,"]")),i}function M(r){var t=r.operator||r.op,e=ct(r.right),n=false;if(Array.isArray(e)){switch(t){case "=":t="IN";break;case "!=":t="NOT IN";break;case "BETWEEN":case "NOT BETWEEN":n=true,e="".concat(e[0]," AND ").concat(e[1]);}n||(e="(".concat(e.join(", "),")"));}var o=r.right.escape||{},s=[Array.isArray(r.left)?r.left.map(ct).join(", "):ct(r.left),t,e,w(o.type),ct(o.value)].filter(L).join("."===t?"":" ");return [r.parentheses?"(".concat(s,")"):s].join(" ")}function P(r){var t=r.name,e=r.type;switch(e){case "table":case "view":var n=[y(t.db),y(t.table)].filter(L).join(".");return "".concat(w(e)," ").concat(n);case "column":return "COLUMN ".concat(Ct(t));default:return "".concat(w(e)," ").concat(C(t))}}function G(r){var t=r.keyword,e=r.expr;return [w(t),C(e)].filter(L).join(" ")}function F(r){return function(r){if(Array.isArray(r))return H(r)}(r)||function(r){if("undefined"!=typeof Symbol&&null!=r[Symbol.iterator]||null!=r["@@iterator"])return Array.from(r)}(r)||function(r,t){if(r){if("string"==typeof r)return H(r,t);var e={}.toString.call(r).slice(8,-1);return "Object"===e&&r.constructor&&(e=r.constructor.name),"Map"===e||"Set"===e?Array.from(r):"Arguments"===e||/^(?:Ui|I)nt(?:8|16|32)(?:Clamped)?Array$/.test(e)?H(r,t):void 0}}(r)||function(){throw new TypeError("Invalid attempt to spread non-iterable instance.\nIn order to be iterable, non-array objects must have a [Symbol.iterator]() method.")}()}function H(r,t){(null==t||t>r.length)&&(t=r.length);for(var e=0,n=Array(t);e<t;e++)n[e]=r[e];return n}function Y(r){return r?[r.prefix.map(C).join(" "),ct(r.value),r.suffix.map(C).join(" ")]:[]}function B(r){return r?r.fetch||r.offset?(e=(t=r).fetch,n=t.offset,[].concat(F(Y(n)),F(Y(e))).filter(L).join(" ")):function(r){var t=r.seperator,e=r.value;return 1===e.length&&"offset"===t?i("OFFSET",ct(e[0])):i("LIMIT",e.map(ct).join("".concat("offset"===t?" ":"").concat(w(t)," ")))}(r):"";var t,e,n;}function $(r){if(r&&0!==r.length){var t=r[0].recursive?"RECURSIVE ":"",e=r.map((function(r){var t=r.name,e=r.stmt,n=r.columns,o=Array.isArray(n)?"(".concat(n.map(Ct).join(", "),")"):"",s=a("values"===e.type?"VALUES":"",ct,e);return "".concat("default"===t.type?y(t.value):C(t)).concat(o," AS (").concat(s,")")})).join(", ");return "WITH ".concat(t).concat(e)}}function W(r){if(r&&r.position){var t=r.keyword,e=r.expr,n=[],o=w(t);switch(o){case "VAR":n.push(e.map(it).join(", "));break;default:n.push(o,"string"==typeof e?y(e):ct(e));}return n.filter(L).join(" ")}}function q(r){var t=r.as_struct_val,e=r.columns,n=r.collate,o=r.distinct,s=r.for,u=r.from,c=r.for_sys_time_as_of,l=void 0===c?{}:c,f=r.locking_read,b=r.groupby,p=r.having,d=r.into,y=void 0===d?{}:d,h=r.isolation,m=r.limit,E=r.options,A=r.orderby,T=r.parentheses_symbol,_=r.qualify,g=r.top,I=r.window,S=r.with,N=r.where,O=[$(S),"SELECT",w(t)];Array.isArray(E)&&O.push(E.join(" ")),O.push(function(r){if(r){if("string"==typeof r)return r;var t=r.type,e=r.columns,n=[w(t)];return e&&n.push("(".concat(e.map(ct).join(", "),")")),n.filter(L).join(" ")}}(o),v(g),St(e,u));var R=y.position,x="";R&&(x=a("INTO",W,y)),"column"===R&&O.push(x),O.push(a("FROM",mr,u)),"from"===R&&O.push(x);var j=l||{},k=j.keyword,U=j.expr;O.push(a(k,ct,U)),O.push(a("WHERE",ct,N)),b&&(O.push(i("GROUP BY",lt(b.columns).join(", "))),O.push(lt(b.modifiers).join(", "))),O.push(a("HAVING",ct,p)),O.push(a("QUALIFY",ct,_)),O.push(a("WINDOW",ct,I)),O.push(ft(A,"order by")),O.push(bt(n)),O.push(B(m)),h&&O.push(a(h.keyword,C,h.expr)),O.push(w(f)),"end"===R&&O.push(x),O.push(function(r){if(r){var t=r.expr,e=r.keyword,n=[w(r.type),w(e)];return t?"".concat(n.join(" "),"(").concat(ct(t),")"):n.join(" ")}}(s));var D=O.filter(L).join(" ");return T?"(".concat(D,")"):D}function V(r,t){var e="undefined"!=typeof Symbol&&r[Symbol.iterator]||r["@@iterator"];if(!e){if(Array.isArray(r)||(e=function(r,t){if(r){if("string"==typeof r)return X(r,t);var e={}.toString.call(r).slice(8,-1);return "Object"===e&&r.constructor&&(e=r.constructor.name),"Map"===e||"Set"===e?Array.from(r):"Arguments"===e||/^(?:Ui|I)nt(?:8|16|32)(?:Clamped)?Array$/.test(e)?X(r,t):void 0}}(r))||t){e&&(r=e);var n=0,o=function(){};return {s:o,n:function(){return n>=r.length?{done:true}:{done:false,value:r[n++]}},e:function(r){throw r},f:o}}throw new TypeError("Invalid attempt to iterate non-iterable instance.\nIn order to be iterable, non-array objects must have a [Symbol.iterator]() method.")}var s,u=true,a=false;return {s:function(){e=e.call(r);},n:function(){var r=e.next();return u=r.done,r},e:function(r){a=true,s=r;},f:function(){try{u||null==e.return||e.return();}finally{if(a)throw s}}}}function X(r,t){(null==t||t>r.length)&&(t=r.length);for(var e=0,n=Array(t);e<t;e++)n[e]=r[e];return n}function K(r){if(!r||0===r.length)return "";var t,e=[],n=V(r);try{for(n.s();!(t=n.n()).done;){var o=t.value,s={},u=o.value;for(var a in o)"value"!==a&&"keyword"!==a&&(s[a]=o[a]);var i=[Ct(s)],c="";u&&(c=ct(u),i.push("=",c)),e.push(i.filter(L).join(" "));}}catch(r){n.e(r);}finally{n.f();}return e.join(", ")}function Q(r){var t=r.name,e=r.value;return ["@".concat(t),"=",ct(e)].filter(L).join(" ")}function z(r){if(!r)return "";var t=r.keyword,e=r.terminated,n=r.enclosed,o=r.escaped;return [w(t),C(e),C(n),C(o)].filter(L).join(" ")}function Z(r){if(!r)return "";var t=r.keyword,e=r.starting,n=r.terminated;return [w(t),C(e),C(n)].filter(L).join(" ")}function J(r){if(!r)return "";var t=r.count,e=r.suffix;return ["IGNORE",C(t),e].filter(L).join(" ")}function rr(r){if(!r)return "";var t=r.mode,e=r.local,n=r.file,o=r.replace_ignore,s=r.table,u=r.partition,i=r.character_set,c=r.column,l=r.fields,f=r.lines,b=r.set,p=r.ignore;return ["LOAD DATA",w(t),w(e),"INFILE",C(n),w(o),"INTO TABLE",hr(s),ar(u),a("CHARACTER SET",C,i),z(l),Z(f),J(p),St(c),a("SET",K,b)].filter(L).join(" ")}function tr(r){var t=r.left,e=r.right,n=r.symbol,o=r.keyword;t.keyword=o;var s=ct(t),u=ct(e);return [s,w(n),u].filter(L).join(" ")}function er(r){var t,e,n,o,s=r.keyword,u=r.suffix,i="";switch(w(s)){case "BINLOG":e=(t=r).in,n=t.from,o=t.limit,i=[a("IN",C,e&&e.right),a("FROM",mr,n),B(o)].filter(L).join(" ");break;case "CHARACTER":case "COLLATION":i=function(r){var t=r.expr;if(t)return "LIKE"===w(t.op)?a("LIKE",C,t.right):a("WHERE",ct,t)}(r);break;case "COLUMNS":case "INDEXES":case "INDEX":i=a("FROM",mr,r.from);break;case "GRANTS":i=function(r){var t=r.for;if(t){var e=t.user,n=t.host,o=t.role_list,s="'".concat(e,"'");return n&&(s+="@'".concat(n,"'")),["FOR",s,o&&"USING",o&&o.map((function(r){return "'".concat(r,"'")})).join(", ")].filter(L).join(" ")}}(r);break;case "CREATE":i=a("",hr,r[u]);break;case "VAR":i=it(r.var),s="";}return ["SHOW",w(s),w(u),i].filter(L).join(" ")}var nr={alter:function(r){var t=r.keyword;switch(void 0===t?"table":t){case "aggregate":return function(r){var t=r.args,e=r.expr,n=r.keyword,o=r.name,s=r.type,u=t.expr,a=t.orderby;return [w(s),w(n),[[y(o.schema),y(o.name)].filter(L).join("."),"(".concat(u.map(et).join(", ")).concat(a?[" ORDER","BY",a.map(et).join(", ")].join(" "):"",")")].filter(L).join(""),tt(e)].filter(L).join(" ")}(r);case "table":return function(r){var t=r.type,e=r.table,n=r.if_exists,o=r.prefix,s=r.expr,u=void 0===s?[]:s,a=w(t),i=mr(e),c=u.map(ct);return [a,"TABLE",w(n),C(o),i,c.join(", ")].filter(L).join(" ")}(r);case "schema":return function(r){var t=r.expr,e=r.keyword,n=r.schema;return [w(r.type),w(e),y(n),tt(t)].filter(L).join(" ")}(r);case "sequence":return function(r){var t=r.type,e=r.keyword,n=r.sequence,o=r.if_exists,s=r.expr,u=void 0===s?[]:s,a=w(t),i=mr(n),c=u.map(Xr);return [a,w(e),w(o),i,c.join(", ")].filter(L).join(" ")}(r);case "domain":case "type":return function(r){var t=r.expr,e=r.keyword,n=r.name;return [w(r.type),w(e),[y(n.schema),y(n.name)].filter(L).join("."),tt(t)].filter(L).join(" ")}(r);case "function":return function(r){var t=r.args,e=r.expr,n=r.keyword,o=r.name;return [w(r.type),w(n),[[y(o.schema),y(o.name)].filter(L).join("."),t&&"(".concat(t.expr?t.expr.map(et).join(", "):"",")")].filter(L).join(""),tt(e)].filter(L).join(" ")}(r);case "view":return function(r){var t=r.type,e=r.columns,n=r.attributes,o=r.select,s=r.view,u=r.with,a=w(t),i=hr(s),c=[a,"VIEW",i];e&&c.push("(".concat(e.map(Ct).join(", "),")"));n&&c.push("WITH ".concat(n.map(w).join(", ")));c.push("AS",q(o)),u&&c.push(w(u));return c.filter(L).join(" ")}(r)}},analyze:function(r){var t=r.type,e=r.table;return [w(t),hr(e)].join(" ")},attach:function(r){var t=r.type,e=r.database,n=r.expr,o=r.as,s=r.schema;return [w(t),w(e),ct(n),w(o),y(s)].filter(L).join(" ")},create:function(r){var t=r.keyword,e="";switch(t.toLowerCase()){case "aggregate":e=function(r){var t=r.type,e=r.replace,n=r.keyword,o=r.name,s=r.args,u=r.options,a=[w(t),w(e),w(n)],i=[y(o.schema),o.name].filter(L).join("."),c="".concat(s.expr.map(et).join(", ")).concat(s.orderby?[" ORDER","BY",s.orderby.map(et).join(", ")].join(" "):"");return a.push("".concat(i,"(").concat(c,")"),"(".concat(u.map(Jr).join(", "),")")),a.filter(L).join(" ")}(r);break;case "table":e=function(r){var t=r.type,e=r.keyword,n=r.table,o=r.like,s=r.as,u=r.temporary,a=r.if_not_exists,i=r.create_definitions,c=r.table_options,l=r.ignore_replace,f=r.replace,p=r.partition_of,v=r.query_expr,d=r.unlogged,y=r.with,h=[w(t),w(f),w(u),w(d),w(e),w(a),mr(n)];if(o){var m=o.type,E=mr(o.table);return h.push(w(m),E),h.filter(L).join(" ")}if(p)return h.concat([Qr(p)]).filter(L).join(" ");i&&h.push("(".concat(i.map(Xr).join(", "),")"));if(c){var A=b().database,T=A&&"sqlite"===A.toLowerCase()?", ":" ";h.push(c.map(Er).join(T));}if(y){var _=y.map((function(r){return [C(r.keyword),w(r.symbol),C(r.value)].join(" ")})).join(", ");h.push("WITH (".concat(_,")"));}h.push(w(l),w(s)),v&&h.push(or(v));return h.filter(L).join(" ")}(r);break;case "trigger":e="constraint"===r.resource?function(r){var t=r.constraint,e=r.constraint_kw,n=r.deferrable,o=r.events,s=r.execute,u=r.for_each,a=r.from,i=r.location,c=r.keyword,l=r.or,f=r.type,b=r.table,p=r.when,v=[w(f),w(l),w(e),w(c),y(t),w(i)],d=g(o);v.push(d,"ON",hr(b)),a&&v.push("FROM",hr(a));v.push.apply(v,Wr(S(n)).concat(Wr(S(u)))),p&&v.push(w(p.type),ct(p.cond));return v.push(w(s.keyword),$r(s.expr)),v.filter(L).join(" ")}(r):function(r){var t=r.definer,e=r.for_each,n=r.keyword,o=r.execute,s=r.type,u=r.table,i=r.if_not_exists,c=r.temporary,l=r.trigger,f=r.events,b=r.order,p=r.time,v=r.when,d=[w(s),w(c),ct(t),w(n),w(i),hr(l),w(p),f.map((function(r){var t=[w(r.keyword)],e=r.args;return e&&t.push(w(e.keyword),e.columns.map(Ct).join(", ")),t.join(" ")})),"ON",hr(u),w(e&&e.keyword),w(e&&e.args),b&&"".concat(w(b.keyword)," ").concat(y(b.trigger)),a("WHEN",ct,v),w(o.prefix)];switch(o.type){case "set":d.push(a("SET",K,o.expr));break;case "multiple":d.push(sr(o.expr.ast));}return d.push(w(o.suffix)),d.filter(L).join(" ")}(r);break;case "extension":e=function(r){var t=r.extension,e=r.from,n=r.if_not_exists,o=r.keyword,s=r.schema,u=r.type,i=r.with,c=r.version;return [w(u),w(o),w(n),C(t),w(i),a("SCHEMA",C,s),a("VERSION",C,c),a("FROM",C,e)].filter(L).join(" ")}(r);break;case "function":e=function(r){var t=r.type,e=r.replace,n=r.keyword,o=r.name,s=r.args,u=r.returns,a=r.options,i=r.last,c=[w(t),w(e),w(n)],l=[C(o.schema),o.name.map(C).join(".")].filter(L).join("."),f=s.map(et).filter(L).join(", ");return c.push("".concat(l,"(").concat(f,")"),function(r){var t=r.type,e=r.keyword,n=r.expr;return [w(t),w(e),Array.isArray(n)?"(".concat(n.map(Tt).join(", "),")"):zr(n)].filter(L).join(" ")}(u),a.map(Zr).join(" "),i),c.filter(L).join(" ")}(r);break;case "index":e=function(r){var t=r.concurrently,e=r.filestream_on,n=r.keyword,o=r.if_not_exists,s=r.include,u=r.index_columns,i=r.index_type,c=r.index_using,l=r.index,f=r.on,b=r.index_options,p=r.algorithm_option,v=r.lock_option,d=r.on_kw,h=r.table,m=r.tablespace,E=r.type,A=r.where,T=r.with,_=r.with_before_where,g=T&&"WITH (".concat(U(T).join(", "),")"),I=s&&"".concat(w(s.keyword)," (").concat(s.columns.map((function(r){return "string"==typeof r?y(r):ct(r)})).join(", "),")"),S=l;l&&(S="string"==typeof l?y(l):[y(l.schema),y(l.name)].filter(L).join("."));var N=[w(E),w(i),w(n),w(o),w(t),S,w(d),hr(h)].concat(Wr(j(c)),["(".concat(O(u),")"),I,U(b).join(" "),tt(p),tt(v),a("TABLESPACE",C,m)]);_?N.push(g,a("WHERE",ct,A)):N.push(a("WHERE",ct,A),g);return N.push(a("ON",ct,f),a("FILESTREAM_ON",C,e)),N.filter(L).join(" ")}(r);break;case "sequence":e=function(r){var t=r.type,e=r.keyword,n=r.sequence,o=r.temporary,s=r.if_not_exists,u=r.create_definitions,a=[w(t),w(o),w(e),w(s),mr(n)];u&&a.push(u.map(Xr).join(" "));return a.filter(L).join(" ")}(r);break;case "database":case "schema":e=function(r){var t=r.type,e=r.keyword,n=r.replace,o=r.if_not_exists,s=r.create_definitions,u=r[e],a=u.db,i=u.schema,c=[C(a),i.map(C).join(".")].filter(L).join("."),l=[w(t),w(n),w(e),w(o),c];s&&l.push(s.map(Er).join(" "));return l.filter(L).join(" ")}(r);break;case "view":e=function(r){var t=r.algorithm,e=r.columns,n=r.definer,o=r.if_not_exists,s=r.keyword,u=r.recursive,a=r.replace,i=r.select,c=r.sql_security,l=r.temporary,f=r.type,b=r.view,p=r.with,v=r.with_options,C=b.db,m=b.schema,E=b.view,A=[y(C),y(m),y(E)].filter(L).join(".");return [w(f),w(a),w(l),w(u),t&&"ALGORITHM = ".concat(w(t)),ct(n),c&&"SQL SECURITY ".concat(w(c)),w(s),w(o),A,e&&"(".concat(e.map(d).join(", "),")"),v&&["WITH","(".concat(v.map((function(r){return h(r).join(" ")})).join(", "),")")].join(" "),"AS",or(i),w(p)].filter(L).join(" ")}(r);break;case "domain":e=function(r){var t=r.as,e=r.domain,n=r.type,o=r.keyword,s=r.target,u=r.create_definitions,a=[w(n),w(o),[y(e.schema),y(e.name)].filter(L).join("."),w(t),A(s)];if(u&&u.length>0){var i,c=[],l=function(r,t){var e="undefined"!=typeof Symbol&&r[Symbol.iterator]||r["@@iterator"];if(!e){if(Array.isArray(r)||(e=qr(r))||t){e&&(r=e);var n=0,o=function(){};return {s:o,n:function(){return n>=r.length?{done:true}:{done:false,value:r[n++]}},e:function(r){throw r},f:o}}throw new TypeError("Invalid attempt to iterate non-iterable instance.\nIn order to be iterable, non-array objects must have a [Symbol.iterator]() method.")}var s,u=true,a=false;return {s:function(){e=e.call(r);},n:function(){var r=e.next();return u=r.done,r},e:function(r){a=true,s=r;},f:function(){try{u||null==e.return||e.return();}finally{if(a)throw s}}}}(u);try{for(l.s();!(i=l.n()).done;){var f=i.value,b=f.type;switch(b){case "collate":c.push(ct(f));break;case "default":c.push(w(b),ct(f.value));break;case "constraint":c.push(Mr(f));}}}catch(r){l.e(r);}finally{l.f();}a.push(c.filter(L).join(" "));}return a.filter(L).join(" ")}(r);break;case "type":e=function(r){var t=r.as,e=r.create_definitions,n=r.keyword,o=r.name,s=r.resource,u=[w(r.type),w(n),[y(o.schema),y(o.name)].filter(L).join("."),w(t),w(s)];if(e){var a=[];switch(s){case "enum":case "range":a.push(ct(e));break;default:a.push("(".concat(e.map(Xr).join(", "),")"));}u.push(a.filter(L).join(" "));}return u.filter(L).join(" ")}(r);break;case "user":e=function(r){var t=r.attribute,e=r.comment,n=r.default_role,o=r.if_not_exists,s=r.keyword,u=r.lock_option,i=r.password_options,c=r.require,l=r.resource_options,f=r.type,b=r.user.map((function(r){var t=r.user,e=r.auth_option,n=[jr(t)];return e&&n.push(w(e.keyword),e.auth_plugin,C(e.value)),n.filter(L).join(" ")})).join(", "),p=[w(f),w(s),w(o),b];n&&p.push(w(n.keyword),n.value.map(jr).join(", "));p.push(a(c&&c.keyword,ct,c&&c.value)),l&&p.push(w(l.keyword),l.value.map((function(r){return ct(r)})).join(" "));i&&i.forEach((function(r){return p.push(a(r.keyword,ct,r.value))}));return p.push(C(u),_(e),C(t)),p.filter(L).join(" ")}(r);break;default:throw new Error("unknown create resource ".concat(t))}return e},comment:function(r){var t=r.expr,e=r.keyword,n=r.target;return [w(r.type),w(e),P(n),G(t)].filter(L).join(" ")},select:q,deallocate:function(r){var t=r.type,e=r.keyword,n=r.expr;return [w(t),w(e),ct(n)].filter(L).join(" ")},delete:function(r){var t=r.columns,e=r.from,n=r.table,o=r.where,s=r.orderby,u=r.with,i=r.limit,c=r.returning,l=[$(u),"DELETE"],f=St(t,e);return l.push(f),Array.isArray(n)&&(1===n.length&&true===n[0].addition||l.push(mr(n))),l.push(a("FROM",mr,e)),l.push(a("WHERE",ct,o)),l.push(ft(s,"order by")),l.push(B(i)),l.push(I(c)),l.filter(L).join(" ")},exec:function(r){var t=r.keyword,e=r.module,n=r.parameters;return [w(t),hr(e),(n||[]).map(Q).filter(L).join(", ")].filter(L).join(" ")},execute:function(r){var t=r.type,e=r.name,n=r.args,o=[w(t)],s=[e];n&&s.push("(".concat(ct(n).join(", "),")"));return o.push(s.join("")),o.filter(L).join(" ")},explain:function(r){var t=r.type,e=r.expr;return [w(t),q(e)].join(" ")},for:function(r){var t=r.type,e=r.label,n=r.target,o=r.query,s=r.stmts;return [e,w(t),n,"IN",sr([o]),"LOOP",sr(s),"END LOOP",e].filter(L).join(" ")},update:function(r){var t=r.from,e=r.table,n=r.set,o=r.where,s=r.orderby,u=r.with,i=r.limit,c=r.returning;return [$(u),"UPDATE",mr(e),a("SET",K,n),a("FROM",mr,t),a("WHERE",ct,o),ft(s,"order by"),B(i),I(c)].filter(L).join(" ")},if:function(r){var t=r.boolean_expr,e=r.else_expr,n=r.elseif_expr,o=r.if_expr,s=r.prefix,u=r.go,a=r.semicolons,i=r.suffix,c=[w(r.type),ct(t),C(s),"".concat(gr(o.ast||o)).concat(a[0]),w(u)];n&&c.push(n.map((function(r){return [w(r.type),ct(r.boolean_expr),"THEN",gr(r.then.ast||r.then),r.semicolon].filter(L).join(" ")})).join(" "));e&&c.push("ELSE","".concat(gr(e.ast||e)).concat(a[1]));return c.push(C(i)),c.filter(L).join(" ")},insert:fr,load_data:rr,drop:Rr,truncate:Rr,replace:fr,declare:function(r){var t=r.type,e=r.declare,n=r.symbol,o=[w(t)],s=e.map((function(r){var t=r.at,e=r.name,n=r.as,o=r.constant,s=r.datatype,u=r.not_null,a=r.prefix,i=r.definition,c=r.keyword,l=[[t,e].filter(L).join(""),w(n),w(o)];switch(c){case "variable":l.push(ht(s),ct(r.collate),w(u)),i&&l.push(w(i.keyword),ct(i.value));break;case "cursor":l.push(w(a));break;case "table":l.push(w(a),"(".concat(i.map(Xr).join(", "),")"));}return l.filter(L).join(" ")})).join("".concat(n," "));return o.push(s),o.join(" ")},use:function(r){var t=r.type,e=r.db,n=w(t),o=y(e);return "".concat(n," ").concat(o)},rename:function(r){var t=r.type,e=r.table,n=[],o="".concat(t&&t.toUpperCase()," TABLE");if(e){var s,u=Ir(e);try{for(u.s();!(s=u.n()).done;){var a=s.value.map(hr);n.push(a.join(" TO "));}}catch(r){u.e(r);}finally{u.f();}}return "".concat(o," ").concat(n.join(", "))},call:function(r){var t=ct(r.expr);return "".concat("CALL"," ").concat(t)},desc:function(r){var t=r.type,e=r.table,n=w(t);return "".concat(n," ").concat(y(e))},set:function(r){var t=r.type,e=r.expr,n=r.keyword,o=w(t),s=e.map(ct).join(", ");return [o,w(n),s].filter(L).join(" ")},lock:xr,unlock:xr,show:er,grant:kr,revoke:kr,proc:function(r){var t=r.stmt;switch(t.type){case "assign":return tr(t);case "return":return function(r){var t=r.type,e=r.expr;return [w(t),ct(e)].join(" ")}(t)}},raise:function(r){var t=r.type,e=r.level,n=r.raise,o=r.using,s=[w(t),w(e)];n&&s.push([C(n.keyword),"format"===n.type&&n.expr.length>0&&","].filter(L).join(""),n.expr.map((function(r){return ct(r)})).join(", "));o&&s.push(w(o.type),w(o.option),o.symbol,o.expr.map((function(r){return ct(r)})).join(", "));return s.filter(L).join(" ")},transaction:function(r){var t=r.expr,e=t.action,n=t.keyword,o=t.modes,s=[C(e),w(n)];return o&&s.push(o.map(C).join(", ")),s.filter(L).join(" ")}};function or(r){if(!r)return "";for(var t=nr[r.type],e=r,n=e._parentheses,o=e._orderby,s=e._limit,u=[n&&"(",t(r)];r._next;){var a=nr[r._next.type],i=w(r.set_op);u.push(i,a(r._next)),r=r._next;}return u.push(n&&")",ft(o,"order by"),B(s)),u.filter(L).join(" ")}function sr(r){for(var t=[],e=0,n=r.length;e<n;++e){var o=r[e]&&r[e].ast?r[e].ast:r[e],s=or(o);e===n-1&&"transaction"===o.type&&(s="".concat(s," ;")),t.push(s);}return t.join(" ; ")}function ur(r){var t=r.type;return "select"===t?or(r):("values"===t?r.values:r).map((function(r){var t=ct(r);return [w(r.prefix),"(".concat(t,")")].filter(L).join("")})).join(", ")}function ar(r){if(!r)return "";var t=["PARTITION","("];if(Array.isArray(r))t.push(r.map((function(r){return y(r)})).join(", "));else {var e=r.value;t.push(e.map(ct).join(", "));}return t.push(")"),t.filter(L).join("")}function ir(r){if(!r)return "";switch(r.type){case "column":return "(".concat(r.expr.map(Ct).join(", "),")")}}function cr(r){var t=r.expr,e=r.keyword,n=t.type,o=[w(e)];switch(n){case "origin":o.push(C(t));break;case "update":o.push("UPDATE",a("SET",K,t.set),a("WHERE",ct,t.where));}return o.filter(L).join(" ")}function lr(r){if(!r)return "";var t=r.action;return [ir(r.target),cr(t)].filter(L).join(" ")}function fr(r){var t=r.table,e=r.type,n=r.or,o=void 0===n?[]:n,s=r.prefix,u=void 0===s?"into":s,i=r.columns,c=r.conflict,l=r.values,f=r.where,b=r.on_duplicate_update,p=r.partition,v=r.returning,d=r.set,y=b||{},h=y.keyword,m=y.set,E=[w(e),o.map(C).join(" "),w(u),mr(t),ar(p)];return Array.isArray(i)&&E.push("(".concat(i.map(C).join(", "),")")),E.push(a(l&&"values"===l.type?"VALUES":"",ur,l)),E.push(a("ON CONFLICT",lr,c)),E.push(a("SET",K,d)),E.push(a("WHERE",ct,f)),E.push(a(h,K,m)),E.push(I(v)),E.filter(L).join(" ")}function br(r){var t=r.expr,e=r.unit,n=r.suffix;return ["INTERVAL",ct(t),w(e),ct(n)].filter(L).join(" ")}function pr(r){return function(r){if(Array.isArray(r))return vr(r)}(r)||function(r){if("undefined"!=typeof Symbol&&null!=r[Symbol.iterator]||null!=r["@@iterator"])return Array.from(r)}(r)||function(r,t){if(r){if("string"==typeof r)return vr(r,t);var e={}.toString.call(r).slice(8,-1);return "Object"===e&&r.constructor&&(e=r.constructor.name),"Map"===e||"Set"===e?Array.from(r):"Arguments"===e||/^(?:Ui|I)nt(?:8|16|32)(?:Clamped)?Array$/.test(e)?vr(r,t):void 0}}(r)||function(){throw new TypeError("Invalid attempt to spread non-iterable instance.\nIn order to be iterable, non-array objects must have a [Symbol.iterator]() method.")}()}function vr(r,t){(null==t||t>r.length)&&(t=r.length);for(var e=0,n=Array(t);e<t;e++)n[e]=r[e];return n}function dr(r){var t=r.type,e=r.as,n=r.expr,o=r.with_offset;return ["".concat(w(t),"(").concat(n&&ct(n)||"",")"),a("AS","string"==typeof e?y:ct,e),a(w(o&&o.keyword),y,o&&o.as)].filter(L).join(" ")}function yr(r){if(r)switch(r.type){case "pivot":case "unpivot":return function(r){var t=r.as,e=r.column,n=r.expr,o=r.in_expr,s=r.type,u=[ct(n),"FOR",Ct(e),M(o)],a=["".concat(w(s),"(").concat(u.join(" "),")")];return t&&a.push("AS",y(t)),a.join(" ")}(r);default:return ""}}function wr(r){if(r){var t=r.keyword,e=r.expr,n=r.index,o=r.index_columns,s=r.parentheses,u=r.prefix,a=[];switch(t.toLowerCase()){case "forceseek":a.push(w(t),"(".concat(y(n)),"(".concat(o.map(ct).filter(L).join(", "),"))"));break;case "spatial_window_max_cells":a.push(w(t),"=",ct(e));break;case "index":a.push(w(u),w(t),s?"(".concat(e.map((function(r){return y(r)})).join(", "),")"):"= ".concat(y(e)));break;default:a.push(ct(e));}return a.filter(L).join(" ")}}function Lr(r,t){var e=r.name,n=r.symbol;return [w(e),n,t].filter(L).join(" ")}function Cr(r){var t=[];switch(r.keyword){case "as":t.push("AS","OF",ct(r.of));break;case "from_to":t.push("FROM",ct(r.from),"TO",ct(r.to));break;case "between_and":t.push("BETWEEN",ct(r.between),"AND",ct(r.and));break;case "contained":t.push("CONTAINED","IN",ct(r.in));}return t.filter(L).join(" ")}function hr(r){if("UNNEST"===w(r.type))return dr(r);var t,e,n,o,s=r.table,u=r.db,i=r.as,c=r.expr,l=r.operator,f=r.prefix,b=r.schema,p=r.server,v=r.suffix,d=r.tablesample,m=r.temporal_table,E=r.table_hint,A=r.surround,T=void 0===A?{}:A,_=y(p,false,T.server),g=y(u,false,T.db),I=y(b,false,T.schema),S=s&&y(s,false,T.table);if(c)switch(c.type){case "values":var N=c.parentheses,O=c.values,R=c.prefix,x=[N&&"(","",N&&")"],j=ur(O);R&&(j=j.split("(").slice(1).map((function(r){return "".concat(w(R),"(").concat(r)})).join("")),x[1]="VALUES ".concat(j),S=x.filter(L).join("");break;case "tumble":S=function(r){if(!r)return "";var t=r.data,e=r.timecol,n=r.offset,o=r.size,s=[y(t.expr.db),y(t.expr.schema),y(t.expr.table)].filter(L).join("."),u="DESCRIPTOR(".concat(Ct(e.expr),")"),a=["TABLE(TUMBLE(TABLE ".concat(Lr(t,s)),Lr(e,u)],i=Lr(o,br(o.expr));return n&&n.expr?a.push(i,"".concat(Lr(n,br(n.expr)),"))")):a.push("".concat(i,"))")),a.filter(L).join(", ")}(c);break;case "generator":e=(t=c).keyword,n=t.type,o=t.generators.map((function(r){return h(r).join(" ")})).join(", "),S="".concat(w(e),"(").concat(w(n),"(").concat(o,"))");break;default:S=ct(c);}var k=[[_,g,I,S=[w(f),S,w(v)].filter(L).join(" ")].filter(L).join(".")];if(d){var U=["TABLESAMPLE",ct(d.expr),C(d.repeatable)].filter(L).join(" ");k.push(U);}k.push(function(r){if(r){var t=r.keyword,e=r.expr;return [w(t),Cr(e)].filter(L).join(" ")}}(m),a("AS","string"==typeof i?y:ct,i),yr(l)),E&&k.push(w(E.keyword),"(".concat(E.expr.map(wr).filter(L).join(", "),")"));var D=k.filter(L).join(" ");return r.parentheses?"(".concat(D,")"):D}function mr(r){if(!r)return "";if(!Array.isArray(r)){var t=r.expr,e=r.parentheses,n=r.joins,o=mr(t);if(e){for(var s=[],u=[],i=true===e?1:e.length,c=0;c++<i;)s.push("("),u.push(")");var l=n&&n.length>0?mr([""].concat(pr(n))):"";return s.join("")+o+u.join("")+l}return o}var f=r[0],b=[];if("dual"===f.type)return "DUAL";b.push(hr(f));for(var p=1;p<r.length;++p){var v=r[p],d=v.on,y=v.using,h=v.join,m=[],E=Array.isArray(v)||Object.hasOwnProperty.call(v,"joins");m.push(h?" ".concat(w(h)):","),m.push(E?mr(v):hr(v)),m.push(a("ON",ct,d)),y&&m.push("USING (".concat(y.map(C).join(", "),")")),b.push(m.filter(L).join(" "));}return b.filter(L).join("")}function Er(r){var t=r.keyword,e=r.symbol,n=r.value,o=[t.toUpperCase()];e&&o.push(e);var s=C(n);switch(t){case "partition by":case "default collate":s=ct(n);break;case "options":s="(".concat(n.map((function(r){return [r.keyword,r.symbol,ct(r.value)].join(" ")})).join(", "),")");break;case "cluster by":s=n.map(ct).join(", ");}return o.push(s),o.filter(L).join(" ")}var Ar=["analyze","attach","select","deallocate","delete","exec","update","insert","drop","rename","truncate","call","desc","use","alter","set","create","lock","unlock","declare","show","replace","if","grant","revoke","proc","raise","execute","transaction","explain","comment","load_data"];function Tr(r){var t=r&&r.ast?r.ast:r;if(!Ar.includes(t.type))throw new Error("".concat(t.type," statements not supported at the moment"))}function _r(r){return Array.isArray(r)?(r.forEach(Tr),sr(r)):(Tr(r),or(r))}function gr(r){return "go"===r.go?function r(t){if(!t||0===t.length)return "";var e=[_r(t.ast)];return t.go_next&&e.push(t.go.toUpperCase(),r(t.go_next)),e.filter((function(r){return r})).join(" ")}(r):_r(r)}function Ir(r,t){var e="undefined"!=typeof Symbol&&r[Symbol.iterator]||r["@@iterator"];if(!e){if(Array.isArray(r)||(e=Nr(r))||t){e&&(r=e);var n=0,o=function(){};return {s:o,n:function(){return n>=r.length?{done:true}:{done:false,value:r[n++]}},e:function(r){throw r},f:o}}throw new TypeError("Invalid attempt to iterate non-iterable instance.\nIn order to be iterable, non-array objects must have a [Symbol.iterator]() method.")}var s,u=true,a=false;return {s:function(){e=e.call(r);},n:function(){var r=e.next();return u=r.done,r},e:function(r){a=true,s=r;},f:function(){try{u||null==e.return||e.return();}finally{if(a)throw s}}}}function Sr(r){return function(r){if(Array.isArray(r))return Or(r)}(r)||function(r){if("undefined"!=typeof Symbol&&null!=r[Symbol.iterator]||null!=r["@@iterator"])return Array.from(r)}(r)||Nr(r)||function(){throw new TypeError("Invalid attempt to spread non-iterable instance.\nIn order to be iterable, non-array objects must have a [Symbol.iterator]() method.")}()}function Nr(r,t){if(r){if("string"==typeof r)return Or(r,t);var e={}.toString.call(r).slice(8,-1);return "Object"===e&&r.constructor&&(e=r.constructor.name),"Map"===e||"Set"===e?Array.from(r):"Arguments"===e||/^(?:Ui|I)nt(?:8|16|32)(?:Clamped)?Array$/.test(e)?Or(r,t):void 0}}function Or(r,t){(null==t||t>r.length)&&(t=r.length);for(var e=0,n=Array(t);e<t;e++)n[e]=r[e];return n}function Rr(r){var t=r.type,e=r.keyword,n=r.name,o=r.prefix,s=r.suffix,u=[w(t),w(e),w(o)];switch(e){case "table":u.push(mr(n));break;case "trigger":u.push([n[0].schema?"".concat(y(n[0].schema),"."):"",y(n[0].trigger)].filter(L).join(""));break;case "database":case "schema":case "procedure":u.push(y(n));break;case "view":u.push(mr(n),r.options&&r.options.map(ct).filter(L).join(" "));break;case "index":u.push.apply(u,[Ct(n)].concat(Sr(r.table?["ON",hr(r.table)]:[]),[r.options&&r.options.map(ct).filter(L).join(" ")]));break;case "type":u.push(n.map(Ct).join(", "),r.options&&r.options.map(ct).filter(L).join(" "));}return s&&u.push(s.map(ct).filter(L).join(" ")),u.filter(L).join(" ")}function xr(r){var t=r.type,e=r.keyword,n=r.tables,o=[t.toUpperCase(),w(e)];if("UNLOCK"===t.toUpperCase())return o.join(" ");var s,u=[],a=Ir(n);try{var i=function(){var r=s.value,t=r.table,e=r.lock_type,n=[hr(t)];if(e){n.push(["prefix","type","suffix"].map((function(r){return w(e[r])})).filter(L).join(" "));}u.push(n.join(" "));};for(a.s();!(s=a.n()).done;)i();}catch(r){a.e(r);}finally{a.f();}return o.push.apply(o,[u.join(", ")].concat(Sr(function(r){var t=r.lock_mode,e=r.nowait,n=[];if(t){var o=t.mode;n.push(o.toUpperCase());}return e&&n.push(e.toUpperCase()),n}(r)))),o.filter(L).join(" ")}function jr(r){var t=r.name,e=r.host,n=[C(t)];return e&&n.push("@",C(e)),n.join("")}function kr(r){var t=r.type,e=r.grant_option_for,n=r.keyword,o=r.objects,s=r.on,u=r.to_from,a=r.user_or_roles,i=r.with,c=[w(t),C(e)],l=o.map((function(r){var t=r.priv,e=r.columns,n=[ct(t)];return e&&n.push("(".concat(e.map(Ct).join(", "),")")),n.join(" ")})).join(", ");if(c.push(l),s)switch(c.push("ON"),n){case "priv":c.push(C(s.object_type),s.priv_level.map((function(r){return [y(r.prefix),y(r.name)].filter(L).join(".")})).join(", "));break;case "proxy":c.push(jr(s));}return c.push(w(u),a.map(jr).join(", ")),c.push(C(i)),c.filter(L).join(" ")}function Ur(r){return function(r){if(Array.isArray(r))return Dr(r)}(r)||function(r){if("undefined"!=typeof Symbol&&null!=r[Symbol.iterator]||null!=r["@@iterator"])return Array.from(r)}(r)||function(r,t){if(r){if("string"==typeof r)return Dr(r,t);var e={}.toString.call(r).slice(8,-1);return "Object"===e&&r.constructor&&(e=r.constructor.name),"Map"===e||"Set"===e?Array.from(r):"Arguments"===e||/^(?:Ui|I)nt(?:8|16|32)(?:Clamped)?Array$/.test(e)?Dr(r,t):void 0}}(r)||function(){throw new TypeError("Invalid attempt to spread non-iterable instance.\nIn order to be iterable, non-array objects must have a [Symbol.iterator]() method.")}()}function Dr(r,t){(null==t||t>r.length)&&(t=r.length);for(var e=0,n=Array(t);e<t;e++)n[e]=r[e];return n}function Mr(r){if(r){var t=r.constraint,e=r.constraint_type,n=r.enforced,o=r.index,s=r.keyword,u=r.reference_definition,i=r.for,c=r.with_values,l=[],f=b().database;l.push(w(s)),l.push(y(t));var p=w(e);return "sqlite"===f.toLowerCase()&&"UNIQUE KEY"===p&&(p="UNIQUE"),l.push(p),l.push("sqlite"!==f.toLowerCase()&&y(o)),l.push.apply(l,Ur(D(r))),l.push.apply(l,Ur(mt(u))),l.push(w(n)),l.push(a("FOR",y,i)),l.push(C(c)),l.filter(L).join(" ")}}function Pr(r){if(r){var t=r.type;return "rows"===t?[w(t),ct(r.expr)].filter(L).join(" "):ct(r)}}function Gr(r){if("string"==typeof r)return r;var t=r.window_specification;return "(".concat(function(r){var t=r.name,e=r.partitionby,n=r.orderby,o=r.window_frame_clause;return [t,ft(e,"partition by"),ft(n,"order by"),Pr(o)].filter(L).join(" ")}(t),")")}function Fr(r){var t=r.name,e=r.as_window_specification;return "".concat(t," AS ").concat(Gr(e))}function Hr(r){if(r){var t=r.as_window_specification,e=r.expr,n=r.keyword,o=r.type,s=r.parentheses,u=w(o);if("WINDOW"===u)return "OVER ".concat(Gr(t));if("ON UPDATE"===u){var a="".concat(w(o)," ").concat(w(n)),i=ct(e)||[];return s&&(a="".concat(a,"(").concat(i.join(", "),")")),a}if(r.partitionby)return ["OVER","(".concat(ft(r.partitionby,"partition by")),"".concat(ft(r.orderby,"order by"),")")].filter(L).join(" ");throw new Error("unknown over type")}}function Yr(r){if(!r||!r.array)return "";var t=r.array.keyword;if(t)return w(t);for(var e=r.array,n=e.dimension,o=e.length,s=[],u=0;u<n;u++)s.push("["),o&&o[u]&&s.push(C(o[u])),s.push("]");return s.join("")}function Br(r){for(var t=r.target,e=r.expr,n=r.keyword,o=r.symbol,s=r.as,u=r.offset,a=r.parentheses,i=wt({expr:e,offset:u}),c=[],l=0,f=t.length;l<f;++l){var b=t[l],p=b.angle_brackets,v=b.length,d=b.dataType,h=b.parentheses,m=b.quoted,E=b.scale,A=b.suffix,T=b.expr,_=T?ct(T):"";null!=v&&(_=E?"".concat(v,", ").concat(E):v),h&&(_="(".concat(_,")")),p&&(_="<".concat(_,">")),A&&A.length&&(_+=" ".concat(A.map(C).join(" ")));var g="::",I="",S=[];"as"===o&&(0===l&&(i="".concat(w(n),"(").concat(i)),I=")",g=" ".concat(o.toUpperCase()," ")),0===l&&S.push(i);var N=Yr(b);S.push(g,m,d,m,N,_,I),c.push(S.filter(L).join(""));}s&&c.push(" AS ".concat(y(s)));var O=c.filter(L).join("");return a?"(".concat(O,")"):O}function $r(r){var t=r.args,e=r.array_index,n=r.name,o=r.args_parentheses,s=r.parentheses,u=r.within_group,a=r.over,i=r.suffix,c=Hr(a),l=function(r){if(!r)return "";var t=r.type,e=r.keyword,n=r.orderby;return [w(t),w(e),"(".concat(ft(n,"order by"),")")].filter(L).join(" ")}(u),f=ct(i),b=[C(n.schema),n.name.map(C).join(".")].filter(L).join(".");if(!t)return [b,l,c].filter(L).join(" ");var p=r.separator||", ";"TRIM"===w(b)&&(p=" ");var v=[b];v.push(false===o?" ":"(");var d=ct(t);if(Array.isArray(p)){for(var y=d[0],h=1,m=d.length;h<m;++h)y=[y,d[h]].join(" ".concat(ct(p[h-1])," "));v.push(y);}else v.push(d.join(p));return  false!==o&&v.push(")"),v.push(Lt(e)),v=[v.join(""),f].filter(L).join(" "),[s?"(".concat(v,")"):v,l,c].filter(L).join(" ")}function Wr(r){return function(r){if(Array.isArray(r))return Vr(r)}(r)||function(r){if("undefined"!=typeof Symbol&&null!=r[Symbol.iterator]||null!=r["@@iterator"])return Array.from(r)}(r)||qr(r)||function(){throw new TypeError("Invalid attempt to spread non-iterable instance.\nIn order to be iterable, non-array objects must have a [Symbol.iterator]() method.")}()}function qr(r,t){if(r){if("string"==typeof r)return Vr(r,t);var e={}.toString.call(r).slice(8,-1);return "Object"===e&&r.constructor&&(e=r.constructor.name),"Map"===e||"Set"===e?Array.from(r):"Arguments"===e||/^(?:Ui|I)nt(?:8|16|32)(?:Clamped)?Array$/.test(e)?Vr(r,t):void 0}}function Vr(r,t){(null==t||t>r.length)&&(t=r.length);for(var e=0,n=Array(t);e<t;e++)n[e]=r[e];return n}function Xr(r){if(!r)return [];var t,e,n,o,s=r.resource;switch(s){case "column":return Tt(r);case "index":return e=[],n=(t=r).keyword,o=t.index,e.push(w(n)),e.push(o),e.push.apply(e,R(D(t))),e.filter(L).join(" ");case "constraint":return Mr(r);case "sequence":return [w(r.prefix),ct(r.value)].filter(L).join(" ");default:throw new Error("unknown resource = ".concat(s," type"))}}function Kr(r){var t=[];switch(r.keyword){case "from":t.push("FROM","(".concat(C(r.from),")"),"TO","(".concat(C(r.to),")"));break;case "in":t.push("IN","(".concat(ct(r.in),")"));break;case "with":t.push("WITH","(MODULUS ".concat(C(r.modulus),", REMAINDER ").concat(C(r.remainder),")"));}return t.filter(L).join(" ")}function Qr(r){var t=r.keyword,e=r.table,n=r.for_values,o=r.tablespace,s=[w(t),hr(e),w(n.keyword),Kr(n.expr)];return o&&s.push("TABLESPACE",C(o)),s.filter(L).join(" ")}function zr(r){return r.dataType?A(r):[y(r.db),y(r.schema),y(r.table)].filter(L).join(".")}function Zr(r){var t=r.type;switch(t){case "as":return [w(t),r.symbol,or(r.declare),w(r.begin),sr(r.expr),w(r.end),r.symbol].filter(L).join(" ");case "set":return [w(t),r.parameter,w(r.value&&r.value.prefix),r.value&&r.value.expr.map(ct).join(", ")].filter(L).join(" ");case "return":return [w(t),ct(r.expr)].filter(L).join(" ");default:return ct(r)}}function Jr(r){var t=r.type,e=r.symbol,n=r.value,o=[w(t),e];switch(w(t)){case "SFUNC":o.push([y(n.schema),n.name].filter(L).join("."));break;case "STYPE":case "MSTYPE":o.push(A(n));break;default:o.push(ct(n));}return o.filter(L).join(" ")}function rt(r,t){switch(r){case "add":var e=t.map((function(r){var t=r.name,e=r.value;return ["PARTITION",C(t),"VALUES",w(e.type),"(".concat(C(e.expr),")")].join(" ")})).join(", ");return "(".concat(e,")");default:return St(t)}}function tt(r){if(!r)return "";var t=r.action,e=r.create_definitions,n=r.if_not_exists,o=r.keyword,s=r.if_exists,u=r.old_column,a=r.prefix,i=r.resource,c=r.symbol,l=r.suffix,f="",b=[];switch(i){case "column":b=[Tt(r)];break;case "index":b=D(r),f=r[i];break;case "table":case "schema":f=y(r[i]);break;case "aggregate":case "function":case "domain":case "type":f=y(r[i]);break;case "algorithm":case "lock":case "table-option":f=[c,w(r[i])].filter(L).join(" ");break;case "constraint":f=y(r[i]),b=[Xr(e)];break;case "partition":b=[rt(t,r.partitions)];break;case "key":f=y(r[i]);break;default:f=[c,r[i]].filter((function(r){return null!==r})).join(" ");}var p=[w(t),w(o),w(n),w(s),u&&Ct(u),w(a),f&&f.trim(),b.filter(L).join(" ")];return l&&p.push(w(l.keyword),l.expr&&Ct(l.expr)),p.filter(L).join(" ")}function et(r){var t=r.default&&[w(r.default.keyword),ct(r.default.value)].join(" ");return [w(r.mode),r.name,A(r.type),t].filter(L).join(" ")}function nt(r){return (nt="function"==typeof Symbol&&"symbol"==typeof Symbol.iterator?function(r){return typeof r}:function(r){return r&&"function"==typeof Symbol&&r.constructor===Symbol&&r!==Symbol.prototype?"symbol":typeof r})(r)}function ot(r){var t=r.expr_list;switch(w(r.type)){case "STRUCT":case "ROW":return "(".concat(St(t),")");case "ARRAY":return function(r){var t=r.array_path,e=r.brackets,n=r.expr_list,o=r.parentheses;if(!n)return "[".concat(St(t),"]");var s=Array.isArray(n)?n.map((function(r){return "(".concat(St(r),")")})).filter(L).join(", "):ct(n);return e?"[".concat(s,"]"):o?"(".concat(s,")"):s}(r);default:return ""}}function st(r){var t=r.definition,e=[w(r.keyword)];return t&&"object"===nt(t)&&(e.length=0,e.push(T(t))),e.push(ot(r)),e.filter(L).join("")}function ut(r){return (ut="function"==typeof Symbol&&"symbol"==typeof Symbol.iterator?function(r){return typeof r}:function(r){return r&&"function"==typeof Symbol&&r.constructor===Symbol&&r!==Symbol.prototype?"symbol":typeof r})(r)}var at={alter:tt,aggr_func:function(r){var t=r.args,e=r.filter,n=r.over,o=r.within_group_orderby,s=ct(t.expr);s=Array.isArray(s)?s.join(", "):s;var u=r.name,a=Hr(n);t.distinct&&(s=["DISTINCT",s].join(" ")),t.separator&&t.separator.delimiter&&(s=[s,C(t.separator.delimiter)].join("".concat(t.separator.symbol," "))),t.separator&&t.separator.expr&&(s=[s,ct(t.separator.expr)].join(" ")),t.orderby&&(s=[s,ft(t.orderby,"order by")].join(" ")),t.separator&&t.separator.value&&(s=[s,w(t.separator.keyword),C(t.separator.value)].filter(L).join(" "));var i=o?"WITHIN GROUP (".concat(ft(o,"order by"),")"):"",c=e?"FILTER (WHERE ".concat(ct(e.where),")"):"";return ["".concat(u,"(").concat(s,")"),i,a,c].filter(L).join(" ")},any_value:function(r){var t=r.args,e=r.type,n=r.over,o=t.expr,s=t.having,u="".concat(w(e),"(").concat(ct(o));return s&&(u="".concat(u," HAVING ").concat(w(s.prefix)," ").concat(ct(s.expr))),[u="".concat(u,")"),Hr(n)].filter(L).join(" ")},window_func:function(r){var t=r.over;return [function(r){var t=r.args,e=r.name,n=r.consider_nulls,o=void 0===n?"":n,s=r.separator,u=void 0===s?", ":s;return [e,"(",t?ct(t).join(u):"",")",o&&" ",o].filter(L).join("")}(r),Hr(t)].filter(L).join(" ")},array:st,assign:tr,binary_expr:M,case:function(r){var t=["CASE"],e=r.args,n=r.expr,o=r.parentheses;n&&t.push(ct(n));for(var s=0,u=e.length;s<u;++s)t.push(e[s].type.toUpperCase()),e[s].cond&&(t.push(ct(e[s].cond)),t.push("THEN")),t.push(ct(e[s].result));return t.push("END"),o?"(".concat(t.join(" "),")"):t.join(" ")},cast:Br,collate:bt,column_ref:Ct,column_definition:Tt,datatype:A,extract:function(r){var t=r.args,e=r.type,n=t.field,o=t.cast_type,s=t.source,u=["".concat(w(e),"(").concat(w(n)),"FROM",w(o),ct(s)];return "".concat(u.filter(L).join(" "),")")},flatten:function(r){var t=r.args,e=r.type,n=["input","path","outer","recursive","mode"].map((function(r){return function(r){if(!r)return "";var t=r.type,e=r.symbol,n=r.value;return [w(t),e,ct(n)].filter(L).join(" ")}(t[r])})).filter(L).join(", ");return "".concat(w(e),"(").concat(n,")")},fulltext_search:function(r){var t=r.against,e=r.as,n=r.columns,o=r.match,s=r.mode,u=[w(o),"(".concat(n.map((function(r){return Ct(r)})).join(", "),")")].join(" "),a=[w(t),["(",ct(r.expr),s&&" ".concat(C(s)),")"].filter(L).join("")].join(" ");return [u,a,_t(e)].filter(L).join(" ")},function:$r,lambda:function(r){var t=r.args,e=r.expr,n=t.value,o=t.parentheses,s=n.map(ct).join(", ");return [o?"(".concat(s,")"):s,"->",ct(e)].join(" ")},load_data:rr,insert:or,interval:br,json:function(r){var t=r.keyword,e=r.expr_list;return [w(t),e.map((function(r){return ct(r)})).join(", ")].join(" ")},json_object_arg:function(r){var t=r.expr,e=t.key,n=t.value,o=t.on,s=[ct(e),"VALUE",ct(n)];return o&&s.push("ON","NULL",ct(o)),s.filter(L).join(" ")},json_visitor:function(r){return [r.symbol,ct(r.expr)].join("")},func_arg:function(r){var t=r.value;return [t.name,t.symbol,ct(t.expr)].filter(L).join(" ")},show:er,struct:st,tablefunc:function(r){var t=r.as,e=r.name,n=r.args,o=[C(e.schema),e.name.map(C).join(".")].filter(L).join(".");return ["".concat(o,"(").concat(ct(n).join(", "),")"),"AS",$r(t)].join(" ")},tables:mr,unnest:dr,values:ur,window:function(r){return r.expr.map(Fr).join(", ")}};function it(r){var t=r.prefix,e=void 0===t?"@":t,n=r.name,o=r.members,s=r.quoted,u=r.suffix,a=[],i=o&&o.length>0?"".concat(n,".").concat(o.join(".")):n,c="".concat(e||"").concat(i);return u&&(c+=u),a.push(c),[s,a.join(" "),s].filter(L).join("")}function ct(r){if(r){var t=r;if(r.ast){var e=t.ast;Reflect.deleteProperty(t,e);for(var n=0,o=Object.keys(e);n<o.length;n++){var s=o[n];t[s]=e[s];}}var u=t.type;return "expr"===u?ct(t.expr):at[u]?at[u](t):C(t)}}function lt(r){return r?(Array.isArray(r)||(r=[r]),r.map(ct)):[]}function ft(r,t){if(!Array.isArray(r))return "";var e=[],n=w(t);switch(n){case "ORDER BY":e=r.map((function(r){return [ct(r.expr),r.type||"ASC",w(r.nulls)].filter(L).join(" ")}));break;case "PARTITION BY":default:e=r.map((function(r){return ct(r.expr)}));}return i(n,e.join(", "))}function bt(r){if(r){var t=r.keyword,e=r.collate,n=e.name,o=e.symbol,s=e.value,u=[w(t)];return s||u.push(o),u.push(Array.isArray(n)?n.map(C).join("."):C(n)),s&&u.push(o),u.push(ct(s)),u.filter(L).join(" ")}}function pt(r){return (pt="function"==typeof Symbol&&"symbol"==typeof Symbol.iterator?function(r){return typeof r}:function(r){return r&&"function"==typeof Symbol&&r.constructor===Symbol&&r!==Symbol.prototype?"symbol":typeof r})(r)}function vt(r){return function(r){if(Array.isArray(r))return yt(r)}(r)||function(r){if("undefined"!=typeof Symbol&&null!=r[Symbol.iterator]||null!=r["@@iterator"])return Array.from(r)}(r)||dt(r)||function(){throw new TypeError("Invalid attempt to spread non-iterable instance.\nIn order to be iterable, non-array objects must have a [Symbol.iterator]() method.")}()}function dt(r,t){if(r){if("string"==typeof r)return yt(r,t);var e={}.toString.call(r).slice(8,-1);return "Object"===e&&r.constructor&&(e=r.constructor.name),"Map"===e||"Set"===e?Array.from(r):"Arguments"===e||/^(?:Ui|I)nt(?:8|16|32)(?:Clamped)?Array$/.test(e)?yt(r,t):void 0}}function yt(r,t){(null==t||t>r.length)&&(t=r.length);for(var e=0,n=Array(t);e<t;e++)n[e]=r[e];return n}function wt(r,t){if("string"==typeof r)return y(r,t);var e=r.expr,n=r.offset,o=r.suffix,s=n&&n.map((function(r){return ["[",r.name,"".concat(r.name?"(":""),C(r.value),"".concat(r.name?")":""),"]"].filter(L).join("")})).join("");return [ct(e),s,o].filter(L).join("")}function Lt(r){if(!r||0===r.length)return "";var t,e=[],n=function(r,t){var e="undefined"!=typeof Symbol&&r[Symbol.iterator]||r["@@iterator"];if(!e){if(Array.isArray(r)||(e=dt(r))||t){e&&(r=e);var n=0,o=function(){};return {s:o,n:function(){return n>=r.length?{done:true}:{done:false,value:r[n++]}},e:function(r){throw r},f:o}}throw new TypeError("Invalid attempt to iterate non-iterable instance.\nIn order to be iterable, non-array objects must have a [Symbol.iterator]() method.")}var s,u=true,a=false;return {s:function(){e=e.call(r);},n:function(){var r=e.next();return u=r.done,r},e:function(r){a=true,s=r;},f:function(){try{u||null==e.return||e.return();}finally{if(a)throw s}}}}(r);try{for(n.s();!(t=n.n()).done;){var o=t.value,s=o.brackets?"[".concat(ct(o.index),"]"):"".concat(o.notation).concat(ct(o.index));o.property&&(s="".concat(s,".").concat(C(o.property))),e.push(s);}}catch(r){n.e(r);}finally{n.f();}return e.join("")}function Ct(r){var t=r.array_index,e=r.as,n=r.column,o=r.collate,s=r.db,u=r.isDual,i=r.notations,c=void 0===i?[]:i,l=r.options,f=r.schema,b=r.table,p=r.parentheses,v=r.suffix,d=r.order_by,C=r.subFields,h=void 0===C?[]:C,m="*"===n?"*":wt(n,u),E=[s,f,b].filter(L).map((function(r){return "".concat("string"==typeof r?y(r):ct(r))})),A=E[0];if(A){for(var T=1;T<E.length;++T)A="".concat(A).concat(c[T]||".").concat(E[T]);m="".concat(A).concat(c[T]||".").concat(m);}var _=[m=["".concat(m).concat(Lt(t))].concat(vt(h)).join("."),bt(o),ct(l),a("AS",ct,e)];_.push("string"==typeof v?w(v):ct(v)),_.push(w(d));var g=_.filter(L).join(" ");return p?"(".concat(g,")"):g}function ht(r){if(r){var t=r.schema,e=r.dataType,n=r.length,o=r.suffix,s=r.scale,u=r.expr,a=A({schema:t,dataType:e,length:n,suffix:o,scale:s,parentheses:null!=n});if(u&&(a+=ct(u)),r.array){var i=Yr(r);a+=[/^\[.*\]$/.test(i)?"":" ",i].join("");}return a}}function mt(r){var t=[];if(!r)return t;var e=r.definition,n=r.keyword,o=r.match,s=r.table,u=r.on_action;return t.push(w(n)),t.push(mr(s)),t.push(e&&"(".concat(e.map((function(r){return ct(r)})).join(", "),")")),t.push(w(o)),u.map((function(r){return t.push(w(r.type),ct(r.value))})),t.filter(L)}function Et(r){var t=[],e=r.nullable,n=r.character_set,o=r.check,s=r.comment,u=r.constraint,i=r.collate,c=r.storage,l=r.using,f=r.default_val,p=r.generated,v=r.auto_increment,d=r.unique,y=r.primary_key,m=r.column_format,E=r.reference_definition,A=r.generated_by_default,T=[w(e&&e.action),w(e&&e.value)].filter(L).join(" ");if(p||t.push(T),f){var g=f.type,I=f.value;t.push(g.toUpperCase(),ct(I));}var S=b().database;return u&&t.push(w(u.keyword),C(u.constraint)),t.push(Mr(o)),t.push(function(r){if(r)return [w(r.value),"(".concat(ct(r.expr),")"),w(r.storage_type)].filter(L).join(" ")}(p)),p&&t.push(T),t.push(N(v),w(y),w(d),C(A),_(s)),t.push.apply(t,vt(h(n))),"sqlite"!==S.toLowerCase()&&t.push(ct(i)),t.push.apply(t,vt(h(m))),t.push.apply(t,vt(h(c))),t.push.apply(t,vt(mt(E))),t.push(a("USING",ct,l)),t.filter(L).join(" ")}function At(r){var t=r.column,e=r.collate,n=r.nulls,o=r.opclass,s=r.order_by,u="string"==typeof t?{type:"column_ref",table:r.table,column:t}:r;return u.collate=null,[ct(u),ct(e),o,w(s),w(n)].filter(L).join(" ")}function Tt(r){var t=[],e=Ct(r.column),n=ht(r.definition);return t.push(e),t.push(n),t.push(Et(r)),t.filter(L).join(" ")}function _t(r){return r?"object"===pt(r)?["AS",ct(r)].join(" "):["AS",/^(`?)[a-z_][0-9a-z_]*(`?)$/i.test(r)?y(r):d(r)].join(" "):""}function gt(r,t){var e=r.expr,n=r.type;if("cast"===n)return Br(r);t&&(e.isDual=t);var o=ct(e),s=r.expr_list;if(s){var u=[o],a=s.map((function(r){return gt(r,t)})).join(", ");return u.push([w(n),n&&"(",a,n&&")"].filter(L).join("")),u.filter(L).join(" ")}return e.parentheses&&Reflect.has(e,"array_index")&&"cast"!==e.type&&(o="(".concat(o,")")),e.array_index&&"column_ref"!==e.type&&"function"!==e.type&&(o="".concat(o).concat(Lt(e.array_index))),[o,_t(r.as)].filter(L).join(" ")}function It(r){var t=Array.isArray(r)&&r[0];return !(!t||"dual"!==t.type)}function St(r,t){if(!r||"*"===r)return r;var e=It(t);return r.map((function(r){return gt(r,e)})).join(", ")}at.var=it,at.expr_list=function(r){var t=lt(r.value),e=r.parentheses,n=r.separator;if(!e&&!n)return t;var o=n||", ",s=t.join(o);return e?"(".concat(s,")"):s},at.select=function(r){var t="object"===ut(r._next)?or(r):q(r);return r.parentheses?"(".concat(t,")"):t},at.unary_expr=function(r){var t=r.operator,e=r.parentheses,n=r.expr,o="-"===t||"+"===t||"~"===t||"!"===t?"":" ",s="".concat(t).concat(o).concat(ct(n));return e?"(".concat(s,")"):s},at.map_object=function(r){var t=r.keyword,e=r.expr.map((function(r){return [C(r.key),C(r.value)].join(", ")})).join(", ");return [w(t),"[".concat(e,"]")].join("")};var Nt=e(0);function Ot(r){return (Ot="function"==typeof Symbol&&"symbol"==typeof Symbol.iterator?function(r){return typeof r}:function(r){return r&&"function"==typeof Symbol&&r.constructor===Symbol&&r!==Symbol.prototype?"symbol":typeof r})(r)}var Rt,xt,jt,kt=(Rt={},xt="mysql",jt=Nt.parse,(xt=function(r){var t=function(r,t){if("object"!=Ot(r)||!r)return r;var e=r[Symbol.toPrimitive];if(void 0!==e){var n=e.call(r,t);if("object"!=Ot(n))return n;throw new TypeError("@@toPrimitive must return a primitive value.")}return ("string"===t?String:Number)(r)}(r,"string");return "symbol"==Ot(t)?t:t+""}(xt))in Rt?Object.defineProperty(Rt,xt,{value:jt,enumerable:true,configurable:true,writable:true}):Rt[xt]=jt,Rt);function Ut(r){return (Ut="function"==typeof Symbol&&"symbol"==typeof Symbol.iterator?function(r){return typeof r}:function(r){return r&&"function"==typeof Symbol&&r.constructor===Symbol&&r!==Symbol.prototype?"symbol":typeof r})(r)}function Dt(r,t){var e="undefined"!=typeof Symbol&&r[Symbol.iterator]||r["@@iterator"];if(!e){if(Array.isArray(r)||(e=function(r,t){if(r){if("string"==typeof r)return Mt(r,t);var e={}.toString.call(r).slice(8,-1);return "Object"===e&&r.constructor&&(e=r.constructor.name),"Map"===e||"Set"===e?Array.from(r):"Arguments"===e||/^(?:Ui|I)nt(?:8|16|32)(?:Clamped)?Array$/.test(e)?Mt(r,t):void 0}}(r))||t){e&&(r=e);var n=0,o=function(){};return {s:o,n:function(){return n>=r.length?{done:true}:{done:false,value:r[n++]}},e:function(r){throw r},f:o}}throw new TypeError("Invalid attempt to iterate non-iterable instance.\nIn order to be iterable, non-array objects must have a [Symbol.iterator]() method.")}var s,u=true,a=false;return {s:function(){e=e.call(r);},n:function(){var r=e.next();return u=r.done,r},e:function(r){a=true,s=r;},f:function(){try{u||null==e.return||e.return();}finally{if(a)throw s}}}}function Mt(r,t){(null==t||t>r.length)&&(t=r.length);for(var e=0,n=Array(t);e<t;e++)n[e]=r[e];return n}function Pt(r,t){for(var e=0;e<t.length;e++){var n=t[e];n.enumerable=n.enumerable||false,n.configurable=true,"value"in n&&(n.writable=true),Object.defineProperty(r,Gt(n.key),n);}}function Gt(r){var t=function(r,t){if("object"!=Ut(r)||!r)return r;var e=r[Symbol.toPrimitive];if(void 0!==e){var n=e.call(r,t);if("object"!=Ut(n))return n;throw new TypeError("@@toPrimitive must return a primitive value.")}return (String)(r)}(r,"string");return "symbol"==Ut(t)?t:t+""}var Ft=function(){return function(r,t,e){return t&&Pt(r.prototype,t),Object.defineProperty(r,"prototype",{writable:false}),r}((function r(){!function(r,t){if(!(r instanceof t))throw new TypeError("Cannot call a class as a function")}(this,r);}),[{key:"astify",value:function(r){var t=arguments.length>1&&void 0!==arguments[1]?arguments[1]:s,e=this.parse(r,t);return e&&e.ast}},{key:"sqlify",value:function(r){var t=arguments.length>1&&void 0!==arguments[1]?arguments[1]:s;return p(t),gr(r)}},{key:"exprToSQL",value:function(r){var t=arguments.length>1&&void 0!==arguments[1]?arguments[1]:s;return p(t),ct(r)}},{key:"columnsToSQL",value:function(r,t){var e=arguments.length>2&&void 0!==arguments[2]?arguments[2]:s;if(p(e),!r||"*"===r)return [];var n=It(t);return r.map((function(r){return gt(r,n)}))}},{key:"parse",value:function(r){var t=arguments.length>1&&void 0!==arguments[1]?arguments[1]:s,e=t.database,n=void 0===e?"mysql":e;p(t);var o=n.toLowerCase();if(kt[o])return kt[o](false===t.trimQuery?r:r.trim(),t.parseOptions||s.parseOptions);throw new Error("".concat(n," is not supported currently"))}},{key:"whiteListCheck",value:function(r,t){var e=arguments.length>2&&void 0!==arguments[2]?arguments[2]:s;if(t&&0!==t.length){var n=e.type,o=void 0===n?"table":n;if(!this["".concat(o,"List")]||"function"!=typeof this["".concat(o,"List")])throw new Error("".concat(o," is not valid check mode"));var u,a=this["".concat(o,"List")].bind(this),i=a(r,e),c=true,l="",f=Dt(i);try{for(f.s();!(u=f.n()).done;){var b,p=u.value,v=!1,d=Dt(t);try{for(d.s();!(b=d.n()).done;){var y=b.value,w=new RegExp("^".concat(y,"$"),"i");if(w.test(p)){v=!0;break}}}catch(r){d.e(r);}finally{d.f();}if(!v){l=p,c=!1;break}}}catch(r){f.e(r);}finally{f.f();}if(!c)throw new Error("authority = '".concat(l,"' is required in ").concat(o," whiteList to execute SQL = '").concat(r,"'"))}}},{key:"tableList",value:function(r,t){var e=this.parse(r,t);return e&&e.tableList}},{key:"columnList",value:function(r,t){var e=this.parse(r,t);return e&&e.columnList}}])}();function Ht(r){return (Ht="function"==typeof Symbol&&"symbol"==typeof Symbol.iterator?function(r){return typeof r}:function(r){return r&&"function"==typeof Symbol&&r.constructor===Symbol&&r!==Symbol.prototype?"symbol":typeof r})(r)}"object"===("undefined"==typeof self?"undefined":Ht(self))&&self&&(self.NodeSQLParser={Parser:Ft,util:n}),"undefined"==typeof commonjsGlobal&&"object"===("undefined"==typeof window?"undefined":Ht(window))&&window&&(window.global=window),"object"===("undefined"==typeof commonjsGlobal?"undefined":Ht(commonjsGlobal))&&commonjsGlobal&&commonjsGlobal.window&&(commonjsGlobal.window.NodeSQLParser={Parser:Ft,util:n});}]));
-		
-	} (mysql));
-	return mysql;
-}
-
-var mysqlExports = requireMysql();
-
-const TYPE_MAP = {
-    S: 'string',
-    N: 'number',
-    B: 'buffer',
-};
-const sleep$1 = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
-async function getTableInfo$2(params) {
-    const { dynamodb, table } = params;
-    let data;
-    try {
-        data = await dynamodb.getTable(table);
+const SYSTEM_TIME_ZONE = _getSystemTimezone();
+class GlobalSettings {
+    _collationConnection = 'utf8mb4_0900_ai_ci';
+    _divPrecisionIncrement = 4;
+    _sqlMode = 'NO_ENGINE_SUBSTITUTION';
+    _timeZone = process.env.TZ ?? SYSTEM_TIME_ZONE;
+    get collationConnection() {
+        return this._collationConnection;
     }
-    catch (err) {
-        shared.logger.error('getTableInfo: err:', err, table);
-        throw err;
+    get divPrecisionIncrement() {
+        return this._divPrecisionIncrement;
     }
-    if (!data?.Table?.AttributeDefinitions || !data?.Table?.KeySchema) {
-        throw new Error('bad_data');
+    get timeZone() {
+        return this._timeZone;
     }
-    const column_list = data.Table.AttributeDefinitions.map((def) => ({
-        name: def.AttributeName,
-        type: TYPE_MAP[def.AttributeType] || 'string',
-    }));
-    const primary_key = data.Table.KeySchema.map((key) => {
-        const type = column_list.find((col) => col.name === key.AttributeName)?.type ||
-            'string';
-        return { name: key.AttributeName, type };
-    });
-    return { table, primary_key, column_list, is_open: true };
-}
-async function getTableList$3(params) {
-    const { dynamodb } = params;
-    try {
-        return await dynamodb.getTableList();
+    get sqlMode() {
+        return this._sqlMode;
     }
-    catch (err) {
-        shared.logger.error('raw_engine.getTableList: err:', err);
-        throw err;
+    get systemTimeZone() {
+        return SYSTEM_TIME_ZONE;
     }
-}
-async function createTable$3(params) {
-    const { dynamodb, table, primary_key, ...other } = params;
-    const column_list = params.column_list.filter((column) => primary_key.find((key) => key.name === column.name));
-    const opts = { ...other, table, primary_key, column_list };
-    try {
-        await dynamodb.createTable(opts);
-        await _waitForTable({ dynamodb, table });
-    }
-    catch (err) {
-        if (err instanceof Error && err.message === 'resource_in_use') {
-            throw new SQLError('table_exists');
+    getGlobalVariable(name) {
+        const name_uc = name.toUpperCase();
+        const type = SYSTEM_VARIABLE_TYPES[name_uc];
+        switch (name_uc) {
+            case 'COLLATION_CONNECTION':
+                return { value: this.collationConnection, type };
+            case 'DIV_PRECISION_INCREMENT':
+                return { value: this.divPrecisionIncrement, type };
+            case 'TIME_ZONE':
+                return { value: this.timeZone, type };
+            case 'SQL_MODE':
+                return { value: this.sqlMode, type };
+            case 'SYSTEM_TIME_ZONE':
+                return { value: this.systemTimeZone, type };
         }
-        shared.logger.error('raw_engine.createTable: err:', err);
-        throw err;
+        return undefined;
+    }
+    setGlobalVariable(name, value) {
+        const name_uc = name.toUpperCase();
+        switch (name_uc) {
+            case 'COLLATION_CONNECTION':
+                this._collationConnection = String(value);
+                return;
+            case 'DIV_PRECISION_INCREMENT':
+                this._divPrecisionIncrement = Number(value);
+                return;
+            case 'TIME_ZONE':
+                this._timeZone = String(value);
+                return;
+            case 'SQL_MODE':
+                this._sqlMode = String(value);
+                return;
+        }
+        throw new SQLError({ err: 'ER_UNKNOWN_SYSTEM_VARIABLE', args: [name] });
     }
 }
-async function dropTable$3(params) {
-    const { dynamodb, table } = params;
+var GlobalSettings$1 = new GlobalSettings();
+function _getSystemTimezone() {
     try {
-        await dynamodb.deleteTable(table);
-    }
-    catch (delete_err) {
-        if (delete_err instanceof Error &&
-            delete_err.name === 'ResourceNotFoundException') {
-            throw new SQLError('table_not_found');
+        const local = new Date()
+            .toLocaleString('en-US', { timeZoneName: 'short' })
+            .split(' ')
+            .pop()
+            ?.trim();
+        if (local && local.length === 3) {
+            return local;
         }
-        shared.logger.error('raw_engine.dropTable: deleteTable err:', delete_err);
-        throw delete_err;
     }
-    try {
-        await _waitForTable({ dynamodb, table });
+    catch {
+        // noop
     }
-    catch (wait_err) {
-        if (wait_err instanceof Error &&
-            wait_err.message === 'resource_not_found') {
-            return;
-        }
-        shared.logger.error('raw_engine.dropTable: waitForTable err:', wait_err);
-        throw wait_err;
+    return Intl.DateTimeFormat().resolvedOptions().timeZone;
+}
+
+class NativeObjectClass {
+    toString() {
+        return JSON.stringify(this);
     }
 }
-async function addColumn$2(_params) { }
-async function createIndex$2(params) {
-    const { dynamodb, table, index_name, key_list } = params;
-    if (!key_list) {
-        throw new Error('key_list is required');
+function mapToObject(obj) {
+    const ret = new NativeObjectClass();
+    for (const [key, value] of Object.entries(obj)) {
+        ret[key] = valueToNative(value);
     }
-    const opts = { table, index_name, key_list };
-    try {
-        await dynamodb.createIndex(opts);
-        await _waitForTable({ dynamodb, table, index_name });
+    return ret;
+}
+function valueToNative(value) {
+    if (value === null) {
+        return null;
     }
-    catch (err) {
-        if (err instanceof Error) {
-            if (err.message === 'resource_in_use' ||
-                err.message.indexOf('already exists') >= 0) {
-                throw new Error('index_exists');
+    else if (typeof value === 'object') {
+        if (value.NULL) {
+            return null;
+        }
+        else if (value.N) {
+            return parseFloat(value.N);
+        }
+        else if (Array.isArray(value.L)) {
+            return value.L.map(valueToNative);
+        }
+        else if (value.M) {
+            return mapToObject(value.M);
+        }
+        else {
+            return value.S ?? value.B ?? value.BOOL ?? null;
+        }
+    }
+    return null;
+}
+function nativeToValue(obj) {
+    if (obj === null) {
+        return { NULL: true };
+    }
+    else if (obj instanceof Uint8Array) {
+        return { B: obj };
+    }
+    else if (Array.isArray(obj)) {
+        return { L: obj.map(nativeToValue) };
+    }
+    else if (typeof obj === 'object') {
+        const M = {};
+        for (const key in obj) {
+            if (obj[key]) {
+                M[key] = nativeToValue(obj[key]);
             }
         }
-        shared.logger.error('raw_engine.createIndex: err:', err);
-        throw err;
+        return { M };
+    }
+    else if (typeof obj === 'number') {
+        return { N: String(obj) };
+    }
+    else if (typeof obj === 'boolean') {
+        return { BOOL: obj };
+    }
+    else {
+        return { S: String(obj) };
     }
 }
-async function deleteIndex$2(params) {
-    const { dynamodb, table, index_name } = params;
-    try {
-        await dynamodb.deleteIndex({ table, index_name });
-        await _waitForTable({ dynamodb, table, index_name });
+function convertValueToPQL(value) {
+    let ret;
+    if (value === null) {
+        ret = 'NULL';
     }
-    catch (err) {
-        if (err instanceof Error && err.message === 'resource_not_found') {
-            throw new Error('index_not_found');
+    else if (typeof value === 'object') {
+        if (value.S !== undefined) {
+            ret = "'" + escapeString(value.S) + "'";
         }
-        shared.logger.error('raw_engine.deleteIndex: err:', err);
-        throw err;
+        else if (value.N !== undefined) {
+            ret = String(value.N);
+        }
+        else {
+            ret = "'" + escapeString(String(value)) + "'";
+        }
     }
+    else {
+        ret = "'" + escapeString(String(value)) + "'";
+    }
+    return ret;
 }
-const LOOP_MS = 250;
-async function _waitForTable(params) {
-    const { dynamodb, table, index_name } = params;
-    while (true) {
-        const result = await dynamodb.getTable(table);
-        const status = result?.Table?.TableStatus;
-        if (status === 'CREATING' ||
-            status === 'UPDATING' ||
-            status === 'DELETING') {
-            await sleep$1(LOOP_MS);
-            continue;
+function escapeIdentifier(string) {
+    return '"' + string.replace('"', '""') + '"';
+}
+function escapeString(string) {
+    let ret = '';
+    for (let i = 0; i < string.length; i++) {
+        const c = string.charCodeAt(i);
+        if (c < 32) {
+            ret += '\\x' + c.toString(16);
         }
-        if (index_name) {
-            const index = result?.Table?.GlobalSecondaryIndexes?.find((item) => item.IndexName === index_name);
-            if (index && index.IndexStatus !== 'ACTIVE') {
-                await sleep$1(LOOP_MS);
-                continue;
+        else if (c === 39) {
+            ret += "''";
+        }
+        else {
+            ret += string[i];
+        }
+    }
+    return ret;
+}
+function escapeValue(value, type) {
+    let s;
+    if (value === null) {
+        s = 'NULL';
+    }
+    else if (Array.isArray(value)) {
+        s = '[ ';
+        s += value.map((v) => escapeValue(v)).join(', ');
+        s += ' ]';
+    }
+    else if (typeof value === 'object') {
+        s = '{ ';
+        s += Object.keys(value)
+            .map((key) => `'${key}': ${escapeValue(value[key])}`)
+            .join(', ');
+        s += ' }';
+    }
+    else if (typeof value === 'number') {
+        s = String(value);
+    }
+    else if (value !== undefined) {
+        s = "'" + escapeString(String(value)) + "'";
+    }
+    else {
+        s = 'undefined';
+    }
+    return s;
+}
+function convertError(err) {
+    if (err.name === 'ConditionalCheckFailedException' && err.Item) {
+        return new Error('cond_fail');
+    }
+    if (err.Code === 'ConditionalCheckFailed') {
+        return new Error('cond_fail');
+    }
+    if (err.name === 'ResourceNotFoundException' ||
+        err.Code === 'ResourceNotFound' ||
+        (err.message && String(err.message).includes('resource not found'))) {
+        return new Error('resource_not_found');
+    }
+    if (err.name === 'ResourceInUseException' ||
+        (err.message && String(err.message).includes('resource in use'))) {
+        return new Error('resource_in_use');
+    }
+    if (err.Code === 'ValidationError' || err.name === 'ValidationError') {
+        if (err.Message?.match(/expected: [^\s]* actual: NULL/)) {
+            return new Error('ER_BAD_NULL_ERROR');
+        }
+        if (err.Message?.match(/expected: [^\s]* actual:/)) {
+            return new Error('ER_TRUNCATED_WRONG_VALUE_FOR_FIELD');
+        }
+        return new Error('validation');
+    }
+    return err;
+}
+function isDynamoDBResponse(value) {
+    return value !== null && typeof value === 'object';
+}
+function isDynamoDBError(value) {
+    return value !== null && typeof value === 'object';
+}
+function safeConvertSuccess(result) {
+    if (!isDynamoDBResponse(result)) {
+        return [null, null];
+    }
+    return convertSuccess(result);
+}
+function safeConvertError(err) {
+    if (!isDynamoDBError(err)) {
+        return err;
+    }
+    return convertError(err);
+}
+function convertSuccess(result) {
+    let err = null;
+    let ret = null;
+    if (result.Responses && Array.isArray(result.Responses)) {
+        ret = [];
+        result.Responses.forEach((item, i) => {
+            if (item.Error) {
+                err ??= [];
+                err[i] = convertError(item.Error);
             }
-        }
+            const converted = convertResult(item);
+            if (converted?.[0]) {
+                ret[i] = converted[0];
+            }
+        });
+    }
+    else {
+        ret = convertResult(result);
+    }
+    return [err, ret];
+}
+function convertResult(result) {
+    if (result.Items) {
+        return result.Items;
+    }
+    if (result.Item) {
+        return [result.Item];
+    }
+    return null;
+}
+function dynamoType(type) {
+    let ret = type;
+    if (type === 'string') {
+        ret = 'S';
+    }
+    else if (type === 'VARCHAR') {
+        ret = 'S';
+    }
+    else if (type === 'INT') {
+        ret = 'N';
+    }
+    else if (type === 'number') {
+        ret = 'N';
+    }
+    else if (type === 'blob') {
+        ret = 'B';
+    }
+    return ret;
+}
+const NAMESPACE_REGEX = /\b(FROM|UPDATE|INTO|DELETE\s+FROM)\s+(["`]?)([A-Za-z0-9_.-]+)(\2)/gi;
+function namespacePartiQL(sql, namespace) {
+    if (namespace) {
+        return sql.replaceAll(NAMESPACE_REGEX, (_, kw, quote, name) => `${kw} "${namespace}${name}"`);
+    }
+    else {
+        return sql;
+    }
+}
+
+async function timesLimit(length, limit, iter) {
+    if (length <= 0) {
         return;
+    }
+    let i = 0;
+    let running = 0;
+    let stop = false;
+    return new Promise((resolve, reject) => {
+        function _done() {
+            if (!stop) {
+                running--;
+                if (i >= length && running === 0) {
+                    resolve();
+                }
+                else {
+                    _loopLaunch();
+                }
+            }
+        }
+        function _catch(err) {
+            stop = true;
+            reject(err);
+        }
+        function _launch(index) {
+            iter(index).then(_done, _catch);
+        }
+        function _loopLaunch() {
+            while (!stop && i < length && running < limit) {
+                running++;
+                const index = i++;
+                _launch(index);
+            }
+        }
+        _loopLaunch();
+    });
+}
+async function parallelLimit(list, limit, iter) {
+    const results = [];
+    await timesLimit(list.length, limit, async (i) => {
+        results[i] = await iter(list[i], i);
+    });
+    return results;
+}
+
+async function parallelBatch(list, batchSize, limit, iter) {
+    const batch_count = Math.ceil(list.length / batchSize);
+    const results = [];
+    await timesLimit(batch_count, limit, async (i) => {
+        const start = i * batchSize;
+        const batch = list.slice(start, start + batchSize);
+        const batch_result = await iter(batch, i);
+        if (batch_result) {
+            for (let j = 0; j < batch_result.length; j++) {
+                results[i + j] = batch_result[j];
+            }
+        }
+    });
+    return results;
+}
+
+const QUERY_LIMIT = 5;
+const BATCH_LIMIT = 100;
+class DynamoDB {
+    client;
+    namespace;
+    constructor(params) {
+        const opts = {
+            region: params?.region ??
+                process.env.AWS_REGION ??
+                process.env.AWS_DEFAULT_REGION,
+        };
+        if (params?.credentials) {
+            opts.credentials = params.credentials;
+        }
+        this.client = new clientDynamodb.DynamoDBClient(opts);
+        this.namespace = params?.namespace ?? '';
+    }
+    async queryQL(list) {
+        if (!Array.isArray(list)) {
+            return this._queryQL(list);
+        }
+        else {
+            return parallelLimit(list, QUERY_LIMIT, async (item) => {
+                return this._queryQL(item);
+            });
+        }
+    }
+    async _queryQL(params) {
+        const sql = namespacePartiQL(typeof params === 'string' ? params : params.sql, this.namespace);
+        const returnVal = typeof params === 'string' ? 'NONE' : (params.return ?? 'NONE');
+        const input = {
+            Statement: sql,
+            ReturnValuesOnConditionCheckFailure: returnVal,
+        };
+        const command = new clientDynamodb.ExecuteStatementCommand(input);
+        return this._pagedSend(command);
+    }
+    async batchQL(params) {
+        const list = Array.isArray(params) ? params : params.list;
+        const returnVal = Array.isArray(params)
+            ? 'NONE'
+            : (params.return ?? 'NONE');
+        const input = {
+            Statements: list.map((sql) => ({
+                Statement: namespacePartiQL(sql, this.namespace),
+                ReturnValuesOnConditionCheckFailure: returnVal,
+            })),
+        };
+        const command = new clientDynamodb.BatchExecuteStatementCommand(input);
+        try {
+            const result = await this.client.send(command);
+            const [err, ret] = convertSuccess(result);
+            if (err) {
+                throw err;
+            }
+            return ret ?? [];
+        }
+        catch (err) {
+            const converted = safeConvertSuccess(err);
+            if (converted[0]) {
+                throw converted[0];
+            }
+            if (converted[1]) {
+                return converted[1];
+            }
+            throw safeConvertError(err);
+        }
+    }
+    async transactionQL(params) {
+        const list = Array.isArray(params) ? params : params.list;
+        const returnVal = Array.isArray(params)
+            ? 'NONE'
+            : (params.return ?? 'NONE');
+        const input = {
+            TransactStatements: list.map((sql) => ({
+                Statement: namespacePartiQL(sql, this.namespace),
+                ReturnValuesOnConditionCheckFailure: returnVal,
+            })),
+        };
+        const command = new clientDynamodb.ExecuteTransactionCommand(input);
+        try {
+            const result = await this.client.send(command);
+            const [err, ret] = convertSuccess(result);
+            if (err) {
+                throw err;
+            }
+            return ret ?? [];
+        }
+        catch (err) {
+            const converted = safeConvertSuccess(err);
+            if (converted[0]) {
+                throw converted[0];
+            }
+            if (converted[1]) {
+                return converted[1];
+            }
+            throw safeConvertError(err);
+        }
+    }
+    async deleteItems(params) {
+        const { table, key_list, list } = params;
+        const prefix = `DELETE FROM ${escapeIdentifier(table)} WHERE `;
+        return parallelBatch(list, BATCH_LIMIT, QUERY_LIMIT, async (batch) => {
+            const sql_list = [];
+            for (const item of batch) {
+                const cond = key_list
+                    .map((key, j) => {
+                    const value = item[j];
+                    if (value === undefined) {
+                        throw TypeError('missing value for key ' + key);
+                    }
+                    return `${escapeIdentifier(key)} = ${convertValueToPQL(value)}`;
+                })
+                    .join(' AND ');
+                sql_list.push(prefix + cond);
+            }
+            return this.transactionQL(sql_list);
+        });
+    }
+    async updateItems(params) {
+        const { table, key_list, list } = params;
+        const prefix = `UPDATE ${escapeIdentifier(table)} SET `;
+        return parallelBatch(list, BATCH_LIMIT, QUERY_LIMIT, async (batch) => {
+            const sql_list = [];
+            for (const item of batch) {
+                const sets = item.set_list
+                    .map((object) => {
+                    const { column, value } = object;
+                    return `${escapeIdentifier(column)} = ${escapeValue(value)}`;
+                })
+                    .join(', ');
+                const cond = ' WHERE ' +
+                    key_list
+                        .map((key, j) => {
+                        const value = item.key[j];
+                        if (value === undefined) {
+                            throw TypeError('missing value for key ' + key);
+                        }
+                        return `${escapeIdentifier(key)} = ${convertValueToPQL(value)}`;
+                    })
+                        .join(' AND ');
+                sql_list.push(prefix + sets + cond);
+            }
+            return this.transactionQL(sql_list);
+        });
+    }
+    async putItems(params) {
+        const { list } = params;
+        const table = `${this.namespace}${params.table}`;
+        const err_list = [];
+        try {
+            await parallelBatch(list, BATCH_LIMIT, QUERY_LIMIT, async (batch, i) => {
+                const input = {
+                    TransactItems: batch.map((item) => {
+                        const value = nativeToValue(item);
+                        return {
+                            Put: { TableName: table, Item: 'M' in value ? value.M : {} },
+                        };
+                    }),
+                };
+                const command = new clientDynamodb.TransactWriteItemsCommand(input);
+                try {
+                    await this.client.send(command);
+                }
+                catch (err) {
+                    const start = i * BATCH_LIMIT;
+                    if (err &&
+                        typeof err === 'object' &&
+                        'name' in err &&
+                        err.name === 'TransactionCanceledException' &&
+                        'CancellationReasons' in err &&
+                        Array.isArray(err.CancellationReasons)) {
+                        err.CancellationReasons.forEach((cancel_err, j) => {
+                            err_list[start + j] = {
+                                err: safeConvertError(cancel_err),
+                                parent: cancel_err,
+                            };
+                        });
+                    }
+                    else {
+                        err_list[start] = { err: safeConvertError(err), parent: err };
+                    }
+                    throw err;
+                }
+            });
+        }
+        catch {
+            throw err_list;
+        }
+    }
+    async getTableList() {
+        const namespace_len = this.namespace.length;
+        const command = new clientDynamodb.ListTablesCommand({ Limit: 100 });
+        const results = [];
+        for (;;) {
+            const result = await this.client.send(command);
+            if (result.TableNames) {
+                for (const table of result.TableNames) {
+                    if (namespace_len === 0) {
+                        results.push(table);
+                    }
+                    else if (table.startsWith(this.namespace)) {
+                        results.push(table.substring(namespace_len));
+                    }
+                }
+            }
+            if (!result.LastEvaluatedTableName) {
+                break;
+            }
+            command.input.ExclusiveStartTableName = result.LastEvaluatedTableName;
+        }
+        return results;
+    }
+    async getTable(raw_table) {
+        const table = `${this.namespace}${raw_table}`;
+        const command = new clientDynamodb.DescribeTableCommand({ TableName: table });
+        try {
+            return await this.client.send(command);
+        }
+        catch (err) {
+            throw safeConvertError(err);
+        }
+    }
+    async createTable(params) {
+        const { billing_mode, column_list, primary_key } = params;
+        const table = `${this.namespace}${params.table}`;
+        const defs = column_list.map((column) => ({
+            AttributeName: column.name,
+            AttributeType: dynamoType(column.type),
+        }));
+        const schema = [
+            { AttributeName: primary_key[0]?.name, KeyType: clientDynamodb.KeyType.HASH },
+        ];
+        if (primary_key[1]) {
+            schema.push({
+                AttributeName: primary_key[1].name,
+                KeyType: clientDynamodb.KeyType.RANGE,
+            });
+        }
+        const input = {
+            TableName: table,
+            BillingMode: (billing_mode ?? 'PAY_PER_REQUEST'),
+            AttributeDefinitions: defs,
+            KeySchema: schema,
+        };
+        const command = new clientDynamodb.CreateTableCommand(input);
+        try {
+            await this.client.send(command);
+        }
+        catch (err) {
+            throw safeConvertError(err);
+        }
+    }
+    async deleteTable(raw_table) {
+        const table = `${this.namespace}${raw_table}`;
+        const command = new clientDynamodb.DeleteTableCommand({ TableName: table });
+        try {
+            await this.client.send(command);
+        }
+        catch (err) {
+            throw safeConvertError(err);
+        }
+    }
+    async createIndex(params) {
+        const { index_name, key_list, projection_type } = params;
+        const table = `${this.namespace}${params.table}`;
+        const defs = key_list.map((item) => ({
+            AttributeName: item.name,
+            AttributeType: dynamoType(item.type),
+        }));
+        const schema = [
+            { AttributeName: key_list[0]?.name, KeyType: clientDynamodb.KeyType.HASH },
+        ];
+        if (key_list[1]) {
+            schema.push({ AttributeName: key_list[1].name, KeyType: clientDynamodb.KeyType.RANGE });
+        }
+        const input = {
+            TableName: table,
+            AttributeDefinitions: defs,
+            GlobalSecondaryIndexUpdates: [
+                {
+                    Create: {
+                        IndexName: index_name,
+                        KeySchema: schema,
+                        Projection: {
+                            ProjectionType: (projection_type ??
+                                'KEYS_ONLY'),
+                        },
+                    },
+                },
+            ],
+        };
+        const command = new clientDynamodb.UpdateTableCommand(input);
+        try {
+            await this.client.send(command);
+        }
+        catch (err) {
+            throw safeConvertError(err);
+        }
+    }
+    async deleteIndex(params) {
+        const { index_name } = params;
+        const table = `${this.namespace}${params.table}`;
+        const input = {
+            TableName: table,
+            GlobalSecondaryIndexUpdates: [{ Delete: { IndexName: index_name } }],
+        };
+        const command = new clientDynamodb.UpdateTableCommand(input);
+        try {
+            await this.client.send(command);
+        }
+        catch (err) {
+            throw safeConvertError(err);
+        }
+    }
+    async _pagedSend(command) {
+        const results = [];
+        for (;;) {
+            try {
+                const result = await this.client.send(command);
+                const list = convertSuccess(result)[1];
+                list?.forEach((item) => {
+                    results.push(item);
+                });
+                if (!result.NextToken) {
+                    break;
+                }
+                command.input.NextToken = result.NextToken;
+            }
+            catch (err) {
+                if (err && typeof err === 'object' && 'Item' in err && err.Item) {
+                    results.push(err.Item);
+                }
+                throw safeConvertError(err);
+            }
+        }
+        return results;
+    }
+}
+
+class DynamoDBWithCache extends DynamoDB {
+    _tableCache = new Map();
+    async getTable(table) {
+        try {
+            const result = await super.getTable(table);
+            if (result.Table?.TableStatus === 'DELETING') {
+                this._tableCache.delete(table);
+            }
+            else {
+                this._tableCache.set(table, { last_updated: Date.now(), result });
+            }
+            return result;
+        }
+        catch (err) {
+            if (err instanceof Error && err.message === 'resource_not_found') {
+                this._tableCache.delete(table);
+            }
+            throw err;
+        }
+    }
+    async getTableCached(table) {
+        const result = this._tableCache.get(table)?.result;
+        if (result) {
+            return result;
+        }
+        else {
+            return this.getTable(table);
+        }
+    }
+    async createTable(params) {
+        this._tableCache.delete(params.table);
+        try {
+            await super.createTable(params);
+        }
+        finally {
+            this._tableCache.delete(params.table);
+        }
+    }
+    async deleteTable(table) {
+        this._tableCache.delete(table);
+        try {
+            await super.deleteTable(table);
+        }
+        finally {
+            this._tableCache.delete(table);
+        }
+    }
+}
+function createDynamoDB(params) {
+    return new DynamoDBWithCache(params);
+}
+
+class SQLMode extends node_events.EventEmitter {
+    _sqlMode;
+    _modeAnsiQuotes = false;
+    constructor(sql_mode) {
+        super();
+        this._sqlMode = sql_mode;
+        this._parseSQLMode();
+    }
+    get sqlMode() {
+        return this._sqlMode;
+    }
+    set sqlMode(sql_mode) {
+        this._sqlMode = sql_mode;
+        this._parseSQLMode();
+    }
+    get modeAnsiQuotes() {
+        return this._modeAnsiQuotes;
+    }
+    _parseSQLMode() {
+        const mode = this._sqlMode.toLowerCase();
+        this._modeAnsiQuotes = mode.includes('ansi_quotes');
     }
 }
 
@@ -2836,6 +2764,78 @@ function offsetAtTime(time_zone, unix_time) {
     }
 }
 
+var commonjsGlobal = typeof globalThis !== 'undefined' ? globalThis : typeof window !== 'undefined' ? window : typeof global !== 'undefined' ? global : typeof self !== 'undefined' ? self : {};
+
+var mysql = {};
+
+var hasRequiredMysql;
+
+function requireMysql () {
+	if (hasRequiredMysql) return mysql;
+	hasRequiredMysql = 1;
+	(function (exports) {
+		!function(r,t){for(var e in t)r[e]=t[e];}(exports,function(r){var t={};function e(n){if(t[n])return t[n].exports;var o=t[n]={i:n,l:false,exports:{}};return r[n].call(o.exports,o,o.exports,e),o.l=true,o.exports}return e.m=r,e.c=t,e.d=function(r,t,n){e.o(r,t)||Object.defineProperty(r,t,{enumerable:true,get:n});},e.r=function(r){"undefined"!=typeof Symbol&&Symbol.toStringTag&&Object.defineProperty(r,Symbol.toStringTag,{value:"Module"}),Object.defineProperty(r,"__esModule",{value:true});},e.t=function(r,t){if(1&t&&(r=e(r)),8&t)return r;if(4&t&&"object"==typeof r&&r&&r.__esModule)return r;var n=Object.create(null);if(e.r(n),Object.defineProperty(n,"default",{enumerable:true,value:r}),2&t&&"string"!=typeof r)for(var o in r)e.d(n,o,function(t){return r[t]}.bind(null,o));return n},e.n=function(r){var t=r&&r.__esModule?function(){return r.default}:function(){return r};return e.d(t,"a",t),t},e.o=function(r,t){return Object.prototype.hasOwnProperty.call(r,t)},e.p="",e(e.s=1)}([function(r,t,e){var n=e(2);function o(r,t,e,n){this.message=r,this.expected=t,this.found=e,this.location=n,this.name="SyntaxError","function"==typeof Error.captureStackTrace&&Error.captureStackTrace(this,o);}!function(r,t){function e(){this.constructor=r;}e.prototype=t.prototype,r.prototype=new e;}(o,Error),o.buildMessage=function(r,t){var e={literal:function(r){return '"'+o(r.text)+'"'},class:function(r){var t,e="";for(t=0;t<r.parts.length;t++)e+=r.parts[t]instanceof Array?s(r.parts[t][0])+"-"+s(r.parts[t][1]):s(r.parts[t]);return "["+(r.inverted?"^":"")+e+"]"},any:function(r){return "any character"},end:function(r){return "end of input"},other:function(r){return r.description}};function n(r){return r.charCodeAt(0).toString(16).toUpperCase()}function o(r){return r.replace(/\\/g,"\\\\").replace(/"/g,'\\"').replace(/\0/g,"\\0").replace(/\t/g,"\\t").replace(/\n/g,"\\n").replace(/\r/g,"\\r").replace(/[\x00-\x0F]/g,(function(r){return "\\x0"+n(r)})).replace(/[\x10-\x1F\x7F-\x9F]/g,(function(r){return "\\x"+n(r)}))}function s(r){return r.replace(/\\/g,"\\\\").replace(/\]/g,"\\]").replace(/\^/g,"\\^").replace(/-/g,"\\-").replace(/\0/g,"\\0").replace(/\t/g,"\\t").replace(/\n/g,"\\n").replace(/\r/g,"\\r").replace(/[\x00-\x0F]/g,(function(r){return "\\x0"+n(r)})).replace(/[\x10-\x1F\x7F-\x9F]/g,(function(r){return "\\x"+n(r)}))}return "Expected "+function(r){var t,n,o,s=new Array(r.length);for(t=0;t<r.length;t++)s[t]=(o=r[t],e[o.type](o));if(s.sort(),s.length>0){for(t=1,n=1;t<s.length;t++)s[t-1]!==s[t]&&(s[n]=s[t],n++);s.length=n;}switch(s.length){case 1:return s[0];case 2:return s[0]+" or "+s[1];default:return s.slice(0,-1).join(", ")+", or "+s[s.length-1]}}(r)+" but "+function(r){return r?'"'+o(r)+'"':"end of input"}(t)+" found."},r.exports={SyntaxError:o,parse:function(r,t){t=void 0!==t?t:{};var e,s={},u={start:lc},a=lc,i=function(r,t){return pv(r,t)},c=function(r,t){return {...r,order_by:t&&t.toLowerCase()}},l=function(r,t){return pv(r,t,1)},f=oc("IF",true),b="IDENTIFIED",p=oc("IDENTIFIED",false),v=oc("WITH",true),d=oc("BY",true),y=oc("RANDOM",true),w=oc("PASSWORD",true),L=oc("AS",true),h=function(r,t){return pv(r,t)},C=oc("role",true),m=oc("NONE",true),E=oc("SSL",true),A=oc("X509",true),T=oc("CIPHER",true),_=oc("ISSUER",true),g=oc("SUBJECT",true),I=function(r,t){return t.prefix=r.toLowerCase(),t},S=oc("REQUIRE",true),N=oc("MAX_QUERIES_PER_HOUR",true),O=oc("MAX_UPDATES_PER_HOUR",true),R=oc("MAX_CONNECTIONS_PER_HOUR",true),j=oc("MAX_USER_CONNECTIONS",true),x=oc("EXPIRE",true),k=oc("DEFAULT",true),U=oc("NEVER",true),D=oc("HISTORY",true),M=oc("REUSE",false),P=oc("CURRENT",true),G=oc("OPTIONAL",true),F=oc("FAILED_LOGIN_ATTEMPTS",true),H=oc("PASSWORD_LOCK_TIME",true),Y=oc("UNBOUNDED",true),B=oc("ACCOUNT",true),$=oc("LOCK",true),W=oc("UNLOCK",true),q=oc("ATTRIBUTE",true),V=oc("CASCADED",true),X=oc("LOCAL",true),K=oc("CHECK",true),Q=oc("OPTION",false),z=oc("ALGORITHM",true),Z=oc("UNDEFINED",true),J=oc("MERGE",true),rr=oc("TEMPTABLE",true),tr=oc("SQL",true),er=oc("SECURITY",true),nr=oc("DEFINER",true),or=oc("INVOKER",true),sr=function(r,t){return pv(r,t)},ur=oc("AUTO_INCREMENT",true),ar=oc("UNIQUE",true),ir=oc("KEY",true),cr=oc("PRIMARY",true),lr=oc("@",false),fr=function(){return bv("=",{type:"origin",value:"definer"},{type:"function",name:{name:[{type:"default",value:"current_user"}]},args:{type:"expr_list",value:[]}})},br=oc("BEFORE",true),pr=oc("AFTER",true),vr=oc("FOR",true),dr=oc("EACH",true),yr=oc("ROW",true),wr=oc("STATEMENT",true),Lr=oc("FOLLOWS",true),hr=oc("PRECEDES",true),Cr=oc("COLUMN_FORMAT",true),mr=oc("FIXED",true),Er=oc("DYNAMIC",true),Ar=oc("STORAGE",true),Tr=oc("DISK",true),_r=oc("MEMORY",true),gr=oc("GENERATED",true),Ir=oc("ALWAYS",true),Sr=oc("STORED",true),Nr=oc("VIRTUAL",true),Or=oc("if",true),Rr=oc("exists",true),jr=oc("first",true),xr=oc("after",true),kr=oc("LESS",true),Ur=oc("THAN",true),Dr=oc("DROP",true),Mr=oc("TRUNCATE",true),Pr=oc("DISCARD",true),Gr=oc("IMPORT",true),Fr=oc("COALESCE",true),Hr=oc("ANALYZE",true),Yr=oc("TABLESPACE",true),Br=oc("INSTANT",true),$r=oc("INPLACE",true),Wr=oc("COPY",true),qr=oc("SHARED",true),Vr=oc("EXCLUSIVE",true),Xr=oc("CHANGE",true),Kr=oc("FOREIGN",true),Qr=oc("CONSTRAINT",true),zr=oc("NOCHECK",true),Zr=oc("NOT",true),Jr=oc("REPLICATION",true),rt=oc("FOREIGN KEY",true),tt=oc("ENFORCED",true),et=oc("MATCH FULL",true),nt=oc("MATCH PARTIAL",true),ot=oc("MATCH SIMPLE",true),st=oc("RESTRICT",true),ut=oc("CASCADE",true),at=oc("SET NULL",true),it=oc("NO ACTION",true),ct=oc("SET DEFAULT",true),lt=oc("CHARACTER",true),ft=oc("SET",true),bt=oc("CHARSET",true),pt=oc("COLLATE",true),vt=oc("AVG_ROW_LENGTH",true),dt=oc("KEY_BLOCK_SIZE",true),yt=oc("MAX_ROWS",true),wt=oc("MIN_ROWS",true),Lt=oc("STATS_SAMPLE_PAGES",true),ht=oc("CHECKSUM",false),Ct=oc("DELAY_KEY_WRITE",false),mt=/^[01]/,Et=sc(["0","1"],false,false),At=oc("CONNECTION",true),Tt=oc("ENGINE_ATTRIBUTE",true),_t=oc("SECONDARY_ENGINE_ATTRIBUTE",true),gt=oc("DATA",true),It=oc("INDEX",true),St=oc("DIRECTORY",true),Nt=oc("COMPRESSION",true),Ot=oc("'",false),Rt=oc("ZLIB",true),jt=oc("LZ4",true),xt=oc("ENGINE",true),kt=function(r,t,e){return {keyword:r.toLowerCase(),symbol:t,value:e.toUpperCase()}},Ut=oc("ROW_FORMAT",true),Dt=oc("COMPRESSED",true),Mt=oc("REDUNDANT",true),Pt=oc("COMPACT",true),Gt=oc("READ",true),Ft=oc("LOW_PRIORITY",true),Ht=oc("WRITE",true),Yt=function(r,t){return pv(r,t)},Bt=oc("BINARY",true),$t=oc("MASTER",true),Wt=oc("LOGS",true),qt=oc("TRIGGERS",true),Vt=oc("STATUS",true),Xt=oc("PROCESSLIST",true),Kt=oc("PROCEDURE",true),Qt=oc("FUNCTION",true),zt=oc("BINLOG",true),Zt=oc("EVENTS",true),Jt=oc("COLLATION",true),re=oc("DATABASES",true),te=oc("COLUMNS",true),ee=oc("INDEXES",true),ne=oc("EVENT",true),oe=oc("GRANTS",true),se=oc("SERIALIZABLE",true),ue=oc("REPEATABLE",true),ae=oc("COMMITTED",true),ie=oc("UNCOMMITTED",true),ce=function(r){return {type:"origin",value:"read "+r.toLowerCase()}},le=oc("ISOLATION",true),fe=oc("LEVEL",true),be=oc("ONLY",true),pe=oc("DEFERRABLE",true),ve=oc("commit",true),de=oc("rollback",true),ye=oc("begin",true),we=oc("WORK",true),Le=oc("TRANSACTION",true),he=oc("start",true),Ce=oc("transaction",true),me=oc("FIELDS",true),Ee=oc("TERMINATED",true),Ae=oc("OPTIONALLY",true),Te=oc("ENCLOSED",true),_e=oc("ESCAPED",true),ge=oc("STARTING",true),Ie=oc("LINES",true),Se=oc("LOAD",true),Ne=oc("CONCURRENT",true),Oe=oc("INFILE",true),Re=oc("INTO",true),je=oc("TABLE",true),xe=oc("ROWS",true),ke=oc("VIEW",true),Ue=oc("GRANT",true),De=oc("OPTION",true),Me=function(r){return {type:"origin",value:Array.isArray(r)?r[0]:r}},Pe=oc("ROUTINE",true),Ge=oc("EXECUTE",true),Fe=oc("ADMIN",true),He=oc("GRANT",false),Ye=oc("PROXY",false),Be=oc("(",false),$e=oc(")",false),We=/^[0-9]/,qe=sc([["0","9"]],false,false),Ve=oc("IN",true),Xe=oc("SHARE",true),Ke=oc("MODE",true),Qe=oc("WAIT",true),ze=oc("NOWAIT",true),Ze=oc("SKIP",true),Je=oc("LOCKED",true),rn=oc("NATURAL",true),tn=oc("LANGUAGE",true),en=oc("QUERY",true),nn=oc("EXPANSION",true),on=oc("BOOLEAN",true),sn=oc("MATCH",true),un=oc("AGAINST",false),an=oc("OUTFILE",true),cn=oc("DUMPFILE",true),ln=oc("BTREE",true),fn=oc("HASH",true),bn=oc("PARSER",true),pn=oc("VISIBLE",true),vn=oc("INVISIBLE",true),dn=oc("LATERAL",true),yn=/^[_0-9]/,wn=sc(["_",["0","9"]],false,false),Ln=oc("ROLLUP",true),hn=oc("?",false),Cn=oc("=",false),mn=oc("DUPLICATE",true),En=function(r,t){return vv(r,t)},An=function(r){return r[0]+" "+r[2]},Tn=oc(">=",false),_n=oc(">",false),gn=oc("<=",false),In=oc("<>",false),Sn=oc("<",false),Nn=oc("!=",false),On=oc("ESCAPE",true),Rn=oc("+",false),jn=oc("-",false),xn=oc("*",false),kn=oc("/",false),Un=oc("%",false),Dn=oc("||",false),Mn=oc("div",true),Pn=oc("mod",true),Gn=oc("&",false),Fn=oc(">>",false),Hn=oc("<<",false),Yn=oc("^",false),Bn=oc("|",false),$n=oc("!",false),Wn=oc("~",false),qn=oc("?|",false),Vn=oc("?&",false),Xn=oc("#-",false),Kn=oc("#>>",false),Qn=oc("#>",false),zn=oc("@>",false),Zn=oc("<@",false),Jn=function(r){return  true===iv[r.toUpperCase()]},ro=oc('"',false),to=/^[^"]/,eo=sc(['"'],true,false),no=/^[^']/,oo=sc(["'"],true,false),so=oc("`",false),uo=/^[^`\\]/,ao=sc(["`","\\"],true,false),io=function(r,t){return r+t.join("")},co=/^[A-Za-z_\u4E00-\u9FA5\xC0-\u017F]/,lo=sc([["A","Z"],["a","z"],"_",["一","龥"],["À","ſ"]],false,false),fo=/^[A-Za-z0-9_$\x80-\uFFFF]/,bo=sc([["A","Z"],["a","z"],["0","9"],"_","$",["","￿"]],false,false),po=/^[A-Za-z0-9_:\u4E00-\u9FA5\xC0-\u017F]/,vo=sc([["A","Z"],["a","z"],["0","9"],"_",":",["一","龥"],["À","ſ"]],false,false),yo=oc(":",false),wo=oc("NOW",true),Lo=oc("OVER",true),ho=oc("WINDOW",true),Co=oc("FOLLOWING",true),mo=oc("PRECEDING",true),Eo=oc("SEPARATOR",true),Ao=oc("YEAR_MONTH",true),To=oc("DAY_HOUR",true),_o=oc("DAY_MINUTE",true),go=oc("DAY_SECOND",true),Io=oc("DAY_MICROSECOND",true),So=oc("HOUR_MINUTE",true),No=oc("HOUR_SECOND",true),Oo=oc("HOUR_MICROSECOND",true),Ro=oc("MINUTE_SECOND",true),jo=oc("MINUTE_MICROSECOND",true),xo=oc("SECOND_MICROSECOND",true),ko=oc("TIMEZONE_HOUR",true),Uo=oc("TIMEZONE_MINUTE",true),Do=oc("CENTURY",true),Mo=oc("DAY",true),Po=oc("DATE",true),Go=oc("DECADE",true),Fo=oc("DOW",true),Ho=oc("DOY",true),Yo=oc("EPOCH",true),Bo=oc("HOUR",true),$o=oc("ISODOW",true),Wo=oc("ISOWEEK",true),qo=oc("ISOYEAR",true),Vo=oc("MICROSECONDS",true),Xo=oc("MILLENNIUM",true),Ko=oc("MILLISECONDS",true),Qo=oc("MINUTE",true),zo=oc("MONTH",true),Zo=oc("QUARTER",true),Jo=oc("SECOND",true),rs=oc("TIME",true),ts=oc("TIMEZONE",true),es=oc("WEEK",true),ns=oc("YEAR",true),os=oc("DATE_TRUNC",true),ss=oc("BOTH",true),us=oc("LEADING",true),as=oc("TRAILING",true),is=oc("trim",true),cs=oc("convert",true),ls=oc("binary",true),fs=oc("_binary",true),bs=oc("_latin1",true),ps=oc("X",true),vs=/^[0-9A-Fa-f]/,ds=sc([["0","9"],["A","F"],["a","f"]],false,false),ys=oc("b",true),ws=oc("0x",true),Ls=oc("N",true),hs=function(r,t){return {type:r.toLowerCase(),value:t[1].join("")}},Cs=/^[^"\\\0-\x1F\x7F]/,ms=sc(['"',"\\",["\0",""],""],true,false),Es=/^[\n]/,As=sc(["\n"],false,false),Ts=/^[^'\\]/,_s=sc(["'","\\"],true,false),gs=oc("\\'",false),Is=oc('\\"',false),Ss=oc("\\\\",false),Ns=oc("\\/",false),Os=oc("\\b",false),Rs=oc("\\f",false),js=oc("\\n",false),xs=oc("\\r",false),ks=oc("\\t",false),Us=oc("\\u",false),Ds=oc("\\",false),Ms=oc("''",false),Ps=oc('""',false),Gs=oc("``",false),Fs=/^[\n\r]/,Hs=sc(["\n","\r"],false,false),Ys=function(r){return function(r){const t=n(Number.MAX_SAFE_INTEGER);return !(n(r)<t)}(r)?{type:"bigint",value:r}:parseFloat(r)},Bs=oc(".",false),$s=/^[0-9a-fA-F]/,Ws=sc([["0","9"],["a","f"],["A","F"]],false,false),qs=/^[eE]/,Vs=sc(["e","E"],false,false),Xs=/^[+\-]/,Ks=sc(["+","-"],false,false),Qs=oc("NULL",true),zs=oc("NOT NULL",true),Zs=oc("TRUE",true),Js=oc("TO",true),ru=oc("FALSE",true),tu=oc("SHOW",true),eu=oc("USE",true),nu=oc("ALTER",true),ou=oc("SELECT",true),su=oc("UPDATE",true),uu=oc("CREATE",true),au=oc("TEMPORARY",true),iu=oc("DELETE",true),cu=oc("INSERT",true),lu=oc("RECURSIVE",true),fu=oc("REPLACE",true),bu=oc("RENAME",true),pu=oc("IGNORE",true),vu=oc("EXPLAIN",true),du=oc("PARTITION",true),yu=oc("FROM",true),wu=oc("TRIGGER",true),Lu=oc("TABLES",true),hu=oc("DATABASE",true),Cu=oc("SCHEMA",true),mu=oc("ON",true),Eu=oc("LEFT",true),Au=oc("RIGHT",true),Tu=oc("FULL",true),_u=oc("INNER",true),gu=oc("CROSS",true),Iu=oc("STRAIGHT_JOIN",true),Su=oc("JOIN",true),Nu=oc("OUTER",true),Ou=oc("UNION",true),Ru=oc("MINUS",true),ju=oc("INTERSECT",true),xu=oc("EXCEPT",true),ku=oc("VALUES",true),Uu=oc("USING",true),Du=oc("WHERE",true),Mu=oc("GO",true),Pu=oc("GROUP",true),Gu=oc("ORDER",true),Fu=oc("HAVING",true),Hu=oc("LIMIT",true),Yu=oc("OFFSET",true),Bu=oc("ASC",true),$u=oc("DESC",true),Wu=oc("DESCRIBE",true),qu=oc("ALL",true),Vu=oc("DISTINCT",true),Xu=oc("BETWEEN",true),Ku=oc("IS",true),Qu=oc("LIKE",true),zu=oc("RLIKE",true),Zu=oc("REGEXP",true),Ju=oc("EXISTS",true),ra=oc("AND",true),ta=oc("OR",true),ea=oc("COUNT",true),na=oc("GROUP_CONCAT",true),oa=oc("MAX",true),sa=oc("MIN",true),ua=oc("SUM",true),aa=oc("AVG",true),ia=oc("EXTRACT",true),ca=oc("CALL",true),la=oc("CASE",true),fa=oc("WHEN",true),ba=oc("THEN",true),pa=oc("ELSE",true),va=oc("END",true),da=oc("CAST",true),ya=oc("VARBINARY",true),wa=oc("BIT",true),La=oc("CHAR",true),ha=oc("VARCHAR",true),Ca=oc("NUMERIC",true),ma=oc("DECIMAL",true),Ea=oc("SIGNED",true),Aa=oc("UNSIGNED",true),Ta=oc("INT",true),_a=oc("ZEROFILL",true),ga=oc("INTEGER",true),Ia=oc("JSON",true),Sa=oc("SMALLINT",true),Na=oc("MEDIUMINT",true),Oa=oc("TINYINT",true),Ra=oc("TINYTEXT",true),ja=oc("TEXT",true),xa=oc("MEDIUMTEXT",true),ka=oc("LONGTEXT",true),Ua=oc("BIGINT",true),Da=oc("ENUM",true),Ma=oc("FLOAT",true),Pa=oc("DOUBLE",true),Ga=oc("DATETIME",true),Fa=oc("TIMESTAMP",true),Ha=oc("USER",true),Ya=oc("VECTOR",true),Ba=oc("CURRENT_DATE",true),$a=(oc("INTERVAL",true)),Wa=oc("MICROSECOND",true),qa=oc("CURRENT_TIME",true),Va=oc("CURRENT_TIMESTAMP",true),Xa=oc("CURRENT_USER",true),Ka=oc("SESSION_USER",true),Qa=oc("SYSTEM_USER",true),za=oc("GLOBAL",true),Za=oc("SESSION",true),Ja=oc("PERSIST",true),ri=oc("PERSIST_ONLY",true),ti=oc("GEOMETRY",true),ei=oc("POINT",true),ni=oc("LINESTRING",true),oi=oc("POLYGON",true),si=oc("MULTIPOINT",true),ui=oc("MULTILINESTRING",true),ai=oc("MULTIPOLYGON",true),ii=oc("GEOMETRYCOLLECTION",true),ci=oc("@@",false),li=oc("$",false),fi=oc("return",true),bi=oc(":=",false),pi=oc("DUAL",true),vi=oc("ADD",true),di=oc("COLUMN",true),yi=oc("MODIFY",true),wi=oc("FULLTEXT",true),Li=oc("SPATIAL",true),hi=oc("COMMENT",true),Ci=oc("REFERENCES",true),mi=oc("SQL_CALC_FOUND_ROWS",true),Ei=oc("SQL_CACHE",true),Ai=oc("SQL_NO_CACHE",true),Ti=oc("SQL_SMALL_RESULT",true),_i=oc("SQL_BIG_RESULT",true),gi=oc("SQL_BUFFER_RESULT",true),Ii=oc(",",false),Si=oc("[",false),Ni=oc("]",false),Oi=oc(";",false),Ri=oc("->",false),ji=oc("->>",false),xi=oc("&&",false),ki=oc("XOR",true),Ui=oc("/*",false),Di=oc("*/",false),Mi=oc("--",false),Pi=oc("#",false),Gi={type:"any"},Fi=/^[ \t\n\r]/,Hi=sc([" ","\t","\n","\r"],false,false),Yi=function(r,t,e){return {type:"assign",left:r,symbol:t,right:e}},Bi=oc("boolean",true),$i=oc("blob",true),Wi=oc("tinyblob",true),qi=oc("mediumblob",true),Vi=oc("longblob",true),Xi=function(r,t){return {dataType:r,...t||{}}},Ki=oc("ARRAY",true),Qi=/^[0-6]/,zi=sc([["0","6"]],false,false),Zi=0,Ji=0,rc=[{line:1,column:1}],tc=0,ec=[],nc=0;if("startRule"in t){if(!(t.startRule in u))throw new Error("Can't start parsing from rule \""+t.startRule+'".');a=u[t.startRule];}function oc(r,t){return {type:"literal",text:r,ignoreCase:t}}function sc(r,t,e){return {type:"class",parts:r,inverted:t,ignoreCase:e}}function uc(t){var e,n=rc[t];if(n)return n;for(e=t-1;!rc[e];)e--;for(n={line:(n=rc[e]).line,column:n.column};e<t;)10===r.charCodeAt(e)?(n.line++,n.column=1):n.column++,e++;return rc[t]=n,n}function ac(r,t){var e=uc(r),n=uc(t);return {start:{offset:r,line:e.line,column:e.column},end:{offset:t,line:n.line,column:n.column}}}function ic(r){Zi<tc||(Zi>tc&&(tc=Zi,ec=[]),ec.push(r));}function cc(r,t,e){return new o(o.buildMessage(r,t),r,t,e)}function lc(){var r,t,e,n,o,u,a,i;if(r=Zi,(t=fc())!==s)if(Gp()!==s){for(e=[],n=Zi,(o=Gp())!==s&&(u=Ob())!==s&&(a=Gp())!==s&&(i=fc())!==s?n=o=[o,u,a,i]:(Zi=n,n=s);n!==s;)e.push(n),n=Zi,(o=Gp())!==s&&(u=Ob())!==s&&(a=Gp())!==s&&(i=fc())!==s?n=o=[o,u,a,i]:(Zi=n,n=s);e!==s?(Ji=r,r=t=function(r,t){if(!t||0===t.length)return r;delete r.tableList,delete r.columnList;let e=r;for(let r=0;r<t.length;r++)delete t[r][3].tableList,delete t[r][3].columnList,e.go_next=t[r][3],e.go="go",e=e.go_next;return {tableList:Array.from(hv),columnList:yv(Cv),ast:r}}(t,e)):(Zi=r,r=s);}else Zi=r,r=s;else Zi=r,r=s;return r}function fc(){var r,t;return r=Zi,Gp()!==s&&(t=function(){var r,t,e,n,o,u,a,i;if(r=Zi,(t=pc())!==s){for(e=[],n=Zi,(o=Gp())!==s&&(u=Up())!==s&&(a=Gp())!==s&&(i=pc())!==s?n=o=[o,u,a,i]:(Zi=n,n=s);n!==s;)e.push(n),n=Zi,(o=Gp())!==s&&(u=Up())!==s&&(a=Gp())!==s&&(i=pc())!==s?n=o=[o,u,a,i]:(Zi=n,n=s);e!==s?(Ji=r,t=function(r,t){const e=r&&r.ast||r,n=t&&t.length&&t[0].length>=4?[e]:e;for(let r=0;r<t.length;r++)t[r][3]&&0!==t[r][3].length&&n.push(t[r][3]&&t[r][3].ast||t[r][3]);return {tableList:Array.from(hv),columnList:yv(Cv),ast:n}}(t,e),r=t):(Zi=r,r=s);}else Zi=r,r=s;return r}())!==s?(Ji=r,r=t):(Zi=r,r=s),r}function bc(){var t;return (t=function(){var r,t,e,n,o,u,a;r=Zi,(t=nb())!==s&&Gp()!==s&&(e=hb())!==s&&Gp()!==s?((n=Ic())===s&&(n=null),n!==s&&Gp()!==s&&(o=wl())!==s?(Ji=r,i=t,c=e,f=n,(b=o)&&b.forEach(r=>hv.add(`${i}::${r.db}::${r.table}`)),t={tableList:Array.from(hv),columnList:yv(Cv),ast:{type:i.toLowerCase(),keyword:c.toLowerCase(),prefix:f,name:b}},r=t):(Zi=r,r=s)):(Zi=r,r=s);var i,c,f,b;r===s&&(r=Zi,(t=nb())!==s&&Gp()!==s&&(e=dp())!==s&&Gp()!==s?((n=Ic())===s&&(n=null),n!==s&&Gp()!==s&&(o=wl())!==s&&Gp()!==s?((u=Gc())===s&&(u=null),u!==s?(Ji=r,t=function(r,t,e,n,o){return {tableList:Array.from(hv),columnList:yv(Cv),ast:{type:r.toLowerCase(),keyword:t.toLowerCase(),prefix:e,name:n,options:o&&[{type:"origin",value:o}]}}}(t,e,n,o,u),r=t):(Zi=r,r=s)):(Zi=r,r=s)):(Zi=r,r=s),r===s&&(r=Zi,(t=nb())!==s&&Gp()!==s&&(e=Ep())!==s&&Gp()!==s&&(n=sf())!==s&&Gp()!==s&&(o=Tb())!==s&&Gp()!==s&&(u=ml())!==s&&Gp()!==s?((a=function(){var r,t,e,n,o,u;r=Zi,(t=Rc())===s&&(t=jc());if(t!==s){for(e=[],n=Zi,(o=Gp())!==s?((u=Rc())===s&&(u=jc()),u!==s?n=o=[o,u]:(Zi=n,n=s)):(Zi=n,n=s);n!==s;)e.push(n),n=Zi,(o=Gp())!==s?((u=Rc())===s&&(u=jc()),u!==s?n=o=[o,u]:(Zi=n,n=s)):(Zi=n,n=s);e!==s?(Ji=r,t=l(t,e),r=t):(Zi=r,r=s);}else Zi=r,r=s;return r}())===s&&(a=null),a!==s&&Gp()!==s?(Ji=r,t=function(r,t,e,n,o){return {tableList:Array.from(hv),columnList:yv(Cv),ast:{type:r.toLowerCase(),keyword:t.toLowerCase(),name:e,table:n,options:o}}}(t,e,n,u,a),r=t):(Zi=r,r=s)):(Zi=r,r=s),r===s&&(r=Zi,(t=nb())!==s&&Gp()!==s?((e=Eb())===s&&(e=Ab()),e!==s&&Gp()!==s?((n=Ic())===s&&(n=null),n!==s&&Gp()!==s&&(o=Cf())!==s?(Ji=r,t=function(r,t,e,n){return {tableList:Array.from(hv),columnList:yv(Cv),ast:{type:r.toLowerCase(),keyword:t.toLowerCase(),prefix:e,name:n}}}(t,e,n,o),r=t):(Zi=r,r=s)):(Zi=r,r=s)):(Zi=r,r=s),r===s&&(r=Zi,(t=nb())!==s&&Gp()!==s&&(e=Cb())!==s&&Gp()!==s?((n=Ic())===s&&(n=null),n!==s&&Gp()!==s&&(o=hl())!==s?(Ji=r,t=function(r,t,e,n){return {tableList:Array.from(hv),columnList:yv(Cv),ast:{type:r.toLowerCase(),keyword:t.toLowerCase(),prefix:e,name:[{schema:n.db,trigger:n.table}]}}}(t,e,n,o),r=t):(Zi=r,r=s)):(Zi=r,r=s)))));return r}())===s&&(t=function(){var t;(t=function(){var r,t,e,n,o,u,a,c,l,f;r=Zi,(t=ab())!==s&&Gp()!==s?((e=ib())===s&&(e=null),e!==s&&Gp()!==s&&hb()!==s&&Gp()!==s?((n=wc())===s&&(n=null),n!==s&&Gp()!==s&&(o=ml())!==s&&Gp()!==s&&(u=function r(){var t,e;(t=function(){var r,t;r=Zi,Gb()!==s&&Gp()!==s&&(t=wl())!==s?(Ji=r,r={type:"like",table:t}):(Zi=r,r=s);return r}())===s&&(t=Zi,xp()!==s&&Gp()!==s&&(e=r())!==s&&Gp()!==s&&kp()!==s?(Ji=t,(n=e).parentheses=true,t=n):(Zi=t,t=s));var n;return t}())!==s?(Ji=r,b=t,p=e,v=n,y=u,(d=o)&&hv.add(`create::${d.db}::${d.table}`),t={tableList:Array.from(hv),columnList:yv(Cv),ast:{type:b[0].toLowerCase(),keyword:"table",temporary:p&&p[0].toLowerCase(),if_not_exists:v,table:[d],like:y}},r=t):(Zi=r,r=s)):(Zi=r,r=s)):(Zi=r,r=s);var b,p,v,d,y;r===s&&(r=Zi,(t=ab())!==s&&Gp()!==s?((e=ib())===s&&(e=null),e!==s&&Gp()!==s&&hb()!==s&&Gp()!==s?((n=wc())===s&&(n=null),n!==s&&Gp()!==s&&(o=ml())!==s&&Gp()!==s?((u=function(){var r,t,e,n,o,u,a,i,c;if(r=Zi,(t=xp())!==s)if(Gp()!==s)if((e=Ec())!==s){for(n=[],o=Zi,(u=Gp())!==s&&(a=Rp())!==s&&(i=Gp())!==s&&(c=Ec())!==s?o=u=[u,a,i,c]:(Zi=o,o=s);o!==s;)n.push(o),o=Zi,(u=Gp())!==s&&(a=Rp())!==s&&(i=Gp())!==s&&(c=Ec())!==s?o=u=[u,a,i,c]:(Zi=o,o=s);n!==s&&(o=Gp())!==s&&(u=kp())!==s?(Ji=r,t=sr(e,n),r=t):(Zi=r,r=s);}else Zi=r,r=s;else Zi=r,r=s;else Zi=r,r=s;return r}())===s&&(u=null),u!==s&&Gp()!==s?((a=function(){var r,t,e,n,o,u,a,c;if(r=Zi,(t=Yc())!==s){for(e=[],n=Zi,(o=Gp())!==s?((u=Rp())===s&&(u=null),u!==s&&(a=Gp())!==s&&(c=Yc())!==s?n=o=[o,u,a,c]:(Zi=n,n=s)):(Zi=n,n=s);n!==s;)e.push(n),n=Zi,(o=Gp())!==s?((u=Rp())===s&&(u=null),u!==s&&(a=Gp())!==s&&(c=Yc())!==s?n=o=[o,u,a,c]:(Zi=n,n=s)):(Zi=n,n=s);e!==s?(Ji=r,t=i(t,e),r=t):(Zi=r,r=s);}else Zi=r,r=s;return r}())===s&&(a=null),a!==s&&Gp()!==s?((c=pb())===s&&(c=fb()),c===s&&(c=null),c!==s&&Gp()!==s?((l=Lb())===s&&(l=null),l!==s&&Gp()!==s?((f=dc())===s&&(f=null),f!==s?(Ji=r,t=function(r,t,e,n,o,s,u,a,i){return n&&hv.add(`create::${n.db}::${n.table}`),{tableList:Array.from(hv),columnList:yv(Cv),ast:{type:r[0].toLowerCase(),keyword:"table",temporary:t&&t[0].toLowerCase(),if_not_exists:e,table:[n],ignore_replace:u&&u[0].toLowerCase(),as:a&&a[0].toLowerCase(),query_expr:i&&i.ast,create_definitions:o,table_options:s}}}(t,e,n,o,u,a,c,l,f),r=t):(Zi=r,r=s)):(Zi=r,r=s)):(Zi=r,r=s)):(Zi=r,r=s)):(Zi=r,r=s)):(Zi=r,r=s)):(Zi=r,r=s)):(Zi=r,r=s));return r}())===s&&(t=function(){var t,e,n,o,u,a,i,c,l,f,b;t=Zi,(e=ab())!==s&&Gp()!==s?((n=_c())===s&&(n=null),n!==s&&Gp()!==s&&Cb()!==s&&Gp()!==s?((o=wc())===s&&(o=null),o!==s&&Gp()!==s&&(u=ml())!==s&&Gp()!==s&&(a=function(){var t;"before"===r.substr(Zi,6).toLowerCase()?(t=r.substr(Zi,6),Zi+=6):(t=s,0===nc&&ic(br));t===s&&("after"===r.substr(Zi,5).toLowerCase()?(t=r.substr(Zi,5),Zi+=5):(t=s,0===nc&&ic(pr)));return t}())!==s&&Gp()!==s&&(i=function(){var r,t;r=Zi,(t=lb())===s&&(t=ub())===s&&(t=cb());t!==s&&(Ji=r,t={keyword:t[0].toLowerCase()});return r=t}())!==s&&Gp()!==s&&Tb()!==s&&Gp()!==s&&(c=ml())!==s&&Gp()!==s&&(l=function(){var t,e,n,o;t=Zi,"for"===r.substr(Zi,3).toLowerCase()?(e=r.substr(Zi,3),Zi+=3):(e=s,0===nc&&ic(vr));e!==s&&Gp()!==s?("each"===r.substr(Zi,4).toLowerCase()?(n=r.substr(Zi,4),Zi+=4):(n=s,0===nc&&ic(dr)),n===s&&(n=null),n!==s&&Gp()!==s?("row"===r.substr(Zi,3).toLowerCase()?(o=r.substr(Zi,3),Zi+=3):(o=s,0===nc&&ic(yr)),o===s&&("statement"===r.substr(Zi,9).toLowerCase()?(o=r.substr(Zi,9),Zi+=9):(o=s,0===nc&&ic(wr))),o!==s?(Ji=t,u=e,i=o,e={keyword:(a=n)?`${u.toLowerCase()} ${a.toLowerCase()}`:u.toLowerCase(),args:i.toLowerCase()},t=e):(Zi=t,t=s)):(Zi=t,t=s)):(Zi=t,t=s);var u,a,i;return t}())!==s&&Gp()!==s?((f=function(){var t,e,n;t=Zi,"follows"===r.substr(Zi,7).toLowerCase()?(e=r.substr(Zi,7),Zi+=7):(e=s,0===nc&&ic(Lr));e===s&&("precedes"===r.substr(Zi,8).toLowerCase()?(e=r.substr(Zi,8),Zi+=8):(e=s,0===nc&&ic(hr)));e!==s&&Gp()!==s&&(n=ff())!==s?(Ji=t,t=e={keyword:e,trigger:n}):(Zi=t,t=s);return t}())===s&&(f=null),f!==s&&Gp()!==s&&(b=function(){var r,t;r=Zi,wb()!==s&&Gp()!==s&&(t=Ol())!==s?(Ji=r,r={type:"set",expr:t}):(Zi=r,r=s);return r}())!==s?(Ji=t,p=e,v=n,d=o,y=u,w=a,L=i,h=c,C=l,m=f,E=b,e={tableList:Array.from(hv),columnList:yv(Cv),ast:{type:p[0].toLowerCase(),definer:v,keyword:"trigger",for_each:C,if_not_exists:d,trigger:y,time:w,events:[L],order:m,table:h,execute:E}},t=e):(Zi=t,t=s)):(Zi=t,t=s)):(Zi=t,t=s)):(Zi=t,t=s);var p,v,d,y,w,L,h,C,m,E;return t}())===s&&(t=function(){var r,t,e,n,o,u,a,c,l,f,b,p;r=Zi,(t=ab())!==s&&Gp()!==s?((e=gp())===s&&(e=Tp())===s&&(e=_p()),e===s&&(e=null),e!==s&&Gp()!==s&&(n=Ep())!==s&&Gp()!==s&&(o=ff())!==s&&Gp()!==s?((u=vl())===s&&(u=null),u!==s&&Gp()!==s&&(a=Tb())!==s&&Gp()!==s&&(c=ml())!==s&&Gp()!==s&&xp()!==s&&Gp()!==s&&(l=function(){var r,t,e,n,o,u,a,c;if(r=Zi,(t=yc())!==s){for(e=[],n=Zi,(o=Gp())!==s&&(u=Rp())!==s&&(a=Gp())!==s&&(c=yc())!==s?n=o=[o,u,a,c]:(Zi=n,n=s);n!==s;)e.push(n),n=Zi,(o=Gp())!==s&&(u=Rp())!==s&&(a=Gp())!==s&&(c=yc())!==s?n=o=[o,u,a,c]:(Zi=n,n=s);e!==s?(Ji=r,t=i(t,e),r=t):(Zi=r,r=s);}else Zi=r,r=s;return r}())!==s&&Gp()!==s&&kp()!==s&&Gp()!==s?((f=dl())===s&&(f=null),f!==s&&Gp()!==s?((b=Rc())===s&&(b=null),b!==s&&Gp()!==s?((p=jc())===s&&(p=null),p!==s&&Gp()!==s?(Ji=r,v=t,d=e,y=n,w=o,L=u,h=a,C=c,m=l,E=f,A=b,T=p,t={tableList:Array.from(hv),columnList:yv(Cv),ast:{type:v[0].toLowerCase(),index_type:d&&d.toLowerCase(),keyword:y.toLowerCase(),index:w,on_kw:h[0].toLowerCase(),table:C,index_columns:m,index_using:L,index_options:E,algorithm_option:A,lock_option:T}},r=t):(Zi=r,r=s)):(Zi=r,r=s)):(Zi=r,r=s)):(Zi=r,r=s)):(Zi=r,r=s)):(Zi=r,r=s);var v,d,y,w,L,h,C,m,E,A,T;return r}())===s&&(t=function(){var r,t,e,n,o,u;r=Zi,(t=ab())!==s&&Gp()!==s?((e=Eb())===s&&(e=Ab()),e!==s&&Gp()!==s?((n=wc())===s&&(n=null),n!==s&&Gp()!==s&&(o=zp())!==s&&Gp()!==s?((u=function(){var r,t,e,n,o,u;if(r=Zi,(t=Hc())!==s){for(e=[],n=Zi,(o=Gp())!==s&&(u=Hc())!==s?n=o=[o,u]:(Zi=n,n=s);n!==s;)e.push(n),n=Zi,(o=Gp())!==s&&(u=Hc())!==s?n=o=[o,u]:(Zi=n,n=s);e!==s?(Ji=r,t=l(t,e),r=t):(Zi=r,r=s);}else Zi=r,r=s;return r}())===s&&(u=null),u!==s?(Ji=r,t=function(r,t,e,n,o){const s=t.toLowerCase();return {tableList:Array.from(hv),columnList:yv(Cv),ast:{type:r[0].toLowerCase(),keyword:s,if_not_exists:e,[s]:{db:n.schema,schema:n.name},create_definitions:o}}}(t,e,n,o,u),r=t):(Zi=r,r=s)):(Zi=r,r=s)):(Zi=r,r=s)):(Zi=r,r=s);return r}())===s&&(t=function(){var t,e,n,o,u,a,i,c,l,f,b,p,v,d,y,w,L,h,C,m,E;t=Zi,(e=ab())!==s&&Gp()!==s?(n=Zi,(o=Bb())!==s&&(u=Gp())!==s&&(a=fb())!==s?n=o=[o,u,a]:(Zi=n,n=s),n===s&&(n=null),n!==s&&(o=Gp())!==s?(u=Zi,"algorithm"===r.substr(Zi,9).toLowerCase()?(a=r.substr(Zi,9),Zi+=9):(a=s,0===nc&&ic(z)),a!==s&&(i=Gp())!==s&&(c=hp())!==s&&(l=Gp())!==s?("undefined"===r.substr(Zi,9).toLowerCase()?(f=r.substr(Zi,9),Zi+=9):(f=s,0===nc&&ic(Z)),f===s&&("merge"===r.substr(Zi,5).toLowerCase()?(f=r.substr(Zi,5),Zi+=5):(f=s,0===nc&&ic(J)),f===s&&("temptable"===r.substr(Zi,9).toLowerCase()?(f=r.substr(Zi,9),Zi+=9):(f=s,0===nc&&ic(rr)))),f!==s?u=a=[a,i,c,l,f]:(Zi=u,u=s)):(Zi=u,u=s),u===s&&(u=null),u!==s&&(a=Gp())!==s?((i=_c())===s&&(i=null),i!==s&&(c=Gp())!==s?(l=Zi,"sql"===r.substr(Zi,3).toLowerCase()?(f=r.substr(Zi,3),Zi+=3):(f=s,0===nc&&ic(tr)),f!==s&&(b=Gp())!==s?("security"===r.substr(Zi,8).toLowerCase()?(p=r.substr(Zi,8),Zi+=8):(p=s,0===nc&&ic(er)),p!==s&&(v=Gp())!==s?("definer"===r.substr(Zi,7).toLowerCase()?(d=r.substr(Zi,7),Zi+=7):(d=s,0===nc&&ic(nr)),d===s&&("invoker"===r.substr(Zi,7).toLowerCase()?(d=r.substr(Zi,7),Zi+=7):(d=s,0===nc&&ic(or))),d!==s?l=f=[f,b,p,v,d]:(Zi=l,l=s)):(Zi=l,l=s)):(Zi=l,l=s),l===s&&(l=null),l!==s&&(f=Gp())!==s&&(b=dp())!==s&&(p=Gp())!==s&&(v=ml())!==s&&(d=Gp())!==s?(y=Zi,(w=xp())!==s&&(L=Gp())!==s&&(h=uf())!==s&&(C=Gp())!==s&&(m=kp())!==s?y=w=[w,L,h,C,m]:(Zi=y,y=s),y===s&&(y=null),y!==s&&(w=Gp())!==s&&(L=Lb())!==s&&(h=Gp())!==s&&(C=sl())!==s&&(m=Gp())!==s?((E=function(){var t,e,n,o,u;t=Zi,(e=Nb())!==s&&Gp()!==s?("cascaded"===r.substr(Zi,8).toLowerCase()?(n=r.substr(Zi,8),Zi+=8):(n=s,0===nc&&ic(V)),n===s&&("local"===r.substr(Zi,5).toLowerCase()?(n=r.substr(Zi,5),Zi+=5):(n=s,0===nc&&ic(X))),n!==s&&Gp()!==s?("check"===r.substr(Zi,5).toLowerCase()?(o=r.substr(Zi,5),Zi+=5):(o=s,0===nc&&ic(K)),o!==s&&Gp()!==s?("OPTION"===r.substr(Zi,6)?(u="OPTION",Zi+=6):(u=s,0===nc&&ic(Q)),u!==s?(Ji=t,e=`with ${n.toLowerCase()} check option`,t=e):(Zi=t,t=s)):(Zi=t,t=s)):(Zi=t,t=s)):(Zi=t,t=s);t===s&&(t=Zi,(e=Nb())!==s&&Gp()!==s?("check"===r.substr(Zi,5).toLowerCase()?(n=r.substr(Zi,5),Zi+=5):(n=s,0===nc&&ic(K)),n!==s&&Gp()!==s?("OPTION"===r.substr(Zi,6)?(o="OPTION",Zi+=6):(o=s,0===nc&&ic(Q)),o!==s?(Ji=t,t=e="with check option"):(Zi=t,t=s)):(Zi=t,t=s)):(Zi=t,t=s));return t}())===s&&(E=null),E!==s?(Ji=t,A=e,T=n,_=u,g=i,I=l,N=y,O=C,R=E,(S=v).view=S.table,delete S.table,e={tableList:Array.from(hv),columnList:yv(Cv),ast:{type:A[0].toLowerCase(),keyword:"view",replace:T&&"or replace",algorithm:_&&_[4],definer:g,sql_security:I&&I[4],columns:N&&N[2],select:O,view:S,with:R}},t=e):(Zi=t,t=s)):(Zi=t,t=s)):(Zi=t,t=s)):(Zi=t,t=s)):(Zi=t,t=s)):(Zi=t,t=s)):(Zi=t,t=s);var A,T,_,g,I,S,N,O,R;return t}())===s&&(t=function(){var t,e,n,o,u,a,i,c,l,f,b;t=Zi,(e=ab())!==s&&Gp()!==s&&lp()!==s&&Gp()!==s?((n=wc())===s&&(n=null),n!==s&&Gp()!==s&&(o=function(){var r,t,e,n,o,u,a,i;if(r=Zi,(t=Lc())!==s){for(e=[],n=Zi,(o=Gp())!==s&&(u=Rp())!==s&&(a=Gp())!==s&&(i=Lc())!==s?n=o=[o,u,a,i]:(Zi=n,n=s);n!==s;)e.push(n),n=Zi,(o=Gp())!==s&&(u=Rp())!==s&&(a=Gp())!==s&&(i=Lc())!==s?n=o=[o,u,a,i]:(Zi=n,n=s);e!==s?(Ji=r,t=h(t,e),r=t):(Zi=r,r=s);}else Zi=r,r=s;return r}())!==s&&Gp()!==s?((u=function(){var t,e,n;t=Zi,rb()!==s&&Gp()!==s?("role"===r.substr(Zi,4).toLowerCase()?(e=r.substr(Zi,4),Zi+=4):(e=s,0===nc&&ic(C)),e!==s&&Gp()!==s&&(n=Qc())!==s?(Ji=t,t={keyword:"default role",value:n}):(Zi=t,t=s)):(Zi=t,t=s);return t}())===s&&(u=null),u!==s&&Gp()!==s?((a=function(){var t,e,n;t=Zi,"require"===r.substr(Zi,7).toLowerCase()?(e=r.substr(Zi,7),Zi+=7):(e=s,0===nc&&ic(S));e!==s&&Gp()!==s&&(n=function(){var r,t,e,n,o,u,a,i;if(r=Zi,(t=hc())!==s){for(e=[],n=Zi,(o=Gp())!==s&&(u=Yb())!==s&&(a=Gp())!==s&&(i=hc())!==s?n=o=[o,u,a,i]:(Zi=n,n=s);n!==s;)e.push(n),n=Zi,(o=Gp())!==s&&(u=Yb())!==s&&(a=Gp())!==s&&(i=hc())!==s?n=o=[o,u,a,i]:(Zi=n,n=s);e!==s?(Ji=r,t=vv(t,e),r=t):(Zi=r,r=s);}else Zi=r,r=s;return r}())!==s?(Ji=t,t=e={keyword:"require",value:n}):(Zi=t,t=s);return t}())===s&&(a=null),a!==s&&Gp()!==s?((i=function(){var r,t,e,n,o,u,a;if(r=Zi,(t=Nb())!==s)if(Gp()!==s)if((e=Cc())!==s){for(n=[],o=Zi,(u=Gp())!==s&&(a=Cc())!==s?o=u=[u,a]:(Zi=o,o=s);o!==s;)n.push(o),o=Zi,(u=Gp())!==s&&(a=Cc())!==s?o=u=[u,a]:(Zi=o,o=s);n!==s?(Ji=r,t=function(r,t){const e=[r];if(t)for(const r of t)e.push(r[1]);return {keyword:"with",value:e}}(e,n),r=t):(Zi=r,r=s);}else Zi=r,r=s;else Zi=r,r=s;else Zi=r,r=s;return r}())===s&&(i=null),i!==s&&Gp()!==s?((c=function(){var r,t,e,n,o,u;if(r=Zi,(t=mc())!==s){for(e=[],n=Zi,(o=Gp())!==s&&(u=mc())!==s?n=o=[o,u]:(Zi=n,n=s);n!==s;)e.push(n),n=Zi,(o=Gp())!==s&&(u=mc())!==s?n=o=[o,u]:(Zi=n,n=s);e!==s?(Ji=r,t=pv(t,e,1),r=t):(Zi=r,r=s);}else Zi=r,r=s;return r}())===s&&(c=null),c!==s&&Gp()!==s?((l=function(){var t,e,n;t=Zi,"account"===r.substr(Zi,7).toLowerCase()?(e=r.substr(Zi,7),Zi+=7):(e=s,0===nc&&ic(B));e!==s&&Gp()!==s?("lock"===r.substr(Zi,4).toLowerCase()?(n=r.substr(Zi,4),Zi+=4):(n=s,0===nc&&ic($)),n===s&&("unlock"===r.substr(Zi,6).toLowerCase()?(n=r.substr(Zi,6),Zi+=6):(n=s,0===nc&&ic(W))),n!==s?(Ji=t,e=function(r){const t={type:"origin",value:r.toLowerCase(),prefix:"account"};return t}(n),t=e):(Zi=t,t=s)):(Zi=t,t=s);return t}())===s&&(l=null),l!==s&&Gp()!==s?((f=Yp())===s&&(f=null),f!==s&&Gp()!==s?((b=function(){var t,e,n;t=Zi,"attribute"===r.substr(Zi,9).toLowerCase()?(e=r.substr(Zi,9),Zi+=9):(e=s,0===nc&&ic(q));e!==s&&Gp()!==s&&(n=Bf())!==s?(Ji=t,(o=n).prefix="attribute",t=e=o):(Zi=t,t=s);var o;return t}())===s&&(b=null),b!==s?(Ji=t,p=e,v=n,d=o,y=u,w=a,L=i,m=c,E=l,A=f,T=b,e={tableList:Array.from(hv),columnList:yv(Cv),ast:{type:p[0].toLowerCase(),keyword:"user",if_not_exists:v,user:d,default_role:y,require:w,resource_options:L,password_options:m,lock_option:E,comment:A,attribute:T}},t=e):(Zi=t,t=s)):(Zi=t,t=s)):(Zi=t,t=s)):(Zi=t,t=s)):(Zi=t,t=s)):(Zi=t,t=s)):(Zi=t,t=s)):(Zi=t,t=s)):(Zi=t,t=s);var p,v,d,y,w,L,m,E,A,T;return t}());return t}())===s&&(t=function(){var t,e,n,o;t=Zi,(e=function(){var t,e,n,o;t=Zi,"truncate"===r.substr(Zi,8).toLowerCase()?(e=r.substr(Zi,8),Zi+=8):(e=s,0===nc&&ic(Mr));e!==s?(n=Zi,nc++,o=mf(),nc--,o===s?n=void 0:(Zi=n,n=s),n!==s?(Ji=t,t=e="TRUNCATE"):(Zi=t,t=s)):(Zi=t,t=s);return t}())!==s&&Gp()!==s?((n=hb())===s&&(n=null),n!==s&&Gp()!==s&&(o=wl())!==s?(Ji=t,u=e,a=n,(i=o)&&i.forEach(r=>hv.add(`${u}::${r.db}::${r.table}`)),e={tableList:Array.from(hv),columnList:yv(Cv),ast:{type:u.toLowerCase(),keyword:a&&a.toLowerCase()||"table",name:i}},t=e):(Zi=t,t=s)):(Zi=t,t=s);var u,a,i;return t}())===s&&(t=function(){var r,t,e;r=Zi,(t=bb())!==s&&Gp()!==s&&hb()!==s&&Gp()!==s&&(e=function(){var r,t,e,n,o,u,a,i;if(r=Zi,(t=pl())!==s){for(e=[],n=Zi,(o=Gp())!==s&&(u=Rp())!==s&&(a=Gp())!==s&&(i=pl())!==s?n=o=[o,u,a,i]:(Zi=n,n=s);n!==s;)e.push(n),n=Zi,(o=Gp())!==s&&(u=Rp())!==s&&(a=Gp())!==s&&(i=pl())!==s?n=o=[o,u,a,i]:(Zi=n,n=s);e!==s?(Ji=r,t=sr(t,e),r=t):(Zi=r,r=s);}else Zi=r,r=s;return r}())!==s?(Ji=r,(n=e).forEach(r=>r.forEach(r=>r.table&&hv.add(`rename::${r.db}::${r.table}`))),t={tableList:Array.from(hv),columnList:yv(Cv),ast:{type:"rename",table:n}},r=t):(Zi=r,r=s);var n;return r}())===s&&(t=function(){var t,e,n;t=Zi,(e=function(){var t,e,n,o;t=Zi,"call"===r.substr(Zi,4).toLowerCase()?(e=r.substr(Zi,4),Zi+=4):(e=s,0===nc&&ic(ca));e!==s?(n=Zi,nc++,o=mf(),nc--,o===s?n=void 0:(Zi=n,n=s),n!==s?(Ji=t,t=e="CALL"):(Zi=t,t=s)):(Zi=t,t=s);return t}())!==s&&Gp()!==s&&(n=function(){var r;(r=Zp())===s&&(r=Jp());return r}())!==s?(Ji=t,o=n,e={tableList:Array.from(hv),columnList:yv(Cv),ast:{type:"call",expr:o}},t=e):(Zi=t,t=s);var o;return t}())===s&&(t=function(){var t,e,n;t=Zi,(e=function(){var t,e,n,o;t=Zi,"use"===r.substr(Zi,3).toLowerCase()?(e=r.substr(Zi,3),Zi+=3):(e=s,0===nc&&ic(eu));e!==s?(n=Zi,nc++,o=mf(),nc--,o===s?n=void 0:(Zi=n,n=s),n!==s?t=e=[e,n]:(Zi=t,t=s)):(Zi=t,t=s);return t}())!==s&&Gp()!==s&&(n=ff())!==s?(Ji=t,o=n,hv.add(`use::${o}::null`),e={tableList:Array.from(hv),columnList:yv(Cv),ast:{type:"use",db:o}},t=e):(Zi=t,t=s);var o;return t}())===s&&(t=function(){var r,t,e,n;r=Zi,(t=ob())!==s&&Gp()!==s&&hb()!==s&&Gp()!==s&&(e=ml())!==s&&Gp()!==s&&(n=function(){var r,t,e,n,o,u,a,i;if(r=Zi,(t=Nc())!==s){for(e=[],n=Zi,(o=Gp())!==s&&(u=Rp())!==s&&(a=Gp())!==s&&(i=Nc())!==s?n=o=[o,u,a,i]:(Zi=n,n=s);n!==s;)e.push(n),n=Zi,(o=Gp())!==s&&(u=Rp())!==s&&(a=Gp())!==s&&(i=Nc())!==s?n=o=[o,u,a,i]:(Zi=n,n=s);e!==s?(Ji=r,t=sr(t,e),r=t):(Zi=r,r=s);}else Zi=r,r=s;return r}())!==s?(Ji=r,o=e,u=n,hv.add(`alter::${o.db}::${o.table}`),t={tableList:Array.from(hv),columnList:yv(Cv),ast:{type:"alter",table:[o],expr:u}},r=t):(Zi=r,r=s);var o,u;return r}())===s&&(t=function(){var t,e,n,o;t=Zi,(e=wb())!==s&&Gp()!==s?((n=function(){var t,e,n,o;t=Zi,"global"===r.substr(Zi,6).toLowerCase()?(e=r.substr(Zi,6),Zi+=6):(e=s,0===nc&&ic(za));e!==s?(n=Zi,nc++,o=mf(),nc--,o===s?n=void 0:(Zi=n,n=s),n!==s?(Ji=t,t=e="GLOBAL"):(Zi=t,t=s)):(Zi=t,t=s);return t}())===s&&(n=function(){var t,e,n,o;t=Zi,"session"===r.substr(Zi,7).toLowerCase()?(e=r.substr(Zi,7),Zi+=7):(e=s,0===nc&&ic(Za));e!==s?(n=Zi,nc++,o=mf(),nc--,o===s?n=void 0:(Zi=n,n=s),n!==s?(Ji=t,t=e="SESSION"):(Zi=t,t=s)):(Zi=t,t=s);return t}())===s&&(n=function(){var t,e,n,o;t=Zi,"local"===r.substr(Zi,5).toLowerCase()?(e=r.substr(Zi,5),Zi+=5):(e=s,0===nc&&ic(X));e!==s?(n=Zi,nc++,o=mf(),nc--,o===s?n=void 0:(Zi=n,n=s),n!==s?(Ji=t,t=e="LOCAL"):(Zi=t,t=s)):(Zi=t,t=s);return t}())===s&&(n=function(){var t,e,n,o;t=Zi,"persist"===r.substr(Zi,7).toLowerCase()?(e=r.substr(Zi,7),Zi+=7):(e=s,0===nc&&ic(Ja));e!==s?(n=Zi,nc++,o=mf(),nc--,o===s?n=void 0:(Zi=n,n=s),n!==s?(Ji=t,t=e="PERSIST"):(Zi=t,t=s)):(Zi=t,t=s);return t}())===s&&(n=function(){var t,e,n,o;t=Zi,"persist_only"===r.substr(Zi,12).toLowerCase()?(e=r.substr(Zi,12),Zi+=12):(e=s,0===nc&&ic(ri));e!==s?(n=Zi,nc++,o=mf(),nc--,o===s?n=void 0:(Zi=n,n=s),n!==s?(Ji=t,t=e="PERSIST_ONLY"):(Zi=t,t=s)):(Zi=t,t=s);return t}()),n===s&&(n=null),n!==s&&Gp()!==s&&(o=function(){var r,t,e,n,o,u,a,i;if(r=Zi,(t=Vp())!==s){for(e=[],n=Zi,(o=Gp())!==s&&(u=Rp())!==s&&(a=Gp())!==s&&(i=Vp())!==s?n=o=[o,u,a,i]:(Zi=n,n=s);n!==s;)e.push(n),n=Zi,(o=Gp())!==s&&(u=Rp())!==s&&(a=Gp())!==s&&(i=Vp())!==s?n=o=[o,u,a,i]:(Zi=n,n=s);e!==s?(Ji=r,t=Yt(t,e),r=t):(Zi=r,r=s);}else Zi=r,r=s;return r}())!==s?(Ji=t,u=n,(a=o).keyword=u,e={tableList:Array.from(hv),columnList:yv(Cv),ast:{type:"set",keyword:u,expr:a}},t=e):(Zi=t,t=s)):(Zi=t,t=s);var u,a;return t}())===s&&(t=function(){var t,e,n;t=Zi,(e=function(){var t,e,n,o;t=Zi,"lock"===r.substr(Zi,4).toLowerCase()?(e=r.substr(Zi,4),Zi+=4):(e=s,0===nc&&ic($));e!==s?(n=Zi,nc++,o=mf(),nc--,o===s?n=void 0:(Zi=n,n=s),n!==s?t=e=[e,n]:(Zi=t,t=s)):(Zi=t,t=s);return t}())!==s&&Gp()!==s&&mb()!==s&&Gp()!==s&&(n=function(){var r,t,e,n,o,u,a,i;if(r=Zi,(t=Bc())!==s){for(e=[],n=Zi,(o=Gp())!==s&&(u=Rp())!==s&&(a=Gp())!==s&&(i=Bc())!==s?n=o=[o,u,a,i]:(Zi=n,n=s);n!==s;)e.push(n),n=Zi,(o=Gp())!==s&&(u=Rp())!==s&&(a=Gp())!==s&&(i=Bc())!==s?n=o=[o,u,a,i]:(Zi=n,n=s);e!==s?(Ji=r,t=Yt(t,e),r=t):(Zi=r,r=s);}else Zi=r,r=s;return r}())!==s?(Ji=t,o=n,e={tableList:Array.from(hv),columnList:yv(Cv),ast:{type:"lock",keyword:"tables",tables:o}},t=e):(Zi=t,t=s);var o;return t}())===s&&(t=function(){var t,e;t=Zi,(e=function(){var t,e,n,o;t=Zi,"unlock"===r.substr(Zi,6).toLowerCase()?(e=r.substr(Zi,6),Zi+=6):(e=s,0===nc&&ic(W));e!==s?(n=Zi,nc++,o=mf(),nc--,o===s?n=void 0:(Zi=n,n=s),n!==s?t=e=[e,n]:(Zi=t,t=s)):(Zi=t,t=s);return t}())!==s&&Gp()!==s&&mb()!==s?(Ji=t,e={tableList:Array.from(hv),columnList:yv(Cv),ast:{type:"unlock",keyword:"tables"}},t=e):(Zi=t,t=s);return t}())===s&&(t=function(){var t,e,n,o,u,a,i,c,l;t=Zi,(e=eb())!==s&&Gp()!==s?("binary"===r.substr(Zi,6).toLowerCase()?(n=r.substr(Zi,6),Zi+=6):(n=s,0===nc&&ic(Bt)),n===s&&("master"===r.substr(Zi,6).toLowerCase()?(n=r.substr(Zi,6),Zi+=6):(n=s,0===nc&&ic($t))),n!==s&&(o=Gp())!==s?("logs"===r.substr(Zi,4).toLowerCase()?(u=r.substr(Zi,4),Zi+=4):(u=s,0===nc&&ic(Wt)),u!==s?(Ji=t,f=n,e={tableList:Array.from(hv),columnList:yv(Cv),ast:{type:"show",suffix:"logs",keyword:f.toLowerCase()}},t=e):(Zi=t,t=s)):(Zi=t,t=s)):(Zi=t,t=s);var f;t===s&&(t=Zi,(e=eb())!==s&&Gp()!==s&&(n=mb())!==s?(Ji=t,hv.add("show::null::null"),e={tableList:Array.from(hv),columnList:yv(Cv),ast:{type:"show",keyword:"tables"}},t=e):(Zi=t,t=s),t===s&&(t=Zi,(e=eb())!==s&&Gp()!==s?("triggers"===r.substr(Zi,8).toLowerCase()?(n=r.substr(Zi,8),Zi+=8):(n=s,0===nc&&ic(qt)),n===s&&("status"===r.substr(Zi,6).toLowerCase()?(n=r.substr(Zi,6),Zi+=6):(n=s,0===nc&&ic(Vt)),n===s&&("processlist"===r.substr(Zi,11).toLowerCase()?(n=r.substr(Zi,11),Zi+=11):(n=s,0===nc&&ic(Xt)))),n!==s?(Ji=t,d=n,e={tableList:Array.from(hv),columnList:yv(Cv),ast:{type:"show",keyword:d.toLowerCase()}},t=e):(Zi=t,t=s)):(Zi=t,t=s),t===s&&(t=Zi,(e=eb())!==s&&Gp()!==s?("procedure"===r.substr(Zi,9).toLowerCase()?(n=r.substr(Zi,9),Zi+=9):(n=s,0===nc&&ic(Kt)),n===s&&("function"===r.substr(Zi,8).toLowerCase()?(n=r.substr(Zi,8),Zi+=8):(n=s,0===nc&&ic(Qt))),n!==s&&(o=Gp())!==s?("status"===r.substr(Zi,6).toLowerCase()?(u=r.substr(Zi,6),Zi+=6):(u=s,0===nc&&ic(Vt)),u!==s?(Ji=t,e=function(r){return {tableList:Array.from(hv),columnList:yv(Cv),ast:{type:"show",keyword:r.toLowerCase(),suffix:"status"}}}(n),t=e):(Zi=t,t=s)):(Zi=t,t=s)):(Zi=t,t=s),t===s&&(t=Zi,(e=eb())!==s&&Gp()!==s?("binlog"===r.substr(Zi,6).toLowerCase()?(n=r.substr(Zi,6),Zi+=6):(n=s,0===nc&&ic(zt)),n!==s&&(o=Gp())!==s?("events"===r.substr(Zi,6).toLowerCase()?(u=r.substr(Zi,6),Zi+=6):(u=s,0===nc&&ic(Zt)),u!==s&&(a=Gp())!==s?((i=Zl())===s&&(i=null),i!==s&&Gp()!==s?((c=bl())===s&&(c=null),c!==s&&Gp()!==s?((l=Nl())===s&&(l=null),l!==s?(Ji=t,b=i,p=c,v=l,e={tableList:Array.from(hv),columnList:yv(Cv),ast:{type:"show",suffix:"events",keyword:"binlog",in:b,from:p,limit:v}},t=e):(Zi=t,t=s)):(Zi=t,t=s)):(Zi=t,t=s)):(Zi=t,t=s)):(Zi=t,t=s)):(Zi=t,t=s),t===s&&(t=Zi,(e=eb())!==s&&Gp()!==s?(n=Zi,"character"===r.substr(Zi,9).toLowerCase()?(o=r.substr(Zi,9),Zi+=9):(o=s,0===nc&&ic(lt)),o!==s&&(u=Gp())!==s?("set"===r.substr(Zi,3).toLowerCase()?(a=r.substr(Zi,3),Zi+=3):(a=s,0===nc&&ic(ft)),a!==s?n=o=[o,u,a]:(Zi=n,n=s)):(Zi=n,n=s),n===s&&("collation"===r.substr(Zi,9).toLowerCase()?(n=r.substr(Zi,9),Zi+=9):(n=s,0===nc&&ic(Jt)),n===s&&("databases"===r.substr(Zi,9).toLowerCase()?(n=r.substr(Zi,9),Zi+=9):(n=s,0===nc&&ic(re)))),n!==s&&(o=Gp())!==s?((u=zl())===s&&(u=Al()),u===s&&(u=null),u!==s?(Ji=t,e=function(r,t){let e=Array.isArray(r)&&r||[r];return {tableList:Array.from(hv),columnList:yv(Cv),ast:{type:"show",suffix:e[2]&&e[2].toLowerCase(),keyword:e[0].toLowerCase(),expr:t}}}(n,u),t=e):(Zi=t,t=s)):(Zi=t,t=s)):(Zi=t,t=s),t===s&&(t=Zi,(e=eb())!==s&&Gp()!==s?("columns"===r.substr(Zi,7).toLowerCase()?(n=r.substr(Zi,7),Zi+=7):(n=s,0===nc&&ic(te)),n===s&&("indexes"===r.substr(Zi,7).toLowerCase()?(n=r.substr(Zi,7),Zi+=7):(n=s,0===nc&&ic(ee)),n===s&&("index"===r.substr(Zi,5).toLowerCase()?(n=r.substr(Zi,5),Zi+=5):(n=s,0===nc&&ic(It)))),n!==s&&(o=Gp())!==s&&(u=bl())!==s?(Ji=t,e=function(r,t){return {tableList:Array.from(hv),columnList:yv(Cv),ast:{type:"show",keyword:r.toLowerCase(),from:t}}}(n,u),t=e):(Zi=t,t=s)):(Zi=t,t=s),t===s&&(t=Zi,(e=eb())!==s&&Gp()!==s&&(n=ab())!==s&&(o=Gp())!==s?((u=dp())===s&&(u=hb())===s&&("event"===r.substr(Zi,5).toLowerCase()?(u=r.substr(Zi,5),Zi+=5):(u=s,0===nc&&ic(ne)),u===s&&(u=Cb())===s&&("procedure"===r.substr(Zi,9).toLowerCase()?(u=r.substr(Zi,9),Zi+=9):(u=s,0===nc&&ic(Kt)))),u!==s&&(a=Gp())!==s&&(i=ml())!==s?(Ji=t,e=function(r,t){const e=r.toLowerCase();return {tableList:Array.from(hv),columnList:yv(Cv),ast:{type:"show",keyword:"create",suffix:e,[e]:t}}}(u,i),t=e):(Zi=t,t=s)):(Zi=t,t=s),t===s&&(t=function(){var t,e,n,o;t=Zi,(e=eb())!==s&&Gp()!==s?("grants"===r.substr(Zi,6).toLowerCase()?(n=r.substr(Zi,6),Zi+=6):(n=s,0===nc&&ic(oe)),n!==s&&Gp()!==s?((o=function(){var t,e,n,o,u,a,i;t=Zi,"for"===r.substr(Zi,3).toLowerCase()?(e=r.substr(Zi,3),Zi+=3):(e=s,0===nc&&ic(vr));e!==s&&Gp()!==s&&(n=ff())!==s&&Gp()!==s?(o=Zi,(u=yp())!==s&&(a=Gp())!==s&&(i=ff())!==s?o=u=[u,a,i]:(Zi=o,o=s),o===s&&(o=null),o!==s&&(u=Gp())!==s?((a=function(){var r,t;r=Zi,Sb()!==s&&Gp()!==s&&(t=function(){var r,t,e,n,o,u,a,i;if(r=Zi,(t=ff())!==s){for(e=[],n=Zi,(o=Gp())!==s&&(u=Rp())!==s&&(a=Gp())!==s&&(i=ff())!==s?n=o=[o,u,a,i]:(Zi=n,n=s);n!==s;)e.push(n),n=Zi,(o=Gp())!==s&&(u=Rp())!==s&&(a=Gp())!==s&&(i=ff())!==s?n=o=[o,u,a,i]:(Zi=n,n=s);e!==s?(Ji=r,t=Yt(t,e),r=t):(Zi=r,r=s);}else Zi=r,r=s;return r}())!==s?(Ji=r,r=t):(Zi=r,r=s);return r}())===s&&(a=null),a!==s?(Ji=t,l=a,e={user:n,host:(c=o)&&c[2],role_list:l},t=e):(Zi=t,t=s)):(Zi=t,t=s)):(Zi=t,t=s);var c,l;return t}())===s&&(o=null),o!==s?(Ji=t,u=o,e={tableList:Array.from(hv),columnList:yv(Cv),ast:{type:"show",keyword:"grants",for:u}},t=e):(Zi=t,t=s)):(Zi=t,t=s)):(Zi=t,t=s);var u;return t}()))))))));var b,p,v;var d;return t}())===s&&(t=function(){var t,e,n;t=Zi,(e=xb())===s&&(e=function(){var t,e,n,o;t=Zi,"describe"===r.substr(Zi,8).toLowerCase()?(e=r.substr(Zi,8),Zi+=8):(e=s,0===nc&&ic(Wu));e!==s?(n=Zi,nc++,o=mf(),nc--,o===s?n=void 0:(Zi=n,n=s),n!==s?(Ji=t,t=e="DESCRIBE"):(Zi=t,t=s)):(Zi=t,t=s);return t}());e!==s&&Gp()!==s&&(n=ff())!==s?(Ji=t,o=n,e={tableList:Array.from(hv),columnList:yv(Cv),ast:{type:"desc",table:o}},t=e):(Zi=t,t=s);var o;return t}())===s&&(t=function(){var t,e,n,o,u,a,i,c,l;t=Zi,"grant"===r.substr(Zi,5).toLowerCase()?(e=r.substr(Zi,5),Zi+=5):(e=s,0===nc&&ic(Ue));e!==s&&Gp()!==s&&(n=function(){var r,t,e,n,o,u,a,i;if(r=Zi,(t=Xc())!==s){for(e=[],n=Zi,(o=Gp())!==s&&(u=Rp())!==s&&(a=Gp())!==s&&(i=Xc())!==s?n=o=[o,u,a,i]:(Zi=n,n=s);n!==s;)e.push(n),n=Zi,(o=Gp())!==s&&(u=Rp())!==s&&(a=Gp())!==s&&(i=Xc())!==s?n=o=[o,u,a,i]:(Zi=n,n=s);e!==s?(Ji=r,t=h(t,e),r=t):(Zi=r,r=s);}else Zi=r,r=s;return r}())!==s&&Gp()!==s&&(o=Tb())!==s&&Gp()!==s?((u=function(){var t,e;t=Zi,(e=hb())===s&&("function"===r.substr(Zi,8).toLowerCase()?(e=r.substr(Zi,8),Zi+=8):(e=s,0===nc&&ic(Qt)),e===s&&("procedure"===r.substr(Zi,9).toLowerCase()?(e=r.substr(Zi,9),Zi+=9):(e=s,0===nc&&ic(Kt))));e!==s&&(Ji=t,e={type:"origin",value:e.toUpperCase()});return t=e}())===s&&(u=null),u!==s&&Gp()!==s&&(a=function(){var r,t,e,n,o;r=Zi,t=Zi,(e=ff())===s&&(e=jp());e!==s&&(n=Gp())!==s&&(o=Op())!==s?t=e=[e,n,o]:(Zi=t,t=s);t===s&&(t=null);t!==s&&(e=Gp())!==s?((n=ff())===s&&(n=jp()),n!==s?(Ji=r,a=n,t={prefix:(u=t)&&u[0],name:a},r=t):(Zi=r,r=s)):(Zi=r,r=s);var u,a;return r}())!==s&&Gp()!==s&&(i=tb())!==s&&Gp()!==s&&(c=Qc())!==s&&Gp()!==s?((l=function(){var t,e,n;t=Zi,Nb()!==s&&Gp()!==s?("grant"===r.substr(Zi,5).toLowerCase()?(e=r.substr(Zi,5),Zi+=5):(e=s,0===nc&&ic(Ue)),e!==s&&Gp()!==s?("option"===r.substr(Zi,6).toLowerCase()?(n=r.substr(Zi,6),Zi+=6):(n=s,0===nc&&ic(De)),n!==s?(Ji=t,t={type:"origin",value:"with grant option"}):(Zi=t,t=s)):(Zi=t,t=s)):(Zi=t,t=s);return t}())===s&&(l=null),l!==s?(Ji=t,f=n,b=u,p=a,v=i,d=c,y=l,e={tableList:Array.from(hv),columnList:yv(Cv),ast:{type:"grant",keyword:"priv",objects:f,on:{object_type:b,priv_level:[p]},to_from:v[0],user_or_roles:d,with:y}},t=e):(Zi=t,t=s)):(Zi=t,t=s)):(Zi=t,t=s);var f,b,p,v,d,y;t===s&&(t=Zi,"GRANT"===r.substr(Zi,5)?(e="GRANT",Zi+=5):(e=s,0===nc&&ic(He)),e!==s&&Gp()!==s?("PROXY"===r.substr(Zi,5)?(n="PROXY",Zi+=5):(n=s,0===nc&&ic(Ye)),n!==s&&Gp()!==s&&(o=Tb())!==s&&Gp()!==s&&(u=Kc())!==s&&Gp()!==s&&(a=tb())!==s&&Gp()!==s&&(i=Qc())!==s&&Gp()!==s?((c=zc())===s&&(c=null),c!==s?(Ji=t,e=function(r,t,e,n){return {tableList:Array.from(hv),columnList:yv(Cv),ast:{type:"grant",keyword:"proxy",objects:[{priv:{type:"origin",value:"proxy"}}],on:r,to_from:t[0],user_or_roles:e,with:n}}}(u,a,i,c),t=e):(Zi=t,t=s)):(Zi=t,t=s)):(Zi=t,t=s),t===s&&(t=Zi,"GRANT"===r.substr(Zi,5)?(e="GRANT",Zi+=5):(e=s,0===nc&&ic(He)),e!==s&&Gp()!==s&&(n=function(){var r,t,e,n,o,u,a,i;if(r=Zi,(t=ff())!==s){for(e=[],n=Zi,(o=Gp())!==s&&(u=Rp())!==s&&(a=Gp())!==s&&(i=ff())!==s?n=o=[o,u,a,i]:(Zi=n,n=s);n!==s;)e.push(n),n=Zi,(o=Gp())!==s&&(u=Rp())!==s&&(a=Gp())!==s&&(i=ff())!==s?n=o=[o,u,a,i]:(Zi=n,n=s);e!==s?(Ji=r,t=h(t,e),r=t):(Zi=r,r=s);}else Zi=r,r=s;return r}())!==s&&Gp()!==s&&(o=tb())!==s&&Gp()!==s&&(u=Qc())!==s&&Gp()!==s?((a=zc())===s&&(a=null),a!==s?(Ji=t,e=function(r,t,e,n){return {tableList:Array.from(hv),columnList:yv(Cv),ast:{type:"grant",keyword:"role",objects:r.map(r=>({priv:{type:"string",value:r}})),to_from:t[0],user_or_roles:e,with:n}}}(n,o,u,a),t=e):(Zi=t,t=s)):(Zi=t,t=s)));return t}())===s&&(t=function(){var t,e,n;t=Zi,(e=function(){var t,e,n,o;t=Zi,"explain"===r.substr(Zi,7).toLowerCase()?(e=r.substr(Zi,7),Zi+=7):(e=s,0===nc&&ic(vu));e!==s?(n=Zi,nc++,o=mf(),nc--,o===s?n=void 0:(Zi=n,n=s),n!==s?t=e=[e,n]:(Zi=t,t=s)):(Zi=t,t=s);return t}())!==s&&Gp()!==s&&(n=sl())!==s?(Ji=t,o=n,e={tableList:Array.from(hv),columnList:yv(Cv),ast:{type:"explain",expr:o}},t=e):(Zi=t,t=s);var o;return t}())===s&&(t=function(){var t,e,n,o;t=Zi,"commit"===r.substr(Zi,6).toLowerCase()?(e=r.substr(Zi,6),Zi+=6):(e=s,0===nc&&ic(ve));e===s&&("rollback"===r.substr(Zi,8).toLowerCase()?(e=r.substr(Zi,8),Zi+=8):(e=s,0===nc&&ic(de)));e!==s&&(Ji=t,e={type:"transaction",expr:{action:{type:"origin",value:e}}});(t=e)===s&&(t=Zi,"begin"===r.substr(Zi,5).toLowerCase()?(e=r.substr(Zi,5),Zi+=5):(e=s,0===nc&&ic(ye)),e!==s&&Gp()!==s?("work"===r.substr(Zi,4).toLowerCase()?(n=r.substr(Zi,4),Zi+=4):(n=s,0===nc&&ic(we)),n===s&&("transaction"===r.substr(Zi,11).toLowerCase()?(n=r.substr(Zi,11),Zi+=11):(n=s,0===nc&&ic(Le))),n===s&&(n=null),n!==s&&Gp()!==s?((o=Wc())===s&&(o=null),o!==s?(Ji=t,e=function(r,t){return {type:"transaction",expr:{action:{type:"origin",value:"begin"},keyword:r,modes:t}}}(n,o),t=e):(Zi=t,t=s)):(Zi=t,t=s)):(Zi=t,t=s),t===s&&(t=Zi,"start"===r.substr(Zi,5).toLowerCase()?(e=r.substr(Zi,5),Zi+=5):(e=s,0===nc&&ic(he)),e!==s&&Gp()!==s?("transaction"===r.substr(Zi,11).toLowerCase()?(n=r.substr(Zi,11),Zi+=11):(n=s,0===nc&&ic(Ce)),n!==s&&Gp()!==s?((o=Wc())===s&&(o=null),o!==s?(Ji=t,e=function(r,t){return {type:"transaction",expr:{action:{type:"origin",value:"start"},keyword:r,modes:t}}}(n,o),t=e):(Zi=t,t=s)):(Zi=t,t=s)):(Zi=t,t=s)));return t}())===s&&(t=function(){var t,e,n,o,u,a,i,c,l,f,b,p,v,y,w,L,h,C,m,E,A,T,_,g,I;t=Zi,"load"===r.substr(Zi,4).toLowerCase()?(e=r.substr(Zi,4),Zi+=4):(e=s,0===nc&&ic(Se));e!==s&&Gp()!==s?("data"===r.substr(Zi,4).toLowerCase()?(n=r.substr(Zi,4),Zi+=4):(n=s,0===nc&&ic(gt)),n!==s&&Gp()!==s?("low_priority"===r.substr(Zi,12).toLowerCase()?(o=r.substr(Zi,12),Zi+=12):(o=s,0===nc&&ic(Ft)),o===s&&("concurrent"===r.substr(Zi,10).toLowerCase()?(o=r.substr(Zi,10),Zi+=10):(o=s,0===nc&&ic(Ne))),o===s&&(o=null),o!==s&&Gp()!==s?("local"===r.substr(Zi,5).toLowerCase()?(u=r.substr(Zi,5),Zi+=5):(u=s,0===nc&&ic(X)),u===s&&(u=null),u!==s&&Gp()!==s?("infile"===r.substr(Zi,6).toLowerCase()?(a=r.substr(Zi,6),Zi+=6):(a=s,0===nc&&ic(Oe)),a!==s&&Gp()!==s&&(i=cf())!==s&&Gp()!==s?((c=Ul())===s&&(c=null),c!==s&&Gp()!==s?("into"===r.substr(Zi,4).toLowerCase()?(l=r.substr(Zi,4),Zi+=4):(l=s,0===nc&&ic(Re)),l!==s&&Gp()!==s?("table"===r.substr(Zi,5).toLowerCase()?(f=r.substr(Zi,5),Zi+=5):(f=s,0===nc&&ic(je)),f!==s&&Gp()!==s&&(b=ml())!==s&&Gp()!==s?((p=xl())===s&&(p=null),p!==s&&Gp()!==s?(v=Zi,(y=Fc())!==s&&(w=Gp())!==s&&(L=cf())!==s?v=y=[y,w,L]:(Zi=v,v=s),v===s&&(v=null),v!==s&&(y=Gp())!==s?((w=function(){var t,e,n,o,u,a,i,c,l,f,b,p;t=Zi,"fields"===r.substr(Zi,6).toLowerCase()?(e=r.substr(Zi,6),Zi+=6):(e=s,0===nc&&ic(me));e===s&&("columns"===r.substr(Zi,7).toLowerCase()?(e=r.substr(Zi,7),Zi+=7):(e=s,0===nc&&ic(te)));e!==s&&Gp()!==s?(n=Zi,"terminated"===r.substr(Zi,10).toLowerCase()?(o=r.substr(Zi,10),Zi+=10):(o=s,0===nc&&ic(Ee)),o!==s&&(u=Gp())!==s?("by"===r.substr(Zi,2).toLowerCase()?(a=r.substr(Zi,2),Zi+=2):(a=s,0===nc&&ic(d)),a!==s&&(i=Gp())!==s&&(c=cf())!==s?n=o=[o,u,a,i,c]:(Zi=n,n=s)):(Zi=n,n=s),n===s&&(n=null),n!==s&&(o=Gp())!==s?(u=Zi,"optionally"===r.substr(Zi,10).toLowerCase()?(a=r.substr(Zi,10),Zi+=10):(a=s,0===nc&&ic(Ae)),a===s&&(a=null),a!==s&&(i=Gp())!==s?("enclosed"===r.substr(Zi,8).toLowerCase()?(c=r.substr(Zi,8),Zi+=8):(c=s,0===nc&&ic(Te)),c!==s&&(l=Gp())!==s?("by"===r.substr(Zi,2).toLowerCase()?(f=r.substr(Zi,2),Zi+=2):(f=s,0===nc&&ic(d)),f!==s&&(b=Gp())!==s&&(p=cf())!==s?u=a=[a,i,c,l,f,b,p]:(Zi=u,u=s)):(Zi=u,u=s)):(Zi=u,u=s),u===s&&(u=null),u!==s&&(a=Gp())!==s?(i=Zi,"escaped"===r.substr(Zi,7).toLowerCase()?(c=r.substr(Zi,7),Zi+=7):(c=s,0===nc&&ic(_e)),c!==s&&(l=Gp())!==s?("by"===r.substr(Zi,2).toLowerCase()?(f=r.substr(Zi,2),Zi+=2):(f=s,0===nc&&ic(d)),f!==s&&(b=Gp())!==s&&(p=cf())!==s?i=c=[c,l,f,b,p]:(Zi=i,i=s)):(Zi=i,i=s),i===s&&(i=null),i!==s?(Ji=t,v=e,w=u,L=i,(y=n)&&(y[4].prefix="TERMINATED BY"),w&&(w[6].prefix=(w[0]&&"OPTIONALLY"===w[0].toUpperCase()?"OPTIONALLY ":"")+"ENCLOSED BY"),L&&(L[4].prefix="ESCAPED BY"),e={keyword:v,terminated:y&&y[4],enclosed:w&&w[6],escaped:L&&L[4]},t=e):(Zi=t,t=s)):(Zi=t,t=s)):(Zi=t,t=s)):(Zi=t,t=s);var v,y,w,L;return t}())===s&&(w=null),w!==s&&(L=Gp())!==s?((h=function(){var t,e,n,o;t=Zi,"lines"===r.substr(Zi,5).toLowerCase()?(e=r.substr(Zi,5),Zi+=5):(e=s,0===nc&&ic(Ie));e!==s&&Gp()!==s?((n=qc())===s&&(n=null),n!==s&&Gp()!==s?((o=qc())===s&&(o=null),o!==s?(Ji=t,e=function(r,t,e){if(t&&e&&t.type===e.type)throw new Error("LINES cannot be specified twice");return t&&Reflect.deleteProperty(t,"type"),e&&Reflect.deleteProperty(e,"type"),{keyword:r,...t||{},...e||{}}}(e,n,o),t=e):(Zi=t,t=s)):(Zi=t,t=s)):(Zi=t,t=s);return t}())===s&&(h=null),h!==s&&Gp()!==s?(C=Zi,(m=pb())!==s&&(E=Gp())!==s&&(A=Vf())!==s&&(T=Gp())!==s?("lines"===r.substr(Zi,5).toLowerCase()?(_=r.substr(Zi,5),Zi+=5):(_=s,0===nc&&ic(Ie)),_===s&&("rows"===r.substr(Zi,4).toLowerCase()?(_=r.substr(Zi,4),Zi+=4):(_=s,0===nc&&ic(xe))),_!==s?C=m=[m,E,A,T,_]:(Zi=C,C=s)):(Zi=C,C=s),C===s&&(C=null),C!==s&&(m=Gp())!==s?((E=al())===s&&(E=null),E!==s&&(A=Gp())!==s?(T=Zi,(_=wb())!==s&&(g=Gp())!==s&&(I=Ol())!==s?T=_=[_,g,I]:(Zi=T,T=s),T===s&&(T=null),T!==s?(Ji=t,N=E,O=T,e={type:"load_data",mode:o,local:u,file:i,replace_ignore:c,table:b,partition:p,character_set:v,fields:w,lines:h,ignore:(S=C)&&{count:S[2],suffix:S[4]},column:N,set:O&&O[2]},t=e):(Zi=t,t=s)):(Zi=t,t=s)):(Zi=t,t=s)):(Zi=t,t=s)):(Zi=t,t=s)):(Zi=t,t=s)):(Zi=t,t=s)):(Zi=t,t=s)):(Zi=t,t=s)):(Zi=t,t=s)):(Zi=t,t=s)):(Zi=t,t=s)):(Zi=t,t=s)):(Zi=t,t=s)):(Zi=t,t=s);var S,N,O;return t}()),t}function pc(){var r;return (r=dc())===s&&(r=function(){var r,t,e,n,o,u,a,i;r=Zi,(t=Gp())!==s?((e=Jc())===s&&(e=null),e!==s&&Gp()!==s&&ub()!==s&&Gp()!==s&&(n=wl())!==s&&Gp()!==s&&wb()!==s&&Gp()!==s&&(o=Ol())!==s&&Gp()!==s?((u=Al())===s&&(u=null),u!==s&&Gp()!==s?((a=gl())===s&&(a=null),a!==s&&Gp()!==s?((i=Nl())===s&&(i=null),i!==s?(Ji=r,t=function(r,t,e,n,o,s){const u={};return t&&t.forEach(r=>{const{db:t,as:e,table:n,join:o}=r,s=o?"select":"update";t&&(u[n]=t),n&&hv.add(`${s}::${t}::${n}`);}),e&&e.forEach(r=>{if(r.table){const t=dv(r.table);hv.add(`update::${u[t]||null}::${t}`);}Cv.add(`update::${r.table}::${r.column}`);}),{tableList:Array.from(hv),columnList:yv(Cv),ast:{with:r,type:"update",table:t,set:e,where:n,orderby:o,limit:s}}}(e,n,o,u,a,i),r=t):(Zi=r,r=s)):(Zi=r,r=s)):(Zi=r,r=s)):(Zi=r,r=s)):(Zi=r,r=s);return r}())===s&&(r=function(){var r,t,e,n,o,u,a,i,c;r=Zi,(t=Ul())!==s&&Gp()!==s?((e=pb())===s&&(e=null),e!==s&&Gp()!==s?((n=db())===s&&(n=null),n!==s&&Gp()!==s&&(o=ml())!==s&&Gp()!==s?((u=xl())===s&&(u=null),u!==s&&Gp()!==s&&xp()!==s&&Gp()!==s&&(a=uf())!==s&&Gp()!==s&&kp()!==s&&Gp()!==s&&(i=jl())!==s&&Gp()!==s?((c=kl())===s&&(c=null),c!==s?(Ji=r,t=function(r,t,e,n,o,s,u,a){if(n&&(hv.add(`insert::${n.db}::${n.table}`),n.as=null),s){let r=n&&n.table||null;Array.isArray(u.values)&&u.values.forEach((r,t)=>{if(r.value.length!=s.length)throw new Error("Error: column count doesn't match value count at row "+(t+1))}),s.forEach(t=>Cv.add(`insert::${r}::${t}`));}const i=[t,e].filter(r=>r).map(r=>r[0]&&r[0].toLowerCase()).join(" ");return {tableList:Array.from(hv),columnList:yv(Cv),ast:{type:r,table:[n],columns:s,values:u,partition:o,prefix:i,on_duplicate_update:a}}}(t,e,n,o,u,a,i,c),r=t):(Zi=r,r=s)):(Zi=r,r=s)):(Zi=r,r=s)):(Zi=r,r=s)):(Zi=r,r=s);return r}())===s&&(r=function(){var r,t,e,n,o,u,a,i;r=Zi,(t=Ul())!==s&&Gp()!==s?((e=pb())===s&&(e=null),e!==s&&Gp()!==s?((n=db())===s&&(n=null),n!==s&&Gp()!==s&&(o=ml())!==s&&Gp()!==s?((u=xl())===s&&(u=null),u!==s&&Gp()!==s&&(a=jl())!==s&&Gp()!==s?((i=kl())===s&&(i=null),i!==s?(Ji=r,t=function(r,t,e,n,o,s,u){n&&(hv.add(`insert::${n.db}::${n.table}`),Cv.add(`insert::${n.table}::(.*)`),n.as=null);const a=[t,e].filter(r=>r).map(r=>r[0]&&r[0].toLowerCase()).join(" ");return {tableList:Array.from(hv),columnList:yv(Cv),ast:{type:r,table:[n],columns:null,values:s,partition:o,prefix:a,on_duplicate_update:u}}}(t,e,n,o,u,a,i),r=t):(Zi=r,r=s)):(Zi=r,r=s)):(Zi=r,r=s)):(Zi=r,r=s)):(Zi=r,r=s);return r}())===s&&(r=function(){var r,t,e,n,o,u,a,i;r=Zi,(t=Ul())!==s&&Gp()!==s?((e=pb())===s&&(e=null),e!==s&&Gp()!==s?((n=db())===s&&(n=null),n!==s&&Gp()!==s&&(o=ml())!==s&&Gp()!==s?((u=xl())===s&&(u=null),u!==s&&Gp()!==s&&wb()!==s&&Gp()!==s&&(a=Ol())!==s&&Gp()!==s?((i=kl())===s&&(i=null),i!==s?(Ji=r,t=function(r,t,e,n,o,s,u){n&&(hv.add(`insert::${n.db}::${n.table}`),Cv.add(`insert::${n.table}::(.*)`),n.as=null);const a=[t,e].filter(r=>r).map(r=>r[0]&&r[0].toLowerCase()).join(" ");return {tableList:Array.from(hv),columnList:yv(Cv),ast:{type:r,table:[n],columns:null,partition:o,prefix:a,set:s,on_duplicate_update:u}}}(t,e,n,o,u,a,i),r=t):(Zi=r,r=s)):(Zi=r,r=s)):(Zi=r,r=s)):(Zi=r,r=s)):(Zi=r,r=s);return r}())===s&&(r=function(){var r,t,e,n,o,u,a,i;r=Zi,(t=Gp())!==s?((e=Jc())===s&&(e=null),e!==s&&Gp()!==s&&cb()!==s&&Gp()!==s?((n=wl())===s&&(n=null),n!==s&&Gp()!==s&&(o=bl())!==s&&Gp()!==s?((u=Al())===s&&(u=null),u!==s&&Gp()!==s?((a=gl())===s&&(a=null),a!==s&&Gp()!==s?((i=Nl())===s&&(i=null),i!==s?(Ji=r,t=function(r,t,e,n,o,s){if(e){(Array.isArray(e)?e:e.expr).forEach(r=>{const{db:t,as:e,table:n,join:o}=r,s=o?"select":"delete";n&&hv.add(`${s}::${t}::${n}`),o||Cv.add(`delete::${n}::(.*)`);});}if(null===t&&1===e.length){const r=e[0];t=[{db:r.db,table:r.table,as:r.as,addition:true}];}return {tableList:Array.from(hv),columnList:yv(Cv),ast:{with:r,type:"delete",table:t,from:e,where:n,orderby:o,limit:s}}}(e,n,o,u,a,i),r=t):(Zi=r,r=s)):(Zi=r,r=s)):(Zi=r,r=s)):(Zi=r,r=s)):(Zi=r,r=s)):(Zi=r,r=s);return r}())===s&&(r=bc())===s&&(r=function(){var r,t;r=[],t=qp();for(;t!==s;)r.push(t),t=qp();return r}()),r}function vc(){var t,e,n,o;return t=Zi,(e=function(){var t,e,n,o;t=Zi,"union"===r.substr(Zi,5).toLowerCase()?(e=r.substr(Zi,5),Zi+=5):(e=s,0===nc&&ic(Ou));e!==s?(n=Zi,nc++,o=mf(),nc--,o===s?n=void 0:(Zi=n,n=s),n!==s?t=e=[e,n]:(Zi=t,t=s)):(Zi=t,t=s);return t}())!==s&&Gp()!==s?((n=kb())===s&&(n=Ub()),n===s&&(n=null),n!==s?(Ji=t,t=e=(o=n)?"union "+o.toLowerCase():"union"):(Zi=t,t=s)):(Zi=t,t=s),t===s&&(t=Zi,(e=function(){var t,e,n,o;t=Zi,"minus"===r.substr(Zi,5).toLowerCase()?(e=r.substr(Zi,5),Zi+=5):(e=s,0===nc&&ic(Ru));e!==s?(n=Zi,nc++,o=mf(),nc--,o===s?n=void 0:(Zi=n,n=s),n!==s?t=e=[e,n]:(Zi=t,t=s)):(Zi=t,t=s);return t}())!==s&&(Ji=t,e="minus"),(t=e)===s&&(t=Zi,(e=function(){var t,e,n,o;t=Zi,"intersect"===r.substr(Zi,9).toLowerCase()?(e=r.substr(Zi,9),Zi+=9):(e=s,0===nc&&ic(ju));e!==s?(n=Zi,nc++,o=mf(),nc--,o===s?n=void 0:(Zi=n,n=s),n!==s?t=e=[e,n]:(Zi=t,t=s)):(Zi=t,t=s);return t}())!==s&&(Ji=t,e="intersect"),(t=e)===s&&(t=Zi,(e=function(){var t,e,n,o;t=Zi,"except"===r.substr(Zi,6).toLowerCase()?(e=r.substr(Zi,6),Zi+=6):(e=s,0===nc&&ic(xu));e!==s?(n=Zi,nc++,o=mf(),nc--,o===s?n=void 0:(Zi=n,n=s),n!==s?t=e=[e,n]:(Zi=t,t=s)):(Zi=t,t=s);return t}())!==s&&(Ji=t,e="except"),t=e))),t}function dc(){var r,t,e,n,o,u,a,i;if(r=Zi,(t=Zc())!==s){for(e=[],n=Zi,(o=Gp())!==s&&(u=vc())!==s&&(a=Gp())!==s&&(i=Zc())!==s?n=o=[o,u,a,i]:(Zi=n,n=s);n!==s;)e.push(n),n=Zi,(o=Gp())!==s&&(u=vc())!==s&&(a=Gp())!==s&&(i=Zc())!==s?n=o=[o,u,a,i]:(Zi=n,n=s);e!==s&&(n=Gp())!==s?((o=gl())===s&&(o=null),o!==s&&(u=Gp())!==s?((a=Nl())===s&&(a=null),a!==s?(Ji=r,r=t=function(r,t,e,n){let o=r;for(let r=0;r<t.length;r++)o._next=t[r][3],o.set_op=t[r][1],o=o._next;return e&&(r._orderby=e),n&&(r._limit=n),{tableList:Array.from(hv),columnList:yv(Cv),ast:r}}(t,e,o,a)):(Zi=r,r=s)):(Zi=r,r=s)):(Zi=r,r=s);}else Zi=r,r=s;return r}function yc(){var r,t,e;return r=Zi,(t=Bl())!==s&&Gp()!==s?((e=jb())===s&&(e=xb()),e===s&&(e=null),e!==s?(Ji=r,r=t=c(t,e)):(Zi=r,r=s)):(Zi=r,r=s),r===s&&(r=function(){var r,t,e;r=Zi,(t=sf())!==s&&Gp()!==s?((e=jb())===s&&(e=xb()),e===s&&(e=null),e!==s?(Ji=r,t=c(t,e),r=t):(Zi=r,r=s)):(Zi=r,r=s);return r}()),r}function wc(){var t,e;return t=Zi,"if"===r.substr(Zi,2).toLowerCase()?(e=r.substr(Zi,2),Zi+=2):(e=s,0===nc&&ic(f)),e!==s&&Gp()!==s&&Hb()!==s&&Gp()!==s&&Fb()!==s?(Ji=t,t=e="IF NOT EXISTS"):(Zi=t,t=s),t}function Lc(){var t,e,n;return t=Zi,(e=Kc())!==s&&Gp()!==s?((n=function(){var t,e,n,o,u,a,i,c,l;return t=Zi,r.substr(Zi,10)===b?(e=b,Zi+=10):(e=s,0===nc&&ic(p)),e!==s&&Gp()!==s?(n=Zi,"with"===r.substr(Zi,4).toLowerCase()?(o=r.substr(Zi,4),Zi+=4):(o=s,0===nc&&ic(v)),o!==s&&(u=Gp())!==s&&(a=ff())!==s?n=o=[o,u,a]:(Zi=n,n=s),n===s&&(n=null),n!==s&&(o=Gp())!==s?("by"===r.substr(Zi,2).toLowerCase()?(u=r.substr(Zi,2),Zi+=2):(u=s,0===nc&&ic(d)),u!==s&&(a=Gp())!==s?("random"===r.substr(Zi,6).toLowerCase()?(i=r.substr(Zi,6),Zi+=6):(i=s,0===nc&&ic(y)),i!==s&&Gp()!==s?("password"===r.substr(Zi,8).toLowerCase()?(c=r.substr(Zi,8),Zi+=8):(c=s,0===nc&&ic(w)),c!==s?(Ji=t,t=e={keyword:["identified",(l=n)&&l[0].toLowerCase()].filter(r=>r).join(" "),auth_plugin:l&&l[2],value:{prefix:"by",type:"origin",value:"random password"}}):(Zi=t,t=s)):(Zi=t,t=s)):(Zi=t,t=s)):(Zi=t,t=s)):(Zi=t,t=s),t===s&&(t=Zi,r.substr(Zi,10)===b?(e=b,Zi+=10):(e=s,0===nc&&ic(p)),e!==s&&Gp()!==s?(n=Zi,"with"===r.substr(Zi,4).toLowerCase()?(o=r.substr(Zi,4),Zi+=4):(o=s,0===nc&&ic(v)),o!==s&&(u=Gp())!==s&&(a=ff())!==s?n=o=[o,u,a]:(Zi=n,n=s),n===s&&(n=null),n!==s&&(o=Gp())!==s?("by"===r.substr(Zi,2).toLowerCase()?(u=r.substr(Zi,2),Zi+=2):(u=s,0===nc&&ic(d)),u!==s&&(a=Gp())!==s&&(i=Bf())!==s?(Ji=t,t=e=function(r,t){return t.prefix="by",{keyword:["identified",r&&r[0].toLowerCase()].filter(r=>r).join(" "),auth_plugin:r&&r[2],value:t}}(n,i)):(Zi=t,t=s)):(Zi=t,t=s)):(Zi=t,t=s),t===s&&(t=Zi,r.substr(Zi,10)===b?(e=b,Zi+=10):(e=s,0===nc&&ic(p)),e!==s&&Gp()!==s?("with"===r.substr(Zi,4).toLowerCase()?(n=r.substr(Zi,4),Zi+=4):(n=s,0===nc&&ic(v)),n!==s&&(o=Gp())!==s&&(u=ff())!==s&&(a=Gp())!==s?("as"===r.substr(Zi,2).toLowerCase()?(i=r.substr(Zi,2),Zi+=2):(i=s,0===nc&&ic(L)),i!==s&&Gp()!==s&&(c=Bf())!==s?(Ji=t,t=e=function(r,t){return t.prefix="as",{keyword:"identified with",auth_plugin:r&&r[2],value:t}}(u,c)):(Zi=t,t=s)):(Zi=t,t=s)):(Zi=t,t=s))),t}())===s&&(n=null),n!==s?(Ji=t,t=e={user:e,auth_option:n}):(Zi=t,t=s)):(Zi=t,t=s),t}function hc(){var t,e,n;return t=Zi,"none"===r.substr(Zi,4).toLowerCase()?(e=r.substr(Zi,4),Zi+=4):(e=s,0===nc&&ic(m)),e===s&&("ssl"===r.substr(Zi,3).toLowerCase()?(e=r.substr(Zi,3),Zi+=3):(e=s,0===nc&&ic(E)),e===s&&("x509"===r.substr(Zi,4).toLowerCase()?(e=r.substr(Zi,4),Zi+=4):(e=s,0===nc&&ic(A)))),e!==s&&(Ji=t,e={type:"origin",value:e}),(t=e)===s&&(t=Zi,"cipher"===r.substr(Zi,6).toLowerCase()?(e=r.substr(Zi,6),Zi+=6):(e=s,0===nc&&ic(T)),e===s&&("issuer"===r.substr(Zi,6).toLowerCase()?(e=r.substr(Zi,6),Zi+=6):(e=s,0===nc&&ic(_)),e===s&&("subject"===r.substr(Zi,7).toLowerCase()?(e=r.substr(Zi,7),Zi+=7):(e=s,0===nc&&ic(g)))),e!==s&&Gp()!==s&&(n=Bf())!==s?(Ji=t,t=e=I(e,n)):(Zi=t,t=s)),t}function Cc(){var t,e,n;return t=Zi,"max_queries_per_hour"===r.substr(Zi,20).toLowerCase()?(e=r.substr(Zi,20),Zi+=20):(e=s,0===nc&&ic(N)),e===s&&("max_updates_per_hour"===r.substr(Zi,20).toLowerCase()?(e=r.substr(Zi,20),Zi+=20):(e=s,0===nc&&ic(O)),e===s&&("max_connections_per_hour"===r.substr(Zi,24).toLowerCase()?(e=r.substr(Zi,24),Zi+=24):(e=s,0===nc&&ic(R)),e===s&&("max_user_connections"===r.substr(Zi,20).toLowerCase()?(e=r.substr(Zi,20),Zi+=20):(e=s,0===nc&&ic(j))))),e!==s&&Gp()!==s&&(n=Vf())!==s?(Ji=t,t=e=I(e,n)):(Zi=t,t=s),t}function mc(){var t,e,n,o,u,a;return t=Zi,"password"===r.substr(Zi,8).toLowerCase()?(e=r.substr(Zi,8),Zi+=8):(e=s,0===nc&&ic(w)),e!==s&&Gp()!==s?("expire"===r.substr(Zi,6).toLowerCase()?(n=r.substr(Zi,6),Zi+=6):(n=s,0===nc&&ic(x)),n!==s&&Gp()!==s?("default"===r.substr(Zi,7).toLowerCase()?(o=r.substr(Zi,7),Zi+=7):(o=s,0===nc&&ic(k)),o===s&&("never"===r.substr(Zi,5).toLowerCase()?(o=r.substr(Zi,5),Zi+=5):(o=s,0===nc&&ic(U)),o===s&&(o=Gl())),o!==s?(Ji=t,t=e={keyword:"password expire",value:"string"==typeof(a=o)?{type:"origin",value:a}:a}):(Zi=t,t=s)):(Zi=t,t=s)):(Zi=t,t=s),t===s&&(t=Zi,"password"===r.substr(Zi,8).toLowerCase()?(e=r.substr(Zi,8),Zi+=8):(e=s,0===nc&&ic(w)),e!==s&&Gp()!==s?("history"===r.substr(Zi,7).toLowerCase()?(n=r.substr(Zi,7),Zi+=7):(n=s,0===nc&&ic(D)),n!==s&&Gp()!==s?("default"===r.substr(Zi,7).toLowerCase()?(o=r.substr(Zi,7),Zi+=7):(o=s,0===nc&&ic(k)),o===s&&(o=Vf()),o!==s?(Ji=t,t=e=function(r){return {keyword:"password history",value:"string"==typeof r?{type:"origin",value:r}:r}}(o)):(Zi=t,t=s)):(Zi=t,t=s)):(Zi=t,t=s),t===s&&(t=Zi,"password"===r.substr(Zi,8).toLowerCase()?(e=r.substr(Zi,8),Zi+=8):(e=s,0===nc&&ic(w)),e!==s&&Gp()!==s?("REUSE"===r.substr(Zi,5)?(n="REUSE",Zi+=5):(n=s,0===nc&&ic(M)),n!==s&&Gp()!==s&&(o=Gl())!==s?(Ji=t,t=e=function(r){return {keyword:"password reuse",value:r}}(o)):(Zi=t,t=s)):(Zi=t,t=s),t===s&&(t=Zi,"password"===r.substr(Zi,8).toLowerCase()?(e=r.substr(Zi,8),Zi+=8):(e=s,0===nc&&ic(w)),e!==s&&Gp()!==s?("require"===r.substr(Zi,7).toLowerCase()?(n=r.substr(Zi,7),Zi+=7):(n=s,0===nc&&ic(S)),n!==s&&Gp()!==s?("current"===r.substr(Zi,7).toLowerCase()?(o=r.substr(Zi,7),Zi+=7):(o=s,0===nc&&ic(P)),o!==s&&Gp()!==s?("default"===r.substr(Zi,7).toLowerCase()?(u=r.substr(Zi,7),Zi+=7):(u=s,0===nc&&ic(k)),u===s&&("optional"===r.substr(Zi,8).toLowerCase()?(u=r.substr(Zi,8),Zi+=8):(u=s,0===nc&&ic(G))),u!==s?(Ji=t,t=e=function(r){return {keyword:"password require current",value:{type:"origin",value:r}}}(u)):(Zi=t,t=s)):(Zi=t,t=s)):(Zi=t,t=s)):(Zi=t,t=s),t===s&&(t=Zi,"failed_login_attempts"===r.substr(Zi,21).toLowerCase()?(e=r.substr(Zi,21),Zi+=21):(e=s,0===nc&&ic(F)),e!==s&&Gp()!==s&&(n=Vf())!==s?(Ji=t,t=e=function(r){return {keyword:"failed_login_attempts",value:r}}(n)):(Zi=t,t=s),t===s&&(t=Zi,"password_lock_time"===r.substr(Zi,18).toLowerCase()?(e=r.substr(Zi,18),Zi+=18):(e=s,0===nc&&ic(H)),e!==s&&Gp()!==s?((n=Vf())===s&&("unbounded"===r.substr(Zi,9).toLowerCase()?(n=r.substr(Zi,9),Zi+=9):(n=s,0===nc&&ic(Y))),n!==s?(Ji=t,t=e=function(r){return {keyword:"password_lock_time",value:"string"==typeof r?{type:"origin",value:r}:r}}(n)):(Zi=t,t=s)):(Zi=t,t=s)))))),t}function Ec(){var r;return (r=Uc())===s&&(r=Tc())===s&&(r=xc())===s&&(r=kc()),r}function Ac(){var t,e,n,o,u;return t=Zi,(e=function(){var t,e;t=Zi,(e=function(){var t,e,n,o;t=Zi,"not null"===r.substr(Zi,8).toLowerCase()?(e=r.substr(Zi,8),Zi+=8):(e=s,0===nc&&ic(zs));e!==s?(n=Zi,nc++,o=mf(),nc--,o===s?n=void 0:(Zi=n,n=s),n!==s?t=e=[e,n]:(Zi=t,t=s)):(Zi=t,t=s);return t}())!==s&&(Ji=t,e={type:"not null",value:"not null"});return t=e}())===s&&(e=Yf()),e!==s&&(Ji=t,(u=e)&&!u.value&&(u.value="null"),e={nullable:u}),(t=e)===s&&(t=Zi,(e=function(){var r,t;r=Zi,rb()!==s&&Gp()!==s&&(t=Bl())!==s?(Ji=r,r={type:"default",value:t}):(Zi=r,r=s);return r}())!==s&&(Ji=t,e={default_val:e}),(t=e)===s&&(t=Zi,"auto_increment"===r.substr(Zi,14).toLowerCase()?(e=r.substr(Zi,14),Zi+=14):(e=s,0===nc&&ic(ur)),e!==s&&(Ji=t,e={auto_increment:e.toLowerCase()}),(t=e)===s&&(t=Zi,"unique"===r.substr(Zi,6).toLowerCase()?(e=r.substr(Zi,6),Zi+=6):(e=s,0===nc&&ic(ar)),e!==s&&Gp()!==s?("key"===r.substr(Zi,3).toLowerCase()?(n=r.substr(Zi,3),Zi+=3):(n=s,0===nc&&ic(ir)),n===s&&(n=null),n!==s?(Ji=t,t=e=function(r){const t=["unique"];return r&&t.push(r),{unique:t.join(" ").toLowerCase("")}}(n)):(Zi=t,t=s)):(Zi=t,t=s),t===s&&(t=Zi,"primary"===r.substr(Zi,7).toLowerCase()?(e=r.substr(Zi,7),Zi+=7):(e=s,0===nc&&ic(cr)),e===s&&(e=null),e!==s&&Gp()!==s?("key"===r.substr(Zi,3).toLowerCase()?(n=r.substr(Zi,3),Zi+=3):(n=s,0===nc&&ic(ir)),n!==s?(Ji=t,t=e=function(r){const t=[];return r&&t.push("primary"),t.push("key"),{primary_key:t.join(" ").toLowerCase("")}}(e)):(Zi=t,t=s)):(Zi=t,t=s),t===s&&(t=Zi,(e=Yp())!==s&&(Ji=t,e={comment:e}),(t=e)===s&&(t=Zi,(e=gc())!==s&&(Ji=t,e={collate:e}),(t=e)===s&&(t=Zi,(e=function(){var t,e,n;t=Zi,"column_format"===r.substr(Zi,13).toLowerCase()?(e=r.substr(Zi,13),Zi+=13):(e=s,0===nc&&ic(Cr));e!==s&&Gp()!==s?("fixed"===r.substr(Zi,5).toLowerCase()?(n=r.substr(Zi,5),Zi+=5):(n=s,0===nc&&ic(mr)),n===s&&("dynamic"===r.substr(Zi,7).toLowerCase()?(n=r.substr(Zi,7),Zi+=7):(n=s,0===nc&&ic(Er)),n===s&&("default"===r.substr(Zi,7).toLowerCase()?(n=r.substr(Zi,7),Zi+=7):(n=s,0===nc&&ic(k)))),n!==s?(Ji=t,e={type:"column_format",value:n.toLowerCase()},t=e):(Zi=t,t=s)):(Zi=t,t=s);return t}())!==s&&(Ji=t,e={column_format:e}),(t=e)===s&&(t=Zi,(e=function(){var t,e,n;t=Zi,"storage"===r.substr(Zi,7).toLowerCase()?(e=r.substr(Zi,7),Zi+=7):(e=s,0===nc&&ic(Ar));e!==s&&Gp()!==s?("disk"===r.substr(Zi,4).toLowerCase()?(n=r.substr(Zi,4),Zi+=4):(n=s,0===nc&&ic(Tr)),n===s&&("memory"===r.substr(Zi,6).toLowerCase()?(n=r.substr(Zi,6),Zi+=6):(n=s,0===nc&&ic(_r))),n!==s?(Ji=t,e={type:"storage",value:n.toLowerCase()},t=e):(Zi=t,t=s)):(Zi=t,t=s);return t}())!==s&&(Ji=t,e={storage:e}),(t=e)===s&&(t=Zi,(e=Mc())!==s&&(Ji=t,e={reference_definition:e}),(t=e)===s&&(t=Zi,(e=function(){var t,e,n,o,u,a,i,c;t=Zi,(e=Dc())===s&&(e=null);e!==s&&Gp()!==s?("check"===r.substr(Zi,5).toLowerCase()?(n=r.substr(Zi,5),Zi+=5):(n=s,0===nc&&ic(K)),n!==s&&Gp()!==s&&xp()!==s&&Gp()!==s&&(o=$l())!==s&&Gp()!==s&&kp()!==s&&Gp()!==s?(u=Zi,(a=Hb())===s&&(a=null),a!==s&&(i=Gp())!==s?("enforced"===r.substr(Zi,8).toLowerCase()?(c=r.substr(Zi,8),Zi+=8):(c=s,0===nc&&ic(tt)),c!==s?u=a=[a,i,c]:(Zi=u,u=s)):(Zi=u,u=s),u===s&&(u=null),u!==s?(Ji=t,e=function(r,t,e,n){const o=[];return n&&o.push(n[0],n[2]),{constraint_type:t.toLowerCase(),keyword:r&&r.keyword,constraint:r&&r.constraint,definition:[e],enforced:o.filter(r=>r).join(" ").toLowerCase(),resource:"constraint"}}(e,n,o,u),t=e):(Zi=t,t=s)):(Zi=t,t=s)):(Zi=t,t=s);return t}())!==s&&(Ji=t,e={check:e}),(t=e)===s&&(t=Zi,(e=Fc())!==s&&Gp()!==s?((n=hp())===s&&(n=null),n!==s&&Gp()!==s&&(o=cf())!==s?(Ji=t,t=e=function(r,t,e){return {character_set:{type:r,value:e,symbol:t}}}(e,n,o)):(Zi=t,t=s)):(Zi=t,t=s),t===s&&(t=Zi,(e=function(){var t,e,n,o,u,a,i,c;t=Zi,e=Zi,(n=function(){var t,e,n,o,u;t=Zi,e=Zi,"generated"===r.substr(Zi,9).toLowerCase()?(n=r.substr(Zi,9),Zi+=9):(n=s,0===nc&&ic(gr));n!==s&&(o=Gp())!==s?("always"===r.substr(Zi,6).toLowerCase()?(u=r.substr(Zi,6),Zi+=6):(u=s,0===nc&&ic(Ir)),u!==s?e=n=[n,o,u]:(Zi=e,e=s)):(Zi=e,e=s);e!==s&&(Ji=t,e=e.join("").toLowerCase());return t=e}())===s&&(n=null);n!==s&&(o=Gp())!==s?("as"===r.substr(Zi,2).toLowerCase()?(u=r.substr(Zi,2),Zi+=2):(u=s,0===nc&&ic(L)),u!==s?e=n=[n,o,u]:(Zi=e,e=s)):(Zi=e,e=s);if(e!==s)if((n=Gp())!==s)if((o=xp())!==s)if((u=Gp())!==s)if((a=Hf())===s&&(a=Bl()),a!==s)if(Gp()!==s)if(kp()!==s)if(Gp()!==s){for(i=[],"stored"===r.substr(Zi,6).toLowerCase()?(c=r.substr(Zi,6),Zi+=6):(c=s,0===nc&&ic(Sr)),c===s&&("virtual"===r.substr(Zi,7).toLowerCase()?(c=r.substr(Zi,7),Zi+=7):(c=s,0===nc&&ic(Nr)));c!==s;)i.push(c),"stored"===r.substr(Zi,6).toLowerCase()?(c=r.substr(Zi,6),Zi+=6):(c=s,0===nc&&ic(Sr)),c===s&&("virtual"===r.substr(Zi,7).toLowerCase()?(c=r.substr(Zi,7),Zi+=7):(c=s,0===nc&&ic(Nr)));i!==s?(Ji=t,l=i,e={type:"generated",expr:a,value:e.filter(r=>"string"==typeof r).join(" ").toLowerCase(),storage_type:l&&l[0]&&l[0].toLowerCase()},t=e):(Zi=t,t=s);}else Zi=t,t=s;else Zi=t,t=s;else Zi=t,t=s;else Zi=t,t=s;else Zi=t,t=s;else Zi=t,t=s;else Zi=t,t=s;else Zi=t,t=s;var l;return t}())!==s&&(Ji=t,e={generated:e}),t=e)))))))))))),t}function Tc(){var r,t,e,n,o,u,a;return r=Zi,(t=sf())!==s&&Gp()!==s&&(e=nv())!==s&&Gp()!==s?((n=function(){var r,t,e,n,o,u;if(r=Zi,(t=Ac())!==s)if(Gp()!==s){for(e=[],n=Zi,(o=Gp())!==s&&(u=Ac())!==s?n=o=[o,u]:(Zi=n,n=s);n!==s;)e.push(n),n=Zi,(o=Gp())!==s&&(u=Ac())!==s?n=o=[o,u]:(Zi=n,n=s);e!==s?(Ji=r,r=t=function(r,t){let e=r;for(let r=0;r<t.length;r++)e={...e,...t[r][1]};return e}(t,e)):(Zi=r,r=s);}else Zi=r,r=s;else Zi=r,r=s;return r}())===s&&(n=null),n!==s?(Ji=r,o=t,u=e,a=n,Cv.add(`create::${o.table}::${o.column}`),r=t={column:o,definition:u,resource:"column",...a||{}}):(Zi=r,r=s)):(Zi=r,r=s),r}function _c(){var t,e,n,o,u;return t=Zi,"definer"===r.substr(Zi,7).toLowerCase()?(e=r.substr(Zi,7),Zi+=7):(e=s,0===nc&&ic(nr)),e!==s&&Gp()!==s&&hp()!==s&&Gp()!==s?((n=yf())===s&&(n=Bf()),n!==s&&Gp()!==s?(64===r.charCodeAt(Zi)?(o="@",Zi++):(o=s,0===nc&&ic(lr)),o!==s&&Gp()!==s?((u=yf())===s&&(u=Bf()),u!==s?(Ji=t,t=e=function(r,t){const e=bv("@",r,t);return bv("=",{type:"origin",value:"definer"},e)}(n,u)):(Zi=t,t=s)):(Zi=t,t=s)):(Zi=t,t=s)):(Zi=t,t=s),t===s&&(t=Zi,"definer"===r.substr(Zi,7).toLowerCase()?(e=r.substr(Zi,7),Zi+=7):(e=s,0===nc&&ic(nr)),e!==s&&Gp()!==s&&hp()!==s&&Gp()!==s&&(n=vp())!==s&&Gp()!==s&&(o=xp())!==s&&Gp()!==s&&(u=kp())!==s?(Ji=t,t=e=fr()):(Zi=t,t=s),t===s&&(t=Zi,"definer"===r.substr(Zi,7).toLowerCase()?(e=r.substr(Zi,7),Zi+=7):(e=s,0===nc&&ic(nr)),e!==s&&Gp()!==s&&hp()!==s&&Gp()!==s&&(n=vp())!==s?(Ji=t,t=e=fr()):(Zi=t,t=s))),t}function gc(){var t,e,n;return t=Zi,function(){var t,e,n,o;t=Zi,"collate"===r.substr(Zi,7).toLowerCase()?(e=r.substr(Zi,7),Zi+=7):(e=s,0===nc&&ic(pt));e!==s?(n=Zi,nc++,o=mf(),nc--,o===s?n=void 0:(Zi=n,n=s),n!==s?(Ji=t,t=e="COLLATE"):(Zi=t,t=s)):(Zi=t,t=s);return t}()!==s&&Gp()!==s?((e=hp())===s&&(e=null),e!==s&&Gp()!==s&&(n=ff())!==s?(Ji=t,t={type:"collate",keyword:"collate",collate:{name:n,symbol:e}}):(Zi=t,t=s)):(Zi=t,t=s),t}function Ic(){var t,e,n;return t=Zi,"if"===r.substr(Zi,2).toLowerCase()?(e=r.substr(Zi,2),Zi+=2):(e=s,0===nc&&ic(Or)),e!==s&&Gp()!==s?("exists"===r.substr(Zi,6).toLowerCase()?(n=r.substr(Zi,6),Zi+=6):(n=s,0===nc&&ic(Rr)),n!==s?(Ji=t,t=e="if exists"):(Zi=t,t=s)):(Zi=t,t=s),t}function Sc(){var t,e,n;return t=Zi,"first"===r.substr(Zi,5).toLowerCase()?(e=r.substr(Zi,5),Zi+=5):(e=s,0===nc&&ic(jr)),e!==s&&(Ji=t,e={keyword:e}),(t=e)===s&&(t=Zi,"after"===r.substr(Zi,5).toLowerCase()?(e=r.substr(Zi,5),Zi+=5):(e=s,0===nc&&ic(xr)),e!==s&&Gp()!==s&&(n=sf())!==s?(Ji=t,t=e=function(r,t){return {keyword:r,expr:t}}(e,n)):(Zi=t,t=s)),t}function Nc(){var t,e,n;return (t=function(){var r,t;r=Zi,Cp()!==s&&Gp()!==s&&(t=Uc())!==s?(Ji=r,r={action:"add",create_definitions:t,resource:"constraint",type:"alter"}):(Zi=r,r=s);return r}())===s&&(t=function(){var t,e,n,o;t=Zi,(e=nb())!==s&&Gp()!==s?("check"===r.substr(Zi,5).toLowerCase()?(n=r.substr(Zi,5),Zi+=5):(n=s,0===nc&&ic(K)),n!==s&&Gp()!==s&&(o=Cf())!==s?(Ji=t,e={action:"drop",constraint:o,keyword:n.toLowerCase(),resource:"constraint",type:"alter"},t=e):(Zi=t,t=s)):(Zi=t,t=s);t===s&&(t=Zi,(e=nb())!==s&&Gp()!==s?("constraint"===r.substr(Zi,10).toLowerCase()?(n=r.substr(Zi,10),Zi+=10):(n=s,0===nc&&ic(Qr)),n!==s&&Gp()!==s&&(o=Cf())!==s?(Ji=t,e=function(r,t){return {action:"drop",constraint:t,keyword:r.toLowerCase(),resource:"constraint",type:"alter"}}(n,o),t=e):(Zi=t,t=s)):(Zi=t,t=s));return t}())===s&&(t=function(){var t,e,n,o,u,a;t=Zi,(e=nb())!==s&&Gp()!==s?("primary"===r.substr(Zi,7).toLowerCase()?(n=r.substr(Zi,7),Zi+=7):(n=s,0===nc&&ic(cr)),n!==s&&(o=Gp())!==s&&(u=Ap())!==s?(Ji=t,t=e={action:"drop",key:"",keyword:"primary key",resource:"key",type:"alter"}):(Zi=t,t=s)):(Zi=t,t=s);t===s&&(t=Zi,(e=nb())!==s&&Gp()!==s?(n=Zi,"foreign"===r.substr(Zi,7).toLowerCase()?(o=r.substr(Zi,7),Zi+=7):(o=s,0===nc&&ic(Kr)),o===s&&(o=null),o!==s&&(u=Gp())!==s&&(a=Ap())!==s?n=o=[o,u,a]:(Zi=n,n=s),n===s&&(n=Ep()),n!==s&&(o=Gp())!==s&&(u=ff())!==s?(Ji=t,e=function(r,t){const e=Array.isArray(r)?"key":"index";return {action:"drop",[e]:t,keyword:Array.isArray(r)?""+[r[0],r[2]].filter(r=>r).join(" ").toLowerCase():r.toLowerCase(),resource:e,type:"alter"}}(n,u),t=e):(Zi=t,t=s)):(Zi=t,t=s));return t}())===s&&(t=function(){var t,e,n,o;t=Zi,Nb()!==s&&Gp()!==s?("check"===r.substr(Zi,5).toLowerCase()?(e=r.substr(Zi,5),Zi+=5):(e=s,0===nc&&ic(K)),e!==s&&Gp()!==s?("check"===r.substr(Zi,5).toLowerCase()?(n=r.substr(Zi,5),Zi+=5):(n=s,0===nc&&ic(K)),n!==s&&Gp()!==s&&Sp()!==s&&Gp()!==s&&(o=Cf())!==s?(Ji=t,t={action:"with",constraint:o,keyword:"check check",resource:"constraint",type:"alter"}):(Zi=t,t=s)):(Zi=t,t=s)):(Zi=t,t=s);return t}())===s&&(t=function(){var t,e,n;t=Zi,"nocheck"===r.substr(Zi,7).toLowerCase()?(e=r.substr(Zi,7),Zi+=7):(e=s,0===nc&&ic(zr));e!==s&&Gp()!==s&&Sp()!==s&&Gp()!==s&&(n=Cf())!==s?(Ji=t,t=e={action:"nocheck",constraint:n,resource:"constraint",type:"alter"}):(Zi=t,t=s);return t}())===s&&(t=function(){var r,t,e,n,o;r=Zi,(t=Cp())!==s&&Gp()!==s&&(e=mp())!==s&&Gp()!==s&&(n=Tc())!==s&&Gp()!==s?((o=Sc())===s&&(o=null),o!==s?(Ji=r,u=e,a=n,i=o,t={action:"add",...a,keyword:u,suffix:i,resource:"column",type:"alter"},r=t):(Zi=r,r=s)):(Zi=r,r=s);var u,a,i;r===s&&(r=Zi,(t=Cp())!==s&&Gp()!==s&&(e=Tc())!==s&&Gp()!==s?((n=Sc())===s&&(n=null),n!==s?(Ji=r,t=function(r,t){return {action:"add",...r,suffix:t,resource:"column",type:"alter"}}(e,n),r=t):(Zi=r,r=s)):(Zi=r,r=s));return r}())===s&&(t=function(){var r,t,e,n;r=Zi,(t=nb())!==s&&Gp()!==s&&(e=mp())!==s&&Gp()!==s&&(n=sf())!==s?(Ji=r,r=t={action:"drop",column:n,keyword:e,resource:"column",type:"alter"}):(Zi=r,r=s);r===s&&(r=Zi,(t=nb())!==s&&Gp()!==s&&(e=sf())!==s?(Ji=r,t=function(r){return {action:"drop",column:r,resource:"column",type:"alter"}}(e),r=t):(Zi=r,r=s));return r}())===s&&(t=function(){var t,e,n,o,u;t=Zi,(e=function(){var t,e,n,o;t=Zi,"modify"===r.substr(Zi,6).toLowerCase()?(e=r.substr(Zi,6),Zi+=6):(e=s,0===nc&&ic(yi));e!==s?(n=Zi,nc++,o=mf(),nc--,o===s?n=void 0:(Zi=n,n=s),n!==s?(Ji=t,t=e="MODIFY"):(Zi=t,t=s)):(Zi=t,t=s);return t}())!==s&&Gp()!==s?((n=mp())===s&&(n=null),n!==s&&Gp()!==s&&(o=Tc())!==s&&Gp()!==s?((u=Sc())===s&&(u=null),u!==s?(Ji=t,a=o,i=u,e={action:"modify",keyword:n,...a,suffix:i,resource:"column",type:"alter"},t=e):(Zi=t,t=s)):(Zi=t,t=s)):(Zi=t,t=s);var a,i;return t}())===s&&(t=function(){var r,t,e;r=Zi,(t=Cp())!==s&&Gp()!==s&&(e=xc())!==s?(Ji=r,n=e,t={action:"add",type:"alter",...n},r=t):(Zi=r,r=s);var n;return r}())===s&&(t=function(){var r,t,e;r=Zi,(t=Cp())!==s&&Gp()!==s&&(e=kc())!==s?(Ji=r,n=e,t={action:"add",type:"alter",...n},r=t):(Zi=r,r=s);var n;return r}())===s&&(t=function(){var r,t,e,n,o;r=Zi,(t=bb())!==s&&Gp()!==s&&mp()!==s&&Gp()!==s&&(e=sf())!==s&&Gp()!==s?((n=tb())===s&&(n=Lb()),n===s&&(n=null),n!==s&&Gp()!==s&&(o=sf())!==s?(Ji=r,a=o,t={action:"rename",type:"alter",resource:"column",keyword:"column",old_column:e,prefix:(u=n)&&u[0].toLowerCase(),column:a},r=t):(Zi=r,r=s)):(Zi=r,r=s);var u,a;return r}())===s&&(t=function(){var r,t,e,n;r=Zi,(t=bb())!==s&&Gp()!==s?((e=tb())===s&&(e=Lb()),e===s&&(e=null),e!==s&&Gp()!==s&&(n=ff())!==s?(Ji=r,u=n,t={action:"rename",type:"alter",resource:"table",keyword:(o=e)&&o[0].toLowerCase(),table:u},r=t):(Zi=r,r=s)):(Zi=r,r=s);var o,u;return r}())===s&&(t=Rc())===s&&(t=jc())===s&&(t=function(){var t,e,n,o,u,a;t=Zi,"change"===r.substr(Zi,6).toLowerCase()?(e=r.substr(Zi,6),Zi+=6):(e=s,0===nc&&ic(Xr));e!==s&&Gp()!==s?((n=mp())===s&&(n=null),n!==s&&Gp()!==s&&(o=sf())!==s&&Gp()!==s&&(u=Tc())!==s&&Gp()!==s?((a=Sc())===s&&(a=null),a!==s?(Ji=t,i=n,c=u,l=a,e={action:"change",old_column:o,...c,keyword:i,resource:"column",type:"alter",suffix:l},t=e):(Zi=t,t=s)):(Zi=t,t=s)):(Zi=t,t=s);var i,c,l;return t}())===s&&(t=function(){var t,e,n,o,u;t=Zi,"drop"===r.substr(Zi,4).toLowerCase()?(e=r.substr(Zi,4),Zi+=4):(e=s,0===nc&&ic(Dr));e===s&&("truncate"===r.substr(Zi,8).toLowerCase()?(e=r.substr(Zi,8),Zi+=8):(e=s,0===nc&&ic(Mr)),e===s&&("discard"===r.substr(Zi,7).toLowerCase()?(e=r.substr(Zi,7),Zi+=7):(e=s,0===nc&&ic(Pr)),e===s&&("import"===r.substr(Zi,6).toLowerCase()?(e=r.substr(Zi,6),Zi+=6):(e=s,0===nc&&ic(Gr)),e===s&&("coalesce"===r.substr(Zi,8).toLowerCase()?(e=r.substr(Zi,8),Zi+=8):(e=s,0===nc&&ic(Fr)),e===s&&("analyze"===r.substr(Zi,7).toLowerCase()?(e=r.substr(Zi,7),Zi+=7):(e=s,0===nc&&ic(Hr)),e===s&&("check"===r.substr(Zi,5).toLowerCase()?(e=r.substr(Zi,5),Zi+=5):(e=s,0===nc&&ic(K))))))));e!==s&&Gp()!==s&&(n=vb())!==s&&Gp()!==s&&(o=al())!==s&&Gp()!==s?("tablespace"===r.substr(Zi,10).toLowerCase()?(u=r.substr(Zi,10),Zi+=10):(u=s,0===nc&&ic(Yr)),u===s&&(u=null),u!==s?(Ji=t,e=function(r,t,e,n){const o={action:r.toLowerCase(),keyword:t,resource:"partition",type:"alter",partitions:e};return n&&(o.suffix={keyword:n}),o}(e,n,o,u),t=e):(Zi=t,t=s)):(Zi=t,t=s);t===s&&(t=Zi,(e=Cp())!==s&&Gp()!==s&&(n=vb())!==s&&Gp()!==s&&(o=xp())!==s&&Gp()!==s&&(u=function(){var r,t,e,n,o,u,a,c;if(r=Zi,(t=Oc())!==s){for(e=[],n=Zi,(o=Gp())!==s&&(u=Rp())!==s&&(a=Gp())!==s&&(c=Oc())!==s?n=o=[o,u,a,c]:(Zi=n,n=s);n!==s;)e.push(n),n=Zi,(o=Gp())!==s&&(u=Rp())!==s&&(a=Gp())!==s&&(c=Oc())!==s?n=o=[o,u,a,c]:(Zi=n,n=s);e!==s?(Ji=r,t=i(t,e),r=t):(Zi=r,r=s);}else Zi=r,r=s;return r}())!==s&&Gp()!==s&&kp()!==s?(Ji=t,t=e={action:"add",keyword:n,resource:"partition",type:"alter",partitions:u}):(Zi=t,t=s));return t}())===s&&(t=Zi,(e=Yc())!==s&&(Ji=t,(n=e).resource=n.keyword,n[n.keyword]=n.value,delete n.value,e={type:"alter",...n}),t=e),t}function Oc(){var t,e,n,o,u;return t=Zi,vb()!==s&&Gp()!==s&&(e=cf())!==s&&Gp()!==s&&Ib()!==s&&Gp()!==s?("less"===r.substr(Zi,4).toLowerCase()?(n=r.substr(Zi,4),Zi+=4):(n=s,0===nc&&ic(kr)),n!==s&&Gp()!==s?("than"===r.substr(Zi,4).toLowerCase()?(o=r.substr(Zi,4),Zi+=4):(o=s,0===nc&&ic(Ur)),o!==s&&Gp()!==s&&xp()!==s&&Gp()!==s&&(u=Vf())!==s&&Gp()!==s&&kp()!==s?(Ji=t,t={name:e,value:{type:"less than",expr:u,parentheses:true}}):(Zi=t,t=s)):(Zi=t,t=s)):(Zi=t,t=s),t}function Rc(){var t,e,n,o;return t=Zi,"algorithm"===r.substr(Zi,9).toLowerCase()?(e=r.substr(Zi,9),Zi+=9):(e=s,0===nc&&ic(z)),e!==s&&Gp()!==s?((n=hp())===s&&(n=null),n!==s&&Gp()!==s?("default"===r.substr(Zi,7).toLowerCase()?(o=r.substr(Zi,7),Zi+=7):(o=s,0===nc&&ic(k)),o===s&&("instant"===r.substr(Zi,7).toLowerCase()?(o=r.substr(Zi,7),Zi+=7):(o=s,0===nc&&ic(Br)),o===s&&("inplace"===r.substr(Zi,7).toLowerCase()?(o=r.substr(Zi,7),Zi+=7):(o=s,0===nc&&ic($r)),o===s&&("copy"===r.substr(Zi,4).toLowerCase()?(o=r.substr(Zi,4),Zi+=4):(o=s,0===nc&&ic(Wr))))),o!==s?(Ji=t,t=e={type:"alter",keyword:"algorithm",resource:"algorithm",symbol:n,algorithm:o}):(Zi=t,t=s)):(Zi=t,t=s)):(Zi=t,t=s),t}function jc(){var t,e,n,o;return t=Zi,"lock"===r.substr(Zi,4).toLowerCase()?(e=r.substr(Zi,4),Zi+=4):(e=s,0===nc&&ic($)),e!==s&&Gp()!==s?((n=hp())===s&&(n=null),n!==s&&Gp()!==s?("default"===r.substr(Zi,7).toLowerCase()?(o=r.substr(Zi,7),Zi+=7):(o=s,0===nc&&ic(k)),o===s&&("none"===r.substr(Zi,4).toLowerCase()?(o=r.substr(Zi,4),Zi+=4):(o=s,0===nc&&ic(m)),o===s&&("shared"===r.substr(Zi,6).toLowerCase()?(o=r.substr(Zi,6),Zi+=6):(o=s,0===nc&&ic(qr)),o===s&&("exclusive"===r.substr(Zi,9).toLowerCase()?(o=r.substr(Zi,9),Zi+=9):(o=s,0===nc&&ic(Vr))))),o!==s?(Ji=t,t=e={type:"alter",keyword:"lock",resource:"lock",symbol:n,lock:o}):(Zi=t,t=s)):(Zi=t,t=s)):(Zi=t,t=s),t}function xc(){var r,t,e,n,o,u,a,i;return r=Zi,(t=Ep())===s&&(t=Ap()),t!==s&&Gp()!==s?((e=Lf())===s&&(e=null),e!==s&&Gp()!==s?((n=vl())===s&&(n=null),n!==s&&Gp()!==s&&(o=nl())!==s&&Gp()!==s?((u=dl())===s&&(u=null),u!==s&&Gp()!==s?(Ji=r,a=n,i=u,r=t={index:e,definition:o,keyword:t.toLowerCase(),index_type:a,resource:"index",index_options:i}):(Zi=r,r=s)):(Zi=r,r=s)):(Zi=r,r=s)):(Zi=r,r=s),r}function kc(){var r,t,e,n,o,u,a,i,c;return r=Zi,(t=Tp())===s&&(t=_p()),t!==s&&Gp()!==s?((e=Ep())===s&&(e=Ap()),e===s&&(e=null),e!==s&&Gp()!==s?((n=Lf())===s&&(n=null),n!==s&&Gp()!==s&&(o=tl())!==s&&Gp()!==s?((u=dl())===s&&(u=null),u!==s?(Ji=r,a=t,c=u,r=t={index:n,definition:o,keyword:(i=e)&&`${a.toLowerCase()} ${i.toLowerCase()}`||a.toLowerCase(),index_options:c,resource:"index"}):(Zi=r,r=s)):(Zi=r,r=s)):(Zi=r,r=s)):(Zi=r,r=s),r}function Uc(){var t;return (t=function(){var t,e,n,o,u,a,i,c;t=Zi,(e=Dc())===s&&(e=null);e!==s&&Gp()!==s?(n=Zi,"primary"===r.substr(Zi,7).toLowerCase()?(o=r.substr(Zi,7),Zi+=7):(o=s,0===nc&&ic(cr)),o!==s&&(u=Gp())!==s?("key"===r.substr(Zi,3).toLowerCase()?(a=r.substr(Zi,3),Zi+=3):(a=s,0===nc&&ic(ir)),a!==s?n=o=[o,u,a]:(Zi=n,n=s)):(Zi=n,n=s),n!==s&&(o=Gp())!==s?((u=vl())===s&&(u=null),u!==s&&(a=Gp())!==s&&(i=nl())!==s&&Gp()!==s?((c=dl())===s&&(c=null),c!==s?(Ji=t,f=n,b=u,p=i,v=c,e={constraint:(l=e)&&l.constraint,definition:p,constraint_type:`${f[0].toLowerCase()} ${f[2].toLowerCase()}`,keyword:l&&l.keyword,index_type:b,resource:"constraint",index_options:v},t=e):(Zi=t,t=s)):(Zi=t,t=s)):(Zi=t,t=s)):(Zi=t,t=s);var l,f,b,p,v;return t}())===s&&(t=function(){var r,t,e,n,o,u,a,i;r=Zi,(t=Dc())===s&&(t=null);t!==s&&Gp()!==s&&(e=gp())!==s&&Gp()!==s?((n=Ep())===s&&(n=Ap()),n===s&&(n=null),n!==s&&Gp()!==s?((o=Lf())===s&&(o=null),o!==s&&Gp()!==s?((u=vl())===s&&(u=null),u!==s&&Gp()!==s&&(a=nl())!==s&&Gp()!==s?((i=dl())===s&&(i=null),i!==s?(Ji=r,l=e,f=n,b=o,p=u,v=a,d=i,t={constraint:(c=t)&&c.constraint,definition:v,constraint_type:f&&`${l.toLowerCase()} ${f.toLowerCase()}`||l.toLowerCase(),keyword:c&&c.keyword,index_type:p,index:b,resource:"constraint",index_options:d},r=t):(Zi=r,r=s)):(Zi=r,r=s)):(Zi=r,r=s)):(Zi=r,r=s)):(Zi=r,r=s);var c,l,f,b,p,v,d;return r}())===s&&(t=function(){var t,e,n,o,u,a;t=Zi,(e=Dc())===s&&(e=null);e!==s&&Gp()!==s?("foreign key"===r.substr(Zi,11).toLowerCase()?(n=r.substr(Zi,11),Zi+=11):(n=s,0===nc&&ic(rt)),n!==s&&Gp()!==s?((o=Lf())===s&&(o=null),o!==s&&Gp()!==s&&(u=tl())!==s&&Gp()!==s?((a=Mc())===s&&(a=null),a!==s?(Ji=t,c=n,l=o,f=u,b=a,e={constraint:(i=e)&&i.constraint,definition:f,constraint_type:c,keyword:i&&i.keyword,index:l,resource:"constraint",reference_definition:b},t=e):(Zi=t,t=s)):(Zi=t,t=s)):(Zi=t,t=s)):(Zi=t,t=s);var i,c,l,f,b;return t}())===s&&(t=function(){var t,e,n,o,u,a,i,c,l,f;t=Zi,(e=Dc())===s&&(e=null);e!==s&&Gp()!==s?("check"===r.substr(Zi,5).toLowerCase()?(n=r.substr(Zi,5),Zi+=5):(n=s,0===nc&&ic(K)),n!==s&&Gp()!==s?(o=Zi,"not"===r.substr(Zi,3).toLowerCase()?(u=r.substr(Zi,3),Zi+=3):(u=s,0===nc&&ic(Zr)),u!==s&&(a=Gp())!==s?("for"===r.substr(Zi,3).toLowerCase()?(i=r.substr(Zi,3),Zi+=3):(i=s,0===nc&&ic(vr)),i!==s&&(c=Gp())!==s?("replication"===r.substr(Zi,11).toLowerCase()?(l=r.substr(Zi,11),Zi+=11):(l=s,0===nc&&ic(Jr)),l!==s&&(f=Gp())!==s?o=u=[u,a,i,c,l,f]:(Zi=o,o=s)):(Zi=o,o=s)):(Zi=o,o=s),o===s&&(o=null),o!==s&&(u=xp())!==s&&(a=Gp())!==s&&(i=$l())!==s&&(c=Gp())!==s&&(l=kp())!==s?(Ji=t,b=e,p=o,v=i,e={constraint_type:n.toLowerCase(),keyword:b&&b.keyword,constraint:b&&b.constraint,index_type:p&&{keyword:"not for replication"},definition:[v],resource:"constraint"},t=e):(Zi=t,t=s)):(Zi=t,t=s)):(Zi=t,t=s);var b,p,v;return t}()),t}function Dc(){var r,t,e,n;return r=Zi,(t=Sp())!==s&&Gp()!==s?((e=ff())===s&&(e=null),e!==s?(Ji=r,n=e,r=t={keyword:t.toLowerCase(),constraint:n}):(Zi=r,r=s)):(Zi=r,r=s),r}function Mc(){var t,e,n,o,u,a,i,c,l,f;return t=Zi,(e=Np())!==s&&Gp()!==s&&(n=wl())!==s&&Gp()!==s&&(o=tl())!==s&&Gp()!==s?("match full"===r.substr(Zi,10).toLowerCase()?(u=r.substr(Zi,10),Zi+=10):(u=s,0===nc&&ic(et)),u===s&&("match partial"===r.substr(Zi,13).toLowerCase()?(u=r.substr(Zi,13),Zi+=13):(u=s,0===nc&&ic(nt)),u===s&&("match simple"===r.substr(Zi,12).toLowerCase()?(u=r.substr(Zi,12),Zi+=12):(u=s,0===nc&&ic(ot)))),u===s&&(u=null),u!==s&&Gp()!==s?((a=Pc())===s&&(a=null),a!==s&&Gp()!==s?((i=Pc())===s&&(i=null),i!==s?(Ji=t,c=u,l=a,f=i,t=e={definition:o,table:n,keyword:e.toLowerCase(),match:c&&c.toLowerCase(),on_action:[l,f].filter(r=>r)}):(Zi=t,t=s)):(Zi=t,t=s)):(Zi=t,t=s)):(Zi=t,t=s),t===s&&(t=Zi,(e=Pc())!==s&&(Ji=t,e={on_action:[e]}),t=e),t}function Pc(){var t,e,n,o;return t=Zi,Tb()!==s&&Gp()!==s?((e=cb())===s&&(e=ub()),e!==s&&Gp()!==s&&(n=function(){var t,e,n;t=Zi,(e=pp())!==s&&Gp()!==s&&xp()!==s&&Gp()!==s?((n=Pl())===s&&(n=null),n!==s&&Gp()!==s&&kp()!==s?(Ji=t,t=e={type:"function",name:{name:[{type:"origin",value:e}]},args:n}):(Zi=t,t=s)):(Zi=t,t=s);t===s&&(t=Zi,(e=Gc())===s&&("set null"===r.substr(Zi,8).toLowerCase()?(e=r.substr(Zi,8),Zi+=8):(e=s,0===nc&&ic(at)),e===s&&("no action"===r.substr(Zi,9).toLowerCase()?(e=r.substr(Zi,9),Zi+=9):(e=s,0===nc&&ic(it)),e===s&&("set default"===r.substr(Zi,11).toLowerCase()?(e=r.substr(Zi,11),Zi+=11):(e=s,0===nc&&ic(ct)),e===s&&(e=pp())))),e!==s&&(Ji=t,e={type:"origin",value:e.toLowerCase()}),t=e);return t}())!==s?(Ji=t,o=n,t={type:"on "+e[0].toLowerCase(),value:o}):(Zi=t,t=s)):(Zi=t,t=s),t}function Gc(){var t,e;return t=Zi,"restrict"===r.substr(Zi,8).toLowerCase()?(e=r.substr(Zi,8),Zi+=8):(e=s,0===nc&&ic(st)),e===s&&("cascade"===r.substr(Zi,7).toLowerCase()?(e=r.substr(Zi,7),Zi+=7):(e=s,0===nc&&ic(ut))),e!==s&&(Ji=t,e=e.toLowerCase()),t=e}function Fc(){var t,e,n;return t=Zi,"character"===r.substr(Zi,9).toLowerCase()?(e=r.substr(Zi,9),Zi+=9):(e=s,0===nc&&ic(lt)),e!==s&&Gp()!==s?("set"===r.substr(Zi,3).toLowerCase()?(n=r.substr(Zi,3),Zi+=3):(n=s,0===nc&&ic(ft)),n!==s?(Ji=t,t=e="CHARACTER SET"):(Zi=t,t=s)):(Zi=t,t=s),t}function Hc(){var t,e,n,o,u,a,i,c,l;return t=Zi,(e=rb())===s&&(e=null),e!==s&&Gp()!==s?((n=Fc())===s&&("charset"===r.substr(Zi,7).toLowerCase()?(n=r.substr(Zi,7),Zi+=7):(n=s,0===nc&&ic(bt)),n===s&&("collate"===r.substr(Zi,7).toLowerCase()?(n=r.substr(Zi,7),Zi+=7):(n=s,0===nc&&ic(pt)))),n!==s&&Gp()!==s?((o=hp())===s&&(o=null),o!==s&&Gp()!==s&&(u=cf())!==s?(Ji=t,i=n,c=o,l=u,t=e={keyword:(a=e)&&`${a[0].toLowerCase()} ${i.toLowerCase()}`||i.toLowerCase(),symbol:c,value:l}):(Zi=t,t=s)):(Zi=t,t=s)):(Zi=t,t=s),t}function Yc(){var t,e,n,o,u,a,i,c,l;return t=Zi,"auto_increment"===r.substr(Zi,14).toLowerCase()?(e=r.substr(Zi,14),Zi+=14):(e=s,0===nc&&ic(ur)),e===s&&("avg_row_length"===r.substr(Zi,14).toLowerCase()?(e=r.substr(Zi,14),Zi+=14):(e=s,0===nc&&ic(vt)),e===s&&("key_block_size"===r.substr(Zi,14).toLowerCase()?(e=r.substr(Zi,14),Zi+=14):(e=s,0===nc&&ic(dt)),e===s&&("max_rows"===r.substr(Zi,8).toLowerCase()?(e=r.substr(Zi,8),Zi+=8):(e=s,0===nc&&ic(yt)),e===s&&("min_rows"===r.substr(Zi,8).toLowerCase()?(e=r.substr(Zi,8),Zi+=8):(e=s,0===nc&&ic(wt)),e===s&&("stats_sample_pages"===r.substr(Zi,18).toLowerCase()?(e=r.substr(Zi,18),Zi+=18):(e=s,0===nc&&ic(Lt))))))),e!==s&&Gp()!==s?((n=hp())===s&&(n=null),n!==s&&Gp()!==s&&(o=Vf())!==s?(Ji=t,c=n,l=o,t=e={keyword:e.toLowerCase(),symbol:c,value:l.value}):(Zi=t,t=s)):(Zi=t,t=s),t===s&&(t=Zi,"CHECKSUM"===r.substr(Zi,8)?(e="CHECKSUM",Zi+=8):(e=s,0===nc&&ic(ht)),e===s&&("DELAY_KEY_WRITE"===r.substr(Zi,15)?(e="DELAY_KEY_WRITE",Zi+=15):(e=s,0===nc&&ic(Ct))),e!==s&&Gp()!==s&&(n=hp())!==s&&Gp()!==s?(mt.test(r.charAt(Zi))?(o=r.charAt(Zi),Zi++):(o=s,0===nc&&ic(Et)),o!==s?(Ji=t,t=e=function(r,t,e){return {keyword:r.toLowerCase(),symbol:t,value:e}}(e,n,o)):(Zi=t,t=s)):(Zi=t,t=s),t===s&&(t=Hc())===s&&(t=Zi,(e=Ip())===s&&("connection"===r.substr(Zi,10).toLowerCase()?(e=r.substr(Zi,10),Zi+=10):(e=s,0===nc&&ic(At)),e===s&&("engine_attribute"===r.substr(Zi,16).toLowerCase()?(e=r.substr(Zi,16),Zi+=16):(e=s,0===nc&&ic(Tt)),e===s&&("secondary_engine_attribute"===r.substr(Zi,26).toLowerCase()?(e=r.substr(Zi,26),Zi+=26):(e=s,0===nc&&ic(_t))))),e!==s&&Gp()!==s?((n=hp())===s&&(n=null),n!==s&&Gp()!==s&&(o=Bf())!==s?(Ji=t,t=e=function(r,t,e){return {keyword:r.toLowerCase(),symbol:t,value:`'${e.value}'`}}(e,n,o)):(Zi=t,t=s)):(Zi=t,t=s),t===s&&(t=Zi,"data"===r.substr(Zi,4).toLowerCase()?(e=r.substr(Zi,4),Zi+=4):(e=s,0===nc&&ic(gt)),e===s&&("index"===r.substr(Zi,5).toLowerCase()?(e=r.substr(Zi,5),Zi+=5):(e=s,0===nc&&ic(It))),e!==s&&Gp()!==s?("directory"===r.substr(Zi,9).toLowerCase()?(n=r.substr(Zi,9),Zi+=9):(n=s,0===nc&&ic(St)),n!==s&&Gp()!==s?((o=hp())===s&&(o=null),o!==s&&(u=Gp())!==s&&(a=Bf())!==s?(Ji=t,t=e=function(r,t,e){return {keyword:r.toLowerCase()+" directory",symbol:t,value:`'${e.value}'`}}(e,o,a)):(Zi=t,t=s)):(Zi=t,t=s)):(Zi=t,t=s),t===s&&(t=Zi,"compression"===r.substr(Zi,11).toLowerCase()?(e=r.substr(Zi,11),Zi+=11):(e=s,0===nc&&ic(Nt)),e!==s&&Gp()!==s?((n=hp())===s&&(n=null),n!==s&&Gp()!==s?(o=Zi,39===r.charCodeAt(Zi)?(u="'",Zi++):(u=s,0===nc&&ic(Ot)),u!==s?("zlib"===r.substr(Zi,4).toLowerCase()?(a=r.substr(Zi,4),Zi+=4):(a=s,0===nc&&ic(Rt)),a===s&&("lz4"===r.substr(Zi,3).toLowerCase()?(a=r.substr(Zi,3),Zi+=3):(a=s,0===nc&&ic(jt)),a===s&&("none"===r.substr(Zi,4).toLowerCase()?(a=r.substr(Zi,4),Zi+=4):(a=s,0===nc&&ic(m)))),a!==s?(39===r.charCodeAt(Zi)?(i="'",Zi++):(i=s,0===nc&&ic(Ot)),i!==s?o=u=[u,a,i]:(Zi=o,o=s)):(Zi=o,o=s)):(Zi=o,o=s),o!==s?(Ji=t,t=e=function(r,t,e){return {keyword:r.toLowerCase(),symbol:t,value:e.join("").toUpperCase()}}(e,n,o)):(Zi=t,t=s)):(Zi=t,t=s)):(Zi=t,t=s),t===s&&(t=Zi,"engine"===r.substr(Zi,6).toLowerCase()?(e=r.substr(Zi,6),Zi+=6):(e=s,0===nc&&ic(xt)),e!==s&&Gp()!==s?((n=hp())===s&&(n=null),n!==s&&Gp()!==s&&(o=Cf())!==s?(Ji=t,t=e=kt(e,n,o)):(Zi=t,t=s)):(Zi=t,t=s),t===s&&(t=Zi,"row_format"===r.substr(Zi,10).toLowerCase()?(e=r.substr(Zi,10),Zi+=10):(e=s,0===nc&&ic(Ut)),e!==s&&Gp()!==s?((n=hp())===s&&(n=null),n!==s&&Gp()!==s?("default"===r.substr(Zi,7).toLowerCase()?(o=r.substr(Zi,7),Zi+=7):(o=s,0===nc&&ic(k)),o===s&&("dynamic"===r.substr(Zi,7).toLowerCase()?(o=r.substr(Zi,7),Zi+=7):(o=s,0===nc&&ic(Er)),o===s&&("fixed"===r.substr(Zi,5).toLowerCase()?(o=r.substr(Zi,5),Zi+=5):(o=s,0===nc&&ic(mr)),o===s&&("compressed"===r.substr(Zi,10).toLowerCase()?(o=r.substr(Zi,10),Zi+=10):(o=s,0===nc&&ic(Dt)),o===s&&("redundant"===r.substr(Zi,9).toLowerCase()?(o=r.substr(Zi,9),Zi+=9):(o=s,0===nc&&ic(Mt)),o===s&&("compact"===r.substr(Zi,7).toLowerCase()?(o=r.substr(Zi,7),Zi+=7):(o=s,0===nc&&ic(Pt))))))),o!==s?(Ji=t,t=e=kt(e,n,o)):(Zi=t,t=s)):(Zi=t,t=s)):(Zi=t,t=s))))))),t}function Bc(){var t,e,n,o,u;return t=Zi,(e=hl())!==s&&Gp()!==s&&(n=function(){var t,e,n;return t=Zi,"read"===r.substr(Zi,4).toLowerCase()?(e=r.substr(Zi,4),Zi+=4):(e=s,0===nc&&ic(Gt)),e!==s&&Gp()!==s?("local"===r.substr(Zi,5).toLowerCase()?(n=r.substr(Zi,5),Zi+=5):(n=s,0===nc&&ic(X)),n===s&&(n=null),n!==s?(Ji=t,t=e={type:"read",suffix:n&&"local"}):(Zi=t,t=s)):(Zi=t,t=s),t===s&&(t=Zi,"low_priority"===r.substr(Zi,12).toLowerCase()?(e=r.substr(Zi,12),Zi+=12):(e=s,0===nc&&ic(Ft)),e===s&&(e=null),e!==s&&Gp()!==s?("write"===r.substr(Zi,5).toLowerCase()?(n=r.substr(Zi,5),Zi+=5):(n=s,0===nc&&ic(Ht)),n!==s?(Ji=t,t=e={type:"write",prefix:e&&"low_priority"}):(Zi=t,t=s)):(Zi=t,t=s)),t}())!==s?(Ji=t,o=e,u=n,hv.add(`lock::${o.db}::${o.table}`),t=e={table:o,lock_type:u}):(Zi=t,t=s),t}function $c(){var t,e,n,o;return t=Zi,"isolation"===r.substr(Zi,9).toLowerCase()?(e=r.substr(Zi,9),Zi+=9):(e=s,0===nc&&ic(le)),e!==s&&Gp()!==s?("level"===r.substr(Zi,5).toLowerCase()?(n=r.substr(Zi,5),Zi+=5):(n=s,0===nc&&ic(fe)),n!==s&&Gp()!==s&&(o=function(){var t,e,n;return t=Zi,"serializable"===r.substr(Zi,12).toLowerCase()?(e=r.substr(Zi,12),Zi+=12):(e=s,0===nc&&ic(se)),e!==s&&(Ji=t,e={type:"origin",value:"serializable"}),(t=e)===s&&(t=Zi,"repeatable"===r.substr(Zi,10).toLowerCase()?(e=r.substr(Zi,10),Zi+=10):(e=s,0===nc&&ic(ue)),e!==s&&Gp()!==s?("read"===r.substr(Zi,4).toLowerCase()?(n=r.substr(Zi,4),Zi+=4):(n=s,0===nc&&ic(Gt)),n!==s?(Ji=t,t=e={type:"origin",value:"repeatable read"}):(Zi=t,t=s)):(Zi=t,t=s),t===s&&(t=Zi,"read"===r.substr(Zi,4).toLowerCase()?(e=r.substr(Zi,4),Zi+=4):(e=s,0===nc&&ic(Gt)),e!==s&&Gp()!==s?("committed"===r.substr(Zi,9).toLowerCase()?(n=r.substr(Zi,9),Zi+=9):(n=s,0===nc&&ic(ae)),n===s&&("uncommitted"===r.substr(Zi,11).toLowerCase()?(n=r.substr(Zi,11),Zi+=11):(n=s,0===nc&&ic(ie))),n!==s?(Ji=t,t=e=ce(n)):(Zi=t,t=s)):(Zi=t,t=s))),t}())!==s?(Ji=t,t=e={type:"origin",value:"isolation level "+o.value}):(Zi=t,t=s)):(Zi=t,t=s),t===s&&(t=Zi,"read"===r.substr(Zi,4).toLowerCase()?(e=r.substr(Zi,4),Zi+=4):(e=s,0===nc&&ic(Gt)),e!==s&&Gp()!==s?("write"===r.substr(Zi,5).toLowerCase()?(n=r.substr(Zi,5),Zi+=5):(n=s,0===nc&&ic(Ht)),n===s&&("only"===r.substr(Zi,4).toLowerCase()?(n=r.substr(Zi,4),Zi+=4):(n=s,0===nc&&ic(be))),n!==s?(Ji=t,t=e=ce(n)):(Zi=t,t=s)):(Zi=t,t=s),t===s&&(t=Zi,(e=Hb())===s&&(e=null),e!==s&&Gp()!==s?("deferrable"===r.substr(Zi,10).toLowerCase()?(n=r.substr(Zi,10),Zi+=10):(n=s,0===nc&&ic(pe)),n!==s?(Ji=t,t=e={type:"origin",value:e?"not deferrable":"deferrable"}):(Zi=t,t=s)):(Zi=t,t=s))),t}function Wc(){var r,t,e,n,o,u,a,c;if(r=Zi,(t=$c())!==s){for(e=[],n=Zi,(o=Gp())!==s&&(u=Rp())!==s&&(a=Gp())!==s&&(c=$c())!==s?n=o=[o,u,a,c]:(Zi=n,n=s);n!==s;)e.push(n),n=Zi,(o=Gp())!==s&&(u=Rp())!==s&&(a=Gp())!==s&&(c=$c())!==s?n=o=[o,u,a,c]:(Zi=n,n=s);e!==s?(Ji=r,r=t=i(t,e)):(Zi=r,r=s);}else Zi=r,r=s;return r}function qc(){var t,e,n,o,u,a;return t=Zi,"starting"===r.substr(Zi,8).toLowerCase()?(e=r.substr(Zi,8),Zi+=8):(e=s,0===nc&&ic(ge)),e===s&&("terminated"===r.substr(Zi,10).toLowerCase()?(e=r.substr(Zi,10),Zi+=10):(e=s,0===nc&&ic(Ee))),e!==s&&Gp()!==s?("by"===r.substr(Zi,2).toLowerCase()?(n=r.substr(Zi,2),Zi+=2):(n=s,0===nc&&ic(d)),n!==s&&Gp()!==s&&(o=cf())!==s?(Ji=t,u=e,(a=o).prefix=u.toUpperCase()+" BY",t=e={type:u.toLowerCase(),[u.toLowerCase()]:a}):(Zi=t,t=s)):(Zi=t,t=s),t}function Vc(){var t;return (t=function(){var t,e,n,o,u;return t=Zi,(e=kb())===s&&(e=ob())===s&&(e=Zi,(n=ab())!==s&&(o=Gp())!==s?("view"===r.substr(Zi,4).toLowerCase()?(u=r.substr(Zi,4),Zi+=4):(u=s,0===nc&&ic(ke)),u!==s?e=n=[n,o,u]:(Zi=e,e=s)):(Zi=e,e=s),e===s&&(e=ab())===s&&(e=cb())===s&&(e=nb())===s&&(e=Zi,"grant"===r.substr(Zi,5).toLowerCase()?(n=r.substr(Zi,5),Zi+=5):(n=s,0===nc&&ic(Ue)),n!==s&&(o=Gp())!==s?("option"===r.substr(Zi,6).toLowerCase()?(u=r.substr(Zi,6),Zi+=6):(u=s,0===nc&&ic(De)),u!==s?e=n=[n,o,u]:(Zi=e,e=s)):(Zi=e,e=s),e===s&&(e=Ep())===s&&(e=lb())===s&&(e=Np())===s&&(e=sb())===s&&(e=Zi,(n=eb())!==s&&(o=Gp())!==s&&(u=dp())!==s?e=n=[n,o,u]:(Zi=e,e=s),e===s&&(e=Cb())===s&&(e=ub())))),e!==s&&(Ji=t,e=Me(e)),t=e}())===s&&(t=function(){var t,e,n,o,u;return t=Zi,e=Zi,(n=ob())!==s&&(o=Gp())!==s?("routine"===r.substr(Zi,7).toLowerCase()?(u=r.substr(Zi,7),Zi+=7):(u=s,0===nc&&ic(Pe)),u!==s?e=n=[n,o,u]:(Zi=e,e=s)):(Zi=e,e=s),e===s&&("execute"===r.substr(Zi,7).toLowerCase()?(e=r.substr(Zi,7),Zi+=7):(e=s,0===nc&&ic(Ge)),e===s&&(e=Zi,"grant"===r.substr(Zi,5).toLowerCase()?(n=r.substr(Zi,5),Zi+=5):(n=s,0===nc&&ic(Ue)),n!==s&&(o=Gp())!==s?("option"===r.substr(Zi,6).toLowerCase()?(u=r.substr(Zi,6),Zi+=6):(u=s,0===nc&&ic(De)),u!==s?e=n=[n,o,u]:(Zi=e,e=s)):(Zi=e,e=s),e===s&&(e=Zi,(n=ab())!==s&&(o=Gp())!==s?("routine"===r.substr(Zi,7).toLowerCase()?(u=r.substr(Zi,7),Zi+=7):(u=s,0===nc&&ic(Pe)),u!==s?e=n=[n,o,u]:(Zi=e,e=s)):(Zi=e,e=s)))),e!==s&&(Ji=t,e=Me(e)),t=e}()),t}function Xc(){var r,t,e,n,o,u,a,i,c;return r=Zi,(t=Vc())!==s&&Gp()!==s?(e=Zi,(n=xp())!==s&&(o=Gp())!==s&&(u=Tl())!==s&&(a=Gp())!==s&&(i=kp())!==s?e=n=[n,o,u,a,i]:(Zi=e,e=s),e===s&&(e=null),e!==s?(Ji=r,r=t={priv:t,columns:(c=e)&&c[2]}):(Zi=r,r=s)):(Zi=r,r=s),r}function Kc(){var t,e,n,o,u,a,i;return t=Zi,(e=ff())!==s&&Gp()!==s?(n=Zi,64===r.charCodeAt(Zi)?(o="@",Zi++):(o=s,0===nc&&ic(lr)),o!==s&&(u=Gp())!==s&&(a=ff())!==s?n=o=[o,u,a]:(Zi=n,n=s),n===s&&(n=null),n!==s?(Ji=t,t=e={name:{type:"single_quote_string",value:e},host:(i=n)?{type:"single_quote_string",value:i[2]}:null}):(Zi=t,t=s)):(Zi=t,t=s),t}function Qc(){var r,t,e,n,o,u,a,i;if(r=Zi,(t=Kc())!==s){for(e=[],n=Zi,(o=Gp())!==s&&(u=Rp())!==s&&(a=Gp())!==s&&(i=Kc())!==s?n=o=[o,u,a,i]:(Zi=n,n=s);n!==s;)e.push(n),n=Zi,(o=Gp())!==s&&(u=Rp())!==s&&(a=Gp())!==s&&(i=Kc())!==s?n=o=[o,u,a,i]:(Zi=n,n=s);e!==s?(Ji=r,r=t=h(t,e)):(Zi=r,r=s);}else Zi=r,r=s;return r}function zc(){var t,e,n;return t=Zi,Nb()!==s&&Gp()!==s?("admin"===r.substr(Zi,5).toLowerCase()?(e=r.substr(Zi,5),Zi+=5):(e=s,0===nc&&ic(Fe)),e!==s&&Gp()!==s?("option"===r.substr(Zi,6).toLowerCase()?(n=r.substr(Zi,6),Zi+=6):(n=s,0===nc&&ic(De)),n!==s?(Ji=t,t={type:"origin",value:"with admin option"}):(Zi=t,t=s)):(Zi=t,t=s)):(Zi=t,t=s),t}function Zc(){var t,e,n,o,u,a,i;return (t=sl())===s&&(t=Zi,e=Zi,40===r.charCodeAt(Zi)?(n="(",Zi++):(n=s,0===nc&&ic(Be)),n!==s&&(o=Gp())!==s&&(u=Zc())!==s&&(a=Gp())!==s?(41===r.charCodeAt(Zi)?(i=")",Zi++):(i=s,0===nc&&ic($e)),i!==s?e=n=[n,o,u,a,i]:(Zi=e,e=s)):(Zi=e,e=s),e!==s&&(Ji=t,e={...e[2],parentheses_symbol:true}),t=e),t}function Jc(){var t,e,n,o,u,a,i,c,l,f,b,p,v;if(t=Zi,Nb()!==s)if(Gp()!==s)if((e=rl())!==s){for(n=[],o=Zi,(u=Gp())!==s&&(a=Rp())!==s&&(i=Gp())!==s&&(c=rl())!==s?o=u=[u,a,i,c]:(Zi=o,o=s);o!==s;)n.push(o),o=Zi,(u=Gp())!==s&&(a=Rp())!==s&&(i=Gp())!==s&&(c=rl())!==s?o=u=[u,a,i,c]:(Zi=o,o=s);n!==s?(Ji=t,t=sr(e,n)):(Zi=t,t=s);}else Zi=t,t=s;else Zi=t,t=s;else Zi=t,t=s;if(t===s)if(t=Zi,Gp()!==s)if(Nb()!==s)if((e=Gp())!==s)if((n=function(){var t,e,n,o;t=Zi,"recursive"===r.substr(Zi,9).toLowerCase()?(e=r.substr(Zi,9),Zi+=9):(e=s,0===nc&&ic(lu));e!==s?(n=Zi,nc++,o=mf(),nc--,o===s?n=void 0:(Zi=n,n=s),n!==s?t=e=[e,n]:(Zi=t,t=s)):(Zi=t,t=s);return t}())!==s)if((o=Gp())!==s)if((u=rl())!==s){for(a=[],i=Zi,(c=Gp())!==s&&(l=Rp())!==s&&(f=Gp())!==s&&(b=rl())!==s?i=c=[c,l,f,b]:(Zi=i,i=s);i!==s;)a.push(i),i=Zi,(c=Gp())!==s&&(l=Rp())!==s&&(f=Gp())!==s&&(b=rl())!==s?i=c=[c,l,f,b]:(Zi=i,i=s);a!==s?(Ji=t,v=a,(p=u).recursive=true,t=pv(p,v)):(Zi=t,t=s);}else Zi=t,t=s;else Zi=t,t=s;else Zi=t,t=s;else Zi=t,t=s;else Zi=t,t=s;else Zi=t,t=s;return t}function rl(){var r,t,e,n,o,u,a;return r=Zi,(t=Bf())===s&&(t=Cf())===s&&(t=ml()),t!==s&&Gp()!==s?((e=tl())===s&&(e=null),e!==s&&Gp()!==s&&Lb()!==s&&Gp()!==s&&xp()!==s&&Gp()!==s?((n=Dl())===s&&(n=dc()),n!==s&&Gp()!==s&&kp()!==s?(Ji=r,u=e,a=n,"string"==typeof(o=t)&&(o={type:"default",value:o}),o.table&&(o={type:"default",value:o.table}),r=t={name:o,stmt:a,columns:u}):(Zi=r,r=s)):(Zi=r,r=s)):(Zi=r,r=s),r}function tl(){var r,t;return r=Zi,xp()!==s&&Gp()!==s&&(t=function(){var r;(r=Tl())===s&&(r=function(){var r,t,e,n,o,u,a,i;if(r=Zi,(t=Hf())!==s){for(e=[],n=Zi,(o=Gp())!==s&&(u=Rp())!==s&&(a=Gp())!==s&&(i=Hf())!==s?n=o=[o,u,a,i]:(Zi=n,n=s);n!==s;)e.push(n),n=Zi,(o=Gp())!==s&&(u=Rp())!==s&&(a=Gp())!==s&&(i=Hf())!==s?n=o=[o,u,a,i]:(Zi=n,n=s);e!==s?(Ji=r,t=sr(t,e),r=t):(Zi=r,r=s);}else Zi=r,r=s;return r}());return r}())!==s&&Gp()!==s&&kp()!==s?(Ji=r,r=t):(Zi=r,r=s),r}function el(){var t,e,n,o,u,a,i;if(t=Zi,(e=wf())!==s)if(Gp()!==s)if((n=xp())!==s)if(Gp()!==s){if(o=[],We.test(r.charAt(Zi))?(u=r.charAt(Zi),Zi++):(u=s,0===nc&&ic(qe)),u!==s)for(;u!==s;)o.push(u),We.test(r.charAt(Zi))?(u=r.charAt(Zi),Zi++):(u=s,0===nc&&ic(qe));else o=s;o!==s&&(u=Gp())!==s&&kp()!==s&&Gp()!==s?((a=jb())===s&&(a=xb()),a===s&&(a=null),a!==s?(Ji=t,i=a,t=e={type:"column_ref",column:e,suffix:`(${parseInt(o.join(""),10)})`,order_by:i,...lv()}):(Zi=t,t=s)):(Zi=t,t=s);}else Zi=t,t=s;else Zi=t,t=s;else Zi=t,t=s;else Zi=t,t=s;return t===s&&(t=Zi,(e=wf())!==s&&Gp()!==s?((n=jb())===s&&(n=xb()),n===s&&(n=null),n!==s?(Ji=t,t=e=function(r,t){return {type:"column_ref",column:r,order_by:t,...lv()}}(e,n)):(Zi=t,t=s)):(Zi=t,t=s)),t}function nl(){var r,t,e;return r=Zi,xp()!==s&&Gp()!==s?((t=function(){var r,t,e,n,o,u,a,i;if(r=Zi,(t=el())!==s){for(e=[],n=Zi,(o=Gp())!==s&&(u=Rp())!==s&&(a=Gp())!==s&&(i=el())!==s?n=o=[o,u,a,i]:(Zi=n,n=s);n!==s;)e.push(n),n=Zi,(o=Gp())!==s&&(u=Rp())!==s&&(a=Gp())!==s&&(i=el())!==s?n=o=[o,u,a,i]:(Zi=n,n=s);e!==s?(Ji=r,r=t=sr(t,e)):(Zi=r,r=s);}else Zi=r,r=s;return r}())===s&&(t=Pl()),t!==s&&Gp()!==s&&kp()!==s?(Ji=r,r=(e=t).type?e.value:e):(Zi=r,r=s)):(Zi=r,r=s),r}function ol(){var t,e,n,o;return t=Zi,(e=function(){var t,e,n,o,u,a;return t=Zi,e=Zi,"for"===r.substr(Zi,3).toLowerCase()?(n=r.substr(Zi,3),Zi+=3):(n=s,0===nc&&ic(vr)),n!==s&&(o=Gp())!==s&&(u=ub())!==s?e=n=[n,o,u]:(Zi=e,e=s),e!==s&&(Ji=t,e=`${(a=e)[0]} ${a[2][0]}`),t=e}())===s&&(e=function(){var t,e,n,o,u,a,i,c,l,f;return t=Zi,e=Zi,"lock"===r.substr(Zi,4).toLowerCase()?(n=r.substr(Zi,4),Zi+=4):(n=s,0===nc&&ic($)),n!==s&&(o=Gp())!==s?("in"===r.substr(Zi,2).toLowerCase()?(u=r.substr(Zi,2),Zi+=2):(u=s,0===nc&&ic(Ve)),u!==s&&(a=Gp())!==s?("share"===r.substr(Zi,5).toLowerCase()?(i=r.substr(Zi,5),Zi+=5):(i=s,0===nc&&ic(Xe)),i!==s&&(c=Gp())!==s?("mode"===r.substr(Zi,4).toLowerCase()?(l=r.substr(Zi,4),Zi+=4):(l=s,0===nc&&ic(Ke)),l!==s?e=n=[n,o,u,a,i,c,l]:(Zi=e,e=s)):(Zi=e,e=s)):(Zi=e,e=s)):(Zi=e,e=s),e!==s&&(Ji=t,e=`${(f=e)[0]} ${f[2]} ${f[4]} ${f[6]}`),t=e}()),e!==s&&Gp()!==s?((n=function(){var t,e,n,o,u,a,i;return t=Zi,e=Zi,"wait"===r.substr(Zi,4).toLowerCase()?(n=r.substr(Zi,4),Zi+=4):(n=s,0===nc&&ic(Qe)),n!==s&&(o=Gp())!==s&&(u=Vf())!==s?e=n=[n,o,u]:(Zi=e,e=s),e!==s&&(Ji=t,e=`${(a=e)[0]} ${a[2].value}`),(t=e)===s&&("nowait"===r.substr(Zi,6).toLowerCase()?(t=r.substr(Zi,6),Zi+=6):(t=s,0===nc&&ic(ze)),t===s&&(t=Zi,e=Zi,"skip"===r.substr(Zi,4).toLowerCase()?(n=r.substr(Zi,4),Zi+=4):(n=s,0===nc&&ic(Ze)),n!==s&&(o=Gp())!==s?("locked"===r.substr(Zi,6).toLowerCase()?(u=r.substr(Zi,6),Zi+=6):(u=s,0===nc&&ic(Je)),u!==s?e=n=[n,o,u]:(Zi=e,e=s)):(Zi=e,e=s),e!==s&&(Ji=t,e=`${(i=e)[0]} ${i[2]}`),t=e)),t}())===s&&(n=null),n!==s?(Ji=t,t=e=e+((o=n)?" "+o:"")):(Zi=t,t=s)):(Zi=t,t=s),t}function sl(){var t,e,n,o,u,a,i,c,l,f,b,p,v,d,y,w,L;return t=Zi,Gp()!==s?((e=Jc())===s&&(e=null),e!==s&&Gp()!==s&&sb()!==s&&Gp()!==s?((n=function(){var r,t,e,n,o,u;if(r=Zi,(t=ul())!==s){for(e=[],n=Zi,(o=Gp())!==s&&(u=ul())!==s?n=o=[o,u]:(Zi=n,n=s);n!==s;)e.push(n),n=Zi,(o=Gp())!==s&&(u=ul())!==s?n=o=[o,u]:(Zi=n,n=s);e!==s?(Ji=r,t=function(r,t){const e=[r];for(let r=0,n=t.length;r<n;++r)e.push(t[r][1]);return e}(t,e),r=t):(Zi=r,r=s);}else Zi=r,r=s;return r}())===s&&(n=null),n!==s&&Gp()!==s?((o=Ub())===s&&(o=null),o!==s&&Gp()!==s&&(u=al())!==s&&Gp()!==s?((a=fl())===s&&(a=null),a!==s&&Gp()!==s?((i=bl())===s&&(i=null),i!==s&&Gp()!==s?((c=fl())===s&&(c=null),c!==s&&Gp()!==s?((l=Al())===s&&(l=null),l!==s&&Gp()!==s?((f=function(){var t,e,n,o;t=Zi,(e=function(){var t,e,n,o;t=Zi,"group"===r.substr(Zi,5).toLowerCase()?(e=r.substr(Zi,5),Zi+=5):(e=s,0===nc&&ic(Pu));e!==s?(n=Zi,nc++,o=mf(),nc--,o===s?n=void 0:(Zi=n,n=s),n!==s?t=e=[e,n]:(Zi=t,t=s)):(Zi=t,t=s);return t}())!==s&&Gp()!==s&&Rb()!==s&&Gp()!==s&&(n=Pl())!==s&&Gp()!==s?((o=function(){var t,e;t=Zi,Nb()!==s&&Gp()!==s?("rollup"===r.substr(Zi,6).toLowerCase()?(e=r.substr(Zi,6),Zi+=6):(e=s,0===nc&&ic(Ln)),e!==s?(Ji=t,t={type:"origin",value:"with rollup"}):(Zi=t,t=s)):(Zi=t,t=s);return t}())===s&&(o=null),o!==s?(Ji=t,u=o,e={columns:n.value,modifiers:[u]},t=e):(Zi=t,t=s)):(Zi=t,t=s);var u;return t}())===s&&(f=null),f!==s&&Gp()!==s?((b=function(){var t,e;t=Zi,function(){var t,e,n,o;t=Zi,"having"===r.substr(Zi,6).toLowerCase()?(e=r.substr(Zi,6),Zi+=6):(e=s,0===nc&&ic(Fu));e!==s?(n=Zi,nc++,o=mf(),nc--,o===s?n=void 0:(Zi=n,n=s),n!==s?t=e=[e,n]:(Zi=t,t=s)):(Zi=t,t=s);return t}()!==s&&Gp()!==s&&(e=Wl())!==s?(Ji=t,t=e):(Zi=t,t=s);return t}())===s&&(b=null),b!==s&&Gp()!==s?((p=gl())===s&&(p=null),p!==s&&Gp()!==s?((v=gc())===s&&(v=null),v!==s&&Gp()!==s?((d=Nl())===s&&(d=null),d!==s&&Gp()!==s?((y=ol())===s&&(y=null),y!==s&&Gp()!==s?((w=function(){var t,e,n;t=Zi,"window"===r.substr(Zi,6).toLowerCase()?(e=r.substr(Zi,6),Zi+=6):(e=s,0===nc&&ic(ho));e!==s&&Gp()!==s&&(n=function(){var r,t,e,n,o,u,a,i;if(r=Zi,(t=If())!==s){for(e=[],n=Zi,(o=Gp())!==s&&(u=Rp())!==s&&(a=Gp())!==s&&(i=If())!==s?n=o=[o,u,a,i]:(Zi=n,n=s);n!==s;)e.push(n),n=Zi,(o=Gp())!==s&&(u=Rp())!==s&&(a=Gp())!==s&&(i=If())!==s?n=o=[o,u,a,i]:(Zi=n,n=s);e!==s?(Ji=r,t=pv(t,e),r=t):(Zi=r,r=s);}else Zi=r,r=s;return r}())!==s?(Ji=t,t=e={keyword:"window",type:"window",expr:n}):(Zi=t,t=s);return t}())===s&&(w=null),w!==s&&Gp()!==s?((L=fl())===s&&(L=null),L!==s?(Ji=t,t=function(r,t,e,n,o,s,u,a,i,c,l,f,b,p,v,d){if(o&&u||o&&d||u&&d||o&&u&&d)throw new Error("A given SQL statement can contain at most one INTO clause");if(s){(Array.isArray(s)?s:s.expr).forEach(r=>r.table&&hv.add(`select::${r.db}::${r.table}`));}return {with:r,type:"select",options:t,distinct:e,columns:n,into:{...o||u||d||{},position:(o?"column":u&&"from")||d&&"end"},from:s,where:a,groupby:i,having:c,orderby:l,limit:b,locking_read:p&&p,window:v,collate:f,...lv()}}(e,n,o,u,a,i,c,l,f,b,p,v,d,y,w,L)):(Zi=t,t=s)):(Zi=t,t=s)):(Zi=t,t=s)):(Zi=t,t=s)):(Zi=t,t=s)):(Zi=t,t=s)):(Zi=t,t=s)):(Zi=t,t=s)):(Zi=t,t=s)):(Zi=t,t=s)):(Zi=t,t=s)):(Zi=t,t=s)):(Zi=t,t=s)):(Zi=t,t=s)):(Zi=t,t=s)):(Zi=t,t=s),t}function ul(){var t,e;return t=Zi,(e=function(){var t;"sql_calc_found_rows"===r.substr(Zi,19).toLowerCase()?(t=r.substr(Zi,19),Zi+=19):(t=s,0===nc&&ic(mi));return t}())===s&&((e=function(){var t;"sql_cache"===r.substr(Zi,9).toLowerCase()?(t=r.substr(Zi,9),Zi+=9):(t=s,0===nc&&ic(Ei));return t}())===s&&(e=function(){var t;"sql_no_cache"===r.substr(Zi,12).toLowerCase()?(t=r.substr(Zi,12),Zi+=12):(t=s,0===nc&&ic(Ai));return t}()),e===s&&(e=function(){var t;"sql_big_result"===r.substr(Zi,14).toLowerCase()?(t=r.substr(Zi,14),Zi+=14):(t=s,0===nc&&ic(_i));return t}())===s&&(e=function(){var t;"sql_small_result"===r.substr(Zi,16).toLowerCase()?(t=r.substr(Zi,16),Zi+=16):(t=s,0===nc&&ic(Ti));return t}())===s&&(e=function(){var t;"sql_buffer_result"===r.substr(Zi,17).toLowerCase()?(t=r.substr(Zi,17),Zi+=17):(t=s,0===nc&&ic(gi));return t}())),e!==s&&(Ji=t,e=e),t=e}function al(){var r,t,e,n,o,u,a,i;if(r=Zi,(t=kb())===s&&(t=Zi,(e=jp())!==s?(n=Zi,nc++,o=mf(),nc--,o===s?n=void 0:(Zi=n,n=s),n!==s?t=e=[e,n]:(Zi=t,t=s)):(Zi=t,t=s),t===s&&(t=jp())),t!==s){for(e=[],n=Zi,(o=Gp())!==s&&(u=Rp())!==s&&(a=Gp())!==s&&(i=cl())!==s?n=o=[o,u,a,i]:(Zi=n,n=s);n!==s;)e.push(n),n=Zi,(o=Gp())!==s&&(u=Rp())!==s&&(a=Gp())!==s&&(i=cl())!==s?n=o=[o,u,a,i]:(Zi=n,n=s);e!==s?(Ji=r,r=t=function(r,t){Cv.add("select::null::(.*)");const e={expr:{type:"column_ref",table:null,column:"*"},as:null,...lv()};return t&&t.length>0?pv(e,t):[e]}(0,e)):(Zi=r,r=s);}else Zi=r,r=s;if(r===s)if(r=Zi,(t=cl())!==s){for(e=[],n=Zi,(o=Gp())!==s&&(u=Rp())!==s&&(a=Gp())!==s&&(i=cl())!==s?n=o=[o,u,a,i]:(Zi=n,n=s);n!==s;)e.push(n),n=Zi,(o=Gp())!==s&&(u=Rp())!==s&&(a=Gp())!==s&&(i=cl())!==s?n=o=[o,u,a,i]:(Zi=n,n=s);e!==s?(Ji=r,r=t=sr(t,e)):(Zi=r,r=s);}else Zi=r,r=s;return r}function il(){var t,e,n,o,u,a,i;return t=Zi,"match"===r.substr(Zi,5).toLowerCase()?(e=r.substr(Zi,5),Zi+=5):(e=s,0===nc&&ic(sn)),e!==s&&Gp()!==s&&xp()!==s&&Gp()!==s&&(n=Tl())!==s&&Gp()!==s&&kp()!==s&&Gp()!==s?("AGAINST"===r.substr(Zi,7)?(o="AGAINST",Zi+=7):(o=s,0===nc&&ic(un)),o!==s&&Gp()!==s&&xp()!==s&&Gp()!==s&&(u=Bl())!==s&&Gp()!==s?((a=function(){var t,e,n,o,u,a,i;return t=Zi,Mb()!==s&&Gp()!==s?("natural"===r.substr(Zi,7).toLowerCase()?(e=r.substr(Zi,7),Zi+=7):(e=s,0===nc&&ic(rn)),e!==s&&Gp()!==s?("language"===r.substr(Zi,8).toLowerCase()?(n=r.substr(Zi,8),Zi+=8):(n=s,0===nc&&ic(tn)),n!==s&&Gp()!==s?("mode"===r.substr(Zi,4).toLowerCase()?(o=r.substr(Zi,4),Zi+=4):(o=s,0===nc&&ic(Ke)),o!==s&&Gp()!==s?("with"===r.substr(Zi,4).toLowerCase()?(u=r.substr(Zi,4),Zi+=4):(u=s,0===nc&&ic(v)),u!==s&&Gp()!==s?("query"===r.substr(Zi,5).toLowerCase()?(a=r.substr(Zi,5),Zi+=5):(a=s,0===nc&&ic(en)),a!==s&&Gp()!==s?("expansion"===r.substr(Zi,9).toLowerCase()?(i=r.substr(Zi,9),Zi+=9):(i=s,0===nc&&ic(nn)),i!==s?(Ji=t,t={type:"origin",value:"IN NATURAL LANGUAGE MODE WITH QUERY EXPANSION"}):(Zi=t,t=s)):(Zi=t,t=s)):(Zi=t,t=s)):(Zi=t,t=s)):(Zi=t,t=s)):(Zi=t,t=s)):(Zi=t,t=s),t===s&&(t=Zi,Mb()!==s&&Gp()!==s?("natural"===r.substr(Zi,7).toLowerCase()?(e=r.substr(Zi,7),Zi+=7):(e=s,0===nc&&ic(rn)),e!==s&&Gp()!==s?("language"===r.substr(Zi,8).toLowerCase()?(n=r.substr(Zi,8),Zi+=8):(n=s,0===nc&&ic(tn)),n!==s&&Gp()!==s?("mode"===r.substr(Zi,4).toLowerCase()?(o=r.substr(Zi,4),Zi+=4):(o=s,0===nc&&ic(Ke)),o!==s?(Ji=t,t={type:"origin",value:"IN NATURAL LANGUAGE MODE"}):(Zi=t,t=s)):(Zi=t,t=s)):(Zi=t,t=s)):(Zi=t,t=s),t===s&&(t=Zi,Mb()!==s&&Gp()!==s?("boolean"===r.substr(Zi,7).toLowerCase()?(e=r.substr(Zi,7),Zi+=7):(e=s,0===nc&&ic(on)),e!==s&&Gp()!==s?("mode"===r.substr(Zi,4).toLowerCase()?(n=r.substr(Zi,4),Zi+=4):(n=s,0===nc&&ic(Ke)),n!==s?(Ji=t,t={type:"origin",value:"IN BOOLEAN MODE"}):(Zi=t,t=s)):(Zi=t,t=s)):(Zi=t,t=s),t===s&&(t=Zi,Nb()!==s&&Gp()!==s?("query"===r.substr(Zi,5).toLowerCase()?(e=r.substr(Zi,5),Zi+=5):(e=s,0===nc&&ic(en)),e!==s&&Gp()!==s?("expansion"===r.substr(Zi,9).toLowerCase()?(n=r.substr(Zi,9),Zi+=9):(n=s,0===nc&&ic(nn)),n!==s?(Ji=t,t={type:"origin",value:"WITH QUERY EXPANSION"}):(Zi=t,t=s)):(Zi=t,t=s)):(Zi=t,t=s)))),t}())===s&&(a=null),a!==s&&Gp()!==s&&kp()!==s&&Gp()!==s?((i=ll())===s&&(i=null),i!==s?(Ji=t,t=e={against:"against",columns:n,expr:u,match:"match",mode:a,type:"fulltext_search",as:i}):(Zi=t,t=s)):(Zi=t,t=s)):(Zi=t,t=s)):(Zi=t,t=s),t}function cl(){var r,t,e,n,o,u,a,i;return r=Zi,(t=il())!==s&&(Ji=r,t=function(r){const{as:t,...e}=r;return {expr:e,as:t}}(t)),(r=t)===s&&(r=Zi,(t=ff())!==s&&(e=Gp())!==s&&(n=Op())!==s&&(o=Gp())!==s&&(u=ff())!==s&&Gp()!==s&&Op()!==s&&Gp()!==s&&jp()!==s?(Ji=r,a=t,i=u,Cv.add(`select::${a}::${i}::(.*)`),r=t={expr:{type:"column_ref",db:a,table:i,column:"*"},as:null,...lv()}):(Zi=r,r=s),r===s&&(r=Zi,t=Zi,(e=ff())!==s&&(n=Gp())!==s&&(o=Op())!==s?t=e=[e,n,o]:(Zi=t,t=s),t===s&&(t=null),t!==s&&(e=Gp())!==s&&(n=jp())!==s?(Ji=r,r=t=function(r){const t=r&&r[0]||null;return Cv.add(`select::${t}::(.*)`),{expr:{type:"column_ref",table:t,column:"*"},as:null,...lv()}}(t)):(Zi=r,r=s),r===s&&(r=Zi,(t=function(){var r,t,e,n;r=Zi,(t=tv())===s&&(t=ev());t!==s&&Gp()!==s&&(e=Lp())!==s&&Gp()!==s&&(n=Bl())!==s?(Ji=r,t=Yi(t,e,n),r=t):(Zi=r,r=s);return r}())!==s&&(e=Gp())!==s?((n=ll())===s&&(n=null),n!==s?(Ji=r,r=t={expr:t,as:n}):(Zi=r,r=s)):(Zi=r,r=s),r===s&&(r=Zi,(t=function(){var r,t,e,n,o,u,a,i;if(r=Zi,(t=Bl())!==s){for(e=[],n=Zi,(o=Gp())!==s?((u=Yb())===s&&(u=Bb())===s&&(u=Pp()),u!==s&&(a=Gp())!==s&&(i=Bl())!==s?n=o=[o,u,a,i]:(Zi=n,n=s)):(Zi=n,n=s);n!==s;)e.push(n),n=Zi,(o=Gp())!==s?((u=Yb())===s&&(u=Bb())===s&&(u=Pp()),u!==s&&(a=Gp())!==s&&(i=Bl())!==s?n=o=[o,u,a,i]:(Zi=n,n=s)):(Zi=n,n=s);e!==s?(Ji=r,t=function(r,t){const e=r.ast;if(e&&"select"===e.type&&(!(r.parentheses_symbol||r.parentheses||r.ast.parentheses||r.ast.parentheses_symbol)||1!==e.columns.length||"*"===e.columns[0].expr.column))throw new Error("invalid column clause with select statement");if(!t||0===t.length)return r;const n=t.length;let o=t[n-1][3];for(let e=n-1;e>=0;e--){const n=0===e?r:t[e-1][3];o=bv(t[e][1],n,o);}return o}(t,e),r=t):(Zi=r,r=s);}else Zi=r,r=s;return r}())!==s&&(e=Gp())!==s?((n=ll())===s&&(n=null),n!==s?(Ji=r,r=t=function(r,t){return "double_quote_string"!==r.type&&"single_quote_string"!==r.type||Cv.add("select::null::"+r.value),{expr:r,as:t}}(t,n)):(Zi=r,r=s)):(Zi=r,r=s))))),r}function ll(){var r,t,e;return r=Zi,(t=Lb())!==s&&Gp()!==s&&(e=function(){var r,t;r=Zi,(t=Cf())!==s?(Ji=Zi,(function(r){if(true===iv[r.toUpperCase()])throw new Error("Error: "+JSON.stringify(r)+" is a reserved word, can not as alias clause");return  false}(t)?s:void 0)!==s?(Ji=r,r=t=t):(Zi=r,r=s)):(Zi=r,r=s);r===s&&(r=Zi,(t=pf())!==s&&(Ji=r,t=t),r=t);return r}())!==s?(Ji=r,r=t=e):(Zi=r,r=s),r===s&&(r=Zi,(t=Lb())===s&&(t=null),t!==s&&Gp()!==s&&(e=ff())!==s?(Ji=r,r=t=e):(Zi=r,r=s)),r}function fl(){var t,e,n;return t=Zi,db()!==s&&Gp()!==s&&(e=function(){var r,t,e,n,o,u,a,c;if(r=Zi,(t=tv())!==s){for(e=[],n=Zi,(o=Gp())!==s&&(u=Rp())!==s&&(a=Gp())!==s&&(c=tv())!==s?n=o=[o,u,a,c]:(Zi=n,n=s);n!==s;)e.push(n),n=Zi,(o=Gp())!==s&&(u=Rp())!==s&&(a=Gp())!==s&&(c=tv())!==s?n=o=[o,u,a,c]:(Zi=n,n=s);e!==s?(Ji=r,t=i(t,e),r=t):(Zi=r,r=s);}else Zi=r,r=s;return r}())!==s?(Ji=t,t={keyword:"var",type:"into",expr:e}):(Zi=t,t=s),t===s&&(t=Zi,db()!==s&&Gp()!==s?("outfile"===r.substr(Zi,7).toLowerCase()?(e=r.substr(Zi,7),Zi+=7):(e=s,0===nc&&ic(an)),e===s&&("dumpfile"===r.substr(Zi,8).toLowerCase()?(e=r.substr(Zi,8),Zi+=8):(e=s,0===nc&&ic(cn))),e===s&&(e=null),e!==s&&Gp()!==s?((n=Bf())===s&&(n=ff()),n!==s?(Ji=t,t={keyword:e,type:"into",expr:n}):(Zi=t,t=s)):(Zi=t,t=s)):(Zi=t,t=s)),t}function bl(){var r,t;return r=Zi,yb()!==s&&Gp()!==s&&(t=wl())!==s?(Ji=r,r=t):(Zi=r,r=s),r}function pl(){var r,t,e;return r=Zi,(t=ml())!==s&&Gp()!==s&&tb()!==s&&Gp()!==s&&(e=ml())!==s?(Ji=r,r=t=[t,e]):(Zi=r,r=s),r}function vl(){var t,e;return t=Zi,Sb()!==s&&Gp()!==s?("btree"===r.substr(Zi,5).toLowerCase()?(e=r.substr(Zi,5),Zi+=5):(e=s,0===nc&&ic(ln)),e===s&&("hash"===r.substr(Zi,4).toLowerCase()?(e=r.substr(Zi,4),Zi+=4):(e=s,0===nc&&ic(fn))),e!==s?(Ji=t,t={keyword:"using",type:e.toLowerCase()}):(Zi=t,t=s)):(Zi=t,t=s),t}function dl(){var r,t,e,n,o,u;if(r=Zi,(t=yl())!==s){for(e=[],n=Zi,(o=Gp())!==s&&(u=yl())!==s?n=o=[o,u]:(Zi=n,n=s);n!==s;)e.push(n),n=Zi,(o=Gp())!==s&&(u=yl())!==s?n=o=[o,u]:(Zi=n,n=s);e!==s?(Ji=r,r=t=function(r,t){const e=[r];for(let r=0;r<t.length;r++)e.push(t[r][1]);return e}(t,e)):(Zi=r,r=s);}else Zi=r,r=s;return r}function yl(){var t,e,n,o,u,a;return t=Zi,(e=function(){var t,e,n,o;t=Zi,"key_block_size"===r.substr(Zi,14).toLowerCase()?(e=r.substr(Zi,14),Zi+=14):(e=s,0===nc&&ic(dt));e!==s?(n=Zi,nc++,o=mf(),nc--,o===s?n=void 0:(Zi=n,n=s),n!==s?(Ji=t,t=e="KEY_BLOCK_SIZE"):(Zi=t,t=s)):(Zi=t,t=s);return t}())!==s&&Gp()!==s?((n=hp())===s&&(n=null),n!==s&&Gp()!==s&&(o=Vf())!==s?(Ji=t,u=n,a=o,t=e={type:e.toLowerCase(),symbol:u,expr:a}):(Zi=t,t=s)):(Zi=t,t=s),t===s&&(t=vl())===s&&(t=Zi,"with"===r.substr(Zi,4).toLowerCase()?(e=r.substr(Zi,4),Zi+=4):(e=s,0===nc&&ic(v)),e!==s&&Gp()!==s?("parser"===r.substr(Zi,6).toLowerCase()?(n=r.substr(Zi,6),Zi+=6):(n=s,0===nc&&ic(bn)),n!==s&&Gp()!==s&&(o=Cf())!==s?(Ji=t,t=e={type:"with parser",expr:o}):(Zi=t,t=s)):(Zi=t,t=s),t===s&&(t=Zi,"visible"===r.substr(Zi,7).toLowerCase()?(e=r.substr(Zi,7),Zi+=7):(e=s,0===nc&&ic(pn)),e===s&&("invisible"===r.substr(Zi,9).toLowerCase()?(e=r.substr(Zi,9),Zi+=9):(e=s,0===nc&&ic(vn))),e!==s&&(Ji=t,e=function(r){return {type:r.toLowerCase(),expr:r.toLowerCase()}}(e)),(t=e)===s&&(t=Yp()))),t}function wl(){var r,t,e,n,o,u,a,i,c,l,f,b;if(r=Zi,(t=hl())!==s){for(e=[],n=Ll();n!==s;)e.push(n),n=Ll();e!==s?(Ji=r,f=t,(b=e).unshift(f),b.forEach(r=>{const{table:t,as:e}=r;mv[t]=t,e&&(mv[e]=t),wv(Cv);}),r=t=b):(Zi=r,r=s);}else Zi=r,r=s;if(r===s){if(r=Zi,t=[],(e=xp())!==s)for(;e!==s;)t.push(e),e=xp();else t=s;if(t!==s)if((e=Gp())!==s)if((n=hl())!==s){for(o=[],u=Ll();u!==s;)o.push(u),u=Ll();if(o!==s)if((u=Gp())!==s){if(a=[],(i=kp())!==s)for(;i!==s;)a.push(i),i=kp();else a=s;if(a!==s)if((i=Gp())!==s){for(c=[],l=Ll();l!==s;)c.push(l),l=Ll();c!==s?(Ji=r,r=t=function(r,t,e,n,o){if(r.length!==n.length)throw new Error(`parentheses not match in from clause: ${r.length} != ${n.length}`);return e.unshift(t),e.forEach(r=>{const{table:t,as:e}=r;mv[t]=t,e&&(mv[e]=t),wv(Cv);}),o.forEach(r=>{const{table:t,as:e}=r;mv[t]=t,e&&(mv[e]=t),wv(Cv);}),{expr:e,parentheses:{length:n.length},joins:o}}(t,n,o,a,c)):(Zi=r,r=s);}else Zi=r,r=s;else Zi=r,r=s;}else Zi=r,r=s;else Zi=r,r=s;}else Zi=r,r=s;else Zi=r,r=s;else Zi=r,r=s;}return r}function Ll(){var r,t,e;return r=Zi,Gp()!==s&&(t=Rp())!==s&&Gp()!==s&&(e=hl())!==s?(Ji=r,r=e):(Zi=r,r=s),r===s&&(r=Zi,Gp()!==s&&(t=function(){var r,t,e,n,o,u,a,i,c,l,f;if(r=Zi,(t=Cl())!==s)if(Gp()!==s)if((e=hl())===s&&(e=wl()),e!==s)if(Gp()!==s)if((n=Sb())!==s)if(Gp()!==s)if(xp()!==s)if(Gp()!==s)if((o=cf())!==s){for(u=[],a=Zi,(i=Gp())!==s&&(c=Rp())!==s&&(l=Gp())!==s&&(f=cf())!==s?a=i=[i,c,l,f]:(Zi=a,a=s);a!==s;)u.push(a),a=Zi,(i=Gp())!==s&&(c=Rp())!==s&&(l=Gp())!==s&&(f=cf())!==s?a=i=[i,c,l,f]:(Zi=a,a=s);u!==s&&(a=Gp())!==s&&(i=kp())!==s?(Ji=r,b=t,v=o,d=u,(p=e).join=b,p.using=pv(v,d),r=t=p):(Zi=r,r=s);}else Zi=r,r=s;else Zi=r,r=s;else Zi=r,r=s;else Zi=r,r=s;else Zi=r,r=s;else Zi=r,r=s;else Zi=r,r=s;else Zi=r,r=s;else Zi=r,r=s;var b,p,v,d;r===s&&(r=Zi,(t=Cl())!==s&&Gp()!==s?((e=hl())===s&&(e=wl()),e!==s&&Gp()!==s?((n=El())===s&&(n=null),n!==s?(Ji=r,t=function(r,t,e){return t.join=r,t.on=e,t}(t,e,n),r=t):(Zi=r,r=s)):(Zi=r,r=s)):(Zi=r,r=s),r===s&&(r=Zi,(t=Cl())===s&&(t=vc()),t!==s&&Gp()!==s&&(e=xp())!==s&&Gp()!==s&&(n=dc())!==s&&Gp()!==s&&kp()!==s&&Gp()!==s?((o=ll())===s&&(o=null),o!==s&&(u=Gp())!==s?((a=El())===s&&(a=null),a!==s?(Ji=r,t=function(r,t,e,n){return t.parentheses=true,{expr:t,as:e,join:r,on:n}}(t,n,o,a),r=t):(Zi=r,r=s)):(Zi=r,r=s)):(Zi=r,r=s)));return r}())!==s?(Ji=r,r=t):(Zi=r,r=s)),r}function hl(){var t,e,n,o,u,a,i;return t=Zi,(e=function(){var t;"dual"===r.substr(Zi,4).toLowerCase()?(t=r.substr(Zi,4),Zi+=4):(t=s,0===nc&&ic(pi));return t}())!==s&&(Ji=t,e={type:"dual"}),(t=e)===s&&(t=Zi,(e=ml())!==s&&Gp()!==s?((n=ll())===s&&(n=null),n!==s?(Ji=t,i=n,t=e="var"===(a=e).type?(a.as=i,a):{db:a.db,table:a.table,as:i,...lv()}):(Zi=t,t=s)):(Zi=t,t=s),t===s&&(t=Zi,(e=xp())!==s&&Gp()!==s&&(n=ml())!==s&&Gp()!==s?((o=ll())===s&&(o=null),o!==s&&Gp()!==s&&kp()!==s?(Ji=t,t=e=function(r,t,e){return "var"===r.type?(r.as=t,r.parentheses=true,r):{db:r.db,table:r.table,as:t,parentheses:true}}(n,o)):(Zi=t,t=s)):(Zi=t,t=s),t===s&&(t=Zi,(e=Dl())!==s&&Gp()!==s?((n=ll())===s&&(n=null),n!==s?(Ji=t,t=e=function(r,t){return {expr:{type:"values",values:r,prefix:"row"},as:t}}(e,n)):(Zi=t,t=s)):(Zi=t,t=s),t===s&&(t=Zi,"lateral"===r.substr(Zi,7).toLowerCase()?(e=r.substr(Zi,7),Zi+=7):(e=s,0===nc&&ic(dn)),e===s&&(e=null),e!==s&&Gp()!==s&&(n=xp())!==s&&Gp()!==s?((o=dc())===s&&(o=Dl()),o!==s&&Gp()!==s&&kp()!==s&&Gp()!==s?((u=ll())===s&&(u=null),u!==s?(Ji=t,t=e=function(r,t,e){Array.isArray(t)&&(t={type:"values",values:t,prefix:"row"}),t.parentheses=true;const n={expr:t,as:e};return r&&(n.prefix=r),n}(e,o,u)):(Zi=t,t=s)):(Zi=t,t=s)):(Zi=t,t=s))))),t}function Cl(){var t,e,n,o;return t=Zi,(e=function(){var t,e,n,o;t=Zi,"left"===r.substr(Zi,4).toLowerCase()?(e=r.substr(Zi,4),Zi+=4):(e=s,0===nc&&ic(Eu));e!==s?(n=Zi,nc++,o=mf(),nc--,o===s?n=void 0:(Zi=n,n=s),n!==s?t=e=[e,n]:(Zi=t,t=s)):(Zi=t,t=s);return t}())!==s&&(n=Gp())!==s?((o=gb())===s&&(o=null),o!==s&&Gp()!==s&&_b()!==s?(Ji=t,t=e="LEFT JOIN"):(Zi=t,t=s)):(Zi=t,t=s),t===s&&(t=Zi,(e=function(){var t,e,n,o;t=Zi,"right"===r.substr(Zi,5).toLowerCase()?(e=r.substr(Zi,5),Zi+=5):(e=s,0===nc&&ic(Au));e!==s?(n=Zi,nc++,o=mf(),nc--,o===s?n=void 0:(Zi=n,n=s),n!==s?t=e=[e,n]:(Zi=t,t=s)):(Zi=t,t=s);return t}())!==s&&(n=Gp())!==s?((o=gb())===s&&(o=null),o!==s&&Gp()!==s&&_b()!==s?(Ji=t,t=e="RIGHT JOIN"):(Zi=t,t=s)):(Zi=t,t=s),t===s&&(t=Zi,(e=function(){var t,e,n,o;t=Zi,"full"===r.substr(Zi,4).toLowerCase()?(e=r.substr(Zi,4),Zi+=4):(e=s,0===nc&&ic(Tu));e!==s?(n=Zi,nc++,o=mf(),nc--,o===s?n=void 0:(Zi=n,n=s),n!==s?t=e=[e,n]:(Zi=t,t=s)):(Zi=t,t=s);return t}())!==s&&(n=Gp())!==s?((o=gb())===s&&(o=null),o!==s&&Gp()!==s&&_b()!==s?(Ji=t,t=e="FULL JOIN"):(Zi=t,t=s)):(Zi=t,t=s),t===s&&(t=Zi,(e=function(){var t,e,n,o;t=Zi,"cross"===r.substr(Zi,5).toLowerCase()?(e=r.substr(Zi,5),Zi+=5):(e=s,0===nc&&ic(gu));e!==s?(n=Zi,nc++,o=mf(),nc--,o===s?n=void 0:(Zi=n,n=s),n!==s?t=e=[e,n]:(Zi=t,t=s)):(Zi=t,t=s);return t}())!==s&&(n=Gp())!==s&&(o=_b())!==s?(Ji=t,t=e="CROSS JOIN"):(Zi=t,t=s),t===s&&(t=Zi,(e=function(){var t,e,n,o;t=Zi,"straight_join"===r.substr(Zi,13).toLowerCase()?(e=r.substr(Zi,13),Zi+=13):(e=s,0===nc&&ic(Iu));e!==s?(n=Zi,nc++,o=mf(),nc--,o===s?n=void 0:(Zi=n,n=s),n!==s?t=e=[e,n]:(Zi=t,t=s)):(Zi=t,t=s);return t}())!==s&&(Ji=t,e="STRAIGHT_JOIN"),(t=e)===s&&(t=Zi,e=Zi,(n=function(){var t,e,n,o;t=Zi,"inner"===r.substr(Zi,5).toLowerCase()?(e=r.substr(Zi,5),Zi+=5):(e=s,0===nc&&ic(_u));e!==s?(n=Zi,nc++,o=mf(),nc--,o===s?n=void 0:(Zi=n,n=s),n!==s?t=e=[e,n]:(Zi=t,t=s)):(Zi=t,t=s);return t}())!==s&&(o=Gp())!==s?e=n=[n,o]:(Zi=e,e=s),e===s&&(e=null),e!==s&&(n=_b())!==s?(Ji=t,t=e="INNER JOIN"):(Zi=t,t=s)))))),t}function ml(){var t,e,n,o,u,a,i,c,l;if(t=Zi,e=[],yn.test(r.charAt(Zi))?(n=r.charAt(Zi),Zi++):(n=s,0===nc&&ic(wn)),n!==s)for(;n!==s;)e.push(n),yn.test(r.charAt(Zi))?(n=r.charAt(Zi),Zi++):(n=s,0===nc&&ic(wn));else e=s;return e!==s&&(n=lf())!==s?(o=Zi,(u=Gp())!==s&&(a=Op())!==s&&(i=Gp())!==s&&(c=lf())!==s?o=u=[u,a,i,c]:(Zi=o,o=s),o===s&&(o=null),o!==s?(Ji=t,t=e=function(r,t,e){const n=`${r.join("")}${t}`,o={db:null,table:n};return null!==e&&(o.db=n,o.table=e[3]),o}(e,n,o)):(Zi=t,t=s)):(Zi=t,t=s),t===s&&(t=Zi,(e=ff())!==s?(n=Zi,(o=Gp())!==s&&(u=Op())!==s&&(a=Gp())!==s&&(i=lf())!==s?n=o=[o,u,a,i]:(Zi=n,n=s),n===s&&(n=null),n!==s?(Ji=t,t=e=function(r,t){const e={db:null,table:r};return null!==t&&(e.db=r,e.table=t[3]),e}(e,n)):(Zi=t,t=s)):(Zi=t,t=s),t===s&&(t=Zi,(e=tv())!==s&&(Ji=t,(l=e).db=null,l.table=l.name,e=l),t=e)),t}function El(){var r,t;return r=Zi,Tb()!==s&&Gp()!==s&&(t=$l())!==s?(Ji=r,r=t):(Zi=r,r=s),r}function Al(){var t,e;return t=Zi,function(){var t,e,n,o;t=Zi,"where"===r.substr(Zi,5).toLowerCase()?(e=r.substr(Zi,5),Zi+=5):(e=s,0===nc&&ic(Du));e!==s?(n=Zi,nc++,o=mf(),nc--,o===s?n=void 0:(Zi=n,n=s),n!==s?t=e=[e,n]:(Zi=t,t=s)):(Zi=t,t=s);return t}()!==s&&Gp()!==s&&(e=Wl())!==s?(Ji=t,t=e):(Zi=t,t=s),t}function Tl(){var r,t,e,n,o,u,a,i;if(r=Zi,(t=sf())!==s){for(e=[],n=Zi,(o=Gp())!==s&&(u=Rp())!==s&&(a=Gp())!==s&&(i=sf())!==s?n=o=[o,u,a,i]:(Zi=n,n=s);n!==s;)e.push(n),n=Zi,(o=Gp())!==s&&(u=Rp())!==s&&(a=Gp())!==s&&(i=sf())!==s?n=o=[o,u,a,i]:(Zi=n,n=s);e!==s?(Ji=r,r=t=sr(t,e)):(Zi=r,r=s);}else Zi=r,r=s;return r}function _l(){var r,t;return r=Zi,vb()!==s&&Gp()!==s&&Rb()!==s&&Gp()!==s&&(t=al())!==s?(Ji=r,r=t):(Zi=r,r=s),r}function gl(){var t,e;return t=Zi,function(){var t,e,n,o;t=Zi,"order"===r.substr(Zi,5).toLowerCase()?(e=r.substr(Zi,5),Zi+=5):(e=s,0===nc&&ic(Gu));e!==s?(n=Zi,nc++,o=mf(),nc--,o===s?n=void 0:(Zi=n,n=s),n!==s?t=e=[e,n]:(Zi=t,t=s)):(Zi=t,t=s);return t}()!==s&&Gp()!==s&&Rb()!==s&&Gp()!==s&&(e=function(){var r,t,e,n,o,u,a,i;if(r=Zi,(t=Il())!==s){for(e=[],n=Zi,(o=Gp())!==s&&(u=Rp())!==s&&(a=Gp())!==s&&(i=Il())!==s?n=o=[o,u,a,i]:(Zi=n,n=s);n!==s;)e.push(n),n=Zi,(o=Gp())!==s&&(u=Rp())!==s&&(a=Gp())!==s&&(i=Il())!==s?n=o=[o,u,a,i]:(Zi=n,n=s);e!==s?(Ji=r,t=sr(t,e),r=t):(Zi=r,r=s);}else Zi=r,r=s;return r}())!==s?(Ji=t,t=e):(Zi=t,t=s),t}function Il(){var r,t,e;return r=Zi,(t=Bl())!==s&&Gp()!==s?((e=xb())===s&&(e=jb()),e===s&&(e=null),e!==s?(Ji=r,r=t={expr:t,type:e}):(Zi=r,r=s)):(Zi=r,r=s),r}function Sl(){var t,e;return (t=Vf())===s&&(t=Tf())===s&&(t=Zi,63===r.charCodeAt(Zi)?(e="?",Zi++):(e=s,0===nc&&ic(hn)),e!==s&&(Ji=t,e={type:"origin",value:"?"}),t=e),t}function Nl(){var t,e,n,o,u,a;return t=Zi,function(){var t,e,n,o;t=Zi,"limit"===r.substr(Zi,5).toLowerCase()?(e=r.substr(Zi,5),Zi+=5):(e=s,0===nc&&ic(Hu));e!==s?(n=Zi,nc++,o=mf(),nc--,o===s?n=void 0:(Zi=n,n=s),n!==s?t=e=[e,n]:(Zi=t,t=s)):(Zi=t,t=s);return t}()!==s&&Gp()!==s&&(e=Sl())!==s&&Gp()!==s?(n=Zi,(o=Rp())===s&&(o=function(){var t,e,n,o;t=Zi,"offset"===r.substr(Zi,6).toLowerCase()?(e=r.substr(Zi,6),Zi+=6):(e=s,0===nc&&ic(Yu));e!==s?(n=Zi,nc++,o=mf(),nc--,o===s?n=void 0:(Zi=n,n=s),n!==s?(Ji=t,t=e="OFFSET"):(Zi=t,t=s)):(Zi=t,t=s);return t}()),o!==s&&(u=Gp())!==s&&(a=Sl())!==s?n=o=[o,u,a]:(Zi=n,n=s),n===s&&(n=null),n!==s?(Ji=t,t=function(r,t){const e=[r];return t&&e.push(t[2]),{seperator:t&&t[0]&&t[0].toLowerCase()||"",value:e,...lv()}}(e,n)):(Zi=t,t=s)):(Zi=t,t=s),t}function Ol(){var r,t,e,n,o,u,a,i;if(r=Zi,(t=Rl())!==s){for(e=[],n=Zi,(o=Gp())!==s&&(u=Rp())!==s&&(a=Gp())!==s&&(i=Rl())!==s?n=o=[o,u,a,i]:(Zi=n,n=s);n!==s;)e.push(n),n=Zi,(o=Gp())!==s&&(u=Rp())!==s&&(a=Gp())!==s&&(i=Rl())!==s?n=o=[o,u,a,i]:(Zi=n,n=s);e!==s?(Ji=r,r=t=sr(t,e)):(Zi=r,r=s);}else Zi=r,r=s;return r}function Rl(){var t,e,n,o,u,a,i,c,l;return t=Zi,e=Zi,(n=ff())!==s&&(o=Gp())!==s&&(u=Op())!==s?e=n=[n,o,u]:(Zi=e,e=s),e===s&&(e=null),e!==s&&(n=Gp())!==s&&(o=wf())!==s&&(u=Gp())!==s?(61===r.charCodeAt(Zi)?(a="=",Zi++):(a=s,0===nc&&ic(Cn)),a!==s&&Gp()!==s&&(i=Bl())!==s?(Ji=t,t=e={column:o,value:i,table:(l=e)&&l[0]}):(Zi=t,t=s)):(Zi=t,t=s),t===s&&(t=Zi,e=Zi,(n=ff())!==s&&(o=Gp())!==s&&(u=Op())!==s?e=n=[n,o,u]:(Zi=e,e=s),e===s&&(e=null),e!==s&&(n=Gp())!==s&&(o=wf())!==s&&(u=Gp())!==s?(61===r.charCodeAt(Zi)?(a="=",Zi++):(a=s,0===nc&&ic(Cn)),a!==s&&Gp()!==s&&(i=Ib())!==s&&Gp()!==s&&xp()!==s&&Gp()!==s&&(c=sf())!==s&&Gp()!==s&&kp()!==s?(Ji=t,t=e=function(r,t,e){return {column:t,value:e,table:r&&r[0],keyword:"values"}}(e,o,c)):(Zi=t,t=s)):(Zi=t,t=s)),t}function jl(){var r,t;return (r=Dl())===s&&(r=Zi,(t=dc())!==s&&(Ji=r,t=t.ast),r=t),r}function xl(){var r,t,e,n,o,u,a,i,c;if(r=Zi,vb()!==s)if(Gp()!==s)if((t=xp())!==s)if(Gp()!==s)if((e=Cf())!==s){for(n=[],o=Zi,(u=Gp())!==s&&(a=Rp())!==s&&(i=Gp())!==s&&(c=Cf())!==s?o=u=[u,a,i,c]:(Zi=o,o=s);o!==s;)n.push(o),o=Zi,(u=Gp())!==s&&(a=Rp())!==s&&(i=Gp())!==s&&(c=Cf())!==s?o=u=[u,a,i,c]:(Zi=o,o=s);n!==s&&(o=Gp())!==s&&(u=kp())!==s?(Ji=r,r=h(e,n)):(Zi=r,r=s);}else Zi=r,r=s;else Zi=r,r=s;else Zi=r,r=s;else Zi=r,r=s;else Zi=r,r=s;return r===s&&(r=Zi,vb()!==s&&Gp()!==s&&(t=Ml())!==s?(Ji=r,r=t):(Zi=r,r=s)),r}function kl(){var t,e,n;return t=Zi,Tb()!==s&&Gp()!==s?("duplicate"===r.substr(Zi,9).toLowerCase()?(e=r.substr(Zi,9),Zi+=9):(e=s,0===nc&&ic(mn)),e!==s&&Gp()!==s&&Ap()!==s&&Gp()!==s&&ub()!==s&&Gp()!==s&&(n=Ol())!==s?(Ji=t,t={keyword:"on duplicate key update",set:n}):(Zi=t,t=s)):(Zi=t,t=s),t}function Ul(){var r,t;return r=Zi,(t=lb())!==s&&(Ji=r,t="insert"),(r=t)===s&&(r=Zi,(t=fb())!==s&&(Ji=r,t="replace"),r=t),r}function Dl(){var r,t;return r=Zi,Ib()!==s&&Gp()!==s&&(t=function(){var r,t,e,n,o,u,a,i;if(r=Zi,(t=Ml())!==s){for(e=[],n=Zi,(o=Gp())!==s&&(u=Rp())!==s&&(a=Gp())!==s&&(i=Ml())!==s?n=o=[o,u,a,i]:(Zi=n,n=s);n!==s;)e.push(n),n=Zi,(o=Gp())!==s&&(u=Rp())!==s&&(a=Gp())!==s&&(i=Ml())!==s?n=o=[o,u,a,i]:(Zi=n,n=s);e!==s?(Ji=r,t=sr(t,e),r=t):(Zi=r,r=s);}else Zi=r,r=s;return r}())!==s?(Ji=r,r={type:"values",values:t}):(Zi=r,r=s),r}function Ml(){var t,e,n,o,u;return t=Zi,"row"===r.substr(Zi,3).toLowerCase()?(e=r.substr(Zi,3),Zi+=3):(e=s,0===nc&&ic(yr)),e===s&&(e=null),e!==s&&Gp()!==s&&xp()!==s&&Gp()!==s&&(n=Pl())!==s&&Gp()!==s&&kp()!==s?(Ji=t,o=e,(u=n).prefix=o&&o.toLowerCase(),t=e=u):(Zi=t,t=s),t}function Pl(){var r,t,e,n,o,u,a,i;if(r=Zi,(t=Bl())!==s){for(e=[],n=Zi,(o=Gp())!==s&&(u=Rp())!==s&&(a=Gp())!==s&&(i=Bl())!==s?n=o=[o,u,a,i]:(Zi=n,n=s);n!==s;)e.push(n),n=Zi,(o=Gp())!==s&&(u=Rp())!==s&&(a=Gp())!==s&&(i=Bl())!==s?n=o=[o,u,a,i]:(Zi=n,n=s);e!==s?(Ji=r,r=t=function(r,t){const e={type:"expr_list"};return e.value=pv(r,t),e}(t,e)):(Zi=r,r=s);}else Zi=r,r=s;return r}function Gl(){var t,e,n;return t=Zi,bp()!==s&&Gp()!==s&&(e=Bl())!==s&&Gp()!==s&&(n=function(){var t;(t=function(){var t,e,n,o;t=Zi,"year"===r.substr(Zi,4).toLowerCase()?(e=r.substr(Zi,4),Zi+=4):(e=s,0===nc&&ic(ns));e!==s?(n=Zi,nc++,o=mf(),nc--,o===s?n=void 0:(Zi=n,n=s),n!==s?(Ji=t,t=e="YEAR"):(Zi=t,t=s)):(Zi=t,t=s);return t}())===s&&(t=function(){var t,e,n,o;t=Zi,"quarter"===r.substr(Zi,7).toLowerCase()?(e=r.substr(Zi,7),Zi+=7):(e=s,0===nc&&ic(Zo));e!==s?(n=Zi,nc++,o=mf(),nc--,o===s?n=void 0:(Zi=n,n=s),n!==s?(Ji=t,t=e="QUARTER"):(Zi=t,t=s)):(Zi=t,t=s);return t}())===s&&(t=function(){var t,e,n,o;t=Zi,"month"===r.substr(Zi,5).toLowerCase()?(e=r.substr(Zi,5),Zi+=5):(e=s,0===nc&&ic(zo));e!==s?(n=Zi,nc++,o=mf(),nc--,o===s?n=void 0:(Zi=n,n=s),n!==s?(Ji=t,t=e="MONTH"):(Zi=t,t=s)):(Zi=t,t=s);return t}())===s&&(t=function(){var t,e,n,o;t=Zi,"week"===r.substr(Zi,4).toLowerCase()?(e=r.substr(Zi,4),Zi+=4):(e=s,0===nc&&ic(es));e!==s?(n=Zi,nc++,o=mf(),nc--,o===s?n=void 0:(Zi=n,n=s),n!==s?(Ji=t,t=e="WEEK"):(Zi=t,t=s)):(Zi=t,t=s);return t}())===s&&(t=function(){var t,e,n,o;t=Zi,"day"===r.substr(Zi,3).toLowerCase()?(e=r.substr(Zi,3),Zi+=3):(e=s,0===nc&&ic(Mo));e!==s?(n=Zi,nc++,o=mf(),nc--,o===s?n=void 0:(Zi=n,n=s),n!==s?(Ji=t,t=e="DAY"):(Zi=t,t=s)):(Zi=t,t=s);return t}())===s&&(t=function(){var t,e,n,o;t=Zi,"hour"===r.substr(Zi,4).toLowerCase()?(e=r.substr(Zi,4),Zi+=4):(e=s,0===nc&&ic(Bo));e!==s?(n=Zi,nc++,o=mf(),nc--,o===s?n=void 0:(Zi=n,n=s),n!==s?(Ji=t,t=e="HOUR"):(Zi=t,t=s)):(Zi=t,t=s);return t}())===s&&(t=function(){var t,e,n,o;t=Zi,"minute"===r.substr(Zi,6).toLowerCase()?(e=r.substr(Zi,6),Zi+=6):(e=s,0===nc&&ic(Qo));e!==s?(n=Zi,nc++,o=mf(),nc--,o===s?n=void 0:(Zi=n,n=s),n!==s?(Ji=t,t=e="MINUTE"):(Zi=t,t=s)):(Zi=t,t=s);return t}())===s&&(t=function(){var t,e,n,o;t=Zi,"second"===r.substr(Zi,6).toLowerCase()?(e=r.substr(Zi,6),Zi+=6):(e=s,0===nc&&ic(Jo));e!==s?(n=Zi,nc++,o=mf(),nc--,o===s?n=void 0:(Zi=n,n=s),n!==s?(Ji=t,t=e="SECOND"):(Zi=t,t=s)):(Zi=t,t=s);return t}())===s&&(t=function(){var t,e,n,o;t=Zi,"microsecond"===r.substr(Zi,11).toLowerCase()?(e=r.substr(Zi,11),Zi+=11):(e=s,0===nc&&ic(Wa));e!==s?(n=Zi,nc++,o=mf(),nc--,o===s?n=void 0:(Zi=n,n=s),n!==s?(Ji=t,t=e="MICROSECOND"):(Zi=t,t=s)):(Zi=t,t=s);return t}())===s&&(t=function(){var t,e,n,o;t=Zi,"second_microsecond"===r.substr(Zi,18).toLowerCase()?(e=r.substr(Zi,18),Zi+=18):(e=s,0===nc&&ic(xo));e!==s?(n=Zi,nc++,o=mf(),nc--,o===s?n=void 0:(Zi=n,n=s),n!==s?(Ji=t,t=e="SECOND_MICROSECOND"):(Zi=t,t=s)):(Zi=t,t=s);return t}())===s&&(t=function(){var t,e,n,o;t=Zi,"minute_microsecond"===r.substr(Zi,18).toLowerCase()?(e=r.substr(Zi,18),Zi+=18):(e=s,0===nc&&ic(jo));e!==s?(n=Zi,nc++,o=mf(),nc--,o===s?n=void 0:(Zi=n,n=s),n!==s?(Ji=t,t=e="MINUTE_MICROSECOND"):(Zi=t,t=s)):(Zi=t,t=s);return t}())===s&&(t=function(){var t,e,n,o;t=Zi,"minute_second"===r.substr(Zi,13).toLowerCase()?(e=r.substr(Zi,13),Zi+=13):(e=s,0===nc&&ic(Ro));e!==s?(n=Zi,nc++,o=mf(),nc--,o===s?n=void 0:(Zi=n,n=s),n!==s?(Ji=t,t=e="MINUTE_SECOND"):(Zi=t,t=s)):(Zi=t,t=s);return t}())===s&&(t=function(){var t,e,n,o;t=Zi,"hour_microsecond"===r.substr(Zi,16).toLowerCase()?(e=r.substr(Zi,16),Zi+=16):(e=s,0===nc&&ic(Oo));e!==s?(n=Zi,nc++,o=mf(),nc--,o===s?n=void 0:(Zi=n,n=s),n!==s?(Ji=t,t=e="HOUR_MICROSECOND"):(Zi=t,t=s)):(Zi=t,t=s);return t}())===s&&(t=function(){var t,e,n,o;t=Zi,"hour_second"===r.substr(Zi,11).toLowerCase()?(e=r.substr(Zi,11),Zi+=11):(e=s,0===nc&&ic(No));e!==s?(n=Zi,nc++,o=mf(),nc--,o===s?n=void 0:(Zi=n,n=s),n!==s?(Ji=t,t=e="HOUR_SECOND"):(Zi=t,t=s)):(Zi=t,t=s);return t}())===s&&(t=function(){var t,e,n,o;t=Zi,"hour_minute"===r.substr(Zi,11).toLowerCase()?(e=r.substr(Zi,11),Zi+=11):(e=s,0===nc&&ic(So));e!==s?(n=Zi,nc++,o=mf(),nc--,o===s?n=void 0:(Zi=n,n=s),n!==s?(Ji=t,t=e="HOUR_MINUTE"):(Zi=t,t=s)):(Zi=t,t=s);return t}())===s&&(t=function(){var t,e,n,o;t=Zi,"day_microsecond"===r.substr(Zi,15).toLowerCase()?(e=r.substr(Zi,15),Zi+=15):(e=s,0===nc&&ic(Io));e!==s?(n=Zi,nc++,o=mf(),nc--,o===s?n=void 0:(Zi=n,n=s),n!==s?(Ji=t,t=e="DAY_MICROSECOND"):(Zi=t,t=s)):(Zi=t,t=s);return t}())===s&&(t=function(){var t,e,n,o;t=Zi,"day_second"===r.substr(Zi,10).toLowerCase()?(e=r.substr(Zi,10),Zi+=10):(e=s,0===nc&&ic(go));e!==s?(n=Zi,nc++,o=mf(),nc--,o===s?n=void 0:(Zi=n,n=s),n!==s?(Ji=t,t=e="DAY_SECOND"):(Zi=t,t=s)):(Zi=t,t=s);return t}())===s&&(t=function(){var t,e,n,o;t=Zi,"day_minute"===r.substr(Zi,10).toLowerCase()?(e=r.substr(Zi,10),Zi+=10):(e=s,0===nc&&ic(_o));e!==s?(n=Zi,nc++,o=mf(),nc--,o===s?n=void 0:(Zi=n,n=s),n!==s?(Ji=t,t=e="DAY_MINUTE"):(Zi=t,t=s)):(Zi=t,t=s);return t}())===s&&(t=function(){var t,e,n,o;t=Zi,"day_hour"===r.substr(Zi,8).toLowerCase()?(e=r.substr(Zi,8),Zi+=8):(e=s,0===nc&&ic(To));e!==s?(n=Zi,nc++,o=mf(),nc--,o===s?n=void 0:(Zi=n,n=s),n!==s?(Ji=t,t=e="DAY_HOUR"):(Zi=t,t=s)):(Zi=t,t=s);return t}())===s&&(t=function(){var t,e,n,o;t=Zi,"year_month"===r.substr(Zi,10).toLowerCase()?(e=r.substr(Zi,10),Zi+=10):(e=s,0===nc&&ic(Ao));e!==s?(n=Zi,nc++,o=mf(),nc--,o===s?n=void 0:(Zi=n,n=s),n!==s?(Ji=t,t=e="YEAR_MONTH"):(Zi=t,t=s)):(Zi=t,t=s);return t}());return t}())!==s?(Ji=t,t={type:"interval",expr:e,unit:n.toLowerCase()}):(Zi=t,t=s),t}function Fl(){var r,t,e,n,o,u;if(r=Zi,(t=Hl())!==s)if(Gp()!==s){for(e=[],n=Zi,(o=Gp())!==s&&(u=Hl())!==s?n=o=[o,u]:(Zi=n,n=s);n!==s;)e.push(n),n=Zi,(o=Gp())!==s&&(u=Hl())!==s?n=o=[o,u]:(Zi=n,n=s);e!==s?(Ji=r,r=t=l(t,e)):(Zi=r,r=s);}else Zi=r,r=s;else Zi=r,r=s;return r}function Hl(){var t,e,n;return t=Zi,function(){var t,e,n,o;t=Zi,"when"===r.substr(Zi,4).toLowerCase()?(e=r.substr(Zi,4),Zi+=4):(e=s,0===nc&&ic(fa));e!==s?(n=Zi,nc++,o=mf(),nc--,o===s?n=void 0:(Zi=n,n=s),n!==s?t=e=[e,n]:(Zi=t,t=s)):(Zi=t,t=s);return t}()!==s&&Gp()!==s&&(e=Wl())!==s&&Gp()!==s&&function(){var t,e,n,o;t=Zi,"then"===r.substr(Zi,4).toLowerCase()?(e=r.substr(Zi,4),Zi+=4):(e=s,0===nc&&ic(ba));e!==s?(n=Zi,nc++,o=mf(),nc--,o===s?n=void 0:(Zi=n,n=s),n!==s?t=e=[e,n]:(Zi=t,t=s)):(Zi=t,t=s);return t}()!==s&&Gp()!==s&&(n=Bl())!==s?(Ji=t,t={type:"when",cond:e,result:n}):(Zi=t,t=s),t}function Yl(){var t,e;return t=Zi,function(){var t,e,n,o;t=Zi,"else"===r.substr(Zi,4).toLowerCase()?(e=r.substr(Zi,4),Zi+=4):(e=s,0===nc&&ic(pa));e!==s?(n=Zi,nc++,o=mf(),nc--,o===s?n=void 0:(Zi=n,n=s),n!==s?t=e=[e,n]:(Zi=t,t=s)):(Zi=t,t=s);return t}()!==s&&Gp()!==s&&(e=Bl())!==s?(Ji=t,t={type:"else",result:e}):(Zi=t,t=s),t}function Bl(){var r;return (r=function(){var r,t,e,n,o,u,a,i;if(r=Zi,(t=ql())!==s){for(e=[],n=Zi,(o=Fp())!==s&&(u=Bb())!==s&&(a=Gp())!==s&&(i=ql())!==s?n=o=[o,u,a,i]:(Zi=n,n=s);n!==s;)e.push(n),n=Zi,(o=Fp())!==s&&(u=Bb())!==s&&(a=Gp())!==s&&(i=ql())!==s?n=o=[o,u,a,i]:(Zi=n,n=s);e!==s?(Ji=r,t=En(t,e),r=t):(Zi=r,r=s);}else Zi=r,r=s;return r}())===s&&(r=dc()),r}function $l(){var r,t,e,n,o,u,a,i;if(r=Zi,(t=Bl())!==s){for(e=[],n=Zi,(o=Gp())!==s?((u=Yb())===s&&(u=Bb()),u!==s&&(a=Gp())!==s&&(i=Bl())!==s?n=o=[o,u,a,i]:(Zi=n,n=s)):(Zi=n,n=s);n!==s;)e.push(n),n=Zi,(o=Gp())!==s?((u=Yb())===s&&(u=Bb()),u!==s&&(a=Gp())!==s&&(i=Bl())!==s?n=o=[o,u,a,i]:(Zi=n,n=s)):(Zi=n,n=s);e!==s?(Ji=r,r=t=function(r,t){const e=t.length;let n=r;for(let r=0;r<e;++r)n=bv(t[r][1],n,t[r][3]);return n}(t,e)):(Zi=r,r=s);}else Zi=r,r=s;return r}function Wl(){var r,t,e,n,o,u,a,i;if(r=Zi,(t=Bl())!==s){for(e=[],n=Zi,(o=Gp())!==s?((u=Yb())===s&&(u=Bb())===s&&(u=Rp())===s&&(u=Pp()),u!==s&&(a=Gp())!==s&&(i=Bl())!==s?n=o=[o,u,a,i]:(Zi=n,n=s)):(Zi=n,n=s);n!==s;)e.push(n),n=Zi,(o=Gp())!==s?((u=Yb())===s&&(u=Bb())===s&&(u=Rp())===s&&(u=Pp()),u!==s&&(a=Gp())!==s&&(i=Bl())!==s?n=o=[o,u,a,i]:(Zi=n,n=s)):(Zi=n,n=s);e!==s?(Ji=r,r=t=function(r,t){const e=t.length;let n=r,o="";for(let r=0;r<e;++r)","===t[r][1]?(o=",",Array.isArray(n)||(n=[n]),n.push(t[r][3])):n=bv(t[r][1],n,t[r][3]);if(","===o){const r={type:"expr_list"};return r.value=Array.isArray(n)?n:[n],r}return n}(t,e)):(Zi=r,r=s);}else Zi=r,r=s;return r}function ql(){var r,t,e,n,o,u,a,i;if(r=Zi,(t=Vl())!==s){for(e=[],n=Zi,(o=Fp())!==s&&(u=Yb())!==s&&(a=Gp())!==s&&(i=Vl())!==s?n=o=[o,u,a,i]:(Zi=n,n=s);n!==s;)e.push(n),n=Zi,(o=Fp())!==s&&(u=Yb())!==s&&(a=Gp())!==s&&(i=Vl())!==s?n=o=[o,u,a,i]:(Zi=n,n=s);e!==s?(Ji=r,r=t=vv(t,e)):(Zi=r,r=s);}else Zi=r,r=s;return r}function Vl(){var r,t;return (r=Xl())===s&&(r=function(){var r,t,e;r=Zi,(t=function(){var r,t,e,n,o;r=Zi,t=Zi,(e=Hb())!==s&&(n=Gp())!==s&&(o=Fb())!==s?t=e=[e,n,o]:(Zi=t,t=s);t!==s&&(Ji=r,t=An(t));(r=t)===s&&(r=Fb());return r}())!==s&&Gp()!==s&&xp()!==s&&Gp()!==s&&(e=dc())!==s&&Gp()!==s&&kp()!==s?(Ji=r,n=t,(o=e).parentheses=true,t=fv(n,o),r=t):(Zi=r,r=s);var n,o;return r}())===s&&(r=Zi,Hb()!==s&&Gp()!==s&&(t=Vl())!==s?(Ji=r,r=fv("NOT",t)):(Zi=r,r=s)),r}function Xl(){var t,e,n;return t=Zi,(e=Jl())!==s&&Gp()!==s?((n=function(){var t;(t=function(){var r,t,e,n,o,u,a;r=Zi,t=[],e=Zi,(n=Gp())!==s&&(o=Kl())!==s&&(u=Gp())!==s&&(a=Jl())!==s?e=n=[n,o,u,a]:(Zi=e,e=s);if(e!==s)for(;e!==s;)t.push(e),e=Zi,(n=Gp())!==s&&(o=Kl())!==s&&(u=Gp())!==s&&(a=Jl())!==s?e=n=[n,o,u,a]:(Zi=e,e=s);else t=s;t!==s&&(e=Gp())!==s?((n=Zl())===s&&(n=null),n!==s?(Ji=r,r=t={type:"arithmetic",tail:t,in:n}):(Zi=r,r=s)):(Zi=r,r=s);return r}())===s&&(t=Zl())===s&&(t=function(){var r,t,e,n;r=Zi,(t=function(){var r,t,e,n,o;r=Zi,t=Zi,(e=Hb())!==s&&(n=Gp())!==s&&(o=Db())!==s?t=e=[e,n,o]:(Zi=t,t=s);t!==s&&(Ji=r,t=An(t));(r=t)===s&&(r=Db());return r}())!==s&&Gp()!==s&&(e=Jl())!==s&&Gp()!==s&&Yb()!==s&&Gp()!==s&&(n=Jl())!==s?(Ji=r,r=t={op:t,right:{type:"expr_list",value:[e,n]}}):(Zi=r,r=s);return r}())===s&&(t=function(){var r,t,e,n,o;r=Zi,(t=Pb())!==s&&(e=Gp())!==s&&(n=Jl())!==s?(Ji=r,r=t={op:"IS",right:n}):(Zi=r,r=s);r===s&&(r=Zi,t=Zi,(e=Pb())!==s&&(n=Gp())!==s&&(o=Hb())!==s?t=e=[e,n,o]:(Zi=t,t=s),t!==s&&(e=Gp())!==s&&(n=Jl())!==s?(Ji=r,t=function(r){return {op:"IS NOT",right:r}}(n),r=t):(Zi=r,r=s));return r}())===s&&(t=zl())===s&&(t=function(){var t,e,n,o;t=Zi,(e=function(){var t,e,n;t=Zi,(e=Hb())===s&&(e=null);e!==s&&Gp()!==s?((n=function(){var t,e,n,o;t=Zi,"regexp"===r.substr(Zi,6).toLowerCase()?(e=r.substr(Zi,6),Zi+=6):(e=s,0===nc&&ic(Zu));e!==s?(n=Zi,nc++,o=mf(),nc--,o===s?n=void 0:(Zi=n,n=s),n!==s?(Ji=t,t=e="REGEXP"):(Zi=t,t=s)):(Zi=t,t=s);return t}())===s&&(n=function(){var t,e,n,o;t=Zi,"rlike"===r.substr(Zi,5).toLowerCase()?(e=r.substr(Zi,5),Zi+=5):(e=s,0===nc&&ic(zu));e!==s?(n=Zi,nc++,o=mf(),nc--,o===s?n=void 0:(Zi=n,n=s),n!==s?(Ji=t,t=e="RLIKE"):(Zi=t,t=s)):(Zi=t,t=s);return t}()),n!==s?(Ji=t,u=n,t=e=(o=e)?`${o} ${u}`:u):(Zi=t,t=s)):(Zi=t,t=s);var o,u;return t}())!==s&&Gp()!==s?("binary"===r.substr(Zi,6).toLowerCase()?(n=r.substr(Zi,6),Zi+=6):(n=s,0===nc&&ic(Bt)),n===s&&(n=null),n!==s&&Gp()!==s?((o=Mf())===s&&(o=Bf())===s&&(o=sf()),o!==s?(Ji=t,u=e,t=e={op:(a=n)?`${u} ${a}`:u,right:o}):(Zi=t,t=s)):(Zi=t,t=s)):(Zi=t,t=s);var u,a;return t}());return t}())===s&&(n=null),n!==s?(Ji=t,t=e=function(r,t){if(null===t)return r;if("arithmetic"===t.type){if(!t.in)return vv(r,t.tail);const e=vv(r,t.tail);return bv(t.in.op,e,t.in.right)}return bv(t.op,r,t.right)}(e,n)):(Zi=t,t=s)):(Zi=t,t=s),t===s&&(t=Bf())===s&&(t=sf()),t}function Kl(){var t;return ">="===r.substr(Zi,2)?(t=">=",Zi+=2):(t=s,0===nc&&ic(Tn)),t===s&&(62===r.charCodeAt(Zi)?(t=">",Zi++):(t=s,0===nc&&ic(_n)),t===s&&("<="===r.substr(Zi,2)?(t="<=",Zi+=2):(t=s,0===nc&&ic(gn)),t===s&&("<>"===r.substr(Zi,2)?(t="<>",Zi+=2):(t=s,0===nc&&ic(In)),t===s&&(60===r.charCodeAt(Zi)?(t="<",Zi++):(t=s,0===nc&&ic(Sn)),t===s&&(61===r.charCodeAt(Zi)?(t="=",Zi++):(t=s,0===nc&&ic(Cn)),t===s&&("!="===r.substr(Zi,2)?(t="!=",Zi+=2):(t=s,0===nc&&ic(Nn)))))))),t}function Ql(){var r,t,e,n,o;return r=Zi,t=Zi,(e=Hb())!==s&&(n=Gp())!==s&&(o=Mb())!==s?t=e=[e,n,o]:(Zi=t,t=s),t!==s&&(Ji=r,t=An(t)),(r=t)===s&&(r=Mb()),r}function zl(){var t,e,n,o,u,a,i;return t=Zi,(e=function(){var r,t,e,n,o;return r=Zi,t=Zi,(e=Hb())!==s&&(n=Gp())!==s&&(o=Gb())!==s?t=e=[e,n,o]:(Zi=t,t=s),t!==s&&(Ji=r,t=An(t)),(r=t)===s&&(r=Gb()),r}())!==s&&Gp()!==s?((n=Hf())===s&&(n=Tf())===s&&(n=Xl()),n!==s&&Gp()!==s?((o=function(){var t,e,n;return t=Zi,"escape"===r.substr(Zi,6).toLowerCase()?(e=r.substr(Zi,6),Zi+=6):(e=s,0===nc&&ic(On)),e!==s&&Gp()!==s&&(n=Bf())!==s?(Ji=t,t=e={type:"ESCAPE",value:n}):(Zi=t,t=s),t}())===s&&(o=null),o!==s?(Ji=t,u=e,a=n,(i=o)&&(a.escape=i),t=e={op:u,right:a}):(Zi=t,t=s)):(Zi=t,t=s)):(Zi=t,t=s),t}function Zl(){var r,t,e,n;return r=Zi,(t=Ql())!==s&&Gp()!==s&&(e=xp())!==s&&Gp()!==s&&(n=Pl())!==s&&Gp()!==s&&kp()!==s?(Ji=r,r=t={op:t,right:n}):(Zi=r,r=s),r===s&&(r=Zi,(t=Ql())!==s&&Gp()!==s?((e=tv())===s&&(e=sf())===s&&(e=Bf()),e!==s?(Ji=r,r=t=function(r,t){return {op:r,right:t}}(t,e)):(Zi=r,r=s)):(Zi=r,r=s)),r}function Jl(){var r,t,e,n,o,u,a,i;if(r=Zi,(t=tf())!==s){for(e=[],n=Zi,(o=Gp())!==s&&(u=rf())!==s&&(a=Gp())!==s&&(i=tf())!==s?n=o=[o,u,a,i]:(Zi=n,n=s);n!==s;)e.push(n),n=Zi,(o=Gp())!==s&&(u=rf())!==s&&(a=Gp())!==s&&(i=tf())!==s?n=o=[o,u,a,i]:(Zi=n,n=s);e!==s?(Ji=r,r=t=function(r,t){if(t&&t.length&&"column_ref"===r.type&&"*"===r.column)throw new Error(JSON.stringify({message:"args could not be star column in additive expr",...lv()}));return vv(r,t)}(t,e)):(Zi=r,r=s);}else Zi=r,r=s;return r}function rf(){var t;return 43===r.charCodeAt(Zi)?(t="+",Zi++):(t=s,0===nc&&ic(Rn)),t===s&&(45===r.charCodeAt(Zi)?(t="-",Zi++):(t=s,0===nc&&ic(jn))),t}function tf(){var r,t,e,n,o,u,a,i;if(r=Zi,(t=nf())!==s){for(e=[],n=Zi,(o=Gp())!==s?((u=ef())===s&&(u=Pp()),u!==s&&(a=Gp())!==s&&(i=nf())!==s?n=o=[o,u,a,i]:(Zi=n,n=s)):(Zi=n,n=s);n!==s;)e.push(n),n=Zi,(o=Gp())!==s?((u=ef())===s&&(u=Pp()),u!==s&&(a=Gp())!==s&&(i=nf())!==s?n=o=[o,u,a,i]:(Zi=n,n=s)):(Zi=n,n=s);e!==s?(Ji=r,r=t=vv(t,e)):(Zi=r,r=s);}else Zi=r,r=s;return r}function ef(){var t,e;return 42===r.charCodeAt(Zi)?(t="*",Zi++):(t=s,0===nc&&ic(xn)),t===s&&(47===r.charCodeAt(Zi)?(t="/",Zi++):(t=s,0===nc&&ic(kn)),t===s&&(37===r.charCodeAt(Zi)?(t="%",Zi++):(t=s,0===nc&&ic(Un)),t===s&&("||"===r.substr(Zi,2)?(t="||",Zi+=2):(t=s,0===nc&&ic(Dn)),t===s&&(t=Zi,"div"===r.substr(Zi,3).toLowerCase()?(e=r.substr(Zi,3),Zi+=3):(e=s,0===nc&&ic(Mn)),e===s&&("mod"===r.substr(Zi,3).toLowerCase()?(e=r.substr(Zi,3),Zi+=3):(e=s,0===nc&&ic(Pn))),e!==s&&(Ji=t,e=e.toUpperCase()),(t=e)===s&&(38===r.charCodeAt(Zi)?(t="&",Zi++):(t=s,0===nc&&ic(Gn)),t===s&&(">>"===r.substr(Zi,2)?(t=">>",Zi+=2):(t=s,0===nc&&ic(Fn)),t===s&&("<<"===r.substr(Zi,2)?(t="<<",Zi+=2):(t=s,0===nc&&ic(Hn)),t===s&&(94===r.charCodeAt(Zi)?(t="^",Zi++):(t=s,0===nc&&ic(Yn)),t===s&&(124===r.charCodeAt(Zi)?(t="|",Zi++):(t=s,0===nc&&ic(Bn))))))))))),t}function nf(){var t,e,n,o,u;return (t=function(){var t,e,n,o,u,a,i,c;if(t=Zi,(e=of())!==s)if(Gp()!==s){for(n=[],o=Zi,(u=Gp())!==s?("?|"===r.substr(Zi,2)?(a="?|",Zi+=2):(a=s,0===nc&&ic(qn)),a===s&&("?&"===r.substr(Zi,2)?(a="?&",Zi+=2):(a=s,0===nc&&ic(Vn)),a===s&&(63===r.charCodeAt(Zi)?(a="?",Zi++):(a=s,0===nc&&ic(hn)),a===s&&("#-"===r.substr(Zi,2)?(a="#-",Zi+=2):(a=s,0===nc&&ic(Xn)),a===s&&("#>>"===r.substr(Zi,3)?(a="#>>",Zi+=3):(a=s,0===nc&&ic(Kn)),a===s&&("#>"===r.substr(Zi,2)?(a="#>",Zi+=2):(a=s,0===nc&&ic(Qn)),a===s&&(a=Mp())===s&&(a=Dp())===s&&("@>"===r.substr(Zi,2)?(a="@>",Zi+=2):(a=s,0===nc&&ic(zn)),a===s&&("<@"===r.substr(Zi,2)?(a="<@",Zi+=2):(a=s,0===nc&&ic(Zn))))))))),a!==s&&(i=Gp())!==s&&(c=of())!==s?o=u=[u,a,i,c]:(Zi=o,o=s)):(Zi=o,o=s);o!==s;)n.push(o),o=Zi,(u=Gp())!==s?("?|"===r.substr(Zi,2)?(a="?|",Zi+=2):(a=s,0===nc&&ic(qn)),a===s&&("?&"===r.substr(Zi,2)?(a="?&",Zi+=2):(a=s,0===nc&&ic(Vn)),a===s&&(63===r.charCodeAt(Zi)?(a="?",Zi++):(a=s,0===nc&&ic(hn)),a===s&&("#-"===r.substr(Zi,2)?(a="#-",Zi+=2):(a=s,0===nc&&ic(Xn)),a===s&&("#>>"===r.substr(Zi,3)?(a="#>>",Zi+=3):(a=s,0===nc&&ic(Kn)),a===s&&("#>"===r.substr(Zi,2)?(a="#>",Zi+=2):(a=s,0===nc&&ic(Qn)),a===s&&(a=Mp())===s&&(a=Dp())===s&&("@>"===r.substr(Zi,2)?(a="@>",Zi+=2):(a=s,0===nc&&ic(zn)),a===s&&("<@"===r.substr(Zi,2)?(a="<@",Zi+=2):(a=s,0===nc&&ic(Zn))))))))),a!==s&&(i=Gp())!==s&&(c=of())!==s?o=u=[u,a,i,c]:(Zi=o,o=s)):(Zi=o,o=s);n!==s?(Ji=t,l=e,e=(f=n)&&0!==f.length?vv(l,f):l,t=e):(Zi=t,t=s);}else Zi=t,t=s;else Zi=t,t=s;var l,f;return t}())===s&&(t=Zi,(e=function(){var t;33===r.charCodeAt(Zi)?(t="!",Zi++):(t=s,0===nc&&ic($n));t===s&&(45===r.charCodeAt(Zi)?(t="-",Zi++):(t=s,0===nc&&ic(jn)),t===s&&(43===r.charCodeAt(Zi)?(t="+",Zi++):(t=s,0===nc&&ic(Rn)),t===s&&(126===r.charCodeAt(Zi)?(t="~",Zi++):(t=s,0===nc&&ic(Wn)))));return t}())!==s?(n=Zi,(o=Gp())!==s&&(u=nf())!==s?n=o=[o,u]:(Zi=n,n=s),n!==s?(Ji=t,t=e=fv(e,n[1])):(Zi=t,t=s)):(Zi=t,t=s)),t}function of(){var t,e,n,o;return (t=Gl())===s&&(t=function(){var t;(t=function(){var t,e,n,o;t=Zi,(e=function(){var t,e,n,o;t=Zi,"count"===r.substr(Zi,5).toLowerCase()?(e=r.substr(Zi,5),Zi+=5):(e=s,0===nc&&ic(ea));e!==s?(n=Zi,nc++,o=mf(),nc--,o===s?n=void 0:(Zi=n,n=s),n!==s?(Ji=t,t=e="COUNT"):(Zi=t,t=s)):(Zi=t,t=s);return t}())===s&&(e=function(){var t,e,n,o;t=Zi,"group_concat"===r.substr(Zi,12).toLowerCase()?(e=r.substr(Zi,12),Zi+=12):(e=s,0===nc&&ic(na));e!==s?(n=Zi,nc++,o=mf(),nc--,o===s?n=void 0:(Zi=n,n=s),n!==s?(Ji=t,t=e="GROUP_CONCAT"):(Zi=t,t=s)):(Zi=t,t=s);return t}());e!==s&&Gp()!==s&&xp()!==s&&Gp()!==s&&(n=function(){var t,e,n,o,u;t=Zi,(e=function(){var t,e;t=Zi,42===r.charCodeAt(Zi)?(e="*",Zi++):(e=s,0===nc&&ic(xn));e!==s&&(Ji=t,e={type:"star",value:"*"});return t=e}())!==s&&(Ji=t,e={expr:e,...lv()});(t=e)===s&&(t=Zi,(e=Ub())===s&&(e=null),e!==s&&Gp()!==s&&(n=Wl())!==s&&Gp()!==s?((o=gl())===s&&(o=null),o!==s&&Gp()!==s?((u=function(){var t,e,n;t=Zi,"separator"===r.substr(Zi,9).toLowerCase()?(e=r.substr(Zi,9),Zi+=9):(e=s,0===nc&&ic(Eo));e===s&&(e=null);e!==s&&Gp()!==s&&(n=Bf())!==s?(Ji=t,t=e={keyword:e,value:n}):(Zi=t,t=s);return t}())===s&&(u=null),u!==s?(Ji=t,e={distinct:e,expr:n,orderby:o,separator:u,...lv()},t=e):(Zi=t,t=s)):(Zi=t,t=s)):(Zi=t,t=s));return t}())!==s&&Gp()!==s&&kp()!==s&&Gp()!==s?((o=gf())===s&&(o=null),o!==s?(Ji=t,e={type:"aggr_func",name:e,args:n,over:o,...lv()},t=e):(Zi=t,t=s)):(Zi=t,t=s);return t}())===s&&(t=function(){var t,e,n,o;t=Zi,(e=function(){var t;(t=function(){var t,e,n,o;t=Zi,"sum"===r.substr(Zi,3).toLowerCase()?(e=r.substr(Zi,3),Zi+=3):(e=s,0===nc&&ic(ua));e!==s?(n=Zi,nc++,o=mf(),nc--,o===s?n=void 0:(Zi=n,n=s),n!==s?(Ji=t,t=e="SUM"):(Zi=t,t=s)):(Zi=t,t=s);return t}())===s&&(t=function(){var t,e,n,o;t=Zi,"max"===r.substr(Zi,3).toLowerCase()?(e=r.substr(Zi,3),Zi+=3):(e=s,0===nc&&ic(oa));e!==s?(n=Zi,nc++,o=mf(),nc--,o===s?n=void 0:(Zi=n,n=s),n!==s?(Ji=t,t=e="MAX"):(Zi=t,t=s)):(Zi=t,t=s);return t}())===s&&(t=function(){var t,e,n,o;t=Zi,"min"===r.substr(Zi,3).toLowerCase()?(e=r.substr(Zi,3),Zi+=3):(e=s,0===nc&&ic(sa));e!==s?(n=Zi,nc++,o=mf(),nc--,o===s?n=void 0:(Zi=n,n=s),n!==s?(Ji=t,t=e="MIN"):(Zi=t,t=s)):(Zi=t,t=s);return t}())===s&&(t=function(){var t,e,n,o;t=Zi,"avg"===r.substr(Zi,3).toLowerCase()?(e=r.substr(Zi,3),Zi+=3):(e=s,0===nc&&ic(aa));e!==s?(n=Zi,nc++,o=mf(),nc--,o===s?n=void 0:(Zi=n,n=s),n!==s?(Ji=t,t=e="AVG"):(Zi=t,t=s)):(Zi=t,t=s);return t}());return t}())!==s&&Gp()!==s&&xp()!==s&&Gp()!==s&&(n=$l())!==s&&Gp()!==s&&kp()!==s&&Gp()!==s?((o=gf())===s&&(o=null),o!==s?(Ji=t,e={type:"aggr_func",name:e,args:{expr:n},over:o,...lv()},t=e):(Zi=t,t=s)):(Zi=t,t=s);return t}());return t}())===s&&(t=il())===s&&(t=Mf())===s&&(t=function(){var r,t,e,n,o,u,a;r=Zi,(t=Vb())!==s&&Gp()!==s&&xp()!==s&&Gp()!==s&&(e=Bl())!==s&&Gp()!==s&&Lb()!==s&&Gp()!==s&&(n=sv())!==s&&Gp()!==s&&(o=Fc())!==s&&Gp()!==s&&(u=cf())!==s&&Gp()!==s&&kp()!==s?(Ji=r,t=function(r,t,e,n,o){const{dataType:s,length:u}=e;let a=s;return void 0!==u&&(a=`${a}(${u})`),{type:"cast",keyword:r.toLowerCase(),expr:t,symbol:"as",target:[{dataType:a,suffix:[{type:"origin",value:n},o]}]}}(t,e,n,o,u),r=t):(Zi=r,r=s);r===s&&(r=Zi,(t=Vb())!==s&&Gp()!==s&&xp()!==s&&Gp()!==s&&(e=Bl())!==s&&Gp()!==s&&Lb()!==s&&Gp()!==s&&(n=nv())!==s&&Gp()!==s&&(o=kp())!==s?(Ji=r,i=e,c=n,t={type:"cast",keyword:t.toLowerCase(),expr:i,symbol:"as",target:[c]},r=t):(Zi=r,r=s),r===s&&(r=Zi,(t=Vb())!==s&&Gp()!==s&&xp()!==s&&Gp()!==s&&(e=Bl())!==s&&Gp()!==s&&Lb()!==s&&Gp()!==s&&(n=Qb())!==s&&Gp()!==s&&(o=xp())!==s&&Gp()!==s&&(u=Xf())!==s&&Gp()!==s&&kp()!==s&&Gp()!==s&&(a=kp())!==s?(Ji=r,t=function(r,t,e){return {type:"cast",keyword:r.toLowerCase(),expr:t,symbol:"as",target:[{dataType:"DECIMAL("+e+")"}]}}(t,e,u),r=t):(Zi=r,r=s),r===s&&(r=Zi,(t=Vb())!==s&&Gp()!==s&&xp()!==s&&Gp()!==s&&(e=Bl())!==s&&Gp()!==s&&Lb()!==s&&Gp()!==s&&(n=Qb())!==s&&Gp()!==s&&(o=xp())!==s&&Gp()!==s&&(u=Xf())!==s&&Gp()!==s&&Rp()!==s&&Gp()!==s&&(a=Xf())!==s&&Gp()!==s&&kp()!==s&&Gp()!==s&&kp()!==s?(Ji=r,t=function(r,t,e,n){return {type:"cast",keyword:r.toLowerCase(),expr:t,symbol:"as",target:[{dataType:"DECIMAL("+e+", "+n+")"}]}}(t,e,u,a),r=t):(Zi=r,r=s),r===s&&(r=Zi,(t=Vb())!==s&&Gp()!==s&&xp()!==s&&Gp()!==s&&(e=Bl())!==s&&Gp()!==s&&Lb()!==s&&Gp()!==s&&(n=Gf())!==s&&Gp()!==s?((o=Zb())===s&&(o=null),o!==s&&Gp()!==s&&(u=kp())!==s?(Ji=r,t=function(r,t,e,n){return {type:"cast",keyword:r.toLowerCase(),expr:t,symbol:"as",target:[{dataType:[e,n].filter(Boolean).join(" ")}]}}(t,e,n,o),r=t):(Zi=r,r=s)):(Zi=r,r=s)))));var i,c;return r}())===s&&(t=function(){var r,t,e,n,o,u,a,i;return r=Zi,Wb()!==s&&Gp()!==s&&(t=Fl())!==s&&Gp()!==s?((e=Yl())===s&&(e=null),e!==s&&Gp()!==s&&(n=qb())!==s&&Gp()!==s?((o=Wb())===s&&(o=null),o!==s?(Ji=r,a=t,(i=e)&&a.push(i),r={type:"case",expr:null,args:a}):(Zi=r,r=s)):(Zi=r,r=s)):(Zi=r,r=s),r===s&&(r=Zi,Wb()!==s&&Gp()!==s&&(t=Bl())!==s&&Gp()!==s&&(e=Fl())!==s&&Gp()!==s?((n=Yl())===s&&(n=null),n!==s&&Gp()!==s&&(o=qb())!==s&&Gp()!==s?((u=Wb())===s&&(u=null),u!==s?(Ji=r,r=function(r,t,e){return e&&t.push(e),{type:"case",expr:r,args:t}}(t,e,n)):(Zi=r,r=s)):(Zi=r,r=s)):(Zi=r,r=s)),r}())===s&&(t=Ff())===s&&(t=Vf())===s&&(t=sf())===s&&(t=Tf())===s&&(t=Zi,xp()!==s&&(e=Gp())!==s&&(n=Wl())!==s&&Gp()!==s&&kp()!==s?(Ji=t,(o=n).parentheses=true,t=o):(Zi=t,t=s),t===s&&(t=tv())===s&&(t=Zi,Gp()!==s?(63===r.charCodeAt(Zi)?(e="?",Zi++):(e=s,0===nc&&ic(hn)),e!==s?(Ji=t,t={type:"origin",value:e}):(Zi=t,t=s)):(Zi=t,t=s))),t}function sf(){var r,t,e,n,o,u,a,i,c,l,f,b,p,v,d,y,w;return r=Zi,(t=Cf())===s&&(t=yf()),t!==s&&(e=Gp())!==s&&(n=Op())!==s&&(o=Gp())!==s?((u=Cf())===s&&(u=yf()),u!==s&&(a=Gp())!==s&&(i=Op())!==s&&(c=Gp())!==s&&(l=wf())!==s?(f=Zi,(b=Gp())!==s&&(p=gc())!==s?f=b=[b,p]:(Zi=f,f=s),f===s&&(f=null),f!==s?(Ji=r,v=t,d=u,y=l,w=f,Cv.add(`select::${"object"==typeof v?v.value:v}::${"object"==typeof d?d.value:d}::${y}`),r=t={type:"column_ref",db:v,table:d,column:y,collate:w&&w[1],...lv()}):(Zi=r,r=s)):(Zi=r,r=s)):(Zi=r,r=s),r===s&&(r=Zi,(t=Cf())===s&&(t=yf()),t!==s&&(e=Gp())!==s&&(n=Op())!==s&&(o=Gp())!==s&&(u=wf())!==s?(a=Zi,(i=Gp())!==s&&(c=gc())!==s?a=i=[i,c]:(Zi=a,a=s),a===s&&(a=null),a!==s?(Ji=r,r=t=function(r,t,e){return Cv.add(`select::${"object"==typeof r?r.value:r}::${t}`),{type:"column_ref",table:r,column:t,collate:e&&e[1],...lv()}}(t,u,a)):(Zi=r,r=s)):(Zi=r,r=s),r===s&&(r=Zi,t=Zi,(e=ff())!==s&&(n=Gp())!==s&&(o=Op())!==s?t=e=[e,n,o]:(Zi=t,t=s),t===s&&(t=null),t!==s&&(e=Gp())!==s&&(n=jp())!==s?(Ji=r,r=t=function(r){const t=r&&r[0]||null;return Cv.add(`select::${t}::(.*)`),{expr:{type:"column_ref",table:t,column:"*"},as:null,...lv()}}(t)):(Zi=r,r=s),r===s&&(r=Zi,(t=Lf())!==s?(e=Zi,(n=Gp())!==s&&(o=gc())!==s?e=n=[n,o]:(Zi=e,e=s),e===s&&(e=null),e!==s?(Ji=r,r=t=function(r,t){return Cv.add("select::null::"+r),{type:"column_ref",table:null,column:r,collate:t&&t[1],...lv()}}(t,e)):(Zi=r,r=s)):(Zi=r,r=s)))),r}function uf(){var r,t,e,n,o,u,a,i;if(r=Zi,(t=Lf())!==s){for(e=[],n=Zi,(o=Gp())!==s&&(u=Rp())!==s&&(a=Gp())!==s&&(i=Lf())!==s?n=o=[o,u,a,i]:(Zi=n,n=s);n!==s;)e.push(n),n=Zi,(o=Gp())!==s&&(u=Rp())!==s&&(a=Gp())!==s&&(i=Lf())!==s?n=o=[o,u,a,i]:(Zi=n,n=s);e!==s?(Ji=r,r=t=sr(t,e)):(Zi=r,r=s);}else Zi=r,r=s;return r}function af(){var r,t;return r=Zi,(t=Cf())!==s&&(Ji=r,t={type:"default",value:t}),r=t}function cf(){var r;return (r=af())===s&&(r=bf()),r}function lf(){var r;return (r=Cf())===s&&(r=pf()),r}function ff(){var r,t;return r=Zi,(t=Cf())!==s?(Ji=Zi,(Jn(t)?s:void 0)!==s?(Ji=r,r=t=t):(Zi=r,r=s)):(Zi=r,r=s),r===s&&(r=pf()),r}function bf(){var r;return (r=vf())===s&&(r=df())===s&&(r=yf()),r}function pf(){var r,t;return r=Zi,(t=vf())===s&&(t=df())===s&&(t=yf()),t!==s&&(Ji=r,t=t.value),r=t}function vf(){var t,e,n,o;if(t=Zi,34===r.charCodeAt(Zi)?(e='"',Zi++):(e=s,0===nc&&ic(ro)),e!==s){if(n=[],to.test(r.charAt(Zi))?(o=r.charAt(Zi),Zi++):(o=s,0===nc&&ic(eo)),o!==s)for(;o!==s;)n.push(o),to.test(r.charAt(Zi))?(o=r.charAt(Zi),Zi++):(o=s,0===nc&&ic(eo));else n=s;n!==s?(34===r.charCodeAt(Zi)?(o='"',Zi++):(o=s,0===nc&&ic(ro)),o!==s?(Ji=t,t=e={type:"double_quote_string",value:n.join("")}):(Zi=t,t=s)):(Zi=t,t=s);}else Zi=t,t=s;return t}function df(){var t,e,n,o;if(t=Zi,39===r.charCodeAt(Zi)?(e="'",Zi++):(e=s,0===nc&&ic(Ot)),e!==s){for(n=[],no.test(r.charAt(Zi))?(o=r.charAt(Zi),Zi++):(o=s,0===nc&&ic(oo));o!==s;)n.push(o),no.test(r.charAt(Zi))?(o=r.charAt(Zi),Zi++):(o=s,0===nc&&ic(oo));n!==s?(39===r.charCodeAt(Zi)?(o="'",Zi++):(o=s,0===nc&&ic(Ot)),o!==s?(Ji=t,t=e={type:"single_quote_string",value:n.join("")}):(Zi=t,t=s)):(Zi=t,t=s);}else Zi=t,t=s;return t}function yf(){var t,e,n,o;if(t=Zi,96===r.charCodeAt(Zi)?(e="`",Zi++):(e=s,0===nc&&ic(so)),e!==s){if(n=[],uo.test(r.charAt(Zi))?(o=r.charAt(Zi),Zi++):(o=s,0===nc&&ic(ao)),o===s&&(o=qf()),o!==s)for(;o!==s;)n.push(o),uo.test(r.charAt(Zi))?(o=r.charAt(Zi),Zi++):(o=s,0===nc&&ic(ao)),o===s&&(o=qf());else n=s;n!==s?(96===r.charCodeAt(Zi)?(o="`",Zi++):(o=s,0===nc&&ic(so)),o!==s?(Ji=t,t=e={type:"backticks_quote_string",value:n.join("")}):(Zi=t,t=s)):(Zi=t,t=s);}else Zi=t,t=s;return t}function wf(){var r,t;return r=Zi,(t=hf())!==s&&(Ji=r,t=t),(r=t)===s&&(r=pf()),r}function Lf(){var r,t;return r=Zi,(t=hf())!==s?(Ji=Zi,(Jn(t)?s:void 0)!==s?(Ji=r,r=t=t):(Zi=r,r=s)):(Zi=r,r=s),r===s&&(r=Zi,(t=yf())!==s&&(Ji=r,t=t.value),r=t),r}function hf(){var r,t,e,n;if(r=Zi,(t=mf())!==s){for(e=[],n=Af();n!==s;)e.push(n),n=Af();e!==s?(Ji=r,r=t=io(t,e)):(Zi=r,r=s);}else Zi=r,r=s;if(r===s)if(r=Zi,(t=zf())!==s){if(e=[],(n=Af())!==s)for(;n!==s;)e.push(n),n=Af();else e=s;e!==s?(Ji=r,r=t=io(t,e)):(Zi=r,r=s);}else Zi=r,r=s;return r}function Cf(){var r,t,e,n;if(r=Zi,(t=mf())!==s){for(e=[],n=Ef();n!==s;)e.push(n),n=Ef();e!==s?(Ji=r,r=t=io(t,e)):(Zi=r,r=s);}else Zi=r,r=s;return r}function mf(){var t;return co.test(r.charAt(Zi))?(t=r.charAt(Zi),Zi++):(t=s,0===nc&&ic(lo)),t}function Ef(){var t;return fo.test(r.charAt(Zi))?(t=r.charAt(Zi),Zi++):(t=s,0===nc&&ic(bo)),t}function Af(){var t;return po.test(r.charAt(Zi))?(t=r.charAt(Zi),Zi++):(t=s,0===nc&&ic(vo)),t}function Tf(){var t,e,n,o;return t=Zi,e=Zi,58===r.charCodeAt(Zi)?(n=":",Zi++):(n=s,0===nc&&ic(yo)),n!==s&&(o=Cf())!==s?e=n=[n,o]:(Zi=e,e=s),e!==s&&(Ji=t,e={type:"param",value:e[1]}),t=e}function _f(){var t,e,n,o,u,a,i,c,l;return t=Zi,Tb()!==s&&Gp()!==s&&ub()!==s&&Gp()!==s&&(e=pp())!==s&&Gp()!==s?(n=Zi,(o=xp())!==s&&(u=Gp())!==s?((a=Pl())===s&&(a=null),a!==s&&(i=Gp())!==s&&(c=kp())!==s?n=o=[o,u,a,i,c]:(Zi=n,n=s)):(Zi=n,n=s),n===s&&(n=null),n!==s?(Ji=t,t={type:"on update",keyword:e,parentheses:!!(l=n),expr:l?l[2]:null}):(Zi=t,t=s)):(Zi=t,t=s),t===s&&(t=Zi,Tb()!==s&&Gp()!==s&&ub()!==s&&Gp()!==s?("now"===r.substr(Zi,3).toLowerCase()?(e=r.substr(Zi,3),Zi+=3):(e=s,0===nc&&ic(wo)),e!==s&&Gp()!==s&&(n=xp())!==s&&(o=Gp())!==s&&(u=kp())!==s?(Ji=t,t=function(r){return {type:"on update",keyword:r,parentheses:true}}(e)):(Zi=t,t=s)):(Zi=t,t=s)),t}function gf(){var t,e,n;return t=Zi,"over"===r.substr(Zi,4).toLowerCase()?(e=r.substr(Zi,4),Zi+=4):(e=s,0===nc&&ic(Lo)),e!==s&&Gp()!==s&&(n=Sf())!==s?(Ji=t,t=e={type:"window",as_window_specification:n}):(Zi=t,t=s),t===s&&(t=_f()),t}function If(){var r,t,e;return r=Zi,(t=Cf())!==s&&Gp()!==s&&Lb()!==s&&Gp()!==s&&(e=Sf())!==s?(Ji=r,r=t={name:t,as_window_specification:e}):(Zi=r,r=s),r}function Sf(){var r,t;return (r=Cf())===s&&(r=Zi,xp()!==s&&Gp()!==s?((t=function(){var r,t,e,n;r=Zi,(t=_l())===s&&(t=null);t!==s&&Gp()!==s?((e=gl())===s&&(e=null),e!==s&&Gp()!==s?((n=function(){var r,t,e,n,o;r=Zi,(t=ap())!==s&&Gp()!==s?((e=Nf())===s&&(e=Of()),e!==s?(Ji=r,r=t={type:"rows",expr:e}):(Zi=r,r=s)):(Zi=r,r=s);r===s&&(r=Zi,(t=ap())!==s&&Gp()!==s&&(e=Db())!==s&&Gp()!==s&&(n=Of())!==s&&Gp()!==s&&Yb()!==s&&Gp()!==s&&(o=Nf())!==s?(Ji=r,t=bv(e,{type:"origin",value:"rows"},{type:"expr_list",value:[n,o]}),r=t):(Zi=r,r=s));return r}())===s&&(n=null),n!==s?(Ji=r,r=t={name:null,partitionby:t,orderby:e,window_frame_clause:n}):(Zi=r,r=s)):(Zi=r,r=s)):(Zi=r,r=s);return r}())===s&&(t=null),t!==s&&Gp()!==s&&kp()!==s?(Ji=r,r={window_specification:t||{},parentheses:true}):(Zi=r,r=s)):(Zi=r,r=s)),r}function Nf(){var t,e,n,o;return t=Zi,(e=jf())!==s&&Gp()!==s?("following"===r.substr(Zi,9).toLowerCase()?(n=r.substr(Zi,9),Zi+=9):(n=s,0===nc&&ic(Co)),n!==s?(Ji=t,(o=e).value+=" FOLLOWING",t=e=o):(Zi=t,t=s)):(Zi=t,t=s),t===s&&(t=Rf()),t}function Of(){var t,e,n,o,u;return t=Zi,(e=jf())!==s&&Gp()!==s?("preceding"===r.substr(Zi,9).toLowerCase()?(n=r.substr(Zi,9),Zi+=9):(n=s,0===nc&&ic(mo)),n===s&&("following"===r.substr(Zi,9).toLowerCase()?(n=r.substr(Zi,9),Zi+=9):(n=s,0===nc&&ic(Co))),n!==s?(Ji=t,u=n,(o=e).value+=" "+u.toUpperCase(),t=e=o):(Zi=t,t=s)):(Zi=t,t=s),t===s&&(t=Rf()),t}function Rf(){var t,e,n;return t=Zi,"current"===r.substr(Zi,7).toLowerCase()?(e=r.substr(Zi,7),Zi+=7):(e=s,0===nc&&ic(P)),e!==s&&Gp()!==s?("row"===r.substr(Zi,3).toLowerCase()?(n=r.substr(Zi,3),Zi+=3):(n=s,0===nc&&ic(yr)),n!==s?(Ji=t,t=e={type:"origin",value:"current row",...lv()}):(Zi=t,t=s)):(Zi=t,t=s),t}function jf(){var t,e;return t=Zi,"unbounded"===r.substr(Zi,9).toLowerCase()?(e=r.substr(Zi,9),Zi+=9):(e=s,0===nc&&ic(Y)),e!==s&&(Ji=t,e={type:"origin",value:e.toUpperCase(),...lv()}),(t=e)===s&&(t=Vf()),t}function xf(){var t,e;return t=Zi,"year_month"===r.substr(Zi,10).toLowerCase()?(e=r.substr(Zi,10),Zi+=10):(e=s,0===nc&&ic(Ao)),e===s&&("day_hour"===r.substr(Zi,8).toLowerCase()?(e=r.substr(Zi,8),Zi+=8):(e=s,0===nc&&ic(To)),e===s&&("day_minute"===r.substr(Zi,10).toLowerCase()?(e=r.substr(Zi,10),Zi+=10):(e=s,0===nc&&ic(_o)),e===s&&("day_second"===r.substr(Zi,10).toLowerCase()?(e=r.substr(Zi,10),Zi+=10):(e=s,0===nc&&ic(go)),e===s&&("day_microsecond"===r.substr(Zi,15).toLowerCase()?(e=r.substr(Zi,15),Zi+=15):(e=s,0===nc&&ic(Io)),e===s&&("hour_minute"===r.substr(Zi,11).toLowerCase()?(e=r.substr(Zi,11),Zi+=11):(e=s,0===nc&&ic(So)),e===s&&("hour_second"===r.substr(Zi,11).toLowerCase()?(e=r.substr(Zi,11),Zi+=11):(e=s,0===nc&&ic(No)),e===s&&("hour_microsecond"===r.substr(Zi,16).toLowerCase()?(e=r.substr(Zi,16),Zi+=16):(e=s,0===nc&&ic(Oo)),e===s&&("minute_second"===r.substr(Zi,13).toLowerCase()?(e=r.substr(Zi,13),Zi+=13):(e=s,0===nc&&ic(Ro)),e===s&&("minute_microsecond"===r.substr(Zi,18).toLowerCase()?(e=r.substr(Zi,18),Zi+=18):(e=s,0===nc&&ic(jo)),e===s&&("second_microsecond"===r.substr(Zi,18).toLowerCase()?(e=r.substr(Zi,18),Zi+=18):(e=s,0===nc&&ic(xo)),e===s&&("timezone_hour"===r.substr(Zi,13).toLowerCase()?(e=r.substr(Zi,13),Zi+=13):(e=s,0===nc&&ic(ko)),e===s&&("timezone_minute"===r.substr(Zi,15).toLowerCase()?(e=r.substr(Zi,15),Zi+=15):(e=s,0===nc&&ic(Uo)),e===s&&("century"===r.substr(Zi,7).toLowerCase()?(e=r.substr(Zi,7),Zi+=7):(e=s,0===nc&&ic(Do)),e===s&&("day"===r.substr(Zi,3).toLowerCase()?(e=r.substr(Zi,3),Zi+=3):(e=s,0===nc&&ic(Mo)),e===s&&("date"===r.substr(Zi,4).toLowerCase()?(e=r.substr(Zi,4),Zi+=4):(e=s,0===nc&&ic(Po)),e===s&&("decade"===r.substr(Zi,6).toLowerCase()?(e=r.substr(Zi,6),Zi+=6):(e=s,0===nc&&ic(Go)),e===s&&("dow"===r.substr(Zi,3).toLowerCase()?(e=r.substr(Zi,3),Zi+=3):(e=s,0===nc&&ic(Fo)),e===s&&("doy"===r.substr(Zi,3).toLowerCase()?(e=r.substr(Zi,3),Zi+=3):(e=s,0===nc&&ic(Ho)),e===s&&("epoch"===r.substr(Zi,5).toLowerCase()?(e=r.substr(Zi,5),Zi+=5):(e=s,0===nc&&ic(Yo)),e===s&&("hour"===r.substr(Zi,4).toLowerCase()?(e=r.substr(Zi,4),Zi+=4):(e=s,0===nc&&ic(Bo)),e===s&&("isodow"===r.substr(Zi,6).toLowerCase()?(e=r.substr(Zi,6),Zi+=6):(e=s,0===nc&&ic($o)),e===s&&("isoweek"===r.substr(Zi,7).toLowerCase()?(e=r.substr(Zi,7),Zi+=7):(e=s,0===nc&&ic(Wo)),e===s&&("isoyear"===r.substr(Zi,7).toLowerCase()?(e=r.substr(Zi,7),Zi+=7):(e=s,0===nc&&ic(qo)),e===s&&("microseconds"===r.substr(Zi,12).toLowerCase()?(e=r.substr(Zi,12),Zi+=12):(e=s,0===nc&&ic(Vo)),e===s&&("millennium"===r.substr(Zi,10).toLowerCase()?(e=r.substr(Zi,10),Zi+=10):(e=s,0===nc&&ic(Xo)),e===s&&("milliseconds"===r.substr(Zi,12).toLowerCase()?(e=r.substr(Zi,12),Zi+=12):(e=s,0===nc&&ic(Ko)),e===s&&("minute"===r.substr(Zi,6).toLowerCase()?(e=r.substr(Zi,6),Zi+=6):(e=s,0===nc&&ic(Qo)),e===s&&("month"===r.substr(Zi,5).toLowerCase()?(e=r.substr(Zi,5),Zi+=5):(e=s,0===nc&&ic(zo)),e===s&&("quarter"===r.substr(Zi,7).toLowerCase()?(e=r.substr(Zi,7),Zi+=7):(e=s,0===nc&&ic(Zo)),e===s&&("second"===r.substr(Zi,6).toLowerCase()?(e=r.substr(Zi,6),Zi+=6):(e=s,0===nc&&ic(Jo)),e===s&&("time"===r.substr(Zi,4).toLowerCase()?(e=r.substr(Zi,4),Zi+=4):(e=s,0===nc&&ic(rs)),e===s&&("timezone"===r.substr(Zi,8).toLowerCase()?(e=r.substr(Zi,8),Zi+=8):(e=s,0===nc&&ic(ts)),e===s&&("week"===r.substr(Zi,4).toLowerCase()?(e=r.substr(Zi,4),Zi+=4):(e=s,0===nc&&ic(es)),e===s&&("year"===r.substr(Zi,4).toLowerCase()?(e=r.substr(Zi,4),Zi+=4):(e=s,0===nc&&ic(ns)))))))))))))))))))))))))))))))))))),e!==s&&(Ji=t,e=e),t=e}function kf(){var t,e,n,o,u,a,i,c;return t=Zi,(e=$b())!==s&&Gp()!==s&&xp()!==s&&Gp()!==s&&(n=xf())!==s&&Gp()!==s&&yb()!==s&&Gp()!==s?((o=cp())===s&&(o=bp())===s&&(o=ip())===s&&(o=sp()),o!==s&&Gp()!==s&&(u=Bl())!==s&&Gp()!==s&&kp()!==s?(Ji=t,a=n,i=o,c=u,t=e={type:e.toLowerCase(),args:{field:a,cast_type:i,source:c},...lv()}):(Zi=t,t=s)):(Zi=t,t=s),t===s&&(t=Zi,(e=$b())!==s&&Gp()!==s&&xp()!==s&&Gp()!==s&&(n=xf())!==s&&Gp()!==s&&yb()!==s&&Gp()!==s&&(o=Bl())!==s&&Gp()!==s&&(u=kp())!==s?(Ji=t,t=e=function(r,t,e){return {type:r.toLowerCase(),args:{field:t,source:e},...lv()}}(e,n,o)):(Zi=t,t=s),t===s&&(t=Zi,"date_trunc"===r.substr(Zi,10).toLowerCase()?(e=r.substr(Zi,10),Zi+=10):(e=s,0===nc&&ic(os)),e!==s&&Gp()!==s&&xp()!==s&&Gp()!==s&&(n=Bl())!==s&&Gp()!==s&&Rp()!==s&&Gp()!==s&&(o=xf())!==s&&Gp()!==s&&(u=kp())!==s?(Ji=t,t=e=function(r,t){return {type:"function",name:{name:[{type:"origin",value:"date_trunc"}]},args:{type:"expr_list",value:[r,{type:"origin",value:t}]},over:null,...lv()}}(n,o)):(Zi=t,t=s))),t}function Uf(){var t,e,n;return t=Zi,(e=function(){var t;return "both"===r.substr(Zi,4).toLowerCase()?(t=r.substr(Zi,4),Zi+=4):(t=s,0===nc&&ic(ss)),t===s&&("leading"===r.substr(Zi,7).toLowerCase()?(t=r.substr(Zi,7),Zi+=7):(t=s,0===nc&&ic(us)),t===s&&("trailing"===r.substr(Zi,8).toLowerCase()?(t=r.substr(Zi,8),Zi+=8):(t=s,0===nc&&ic(as)))),t}())===s&&(e=null),e!==s&&Gp()!==s?((n=Bl())===s&&(n=null),n!==s&&Gp()!==s&&yb()!==s?(Ji=t,t=e=function(r,t,e){let n=[];return r&&n.push({type:"origin",value:r}),t&&n.push(t),n.push({type:"origin",value:"from"}),{type:"expr_list",value:n}}(e,n)):(Zi=t,t=s)):(Zi=t,t=s),t}function Df(){var t,e,n,o;return t=Zi,"trim"===r.substr(Zi,4).toLowerCase()?(e=r.substr(Zi,4),Zi+=4):(e=s,0===nc&&ic(is)),e!==s&&Gp()!==s&&xp()!==s&&Gp()!==s?((n=Uf())===s&&(n=null),n!==s&&Gp()!==s&&(o=Bl())!==s&&Gp()!==s&&kp()!==s?(Ji=t,t=e=function(r,t){let e=r||{type:"expr_list",value:[]};return e.value.push(t),{type:"function",name:{name:[{type:"origin",value:"trim"}]},args:e,...lv()}}(n,o)):(Zi=t,t=s)):(Zi=t,t=s),t}function Mf(){var t,e,n,o,u,a,i,c;return (t=kf())===s&&(t=Df())===s&&(t=Zi,"convert"===r.substr(Zi,7).toLowerCase()?(e=r.substr(Zi,7),Zi+=7):(e=s,0===nc&&ic(cs)),e!==s&&Gp()!==s&&(n=xp())!==s&&Gp()!==s&&(o=function(){var r,t,e,n,o,u;return r=Zi,(t=Xp())!==s&&Gp()!==s&&Rp()!==s&&Gp()!==s?((e=sv())===s&&(e=av()),e!==s&&Gp()!==s&&(n=Fc())!==s&&Gp()!==s&&(o=cf())!==s?(Ji=r,r=t=function(r,t,e,n){const{dataType:o,length:s}=t;let u=o;return void 0!==s&&(u=`${u}(${s})`),{type:"expr_list",value:[r,{type:"origin",value:u,suffix:{prefix:e,...n}}]}}(t,e,n,o)):(Zi=r,r=s)):(Zi=r,r=s),r===s&&(r=Zi,(t=Xp())!==s&&Gp()!==s&&Rp()!==s&&Gp()!==s?((e=Gf())===s&&(e=nv()),e!==s?(Ji=r,r=t={type:"expr_list",value:[t,{type:"datatype",..."string"==typeof(u=e)?{dataType:u}:u}]}):(Zi=r,r=s)):(Zi=r,r=s),r===s&&(r=Zi,(t=Wl())!==s&&Gp()!==s&&Sb()!==s&&Gp()!==s&&(e=Cf())!==s?(Ji=r,r=t=function(r,t){return r.suffix="USING "+t.toUpperCase(),{type:"expr_list",value:[r]}}(t,e)):(Zi=r,r=s))),r}())!==s&&(u=Gp())!==s&&kp()!==s?(Ji=t,t=e={type:"function",name:{name:[{type:"origin",value:"convert"}]},args:o,...lv()}):(Zi=t,t=s),t===s&&(t=Zi,(e=function(){var t;(t=Pf())===s&&(t=vp())===s&&(t=lp())===s&&(t=function(){var t,e,n,o;t=Zi,"session_user"===r.substr(Zi,12).toLowerCase()?(e=r.substr(Zi,12),Zi+=12):(e=s,0===nc&&ic(Ka));e!==s?(n=Zi,nc++,o=mf(),nc--,o===s?n=void 0:(Zi=n,n=s),n!==s?(Ji=t,t=e="SESSION_USER"):(Zi=t,t=s)):(Zi=t,t=s);return t}())===s&&(t=function(){var t,e,n,o;t=Zi,"system_user"===r.substr(Zi,11).toLowerCase()?(e=r.substr(Zi,11),Zi+=11):(e=s,0===nc&&ic(Qa));e!==s?(n=Zi,nc++,o=mf(),nc--,o===s?n=void 0:(Zi=n,n=s),n!==s?(Ji=t,t=e="SYSTEM_USER"):(Zi=t,t=s)):(Zi=t,t=s);return t}());return t}())!==s&&Gp()!==s&&(n=xp())!==s&&Gp()!==s?((o=Pl())===s&&(o=null),o!==s&&(u=Gp())!==s&&kp()!==s&&Gp()!==s?((a=gf())===s&&(a=null),a!==s?(Ji=t,t=e=function(r,t,e){return {type:"function",name:{name:[{type:"default",value:r}]},args:t||{type:"expr_list",value:[]},over:e,...lv()}}(e,o,a)):(Zi=t,t=s)):(Zi=t,t=s)):(Zi=t,t=s),t===s&&(t=Zi,(e=Pf())!==s&&Gp()!==s?((n=_f())===s&&(n=null),n!==s?(Ji=t,t=e={type:"function",name:{name:[{type:"origin",value:e}]},over:n,...lv()}):(Zi=t,t=s)):(Zi=t,t=s),t===s&&(t=Zi,(e=zp())!==s?(Ji=Zi,(!cv[(c=e).name[0]&&c.name[0].value.toLowerCase()]?void 0:s)!==s&&(n=Gp())!==s&&xp()!==s&&(o=Gp())!==s?((u=Wl())===s&&(u=null),u!==s&&Gp()!==s&&kp()!==s&&(a=Gp())!==s?((i=gf())===s&&(i=null),i!==s?(Ji=t,t=e=function(r,t,e){return t&&"expr_list"!==t.type&&(t={type:"expr_list",value:[t]}),(r.name[0]&&"TIMESTAMPDIFF"===r.name[0].value.toUpperCase()||r.name[0]&&"TIMESTAMPADD"===r.name[0].value.toUpperCase())&&t.value&&t.value[0]&&(t.value[0]={type:"origin",value:t.value[0].column}),{type:"function",name:r,args:t||{type:"expr_list",value:[]},over:e,...lv()}}(e,u,i)):(Zi=t,t=s)):(Zi=t,t=s)):(Zi=t,t=s)):(Zi=t,t=s))))),t}function Pf(){var t;return (t=function(){var t,e,n,o;t=Zi,"current_date"===r.substr(Zi,12).toLowerCase()?(e=r.substr(Zi,12),Zi+=12):(e=s,0===nc&&ic(Ba));e!==s?(n=Zi,nc++,o=mf(),nc--,o===s?n=void 0:(Zi=n,n=s),n!==s?(Ji=t,t=e="CURRENT_DATE"):(Zi=t,t=s)):(Zi=t,t=s);return t}())===s&&(t=function(){var t,e,n,o;t=Zi,"current_time"===r.substr(Zi,12).toLowerCase()?(e=r.substr(Zi,12),Zi+=12):(e=s,0===nc&&ic(qa));e!==s?(n=Zi,nc++,o=mf(),nc--,o===s?n=void 0:(Zi=n,n=s),n!==s?(Ji=t,t=e="CURRENT_TIME"):(Zi=t,t=s)):(Zi=t,t=s);return t}())===s&&(t=pp()),t}function Gf(){var t;return (t=function(){var t,e,n,o;t=Zi,"signed"===r.substr(Zi,6).toLowerCase()?(e=r.substr(Zi,6),Zi+=6):(e=s,0===nc&&ic(Ea));e!==s?(n=Zi,nc++,o=mf(),nc--,o===s?n=void 0:(Zi=n,n=s),n!==s?(Ji=t,t=e="SIGNED"):(Zi=t,t=s)):(Zi=t,t=s);return t}())===s&&(t=function(){var t,e,n,o;t=Zi,"unsigned"===r.substr(Zi,8).toLowerCase()?(e=r.substr(Zi,8),Zi+=8):(e=s,0===nc&&ic(Aa));e!==s?(n=Zi,nc++,o=mf(),nc--,o===s?n=void 0:(Zi=n,n=s),n!==s?(Ji=t,t=e="UNSIGNED"):(Zi=t,t=s)):(Zi=t,t=s);return t}()),t}function Ff(){var t,e,n,o,u,a,i,c,l;return t=Zi,"binary"===r.substr(Zi,6).toLowerCase()?(e=r.substr(Zi,6),Zi+=6):(e=s,0===nc&&ic(ls)),e===s&&("_binary"===r.substr(Zi,7).toLowerCase()?(e=r.substr(Zi,7),Zi+=7):(e=s,0===nc&&ic(fs))),e===s&&(e=null),e!==s&&Gp()!==s&&(n=Bf())!==s?(o=Zi,(u=Gp())!==s&&(a=gc())!==s?o=u=[u,a]:(Zi=o,o=s),o===s&&(o=null),o!==s?(Ji=t,c=n,l=o,(i=e)&&(c.prefix=i.toLowerCase()),l&&(c.suffix={collate:l[1]}),t=e=c):(Zi=t,t=s)):(Zi=t,t=s),t===s&&(t=function(){var t,e;t=Zi,(e=function(){var t,e,n,o;t=Zi,"true"===r.substr(Zi,4).toLowerCase()?(e=r.substr(Zi,4),Zi+=4):(e=s,0===nc&&ic(Zs));e!==s?(n=Zi,nc++,o=mf(),nc--,o===s?n=void 0:(Zi=n,n=s),n!==s?t=e=[e,n]:(Zi=t,t=s)):(Zi=t,t=s);return t}())!==s&&(Ji=t,e={type:"bool",value:true});(t=e)===s&&(t=Zi,(e=function(){var t,e,n,o;t=Zi,"false"===r.substr(Zi,5).toLowerCase()?(e=r.substr(Zi,5),Zi+=5):(e=s,0===nc&&ic(ru));e!==s?(n=Zi,nc++,o=mf(),nc--,o===s?n=void 0:(Zi=n,n=s),n!==s?t=e=[e,n]:(Zi=t,t=s)):(Zi=t,t=s);return t}())!==s&&(Ji=t,e={type:"bool",value:false}),t=e);return t}())===s&&(t=Yf())===s&&(t=function(){var t,e,n,o,u,a;t=Zi,(e=ip())===s&&(e=sp())===s&&(e=cp())===s&&(e=up());if(e!==s)if(Gp()!==s){if(n=Zi,39===r.charCodeAt(Zi)?(o="'",Zi++):(o=s,0===nc&&ic(Ot)),o!==s){for(u=[],a=Wf();a!==s;)u.push(a),a=Wf();u!==s?(39===r.charCodeAt(Zi)?(a="'",Zi++):(a=s,0===nc&&ic(Ot)),a!==s?n=o=[o,u,a]:(Zi=n,n=s)):(Zi=n,n=s);}else Zi=n,n=s;n!==s?(Ji=t,e=hs(e,n),t=e):(Zi=t,t=s);}else Zi=t,t=s;else Zi=t,t=s;if(t===s)if(t=Zi,(e=ip())===s&&(e=sp())===s&&(e=cp())===s&&(e=up()),e!==s)if(Gp()!==s){if(n=Zi,34===r.charCodeAt(Zi)?(o='"',Zi++):(o=s,0===nc&&ic(ro)),o!==s){for(u=[],a=$f();a!==s;)u.push(a),a=$f();u!==s?(34===r.charCodeAt(Zi)?(a='"',Zi++):(a=s,0===nc&&ic(ro)),a!==s?n=o=[o,u,a]:(Zi=n,n=s)):(Zi=n,n=s);}else Zi=n,n=s;n!==s?(Ji=t,e=hs(e,n),t=e):(Zi=t,t=s);}else Zi=t,t=s;else Zi=t,t=s;return t}()),t}function Hf(){var r;return (r=Ff())===s&&(r=Vf()),r}function Yf(){var t,e;return t=Zi,(e=function(){var t,e,n,o;t=Zi,"null"===r.substr(Zi,4).toLowerCase()?(e=r.substr(Zi,4),Zi+=4):(e=s,0===nc&&ic(Qs));e!==s?(n=Zi,nc++,o=mf(),nc--,o===s?n=void 0:(Zi=n,n=s),n!==s?t=e=[e,n]:(Zi=t,t=s)):(Zi=t,t=s);return t}())!==s&&(Ji=t,e={type:"null",value:null}),t=e}function Bf(){var t,e,n,o,u,a,i,c;if(t=Zi,"_binary"===r.substr(Zi,7).toLowerCase()?(e=r.substr(Zi,7),Zi+=7):(e=s,0===nc&&ic(fs)),e===s&&("_latin1"===r.substr(Zi,7).toLowerCase()?(e=r.substr(Zi,7),Zi+=7):(e=s,0===nc&&ic(bs))),e===s&&(e=null),e!==s)if((n=Gp())!==s)if("x"===r.substr(Zi,1).toLowerCase()?(o=r.charAt(Zi),Zi++):(o=s,0===nc&&ic(ps)),o!==s){if(u=Zi,39===r.charCodeAt(Zi)?(a="'",Zi++):(a=s,0===nc&&ic(Ot)),a!==s){for(i=[],vs.test(r.charAt(Zi))?(c=r.charAt(Zi),Zi++):(c=s,0===nc&&ic(ds));c!==s;)i.push(c),vs.test(r.charAt(Zi))?(c=r.charAt(Zi),Zi++):(c=s,0===nc&&ic(ds));i!==s?(39===r.charCodeAt(Zi)?(c="'",Zi++):(c=s,0===nc&&ic(Ot)),c!==s?u=a=[a,i,c]:(Zi=u,u=s)):(Zi=u,u=s);}else Zi=u,u=s;u!==s?(Ji=t,t=e={type:"hex_string",prefix:e,value:u[1].join("")}):(Zi=t,t=s);}else Zi=t,t=s;else Zi=t,t=s;else Zi=t,t=s;if(t===s){if(t=Zi,"_binary"===r.substr(Zi,7).toLowerCase()?(e=r.substr(Zi,7),Zi+=7):(e=s,0===nc&&ic(fs)),e===s&&("_latin1"===r.substr(Zi,7).toLowerCase()?(e=r.substr(Zi,7),Zi+=7):(e=s,0===nc&&ic(bs))),e===s&&(e=null),e!==s)if((n=Gp())!==s)if("b"===r.substr(Zi,1).toLowerCase()?(o=r.charAt(Zi),Zi++):(o=s,0===nc&&ic(ys)),o!==s){if(u=Zi,39===r.charCodeAt(Zi)?(a="'",Zi++):(a=s,0===nc&&ic(Ot)),a!==s){for(i=[],vs.test(r.charAt(Zi))?(c=r.charAt(Zi),Zi++):(c=s,0===nc&&ic(ds));c!==s;)i.push(c),vs.test(r.charAt(Zi))?(c=r.charAt(Zi),Zi++):(c=s,0===nc&&ic(ds));i!==s?(39===r.charCodeAt(Zi)?(c="'",Zi++):(c=s,0===nc&&ic(Ot)),c!==s?u=a=[a,i,c]:(Zi=u,u=s)):(Zi=u,u=s);}else Zi=u,u=s;u!==s?(Ji=t,t=e=function(r,t,e){return {type:"bit_string",prefix:r,value:e[1].join("")}}(e,0,u)):(Zi=t,t=s);}else Zi=t,t=s;else Zi=t,t=s;else Zi=t,t=s;if(t===s){if(t=Zi,"_binary"===r.substr(Zi,7).toLowerCase()?(e=r.substr(Zi,7),Zi+=7):(e=s,0===nc&&ic(fs)),e===s&&("_latin1"===r.substr(Zi,7).toLowerCase()?(e=r.substr(Zi,7),Zi+=7):(e=s,0===nc&&ic(bs))),e===s&&(e=null),e!==s)if((n=Gp())!==s)if("0x"===r.substr(Zi,2).toLowerCase()?(o=r.substr(Zi,2),Zi+=2):(o=s,0===nc&&ic(ws)),o!==s){for(u=[],vs.test(r.charAt(Zi))?(a=r.charAt(Zi),Zi++):(a=s,0===nc&&ic(ds));a!==s;)u.push(a),vs.test(r.charAt(Zi))?(a=r.charAt(Zi),Zi++):(a=s,0===nc&&ic(ds));u!==s?(Ji=t,t=e=function(r,t,e){return {type:"full_hex_string",prefix:r,value:e.join("")}}(e,0,u)):(Zi=t,t=s);}else Zi=t,t=s;else Zi=t,t=s;else Zi=t,t=s;if(t===s){if(t=Zi,"n"===r.substr(Zi,1).toLowerCase()?(e=r.charAt(Zi),Zi++):(e=s,0===nc&&ic(Ls)),e!==s){if(n=Zi,39===r.charCodeAt(Zi)?(o="'",Zi++):(o=s,0===nc&&ic(Ot)),o!==s){for(u=[],a=Wf();a!==s;)u.push(a),a=Wf();u!==s?(39===r.charCodeAt(Zi)?(a="'",Zi++):(a=s,0===nc&&ic(Ot)),a!==s?n=o=[o,u,a]:(Zi=n,n=s)):(Zi=n,n=s);}else Zi=n,n=s;n!==s?(Ji=t,t=e=function(r,t){return {type:"natural_string",value:t[1].join("")}}(0,n)):(Zi=t,t=s);}else Zi=t,t=s;if(t===s){if(t=Zi,e=Zi,39===r.charCodeAt(Zi)?(n="'",Zi++):(n=s,0===nc&&ic(Ot)),n!==s){for(o=[],u=Wf();u!==s;)o.push(u),u=Wf();o!==s?(39===r.charCodeAt(Zi)?(u="'",Zi++):(u=s,0===nc&&ic(Ot)),u!==s?e=n=[n,o,u]:(Zi=e,e=s)):(Zi=e,e=s);}else Zi=e,e=s;if(e!==s&&(Ji=t,e=function(r){return {type:"single_quote_string",value:r[1].join("")}}(e)),(t=e)===s){if(t=Zi,e=Zi,34===r.charCodeAt(Zi)?(n='"',Zi++):(n=s,0===nc&&ic(ro)),n!==s){for(o=[],u=$f();u!==s;)o.push(u),u=$f();o!==s?(34===r.charCodeAt(Zi)?(u='"',Zi++):(u=s,0===nc&&ic(ro)),u!==s?e=n=[n,o,u]:(Zi=e,e=s)):(Zi=e,e=s);}else Zi=e,e=s;e!==s&&(Ji=t,e=function(r){return {type:"double_quote_string",value:r[1].join("")}}(e)),t=e;}}}}}return t}function $f(){var t;return Cs.test(r.charAt(Zi))?(t=r.charAt(Zi),Zi++):(t=s,0===nc&&ic(ms)),t===s&&(t=qf())===s&&(Es.test(r.charAt(Zi))?(t=r.charAt(Zi),Zi++):(t=s,0===nc&&ic(As))),t}function Wf(){var t;return Ts.test(r.charAt(Zi))?(t=r.charAt(Zi),Zi++):(t=s,0===nc&&ic(_s)),t===s&&(t=qf()),t}function qf(){var t,e,n,o,u,a,i,c,l,f;return t=Zi,"\\'"===r.substr(Zi,2)?(e="\\'",Zi+=2):(e=s,0===nc&&ic(gs)),e!==s&&(Ji=t,e="\\'"),(t=e)===s&&(t=Zi,'\\"'===r.substr(Zi,2)?(e='\\"',Zi+=2):(e=s,0===nc&&ic(Is)),e!==s&&(Ji=t,e='\\"'),(t=e)===s&&(t=Zi,"\\\\"===r.substr(Zi,2)?(e="\\\\",Zi+=2):(e=s,0===nc&&ic(Ss)),e!==s&&(Ji=t,e="\\\\"),(t=e)===s&&(t=Zi,"\\/"===r.substr(Zi,2)?(e="\\/",Zi+=2):(e=s,0===nc&&ic(Ns)),e!==s&&(Ji=t,e="\\/"),(t=e)===s&&(t=Zi,"\\b"===r.substr(Zi,2)?(e="\\b",Zi+=2):(e=s,0===nc&&ic(Os)),e!==s&&(Ji=t,e="\b"),(t=e)===s&&(t=Zi,"\\f"===r.substr(Zi,2)?(e="\\f",Zi+=2):(e=s,0===nc&&ic(Rs)),e!==s&&(Ji=t,e="\f"),(t=e)===s&&(t=Zi,"\\n"===r.substr(Zi,2)?(e="\\n",Zi+=2):(e=s,0===nc&&ic(js)),e!==s&&(Ji=t,e="\n"),(t=e)===s&&(t=Zi,"\\r"===r.substr(Zi,2)?(e="\\r",Zi+=2):(e=s,0===nc&&ic(xs)),e!==s&&(Ji=t,e="\r"),(t=e)===s&&(t=Zi,"\\t"===r.substr(Zi,2)?(e="\\t",Zi+=2):(e=s,0===nc&&ic(ks)),e!==s&&(Ji=t,e="\t"),(t=e)===s&&(t=Zi,"\\u"===r.substr(Zi,2)?(e="\\u",Zi+=2):(e=s,0===nc&&ic(Us)),e!==s&&(n=Jf())!==s&&(o=Jf())!==s&&(u=Jf())!==s&&(a=Jf())!==s?(Ji=t,i=n,c=o,l=u,f=a,t=e=String.fromCharCode(parseInt("0x"+i+c+l+f))):(Zi=t,t=s),t===s&&(t=Zi,92===r.charCodeAt(Zi)?(e="\\",Zi++):(e=s,0===nc&&ic(Ds)),e!==s&&(Ji=t,e="\\"),(t=e)===s&&(t=Zi,"''"===r.substr(Zi,2)?(e="''",Zi+=2):(e=s,0===nc&&ic(Ms)),e!==s&&(Ji=t,e="''"),(t=e)===s&&(t=Zi,'""'===r.substr(Zi,2)?(e='""',Zi+=2):(e=s,0===nc&&ic(Ps)),e!==s&&(Ji=t,e='""'),(t=e)===s&&(t=Zi,"``"===r.substr(Zi,2)?(e="``",Zi+=2):(e=s,0===nc&&ic(Gs)),e!==s&&(Ji=t,e="``"),t=e))))))))))))),t}function Vf(){var r,t,e,n,o;return r=Zi,(t=function(){var r,t,e,n;r=Zi,(t=Xf())!==s&&(e=Kf())!==s&&(n=Qf())!==s?(Ji=r,r=t=t+e+n):(Zi=r,r=s);r===s&&(r=Zi,(t=Xf())!==s&&(e=Kf())!==s?(Ji=r,t=function(r,t){const e=r+t,n=parseFloat(e);return n.toString()===e?n:e}(t,e),r=t):(Zi=r,r=s),r===s&&(r=Zi,(t=Xf())!==s&&(e=Qf())!==s?(Ji=r,t=function(r,t){return r+t}(t,e),r=t):(Zi=r,r=s),r===s&&(r=Zi,(t=Xf())!==s&&(Ji=r,t=Ys(t)),r=t)));return r}())!==s?(e=Zi,nc++,n=Ef(),nc--,n===s?e=void 0:(Zi=e,e=s),e!==s?(Ji=r,r=t=(o=t)&&"bigint"===o.type?o:{type:"number",value:o}):(Zi=r,r=s)):(Zi=r,r=s),r}function Xf(){var t,e,n;return (t=zf())===s&&(t=Zf())===s&&(t=Zi,45===r.charCodeAt(Zi)?(e="-",Zi++):(e=s,0===nc&&ic(jn)),e===s&&(43===r.charCodeAt(Zi)?(e="+",Zi++):(e=s,0===nc&&ic(Rn))),e!==s&&(n=zf())!==s?(Ji=t,t=e=e+n):(Zi=t,t=s),t===s&&(t=Zi,45===r.charCodeAt(Zi)?(e="-",Zi++):(e=s,0===nc&&ic(jn)),e===s&&(43===r.charCodeAt(Zi)?(e="+",Zi++):(e=s,0===nc&&ic(Rn))),e!==s&&(n=Zf())!==s?(Ji=t,t=e=function(r,t){return r+t}(e,n)):(Zi=t,t=s))),t}function Kf(){var t,e,n,o;return t=Zi,46===r.charCodeAt(Zi)?(e=".",Zi++):(e=s,0===nc&&ic(Bs)),e!==s?((n=zf())===s&&(n=null),n!==s?(Ji=t,t=e=(o=n)?"."+o:""):(Zi=t,t=s)):(Zi=t,t=s),t}function Qf(){var t,e,n;return t=Zi,(e=function(){var t,e,n;t=Zi,qs.test(r.charAt(Zi))?(e=r.charAt(Zi),Zi++):(e=s,0===nc&&ic(Vs));e!==s?(Xs.test(r.charAt(Zi))?(n=r.charAt(Zi),Zi++):(n=s,0===nc&&ic(Ks)),n===s&&(n=null),n!==s?(Ji=t,t=e=e+(null!==(o=n)?o:"")):(Zi=t,t=s)):(Zi=t,t=s);var o;return t}())!==s&&(n=zf())!==s?(Ji=t,t=e=e+n):(Zi=t,t=s),t}function zf(){var r,t,e;if(r=Zi,t=[],(e=Zf())!==s)for(;e!==s;)t.push(e),e=Zf();else t=s;return t!==s&&(Ji=r,t=t.join("")),r=t}function Zf(){var t;return We.test(r.charAt(Zi))?(t=r.charAt(Zi),Zi++):(t=s,0===nc&&ic(qe)),t}function Jf(){var t;return $s.test(r.charAt(Zi))?(t=r.charAt(Zi),Zi++):(t=s,0===nc&&ic(Ws)),t}function rb(){var t,e,n,o;return t=Zi,"default"===r.substr(Zi,7).toLowerCase()?(e=r.substr(Zi,7),Zi+=7):(e=s,0===nc&&ic(k)),e!==s?(n=Zi,nc++,o=mf(),nc--,o===s?n=void 0:(Zi=n,n=s),n!==s?t=e=[e,n]:(Zi=t,t=s)):(Zi=t,t=s),t}function tb(){var t,e,n,o;return t=Zi,"to"===r.substr(Zi,2).toLowerCase()?(e=r.substr(Zi,2),Zi+=2):(e=s,0===nc&&ic(Js)),e!==s?(n=Zi,nc++,o=mf(),nc--,o===s?n=void 0:(Zi=n,n=s),n!==s?t=e=[e,n]:(Zi=t,t=s)):(Zi=t,t=s),t}function eb(){var t,e,n,o;return t=Zi,"show"===r.substr(Zi,4).toLowerCase()?(e=r.substr(Zi,4),Zi+=4):(e=s,0===nc&&ic(tu)),e!==s?(n=Zi,nc++,o=mf(),nc--,o===s?n=void 0:(Zi=n,n=s),n!==s?t=e=[e,n]:(Zi=t,t=s)):(Zi=t,t=s),t}function nb(){var t,e,n,o;return t=Zi,"drop"===r.substr(Zi,4).toLowerCase()?(e=r.substr(Zi,4),Zi+=4):(e=s,0===nc&&ic(Dr)),e!==s?(n=Zi,nc++,o=mf(),nc--,o===s?n=void 0:(Zi=n,n=s),n!==s?(Ji=t,t=e="DROP"):(Zi=t,t=s)):(Zi=t,t=s),t}function ob(){var t,e,n,o;return t=Zi,"alter"===r.substr(Zi,5).toLowerCase()?(e=r.substr(Zi,5),Zi+=5):(e=s,0===nc&&ic(nu)),e!==s?(n=Zi,nc++,o=mf(),nc--,o===s?n=void 0:(Zi=n,n=s),n!==s?t=e=[e,n]:(Zi=t,t=s)):(Zi=t,t=s),t}function sb(){var t,e,n,o;return t=Zi,"select"===r.substr(Zi,6).toLowerCase()?(e=r.substr(Zi,6),Zi+=6):(e=s,0===nc&&ic(ou)),e!==s?(n=Zi,nc++,o=mf(),nc--,o===s?n=void 0:(Zi=n,n=s),n!==s?t=e=[e,n]:(Zi=t,t=s)):(Zi=t,t=s),t}function ub(){var t,e,n,o;return t=Zi,"update"===r.substr(Zi,6).toLowerCase()?(e=r.substr(Zi,6),Zi+=6):(e=s,0===nc&&ic(su)),e!==s?(n=Zi,nc++,o=mf(),nc--,o===s?n=void 0:(Zi=n,n=s),n!==s?t=e=[e,n]:(Zi=t,t=s)):(Zi=t,t=s),t}function ab(){var t,e,n,o;return t=Zi,"create"===r.substr(Zi,6).toLowerCase()?(e=r.substr(Zi,6),Zi+=6):(e=s,0===nc&&ic(uu)),e!==s?(n=Zi,nc++,o=mf(),nc--,o===s?n=void 0:(Zi=n,n=s),n!==s?t=e=[e,n]:(Zi=t,t=s)):(Zi=t,t=s),t}function ib(){var t,e,n,o;return t=Zi,"temporary"===r.substr(Zi,9).toLowerCase()?(e=r.substr(Zi,9),Zi+=9):(e=s,0===nc&&ic(au)),e!==s?(n=Zi,nc++,o=mf(),nc--,o===s?n=void 0:(Zi=n,n=s),n!==s?t=e=[e,n]:(Zi=t,t=s)):(Zi=t,t=s),t}function cb(){var t,e,n,o;return t=Zi,"delete"===r.substr(Zi,6).toLowerCase()?(e=r.substr(Zi,6),Zi+=6):(e=s,0===nc&&ic(iu)),e!==s?(n=Zi,nc++,o=mf(),nc--,o===s?n=void 0:(Zi=n,n=s),n!==s?t=e=[e,n]:(Zi=t,t=s)):(Zi=t,t=s),t}function lb(){var t,e,n,o;return t=Zi,"insert"===r.substr(Zi,6).toLowerCase()?(e=r.substr(Zi,6),Zi+=6):(e=s,0===nc&&ic(cu)),e!==s?(n=Zi,nc++,o=mf(),nc--,o===s?n=void 0:(Zi=n,n=s),n!==s?t=e=[e,n]:(Zi=t,t=s)):(Zi=t,t=s),t}function fb(){var t,e,n,o;return t=Zi,"replace"===r.substr(Zi,7).toLowerCase()?(e=r.substr(Zi,7),Zi+=7):(e=s,0===nc&&ic(fu)),e!==s?(n=Zi,nc++,o=mf(),nc--,o===s?n=void 0:(Zi=n,n=s),n!==s?t=e=[e,n]:(Zi=t,t=s)):(Zi=t,t=s),t}function bb(){var t,e,n,o;return t=Zi,"rename"===r.substr(Zi,6).toLowerCase()?(e=r.substr(Zi,6),Zi+=6):(e=s,0===nc&&ic(bu)),e!==s?(n=Zi,nc++,o=mf(),nc--,o===s?n=void 0:(Zi=n,n=s),n!==s?t=e=[e,n]:(Zi=t,t=s)):(Zi=t,t=s),t}function pb(){var t,e,n,o;return t=Zi,"ignore"===r.substr(Zi,6).toLowerCase()?(e=r.substr(Zi,6),Zi+=6):(e=s,0===nc&&ic(pu)),e!==s?(n=Zi,nc++,o=mf(),nc--,o===s?n=void 0:(Zi=n,n=s),n!==s?t=e=[e,n]:(Zi=t,t=s)):(Zi=t,t=s),t}function vb(){var t,e,n,o;return t=Zi,"partition"===r.substr(Zi,9).toLowerCase()?(e=r.substr(Zi,9),Zi+=9):(e=s,0===nc&&ic(du)),e!==s?(n=Zi,nc++,o=mf(),nc--,o===s?n=void 0:(Zi=n,n=s),n!==s?(Ji=t,t=e="PARTITION"):(Zi=t,t=s)):(Zi=t,t=s),t}function db(){var t,e,n,o;return t=Zi,"into"===r.substr(Zi,4).toLowerCase()?(e=r.substr(Zi,4),Zi+=4):(e=s,0===nc&&ic(Re)),e!==s?(n=Zi,nc++,o=mf(),nc--,o===s?n=void 0:(Zi=n,n=s),n!==s?t=e=[e,n]:(Zi=t,t=s)):(Zi=t,t=s),t}function yb(){var t,e,n,o;return t=Zi,"from"===r.substr(Zi,4).toLowerCase()?(e=r.substr(Zi,4),Zi+=4):(e=s,0===nc&&ic(yu)),e!==s?(n=Zi,nc++,o=mf(),nc--,o===s?n=void 0:(Zi=n,n=s),n!==s?t=e=[e,n]:(Zi=t,t=s)):(Zi=t,t=s),t}function wb(){var t,e,n,o;return t=Zi,"set"===r.substr(Zi,3).toLowerCase()?(e=r.substr(Zi,3),Zi+=3):(e=s,0===nc&&ic(ft)),e!==s?(n=Zi,nc++,o=mf(),nc--,o===s?n=void 0:(Zi=n,n=s),n!==s?(Ji=t,t=e="SET"):(Zi=t,t=s)):(Zi=t,t=s),t}function Lb(){var t,e,n,o;return t=Zi,"as"===r.substr(Zi,2).toLowerCase()?(e=r.substr(Zi,2),Zi+=2):(e=s,0===nc&&ic(L)),e!==s?(n=Zi,nc++,o=mf(),nc--,o===s?n=void 0:(Zi=n,n=s),n!==s?t=e=[e,n]:(Zi=t,t=s)):(Zi=t,t=s),t}function hb(){var t,e,n,o;return t=Zi,"table"===r.substr(Zi,5).toLowerCase()?(e=r.substr(Zi,5),Zi+=5):(e=s,0===nc&&ic(je)),e!==s?(n=Zi,nc++,o=mf(),nc--,o===s?n=void 0:(Zi=n,n=s),n!==s?(Ji=t,t=e="TABLE"):(Zi=t,t=s)):(Zi=t,t=s),t}function Cb(){var t,e,n,o;return t=Zi,"trigger"===r.substr(Zi,7).toLowerCase()?(e=r.substr(Zi,7),Zi+=7):(e=s,0===nc&&ic(wu)),e!==s?(n=Zi,nc++,o=mf(),nc--,o===s?n=void 0:(Zi=n,n=s),n!==s?(Ji=t,t=e="TRIGGER"):(Zi=t,t=s)):(Zi=t,t=s),t}function mb(){var t,e,n,o;return t=Zi,"tables"===r.substr(Zi,6).toLowerCase()?(e=r.substr(Zi,6),Zi+=6):(e=s,0===nc&&ic(Lu)),e!==s?(n=Zi,nc++,o=mf(),nc--,o===s?n=void 0:(Zi=n,n=s),n!==s?(Ji=t,t=e="TABLES"):(Zi=t,t=s)):(Zi=t,t=s),t}function Eb(){var t,e,n,o;return t=Zi,"database"===r.substr(Zi,8).toLowerCase()?(e=r.substr(Zi,8),Zi+=8):(e=s,0===nc&&ic(hu)),e!==s?(n=Zi,nc++,o=mf(),nc--,o===s?n=void 0:(Zi=n,n=s),n!==s?(Ji=t,t=e="DATABASE"):(Zi=t,t=s)):(Zi=t,t=s),t}function Ab(){var t,e,n,o;return t=Zi,"schema"===r.substr(Zi,6).toLowerCase()?(e=r.substr(Zi,6),Zi+=6):(e=s,0===nc&&ic(Cu)),e!==s?(n=Zi,nc++,o=mf(),nc--,o===s?n=void 0:(Zi=n,n=s),n!==s?(Ji=t,t=e="SCHEMA"):(Zi=t,t=s)):(Zi=t,t=s),t}function Tb(){var t,e,n,o;return t=Zi,"on"===r.substr(Zi,2).toLowerCase()?(e=r.substr(Zi,2),Zi+=2):(e=s,0===nc&&ic(mu)),e!==s?(n=Zi,nc++,o=mf(),nc--,o===s?n=void 0:(Zi=n,n=s),n!==s?t=e=[e,n]:(Zi=t,t=s)):(Zi=t,t=s),t}function _b(){var t,e,n,o;return t=Zi,"join"===r.substr(Zi,4).toLowerCase()?(e=r.substr(Zi,4),Zi+=4):(e=s,0===nc&&ic(Su)),e!==s?(n=Zi,nc++,o=mf(),nc--,o===s?n=void 0:(Zi=n,n=s),n!==s?t=e=[e,n]:(Zi=t,t=s)):(Zi=t,t=s),t}function gb(){var t,e,n,o;return t=Zi,"outer"===r.substr(Zi,5).toLowerCase()?(e=r.substr(Zi,5),Zi+=5):(e=s,0===nc&&ic(Nu)),e!==s?(n=Zi,nc++,o=mf(),nc--,o===s?n=void 0:(Zi=n,n=s),n!==s?t=e=[e,n]:(Zi=t,t=s)):(Zi=t,t=s),t}function Ib(){var t,e,n,o;return t=Zi,"values"===r.substr(Zi,6).toLowerCase()?(e=r.substr(Zi,6),Zi+=6):(e=s,0===nc&&ic(ku)),e!==s?(n=Zi,nc++,o=mf(),nc--,o===s?n=void 0:(Zi=n,n=s),n!==s?t=e=[e,n]:(Zi=t,t=s)):(Zi=t,t=s),t}function Sb(){var t,e,n,o;return t=Zi,"using"===r.substr(Zi,5).toLowerCase()?(e=r.substr(Zi,5),Zi+=5):(e=s,0===nc&&ic(Uu)),e!==s?(n=Zi,nc++,o=mf(),nc--,o===s?n=void 0:(Zi=n,n=s),n!==s?t=e=[e,n]:(Zi=t,t=s)):(Zi=t,t=s),t}function Nb(){var t,e,n,o;return t=Zi,"with"===r.substr(Zi,4).toLowerCase()?(e=r.substr(Zi,4),Zi+=4):(e=s,0===nc&&ic(v)),e!==s?(n=Zi,nc++,o=mf(),nc--,o===s?n=void 0:(Zi=n,n=s),n!==s?t=e=[e,n]:(Zi=t,t=s)):(Zi=t,t=s),t}function Ob(){var t,e,n,o;return t=Zi,"go"===r.substr(Zi,2).toLowerCase()?(e=r.substr(Zi,2),Zi+=2):(e=s,0===nc&&ic(Mu)),e!==s?(n=Zi,nc++,o=mf(),nc--,o===s?n=void 0:(Zi=n,n=s),n!==s?(Ji=t,t=e="GO"):(Zi=t,t=s)):(Zi=t,t=s),t}function Rb(){var t,e,n,o;return t=Zi,"by"===r.substr(Zi,2).toLowerCase()?(e=r.substr(Zi,2),Zi+=2):(e=s,0===nc&&ic(d)),e!==s?(n=Zi,nc++,o=mf(),nc--,o===s?n=void 0:(Zi=n,n=s),n!==s?t=e=[e,n]:(Zi=t,t=s)):(Zi=t,t=s),t}function jb(){var t,e,n,o;return t=Zi,"asc"===r.substr(Zi,3).toLowerCase()?(e=r.substr(Zi,3),Zi+=3):(e=s,0===nc&&ic(Bu)),e!==s?(n=Zi,nc++,o=mf(),nc--,o===s?n=void 0:(Zi=n,n=s),n!==s?(Ji=t,t=e="ASC"):(Zi=t,t=s)):(Zi=t,t=s),t}function xb(){var t,e,n,o;return t=Zi,"desc"===r.substr(Zi,4).toLowerCase()?(e=r.substr(Zi,4),Zi+=4):(e=s,0===nc&&ic($u)),e!==s?(n=Zi,nc++,o=mf(),nc--,o===s?n=void 0:(Zi=n,n=s),n!==s?(Ji=t,t=e="DESC"):(Zi=t,t=s)):(Zi=t,t=s),t}function kb(){var t,e,n,o;return t=Zi,"all"===r.substr(Zi,3).toLowerCase()?(e=r.substr(Zi,3),Zi+=3):(e=s,0===nc&&ic(qu)),e!==s?(n=Zi,nc++,o=mf(),nc--,o===s?n=void 0:(Zi=n,n=s),n!==s?(Ji=t,t=e="ALL"):(Zi=t,t=s)):(Zi=t,t=s),t}function Ub(){var t,e,n,o;return t=Zi,"distinct"===r.substr(Zi,8).toLowerCase()?(e=r.substr(Zi,8),Zi+=8):(e=s,0===nc&&ic(Vu)),e!==s?(n=Zi,nc++,o=mf(),nc--,o===s?n=void 0:(Zi=n,n=s),n!==s?(Ji=t,t=e="DISTINCT"):(Zi=t,t=s)):(Zi=t,t=s),t}function Db(){var t,e,n,o;return t=Zi,"between"===r.substr(Zi,7).toLowerCase()?(e=r.substr(Zi,7),Zi+=7):(e=s,0===nc&&ic(Xu)),e!==s?(n=Zi,nc++,o=mf(),nc--,o===s?n=void 0:(Zi=n,n=s),n!==s?(Ji=t,t=e="BETWEEN"):(Zi=t,t=s)):(Zi=t,t=s),t}function Mb(){var t,e,n,o;return t=Zi,"in"===r.substr(Zi,2).toLowerCase()?(e=r.substr(Zi,2),Zi+=2):(e=s,0===nc&&ic(Ve)),e!==s?(n=Zi,nc++,o=mf(),nc--,o===s?n=void 0:(Zi=n,n=s),n!==s?(Ji=t,t=e="IN"):(Zi=t,t=s)):(Zi=t,t=s),t}function Pb(){var t,e,n,o;return t=Zi,"is"===r.substr(Zi,2).toLowerCase()?(e=r.substr(Zi,2),Zi+=2):(e=s,0===nc&&ic(Ku)),e!==s?(n=Zi,nc++,o=mf(),nc--,o===s?n=void 0:(Zi=n,n=s),n!==s?(Ji=t,t=e="IS"):(Zi=t,t=s)):(Zi=t,t=s),t}function Gb(){var t,e,n,o;return t=Zi,"like"===r.substr(Zi,4).toLowerCase()?(e=r.substr(Zi,4),Zi+=4):(e=s,0===nc&&ic(Qu)),e!==s?(n=Zi,nc++,o=mf(),nc--,o===s?n=void 0:(Zi=n,n=s),n!==s?(Ji=t,t=e="LIKE"):(Zi=t,t=s)):(Zi=t,t=s),t}function Fb(){var t,e,n,o;return t=Zi,"exists"===r.substr(Zi,6).toLowerCase()?(e=r.substr(Zi,6),Zi+=6):(e=s,0===nc&&ic(Ju)),e!==s?(n=Zi,nc++,o=mf(),nc--,o===s?n=void 0:(Zi=n,n=s),n!==s?(Ji=t,t=e="EXISTS"):(Zi=t,t=s)):(Zi=t,t=s),t}function Hb(){var t,e,n,o;return t=Zi,"not"===r.substr(Zi,3).toLowerCase()?(e=r.substr(Zi,3),Zi+=3):(e=s,0===nc&&ic(Zr)),e!==s?(n=Zi,nc++,o=mf(),nc--,o===s?n=void 0:(Zi=n,n=s),n!==s?(Ji=t,t=e="NOT"):(Zi=t,t=s)):(Zi=t,t=s),t}function Yb(){var t,e,n,o;return t=Zi,"and"===r.substr(Zi,3).toLowerCase()?(e=r.substr(Zi,3),Zi+=3):(e=s,0===nc&&ic(ra)),e!==s?(n=Zi,nc++,o=mf(),nc--,o===s?n=void 0:(Zi=n,n=s),n!==s?(Ji=t,t=e="AND"):(Zi=t,t=s)):(Zi=t,t=s),t}function Bb(){var t,e,n,o;return t=Zi,"or"===r.substr(Zi,2).toLowerCase()?(e=r.substr(Zi,2),Zi+=2):(e=s,0===nc&&ic(ta)),e!==s?(n=Zi,nc++,o=mf(),nc--,o===s?n=void 0:(Zi=n,n=s),n!==s?(Ji=t,t=e="OR"):(Zi=t,t=s)):(Zi=t,t=s),t}function $b(){var t,e,n,o;return t=Zi,"extract"===r.substr(Zi,7).toLowerCase()?(e=r.substr(Zi,7),Zi+=7):(e=s,0===nc&&ic(ia)),e!==s?(n=Zi,nc++,o=mf(),nc--,o===s?n=void 0:(Zi=n,n=s),n!==s?(Ji=t,t=e="EXTRACT"):(Zi=t,t=s)):(Zi=t,t=s),t}function Wb(){var t,e,n,o;return t=Zi,"case"===r.substr(Zi,4).toLowerCase()?(e=r.substr(Zi,4),Zi+=4):(e=s,0===nc&&ic(la)),e!==s?(n=Zi,nc++,o=mf(),nc--,o===s?n=void 0:(Zi=n,n=s),n!==s?t=e=[e,n]:(Zi=t,t=s)):(Zi=t,t=s),t}function qb(){var t,e,n,o;return t=Zi,"end"===r.substr(Zi,3).toLowerCase()?(e=r.substr(Zi,3),Zi+=3):(e=s,0===nc&&ic(va)),e!==s?(n=Zi,nc++,o=mf(),nc--,o===s?n=void 0:(Zi=n,n=s),n!==s?t=e=[e,n]:(Zi=t,t=s)):(Zi=t,t=s),t}function Vb(){var t,e,n,o;return t=Zi,"cast"===r.substr(Zi,4).toLowerCase()?(e=r.substr(Zi,4),Zi+=4):(e=s,0===nc&&ic(da)),e!==s?(n=Zi,nc++,o=mf(),nc--,o===s?n=void 0:(Zi=n,n=s),n!==s?(Ji=t,t=e="CAST"):(Zi=t,t=s)):(Zi=t,t=s),t}function Xb(){var t,e,n,o;return t=Zi,"bit"===r.substr(Zi,3).toLowerCase()?(e=r.substr(Zi,3),Zi+=3):(e=s,0===nc&&ic(wa)),e!==s?(n=Zi,nc++,o=mf(),nc--,o===s?n=void 0:(Zi=n,n=s),n!==s?(Ji=t,t=e="BIT"):(Zi=t,t=s)):(Zi=t,t=s),t}function Kb(){var t,e,n,o;return t=Zi,"numeric"===r.substr(Zi,7).toLowerCase()?(e=r.substr(Zi,7),Zi+=7):(e=s,0===nc&&ic(Ca)),e!==s?(n=Zi,nc++,o=mf(),nc--,o===s?n=void 0:(Zi=n,n=s),n!==s?(Ji=t,t=e="NUMERIC"):(Zi=t,t=s)):(Zi=t,t=s),t}function Qb(){var t,e,n,o;return t=Zi,"decimal"===r.substr(Zi,7).toLowerCase()?(e=r.substr(Zi,7),Zi+=7):(e=s,0===nc&&ic(ma)),e!==s?(n=Zi,nc++,o=mf(),nc--,o===s?n=void 0:(Zi=n,n=s),n!==s?(Ji=t,t=e="DECIMAL"):(Zi=t,t=s)):(Zi=t,t=s),t}function zb(){var t,e,n,o;return t=Zi,"int"===r.substr(Zi,3).toLowerCase()?(e=r.substr(Zi,3),Zi+=3):(e=s,0===nc&&ic(Ta)),e!==s?(n=Zi,nc++,o=mf(),nc--,o===s?n=void 0:(Zi=n,n=s),n!==s?(Ji=t,t=e="INT"):(Zi=t,t=s)):(Zi=t,t=s),t}function Zb(){var t,e,n,o;return t=Zi,"integer"===r.substr(Zi,7).toLowerCase()?(e=r.substr(Zi,7),Zi+=7):(e=s,0===nc&&ic(ga)),e!==s?(n=Zi,nc++,o=mf(),nc--,o===s?n=void 0:(Zi=n,n=s),n!==s?(Ji=t,t=e="INTEGER"):(Zi=t,t=s)):(Zi=t,t=s),t}function Jb(){var t,e,n,o;return t=Zi,"smallint"===r.substr(Zi,8).toLowerCase()?(e=r.substr(Zi,8),Zi+=8):(e=s,0===nc&&ic(Sa)),e!==s?(n=Zi,nc++,o=mf(),nc--,o===s?n=void 0:(Zi=n,n=s),n!==s?(Ji=t,t=e="SMALLINT"):(Zi=t,t=s)):(Zi=t,t=s),t}function rp(){var t,e,n,o;return t=Zi,"mediumint"===r.substr(Zi,9).toLowerCase()?(e=r.substr(Zi,9),Zi+=9):(e=s,0===nc&&ic(Na)),e!==s?(n=Zi,nc++,o=mf(),nc--,o===s?n=void 0:(Zi=n,n=s),n!==s?(Ji=t,t=e="MEDIUMINT"):(Zi=t,t=s)):(Zi=t,t=s),t}function tp(){var t,e,n,o;return t=Zi,"tinyint"===r.substr(Zi,7).toLowerCase()?(e=r.substr(Zi,7),Zi+=7):(e=s,0===nc&&ic(Oa)),e!==s?(n=Zi,nc++,o=mf(),nc--,o===s?n=void 0:(Zi=n,n=s),n!==s?(Ji=t,t=e="TINYINT"):(Zi=t,t=s)):(Zi=t,t=s),t}function ep(){var t,e,n,o;return t=Zi,"bigint"===r.substr(Zi,6).toLowerCase()?(e=r.substr(Zi,6),Zi+=6):(e=s,0===nc&&ic(Ua)),e!==s?(n=Zi,nc++,o=mf(),nc--,o===s?n=void 0:(Zi=n,n=s),n!==s?(Ji=t,t=e="BIGINT"):(Zi=t,t=s)):(Zi=t,t=s),t}function np(){var t,e,n,o;return t=Zi,"float"===r.substr(Zi,5).toLowerCase()?(e=r.substr(Zi,5),Zi+=5):(e=s,0===nc&&ic(Ma)),e!==s?(n=Zi,nc++,o=mf(),nc--,o===s?n=void 0:(Zi=n,n=s),n!==s?(Ji=t,t=e="FLOAT"):(Zi=t,t=s)):(Zi=t,t=s),t}function op(){var t,e,n,o;return t=Zi,"double"===r.substr(Zi,6).toLowerCase()?(e=r.substr(Zi,6),Zi+=6):(e=s,0===nc&&ic(Pa)),e!==s?(n=Zi,nc++,o=mf(),nc--,o===s?n=void 0:(Zi=n,n=s),n!==s?(Ji=t,t=e="DOUBLE"):(Zi=t,t=s)):(Zi=t,t=s),t}function sp(){var t,e,n,o;return t=Zi,"date"===r.substr(Zi,4).toLowerCase()?(e=r.substr(Zi,4),Zi+=4):(e=s,0===nc&&ic(Po)),e!==s?(n=Zi,nc++,o=mf(),nc--,o===s?n=void 0:(Zi=n,n=s),n!==s?(Ji=t,t=e="DATE"):(Zi=t,t=s)):(Zi=t,t=s),t}function up(){var t,e,n,o;return t=Zi,"datetime"===r.substr(Zi,8).toLowerCase()?(e=r.substr(Zi,8),Zi+=8):(e=s,0===nc&&ic(Ga)),e!==s?(n=Zi,nc++,o=mf(),nc--,o===s?n=void 0:(Zi=n,n=s),n!==s?(Ji=t,t=e="DATETIME"):(Zi=t,t=s)):(Zi=t,t=s),t}function ap(){var t,e,n,o;return t=Zi,"rows"===r.substr(Zi,4).toLowerCase()?(e=r.substr(Zi,4),Zi+=4):(e=s,0===nc&&ic(xe)),e!==s?(n=Zi,nc++,o=mf(),nc--,o===s?n=void 0:(Zi=n,n=s),n!==s?(Ji=t,t=e="ROWS"):(Zi=t,t=s)):(Zi=t,t=s),t}function ip(){var t,e,n,o;return t=Zi,"time"===r.substr(Zi,4).toLowerCase()?(e=r.substr(Zi,4),Zi+=4):(e=s,0===nc&&ic(rs)),e!==s?(n=Zi,nc++,o=mf(),nc--,o===s?n=void 0:(Zi=n,n=s),n!==s?(Ji=t,t=e="TIME"):(Zi=t,t=s)):(Zi=t,t=s),t}function cp(){var t,e,n,o;return t=Zi,"timestamp"===r.substr(Zi,9).toLowerCase()?(e=r.substr(Zi,9),Zi+=9):(e=s,0===nc&&ic(Fa)),e!==s?(n=Zi,nc++,o=mf(),nc--,o===s?n=void 0:(Zi=n,n=s),n!==s?(Ji=t,t=e="TIMESTAMP"):(Zi=t,t=s)):(Zi=t,t=s),t}function lp(){var t,e,n,o;return t=Zi,"user"===r.substr(Zi,4).toLowerCase()?(e=r.substr(Zi,4),Zi+=4):(e=s,0===nc&&ic(Ha)),e!==s?(n=Zi,nc++,o=mf(),nc--,o===s?n=void 0:(Zi=n,n=s),n!==s?(Ji=t,t=e="USER"):(Zi=t,t=s)):(Zi=t,t=s),t}function fp(){var t,e,n,o;return t=Zi,"vector"===r.substr(Zi,6).toLowerCase()?(e=r.substr(Zi,6),Zi+=6):(e=s,0===nc&&ic(Ya)),e!==s?(n=Zi,nc++,o=mf(),nc--,o===s?n=void 0:(Zi=n,n=s),n!==s?(Ji=t,t=e="VECTOR"):(Zi=t,t=s)):(Zi=t,t=s),t}function bp(){var t,e,n,o;return t=Zi,"interval"===r.substr(Zi,8).toLowerCase()?(e=r.substr(Zi,8),Zi+=8):(e=s,0===nc&&ic($a)),e!==s?(n=Zi,nc++,o=mf(),nc--,o===s?n=void 0:(Zi=n,n=s),n!==s?(Ji=t,t=e="INTERVAL"):(Zi=t,t=s)):(Zi=t,t=s),t}function pp(){var t,e,n,o;return t=Zi,"current_timestamp"===r.substr(Zi,17).toLowerCase()?(e=r.substr(Zi,17),Zi+=17):(e=s,0===nc&&ic(Va)),e!==s?(n=Zi,nc++,o=mf(),nc--,o===s?n=void 0:(Zi=n,n=s),n!==s?(Ji=t,t=e="CURRENT_TIMESTAMP"):(Zi=t,t=s)):(Zi=t,t=s),t}function vp(){var t,e,n,o;return t=Zi,"current_user"===r.substr(Zi,12).toLowerCase()?(e=r.substr(Zi,12),Zi+=12):(e=s,0===nc&&ic(Xa)),e!==s?(n=Zi,nc++,o=mf(),nc--,o===s?n=void 0:(Zi=n,n=s),n!==s?(Ji=t,t=e="CURRENT_USER"):(Zi=t,t=s)):(Zi=t,t=s),t}function dp(){var t,e,n,o;return t=Zi,"view"===r.substr(Zi,4).toLowerCase()?(e=r.substr(Zi,4),Zi+=4):(e=s,0===nc&&ic(ke)),e!==s?(n=Zi,nc++,o=mf(),nc--,o===s?n=void 0:(Zi=n,n=s),n!==s?(Ji=t,t=e="VIEW"):(Zi=t,t=s)):(Zi=t,t=s),t}function yp(){var t;return 64===r.charCodeAt(Zi)?(t="@",Zi++):(t=s,0===nc&&ic(lr)),t}function wp(){var t;return (t=function(){var t;return "@@"===r.substr(Zi,2)?(t="@@",Zi+=2):(t=s,0===nc&&ic(ci)),t}())===s&&(t=yp())===s&&(t=function(){var t;return 36===r.charCodeAt(Zi)?(t="$",Zi++):(t=s,0===nc&&ic(li)),t}()),t}function Lp(){var t;return ":="===r.substr(Zi,2)?(t=":=",Zi+=2):(t=s,0===nc&&ic(bi)),t}function hp(){var t;return 61===r.charCodeAt(Zi)?(t="=",Zi++):(t=s,0===nc&&ic(Cn)),t}function Cp(){var t,e,n,o;return t=Zi,"add"===r.substr(Zi,3).toLowerCase()?(e=r.substr(Zi,3),Zi+=3):(e=s,0===nc&&ic(vi)),e!==s?(n=Zi,nc++,o=mf(),nc--,o===s?n=void 0:(Zi=n,n=s),n!==s?(Ji=t,t=e="ADD"):(Zi=t,t=s)):(Zi=t,t=s),t}function mp(){var t,e,n,o;return t=Zi,"column"===r.substr(Zi,6).toLowerCase()?(e=r.substr(Zi,6),Zi+=6):(e=s,0===nc&&ic(di)),e!==s?(n=Zi,nc++,o=mf(),nc--,o===s?n=void 0:(Zi=n,n=s),n!==s?(Ji=t,t=e="COLUMN"):(Zi=t,t=s)):(Zi=t,t=s),t}function Ep(){var t,e,n,o;return t=Zi,"index"===r.substr(Zi,5).toLowerCase()?(e=r.substr(Zi,5),Zi+=5):(e=s,0===nc&&ic(It)),e!==s?(n=Zi,nc++,o=mf(),nc--,o===s?n=void 0:(Zi=n,n=s),n!==s?(Ji=t,t=e="INDEX"):(Zi=t,t=s)):(Zi=t,t=s),t}function Ap(){var t,e,n,o;return t=Zi,"key"===r.substr(Zi,3).toLowerCase()?(e=r.substr(Zi,3),Zi+=3):(e=s,0===nc&&ic(ir)),e!==s?(n=Zi,nc++,o=mf(),nc--,o===s?n=void 0:(Zi=n,n=s),n!==s?(Ji=t,t=e="KEY"):(Zi=t,t=s)):(Zi=t,t=s),t}function Tp(){var t,e,n,o;return t=Zi,"fulltext"===r.substr(Zi,8).toLowerCase()?(e=r.substr(Zi,8),Zi+=8):(e=s,0===nc&&ic(wi)),e!==s?(n=Zi,nc++,o=mf(),nc--,o===s?n=void 0:(Zi=n,n=s),n!==s?(Ji=t,t=e="FULLTEXT"):(Zi=t,t=s)):(Zi=t,t=s),t}function _p(){var t,e,n,o;return t=Zi,"spatial"===r.substr(Zi,7).toLowerCase()?(e=r.substr(Zi,7),Zi+=7):(e=s,0===nc&&ic(Li)),e!==s?(n=Zi,nc++,o=mf(),nc--,o===s?n=void 0:(Zi=n,n=s),n!==s?(Ji=t,t=e="SPATIAL"):(Zi=t,t=s)):(Zi=t,t=s),t}function gp(){var t,e,n,o;return t=Zi,"unique"===r.substr(Zi,6).toLowerCase()?(e=r.substr(Zi,6),Zi+=6):(e=s,0===nc&&ic(ar)),e!==s?(n=Zi,nc++,o=mf(),nc--,o===s?n=void 0:(Zi=n,n=s),n!==s?(Ji=t,t=e="UNIQUE"):(Zi=t,t=s)):(Zi=t,t=s),t}function Ip(){var t,e,n,o;return t=Zi,"comment"===r.substr(Zi,7).toLowerCase()?(e=r.substr(Zi,7),Zi+=7):(e=s,0===nc&&ic(hi)),e!==s?(n=Zi,nc++,o=mf(),nc--,o===s?n=void 0:(Zi=n,n=s),n!==s?(Ji=t,t=e="COMMENT"):(Zi=t,t=s)):(Zi=t,t=s),t}function Sp(){var t,e,n,o;return t=Zi,"constraint"===r.substr(Zi,10).toLowerCase()?(e=r.substr(Zi,10),Zi+=10):(e=s,0===nc&&ic(Qr)),e!==s?(n=Zi,nc++,o=mf(),nc--,o===s?n=void 0:(Zi=n,n=s),n!==s?(Ji=t,t=e="CONSTRAINT"):(Zi=t,t=s)):(Zi=t,t=s),t}function Np(){var t,e,n,o;return t=Zi,"references"===r.substr(Zi,10).toLowerCase()?(e=r.substr(Zi,10),Zi+=10):(e=s,0===nc&&ic(Ci)),e!==s?(n=Zi,nc++,o=mf(),nc--,o===s?n=void 0:(Zi=n,n=s),n!==s?(Ji=t,t=e="REFERENCES"):(Zi=t,t=s)):(Zi=t,t=s),t}function Op(){var t;return 46===r.charCodeAt(Zi)?(t=".",Zi++):(t=s,0===nc&&ic(Bs)),t}function Rp(){var t;return 44===r.charCodeAt(Zi)?(t=",",Zi++):(t=s,0===nc&&ic(Ii)),t}function jp(){var t;return 42===r.charCodeAt(Zi)?(t="*",Zi++):(t=s,0===nc&&ic(xn)),t}function xp(){var t;return 40===r.charCodeAt(Zi)?(t="(",Zi++):(t=s,0===nc&&ic(Be)),t}function kp(){var t;return 41===r.charCodeAt(Zi)?(t=")",Zi++):(t=s,0===nc&&ic($e)),t}function Up(){var t;return 59===r.charCodeAt(Zi)?(t=";",Zi++):(t=s,0===nc&&ic(Oi)),t}function Dp(){var t;return "->"===r.substr(Zi,2)?(t="->",Zi+=2):(t=s,0===nc&&ic(Ri)),t}function Mp(){var t;return "->>"===r.substr(Zi,3)?(t="->>",Zi+=3):(t=s,0===nc&&ic(ji)),t}function Pp(){var t;return (t=function(){var t;return "||"===r.substr(Zi,2)?(t="||",Zi+=2):(t=s,0===nc&&ic(Dn)),t}())===s&&(t=function(){var t;return "&&"===r.substr(Zi,2)?(t="&&",Zi+=2):(t=s,0===nc&&ic(xi)),t}())===s&&(t=function(){var t,e,n,o;return t=Zi,"xor"===r.substr(Zi,3).toLowerCase()?(e=r.substr(Zi,3),Zi+=3):(e=s,0===nc&&ic(ki)),e!==s?(n=Zi,nc++,o=mf(),nc--,o===s?n=void 0:(Zi=n,n=s),n!==s?(Ji=t,t=e="XOR"):(Zi=t,t=s)):(Zi=t,t=s),t}()),t}function Gp(){var r,t;for(r=[],(t=$p())===s&&(t=Hp());t!==s;)r.push(t),(t=$p())===s&&(t=Hp());return r}function Fp(){var r,t;if(r=[],(t=$p())===s&&(t=Hp()),t!==s)for(;t!==s;)r.push(t),(t=$p())===s&&(t=Hp());else r=s;return r}function Hp(){var t;return (t=function(){var t,e,n,o,u,a;t=Zi,"/*"===r.substr(Zi,2)?(e="/*",Zi+=2):(e=s,0===nc&&ic(Ui));if(e!==s){for(n=[],o=Zi,u=Zi,nc++,"*/"===r.substr(Zi,2)?(a="*/",Zi+=2):(a=s,0===nc&&ic(Di)),nc--,a===s?u=void 0:(Zi=u,u=s),u!==s&&(a=Bp())!==s?o=u=[u,a]:(Zi=o,o=s);o!==s;)n.push(o),o=Zi,u=Zi,nc++,"*/"===r.substr(Zi,2)?(a="*/",Zi+=2):(a=s,0===nc&&ic(Di)),nc--,a===s?u=void 0:(Zi=u,u=s),u!==s&&(a=Bp())!==s?o=u=[u,a]:(Zi=o,o=s);n!==s?("*/"===r.substr(Zi,2)?(o="*/",Zi+=2):(o=s,0===nc&&ic(Di)),o!==s?t=e=[e,n,o]:(Zi=t,t=s)):(Zi=t,t=s);}else Zi=t,t=s;return t}())===s&&(t=function(){var t,e,n,o,u,a;t=Zi,"--"===r.substr(Zi,2)?(e="--",Zi+=2):(e=s,0===nc&&ic(Mi));if(e!==s){for(n=[],o=Zi,u=Zi,nc++,a=Wp(),nc--,a===s?u=void 0:(Zi=u,u=s),u!==s&&(a=Bp())!==s?o=u=[u,a]:(Zi=o,o=s);o!==s;)n.push(o),o=Zi,u=Zi,nc++,a=Wp(),nc--,a===s?u=void 0:(Zi=u,u=s),u!==s&&(a=Bp())!==s?o=u=[u,a]:(Zi=o,o=s);n!==s?t=e=[e,n]:(Zi=t,t=s);}else Zi=t,t=s;return t}())===s&&(t=function(){var t,e,n,o,u,a;t=Zi,35===r.charCodeAt(Zi)?(e="#",Zi++):(e=s,0===nc&&ic(Pi));if(e!==s){for(n=[],o=Zi,u=Zi,nc++,a=Wp(),nc--,a===s?u=void 0:(Zi=u,u=s),u!==s&&(a=Bp())!==s?o=u=[u,a]:(Zi=o,o=s);o!==s;)n.push(o),o=Zi,u=Zi,nc++,a=Wp(),nc--,a===s?u=void 0:(Zi=u,u=s),u!==s&&(a=Bp())!==s?o=u=[u,a]:(Zi=o,o=s);n!==s?t=e=[e,n]:(Zi=t,t=s);}else Zi=t,t=s;return t}()),t}function Yp(){var r,t,e,n,o,u,a;return r=Zi,(t=Ip())!==s&&Gp()!==s?((e=hp())===s&&(e=null),e!==s&&Gp()!==s&&(n=Bf())!==s?(Ji=r,u=e,a=n,r=t={type:(o=t).toLowerCase(),keyword:o.toLowerCase(),symbol:u,value:a}):(Zi=r,r=s)):(Zi=r,r=s),r}function Bp(){var t;return r.length>Zi?(t=r.charAt(Zi),Zi++):(t=s,0===nc&&ic(Gi)),t}function $p(){var t;return Fi.test(r.charAt(Zi))?(t=r.charAt(Zi),Zi++):(t=s,0===nc&&ic(Hi)),t}function Wp(){var t,e;if((t=function(){var t,e;t=Zi,nc++,r.length>Zi?(e=r.charAt(Zi),Zi++):(e=s,0===nc&&ic(Gi));nc--,e===s?t=void 0:(Zi=t,t=s);return t}())===s)if(t=[],Fs.test(r.charAt(Zi))?(e=r.charAt(Zi),Zi++):(e=s,0===nc&&ic(Hs)),e!==s)for(;e!==s;)t.push(e),Fs.test(r.charAt(Zi))?(e=r.charAt(Zi),Zi++):(e=s,0===nc&&ic(Hs));else t=s;return t}function qp(){var t,e;return t=Zi,Ji=Zi,Lv=[],(void 0)!==s&&Gp()!==s?((e=Vp())===s&&(e=function(){var t,e;t=Zi,function(){var t;return "return"===r.substr(Zi,6).toLowerCase()?(t=r.substr(Zi,6),Zi+=6):(t=s,0===nc&&ic(fi)),t}()!==s&&Gp()!==s&&(e=function(){var t;(t=Zc())===s&&(t=function(){var r,t,e,n,o;r=Zi,(t=tv())!==s&&Gp()!==s&&(e=Cl())!==s&&Gp()!==s&&(n=tv())!==s&&Gp()!==s&&(o=El())!==s?(Ji=r,r=t={type:"join",ltable:t,rtable:n,op:e,on:o}):(Zi=r,r=s);return r}())===s&&(t=Xp())===s&&(t=function(){var t,e;t=Zi,function(){var t;return 91===r.charCodeAt(Zi)?(t="[",Zi++):(t=s,0===nc&&ic(Si)),t}()!==s&&Gp()!==s&&(e=rv())!==s&&Gp()!==s&&function(){var t;return 93===r.charCodeAt(Zi)?(t="]",Zi++):(t=s,0===nc&&ic(Ni)),t}()!==s?(Ji=t,t={type:"array",value:e}):(Zi=t,t=s);return t}());return t}())!==s?(Ji=t,t={type:"return",expr:e}):(Zi=t,t=s);return t}()),e!==s?(Ji=t,t={stmt:e,vars:Lv}):(Zi=t,t=s)):(Zi=t,t=s),t}function Vp(){var r,t,e,n;return r=Zi,(t=tv())===s&&(t=ev()),t!==s&&Gp()!==s?((e=Lp())===s&&(e=hp()),e!==s&&Gp()!==s&&(n=Bl())!==s?(Ji=r,r=t=Yi(t,e,n)):(Zi=r,r=s)):(Zi=r,r=s),r}function Xp(){var r,t,e,n,o,u,a,i;if(r=Zi,(t=Kp())!==s){for(e=[],n=Zi,(o=Gp())!==s&&(u=rf())!==s&&(a=Gp())!==s&&(i=Kp())!==s?n=o=[o,u,a,i]:(Zi=n,n=s);n!==s;)e.push(n),n=Zi,(o=Gp())!==s&&(u=rf())!==s&&(a=Gp())!==s&&(i=Kp())!==s?n=o=[o,u,a,i]:(Zi=n,n=s);e!==s?(Ji=r,r=t=En(t,e)):(Zi=r,r=s);}else Zi=r,r=s;return r}function Kp(){var r,t,e,n,o,u,a,i;if(r=Zi,(t=Qp())!==s){for(e=[],n=Zi,(o=Gp())!==s&&(u=ef())!==s&&(a=Gp())!==s&&(i=Qp())!==s?n=o=[o,u,a,i]:(Zi=n,n=s);n!==s;)e.push(n),n=Zi,(o=Gp())!==s&&(u=ef())!==s&&(a=Gp())!==s&&(i=Qp())!==s?n=o=[o,u,a,i]:(Zi=n,n=s);e!==s?(Ji=r,r=t=En(t,e)):(Zi=r,r=s);}else Zi=r,r=s;return r}function Qp(){var r,t,e;return (r=Zp())===s&&(r=Hf())===s&&(r=tv())===s&&(r=sf())===s&&(r=Jp())===s&&(r=Tf())===s&&(r=Zi,xp()!==s&&Gp()!==s&&(t=Xp())!==s&&Gp()!==s&&kp()!==s?(Ji=r,(e=t).parentheses=true,r=e):(Zi=r,r=s)),r}function zp(){var r,t,e,n,o,u,a;return r=Zi,(t=af())===s&&(t=yf()),t!==s?(e=Zi,(n=Gp())!==s&&(o=Op())!==s&&(u=Gp())!==s?((a=af())===s&&(a=yf()),a!==s?e=n=[n,o,u,a]:(Zi=e,e=s)):(Zi=e,e=s),e===s&&(e=null),e!==s?(Ji=r,r=t=function(r,t){const e={name:[r]};return null!==t&&(e.schema=r,e.name=[t[3]]),e}(t,e)):(Zi=r,r=s)):(Zi=r,r=s),r}function Zp(){var r,t,e;return r=Zi,(t=zp())!==s&&Gp()!==s&&xp()!==s&&Gp()!==s?((e=rv())===s&&(e=null),e!==s&&Gp()!==s&&kp()!==s?(Ji=r,r=t={type:"function",name:t,args:{type:"expr_list",value:e},...lv()}):(Zi=r,r=s)):(Zi=r,r=s),r}function Jp(){var r,t;return r=Zi,(t=zp())!==s&&(Ji=r,t={type:"function",name:t,args:null,...lv()}),r=t}function rv(){var r,t,e,n,o,u,a,i;if(r=Zi,(t=Qp())!==s){for(e=[],n=Zi,(o=Gp())!==s&&(u=Rp())!==s&&(a=Gp())!==s&&(i=Qp())!==s?n=o=[o,u,a,i]:(Zi=n,n=s);n!==s;)e.push(n),n=Zi,(o=Gp())!==s&&(u=Rp())!==s&&(a=Gp())!==s&&(i=Qp())!==s?n=o=[o,u,a,i]:(Zi=n,n=s);e!==s?(Ji=r,r=t=sr(t,e)):(Zi=r,r=s);}else Zi=r,r=s;return r}function tv(){var r,t,e,n,o;return r=Zi,(t=wp())!==s&&(e=ev())!==s?(Ji=r,n=t,o=e,r=t={type:"var",...o,prefix:n}):(Zi=r,r=s),r}function ev(){var t,e,n,o,u;return t=Zi,(e=Cf())!==s&&(n=function(){var t,e,n,o,u;t=Zi,e=[],n=Zi,46===r.charCodeAt(Zi)?(o=".",Zi++):(o=s,0===nc&&ic(Bs));o!==s&&(u=Cf())!==s?n=o=[o,u]:(Zi=n,n=s);for(;n!==s;)e.push(n),n=Zi,46===r.charCodeAt(Zi)?(o=".",Zi++):(o=s,0===nc&&ic(Bs)),o!==s&&(u=Cf())!==s?n=o=[o,u]:(Zi=n,n=s);e!==s&&(Ji=t,e=function(r){const t=[];for(let e=0;e<r.length;e++)t.push(r[e][1]);return t}(e));return t=e}())!==s?(Ji=t,o=e,u=n,Lv.push(o),t=e={type:"var",name:o,members:u,prefix:null}):(Zi=t,t=s),t===s&&(t=Zi,(e=Vf())!==s&&(Ji=t,e={type:"var",name:e.value,members:[],quoted:null,prefix:null}),t=e),t}function nv(){var t;return (t=sv())===s&&(t=function(){var t,e,n,o,u,a,i,c,l,f,b,p;t=Zi,(e=Kb())===s&&(e=Qb())===s&&(e=zb())===s&&(e=Zb())===s&&(e=Jb())===s&&(e=rp())===s&&(e=tp())===s&&(e=ep())===s&&(e=np())===s&&(e=op())===s&&(e=Xb());if(e!==s)if((n=Gp())!==s)if((o=xp())!==s)if((u=Gp())!==s){if(a=[],We.test(r.charAt(Zi))?(i=r.charAt(Zi),Zi++):(i=s,0===nc&&ic(qe)),i!==s)for(;i!==s;)a.push(i),We.test(r.charAt(Zi))?(i=r.charAt(Zi),Zi++):(i=s,0===nc&&ic(qe));else a=s;if(a!==s)if((i=Gp())!==s){if(c=Zi,(l=Rp())!==s)if((f=Gp())!==s){if(b=[],We.test(r.charAt(Zi))?(p=r.charAt(Zi),Zi++):(p=s,0===nc&&ic(qe)),p!==s)for(;p!==s;)b.push(p),We.test(r.charAt(Zi))?(p=r.charAt(Zi),Zi++):(p=s,0===nc&&ic(qe));else b=s;b!==s?c=l=[l,f,b]:(Zi=c,c=s);}else Zi=c,c=s;else Zi=c,c=s;c===s&&(c=null),c!==s&&(l=Gp())!==s&&(f=kp())!==s&&(b=Gp())!==s?((p=uv())===s&&(p=null),p!==s?(Ji=t,v=c,d=p,e={dataType:e,length:parseInt(a.join(""),10),scale:v&&parseInt(v[2].join(""),10),parentheses:true,suffix:d},t=e):(Zi=t,t=s)):(Zi=t,t=s);}else Zi=t,t=s;else Zi=t,t=s;}else Zi=t,t=s;else Zi=t,t=s;else Zi=t,t=s;else Zi=t,t=s;var v,d;if(t===s){if(t=Zi,(e=Kb())===s&&(e=Qb())===s&&(e=zb())===s&&(e=Zb())===s&&(e=Jb())===s&&(e=rp())===s&&(e=tp())===s&&(e=ep())===s&&(e=np())===s&&(e=op())===s&&(e=Xb()),e!==s){if(n=[],We.test(r.charAt(Zi))?(o=r.charAt(Zi),Zi++):(o=s,0===nc&&ic(qe)),o!==s)for(;o!==s;)n.push(o),We.test(r.charAt(Zi))?(o=r.charAt(Zi),Zi++):(o=s,0===nc&&ic(qe));else n=s;n!==s&&(o=Gp())!==s?((u=uv())===s&&(u=null),u!==s?(Ji=t,e=function(r,t,e){return {dataType:r,length:parseInt(t.join(""),10),suffix:e}}(e,n,u),t=e):(Zi=t,t=s)):(Zi=t,t=s);}else Zi=t,t=s;t===s&&(t=Zi,(e=Kb())===s&&(e=Qb())===s&&(e=zb())===s&&(e=Zb())===s&&(e=Jb())===s&&(e=rp())===s&&(e=tp())===s&&(e=ep())===s&&(e=np())===s&&(e=op())===s&&(e=Xb()),e!==s&&(n=Gp())!==s?((o=uv())===s&&(o=null),o!==s&&(u=Gp())!==s?(Ji=t,e=function(r,t){return {dataType:r,suffix:t}}(e,o),t=e):(Zi=t,t=s)):(Zi=t,t=s));}return t}())===s&&(t=av())===s&&(t=function(){var t,e;t=Zi,(e=function(){var t,e,n,o;return t=Zi,"json"===r.substr(Zi,4).toLowerCase()?(e=r.substr(Zi,4),Zi+=4):(e=s,0===nc&&ic(Ia)),e!==s?(n=Zi,nc++,o=mf(),nc--,o===s?n=void 0:(Zi=n,n=s),n!==s?(Ji=t,t=e="JSON"):(Zi=t,t=s)):(Zi=t,t=s),t}())!==s&&(Ji=t,e={dataType:e});return t=e}())===s&&(t=function(){var t,e,n;t=Zi,(e=function(){var t,e,n,o;return t=Zi,"tinytext"===r.substr(Zi,8).toLowerCase()?(e=r.substr(Zi,8),Zi+=8):(e=s,0===nc&&ic(Ra)),e!==s?(n=Zi,nc++,o=mf(),nc--,o===s?n=void 0:(Zi=n,n=s),n!==s?(Ji=t,t=e="TINYTEXT"):(Zi=t,t=s)):(Zi=t,t=s),t}())===s&&(e=function(){var t,e,n,o;return t=Zi,"text"===r.substr(Zi,4).toLowerCase()?(e=r.substr(Zi,4),Zi+=4):(e=s,0===nc&&ic(ja)),e!==s?(n=Zi,nc++,o=mf(),nc--,o===s?n=void 0:(Zi=n,n=s),n!==s?(Ji=t,t=e="TEXT"):(Zi=t,t=s)):(Zi=t,t=s),t}())===s&&(e=function(){var t,e,n,o;return t=Zi,"mediumtext"===r.substr(Zi,10).toLowerCase()?(e=r.substr(Zi,10),Zi+=10):(e=s,0===nc&&ic(xa)),e!==s?(n=Zi,nc++,o=mf(),nc--,o===s?n=void 0:(Zi=n,n=s),n!==s?(Ji=t,t=e="MEDIUMTEXT"):(Zi=t,t=s)):(Zi=t,t=s),t}())===s&&(e=function(){var t,e,n,o;return t=Zi,"longtext"===r.substr(Zi,8).toLowerCase()?(e=r.substr(Zi,8),Zi+=8):(e=s,0===nc&&ic(ka)),e!==s?(n=Zi,nc++,o=mf(),nc--,o===s?n=void 0:(Zi=n,n=s),n!==s?(Ji=t,t=e="LONGTEXT"):(Zi=t,t=s)):(Zi=t,t=s),t}());e!==s?((n=ov())===s&&(n=null),n!==s?(Ji=t,e=Xi(e,n),t=e):(Zi=t,t=s)):(Zi=t,t=s);return t}())===s&&(t=function(){var t,e,n;t=Zi,(e=function(){var t,e,n,o;return t=Zi,"enum"===r.substr(Zi,4).toLowerCase()?(e=r.substr(Zi,4),Zi+=4):(e=s,0===nc&&ic(Da)),e!==s?(n=Zi,nc++,o=mf(),nc--,o===s?n=void 0:(Zi=n,n=s),n!==s?(Ji=t,t=e="ENUM"):(Zi=t,t=s)):(Zi=t,t=s),t}())===s&&(e=wb());e!==s&&Gp()!==s&&(n=Ml())!==s?(Ji=t,o=e,(u=n).parentheses=true,t=e={dataType:o,expr:u}):(Zi=t,t=s);var o,u;return t}())===s&&(t=function(){var t,e;t=Zi,"boolean"===r.substr(Zi,7).toLowerCase()?(e=r.substr(Zi,7),Zi+=7):(e=s,0===nc&&ic(Bi));e!==s&&(Ji=t,e={dataType:"BOOLEAN"});return t=e}())===s&&(t=function(){var t,e,n;t=Zi,(e=function(){var t,e,n,o;return t=Zi,"binary"===r.substr(Zi,6).toLowerCase()?(e=r.substr(Zi,6),Zi+=6):(e=s,0===nc&&ic(Bt)),e!==s?(n=Zi,nc++,o=mf(),nc--,o===s?n=void 0:(Zi=n,n=s),n!==s?(Ji=t,t=e="BINARY"):(Zi=t,t=s)):(Zi=t,t=s),t}())===s&&(e=function(){var t,e,n,o;return t=Zi,"varbinary"===r.substr(Zi,9).toLowerCase()?(e=r.substr(Zi,9),Zi+=9):(e=s,0===nc&&ic(ya)),e!==s?(n=Zi,nc++,o=mf(),nc--,o===s?n=void 0:(Zi=n,n=s),n!==s?(Ji=t,t=e="VARBINARY"):(Zi=t,t=s)):(Zi=t,t=s),t}());e!==s&&Gp()!==s?((n=ov())===s&&(n=null),n!==s?(Ji=t,e=Xi(e,n),t=e):(Zi=t,t=s)):(Zi=t,t=s);return t}())===s&&(t=function(){var t,e;t=Zi,"blob"===r.substr(Zi,4).toLowerCase()?(e=r.substr(Zi,4),Zi+=4):(e=s,0===nc&&ic($i));e===s&&("tinyblob"===r.substr(Zi,8).toLowerCase()?(e=r.substr(Zi,8),Zi+=8):(e=s,0===nc&&ic(Wi)),e===s&&("mediumblob"===r.substr(Zi,10).toLowerCase()?(e=r.substr(Zi,10),Zi+=10):(e=s,0===nc&&ic(qi)),e===s&&("longblob"===r.substr(Zi,8).toLowerCase()?(e=r.substr(Zi,8),Zi+=8):(e=s,0===nc&&ic(Vi)))));e!==s&&(Ji=t,e={dataType:e.toUpperCase()});return t=e}())===s&&(t=function(){var t,e;t=Zi,(e=function(){var t,e,n,o;return t=Zi,"geometry"===r.substr(Zi,8).toLowerCase()?(e=r.substr(Zi,8),Zi+=8):(e=s,0===nc&&ic(ti)),e!==s?(n=Zi,nc++,o=mf(),nc--,o===s?n=void 0:(Zi=n,n=s),n!==s?(Ji=t,t=e="GEOMETRY"):(Zi=t,t=s)):(Zi=t,t=s),t}())===s&&(e=function(){var t,e,n,o;return t=Zi,"point"===r.substr(Zi,5).toLowerCase()?(e=r.substr(Zi,5),Zi+=5):(e=s,0===nc&&ic(ei)),e!==s?(n=Zi,nc++,o=mf(),nc--,o===s?n=void 0:(Zi=n,n=s),n!==s?(Ji=t,t=e="POINT"):(Zi=t,t=s)):(Zi=t,t=s),t}())===s&&(e=function(){var t,e,n,o;return t=Zi,"linestring"===r.substr(Zi,10).toLowerCase()?(e=r.substr(Zi,10),Zi+=10):(e=s,0===nc&&ic(ni)),e!==s?(n=Zi,nc++,o=mf(),nc--,o===s?n=void 0:(Zi=n,n=s),n!==s?(Ji=t,t=e="LINESTRING"):(Zi=t,t=s)):(Zi=t,t=s),t}())===s&&(e=function(){var t,e,n,o;return t=Zi,"polygon"===r.substr(Zi,7).toLowerCase()?(e=r.substr(Zi,7),Zi+=7):(e=s,0===nc&&ic(oi)),e!==s?(n=Zi,nc++,o=mf(),nc--,o===s?n=void 0:(Zi=n,n=s),n!==s?(Ji=t,t=e="POLYGON"):(Zi=t,t=s)):(Zi=t,t=s),t}())===s&&(e=function(){var t,e,n,o;return t=Zi,"multipoint"===r.substr(Zi,10).toLowerCase()?(e=r.substr(Zi,10),Zi+=10):(e=s,0===nc&&ic(si)),e!==s?(n=Zi,nc++,o=mf(),nc--,o===s?n=void 0:(Zi=n,n=s),n!==s?(Ji=t,t=e="MULTIPOINT"):(Zi=t,t=s)):(Zi=t,t=s),t}())===s&&(e=function(){var t,e,n,o;return t=Zi,"multilinestring"===r.substr(Zi,15).toLowerCase()?(e=r.substr(Zi,15),Zi+=15):(e=s,0===nc&&ic(ui)),e!==s?(n=Zi,nc++,o=mf(),nc--,o===s?n=void 0:(Zi=n,n=s),n!==s?(Ji=t,t=e="MULTILINESTRING"):(Zi=t,t=s)):(Zi=t,t=s),t}())===s&&(e=function(){var t,e,n,o;return t=Zi,"multipolygon"===r.substr(Zi,12).toLowerCase()?(e=r.substr(Zi,12),Zi+=12):(e=s,0===nc&&ic(ai)),e!==s?(n=Zi,nc++,o=mf(),nc--,o===s?n=void 0:(Zi=n,n=s),n!==s?(Ji=t,t=e="MULTIPOLYGON"):(Zi=t,t=s)):(Zi=t,t=s),t}())===s&&(e=function(){var t,e,n,o;return t=Zi,"geometrycollection"===r.substr(Zi,18).toLowerCase()?(e=r.substr(Zi,18),Zi+=18):(e=s,0===nc&&ic(ii)),e!==s?(n=Zi,nc++,o=mf(),nc--,o===s?n=void 0:(Zi=n,n=s),n!==s?(Ji=t,t=e="GEOMETRYCOLLECTION"):(Zi=t,t=s)):(Zi=t,t=s),t}());e!==s&&(Ji=t,e={dataType:e});return t=e}())===s&&(t=function(){var t,e,n,o;if(t=Zi,(e=fp())!==s)if(Gp()!==s)if(xp()!==s)if(Gp()!==s){if(n=[],We.test(r.charAt(Zi))?(o=r.charAt(Zi),Zi++):(o=s,0===nc&&ic(qe)),o!==s)for(;o!==s;)n.push(o),We.test(r.charAt(Zi))?(o=r.charAt(Zi),Zi++):(o=s,0===nc&&ic(qe));else n=s;n!==s&&(o=Gp())!==s&&kp()!==s?(Ji=t,e={dataType:e,length:parseInt(n.join(""),10),parentheses:true},t=e):(Zi=t,t=s);}else Zi=t,t=s;else Zi=t,t=s;else Zi=t,t=s;else Zi=t,t=s;t===s&&(t=Zi,(e=fp())!==s&&(Ji=t,e=function(r){return {dataType:r}}(e)),t=e);return t}()),t}function ov(){var t,e,n,o,u;if(t=Zi,xp()!==s)if(Gp()!==s){if(e=[],We.test(r.charAt(Zi))?(n=r.charAt(Zi),Zi++):(n=s,0===nc&&ic(qe)),n!==s)for(;n!==s;)e.push(n),We.test(r.charAt(Zi))?(n=r.charAt(Zi),Zi++):(n=s,0===nc&&ic(qe));else e=s;e!==s&&(n=Gp())!==s&&kp()!==s&&Gp()!==s?((o=uv())===s&&(o=null),o!==s?(Ji=t,u=o,t={length:parseInt(e.join(""),10),parentheses:true,suffix:u}):(Zi=t,t=s)):(Zi=t,t=s);}else Zi=t,t=s;else Zi=t,t=s;return t}function sv(){var t,e,n,o,u,a,i,c,l,f,b;if(t=Zi,(e=function(){var t,e,n,o;return t=Zi,"char"===r.substr(Zi,4).toLowerCase()?(e=r.substr(Zi,4),Zi+=4):(e=s,0===nc&&ic(La)),e!==s?(n=Zi,nc++,o=mf(),nc--,o===s?n=void 0:(Zi=n,n=s),n!==s?(Ji=t,t=e="CHAR"):(Zi=t,t=s)):(Zi=t,t=s),t}())===s&&(e=function(){var t,e,n,o;return t=Zi,"varchar"===r.substr(Zi,7).toLowerCase()?(e=r.substr(Zi,7),Zi+=7):(e=s,0===nc&&ic(ha)),e!==s?(n=Zi,nc++,o=mf(),nc--,o===s?n=void 0:(Zi=n,n=s),n!==s?(Ji=t,t=e="VARCHAR"):(Zi=t,t=s)):(Zi=t,t=s),t}()),e!==s){if(n=Zi,(o=Gp())!==s)if((u=xp())!==s)if((a=Gp())!==s){if(i=[],We.test(r.charAt(Zi))?(c=r.charAt(Zi),Zi++):(c=s,0===nc&&ic(qe)),c!==s)for(;c!==s;)i.push(c),We.test(r.charAt(Zi))?(c=r.charAt(Zi),Zi++):(c=s,0===nc&&ic(qe));else i=s;i!==s&&(c=Gp())!==s&&(l=kp())!==s&&(f=Gp())!==s?("array"===r.substr(Zi,5).toLowerCase()?(b=r.substr(Zi,5),Zi+=5):(b=s,0===nc&&ic(Ki)),b===s&&(b=null),b!==s?n=o=[o,u,a,i,c,l,f,b]:(Zi=n,n=s)):(Zi=n,n=s);}else Zi=n,n=s;else Zi=n,n=s;else Zi=n,n=s;n===s&&(n=null),n!==s?(Ji=t,t=e=function(r,t){const e={dataType:r};return t&&(e.length=parseInt(t[3].join(""),10),e.parentheses=true,e.suffix=t[7]&&["ARRAY"]),e}(e,n)):(Zi=t,t=s);}else Zi=t,t=s;return t}function uv(){var t,e,n;return t=Zi,(e=Gf())===s&&(e=null),e!==s&&Gp()!==s?((n=function(){var t,e,n,o;return t=Zi,"zerofill"===r.substr(Zi,8).toLowerCase()?(e=r.substr(Zi,8),Zi+=8):(e=s,0===nc&&ic(_a)),e!==s?(n=Zi,nc++,o=mf(),nc--,o===s?n=void 0:(Zi=n,n=s),n!==s?(Ji=t,t=e="ZEROFILL"):(Zi=t,t=s)):(Zi=t,t=s),t}())===s&&(n=null),n!==s?(Ji=t,t=e=function(r,t){const e=[];return r&&e.push(r),t&&e.push(t),e}(e,n)):(Zi=t,t=s)):(Zi=t,t=s),t}function av(){var t,e,n,o,u,a,i,c,l,f,b;return t=Zi,(e=sp())===s&&(e=up())===s&&(e=ip())===s&&(e=cp())===s&&(e=function(){var t,e,n,o;return t=Zi,"year"===r.substr(Zi,4).toLowerCase()?(e=r.substr(Zi,4),Zi+=4):(e=s,0===nc&&ic(ns)),e!==s?(n=Zi,nc++,o=mf(),nc--,o===s?n=void 0:(Zi=n,n=s),n!==s?(Ji=t,t=e="YEAR"):(Zi=t,t=s)):(Zi=t,t=s),t}()),e!==s?(n=Zi,(o=Gp())!==s&&(u=xp())!==s&&(a=Gp())!==s?(Qi.test(r.charAt(Zi))?(i=r.charAt(Zi),Zi++):(i=s,0===nc&&ic(zi)),i!==s&&(c=Gp())!==s&&(l=kp())!==s&&(f=Gp())!==s?((b=uv())===s&&(b=null),b!==s?n=o=[o,u,a,i,c,l,f,b]:(Zi=n,n=s)):(Zi=n,n=s)):(Zi=n,n=s),n===s&&(n=null),n!==s?(Ji=t,t=e=function(r,t){const e={dataType:r};return t&&(e.length=parseInt(t[3],10),e.parentheses=true,e.suffix=t[7]),e}(e,n)):(Zi=t,t=s)):(Zi=t,t=s),t}const iv={ALTER:true,ALL:true,ADD:true,AND:true,AS:true,ASC:true,ANALYZE:true,ACCESSIBLE:true,BEFORE:true,BETWEEN:true,BIGINT:true,BLOB:true,BOTH:true,BY:true,BOOLEAN:true,CALL:true,CASCADE:true,CASE:true,CHAR:true,CHECK:true,COLLATE:true,CONDITION:true,CONSTRAINT:true,CONTINUE:true,CONVERT:true,CREATE:true,CROSS:true,CURRENT_DATE:true,CURRENT_TIME:true,CURRENT_TIMESTAMP:true,CURRENT_USER:true,CURSOR:true,DATABASE:true,DATABASES:true,DAY_HOUR:true,DAY_MICROSECOND:true,DAY_MINUTE:true,DAY_SECOND:true,DEC:true,DECIMAL:true,DECLARE:true,DEFAULT:true,DELAYED:true,DELETE:true,DESC:true,DESCRIBE:true,DETERMINISTIC:true,DISTINCT:true,DISTINCTROW:true,DIV:true,DROP:true,DOUBLE:true,DUAL:true,ELSE:true,EACH:true,ELSEIF:true,ENCLOSED:true,ESCAPED:true,EXCEPT:true,EXISTS:true,EXIT:true,EXPLAIN:true,FALSE:true,FULL:true,FROM:true,FETCH:true,FLOAT:true,FLOAT4:true,FLOAT8:true,FOR:true,FORCE:true,FOREIGN:true,FULLTEXT:true,FUNCTION:true,GENERATED:true,GET:true,GO:true,GRANT:true,GROUP:true,GROUPING:true,GROUPS:true,HAVING:true,HIGH_PRIORITY:true,HOUR_MICROSECOND:true,HOUR_MINUTE:true,HOUR_SECOND:true,IGNORE:true,IN:true,INNER:true,INFILE:true,INOUT:true,INSENSITIVE:true,INSERT:true,INTERSECT:true,INT:true,INT1:true,INT2:true,INT3:true,INT4:true,INT8:true,INTEGER:true,INTERVAL:true,INTO:true,IO_AFTER_GTIDS:true,IO_BEFORE_GTIDS:true,IS:true,ITERATE:true,JOIN:true,JSON_TABLE:true,KEY:true,KEYS:true,KILL:true,LAG:true,LAST_VALUE:true,LATERAL:true,LEAD:true,LEADING:true,LEAVE:true,LEFT:true,LIKE:true,LIMIT:true,LINEAR:true,LINES:true,LOAD:true,LOCALTIME:true,LOCALTIMESTAMP:true,LOCK:true,LONG:true,LONGBLOB:true,LONGTEXT:true,LOOP:true,LOW_PRIORITY:true,MASTER_BIND:true,MATCH:true,MAXVALUE:true,MEDIUMBLOB:true,MEDIUMINT:true,MEDIUMTEXT:true,MIDDLEINT:true,MINUTE_MICROSECOND:true,MINUTE_SECOND:true,MINUS:true,MOD:true,MODIFIES:true,NATURAL:true,NOT:true,NO_WRITE_TO_BINLOG:true,NTH_VALUE:true,NTILE:true,NULL:true,NUMERIC:true,OF:true,ON:true,OPTIMIZE:true,OPTIMIZER_COSTS:true,OPTION:true,OPTIONALLY:true,OR:true,ORDER:true,OUT:true,OUTER:true,OUTFILE:true,OVER:true,PARTITION:true,PERCENT_RANK:true,PRECISION:true,PRIMARY:true,PROCEDURE:true,PURGE:true,RANGE:true,RANK:true,READ:true,READS:true,READ_WRITE:true,REAL:true,RECURSIVE:true,REFERENCES:true,REGEXP:true,RELEASE:true,RENAME:true,REPEAT:true,REPLACE:true,REQUIRE:true,RESIGNAL:true,RESTRICT:true,RETURN:true,REVOKE:true,RIGHT:true,RLIKE:true,ROW:true,ROWS:true,ROW_NUMBER:true,SCHEMA:true,SCHEMAS:true,SELECT:true,SENSITIVE:true,SEPARATOR:true,SET:true,SHOW:true,SIGNAL:true,SMALLINT:true,SPATIAL:true,SPECIFIC:true,SQL:true,SQLEXCEPTION:true,SQLSTATE:true,SQLWARNING:true,SQL_BIG_RESULT:true,SSL:true,STARTING:true,STORED:true,STRAIGHT_JOIN:true,TABLE:true,TERMINATED:true,THEN:true,TINYBLOB:true,TINYINT:true,TINYTEXT:true,TO:true,TRAILING:true,TRIGGER:true,TRUE:true,UNION:true,UNIQUE:true,UNLOCK:true,UNSIGNED:true,UPDATE:true,USAGE:true,USE:true,USING:true,UTC_DATE:true,UTC_TIME:true,UTC_TIMESTAMP:true,VALUES:true,VARBINARY:true,VARCHAR:true,VARCHARACTER:true,VARYING:true,VIRTUAL:true,VECTOR:true,WHEN:true,WHERE:true,WHILE:true,WINDOW:true,WITH:true,WRITE:true,XOR:true,YEAR_MONTH:true,ZEROFILL:true},cv={avg:true,sum:true,count:true,convert:true,max:true,min:true,group_concat:true,std:true,variance:true,current_date:true,current_time:true,current_timestamp:true,current_user:true,user:true,session_user:true,system_user:true};function lv(){return t.includeLocations?{loc:ac(Ji,Zi)}:{}}function fv(r,t){return {type:"unary_expr",operator:r,expr:t}}function bv(r,t,e){return {type:"binary_expr",operator:r,left:t,right:e,...lv()}}function pv(r,t,e=3){const n=[r];for(let r=0;r<t.length;r++)delete t[r][e].tableList,delete t[r][e].columnList,n.push(t[r][e]);return n}function vv(r,t){let e=r;for(let r=0;r<t.length;r++)e=bv(t[r][1],e,t[r][3]);return e}function dv(r){const t=mv[r];return t||(r||null)}function yv(r){const t=new Set;for(let e of r.keys()){const r=e.split("::");if(!r){t.add(e);break}r&&r[1]&&(r[1]=dv(r[1])),t.add(r.join("::"));}return Array.from(t)}function wv(r){const t=yv(r);r.clear(),t.forEach(t=>r.add(t));}let Lv=[];const hv=new Set,Cv=new Set,mv={};if((e=a())!==s&&Zi===r.length)return e;throw e!==s&&Zi<r.length&&ic({type:"end"}),cc(ec,tc<r.length?r.charAt(tc):null,tc<r.length?ac(tc,tc+1):ac(tc,tc))}};},function(r,t,e){r.exports=e(3);},function(r,t){r.exports=require$$0;},function(r,t,e){e.r(t),e.d(t,"Parser",(function(){return $t})),e.d(t,"util",(function(){return n}));var n={};function o(r){return (o="function"==typeof Symbol&&"symbol"==typeof Symbol.iterator?function(r){return typeof r}:function(r){return r&&"function"==typeof Symbol&&r.constructor===Symbol&&r!==Symbol.prototype?"symbol":typeof r})(r)}e.r(n),e.d(n,"arrayStructTypeToSQL",(function(){return T})),e.d(n,"autoIncrementToSQL",(function(){return N})),e.d(n,"columnOrderListToSQL",(function(){return O})),e.d(n,"commonKeywordArgsToSQL",(function(){return S})),e.d(n,"commonOptionConnector",(function(){return a})),e.d(n,"connector",(function(){return i})),e.d(n,"commonTypeValue",(function(){return C})),e.d(n,"commentToSQL",(function(){return _})),e.d(n,"createBinaryExpr",(function(){return l})),e.d(n,"createValueExpr",(function(){return c})),e.d(n,"dataTypeToSQL",(function(){return A})),e.d(n,"DEFAULT_OPT",(function(){return s})),e.d(n,"escape",(function(){return f})),e.d(n,"literalToSQL",(function(){return h})),e.d(n,"columnIdentifierToSql",(function(){return d})),e.d(n,"getParserOpt",(function(){return b})),e.d(n,"identifierToSql",(function(){return y})),e.d(n,"onPartitionsToSQL",(function(){return E})),e.d(n,"replaceParams",(function(){return m})),e.d(n,"returningToSQL",(function(){return I})),e.d(n,"hasVal",(function(){return L})),e.d(n,"setParserOpt",(function(){return p})),e.d(n,"toUpper",(function(){return w})),e.d(n,"topToSQL",(function(){return v})),e.d(n,"triggerEventToSQL",(function(){return g}));var s={database:"mysql",type:"table",trimQuery:true,parseOptions:{includeLocations:false}},u=s;function a(r,t,e){if(e)return r?"".concat(r.toUpperCase()," ").concat(t(e)):t(e)}function i(r,t){if(t)return "".concat(r.toUpperCase()," ").concat(t)}function c(r){var t=o(r);if(Array.isArray(r))return {type:"expr_list",value:r.map(c)};if(null===r)return {type:"null",value:null};switch(t){case "boolean":return {type:"bool",value:r};case "string":return {type:"string",value:r};case "number":return {type:"number",value:r};default:throw new Error('Cannot convert value "'.concat(t,'" to SQL'))}}function l(r,t,e){var n={operator:r,type:"binary_expr"};return n.left=t.type?t:c(t),"BETWEEN"===r||"NOT BETWEEN"===r?(n.right={type:"expr_list",value:[c(e[0]),c(e[1])]},n):(n.right=e.type?e:c(e),n)}function f(r){return r}function b(){return u}function p(r){u=r;}function v(r){if(r){var t=r.value,e=r.percent,n=r.parentheses?"(".concat(t,")"):t,o="TOP ".concat(n);return e?"".concat(o," ").concat(e.toUpperCase()):o}}function d(r){var t=b().database;if(r)switch(t&&t.toLowerCase()){case "athena":case "db2":case "postgresql":case "redshift":case "snowflake":case "noql":case "trino":case "sqlite":return '"'.concat(r,'"');case "transactsql":return "[".concat(r,"]");case "mysql":case "mariadb":case "bigquery":default:return "`".concat(r,"`")}}function y(r,t,e){if(true===t)return "'".concat(r,"'");if(r){if("*"===r)return r;if(null!=e)return "".concat(e).concat(r).concat(e);var n=b().database;switch(n&&n.toLowerCase()){case "mysql":case "mariadb":return "`".concat(r,"`");case "athena":case "postgresql":case "redshift":case "snowflake":case "trino":case "noql":case "sqlite":return '"'.concat(r,'"');case "transactsql":return "[".concat(r,"]");case "bigquery":case "db2":return r;default:return "`".concat(r,"`")}}}function w(r){if(r)return r.toUpperCase()}function L(r){return r}function h(r){if(r){var t=r.prefix,e=r.type,n=r.parentheses,s=r.suffix,u=r.value,a="object"===o(r)?u:r;switch(e){case "backticks_quote_string":a="`".concat(u,"`");break;case "string":a="'".concat(u,"'");break;case "regex_string":a='r"'.concat(u,'"');break;case "hex_string":a="X'".concat(u,"'");break;case "full_hex_string":a="0x".concat(u);break;case "natural_string":a="N'".concat(u,"'");break;case "bit_string":a="b'".concat(u,"'");break;case "double_quote_string":a='"'.concat(u,'"');break;case "single_quote_string":a="'".concat(u,"'");break;case "boolean":case "bool":a=u?"TRUE":"FALSE";break;case "null":a="NULL";break;case "star":a="*";break;case "param":a="".concat(t||":").concat(u),t=null;break;case "origin":a=u.toUpperCase();break;case "date":case "datetime":case "time":case "timestamp":a="".concat(e.toUpperCase()," '").concat(u,"'");break;case "var_string":a="N'".concat(u,"'");break;case "unicode_string":a="U&'".concat(u,"'");}var i=[];return t&&i.push(w(t)),i.push(a),s&&("string"==typeof s&&i.push(s),"object"===o(s)&&(s.collate?i.push(pt(s.collate)):i.push(h(s)))),a=i.join(" "),n?"(".concat(a,")"):a}}function C(r){if(!r)return [];var t=r.type,e=r.symbol,n=r.value;return [t.toUpperCase(),e,"string"==typeof n?n.toUpperCase():h(n)].filter(L)}function m(r,t){return function r(t,e){return Object.keys(t).filter((function(r){var e=t[r];return Array.isArray(e)||"object"===o(e)&&null!==e})).forEach((function(n){var s=t[n];if("object"!==o(s)||"param"!==s.type)return r(s,e);if(void 0===e[s.value])throw new Error("no value for parameter :".concat(s.value," found"));return t[n]=c(e[s.value]),null})),t}(JSON.parse(JSON.stringify(r)),t)}function E(r){var t=r.type,e=r.partitions;return [w(t),"(".concat(e.map((function(r){if("range"!==r.type)return h(r);var t=r.start,e=r.end,n=r.symbol;return "".concat(h(t)," ").concat(w(n)," ").concat(h(e))})).join(", "),")")].join(" ")}function A(r){var t=r.schema,e=r.dataType,n=r.length,o=r.parentheses,s=r.scale,u=r.suffix,a="";null!=n&&(a=s?"".concat(n,", ").concat(s):n),o&&(a="(".concat(a,")")),u&&u.length&&(a+=" ".concat(u.join(" ")));var i=t?"".concat(t,"."):"";return "".concat(i).concat(e).concat(a)}function T(r){if(r){var t=r.dataType,e=r.definition,n=r.anglebracket,o=w(t);if("ARRAY"!==o&&"STRUCT"!==o)return o;var s=e&&e.map((function(r){return [r.field_name,T(r.field_type)].filter(L).join(" ")})).join(", ");return n?"".concat(o,"<").concat(s,">"):"".concat(o," ").concat(s)}}function _(r){if(r){var t=[],e=r.keyword,n=r.symbol,o=r.value;return t.push(e.toUpperCase()),n&&t.push(n),t.push(h(o)),t.join(" ")}}function g(r){return r.map((function(r){var t=r.keyword,e=r.args,n=[w(t)];if(e){var o=e.keyword,s=e.columns;n.push(w(o),s.map(At).join(", "));}return n.join(" ")})).join(" OR ")}function I(r){return r?["RETURNING",r.columns.map(Ot).filter(L).join(", ")].join(" "):""}function S(r){return r?[w(r.keyword),w(r.args)]:[]}function N(r){if(r){if("string"==typeof r){var t=b().database;switch(t&&t.toLowerCase()){case "sqlite":return "AUTOINCREMENT";default:return "AUTO_INCREMENT"}}var e=r.keyword,n=r.seed,o=r.increment,s=r.parentheses,u=w(e);return s&&(u+="(".concat(h(n),", ").concat(h(o),")")),u}}function O(r){if(r)return r.map(It).filter(L).join(", ")}function R(r){return function(r){if(Array.isArray(r))return j(r)}(r)||function(r){if("undefined"!=typeof Symbol&&null!=r[Symbol.iterator]||null!=r["@@iterator"])return Array.from(r)}(r)||function(r,t){if(r){if("string"==typeof r)return j(r,t);var e={}.toString.call(r).slice(8,-1);return "Object"===e&&r.constructor&&(e=r.constructor.name),"Map"===e||"Set"===e?Array.from(r):"Arguments"===e||/^(?:Ui|I)nt(?:8|16|32)(?:Clamped)?Array$/.test(e)?j(r,t):void 0}}(r)||function(){throw new TypeError("Invalid attempt to spread non-iterable instance.\nIn order to be iterable, non-array objects must have a [Symbol.iterator]() method.")}()}function j(r,t){(null==t||t>r.length)&&(t=r.length);for(var e=0,n=Array(t);e<t;e++)n[e]=r[e];return n}function x(r){if(!r)return [];var t=r.keyword,e=r.type;return [t.toUpperCase(),w(e)]}function k(r){if(r){var t=r.type,e=r.expr,n=r.symbol,o=t.toUpperCase(),s=[];switch(s.push(o),o){case "KEY_BLOCK_SIZE":n&&s.push(n),s.push(h(e));break;case "BTREE":case "HASH":s.length=0,s.push.apply(s,R(x(r)));break;case "WITH PARSER":s.push(e);break;case "VISIBLE":case "INVISIBLE":break;case "COMMENT":s.shift(),s.push(_(r));break;case "DATA_COMPRESSION":s.push(n,w(e.value),E(e.on));break;default:s.push(n,h(e));}return s.filter(L).join(" ")}}function U(r){return r?r.map(k):[]}function D(r){var t=r.constraint_type,e=r.index_type,n=r.index_options,o=void 0===n?[]:n,s=r.definition,u=r.on,a=r.with,i=[];if(i.push.apply(i,R(x(e))),s&&s.length){var c="CHECK"===w(t)?"(".concat(lt(s[0]),")"):"(".concat(s.map((function(r){return lt(r)})).join(", "),")");i.push(c);}return i.push(U(o).join(" ")),a&&i.push("WITH (".concat(U(a).join(", "),")")),u&&i.push("ON [".concat(u,"]")),i}function M(r){var t=r.operator||r.op,e=lt(r.right),n=false;if(Array.isArray(e)){switch(t){case "=":t="IN";break;case "!=":t="NOT IN";break;case "BETWEEN":case "NOT BETWEEN":n=true,e="".concat(e[0]," AND ").concat(e[1]);}n||(e="(".concat(e.join(", "),")"));}var o=r.right.escape||{},s=[Array.isArray(r.left)?r.left.map(lt).join(", "):lt(r.left),t,e,w(o.type),lt(o.value)].filter(L).join("."===t?"":" ");return [r.parentheses?"(".concat(s,")"):s].join(" ")}function P(r){var t=r.name,e=r.type;switch(e){case "table":case "view":var n=[y(t.db),y(t.table)].filter(L).join(".");return "".concat(w(e)," ").concat(n);case "column":return "COLUMN ".concat(At(t));default:return "".concat(w(e)," ").concat(h(t))}}function G(r){var t=r.keyword,e=r.expr;return [w(t),h(e)].filter(L).join(" ")}function F(r){return function(r){if(Array.isArray(r))return H(r)}(r)||function(r){if("undefined"!=typeof Symbol&&null!=r[Symbol.iterator]||null!=r["@@iterator"])return Array.from(r)}(r)||function(r,t){if(r){if("string"==typeof r)return H(r,t);var e={}.toString.call(r).slice(8,-1);return "Object"===e&&r.constructor&&(e=r.constructor.name),"Map"===e||"Set"===e?Array.from(r):"Arguments"===e||/^(?:Ui|I)nt(?:8|16|32)(?:Clamped)?Array$/.test(e)?H(r,t):void 0}}(r)||function(){throw new TypeError("Invalid attempt to spread non-iterable instance.\nIn order to be iterable, non-array objects must have a [Symbol.iterator]() method.")}()}function H(r,t){(null==t||t>r.length)&&(t=r.length);for(var e=0,n=Array(t);e<t;e++)n[e]=r[e];return n}function Y(r){return r?[r.prefix.map(h).join(" "),lt(r.value),r.suffix.map(h).join(" ")]:[]}function B(r){return r?r.fetch||r.offset?(e=(t=r).fetch,n=t.offset,[].concat(F(Y(n)),F(Y(e))).filter(L).join(" ")):function(r){var t=r.seperator,e=r.value;return 1===e.length&&"offset"===t?i("OFFSET",lt(e[0])):i("LIMIT",e.map(lt).join("".concat("offset"===t?" ":"").concat(w(t)," ")))}(r):"";var t,e,n;}function $(r){if(r&&0!==r.length){var t=r[0].recursive?"RECURSIVE ":"",e=r.map((function(r){var t=r.name,e=r.stmt,n=r.columns,o=Array.isArray(n)?"(".concat(n.map(At).join(", "),")"):"",s=a("values"===e.type?"VALUES":"",lt,e);return "".concat("default"===t.type?y(t.value):h(t)).concat(o," AS (").concat(s,")")})).join(", ");return "WITH ".concat(t).concat(e)}}function W(r){if(r&&r.position){var t=r.keyword,e=r.expr,n=[],o=w(t);switch(o){case "VAR":n.push(e.map(ct).join(", "));break;default:n.push(o,"string"==typeof e?y(e):lt(e));}return n.filter(L).join(" ")}}function q(r){var t=r.as_struct_val,e=r.columns,n=r.collate,o=r.distinct,s=r.for,u=r.from,c=r.for_sys_time_as_of,l=void 0===c?{}:c,f=r.locking_read,b=r.groupby,p=r.having,d=r.into,y=void 0===d?{}:d,C=r.isolation,m=r.limit,E=r.options,A=r.orderby,T=r.parentheses_symbol,_=r.qualify,g=r.top,I=r.window,S=r.with,N=r.where,O=[$(S),"SELECT",w(t)];Array.isArray(E)&&O.push(E.join(" ")),O.push(function(r){if(r){if("string"==typeof r)return r;var t=r.type,e=r.columns,n=[w(t)];return e&&n.push("(".concat(e.map(lt).join(", "),")")),n.filter(L).join(" ")}}(o),v(g),jt(e,u));var R=y.position,j="";R&&(j=a("INTO",W,y)),"column"===R&&O.push(j),O.push(a("FROM",mr,u)),"from"===R&&O.push(j);var x=l||{},k=x.keyword,U=x.expr;O.push(a(k,lt,U)),O.push(a("WHERE",lt,N)),b&&(O.push(i("GROUP BY",ft(b.columns).join(", "))),O.push(ft(b.modifiers).join(", "))),O.push(a("HAVING",lt,p)),O.push(a("QUALIFY",lt,_)),O.push(a("WINDOW",lt,I)),O.push(bt(A,"order by")),O.push(pt(n)),O.push(B(m)),C&&O.push(a(C.keyword,h,C.expr)),O.push(w(f)),"end"===R&&O.push(j),O.push(function(r){if(r){var t=r.expr,e=r.keyword,n=[w(r.type),w(e)];return t?"".concat(n.join(" "),"(").concat(lt(t),")"):n.join(" ")}}(s));var D=O.filter(L).join(" ");return T?"(".concat(D,")"):D}function V(r,t){var e="undefined"!=typeof Symbol&&r[Symbol.iterator]||r["@@iterator"];if(!e){if(Array.isArray(r)||(e=function(r,t){if(r){if("string"==typeof r)return X(r,t);var e={}.toString.call(r).slice(8,-1);return "Object"===e&&r.constructor&&(e=r.constructor.name),"Map"===e||"Set"===e?Array.from(r):"Arguments"===e||/^(?:Ui|I)nt(?:8|16|32)(?:Clamped)?Array$/.test(e)?X(r,t):void 0}}(r))||t){e&&(r=e);var n=0,o=function(){};return {s:o,n:function(){return n>=r.length?{done:true}:{done:false,value:r[n++]}},e:function(r){throw r},f:o}}throw new TypeError("Invalid attempt to iterate non-iterable instance.\nIn order to be iterable, non-array objects must have a [Symbol.iterator]() method.")}var s,u=true,a=false;return {s:function(){e=e.call(r);},n:function(){var r=e.next();return u=r.done,r},e:function(r){a=true,s=r;},f:function(){try{u||null==e.return||e.return();}finally{if(a)throw s}}}}function X(r,t){(null==t||t>r.length)&&(t=r.length);for(var e=0,n=Array(t);e<t;e++)n[e]=r[e];return n}function K(r){if(!r||0===r.length)return "";var t,e=[],n=V(r);try{for(n.s();!(t=n.n()).done;){var o=t.value,s={},u=o.value;for(var a in o)"value"!==a&&"keyword"!==a&&(s[a]=o[a]);var i=[At(s)],c="";u&&(c=lt(u),i.push("=",c)),e.push(i.filter(L).join(" "));}}catch(r){n.e(r);}finally{n.f();}return e.join(", ")}function Q(r){var t=r.name,e=r.value;return ["@".concat(t),"=",lt(e)].filter(L).join(" ")}function z(r){if(!r)return "";var t=r.keyword,e=r.terminated,n=r.enclosed,o=r.escaped;return [w(t),h(e),h(n),h(o)].filter(L).join(" ")}function Z(r){if(!r)return "";var t=r.keyword,e=r.starting,n=r.terminated;return [w(t),h(e),h(n)].filter(L).join(" ")}function J(r){if(!r)return "";var t=r.count,e=r.suffix;return ["IGNORE",h(t),e].filter(L).join(" ")}function rr(r){if(!r)return "";var t=r.mode,e=r.local,n=r.file,o=r.replace_ignore,s=r.table,u=r.partition,i=r.character_set,c=r.column,l=r.fields,f=r.lines,b=r.set,p=r.ignore;return ["LOAD DATA",w(t),w(e),"INFILE",h(n),w(o),"INTO TABLE",Cr(s),ar(u),a("CHARACTER SET",h,i),z(l),Z(f),J(p),jt(c),a("SET",K,b)].filter(L).join(" ")}function tr(r){var t=r.left,e=r.right,n=r.symbol,o=r.keyword;t.keyword=o;var s=lt(t),u=lt(e);return [s,w(n),u].filter(L).join(" ")}function er(r){var t,e,n,o,s=r.keyword,u=r.suffix,i="";switch(w(s)){case "BINLOG":e=(t=r).in,n=t.from,o=t.limit,i=[a("IN",h,e&&e.right),a("FROM",mr,n),B(o)].filter(L).join(" ");break;case "CHARACTER":case "COLLATION":i=function(r){var t=r.expr;if(t)return "LIKE"===w(t.op)?a("LIKE",h,t.right):a("WHERE",lt,t)}(r);break;case "COLUMNS":case "INDEXES":case "INDEX":i=a("FROM",mr,r.from);break;case "GRANTS":i=function(r){var t=r.for;if(t){var e=t.user,n=t.host,o=t.role_list,s="'".concat(e,"'");return n&&(s+="@'".concat(n,"'")),["FOR",s,o&&"USING",o&&o.map((function(r){return "'".concat(r,"'")})).join(", ")].filter(L).join(" ")}}(r);break;case "CREATE":i=a("",Cr,r[u]);break;case "VAR":i=ct(r.var),s="";}return ["SHOW",w(s),w(u),i].filter(L).join(" ")}var nr={alter:function(r){var t=r.keyword;switch(void 0===t?"table":t){case "aggregate":return function(r){var t=r.args,e=r.expr,n=r.keyword,o=r.name,s=r.type,u=t.expr,a=t.orderby;return [w(s),w(n),[[y(o.schema),y(o.name)].filter(L).join("."),"(".concat(u.map(nt).join(", ")).concat(a?[" ORDER","BY",a.map(nt).join(", ")].join(" "):"",")")].filter(L).join(""),et(e)].filter(L).join(" ")}(r);case "table":return function(r){var t=r.type,e=r.table,n=r.if_exists,o=r.prefix,s=r.expr,u=void 0===s?[]:s,a=w(t),i=mr(e),c=u.map(lt);return [a,"TABLE",w(n),h(o),i,c.join(", ")].filter(L).join(" ")}(r);case "schema":return function(r){var t=r.expr,e=r.keyword,n=r.schema;return [w(r.type),w(e),y(n),et(t)].filter(L).join(" ")}(r);case "sequence":return function(r){var t=r.type,e=r.keyword,n=r.sequence,o=r.if_exists,s=r.expr,u=void 0===s?[]:s,a=w(t),i=mr(n),c=u.map(Kr);return [a,w(e),w(o),i,c.join(", ")].filter(L).join(" ")}(r);case "domain":case "type":return function(r){var t=r.expr,e=r.keyword,n=r.name;return [w(r.type),w(e),[y(n.schema),y(n.name)].filter(L).join("."),et(t)].filter(L).join(" ")}(r);case "function":return function(r){var t=r.args,e=r.expr,n=r.keyword,o=r.name;return [w(r.type),w(n),[[y(o.schema),y(o.name)].filter(L).join("."),t&&"(".concat(t.expr?t.expr.map(nt).join(", "):"",")")].filter(L).join(""),et(e)].filter(L).join(" ")}(r);case "view":return function(r){var t=r.type,e=r.columns,n=r.attributes,o=r.select,s=r.view,u=r.with,a=w(t),i=Cr(s),c=[a,"VIEW",i];e&&c.push("(".concat(e.map(At).join(", "),")"));n&&c.push("WITH ".concat(n.map(w).join(", ")));c.push("AS",q(o)),u&&c.push(w(u));return c.filter(L).join(" ")}(r)}},analyze:function(r){var t=r.type,e=r.table;return [w(t),Cr(e)].join(" ")},attach:function(r){var t=r.type,e=r.database,n=r.expr,o=r.as,s=r.schema;return [w(t),w(e),lt(n),w(o),y(s)].filter(L).join(" ")},create:function(r){var t=r.keyword,e="";switch(t.toLowerCase()){case "aggregate":e=function(r){var t=r.type,e=r.replace,n=r.keyword,o=r.name,s=r.args,u=r.options,a=[w(t),w(e),w(n)],i=[y(o.schema),o.name].filter(L).join("."),c="".concat(s.expr.map(nt).join(", ")).concat(s.orderby?[" ORDER","BY",s.orderby.map(nt).join(", ")].join(" "):"");return a.push("".concat(i,"(").concat(c,")"),"(".concat(u.map(rt).join(", "),")")),a.filter(L).join(" ")}(r);break;case "table":e=function(r){var t=r.type,e=r.keyword,n=r.table,o=r.like,s=r.as,u=r.temporary,a=r.if_not_exists,i=r.create_definitions,c=r.table_options,l=r.ignore_replace,f=r.replace,p=r.partition_of,v=r.query_expr,d=r.unlogged,y=r.with,C=[w(t),w(f),w(u),w(d),w(e),w(a),mr(n)];if(o){var m=o.type,E=mr(o.table);return C.push(w(m),E),C.filter(L).join(" ")}if(p)return C.concat([zr(p)]).filter(L).join(" ");i&&C.push("(".concat(i.map(Kr).join(", "),")"));if(c){var A=b().database,T=A&&"sqlite"===A.toLowerCase()?", ":" ";C.push(c.map(Er).join(T));}if(y){var _=y.map((function(r){return [h(r.keyword),w(r.symbol),h(r.value)].join(" ")})).join(", ");C.push("WITH (".concat(_,")"));}C.push(w(l),w(s)),v&&C.push(or(v));return C.filter(L).join(" ")}(r);break;case "trigger":e="constraint"===r.resource?function(r){var t=r.constraint,e=r.constraint_kw,n=r.deferrable,o=r.events,s=r.execute,u=r.for_each,a=r.from,i=r.location,c=r.keyword,l=r.or,f=r.type,b=r.table,p=r.when,v=[w(f),w(l),w(e),w(c),y(t),w(i)],d=g(o);v.push(d,"ON",Cr(b)),a&&v.push("FROM",Cr(a));v.push.apply(v,qr(S(n)).concat(qr(S(u)))),p&&v.push(w(p.type),lt(p.cond));return v.push(w(s.keyword),Wr(s.expr)),v.filter(L).join(" ")}(r):function(r){var t=r.definer,e=r.for_each,n=r.keyword,o=r.execute,s=r.type,u=r.table,i=r.if_not_exists,c=r.temporary,l=r.trigger,f=r.events,b=r.order,p=r.time,v=r.when,d=[w(s),w(c),lt(t),w(n),w(i),Cr(l),w(p),f.map((function(r){var t=[w(r.keyword)],e=r.args;return e&&t.push(w(e.keyword),e.columns.map(At).join(", ")),t.join(" ")})),"ON",Cr(u),w(e&&e.keyword),w(e&&e.args),b&&"".concat(w(b.keyword)," ").concat(y(b.trigger)),a("WHEN",lt,v),w(o.prefix)];switch(o.type){case "set":d.push(a("SET",K,o.expr));break;case "multiple":d.push(sr(o.expr.ast));}return d.push(w(o.suffix)),d.filter(L).join(" ")}(r);break;case "extension":e=function(r){var t=r.extension,e=r.from,n=r.if_not_exists,o=r.keyword,s=r.schema,u=r.type,i=r.with,c=r.version;return [w(u),w(o),w(n),h(t),w(i),a("SCHEMA",h,s),a("VERSION",h,c),a("FROM",h,e)].filter(L).join(" ")}(r);break;case "function":e=function(r){var t=r.type,e=r.replace,n=r.keyword,o=r.name,s=r.args,u=r.returns,a=r.options,i=r.last,c=[w(t),w(e),w(n)],l=[h(o.schema),o.name.map(h).join(".")].filter(L).join("."),f=s.map(nt).filter(L).join(", ");return c.push("".concat(l,"(").concat(f,")"),function(r){var t=r.type,e=r.keyword,n=r.expr;return [w(t),w(e),Array.isArray(n)?"(".concat(n.map(St).join(", "),")"):Zr(n)].filter(L).join(" ")}(u),a.map(Jr).join(" "),i),c.filter(L).join(" ")}(r);break;case "index":e=function(r){var t=r.concurrently,e=r.filestream_on,n=r.keyword,o=r.if_not_exists,s=r.include,u=r.index_columns,i=r.index_type,c=r.index_using,l=r.index,f=r.on,b=r.index_options,p=r.algorithm_option,v=r.lock_option,d=r.on_kw,C=r.table,m=r.tablespace,E=r.type,A=r.where,T=r.with,_=r.with_before_where,g=T&&"WITH (".concat(U(T).join(", "),")"),I=s&&"".concat(w(s.keyword)," (").concat(s.columns.map((function(r){return "string"==typeof r?y(r):lt(r)})).join(", "),")"),S=l;l&&(S="string"==typeof l?y(l):[y(l.schema),y(l.name)].filter(L).join("."));var N=[w(E),w(i),w(n),w(o),w(t),S,w(d),Cr(C)].concat(qr(x(c)),["(".concat(O(u),")"),I,U(b).join(" "),et(p),et(v),a("TABLESPACE",h,m)]);_?N.push(g,a("WHERE",lt,A)):N.push(a("WHERE",lt,A),g);return N.push(a("ON",lt,f),a("FILESTREAM_ON",h,e)),N.filter(L).join(" ")}(r);break;case "sequence":e=function(r){var t=r.type,e=r.keyword,n=r.sequence,o=r.temporary,s=r.if_not_exists,u=r.create_definitions,a=[w(t),w(o),w(e),w(s),mr(n)];u&&a.push(u.map(Kr).join(" "));return a.filter(L).join(" ")}(r);break;case "database":case "schema":e=function(r){var t=r.type,e=r.keyword,n=r.replace,o=r.if_not_exists,s=r.create_definitions,u=r[e],a=u.db,i=u.schema,c=[h(a),i.map(h).join(".")].filter(L).join("."),l=[w(t),w(n),w(e),w(o),c];s&&l.push(s.map(Er).join(" "));return l.filter(L).join(" ")}(r);break;case "view":e=function(r){var t=r.algorithm,e=r.columns,n=r.definer,o=r.if_not_exists,s=r.keyword,u=r.recursive,a=r.replace,i=r.select,c=r.sql_security,l=r.temporary,f=r.type,b=r.view,p=r.with,v=r.with_options,h=b.db,m=b.schema,E=b.view,A=[y(h),y(m),y(E)].filter(L).join(".");return [w(f),w(a),w(l),w(u),t&&"ALGORITHM = ".concat(w(t)),lt(n),c&&"SQL SECURITY ".concat(w(c)),w(s),w(o),A,e&&"(".concat(e.map(d).join(", "),")"),v&&["WITH","(".concat(v.map((function(r){return C(r).join(" ")})).join(", "),")")].join(" "),"AS",or(i),w(p)].filter(L).join(" ")}(r);break;case "domain":e=function(r){var t=r.as,e=r.domain,n=r.type,o=r.keyword,s=r.target,u=r.create_definitions,a=[w(n),w(o),[y(e.schema),y(e.name)].filter(L).join("."),w(t),A(s)];if(u&&u.length>0){var i,c=[],l=function(r,t){var e="undefined"!=typeof Symbol&&r[Symbol.iterator]||r["@@iterator"];if(!e){if(Array.isArray(r)||(e=Vr(r))||t){e&&(r=e);var n=0,o=function(){};return {s:o,n:function(){return n>=r.length?{done:true}:{done:false,value:r[n++]}},e:function(r){throw r},f:o}}throw new TypeError("Invalid attempt to iterate non-iterable instance.\nIn order to be iterable, non-array objects must have a [Symbol.iterator]() method.")}var s,u=true,a=false;return {s:function(){e=e.call(r);},n:function(){var r=e.next();return u=r.done,r},e:function(r){a=true,s=r;},f:function(){try{u||null==e.return||e.return();}finally{if(a)throw s}}}}(u);try{for(l.s();!(i=l.n()).done;){var f=i.value,b=f.type;switch(b){case "collate":c.push(lt(f));break;case "default":c.push(w(b),lt(f.value));break;case "constraint":c.push(Pr(f));}}}catch(r){l.e(r);}finally{l.f();}a.push(c.filter(L).join(" "));}return a.filter(L).join(" ")}(r);break;case "type":e=function(r){var t=r.as,e=r.create_definitions,n=r.keyword,o=r.name,s=r.resource,u=[w(r.type),w(n),[y(o.schema),y(o.name)].filter(L).join("."),w(t),w(s)];if(e){var a=[];switch(s){case "enum":case "range":a.push(lt(e));break;default:a.push("(".concat(e.map(Kr).join(", "),")"));}u.push(a.filter(L).join(" "));}return u.filter(L).join(" ")}(r);break;case "user":e=function(r){var t=r.attribute,e=r.comment,n=r.default_role,o=r.if_not_exists,s=r.keyword,u=r.lock_option,i=r.password_options,c=r.require,l=r.resource_options,f=r.type,b=r.user.map((function(r){var t=r.user,e=r.auth_option,n=[kr(t)];return e&&n.push(w(e.keyword),e.auth_plugin,h(e.value)),n.filter(L).join(" ")})).join(", "),p=[w(f),w(s),w(o),b];n&&p.push(w(n.keyword),n.value.map(kr).join(", "));p.push(a(c&&c.keyword,lt,c&&c.value)),l&&p.push(w(l.keyword),l.value.map((function(r){return lt(r)})).join(" "));i&&i.forEach((function(r){return p.push(a(r.keyword,lt,r.value))}));return p.push(h(u),_(e),h(t)),p.filter(L).join(" ")}(r);break;default:throw new Error("unknown create resource ".concat(t))}return e},comment:function(r){var t=r.expr,e=r.keyword,n=r.target;return [w(r.type),w(e),P(n),G(t)].filter(L).join(" ")},select:q,deallocate:function(r){var t=r.type,e=r.keyword,n=r.expr;return [w(t),w(e),lt(n)].filter(L).join(" ")},delete:function(r){var t=r.columns,e=r.from,n=r.table,o=r.where,s=r.orderby,u=r.with,i=r.limit,c=r.returning,l=[$(u),"DELETE"],f=jt(t,e);return l.push(f),Array.isArray(n)&&(1===n.length&&true===n[0].addition||l.push(mr(n))),l.push(a("FROM",mr,e)),l.push(a("WHERE",lt,o)),l.push(bt(s,"order by")),l.push(B(i)),l.push(I(c)),l.filter(L).join(" ")},exec:function(r){var t=r.keyword,e=r.module,n=r.parameters;return [w(t),Cr(e),(n||[]).map(Q).filter(L).join(", ")].filter(L).join(" ")},execute:function(r){var t=r.type,e=r.name,n=r.args,o=[w(t)],s=[e];n&&s.push("(".concat(lt(n).join(", "),")"));return o.push(s.join("")),o.filter(L).join(" ")},explain:function(r){var t=r.type,e=r.expr;return [w(t),q(e)].join(" ")},for:function(r){var t=r.type,e=r.label,n=r.target,o=r.query,s=r.stmts;return [e,w(t),n,"IN",sr([o]),"LOOP",sr(s),"END LOOP",e].filter(L).join(" ")},update:function(r){var t=r.from,e=r.table,n=r.set,o=r.where,s=r.orderby,u=r.with,i=r.limit,c=r.returning;return [$(u),"UPDATE",mr(e),a("SET",K,n),a("FROM",mr,t),a("WHERE",lt,o),bt(s,"order by"),B(i),I(c)].filter(L).join(" ")},if:function(r){var t=r.boolean_expr,e=r.else_expr,n=r.elseif_expr,o=r.if_expr,s=r.prefix,u=r.go,a=r.semicolons,i=r.suffix,c=[w(r.type),lt(t),h(s),"".concat(gr(o.ast||o)).concat(a[0]),w(u)];n&&c.push(n.map((function(r){return [w(r.type),lt(r.boolean_expr),"THEN",gr(r.then.ast||r.then),r.semicolon].filter(L).join(" ")})).join(" "));e&&c.push("ELSE","".concat(gr(e.ast||e)).concat(a[1]));return c.push(h(i)),c.filter(L).join(" ")},insert:fr,load_data:rr,drop:Rr,truncate:Rr,replace:fr,declare:function(r){var t=r.type,e=r.declare,n=r.symbol,o=[w(t)],s=e.map((function(r){var t=r.at,e=r.name,n=r.as,o=r.constant,s=r.datatype,u=r.not_null,a=r.prefix,i=r.definition,c=r.keyword,l=[[t,e].filter(L).join(""),w(n),w(o)];switch(c){case "variable":l.push(Tt(s),lt(r.collate),w(u)),i&&l.push(w(i.keyword),lt(i.value));break;case "cursor":l.push(w(a));break;case "table":l.push(w(a),"(".concat(i.map(Kr).join(", "),")"));}return l.filter(L).join(" ")})).join("".concat(n," "));return o.push(s),o.join(" ")},use:function(r){var t=r.type,e=r.db,n=w(t),o=y(e);return "".concat(n," ").concat(o)},rename:function(r){var t=r.type,e=r.table,n=[],o="".concat(t&&t.toUpperCase()," TABLE");if(e){var s,u=Ir(e);try{for(u.s();!(s=u.n()).done;){var a=s.value.map(Cr);n.push(a.join(" TO "));}}catch(r){u.e(r);}finally{u.f();}}return "".concat(o," ").concat(n.join(", "))},call:function(r){var t=lt(r.expr);return "".concat("CALL"," ").concat(t)},desc:jr,describe:jr,set:function(r){var t=r.type,e=r.expr,n=r.keyword,o=w(t),s=e.map(lt).join(", ");return [o,w(n),s].filter(L).join(" ")},lock:xr,unlock:xr,show:er,grant:Ur,revoke:Ur,proc:function(r){var t=r.stmt;switch(t.type){case "assign":return tr(t);case "return":return function(r){var t=r.type,e=r.expr;return [w(t),lt(e)].join(" ")}(t)}},raise:function(r){var t=r.type,e=r.level,n=r.raise,o=r.using,s=[w(t),w(e)];n&&s.push([h(n.keyword),"format"===n.type&&n.expr.length>0&&","].filter(L).join(""),n.expr.map((function(r){return lt(r)})).join(", "));o&&s.push(w(o.type),w(o.option),o.symbol,o.expr.map((function(r){return lt(r)})).join(", "));return s.filter(L).join(" ")},transaction:function(r){var t=r.expr,e=t.action,n=t.keyword,o=t.modes,s=[h(e),w(n)];return o&&s.push(o.map(h).join(", ")),s.filter(L).join(" ")}};function or(r){if(!r)return "";for(var t=nr[r.type],e=r,n=e._parentheses,o=e._orderby,s=e._limit,u=[n&&"(",t(r)];r._next;){var a=nr[r._next.type],i=w(r.set_op);u.push(i,a(r._next)),r=r._next;}return u.push(n&&")",bt(o,"order by"),B(s)),u.filter(L).join(" ")}function sr(r){for(var t=[],e=0,n=r.length;e<n;++e){var o=r[e]&&r[e].ast?r[e].ast:r[e],s=or(o);e===n-1&&"transaction"===o.type&&(s="".concat(s," ;")),t.push(s);}return t.join(" ; ")}function ur(r){var t=r.type;return "select"===t?or(r):("values"===t?r.values:r).map((function(r){var t=lt(r);return [w(r.prefix),"(".concat(t,")")].filter(L).join("")})).join(", ")}function ar(r){if(!r)return "";var t=["PARTITION","("];if(Array.isArray(r))t.push(r.map((function(r){return y(r)})).join(", "));else {var e=r.value;t.push(e.map(lt).join(", "));}return t.push(")"),t.filter(L).join("")}function ir(r){if(!r)return "";switch(r.type){case "column":return "(".concat(r.expr.map(At).join(", "),")")}}function cr(r){var t=r.expr,e=r.keyword,n=t.type,o=[w(e)];switch(n){case "origin":o.push(h(t));break;case "update":o.push("UPDATE",a("SET",K,t.set),a("WHERE",lt,t.where));}return o.filter(L).join(" ")}function lr(r){if(!r)return "";var t=r.action;return [ir(r.target),cr(t)].filter(L).join(" ")}function fr(r){var t=r.table,e=r.type,n=r.or,o=void 0===n?[]:n,s=r.prefix,u=void 0===s?"into":s,i=r.columns,c=r.conflict,l=r.values,f=r.where,b=r.on_duplicate_update,p=r.partition,v=r.returning,d=r.set,y=b||{},C=y.keyword,m=y.set,E=[w(e),o.map(h).join(" "),w(u),mr(t),ar(p)];return Array.isArray(i)&&E.push("(".concat(i.map(h).join(", "),")")),E.push(a(l&&"values"===l.type?"VALUES":"",ur,l)),E.push(a("ON CONFLICT",lr,c)),E.push(a("SET",K,d)),E.push(a("WHERE",lt,f)),E.push(a(C,K,m)),E.push(I(v)),E.filter(L).join(" ")}function br(r){var t=r.expr,e=r.unit,n=r.suffix;return ["INTERVAL",lt(t),w(e),lt(n)].filter(L).join(" ")}function pr(r){return function(r){if(Array.isArray(r))return vr(r)}(r)||function(r){if("undefined"!=typeof Symbol&&null!=r[Symbol.iterator]||null!=r["@@iterator"])return Array.from(r)}(r)||function(r,t){if(r){if("string"==typeof r)return vr(r,t);var e={}.toString.call(r).slice(8,-1);return "Object"===e&&r.constructor&&(e=r.constructor.name),"Map"===e||"Set"===e?Array.from(r):"Arguments"===e||/^(?:Ui|I)nt(?:8|16|32)(?:Clamped)?Array$/.test(e)?vr(r,t):void 0}}(r)||function(){throw new TypeError("Invalid attempt to spread non-iterable instance.\nIn order to be iterable, non-array objects must have a [Symbol.iterator]() method.")}()}function vr(r,t){(null==t||t>r.length)&&(t=r.length);for(var e=0,n=Array(t);e<t;e++)n[e]=r[e];return n}function dr(r){var t=r.type,e=r.as,n=r.expr,o=r.with_offset;return ["".concat(w(t),"(").concat(n&&lt(n)||"",")"),a("AS","string"==typeof e?y:lt,e),a(w(o&&o.keyword),y,o&&o.as)].filter(L).join(" ")}function yr(r){if(r)switch(r.type){case "pivot":case "unpivot":return function(r){var t=r.as,e=r.column,n=r.expr,o=r.in_expr,s=r.type,u=[lt(n),"FOR",At(e),M(o)],a=["".concat(w(s),"(").concat(u.join(" "),")")];return t&&a.push("AS",y(t)),a.join(" ")}(r);default:return ""}}function wr(r){if(r){var t=r.keyword,e=r.expr,n=r.index,o=r.index_columns,s=r.parentheses,u=r.prefix,a=[];switch(t.toLowerCase()){case "forceseek":a.push(w(t),"(".concat(y(n)),"(".concat(o.map(lt).filter(L).join(", "),"))"));break;case "spatial_window_max_cells":a.push(w(t),"=",lt(e));break;case "index":a.push(w(u),w(t),s?"(".concat(e.map((function(r){return y(r)})).join(", "),")"):"= ".concat(y(e)));break;default:a.push(lt(e));}return a.filter(L).join(" ")}}function Lr(r,t){var e=r.name,n=r.symbol;return [w(e),n,t].filter(L).join(" ")}function hr(r){var t=[];switch(r.keyword){case "as":t.push("AS","OF",lt(r.of));break;case "from_to":t.push("FROM",lt(r.from),"TO",lt(r.to));break;case "between_and":t.push("BETWEEN",lt(r.between),"AND",lt(r.and));break;case "contained":t.push("CONTAINED","IN",lt(r.in));}return t.filter(L).join(" ")}function Cr(r){if("UNNEST"===w(r.type))return dr(r);var t,e,n,o,s=r.table,u=r.db,i=r.as,c=r.expr,l=r.operator,f=r.prefix,b=r.schema,p=r.server,v=r.suffix,d=r.tablesample,m=r.temporal_table,E=r.table_hint,A=r.surround,T=void 0===A?{}:A,_=y(p,false,T.server),g=y(u,false,T.db),I=y(b,false,T.schema),S=s&&y(s,false,T.table);if(c)switch(c.type){case "values":var N=c.parentheses,O=c.values,R=c.prefix,j=[N&&"(","",N&&")"],x=ur(O);R&&(x=x.split("(").slice(1).map((function(r){return "".concat(w(R),"(").concat(r)})).join("")),j[1]="VALUES ".concat(x),S=j.filter(L).join("");break;case "tumble":S=function(r){if(!r)return "";var t=r.data,e=r.timecol,n=r.offset,o=r.size,s=[y(t.expr.db),y(t.expr.schema),y(t.expr.table)].filter(L).join("."),u="DESCRIPTOR(".concat(At(e.expr),")"),a=["TABLE(TUMBLE(TABLE ".concat(Lr(t,s)),Lr(e,u)],i=Lr(o,br(o.expr));return n&&n.expr?a.push(i,"".concat(Lr(n,br(n.expr)),"))")):a.push("".concat(i,"))")),a.filter(L).join(", ")}(c);break;case "generator":e=(t=c).keyword,n=t.type,o=t.generators.map((function(r){return C(r).join(" ")})).join(", "),S="".concat(w(e),"(").concat(w(n),"(").concat(o,"))");break;default:S=lt(c);}var k=[[_,g,I,S=[w(f),S,w(v)].filter(L).join(" ")].filter(L).join(".")];if(d){var U=["TABLESAMPLE",lt(d.expr),h(d.repeatable)].filter(L).join(" ");k.push(U);}k.push(function(r){if(r){var t=r.keyword,e=r.expr;return [w(t),hr(e)].filter(L).join(" ")}}(m),a("AS","string"==typeof i?y:lt,i),yr(l)),E&&k.push(w(E.keyword),"(".concat(E.expr.map(wr).filter(L).join(", "),")"));var D=k.filter(L).join(" ");return r.parentheses?"(".concat(D,")"):D}function mr(r){if(!r)return "";if(!Array.isArray(r)){var t=r.expr,e=r.parentheses,n=r.joins,o=mr(t);if(e){for(var s=[],u=[],i=true===e?1:e.length,c=0;c++<i;)s.push("("),u.push(")");var l=n&&n.length>0?mr([""].concat(pr(n))):"";return s.join("")+o+u.join("")+l}return o}var f=r[0],b=[];if("dual"===f.type)return "DUAL";b.push(Cr(f));for(var p=1;p<r.length;++p){var v=r[p],d=v.on,y=v.using,C=v.join,m=[],E=Array.isArray(v)||Object.hasOwnProperty.call(v,"joins");m.push(C?" ".concat(w(C)):","),m.push(E?mr(v):Cr(v)),m.push(a("ON",lt,d)),y&&m.push("USING (".concat(y.map(h).join(", "),")")),b.push(m.filter(L).join(" "));}return b.filter(L).join("")}function Er(r){var t=r.keyword,e=r.symbol,n=r.value,o=[t.toUpperCase()];e&&o.push(e);var s=h(n);switch(t){case "partition by":case "default collate":s=lt(n);break;case "options":s="(".concat(n.map((function(r){return [r.keyword,r.symbol,lt(r.value)].join(" ")})).join(", "),")");break;case "cluster by":s=n.map(lt).join(", ");}return o.push(s),o.filter(L).join(" ")}var Ar=["analyze","attach","select","deallocate","delete","exec","update","insert","drop","rename","truncate","call","desc","describe","use","alter","set","create","lock","unlock","declare","show","replace","if","grant","revoke","proc","raise","execute","transaction","explain","comment","load_data"];function Tr(r){var t=r&&r.ast?r.ast:r;if(!Ar.includes(t.type))throw new Error("".concat(t.type," statements not supported at the moment"))}function _r(r){return Array.isArray(r)?(r.forEach(Tr),sr(r)):(Tr(r),or(r))}function gr(r){return "go"===r.go?function r(t){if(!t||0===t.length)return "";var e=[_r(t.ast)];return t.go_next&&e.push(t.go.toUpperCase(),r(t.go_next)),e.filter((function(r){return r})).join(" ")}(r):_r(r)}function Ir(r,t){var e="undefined"!=typeof Symbol&&r[Symbol.iterator]||r["@@iterator"];if(!e){if(Array.isArray(r)||(e=Nr(r))||t){e&&(r=e);var n=0,o=function(){};return {s:o,n:function(){return n>=r.length?{done:true}:{done:false,value:r[n++]}},e:function(r){throw r},f:o}}throw new TypeError("Invalid attempt to iterate non-iterable instance.\nIn order to be iterable, non-array objects must have a [Symbol.iterator]() method.")}var s,u=true,a=false;return {s:function(){e=e.call(r);},n:function(){var r=e.next();return u=r.done,r},e:function(r){a=true,s=r;},f:function(){try{u||null==e.return||e.return();}finally{if(a)throw s}}}}function Sr(r){return function(r){if(Array.isArray(r))return Or(r)}(r)||function(r){if("undefined"!=typeof Symbol&&null!=r[Symbol.iterator]||null!=r["@@iterator"])return Array.from(r)}(r)||Nr(r)||function(){throw new TypeError("Invalid attempt to spread non-iterable instance.\nIn order to be iterable, non-array objects must have a [Symbol.iterator]() method.")}()}function Nr(r,t){if(r){if("string"==typeof r)return Or(r,t);var e={}.toString.call(r).slice(8,-1);return "Object"===e&&r.constructor&&(e=r.constructor.name),"Map"===e||"Set"===e?Array.from(r):"Arguments"===e||/^(?:Ui|I)nt(?:8|16|32)(?:Clamped)?Array$/.test(e)?Or(r,t):void 0}}function Or(r,t){(null==t||t>r.length)&&(t=r.length);for(var e=0,n=Array(t);e<t;e++)n[e]=r[e];return n}function Rr(r){var t=r.type,e=r.keyword,n=r.name,o=r.prefix,s=r.suffix,u=[w(t),w(e),w(o)];switch(e){case "table":u.push(mr(n));break;case "trigger":u.push([n[0].schema?"".concat(y(n[0].schema),"."):"",y(n[0].trigger)].filter(L).join(""));break;case "database":case "schema":case "procedure":u.push(y(n));break;case "view":u.push(mr(n),r.options&&r.options.map(lt).filter(L).join(" "));break;case "index":u.push.apply(u,[At(n)].concat(Sr(r.table?["ON",Cr(r.table)]:[]),[r.options&&r.options.map(lt).filter(L).join(" ")]));break;case "type":u.push(n.map(At).join(", "),r.options&&r.options.map(lt).filter(L).join(" "));}return s&&u.push(s.map(lt).filter(L).join(" ")),u.filter(L).join(" ")}function jr(r){var t=r.type,e=r.table,n=w(t),o="string"==typeof e?y(e):Cr(e);return "".concat(n," ").concat(o)}function xr(r){var t=r.type,e=r.keyword,n=r.tables,o=[t.toUpperCase(),w(e)];if("UNLOCK"===t.toUpperCase())return o.join(" ");var s,u=[],a=Ir(n);try{var i=function(){var r=s.value,t=r.table,e=r.lock_type,n=[Cr(t)];if(e){n.push(["prefix","type","suffix"].map((function(r){return w(e[r])})).filter(L).join(" "));}u.push(n.join(" "));};for(a.s();!(s=a.n()).done;)i();}catch(r){a.e(r);}finally{a.f();}return o.push.apply(o,[u.join(", ")].concat(Sr(function(r){var t=r.lock_mode,e=r.nowait,n=[];if(t){var o=t.mode;n.push(o.toUpperCase());}return e&&n.push(e.toUpperCase()),n}(r)))),o.filter(L).join(" ")}function kr(r){var t=r.name,e=r.host,n=[h(t)];return e&&n.push("@",h(e)),n.join("")}function Ur(r){var t=r.type,e=r.grant_option_for,n=r.keyword,o=r.objects,s=r.on,u=r.to_from,a=r.user_or_roles,i=r.with,c=[w(t),h(e)],l=o.map((function(r){var t=r.priv,e=r.columns,n=[lt(t)];return e&&n.push("(".concat(e.map(At).join(", "),")")),n.join(" ")})).join(", ");if(c.push(l),s)switch(c.push("ON"),n){case "priv":c.push(h(s.object_type),s.priv_level.map((function(r){return [y(r.prefix),y(r.name)].filter(L).join(".")})).join(", "));break;case "proxy":c.push(kr(s));}return c.push(w(u),a.map(kr).join(", ")),c.push(h(i)),c.filter(L).join(" ")}function Dr(r){return function(r){if(Array.isArray(r))return Mr(r)}(r)||function(r){if("undefined"!=typeof Symbol&&null!=r[Symbol.iterator]||null!=r["@@iterator"])return Array.from(r)}(r)||function(r,t){if(r){if("string"==typeof r)return Mr(r,t);var e={}.toString.call(r).slice(8,-1);return "Object"===e&&r.constructor&&(e=r.constructor.name),"Map"===e||"Set"===e?Array.from(r):"Arguments"===e||/^(?:Ui|I)nt(?:8|16|32)(?:Clamped)?Array$/.test(e)?Mr(r,t):void 0}}(r)||function(){throw new TypeError("Invalid attempt to spread non-iterable instance.\nIn order to be iterable, non-array objects must have a [Symbol.iterator]() method.")}()}function Mr(r,t){(null==t||t>r.length)&&(t=r.length);for(var e=0,n=Array(t);e<t;e++)n[e]=r[e];return n}function Pr(r){if(r){var t=r.constraint,e=r.constraint_type,n=r.enforced,o=r.index,s=r.keyword,u=r.reference_definition,i=r.for,c=r.with_values,l=[],f=b().database;l.push(w(s)),l.push(y(t));var p=w(e);return "sqlite"===f.toLowerCase()&&"UNIQUE KEY"===p&&(p="UNIQUE"),l.push(p),l.push("sqlite"!==f.toLowerCase()&&y(o)),l.push.apply(l,Dr(D(r))),l.push.apply(l,Dr(_t(u))),l.push(w(n)),l.push(a("FOR",y,i)),l.push(h(c)),l.filter(L).join(" ")}}function Gr(r){if(r){var t=r.type;return "rows"===t?[w(t),lt(r.expr)].filter(L).join(" "):lt(r)}}function Fr(r){if("string"==typeof r)return r;var t=r.window_specification;return "(".concat(function(r){var t=r.name,e=r.partitionby,n=r.orderby,o=r.window_frame_clause;return [t,bt(e,"partition by"),bt(n,"order by"),Gr(o)].filter(L).join(" ")}(t),")")}function Hr(r){var t=r.name,e=r.as_window_specification;return "".concat(t," AS ").concat(Fr(e))}function Yr(r){if(r){var t=r.as_window_specification,e=r.expr,n=r.keyword,o=r.type,s=r.parentheses,u=w(o);if("WINDOW"===u)return "OVER ".concat(Fr(t));if("ON UPDATE"===u){var a="".concat(w(o)," ").concat(w(n)),i=lt(e)||[];return s&&(a="".concat(a,"(").concat(i.join(", "),")")),a}if(r.partitionby)return ["OVER","(".concat(bt(r.partitionby,"partition by")),"".concat(bt(r.orderby,"order by"),")")].filter(L).join(" ");throw new Error("unknown over type")}}function Br(r){if(!r||!r.array)return "";var t=r.array.keyword;if(t)return w(t);for(var e=r.array,n=e.dimension,o=e.length,s=[],u=0;u<n;u++)s.push("["),o&&o[u]&&s.push(h(o[u])),s.push("]");return s.join("")}function $r(r){for(var t=r.target,e=r.expr,n=r.keyword,o=r.symbol,s=r.as,u=r.offset,a=r.parentheses,i=mt({expr:e,offset:u}),c=[],l=0,f=t.length;l<f;++l){var b=t[l],p=b.angle_brackets,v=b.length,d=b.dataType,C=b.parentheses,m=b.quoted,E=b.scale,A=b.suffix,T=b.expr,_=T?lt(T):"";null!=v&&(_=E?"".concat(v,", ").concat(E):v),C&&(_="(".concat(_,")")),p&&(_="<".concat(_,">")),A&&A.length&&(_+=" ".concat(A.map(h).join(" ")));var g="::",I="",S=[];"as"===o&&(0===l&&(i="".concat(w(n),"(").concat(i)),I=")",g=" ".concat(o.toUpperCase()," ")),0===l&&S.push(i);var N=Br(b);S.push(g,m,d,m,N,_,I),c.push(S.filter(L).join(""));}s&&c.push(" AS ".concat(y(s)));var O=c.filter(L).join("");return a?"(".concat(O,")"):O}function Wr(r){var t=r.args,e=r.array_index,n=r.name,o=r.args_parentheses,s=r.parentheses,u=r.within_group,a=r.over,i=r.suffix,c=Yr(a),l=function(r){if(!r)return "";var t=r.type,e=r.keyword,n=r.orderby;return [w(t),w(e),"(".concat(bt(n,"order by"),")")].filter(L).join(" ")}(u),f=lt(i),b=[h(n.schema),n.name.map(h).join(".")].filter(L).join(".");if(!t)return [b,l,c].filter(L).join(" ");var p=r.separator||", ",v=0;if("TRIM"===w(b))for(var d=0,y=t.value.length;d<y;++d){var C=t.value[d];if("origin"===C.type&&"from"===C.value){v=d;break}}var m=[b];m.push(false===o?" ":"(");var E=lt(t);if(Array.isArray(p)){for(var A=E[0],T=1,_=E.length;T<_;++T)A=[A,E[T]].join(" ".concat(lt(p[T-1])," "));m.push(A);}else "TRIM"===w(b)&&v>0?m.push([E.slice(0,v+1).join(" "),E.slice(v+1).join(", ")].join(" ")):m.push(E.join(p));return  false!==o&&m.push(")"),m.push(Et(e)),m=[m.join(""),f].filter(L).join(" "),[s?"(".concat(m,")"):m,l,c].filter(L).join(" ")}function qr(r){return function(r){if(Array.isArray(r))return Xr(r)}(r)||function(r){if("undefined"!=typeof Symbol&&null!=r[Symbol.iterator]||null!=r["@@iterator"])return Array.from(r)}(r)||Vr(r)||function(){throw new TypeError("Invalid attempt to spread non-iterable instance.\nIn order to be iterable, non-array objects must have a [Symbol.iterator]() method.")}()}function Vr(r,t){if(r){if("string"==typeof r)return Xr(r,t);var e={}.toString.call(r).slice(8,-1);return "Object"===e&&r.constructor&&(e=r.constructor.name),"Map"===e||"Set"===e?Array.from(r):"Arguments"===e||/^(?:Ui|I)nt(?:8|16|32)(?:Clamped)?Array$/.test(e)?Xr(r,t):void 0}}function Xr(r,t){(null==t||t>r.length)&&(t=r.length);for(var e=0,n=Array(t);e<t;e++)n[e]=r[e];return n}function Kr(r){if(!r)return [];var t,e,n,o,s=r.resource;switch(s){case "column":return St(r);case "index":return e=[],n=(t=r).keyword,o=t.index,e.push(w(n)),e.push(o),e.push.apply(e,R(D(t))),e.filter(L).join(" ");case "constraint":return Pr(r);case "sequence":return [w(r.prefix),lt(r.value)].filter(L).join(" ");default:throw new Error("unknown resource = ".concat(s," type"))}}function Qr(r){var t=[];switch(r.keyword){case "from":t.push("FROM","(".concat(h(r.from),")"),"TO","(".concat(h(r.to),")"));break;case "in":t.push("IN","(".concat(lt(r.in),")"));break;case "with":t.push("WITH","(MODULUS ".concat(h(r.modulus),", REMAINDER ").concat(h(r.remainder),")"));}return t.filter(L).join(" ")}function zr(r){var t=r.keyword,e=r.table,n=r.for_values,o=r.tablespace,s=[w(t),Cr(e),w(n.keyword),Qr(n.expr)];return o&&s.push("TABLESPACE",h(o)),s.filter(L).join(" ")}function Zr(r){return r.dataType?A(r):[y(r.db),y(r.schema),y(r.table)].filter(L).join(".")}function Jr(r){var t=r.type;switch(t){case "as":return [w(t),r.symbol,or(r.declare),w(r.begin),sr(r.expr),w(r.end),r.symbol].filter(L).join(" ");case "set":return [w(t),r.parameter,w(r.value&&r.value.prefix),r.value&&r.value.expr.map(lt).join(", ")].filter(L).join(" ");case "return":return [w(t),lt(r.expr)].filter(L).join(" ");default:return lt(r)}}function rt(r){var t=r.type,e=r.symbol,n=r.value,o=[w(t),e];switch(w(t)){case "SFUNC":o.push([y(n.schema),n.name].filter(L).join("."));break;case "STYPE":case "MSTYPE":o.push(A(n));break;default:o.push(lt(n));}return o.filter(L).join(" ")}function tt(r,t){switch(r){case "add":var e=t.map((function(r){var t=r.name,e=r.value;return ["PARTITION",h(t),"VALUES",w(e.type),"(".concat(h(e.expr),")")].join(" ")})).join(", ");return "(".concat(e,")");default:return jt(t)}}function et(r){if(!r)return "";var t=r.action,e=r.create_definitions,n=r.if_not_exists,o=r.keyword,s=r.if_exists,u=r.old_column,a=r.prefix,i=r.resource,c=r.symbol,l=r.suffix,f="",b=[];switch(i){case "column":b=[St(r)];break;case "index":b=D(r),f=r[i];break;case "table":case "schema":f=y(r[i]);break;case "aggregate":case "function":case "domain":case "type":f=y(r[i]);break;case "algorithm":case "lock":case "table-option":f=[c,w(r[i])].filter(L).join(" ");break;case "constraint":f=y(r[i]),b=[Kr(e)];break;case "partition":b=[tt(t,r.partitions)];break;case "key":f=y(r[i]);break;default:f=[c,r[i]].filter((function(r){return null!==r})).join(" ");}var p=[w(t),w(o),w(n),w(s),u&&At(u),w(a),f&&f.trim(),b.filter(L).join(" ")];return l&&p.push(w(l.keyword),l.expr&&At(l.expr)),p.filter(L).join(" ")}function nt(r){var t=r.default&&[w(r.default.keyword),lt(r.default.value)].join(" ");return [w(r.mode),r.name,A(r.type),t].filter(L).join(" ")}function ot(r){return (ot="function"==typeof Symbol&&"symbol"==typeof Symbol.iterator?function(r){return typeof r}:function(r){return r&&"function"==typeof Symbol&&r.constructor===Symbol&&r!==Symbol.prototype?"symbol":typeof r})(r)}function st(r){var t=r.expr_list;switch(w(r.type)){case "STRUCT":case "ROW":return "(".concat(jt(t),")");case "ARRAY":return function(r){var t=r.array_path,e=r.brackets,n=r.expr_list,o=r.parentheses;if(!n)return "[".concat(jt(t),"]");var s=Array.isArray(n)?n.map((function(r){return "(".concat(jt(r),")")})).filter(L).join(", "):lt(n);return e?"[".concat(s,"]"):o?"(".concat(s,")"):s}(r);default:return ""}}function ut(r){var t=r.definition,e=r.keyword,n=r.orderby,o=r.limit,s=[w(e)];return t&&"object"===ot(t)&&(s.length=0,s.push(T(t))),s.push(st(r),bt(n,"order by"),B(o)),s.filter(L).join("")}function at(r){return (at="function"==typeof Symbol&&"symbol"==typeof Symbol.iterator?function(r){return typeof r}:function(r){return r&&"function"==typeof Symbol&&r.constructor===Symbol&&r!==Symbol.prototype?"symbol":typeof r})(r)}var it={alter:et,aggr_func:function(r){var t=r.args,e=r.filter,n=r.over,o=r.within_group_orderby,s=lt(t.expr);s=Array.isArray(s)?s.join(", "):s;var u=r.name,a=Yr(n);t.distinct&&(s=["DISTINCT",s].join(" ")),t.separator&&t.separator.delimiter&&(s=[s,h(t.separator.delimiter)].join("".concat(t.separator.symbol," "))),t.separator&&t.separator.expr&&(s=[s,lt(t.separator.expr)].join(" ")),t.orderby&&(s=[s,bt(t.orderby,"order by")].join(" ")),t.separator&&t.separator.value&&(s=[s,w(t.separator.keyword),h(t.separator.value)].filter(L).join(" "));var i=o?"WITHIN GROUP (".concat(bt(o,"order by"),")"):"",c=e?"FILTER (WHERE ".concat(lt(e.where),")"):"";return ["".concat(u,"(").concat(s,")"),i,a,c].filter(L).join(" ")},any_value:function(r){var t=r.args,e=r.type,n=r.over,o=t.expr,s=t.having,u="".concat(w(e),"(").concat(lt(o));return s&&(u="".concat(u," HAVING ").concat(w(s.prefix)," ").concat(lt(s.expr))),[u="".concat(u,")"),Yr(n)].filter(L).join(" ")},window_func:function(r){var t=r.over;return [function(r){var t=r.args,e=r.name,n=r.consider_nulls,o=void 0===n?"":n,s=r.separator,u=void 0===s?", ":s;return [e,"(",t?lt(t).join(u):"",")",o&&" ",o].filter(L).join("")}(r),Yr(t)].filter(L).join(" ")},array:ut,assign:tr,binary_expr:M,case:function(r){var t=["CASE"],e=r.args,n=r.expr,o=r.parentheses;n&&t.push(lt(n));for(var s=0,u=e.length;s<u;++s)t.push(e[s].type.toUpperCase()),e[s].cond&&(t.push(lt(e[s].cond)),t.push("THEN")),t.push(lt(e[s].result));return t.push("END"),o?"(".concat(t.join(" "),")"):t.join(" ")},cast:$r,collate:pt,column_ref:At,column_definition:St,datatype:A,extract:function(r){var t=r.args,e=r.type,n=t.field,o=t.cast_type,s=t.source,u=["".concat(w(e),"(").concat(w(n)),"FROM",w(o),lt(s)];return "".concat(u.filter(L).join(" "),")")},flatten:function(r){var t=r.args,e=r.type,n=["input","path","outer","recursive","mode"].map((function(r){return function(r){if(!r)return "";var t=r.type,e=r.symbol,n=r.value;return [w(t),e,lt(n)].filter(L).join(" ")}(t[r])})).filter(L).join(", ");return "".concat(w(e),"(").concat(n,")")},fulltext_search:function(r){var t=r.against,e=r.as,n=r.columns,o=r.match,s=r.mode,u=[w(o),"(".concat(n.map((function(r){return At(r)})).join(", "),")")].join(" "),a=[w(t),["(",lt(r.expr),s&&" ".concat(h(s)),")"].filter(L).join("")].join(" ");return [u,a,Nt(e)].filter(L).join(" ")},function:Wr,lambda:function(r){var t=r.args,e=r.expr,n=t.value,o=t.parentheses,s=n.map(lt).join(", ");return [o?"(".concat(s,")"):s,"->",lt(e)].join(" ")},load_data:rr,insert:or,interval:br,json:function(r){var t=r.keyword,e=r.expr_list;return [w(t),e.map((function(r){return lt(r)})).join(", ")].join(" ")},json_object_arg:function(r){var t=r.expr,e=t.key,n=t.value,o=t.on,s=[lt(e),"VALUE",lt(n)];return o&&s.push("ON","NULL",lt(o)),s.filter(L).join(" ")},json_visitor:function(r){return [r.symbol,lt(r.expr)].join("")},func_arg:function(r){var t=r.value;return [t.name,t.symbol,lt(t.expr)].filter(L).join(" ")},show:er,struct:ut,tablefunc:function(r){var t=r.as,e=r.name,n=r.args,o=[h(e.schema),e.name.map(h).join(".")].filter(L).join(".");return ["".concat(o,"(").concat(lt(n).join(", "),")"),"AS",Wr(t)].join(" ")},tables:mr,unnest:dr,values:ur,window:function(r){return r.expr.map(Hr).join(", ")}};function ct(r){var t=r.prefix,e=void 0===t?"@":t,n=r.name,o=r.members,s=r.quoted,u=r.suffix,a=[],i=o&&o.length>0?"".concat(n,".").concat(o.join(".")):n,c="".concat(e||"").concat(i);return u&&(c+=u),a.push(c),[s,a.join(" "),s].filter(L).join("")}function lt(r){if(r){var t=r;if(r.ast){var e=t.ast;Reflect.deleteProperty(t,e);for(var n=0,o=Object.keys(e);n<o.length;n++){var s=o[n];t[s]=e[s];}}var u=t.type;return "expr"===u?lt(t.expr):it[u]?it[u](t):h(t)}}function ft(r){return r?(Array.isArray(r)||(r=[r]),r.map(lt)):[]}function bt(r,t){if(!Array.isArray(r))return "";var e=[],n=w(t);switch(n){case "ORDER BY":e=r.map((function(r){return [lt(r.expr),r.type||"ASC",w(r.nulls)].filter(L).join(" ")}));break;case "PARTITION BY":default:e=r.map((function(r){return lt(r.expr)}));}return i(n,e.join(", "))}function pt(r){if(r){var t=r.keyword,e=r.collate,n=e.name,o=e.symbol,s=e.value,u=[w(t)];return s||u.push(o),u.push(Array.isArray(n)?n.map(h).join("."):h(n)),s&&u.push(o),u.push(lt(s)),u.filter(L).join(" ")}}function vt(r){return (vt="function"==typeof Symbol&&"symbol"==typeof Symbol.iterator?function(r){return typeof r}:function(r){return r&&"function"==typeof Symbol&&r.constructor===Symbol&&r!==Symbol.prototype?"symbol":typeof r})(r)}function dt(r,t){var e=Object.keys(r);if(Object.getOwnPropertySymbols){var n=Object.getOwnPropertySymbols(r);t&&(n=n.filter((function(t){return Object.getOwnPropertyDescriptor(r,t).enumerable}))),e.push.apply(e,n);}return e}function yt(r){for(var t=1;t<arguments.length;t++){var e=null!=arguments[t]?arguments[t]:{};t%2?dt(Object(e),true).forEach((function(t){wt(r,t,e[t]);})):Object.getOwnPropertyDescriptors?Object.defineProperties(r,Object.getOwnPropertyDescriptors(e)):dt(Object(e)).forEach((function(t){Object.defineProperty(r,t,Object.getOwnPropertyDescriptor(e,t));}));}return r}function wt(r,t,e){return (t=function(r){var t=function(r,t){if("object"!=vt(r)||!r)return r;var e=r[Symbol.toPrimitive];if(void 0!==e){var n=e.call(r,t);if("object"!=vt(n))return n;throw new TypeError("@@toPrimitive must return a primitive value.")}return ("string"===t?String:Number)(r)}(r,"string");return "symbol"==vt(t)?t:t+""}(t))in r?Object.defineProperty(r,t,{value:e,enumerable:true,configurable:true,writable:true}):r[t]=e,r}function Lt(r){return function(r){if(Array.isArray(r))return Ct(r)}(r)||function(r){if("undefined"!=typeof Symbol&&null!=r[Symbol.iterator]||null!=r["@@iterator"])return Array.from(r)}(r)||ht(r)||function(){throw new TypeError("Invalid attempt to spread non-iterable instance.\nIn order to be iterable, non-array objects must have a [Symbol.iterator]() method.")}()}function ht(r,t){if(r){if("string"==typeof r)return Ct(r,t);var e={}.toString.call(r).slice(8,-1);return "Object"===e&&r.constructor&&(e=r.constructor.name),"Map"===e||"Set"===e?Array.from(r):"Arguments"===e||/^(?:Ui|I)nt(?:8|16|32)(?:Clamped)?Array$/.test(e)?Ct(r,t):void 0}}function Ct(r,t){(null==t||t>r.length)&&(t=r.length);for(var e=0,n=Array(t);e<t;e++)n[e]=r[e];return n}function mt(r,t){if("string"==typeof r)return y(r,t);var e=r.expr,n=r.offset,o=r.suffix,s=n&&n.map((function(r){return ["[",r.name,"".concat(r.name?"(":""),h(r.value),"".concat(r.name?")":""),"]"].filter(L).join("")})).join("");return [lt(e),s,o].filter(L).join("")}function Et(r){if(!r||0===r.length)return "";var t,e=[],n=function(r,t){var e="undefined"!=typeof Symbol&&r[Symbol.iterator]||r["@@iterator"];if(!e){if(Array.isArray(r)||(e=ht(r))||t){e&&(r=e);var n=0,o=function(){};return {s:o,n:function(){return n>=r.length?{done:true}:{done:false,value:r[n++]}},e:function(r){throw r},f:o}}throw new TypeError("Invalid attempt to iterate non-iterable instance.\nIn order to be iterable, non-array objects must have a [Symbol.iterator]() method.")}var s,u=true,a=false;return {s:function(){e=e.call(r);},n:function(){var r=e.next();return u=r.done,r},e:function(r){a=true,s=r;},f:function(){try{u||null==e.return||e.return();}finally{if(a)throw s}}}}(r);try{for(n.s();!(t=n.n()).done;){var o=t.value,s=o.brackets?"[".concat(lt(o.index),"]"):"".concat(o.notation).concat(lt(o.index));o.property&&(s="".concat(s,".").concat(h(o.property))),e.push(s);}}catch(r){n.e(r);}finally{n.f();}return e.join("")}function At(r){var t=r.array_index,e=r.as,n=r.column,o=r.collate,s=r.db,u=r.isDual,i=r.notations,c=void 0===i?[]:i,l=r.options,f=r.schema,b=r.table,p=r.parentheses,v=r.suffix,d=r.order_by,h=r.subFields,C=void 0===h?[]:h,m="*"===n?"*":mt(n,u),E=[s,f,b].filter(L).map((function(r){return "".concat("string"==typeof r?y(r):lt(r))})),A=E[0];if(A){for(var T=1;T<E.length;++T)A="".concat(A).concat(c[T]||".").concat(E[T]);m="".concat(A).concat(c[T]||".").concat(m);}var _=[m=["".concat(m).concat(Et(t))].concat(Lt(C)).join("."),pt(o),lt(l),a("AS",lt,e)];_.push("string"==typeof v?w(v):lt(v)),_.push(w(d));var g=_.filter(L).join(" ");return p?"(".concat(g,")"):g}function Tt(r){if(r){var t=r.schema,e=r.dataType,n=r.length,o=r.suffix,s=r.scale,u=r.expr,a=A({schema:t,dataType:e,length:n,suffix:o,scale:s,parentheses:null!=n});if(u&&(a+=lt(u)),r.array){var i=Br(r);a+=[/^\[.*\]$/.test(i)?"":" ",i].join("");}return a}}function _t(r){var t=[];if(!r)return t;var e=r.definition,n=r.keyword,o=r.match,s=r.table,u=r.on_action;return t.push(w(n)),t.push(mr(s)),t.push(e&&"(".concat(e.map((function(r){return lt(r)})).join(", "),")")),t.push(w(o)),u.map((function(r){return t.push(w(r.type),lt(r.value))})),t.filter(L)}function gt(r){var t=[],e=r.nullable,n=r.character_set,o=r.check,s=r.comment,u=r.constraint,i=r.collate,c=r.storage,l=r.using,f=r.default_val,p=r.generated,v=r.auto_increment,d=r.unique,y=r.primary_key,m=r.column_format,E=r.reference_definition,A=r.generated_by_default,T=[w(e&&e.action),w(e&&e.value)].filter(L).join(" ");if(p||t.push(T),f){var g=f.type,I=f.value;t.push(g.toUpperCase(),lt(I));}var S=b().database;return u&&t.push(w(u.keyword),h(u.constraint)),t.push(Pr(o)),t.push(function(r){if(r)return [w(r.value),"(".concat(lt(r.expr),")"),w(r.storage_type)].filter(L).join(" ")}(p)),p&&t.push(T),t.push(N(v),w(y),w(d),h(A),_(s)),t.push.apply(t,Lt(C(n))),"sqlite"!==S.toLowerCase()&&t.push(lt(i)),t.push.apply(t,Lt(C(m))),t.push.apply(t,Lt(C(c))),t.push.apply(t,Lt(_t(E))),t.push(a("USING",lt,l)),t.filter(L).join(" ")}function It(r){var t=r.order_by,e=r.column,n=r.collate,o=r.nulls,s=r.opclass,u="string"==typeof e?{type:"column_ref",table:r.table,column:e}:yt(yt({},r),{},{order_by:null});return u.collate=null,[lt(u),lt(n),s,w(t),w(o)].filter(L).join(" ")}function St(r){var t=[],e=At(r.column),n=Tt(r.definition);return t.push(e),t.push(n),t.push(gt(r)),t.filter(L).join(" ")}function Nt(r){return r?"object"===vt(r)?["AS",lt(r)].join(" "):["AS",/^(`?)[a-z_][0-9a-z_]*(`?)$/i.test(r)?y(r):d(r)].join(" "):""}function Ot(r,t){var e=r.expr,n=r.type;if("cast"===n)return $r(r);t&&(e.isDual=t);var o=lt(e),s=r.expr_list;if(s){var u=[o],a=s.map((function(r){return Ot(r,t)})).join(", ");return u.push([w(n),n&&"(",a,n&&")"].filter(L).join("")),u.filter(L).join(" ")}return e.parentheses&&Reflect.has(e,"array_index")&&"cast"!==e.type&&(o="(".concat(o,")")),e.array_index&&"column_ref"!==e.type&&"function"!==e.type&&(o="".concat(o).concat(Et(e.array_index))),[o,Nt(r.as)].filter(L).join(" ")}function Rt(r){var t=Array.isArray(r)&&r[0];return !(!t||"dual"!==t.type)}function jt(r,t){if(!r||"*"===r)return r;var e=Rt(t);return r.map((function(r){return Ot(r,e)})).join(", ")}it.var=ct,it.expr_list=function(r){var t=ft(r.value),e=r.parentheses,n=r.separator;if(!e&&!n)return t;var o=n||", ",s=t.join(o);return e?"(".concat(s,")"):s},it.select=function(r){var t="object"===at(r._next)?or(r):q(r);return r.parentheses?"(".concat(t,")"):t},it.unary_expr=function(r){var t=r.operator,e=r.parentheses,n=r.expr,o="-"===t||"+"===t||"~"===t||"!"===t?"":" ",s="".concat(t).concat(o).concat(lt(n));return e?"(".concat(s,")"):s},it.map_object=function(r){var t=r.keyword,e=r.expr.map((function(r){return [h(r.key),h(r.value)].join(", ")})).join(", ");return [w(t),"[".concat(e,"]")].join("")};var xt=e(0);function kt(r){return (kt="function"==typeof Symbol&&"symbol"==typeof Symbol.iterator?function(r){return typeof r}:function(r){return r&&"function"==typeof Symbol&&r.constructor===Symbol&&r!==Symbol.prototype?"symbol":typeof r})(r)}var Ut,Dt,Mt,Pt=(Ut={},Dt="mysql",Mt=xt.parse,(Dt=function(r){var t=function(r,t){if("object"!=kt(r)||!r)return r;var e=r[Symbol.toPrimitive];if(void 0!==e){var n=e.call(r,t);if("object"!=kt(n))return n;throw new TypeError("@@toPrimitive must return a primitive value.")}return ("string"===t?String:Number)(r)}(r,"string");return "symbol"==kt(t)?t:t+""}(Dt))in Ut?Object.defineProperty(Ut,Dt,{value:Mt,enumerable:true,configurable:true,writable:true}):Ut[Dt]=Mt,Ut);function Gt(r){return (Gt="function"==typeof Symbol&&"symbol"==typeof Symbol.iterator?function(r){return typeof r}:function(r){return r&&"function"==typeof Symbol&&r.constructor===Symbol&&r!==Symbol.prototype?"symbol":typeof r})(r)}function Ft(r,t){var e="undefined"!=typeof Symbol&&r[Symbol.iterator]||r["@@iterator"];if(!e){if(Array.isArray(r)||(e=function(r,t){if(r){if("string"==typeof r)return Ht(r,t);var e={}.toString.call(r).slice(8,-1);return "Object"===e&&r.constructor&&(e=r.constructor.name),"Map"===e||"Set"===e?Array.from(r):"Arguments"===e||/^(?:Ui|I)nt(?:8|16|32)(?:Clamped)?Array$/.test(e)?Ht(r,t):void 0}}(r))||t){e&&(r=e);var n=0,o=function(){};return {s:o,n:function(){return n>=r.length?{done:true}:{done:false,value:r[n++]}},e:function(r){throw r},f:o}}throw new TypeError("Invalid attempt to iterate non-iterable instance.\nIn order to be iterable, non-array objects must have a [Symbol.iterator]() method.")}var s,u=true,a=false;return {s:function(){e=e.call(r);},n:function(){var r=e.next();return u=r.done,r},e:function(r){a=true,s=r;},f:function(){try{u||null==e.return||e.return();}finally{if(a)throw s}}}}function Ht(r,t){(null==t||t>r.length)&&(t=r.length);for(var e=0,n=Array(t);e<t;e++)n[e]=r[e];return n}function Yt(r,t){for(var e=0;e<t.length;e++){var n=t[e];n.enumerable=n.enumerable||false,n.configurable=true,"value"in n&&(n.writable=true),Object.defineProperty(r,Bt(n.key),n);}}function Bt(r){var t=function(r,t){if("object"!=Gt(r)||!r)return r;var e=r[Symbol.toPrimitive];if(void 0!==e){var n=e.call(r,t);if("object"!=Gt(n))return n;throw new TypeError("@@toPrimitive must return a primitive value.")}return (String)(r)}(r,"string");return "symbol"==Gt(t)?t:t+""}var $t=function(){return function(r,t,e){return t&&Yt(r.prototype,t),Object.defineProperty(r,"prototype",{writable:false}),r}((function r(){!function(r,t){if(!(r instanceof t))throw new TypeError("Cannot call a class as a function")}(this,r);}),[{key:"astify",value:function(r){var t=arguments.length>1&&void 0!==arguments[1]?arguments[1]:s,e=this.parse(r,t);return e&&e.ast}},{key:"sqlify",value:function(r){var t=arguments.length>1&&void 0!==arguments[1]?arguments[1]:s;return p(t),gr(r)}},{key:"exprToSQL",value:function(r){var t=arguments.length>1&&void 0!==arguments[1]?arguments[1]:s;return p(t),lt(r)}},{key:"columnsToSQL",value:function(r,t){var e=arguments.length>2&&void 0!==arguments[2]?arguments[2]:s;if(p(e),!r||"*"===r)return [];var n=Rt(t);return r.map((function(r){return Ot(r,n)}))}},{key:"parse",value:function(r){var t=arguments.length>1&&void 0!==arguments[1]?arguments[1]:s,e=t.database,n=void 0===e?"mysql":e;p(t);var o=n.toLowerCase();if(Pt[o])return Pt[o](false===t.trimQuery?r:r.trim(),t.parseOptions||s.parseOptions);throw new Error("".concat(n," is not supported currently"))}},{key:"whiteListCheck",value:function(r,t){var e=arguments.length>2&&void 0!==arguments[2]?arguments[2]:s;if(t&&0!==t.length){var n=e.type,o=void 0===n?"table":n;if(!this["".concat(o,"List")]||"function"!=typeof this["".concat(o,"List")])throw new Error("".concat(o," is not valid check mode"));var u,a=this["".concat(o,"List")].bind(this),i=a(r,e),c=true,l="",f=Ft(i);try{for(f.s();!(u=f.n()).done;){var b,p=u.value,v=!1,d=Ft(t);try{for(d.s();!(b=d.n()).done;){var y=b.value,w=new RegExp("^".concat(y,"$"),"i");if(w.test(p)){v=!0;break}}}catch(r){d.e(r);}finally{d.f();}if(!v){l=p,c=!1;break}}}catch(r){f.e(r);}finally{f.f();}if(!c)throw new Error("authority = '".concat(l,"' is required in ").concat(o," whiteList to execute SQL = '").concat(r,"'"))}}},{key:"tableList",value:function(r,t){var e=this.parse(r,t);return e&&e.tableList}},{key:"columnList",value:function(r,t){var e=this.parse(r,t);return e&&e.columnList}}])}();function Wt(r){return (Wt="function"==typeof Symbol&&"symbol"==typeof Symbol.iterator?function(r){return typeof r}:function(r){return r&&"function"==typeof Symbol&&r.constructor===Symbol&&r!==Symbol.prototype?"symbol":typeof r})(r)}"object"===("undefined"==typeof self?"undefined":Wt(self))&&self&&(self.NodeSQLParser={Parser:$t,util:n}),"undefined"==typeof commonjsGlobal&&"object"===("undefined"==typeof window?"undefined":Wt(window))&&window&&(window.global=window),"object"===("undefined"==typeof commonjsGlobal?"undefined":Wt(commonjsGlobal))&&commonjsGlobal&&commonjsGlobal.window&&(commonjsGlobal.window.NodeSQLParser={Parser:$t,util:n});}]));
+		
+	} (mysql));
+	return mysql;
+}
+
+var mysqlExports = requireMysql();
+
+async function getTableInfo$2(params) {
+    const { table } = params;
+    return { table, primary_key: [], column_list: [], is_open: false };
+}
+async function getTableList$3(_params) {
+    return ['SCHEMATA', 'TABLES', 'COLUMNS'];
+}
+
+function deepClone(input) {
+    const seen = new WeakMap();
+    function _clone(value) {
+        if (value === null || typeof value !== 'object') {
+            return value;
+        }
+        const cached = seen.get(value);
+        if (cached !== undefined) {
+            return cached;
+        }
+        else if (Array.isArray(value)) {
+            const arr = [];
+            seen.set(value, arr);
+            for (const item of value) {
+                arr.push(_clone(item));
+            }
+            return arr;
+        }
+        else if (value instanceof Map) {
+            const result = new Map();
+            seen.set(value, result);
+            for (const [k, v] of value) {
+                result.set(_clone(k), _clone(v));
+            }
+            return result;
+        }
+        else if (value instanceof Set) {
+            const result = new Set();
+            seen.set(value, result);
+            for (const v of value) {
+                result.add(_clone(v));
+            }
+            return result;
+        }
+        const obj = {};
+        seen.set(value, obj);
+        for (const key in value) {
+            if (Object.prototype.hasOwnProperty.call(value, key)) {
+                obj[key] = _clone(value[key]);
+            }
+        }
+        return obj;
+    }
+    return _clone(input);
+}
+
 const YEAR_MULT$1 = 10000;
 const MONTH_MULT$1 = 100;
 const DAY_MULT$1 = 1;
@@ -2853,12 +2853,12 @@ class SQLDateTime {
         if (params.timeZone) {
             this._time -= offsetAtTime(params.timeZone, this._time) ?? 0;
         }
-        if (params?.fraction !== undefined) {
+        if (params.fraction !== undefined) {
             this._fraction = params.fraction;
         }
         else {
             this._fraction = parseFloat('0.' +
-                (String(params.time).split('.')[1] || '').slice(0, 6).padEnd(6, '0'));
+                (String(params.time).split('.')[1] ?? '').slice(0, 6).padEnd(6, '0'));
         }
         this._decimals = params.decimals ?? (this._fraction ? 6 : 0);
         this._fraction = parseFloat(this._fraction.toFixed(this._decimals));
@@ -2967,6 +2967,846 @@ function createSQLDateTime(params) {
     }
 }
 
+const CATALOG_LIST = [
+    {
+        CATALOG_NAME: { value: 'def', type: 'string' },
+        CATALOG_DESCRIPTION: { value: 'Primary catalog', type: 'string' },
+        CATALOG_OWNER: { value: 'SYSTEM', type: 'string' },
+    },
+];
+async function getRowList$2(params) {
+    const { list } = params;
+    const source_map = new Map();
+    const column_map = new Map();
+    for (const from of list) {
+        const { results, column_list } = await _getFromTable$2({ ...params, from });
+        source_map.set(from, results);
+        column_map.set(from, column_list);
+    }
+    return { source_map, column_map };
+}
+async function _getFromTable$2(params) {
+    const { dynamodb } = params;
+    const table = params.from.table.toLowerCase();
+    if (table === 'catalogs') {
+        return {
+            results: deepClone(CATALOG_LIST),
+            column_list: Object.keys(CATALOG_LIST[0]),
+        };
+    }
+    else if (table === 'schemata') {
+        const list = getDatabaseList();
+        const results = list.map(_dbToSchemata);
+        return { results, column_list: Object.keys(results[0] ?? {}) };
+    }
+    else if (table === 'tables') {
+        const list = getDatabaseList();
+        const results = [];
+        for (const database of list) {
+            const tables = await getTableList({ dynamodb, database });
+            for (const found of tables) {
+                results.push(_tableToTable(database, found));
+            }
+        }
+        return { results, column_list: Object.keys(results[0] ?? {}) };
+    }
+    else {
+        throw new SQLError({
+            err: 'ER_BAD_TABLE_ERROR',
+            args: [params.from.table],
+        });
+    }
+}
+function _dbToSchemata(database) {
+    return {
+        CATALOG_NAME: { value: 'def', type: 'string' },
+        SCHEMA_NAME: { value: database, type: 'string' },
+        DEFAULT_CHARACTER_SET_NAME: { value: 'utf8mb4', type: 'string' },
+        DEFAULT_COLLATION_NAME: { value: 'utf8mb4_0900_as_cs', type: 'string' },
+        SQL_PATH: { value: null, type: 'null' },
+        DEFAULT_ENCRYPTION: { value: 'NO', type: 'char' },
+    };
+}
+function _tableToTable(database, table) {
+    return {
+        TABLE_CATALOG: { value: 'def', type: 'string' },
+        TABLE_SCHEMA: { value: database, type: 'string' },
+        TABLE_NAME: { value: table, type: 'string' },
+        TABLE_TYPE: { value: 'BASE TABLE', type: 'string' },
+        ENGINE: { value: null, type: 'string' },
+        VERSION: { value: 10n, type: 'longlong' },
+        ROW_FORMAT: { value: 'Dynamic', type: 'string' },
+        TABLE_ROWS: { value: 0n, type: 'longlong' },
+        AVG_ROW_LENGTH: { value: 0n, type: 'longlong' },
+        DATA_LENGTH: { value: 0n, type: 'longlong' },
+        MAX_DATA_LENGTH: { value: 0n, type: 'longlong' },
+        INDEX_LENGTH: { value: 0n, type: 'longlong' },
+        DATA_FREE: { value: 0n, type: 'longlong' },
+        AUTO_INCREMENT: { value: null, type: 'string' },
+        CREATE_TIME: {
+            value: new SQLDateTime({ time: Date.now() / 1000 }),
+            type: 'datetime',
+        },
+        UPDATE_TIME: { value: null, type: 'datetime' },
+        CHECK_TIME: { value: null, type: 'datetime' },
+        TABLE_COLLATION: { value: null, type: 'string' },
+        CHECKSUM: { value: null, type: 'longlong' },
+        CREATE_OPTIONS: { value: '', type: 'string' },
+        TABLE_COMMENT: { value: '', type: 'string' },
+    };
+}
+
+async function commit$3(_params) { }
+async function rollback$3(_params) { }
+async function createTable$3() {
+    throw new SQLError({
+        code: 'ER_DBACCESS_DENIED_ERROR',
+        args: ['user', 'information_schema'],
+    });
+}
+async function dropTable$3() {
+    throw new SQLError({
+        code: 'ER_DBACCESS_DENIED_ERROR',
+        args: ['user', 'information_schema'],
+    });
+}
+async function createIndex$2() {
+    throw new SQLError({
+        code: 'ER_DBACCESS_DENIED_ERROR',
+        args: ['user', 'information_schema'],
+    });
+}
+async function deleteIndex$2() {
+    throw new SQLError({
+        code: 'ER_DBACCESS_DENIED_ERROR',
+        args: ['user', 'information_schema'],
+    });
+}
+async function addColumn$2() {
+    throw new SQLError({
+        code: 'ER_DBACCESS_DENIED_ERROR',
+        args: ['user', 'information_schema'],
+    });
+}
+async function singleDelete$2() {
+    throw new SQLError({
+        code: 'ER_DBACCESS_DENIED_ERROR',
+        args: ['user', 'information_schema'],
+    });
+}
+async function multipleDelete$2() {
+    throw new SQLError({
+        code: 'ER_DBACCESS_DENIED_ERROR',
+        args: ['user', 'information_schema'],
+    });
+}
+async function singleUpdate$2() {
+    throw new SQLError({
+        code: 'ER_DBACCESS_DENIED_ERROR',
+        args: ['user', 'information_schema'],
+    });
+}
+async function multipleUpdate$2() {
+    throw new SQLError({
+        code: 'ER_DBACCESS_DENIED_ERROR',
+        args: ['user', 'information_schema'],
+    });
+}
+async function insertRowList$2() {
+    throw new SQLError({
+        code: 'ER_DBACCESS_DENIED_ERROR',
+        args: ['user', 'information_schema'],
+    });
+}
+
+var InformationSchemaEngine = /*#__PURE__*/Object.freeze({
+    __proto__: null,
+    addColumn: addColumn$2,
+    commit: commit$3,
+    createIndex: createIndex$2,
+    createTable: createTable$3,
+    deleteIndex: deleteIndex$2,
+    dropTable: dropTable$3,
+    getRowList: getRowList$2,
+    getTableInfo: getTableInfo$2,
+    getTableList: getTableList$3,
+    insertRowList: insertRowList$2,
+    multipleDelete: multipleDelete$2,
+    multipleUpdate: multipleUpdate$2,
+    rollback: rollback$3,
+    singleDelete: singleDelete$2,
+    singleUpdate: singleUpdate$2
+});
+
+const g_tableMap = new Map();
+function getTable(database, table, session) {
+    const data = session.getTempTable(database, table) ??
+        g_tableMap.get(`${database}.${table}`);
+    if (data) {
+        const updates = txGetData(database, table, session)?.data;
+        if (updates) {
+            return Object.assign({}, data, updates);
+        }
+        else {
+            return data;
+        }
+    }
+    return null;
+}
+function updateTableData(database, table, session, updates) {
+    const data = session.getTempTable(database, table) ??
+        g_tableMap.get(`${database}.${table}`);
+    if (data) {
+        Object.assign(data, updates);
+    }
+}
+function txSaveData(database, table, session, data) {
+    const tx = session.getTransaction();
+    if (tx) {
+        const existing = tx.getData('memory') ?? {};
+        existing[`${database}.${table}`] = { database, table, data };
+        tx.setData('memory', existing);
+    }
+}
+function txGetData(database, table, session) {
+    const tx = session.getTransaction();
+    if (tx) {
+        return tx.getData('memory')?.[`${database}.${table}`];
+    }
+    return undefined;
+}
+function saveTable(database, table, data) {
+    g_tableMap.set(`${database}.${table}`, data);
+}
+function deleteTable(database, table) {
+    g_tableMap.delete(`${database}.${table}`);
+}
+
+async function getTableInfo$1(params) {
+    const { session, database, table } = params;
+    const data = getTable(database, table, session);
+    if (data) {
+        return {
+            table,
+            primary_key: data.primary_key,
+            column_list: data.column_list,
+            is_open: false,
+        };
+    }
+    throw new SQLError({ err: 'table_not_found', args: [table] });
+}
+async function getTableList$2(_params) {
+    return [];
+}
+async function createTable$2(params) {
+    const { session, database, table, primary_key, column_list, is_temp } = params;
+    if (primary_key.length === 0) {
+        throw new SQLError({
+            err: 'unsupported',
+            message: 'primary key is required',
+        });
+    }
+    const data = {
+        column_list,
+        primary_key,
+        row_list: [],
+        primary_map: new Map(),
+    };
+    if (is_temp) {
+        session.saveTempTable(database, table, data);
+    }
+    else {
+        saveTable(database, table, data);
+    }
+}
+async function dropTable$2(params) {
+    const { session, database, table } = params;
+    if (session.getTempTable(database, table)) {
+        session.deleteTempTable(database, table);
+    }
+    else {
+        deleteTable(database, table);
+    }
+}
+async function addColumn$1(_params) { }
+async function createIndex$1(_params) { }
+async function deleteIndex$1(_params) { }
+
+async function singleDelete$1(_params) {
+    throw new NoSingleOperationError();
+}
+async function multipleDelete$1(params) {
+    const { session, list } = params;
+    let affectedRows = 0;
+    for (const changes of list) {
+        const { database, table, delete_list } = changes;
+        const data = getTable(database, table, session);
+        if (!data) {
+            throw new SQLError('table_not_found');
+        }
+        const row_list = data.row_list.slice();
+        const primary_map = new Map(data.primary_map);
+        for (const object of delete_list) {
+            const key_list = object.map((key) => key.value);
+            const delete_key = JSON.stringify(key_list);
+            const index = primary_map.get(delete_key);
+            if (index !== undefined && index >= 0) {
+                primary_map.delete(delete_key);
+                row_list.splice(index, 1);
+                const deletedIndex = index;
+                primary_map.forEach((value, key) => {
+                    if (value > deletedIndex) {
+                        primary_map.set(key, value - 1);
+                    }
+                });
+                affectedRows++;
+            }
+            else {
+                shared.logger.info('memory.delete: failed to find key:', key_list, 'for table:', table);
+            }
+        }
+        txSaveData(database, table, session, { row_list, primary_map });
+    }
+    return { affectedRows };
+}
+
+async function insertRowList$1(params) {
+    const { session, database, table, list, duplicate_mode } = params;
+    const data = getTable(database, table, session);
+    if (list.length === 0) {
+        return { affectedRows: 0 };
+    }
+    if (!data) {
+        throw new SQLError('table_not_found');
+    }
+    const { primary_key } = data;
+    const row_list = data.row_list.slice();
+    const primary_map = new Map(data.primary_map);
+    let affectedRows = 0;
+    for (const row of list) {
+        _transformRow(row);
+        const key_values = primary_key.map((key) => row[key.name]?.value);
+        const key = JSON.stringify(key_values);
+        const index = primary_map.get(key);
+        if (index === undefined) {
+            primary_map.set(key, row_list.push(row) - 1);
+            affectedRows++;
+        }
+        else if (duplicate_mode === 'replace') {
+            const existingRow = row_list[index];
+            if (existingRow && !_rowEqual(existingRow, row)) {
+                affectedRows++;
+            }
+            row_list[index] = row;
+            affectedRows++;
+        }
+        else if (!duplicate_mode) {
+            throw new SQLError({
+                err: 'dup_primary_key_entry',
+                args: [primary_key, key_values],
+            });
+        }
+    }
+    txSaveData(database, table, session, { row_list, primary_map });
+    return { affectedRows };
+}
+function _transformRow(row) {
+    for (const key in row) {
+        const cell = row[key];
+        if (cell) {
+            row[key] = { type: cell.type, value: cell.value };
+        }
+    }
+}
+function _rowEqual(a, b) {
+    const keys_a = Object.keys(a);
+    return keys_a.every((key) => {
+        return a[key]?.value === b[key]?.value;
+    });
+}
+
+async function getRowList$1(params) {
+    const { list } = params;
+    const source_map = new Map();
+    const column_map = new Map();
+    for (const from of list) {
+        const { row_list, column_list } = _getFromTable$1({ ...params, from });
+        source_map.set(from, row_list);
+        column_map.set(from, column_list);
+    }
+    return { source_map, column_map };
+}
+function _getFromTable$1(params) {
+    const { session, from } = params;
+    const { db, table } = from;
+    const data = getTable(db ?? '', table, session);
+    if (!data) {
+        throw new SQLError('table_not_found');
+    }
+    return {
+        row_list: data.row_list,
+        column_list: data.column_list.map((column) => column.name),
+    };
+}
+
+async function singleUpdate$1(_params) {
+    throw new NoSingleOperationError();
+}
+async function multipleUpdate$1(params) {
+    const { session, list } = params;
+    let affectedRows = 0;
+    let changedRows = 0;
+    for (const changes of list) {
+        const { database, table, update_list } = changes;
+        const data = getTable(database, table, session);
+        if (!data) {
+            throw new SQLError('table_not_found');
+        }
+        const row_list = data.row_list.slice();
+        const primary_map = new Map(data.primary_map);
+        for (const update of update_list) {
+            const { set_list } = update;
+            const key_list = update.key.map((key) => key.value);
+            const update_key = JSON.stringify(key_list);
+            const index = primary_map.get(update_key);
+            if (index !== undefined && index >= 0) {
+                const old_row = row_list[index];
+                if (!old_row) {
+                    continue;
+                }
+                const new_row = Object.assign({}, old_row);
+                let changed = false;
+                for (const set of set_list) {
+                    new_row[set.column] = _transformCell(set.value);
+                    if (old_row[set.column]?.value !== new_row[set.column]?.value) {
+                        changed = true;
+                    }
+                }
+                const new_key = _makePrimaryKey(data.primary_key, new_row);
+                if (new_key !== update_key && primary_map.has(new_key)) {
+                    throw new SQLError({
+                        err: 'dup_primary_key_entry',
+                        args: [data.primary_key, new_key],
+                    });
+                }
+                else if (new_key !== update_key) {
+                    primary_map.delete(update_key);
+                    primary_map.set(new_key, index);
+                }
+                row_list[index] = new_row;
+                affectedRows++;
+                if (changed) {
+                    changedRows++;
+                }
+            }
+            else {
+                shared.logger.error('memory.update: failed to find key:', key_list, 'for table:', table);
+            }
+        }
+        txSaveData(database, table, session, { row_list, primary_map });
+    }
+    return { affectedRows, changedRows };
+}
+function _transformCell(cell) {
+    return { value: cell.value, type: cell.type };
+}
+function _makePrimaryKey(primary_key, row) {
+    const key_values = primary_key.map((key) => row[key.name]?.value);
+    return JSON.stringify(key_values);
+}
+
+async function commit$2(params) {
+    const { session, data } = params;
+    for (const key in data) {
+        const entry = data[key];
+        if (entry) {
+            updateTableData(entry.database, entry.table, session, entry.data);
+        }
+    }
+}
+async function rollback$2(_params) { }
+
+var MemoryEngine = /*#__PURE__*/Object.freeze({
+    __proto__: null,
+    addColumn: addColumn$1,
+    commit: commit$2,
+    createIndex: createIndex$1,
+    createTable: createTable$2,
+    deleteIndex: deleteIndex$1,
+    dropTable: dropTable$2,
+    getRowList: getRowList$1,
+    getTableInfo: getTableInfo$1,
+    getTableList: getTableList$2,
+    insertRowList: insertRowList$1,
+    multipleDelete: multipleDelete$1,
+    multipleUpdate: multipleUpdate$1,
+    rollback: rollback$2,
+    singleDelete: singleDelete$1,
+    singleUpdate: singleUpdate$1
+});
+
+const TYPE_MAP = {
+    S: 'string',
+    N: 'number',
+    B: 'buffer',
+};
+const sleep$1 = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+async function getTableInfo(params) {
+    const { dynamodb, table } = params;
+    let data;
+    try {
+        data = await dynamodb.getTable(table);
+    }
+    catch (err) {
+        shared.logger.error('getTableInfo: err:', err, table);
+        throw err;
+    }
+    if (!data.Table?.AttributeDefinitions || !data.Table.KeySchema) {
+        throw new Error('bad_data');
+    }
+    const column_list = data.Table.AttributeDefinitions.map((def) => ({
+        name: def.AttributeName,
+        type: TYPE_MAP[def.AttributeType] ?? 'string',
+    }));
+    const primary_key = data.Table.KeySchema.map((key) => {
+        const type = column_list.find((col) => col.name === key.AttributeName)?.type ??
+            'string';
+        return { name: key.AttributeName, type };
+    });
+    return { table, primary_key, column_list, is_open: true };
+}
+async function getTableList$1(params) {
+    const { dynamodb } = params;
+    try {
+        return await dynamodb.getTableList();
+    }
+    catch (err) {
+        shared.logger.error('raw_engine.getTableList: err:', err);
+        throw err;
+    }
+}
+async function createTable$1(params) {
+    const { dynamodb, table, primary_key, ...other } = params;
+    const column_list = params.column_list.filter((column) => primary_key.find((key) => key.name === column.name));
+    const opts = { ...other, table, primary_key, column_list };
+    try {
+        await dynamodb.createTable(opts);
+        await _waitForTable({ dynamodb, table });
+    }
+    catch (err) {
+        if (err instanceof Error && err.message === 'resource_in_use') {
+            throw new SQLError('table_exists');
+        }
+        shared.logger.error('raw_engine.createTable: err:', err);
+        throw err;
+    }
+}
+async function dropTable$1(params) {
+    const { dynamodb, table } = params;
+    try {
+        await dynamodb.deleteTable(table);
+    }
+    catch (delete_err) {
+        if (delete_err instanceof Error &&
+            delete_err.name === 'ResourceNotFoundException') {
+            throw new SQLError('table_not_found');
+        }
+        shared.logger.error('raw_engine.dropTable: deleteTable err:', delete_err);
+        throw delete_err;
+    }
+    try {
+        await _waitForTable({ dynamodb, table });
+    }
+    catch (wait_err) {
+        if (wait_err instanceof Error &&
+            wait_err.message === 'resource_not_found') {
+            return;
+        }
+        shared.logger.error('raw_engine.dropTable: waitForTable err:', wait_err);
+        throw wait_err;
+    }
+}
+async function addColumn(_params) { }
+async function createIndex(params) {
+    const { dynamodb, table, index_name, key_list } = params;
+    if (!key_list) {
+        throw new Error('key_list is required');
+    }
+    const opts = { table, index_name, key_list };
+    try {
+        await dynamodb.createIndex(opts);
+        await _waitForTable({ dynamodb, table, index_name });
+    }
+    catch (err) {
+        if (err instanceof Error) {
+            if (err.message === 'resource_in_use' ||
+                err.message.indexOf('already exists') >= 0) {
+                throw new Error('index_exists');
+            }
+        }
+        shared.logger.error('raw_engine.createIndex: err:', err);
+        throw err;
+    }
+}
+async function deleteIndex(params) {
+    const { dynamodb, table, index_name } = params;
+    try {
+        await dynamodb.deleteIndex({ table, index_name });
+        await _waitForTable({ dynamodb, table, index_name });
+    }
+    catch (err) {
+        if (err instanceof Error && err.message === 'resource_not_found') {
+            throw new Error('index_not_found');
+        }
+        shared.logger.error('raw_engine.deleteIndex: err:', err);
+        throw err;
+    }
+}
+const LOOP_MS = 250;
+async function _waitForTable(params) {
+    const { dynamodb, table, index_name } = params;
+    for (;;) {
+        const result = await dynamodb.getTable(table);
+        const tableData = result.Table;
+        if (!tableData) {
+            await sleep$1(LOOP_MS);
+            continue;
+        }
+        const status = tableData.TableStatus;
+        if (status === 'CREATING' ||
+            status === 'UPDATING' ||
+            status === 'DELETING') {
+            await sleep$1(LOOP_MS);
+            continue;
+        }
+        if (index_name !== undefined) {
+            const index = tableData.GlobalSecondaryIndexes?.find((item) => item.IndexName === index_name);
+            if (!index || index.IndexStatus !== 'ACTIVE') {
+                await sleep$1(LOOP_MS);
+                continue;
+            }
+        }
+        return;
+    }
+}
+
+function toBigInt(value) {
+    try {
+        if (typeof value === 'bigint') {
+            return value;
+        }
+        if (typeof value === 'string' ||
+            typeof value === 'number' ||
+            typeof value === 'boolean') {
+            return BigInt(value);
+        }
+        return null;
+    }
+    catch {
+        return null;
+    }
+}
+
+function isBaseFrom$3(from) {
+    return 'table' in from && typeof from.table === 'string';
+}
+function getDatabaseFromTable(ast) {
+    if (ast.type === 'create') {
+        if (Array.isArray(ast.table)) {
+            return ast.table[0]?.db;
+        }
+        else if (ast.table) {
+            return ast.table.db ?? undefined;
+        }
+    }
+    return undefined;
+}
+function getTableFromTable(ast) {
+    if (ast.type === 'create') {
+        if (Array.isArray(ast.table)) {
+            return ast.table[0]?.table;
+        }
+        else if (ast.table) {
+            return ast.table.table;
+        }
+    }
+    return undefined;
+}
+function getDatabaseFromUpdate(ast) {
+    if (ast.type === 'update') {
+        if (Array.isArray(ast.table) && ast.table[0] && isBaseFrom$3(ast.table[0])) {
+            return ast.table[0].db ?? '';
+        }
+    }
+    return undefined;
+}
+// Helper to extract function name from node-sql-parser AST format
+function getFunctionName(nameObj) {
+    if (typeof nameObj === 'string') {
+        return nameObj;
+    }
+    if (Array.isArray(nameObj.name)) {
+        return nameObj.name.map((n) => n.value).join('.');
+    }
+    return String(nameObj);
+}
+// Helper to extract database name from node-sql-parser AST format
+function getDatabaseName(dbObj) {
+    if (typeof dbObj === 'string') {
+        return dbObj;
+    }
+    if (dbObj.schema && Array.isArray(dbObj.schema)) {
+        return dbObj.schema[0]?.value ?? '';
+    }
+    return String(dbObj);
+}
+function walkColumnRefs(object, cb) {
+    if (object &&
+        typeof object === 'object' &&
+        'type' in object &&
+        object.type === 'column_ref') {
+        cb(object);
+    }
+    else {
+        let array;
+        if (Array.isArray(object)) {
+            array = object;
+        }
+        else if (object && typeof object === 'object') {
+            array = Object.values(object);
+        }
+        array?.forEach((child) => {
+            walkColumnRefs(child, cb);
+        });
+    }
+}
+
+const MINUTE$1 = 60;
+const HOUR$1 = MINUTE$1 * 60;
+const DAY$2 = 24 * HOUR$1;
+class SQLTime {
+    _time;
+    _decimals;
+    constructor(params) {
+        this._time = params.time;
+        this._decimals = params.decimals ?? 0;
+    }
+    getType() {
+        return 'time';
+    }
+    getTime() {
+        return this._time;
+    }
+    getFraction() {
+        return this._time % 1;
+    }
+    getDecimals() {
+        return this._decimals;
+    }
+    toString(params) {
+        let ret;
+        if (isNaN(this._time)) {
+            ret = '';
+        }
+        else {
+            let seconds = this._time;
+            if (params?.timeZone) {
+                const remainder = seconds - (seconds % (24 * 60 * 60));
+                seconds -= remainder;
+                seconds += offsetAtTime(params.timeZone, Date.now() / 1000) ?? 0;
+                seconds = seconds % (24 * 60 * 60);
+                seconds += remainder;
+            }
+            const neg = seconds < 0 ? '-' : '';
+            if (neg) {
+                seconds = -seconds;
+            }
+            const hours = Math.floor(seconds / HOUR$1);
+            seconds -= hours * HOUR$1;
+            const minutes = Math.floor(seconds / MINUTE$1);
+            seconds -= minutes * MINUTE$1;
+            const decimals = Math.min(params?.decimals ?? this._decimals, 6);
+            let ret_secs = seconds.toFixed(decimals);
+            if (ret_secs.length < (decimals > 0 ? decimals + 3 : 2)) {
+                ret_secs = '0' + ret_secs;
+            }
+            ret = `${neg}${_pad(hours)}:${_pad(minutes)}:${ret_secs}`;
+        }
+        return ret;
+    }
+    toSQLDateTime(decimals) {
+        const now = Date.now() / 1000;
+        const time = now - (now % DAY$2) + this._time;
+        return new SQLDateTime({ time, decimals: decimals ?? this._decimals });
+    }
+    toNumber() {
+        let seconds = this._time;
+        const hours = Math.floor(seconds / HOUR$1);
+        seconds -= hours * HOUR$1;
+        const minutes = Math.floor(seconds / MINUTE$1);
+        seconds -= minutes * MINUTE$1;
+        return hours * 10000 + minutes * 100 + seconds;
+    }
+    gt(other) {
+        return this._time > other.getTime();
+    }
+}
+function createSQLTime(params) {
+    if (isNaN(params.time)) {
+        return null;
+    }
+    else {
+        return new SQLTime(params);
+    }
+}
+function _pad(num) {
+    return (num < 10 ? '0' : '') + num;
+}
+
+function getDecimalsForString(s) {
+    return _scaleNumberString(s);
+}
+function getDecimals$1(result) {
+    if (result.decimals !== undefined) {
+        return result.decimals;
+    }
+    else if (result.value instanceof SQLDateTime) {
+        return result.value.getDecimals();
+    }
+    else if (result.value instanceof SQLTime) {
+        return result.value.getDecimals();
+    }
+    else {
+        switch (result.type) {
+            case 'string':
+            case 'double':
+                return 31;
+            case 'decimal':
+            case 'number':
+                if (typeof result.value === 'number') {
+                    return _scaleNumber(result.value);
+                }
+                break;
+        }
+    }
+    return 0;
+}
+function _scaleNumber(n) {
+    return _scaleNumberString(String(n));
+}
+function _scaleNumberString(s) {
+    const e = s.indexOf('e');
+    if (e !== -1) {
+        const coeff = s.slice(0, e);
+        const exp = parseInt(s.slice(e + 1), 10);
+        const dot = coeff.indexOf('.');
+        const digits = dot === -1 ? 0 : coeff.length - dot - 1;
+        return Math.max(0, digits - exp);
+    }
+    const i = s.indexOf('.');
+    return i === -1 ? 0 : s.length - i - 1;
+}
+
 const YEAR_MULT = 10000;
 const MONTH_MULT = 100;
 const DAY_MULT = 1;
@@ -3048,105 +3888,6 @@ function createSQLDate(params) {
     }
     else {
         return new SQLDate(params);
-    }
-}
-
-const MINUTE$1 = 60;
-const HOUR$1 = MINUTE$1 * 60;
-const DAY$2 = 24 * HOUR$1;
-class SQLTime {
-    _time;
-    _decimals;
-    constructor(params) {
-        this._time = params.time;
-        this._decimals = params.decimals ?? 0;
-    }
-    getType() {
-        return 'time';
-    }
-    getTime() {
-        return this._time;
-    }
-    getFraction() {
-        return this._time % 1;
-    }
-    getDecimals() {
-        return this._decimals;
-    }
-    toString(params) {
-        let ret;
-        if (isNaN(this._time)) {
-            ret = '';
-        }
-        else {
-            let seconds = this._time;
-            if (params?.timeZone) {
-                const remainder = seconds - (seconds % (24 * 60 * 60));
-                seconds -= remainder;
-                seconds += offsetAtTime(params?.timeZone, Date.now() / 1000) ?? 0;
-                seconds = seconds % (24 * 60 * 60);
-                seconds += remainder;
-            }
-            const neg = seconds < 0 ? '-' : '';
-            if (neg) {
-                seconds = -seconds;
-            }
-            const hours = Math.floor(seconds / HOUR$1);
-            seconds -= hours * HOUR$1;
-            const minutes = Math.floor(seconds / MINUTE$1);
-            seconds -= minutes * MINUTE$1;
-            const decimals = Math.min(params?.decimals ?? this._decimals, 6);
-            let ret_secs = seconds.toFixed(decimals);
-            if (ret_secs.length < (decimals > 0 ? decimals + 3 : 2)) {
-                ret_secs = '0' + ret_secs;
-            }
-            ret = `${neg}${_pad(hours)}:${_pad(minutes)}:${ret_secs}`;
-        }
-        return ret;
-    }
-    toSQLDateTime(decimals) {
-        const now = Date.now() / 1000;
-        const time = now - (now % DAY$2) + this._time;
-        return new SQLDateTime({ time, decimals: decimals ?? this._decimals });
-    }
-    toNumber() {
-        let seconds = this._time;
-        const hours = Math.floor(seconds / HOUR$1);
-        seconds -= hours * HOUR$1;
-        const minutes = Math.floor(seconds / MINUTE$1);
-        seconds -= minutes * MINUTE$1;
-        return hours * 10000 + minutes * 100 + seconds;
-    }
-    gt(other) {
-        return this._time > other.getTime();
-    }
-}
-function createSQLTime(params) {
-    if (isNaN(params.time)) {
-        return null;
-    }
-    else {
-        return new SQLTime(params);
-    }
-}
-function _pad(num) {
-    return (num < 10 ? '0' : '') + num;
-}
-
-function toBigInt(value) {
-    try {
-        if (typeof value === 'bigint') {
-            return value;
-        }
-        if (typeof value === 'string' ||
-            typeof value === 'number' ||
-            typeof value === 'boolean') {
-            return BigInt(value);
-        }
-        return null;
-    }
-    catch {
-        return null;
     }
 }
 
@@ -3352,7 +4093,7 @@ function convertTime(params) {
         if (time === undefined) {
             const result = _stringToDateTime(value);
             if (result !== undefined) {
-                time = (result.time % DAY$1) + (result.fraction || 0);
+                time = (result.time % DAY$1) + (result.fraction ?? 0);
             }
         }
         if (time === undefined) {
@@ -3370,9 +4111,7 @@ function convertTime(params) {
     }
     else if (typeof value === 'number') {
         const time = _numToTime(value);
-        if (decimals === undefined) {
-            decimals = getDecimals$1(value);
-        }
+        decimals ??= getDecimals(value);
         return createSQLTime({ time, decimals });
     }
     return null;
@@ -3385,9 +4124,9 @@ function _stringToTime(value) {
         const negative = match[1];
         const days = parseInt(match[2]);
         const hours = parseInt(match[3]);
-        const mins = parseInt(match[5] || '0');
-        const secs = parseInt(match[7] || '0');
-        const fraction = parseFloat('0' + (match[8] || ''));
+        const mins = parseInt(match[5] ?? '0');
+        const secs = parseInt(match[7] ?? '0');
+        const fraction = parseFloat('0' + (match[8] ?? ''));
         ret = days * DAY$1 + hours * HOUR + mins * MINUTE + secs + fraction;
         if (negative) {
             ret = -ret;
@@ -3399,8 +4138,8 @@ function _stringToTime(value) {
             const negative = match[1];
             const hours = parseInt(match[2]);
             const mins = parseInt(match[3]);
-            const secs = parseInt(match[5] || '0');
-            const fraction = parseFloat('0' + (match[6] || ''));
+            const secs = parseInt(match[5] ?? '0');
+            const fraction = parseFloat('0' + (match[6] ?? ''));
             ret = hours * HOUR + mins * MINUTE + secs + fraction;
             if (negative) {
                 ret = -ret;
@@ -3428,8 +4167,8 @@ function _stringToDateTime(value) {
         const month = match[2];
         const day = match[3];
         const hour = match[5];
-        const min = match[7] || '0';
-        const sec = match[9] || '0';
+        const min = match[7] ?? '0';
+        const sec = match[9] ?? '0';
         const fraction = parseFloat('0' + match[10]);
         ret = _partsToTime('datetime', year, month, day, hour, min, sec, fraction);
     }
@@ -3449,7 +4188,7 @@ function _numToDateTime(number) {
         const day = match[3];
         const hour = match[4];
         const min = match[5];
-        const sec = match[7] || '0';
+        const sec = match[7] ?? '0';
         const fraction = parseFloat('0' + match[8]);
         ret = _partsToTime('datetime', year, month, day, hour, min, sec, fraction);
     }
@@ -3461,7 +4200,7 @@ function _numToDateTime(number) {
             const day = match[3];
             const hour = match[4];
             const min = match[5];
-            const sec = match[7] || '0';
+            const sec = match[7] ?? '0';
             const fraction = parseFloat('0' + match[8]);
             ret = _partsToTime('datetime', year, month, day, hour, min, sec, fraction);
         }
@@ -3493,13 +4232,13 @@ function _numToTime(number) {
     number -= minutes * 100;
     return hours * HOUR + minutes * MINUTE + number;
 }
-function getDecimals$1(value, max) {
+function getDecimals(value, max) {
     let ret = 0;
     if (typeof value === 'number') {
-        ret = String(value).split('.')?.[1]?.length || 0;
+        ret = String(value).split('.')[1]?.length ?? 0;
     }
     else if (typeof value === 'string') {
-        ret = value.split('.')?.[1]?.length || 0;
+        ret = value.split('.')[1]?.length ?? 0;
     }
     if (max !== undefined) {
         ret = Math.min(max, ret);
@@ -3543,14 +4282,14 @@ function _isToNumber(value) {
 
 function sum(expr, state) {
     const { row, ...other } = state;
-    const group = (row?.['@@group'] ?? [{}]);
+    const group = row && 'group' in row ? row.group : [];
     let err = null;
     let value = 0;
     let name = '';
     let hasString = false;
     for (const group_row of group) {
         const group_state = { ...other, row: group_row };
-        const result = getValue(expr.args?.expr, group_state);
+        const result = getValue(expr.args.expr, group_state);
         if (!name) {
             name = `SUM(${result.name})`;
         }
@@ -3579,18 +4318,18 @@ function sum(expr, state) {
 }
 function count(expr, state) {
     const { row, ...other } = state;
-    const group = (row?.['@@group'] ?? [{}]);
+    const group = row && 'group' in row ? row.group : [];
     let err = null;
     let value = 0;
     let name = '';
-    if (expr.args?.expr?.type === 'star') {
+    if (expr.args.expr.type === 'star') {
         value = group.length;
         name = 'COUNT(*)';
     }
     else {
         for (const group_row of group) {
             const group_state = { ...other, row: group_row };
-            const result = getValue(expr.args?.expr, group_state);
+            const result = getValue(expr.args.expr, group_state);
             if (!name) {
                 name = `COUNT(${result.name})`;
             }
@@ -3607,7 +4346,7 @@ function count(expr, state) {
 }
 function avg(expr, state) {
     const { row, ...other } = state;
-    const group = (row?.['@@group'] ?? [{}]);
+    const group = row && 'group' in row ? row.group : [];
     let err = null;
     let total = 0;
     let cnt = 0;
@@ -3615,7 +4354,7 @@ function avg(expr, state) {
     let hasString = false;
     for (const group_row of group) {
         const group_state = { ...other, row: group_row };
-        const result = getValue(expr.args?.expr, group_state);
+        const result = getValue(expr.args.expr, group_state);
         if (!name) {
             name = `AVG(${result.name})`;
         }
@@ -3640,14 +4379,14 @@ function avg(expr, state) {
 }
 function min(expr, state) {
     const { row, ...other } = state;
-    const group = (row?.['@@group'] ?? [{}]);
+    const group = row && 'group' in row ? row.group : [];
     let err = null;
     let value = null;
     let type = 'null';
     let name = '';
     for (const group_row of group) {
         const group_state = { ...other, row: group_row };
-        const result = getValue(expr.args?.expr, group_state);
+        const result = getValue(expr.args.expr, group_state);
         if (!name) {
             name = `MIN(${result.name})`;
         }
@@ -3666,14 +4405,14 @@ function min(expr, state) {
 }
 function max(expr, state) {
     const { row, ...other } = state;
-    const group = (row?.['@@group'] ?? [{}]);
+    const group = row && 'group' in row ? row.group : [];
     let err = null;
     let value = null;
     let type = 'null';
     let name = '';
     for (const group_row of group) {
         const group_state = { ...other, row: group_row };
-        const result = getValue(expr.args?.expr, group_state);
+        const result = getValue(expr.args.expr, group_state);
         if (!name) {
             name = `MAX(${result.name})`;
         }
@@ -3690,7 +4429,466 @@ function max(expr, state) {
     }
     return { err, value, type, name };
 }
-const methods$5 = { sum, count, avg, min, max };
+function stddev_pop(expr, state) {
+    const { row, ...other } = state;
+    const group = row && 'group' in row ? row.group : [];
+    let err = null;
+    let name = '';
+    const values = [];
+    for (const group_row of group) {
+        const group_state = { ...other, row: group_row };
+        const result = getValue(expr.args.expr, group_state);
+        if (!name) {
+            name = `STDDEV_POP(${result.name})`;
+        }
+        if (result.err) {
+            err = result.err;
+            break;
+        }
+        else if (result.value !== null) {
+            const num = convertNum(result.value);
+            if (num !== null) {
+                values.push(num);
+            }
+        }
+    }
+    let value = null;
+    if (err === null && values.length > 0) {
+        const mean = values.reduce((a, b) => a + b, 0) / values.length;
+        const variance = values.reduce((total, val) => total + Math.pow(val - mean, 2), 0) /
+            values.length;
+        value = Math.sqrt(variance);
+    }
+    return { err, value, type: 'double', name };
+}
+function stddev_samp(expr, state) {
+    const { row, ...other } = state;
+    const group = row && 'group' in row ? row.group : [];
+    let err = null;
+    let name = '';
+    const values = [];
+    for (const group_row of group) {
+        const group_state = { ...other, row: group_row };
+        const result = getValue(expr.args.expr, group_state);
+        if (!name) {
+            name = `STDDEV_SAMP(${result.name})`;
+        }
+        if (result.err) {
+            err = result.err;
+            break;
+        }
+        else if (result.value !== null) {
+            const num = convertNum(result.value);
+            if (num !== null) {
+                values.push(num);
+            }
+        }
+    }
+    let value = null;
+    if (err === null && values.length > 1) {
+        const mean = values.reduce((a, b) => a + b, 0) / values.length;
+        const variance = values.reduce((total, val) => total + Math.pow(val - mean, 2), 0) /
+            (values.length - 1);
+        value = Math.sqrt(variance);
+    }
+    return { err, value, type: 'double', name };
+}
+function var_pop(expr, state) {
+    const { row, ...other } = state;
+    const group = row && 'group' in row ? row.group : [];
+    let err = null;
+    let name = '';
+    const values = [];
+    for (const group_row of group) {
+        const group_state = { ...other, row: group_row };
+        const result = getValue(expr.args.expr, group_state);
+        if (!name) {
+            name = `VAR_POP(${result.name})`;
+        }
+        if (result.err) {
+            err = result.err;
+            break;
+        }
+        else if (result.value !== null) {
+            const num = convertNum(result.value);
+            if (num !== null) {
+                values.push(num);
+            }
+        }
+    }
+    let value = null;
+    if (err === null && values.length > 0) {
+        const mean = values.reduce((a, b) => a + b, 0) / values.length;
+        value =
+            values.reduce((total, val) => total + Math.pow(val - mean, 2), 0) /
+                values.length;
+    }
+    return { err, value, type: 'double', name };
+}
+function var_samp(expr, state) {
+    const { row, ...other } = state;
+    const group = row && 'group' in row ? row.group : [];
+    let err = null;
+    let name = '';
+    const values = [];
+    for (const group_row of group) {
+        const group_state = { ...other, row: group_row };
+        const result = getValue(expr.args.expr, group_state);
+        if (!name) {
+            name = `VAR_SAMP(${result.name})`;
+        }
+        if (result.err) {
+            err = result.err;
+            break;
+        }
+        else if (result.value !== null) {
+            const num = convertNum(result.value);
+            if (num !== null) {
+                values.push(num);
+            }
+        }
+    }
+    let value = null;
+    if (err === null && values.length > 1) {
+        const mean = values.reduce((a, b) => a + b, 0) / values.length;
+        value =
+            values.reduce((total, val) => total + Math.pow(val - mean, 2), 0) /
+                (values.length - 1);
+    }
+    return { err, value, type: 'double', name };
+}
+function bit_and(expr, state) {
+    const { row, ...other } = state;
+    const group = row && 'group' in row ? row.group : [];
+    let err = null;
+    let value = (1n << 64n) - 1n;
+    let name = '';
+    for (const group_row of group) {
+        const group_state = { ...other, row: group_row };
+        const result = getValue(expr.args.expr, group_state);
+        if (!name) {
+            name = `BIT_AND(${result.name})`;
+        }
+        if (result.err) {
+            err = result.err;
+            break;
+        }
+        else if (result.value !== null) {
+            const num = convertNum(result.value);
+            if (num !== null) {
+                let bits = BigInt(Math.trunc(num));
+                if (bits < 0n) {
+                    bits = (1n << 64n) + bits;
+                }
+                value = value & bits;
+            }
+        }
+    }
+    return { err, value: Number(value), type: 'longlong', name };
+}
+function bit_or(expr, state) {
+    const { row, ...other } = state;
+    const group = row && 'group' in row ? row.group : [];
+    let err = null;
+    let value = 0n;
+    let name = '';
+    for (const group_row of group) {
+        const group_state = { ...other, row: group_row };
+        const result = getValue(expr.args.expr, group_state);
+        if (!name) {
+            name = `BIT_OR(${result.name})`;
+        }
+        if (result.err) {
+            err = result.err;
+            break;
+        }
+        else if (result.value !== null) {
+            const num = convertNum(result.value);
+            if (num !== null) {
+                let bits = BigInt(Math.trunc(num));
+                if (bits < 0n) {
+                    bits = (1n << 64n) + bits;
+                }
+                value = value | bits;
+            }
+        }
+    }
+    return { err, value: Number(value), type: 'longlong', name };
+}
+function bit_xor(expr, state) {
+    const { row, ...other } = state;
+    const group = row && 'group' in row ? row.group : [];
+    let err = null;
+    let value = 0n;
+    let name = '';
+    for (const group_row of group) {
+        const group_state = { ...other, row: group_row };
+        const result = getValue(expr.args.expr, group_state);
+        if (!name) {
+            name = `BIT_XOR(${result.name})`;
+        }
+        if (result.err) {
+            err = result.err;
+            break;
+        }
+        else if (result.value !== null) {
+            const num = convertNum(result.value);
+            if (num !== null) {
+                let bits = BigInt(Math.trunc(num));
+                if (bits < 0n) {
+                    bits = (1n << 64n) + bits;
+                }
+                value = value ^ bits;
+            }
+        }
+    }
+    return { err, value: Number(value), type: 'longlong', name };
+}
+const methods$5 = {
+    sum,
+    count,
+    avg,
+    min,
+    max,
+    stddev_pop,
+    std: stddev_pop,
+    stddev: stddev_pop,
+    stddev_samp,
+    var_pop,
+    variance: var_pop,
+    var_samp,
+    bit_and,
+    bit_or,
+    bit_xor,
+};
+
+function equal$1(expr, state) {
+    return _equal$1(expr, state, ' = ');
+}
+function notEqual$1(expr, state) {
+    const ret = _equal$1(expr, state, ' != ');
+    if (ret.value !== null) {
+        ret.value = ret.value ? 0 : 1;
+    }
+    return ret;
+}
+function inOp(expr, state) {
+    const left = getValue(expr.left, state);
+    if (left.err) {
+        return left;
+    }
+    let value = 0;
+    const names = [];
+    if (left.value === null) {
+        value = null;
+    }
+    else if (expr.right.type === 'expr_list') {
+        const list = expr.right.value ?? [];
+        for (const item of list) {
+            const right = getValue(item, state);
+            names.push(right.name ?? '');
+            const new_left = { ...left };
+            _convertCompare(new_left, right, state.session.timeZone);
+            if (right.err) {
+                return right;
+            }
+            if (right.value === null) {
+                value = null;
+            }
+            else if (new_left.value === right.value) {
+                value = 1;
+                break;
+            }
+        }
+    }
+    return {
+        err: null,
+        value,
+        name: `${left.name} IN (${names.join(', ')})`,
+        type: 'longlong',
+    };
+}
+function notIn(expr, state) {
+    const result = inOp(expr, state);
+    result.name = result.name?.replace(' IN ', ' NOT IN ') ?? '';
+    if (result.value !== null) {
+        result.value = result.value ? 0 : 1;
+    }
+    return result;
+}
+function gte$1(expr, state) {
+    return _gte$1(expr.left, expr.right, state, ' >= ', false);
+}
+function lte$1(expr, state) {
+    return _gte$1(expr.right, expr.left, state, ' <= ', true);
+}
+function gt$1(expr, state) {
+    return _gt$1(expr.left, expr.right, state, ' > ', false);
+}
+function lt$1(expr, state) {
+    return _gt$1(expr.right, expr.left, state, ' < ', true);
+}
+function nullif(expr, state) {
+    const args = expr.args?.value ?? [];
+    const arg1 = getValue(args[0], state);
+    const arg2 = getValue(args[1], state);
+    const err = arg1.err ?? arg2.err ?? null;
+    let value;
+    let type = arg1.type;
+    const name = `NULLIF(${arg1.name}, ${arg2.name})`;
+    if (!err) {
+        const origValue = arg1.value;
+        _convertCompare(arg1, arg2, state.session.timeZone);
+        const isEqual = arg1.value !== null && arg2.value !== null && arg1.value === arg2.value;
+        value = isEqual ? null : origValue;
+        if (origValue instanceof SQLDate ||
+            origValue instanceof SQLDateTime ||
+            origValue instanceof SQLTime) {
+            type = 'string';
+        }
+    }
+    return { err, name, value, type };
+}
+function _convertCompare(left, right, timeZone) {
+    if (left.value !== null &&
+        right.value !== null &&
+        left.value !== right.value) {
+        if ((_isDateLike(left.value) || _isDateLike(right.value)) &&
+            left.type !== right.type) {
+            const type = _unionDateTime(left.value, right.value);
+            if (type === 'datetime') {
+                const left_dt = convertDateTime({
+                    value: left.value,
+                    decimals: 6,
+                    timeZone,
+                });
+                const right_dt = convertDateTime({
+                    value: right.value,
+                    decimals: 6,
+                    timeZone,
+                });
+                if (left_dt && right_dt) {
+                    left.value = left_dt.toDate(timeZone).getTime();
+                    right.value = right_dt.toDate(timeZone).getTime();
+                }
+            }
+        }
+        if (typeof left.value === 'number' ||
+            typeof right.value === 'number' ||
+            left.type === 'number' ||
+            right.type === 'number') {
+            left.value = convertNum(left.value);
+            right.value = convertNum(right.value);
+        }
+        else {
+            if (left.value instanceof SQLDateTime) {
+                left.value = left.value.toString({ timeZone });
+            }
+            else {
+                left.value = String(left.value).trimEnd();
+            }
+            if (right.value instanceof SQLDateTime) {
+                right.value = right.value.toString({ timeZone });
+            }
+            else {
+                right.value = String(right.value).trimEnd();
+            }
+        }
+    }
+}
+function _equal$1(expr, state, op) {
+    const left = getValue(expr.left, state);
+    const right = getValue(expr.right, state);
+    const err = left.err ?? right.err;
+    const name = (left.name ?? '') + op + (right.name ?? '');
+    let value = 0;
+    if (!err) {
+        _convertCompare(left, right, state.session.timeZone);
+        if (left.value === null || right.value === null) {
+            value = null;
+        }
+        else if (left.value === right.value) {
+            value = 1;
+        }
+        else if (typeof left.value === 'string' &&
+            typeof right.value === 'string') {
+            value = left.value.localeCompare(right.value) === 0 ? 1 : 0;
+        }
+    }
+    return { err, value, name, type: 'longlong' };
+}
+function _gt$1(expr_left, expr_right, state, op, flip) {
+    const left = getValue(expr_left, state);
+    const right = getValue(expr_right, state);
+    const err = left.err ?? right.err;
+    const name = flip
+        ? (right.name ?? '') + op + (left.name ?? '')
+        : (left.name ?? '') + op + (right.name ?? '');
+    let value = 0;
+    if (!err) {
+        _convertCompare(left, right, state.session.timeZone);
+        if (left.value === null || right.value === null) {
+            value = null;
+        }
+        else if (left.value === right.value) {
+            value = 0;
+        }
+        else if (typeof left.value === 'number' &&
+            typeof right.value === 'number') {
+            value = left.value > right.value ? 1 : 0;
+        }
+        else if (typeof left.value === 'string' &&
+            typeof right.value === 'string') {
+            value = left.value.localeCompare(right.value) > 0 ? 1 : 0;
+        }
+    }
+    return { err, value, name, type: 'longlong' };
+}
+function _gte$1(expr_left, expr_right, state, op, flip) {
+    const left = getValue(expr_left, state);
+    const right = getValue(expr_right, state);
+    const err = left.err ?? right.err;
+    const name = flip
+        ? (right.name ?? '') + op + (left.name ?? '')
+        : (left.name ?? '') + op + (right.name ?? '');
+    let value = 0;
+    if (!err) {
+        _convertCompare(left, right, state.session.timeZone);
+        if (left.value === null || right.value === null) {
+            value = null;
+        }
+        else if (left.value === right.value) {
+            value = 1;
+        }
+        else if (typeof left.value === 'number' &&
+            typeof right.value === 'number') {
+            const leftNum = convertNum(left.value);
+            const rightNum = convertNum(right.value);
+            value =
+                leftNum !== null && rightNum !== null && leftNum >= rightNum ? 1 : 0;
+        }
+        else if (typeof left.value === 'string' &&
+            typeof right.value === 'string') {
+            value = left.value.localeCompare(right.value) >= 0 ? 1 : 0;
+        }
+    }
+    return { err, value, type: 'longlong', name };
+}
+function _isDateLike(value) {
+    return value instanceof SQLDate || value instanceof SQLDateTime;
+}
+function _unionDateTime(value1, value2) {
+    if (typeof value1 === 'string' || typeof value2 === 'string') {
+        return 'datetime';
+    }
+    else if (value1 instanceof SQLTime || value2 instanceof SQLTime) {
+        return 'datetime';
+    }
+    else if (_isDateLike(value1) && _isDateLike(value2)) {
+        return 'datetime';
+    }
+    return undefined;
+}
 
 function plus$1(expr, state) {
     const result = _numBothSides(expr, state, ' + ', true);
@@ -3773,8 +4971,32 @@ function mod$1(expr, state) {
     const right = getValue(expr.right, state);
     return modHelper(left, right, left.name + ' % ' + right.name);
 }
+function intDiv(expr, state) {
+    const left = getValue(expr.left, state);
+    const right = getValue(expr.right, state);
+    const err = left.err ?? right.err;
+    const name = left.name + ' DIV ' + right.name;
+    let value = null;
+    if (!err) {
+        if (left.value === null || right.value === null) {
+            value = null;
+        }
+        else {
+            const leftNum = convertNum(left.value);
+            const rightNum = convertNum(right.value);
+            if (leftNum === null || rightNum === null || rightNum === 0) {
+                value = null;
+            }
+            else {
+                // MySQL DIV truncates towards zero, not towards negative infinity
+                value = Math.trunc(leftNum / rightNum);
+            }
+        }
+    }
+    return { err, value, name, type: 'longlong' };
+}
 function modHelper(left, right, name) {
-    const err = left.err || right.err;
+    const err = left.err ?? right.err;
     let value;
     let type;
     if (!err && (left.value === null || right.value === null)) {
@@ -3811,7 +5033,7 @@ function modHelper(left, right, name) {
 function _numBothSides(expr, state, op, allow_interval) {
     const left = getValue(expr.left, state);
     const right = getValue(expr.right, state);
-    let err = left.err || right.err;
+    let err = left.err ?? right.err;
     const name = left.name + op + right.name;
     let value;
     let left_num;
@@ -3912,233 +5134,6 @@ function _unionNumberType(type1, type2, default_type) {
     return default_type;
 }
 
-function equal$1(expr, state) {
-    return _equal$1(expr, state, ' = ');
-}
-function notEqual$1(expr, state) {
-    const ret = _equal$1(expr, state, ' != ');
-    if (ret.value !== null) {
-        ret.value = ret.value ? 0 : 1;
-    }
-    return ret;
-}
-function inOp(expr, state) {
-    const left = getValue(expr.left, state);
-    if (left.err) {
-        return left;
-    }
-    let value = 0;
-    const names = [];
-    if (left.value === null) {
-        value = null;
-    }
-    else if (expr.right?.type === 'expr_list') {
-        const list = expr.right.value ?? [];
-        for (const item of list) {
-            const right = getValue(item, state);
-            names.push(right.name ?? '');
-            const new_left = { ...left };
-            _convertCompare(new_left, right, state.session.timeZone);
-            if (right.err) {
-                return right;
-            }
-            if (right.value === null) {
-                value = null;
-            }
-            else if (new_left.value === right.value) {
-                value = 1;
-                break;
-            }
-        }
-    }
-    return {
-        err: null,
-        value,
-        name: `${left.name} IN (${names.join(', ')})`,
-        type: 'longlong',
-    };
-}
-function notIn(expr, state) {
-    const result = inOp(expr, state);
-    result.name = result.name?.replace(' IN ', ' NOT IN ') ?? '';
-    if (result.value !== null) {
-        result.value = result.value ? 0 : 1;
-    }
-    return result;
-}
-function gte$1(expr, state) {
-    return _gte$1(expr.left, expr.right, state, ' >= ', false);
-}
-function lte$1(expr, state) {
-    return _gte$1(expr.right, expr.left, state, ' <= ', true);
-}
-function gt$1(expr, state) {
-    return _gt$1(expr.left, expr.right, state, ' > ', false);
-}
-function lt$1(expr, state) {
-    return _gt$1(expr.right, expr.left, state, ' < ', true);
-}
-function nullif(expr, state) {
-    const arg1 = getValue(expr.args?.value?.[0], state);
-    const arg2 = getValue(expr.args?.value?.[1], state);
-    const err = arg1.err || arg2.err || null;
-    let value;
-    let type = arg1.type;
-    const name = `NULLIF(${arg1.name}, ${arg2.name})`;
-    if (!err) {
-        const origValue = arg1.value;
-        _convertCompare(arg1, arg2, state.session.timeZone);
-        const isEqual = arg1.value !== null && arg2.value !== null && arg1.value === arg2.value;
-        value = isEqual ? null : origValue;
-        if (origValue instanceof SQLDate ||
-            origValue instanceof SQLDateTime ||
-            origValue instanceof SQLTime) {
-            type = 'string';
-        }
-    }
-    return { err, name, value, type };
-}
-function _convertCompare(left, right, timeZone) {
-    if (left.value !== null &&
-        right.value !== null &&
-        left.value !== right.value) {
-        if ((_isDateLike(left.value) || _isDateLike(right.value)) &&
-            left.type !== right.type) {
-            const type = _unionDateTime(left.value, right.value);
-            if (type === 'datetime') {
-                const left_dt = convertDateTime({
-                    value: left.value,
-                    decimals: 6,
-                    timeZone,
-                });
-                const right_dt = convertDateTime({
-                    value: right.value,
-                    decimals: 6,
-                    timeZone,
-                });
-                if (left_dt && right_dt) {
-                    left.value = left_dt.toDate(timeZone).getTime();
-                    right.value = right_dt.toDate(timeZone).getTime();
-                }
-            }
-        }
-        if (typeof left.value === 'number' ||
-            typeof right.value === 'number' ||
-            left.type === 'number' ||
-            right.type === 'number') {
-            left.value = convertNum(left.value);
-            right.value = convertNum(right.value);
-        }
-        else {
-            if (left.value instanceof SQLDateTime) {
-                left.value = left.value.toString({ timeZone });
-            }
-            else {
-                left.value = String(left.value).trimEnd();
-            }
-            if (right.value instanceof SQLDateTime) {
-                right.value = right.value.toString({ timeZone });
-            }
-            else {
-                right.value = String(right.value).trimEnd();
-            }
-        }
-    }
-}
-function _equal$1(expr, state, op) {
-    const left = getValue(expr.left, state);
-    const right = getValue(expr.right, state);
-    const err = left.err || right.err;
-    const name = (left.name ?? '') + op + (right.name ?? '');
-    let value = 0;
-    if (!err) {
-        _convertCompare(left, right, state.session.timeZone);
-        if (left.value === null || right.value === null) {
-            value = null;
-        }
-        else if (left.value === right.value) {
-            value = 1;
-        }
-        else if (typeof left.value === 'string' &&
-            typeof right.value === 'string') {
-            value = left.value.localeCompare(right.value) === 0 ? 1 : 0;
-        }
-    }
-    return { err, value, name, type: 'longlong' };
-}
-function _gt$1(expr_left, expr_right, state, op, flip) {
-    const left = getValue(expr_left, state);
-    const right = getValue(expr_right, state);
-    const err = left.err || right.err;
-    const name = flip
-        ? (right.name ?? '') + op + (left.name ?? '')
-        : (left.name ?? '') + op + (right.name ?? '');
-    let value = 0;
-    if (!err) {
-        _convertCompare(left, right, state.session.timeZone);
-        if (left.value === null || right.value === null) {
-            value = null;
-        }
-        else if (left.value === right.value) {
-            value = 0;
-        }
-        else if (typeof left.value === 'number' &&
-            typeof right.value === 'number') {
-            value = left.value > right.value ? 1 : 0;
-        }
-        else if (typeof left.value === 'string' &&
-            typeof right.value === 'string') {
-            value = left.value.localeCompare(right.value) > 0 ? 1 : 0;
-        }
-    }
-    return { err, value, name, type: 'longlong' };
-}
-function _gte$1(expr_left, expr_right, state, op, flip) {
-    const left = getValue(expr_left, state);
-    const right = getValue(expr_right, state);
-    const err = left.err || right.err;
-    const name = flip
-        ? (right.name ?? '') + op + (left.name ?? '')
-        : (left.name ?? '') + op + (right.name ?? '');
-    let value = 0;
-    if (!err) {
-        _convertCompare(left, right, state.session.timeZone);
-        if (left.value === null || right.value === null) {
-            value = null;
-        }
-        else if (left.value === right.value) {
-            value = 1;
-        }
-        else if (typeof left.value === 'number' &&
-            typeof right.value === 'number') {
-            const leftNum = convertNum(left.value);
-            const rightNum = convertNum(right.value);
-            value =
-                leftNum !== null && rightNum !== null && leftNum >= rightNum ? 1 : 0;
-        }
-        else if (typeof left.value === 'string' &&
-            typeof right.value === 'string') {
-            value = left.value.localeCompare(right.value) >= 0 ? 1 : 0;
-        }
-    }
-    return { err, value, type: 'longlong', name };
-}
-function _isDateLike(value) {
-    return value instanceof SQLDate || value instanceof SQLDateTime;
-}
-function _unionDateTime(value1, value2) {
-    if (typeof value1 === 'string' || typeof value2 === 'string') {
-        return 'datetime';
-    }
-    else if (value1 instanceof SQLTime || value2 instanceof SQLTime) {
-        return 'datetime';
-    }
-    else if (_isDateLike(value1) && _isDateLike(value2)) {
-        return 'datetime';
-    }
-    return undefined;
-}
-
 function and$1(expr, state) {
     const left = getValue(expr.left, state);
     let err = left.err;
@@ -4186,7 +5181,7 @@ function or$1(expr, state) {
 function xor(expr, state) {
     const left = getValue(expr.left, state);
     const right = getValue(expr.right, state);
-    const err = left.err || right.err;
+    const err = left.err ?? right.err;
     const name = left.name + ' XOR ' + right.name;
     let value = 1;
     if (!err) {
@@ -4216,7 +5211,6 @@ function _is$1(expr, state, op) {
     let right_name;
     // Type guard: check if rightExpr is a Value type
     if (typeof rightExpr === 'object' &&
-        rightExpr &&
         'value' in rightExpr &&
         !('type' in rightExpr && rightExpr.type === 'expr_list')) {
         if (rightExpr.value === null) {
@@ -4231,12 +5225,12 @@ function _is$1(expr, state, op) {
             right = false;
             right_name = 'FALSE';
         }
-        else if (!result.err) {
-            result.err = { err: 'syntax_err', args: [op] };
+        else {
+            result.err ??= { err: 'syntax_err', args: [op] };
         }
     }
-    else if (!result.err) {
-        result.err = { err: 'syntax_err', args: [op] };
+    else {
+        result.err ??= { err: 'syntax_err', args: [op] };
     }
     result.name = `${result.name} ${op} ${right_name}`;
     if (!result.err) {
@@ -4263,7 +5257,7 @@ function _is$1(expr, state, op) {
 function like(expr, state) {
     const left = getValue(expr.left, state);
     const right = getValue(expr.right, state);
-    const err = left.err || right.err;
+    const err = left.err ?? right.err;
     const name = (left.name ?? '') + ' LIKE ' + (right.name ?? '');
     let value = 0;
     if (!err) {
@@ -4290,12 +5284,72 @@ function notLike(expr, state) {
     }
     return result;
 }
+function between(expr, state) {
+    const value_result = getValue(expr.left, state);
+    if (value_result.err) {
+        return value_result;
+    }
+    // Right side should be expr_list with 2 values
+    if (typeof expr.right !== 'object' ||
+        !('type' in expr.right) ||
+        expr.right.type !== 'expr_list' ||
+        !('value' in expr.right) ||
+        !Array.isArray(expr.right.value) ||
+        expr.right.value.length !== 2) {
+        return {
+            err: { err: 'syntax_err', args: ['BETWEEN'] },
+            value: null,
+            name: '',
+            type: 'longlong',
+        };
+    }
+    const min_result = getValue(expr.right.value[0], state);
+    if (min_result.err) {
+        return min_result;
+    }
+    const max_result = getValue(expr.right.value[1], state);
+    if (max_result.err) {
+        return max_result;
+    }
+    const name = `${value_result.name} BETWEEN ${min_result.name} AND ${max_result.name}`;
+    if (value_result.value === null ||
+        min_result.value === null ||
+        max_result.value === null) {
+        return { err: null, value: null, name, type: 'longlong' };
+    }
+    // Use >= and <= comparison logic
+    const gte_result = gte$1({
+        left: expr.left,
+        right: expr.right.value[0],
+    }, state);
+    if (gte_result.err || gte_result.value === null) {
+        return { err: gte_result.err, value: null, name, type: 'longlong' };
+    }
+    const lte_result = lte$1({
+        left: expr.left,
+        right: expr.right.value[1],
+    }, state);
+    if (lte_result.err || lte_result.value === null) {
+        return { err: lte_result.err, value: null, name, type: 'longlong' };
+    }
+    const value = gte_result.value && lte_result.value ? 1 : 0;
+    return { err: null, value, name, type: 'longlong' };
+}
+function notBetween(expr, state) {
+    const result = between(expr, state);
+    result.name = result.name?.replace(' BETWEEN ', ' NOT BETWEEN ') ?? '';
+    if (result.value !== null) {
+        result.value = result.value ? 0 : 1;
+    }
+    return result;
+}
 const methods$4 = {
     '+': plus$1,
     '-': minus$2,
     '*': mul,
     '/': div,
     '%': mod$1,
+    div: intDiv,
     '=': equal$1,
     '!=': notEqual$1,
     '<>': notEqual$1,
@@ -4304,12 +5358,16 @@ const methods$4 = {
     '>=': gte$1,
     '<=': lte$1,
     and: and$1,
+    '&&': and$1,
     or: or$1,
+    '||': or$1,
     xor,
     is: is$1,
     'is not': isNot$1,
     like,
     'not like': notLike,
+    between,
+    'not between': notBetween,
     in: inOp,
     'not in': notIn,
 };
@@ -4322,7 +5380,7 @@ function datetime(expr, state) {
         const target = Array.isArray(expr.target)
             ? expr.target[0]
             : expr.target;
-        const decimals = target?.length || 0;
+        const decimals = target?.length ?? 0;
         if (decimals > 6) {
             result.err = 'ER_TOO_BIG_PRECISION';
         }
@@ -4354,7 +5412,7 @@ function time$1(expr, state) {
         const target = Array.isArray(expr.target)
             ? expr.target[0]
             : expr.target;
-        const decimals = target?.length || 0;
+        const decimals = target?.length ?? 0;
         if (decimals > 6) {
             result.err = 'ER_TOO_BIG_PRECISION';
         }
@@ -4408,744 +5466,539 @@ function double(expr, state) {
 const methods$3 = { datetime, date: date$1, time: time$1, signed, char, decimal, double };
 
 function assertArgCount(expr, min, max) {
-    const arg_count = expr.args?.value?.length ?? 0;
-    const expected = max === undefined ? min : max;
+    if (!expr.args) {
+        if (min === 0) {
+            expr.args = { type: 'expr_list', value: [] };
+        }
+        else {
+            throw new SQLError({
+                err: 'ER_WRONG_PARAMCOUNT_TO_NATIVE_FCT',
+                args: [getFunctionName(expr.name).toUpperCase()],
+            });
+        }
+    }
+    const argsValue = expr.args.value;
+    if (!argsValue || !Array.isArray(argsValue)) {
+        if (min === 0) {
+            expr.args.value = [];
+            return;
+        }
+        else {
+            throw new SQLError({
+                err: 'ER_WRONG_PARAMCOUNT_TO_NATIVE_FCT',
+                args: [getFunctionName(expr.name).toUpperCase()],
+            });
+        }
+    }
+    const arg_count = argsValue.length;
+    const expected = max ?? min;
     if (arg_count < min || arg_count > expected) {
         throw new SQLError({
             err: 'ER_WRONG_PARAMCOUNT_TO_NATIVE_FCT',
-            args: [String(expr.name ?? 'FUNCTION').toUpperCase()],
-        });
-    }
-    if (expr.args && !Array.isArray(expr.args.value)) {
-        throw new SQLError({
-            err: 'ER_WRONG_PARAMCOUNT_TO_NATIVE_FCT',
-            args: [String(expr.name ?? 'FUNCTION').toUpperCase()],
+            args: [getFunctionName(expr.name).toUpperCase()],
         });
     }
 }
 function assertArgCountParse(expr, min, max) {
-    const arg_count = expr.args?.value?.length ?? 0;
-    const expected = max === undefined ? min : max;
+    if (!expr.args) {
+        if (min === 0) {
+            expr.args = { type: 'expr_list', value: [] };
+        }
+        else {
+            throw new SQLError({ err: 'ER_PARSE_ERROR' });
+        }
+    }
+    const argsValue = expr.args.value;
+    if (!argsValue || !Array.isArray(argsValue)) {
+        if (min === 0) {
+            expr.args.value = [];
+            return;
+        }
+        else {
+            throw new SQLError({ err: 'ER_PARSE_ERROR' });
+        }
+    }
+    const arg_count = argsValue.length;
+    const expected = max ?? min;
     if (arg_count < min || arg_count > expected) {
         throw new SQLError({ err: 'ER_PARSE_ERROR' });
     }
-    if (expr.args && !Array.isArray(expr.args.value)) {
-        throw new SQLError({ err: 'ER_PARSE_ERROR' });
-    }
 }
 
-function abs(expr, state) {
-    assertArgCount(expr, 1);
-    const result = getValue(expr.args.value[0], state);
-    result.name = `ABS(${result.name})`;
-    if (!result.err && result.value !== null) {
-        const num = convertNum(result.value);
-        result.value = num !== null ? Math.abs(num) : null;
-        result.type = result.type === 'string' ? 'double' : result.type;
+function coalesce(expr, state) {
+    assertArgCountParse(expr, 1, Infinity);
+    let err = null;
+    let value = null;
+    const names = [];
+    const values = [];
+    for (const sub of expr.args.value) {
+        const result = getValue(sub, state);
+        names.push(result.name ?? '');
+        values.push(result);
+        if (result.err) {
+            err = result.err;
+            break;
+        }
+        else if (value === null && result.value !== null) {
+            value = result.value;
+        }
     }
-    else {
-        result.type = 'double';
-    }
-    return result;
+    const { type } = _unionType$1(values);
+    return { err, name: `COALESCE(${names.join(', ')}`, value, type };
 }
-function ceil(expr, state) {
-    assertArgCount(expr, 1);
-    const result = getValue(expr.args.value[0], state);
-    result.name = `CEIL(${result.name})`;
-    if (!result.err && result.value !== null) {
-        const num = convertNum(result.value);
-        result.value = num === null ? null : Math.ceil(num);
+function ifnull(expr, state) {
+    assertArgCount(expr, 2);
+    const arg1 = getValue(expr.args.value[0], state);
+    const arg2 = getValue(expr.args.value[1], state);
+    if (arg1.err) {
+        return arg1;
     }
-    result.type = _resolveTypeForRounding(result);
-    return result;
-}
-function floor(expr, state) {
-    assertArgCount(expr, 1);
-    const result = getValue(expr.args.value[0], state);
-    result.name = `FLOOR(${result.name})`;
-    if (!result.err && result.value !== null) {
-        const num = convertNum(result.value);
-        result.value = num !== null ? Math.floor(num) : null;
-    }
-    result.type = _resolveTypeForRounding(result);
-    return result;
-}
-function round(expr, state) {
-    assertArgCount(expr, 1, 2);
-    const result = getValue(expr.args.value[0], state);
-    const arg2 = expr.args.value[1]
-        ? getValue(expr.args.value[1], state)
-        : undefined;
-    if (result.err) {
-        return result;
-    }
-    if (arg2 && arg2.err) {
+    if (arg2.err) {
         return arg2;
     }
-    if (result.value === null) {
-        result.type = 'double';
-    }
-    let value = convertNum(result.value);
-    let decimals = 0;
-    result.name = arg2
-        ? `ROUND(${result.name}, ${arg2.name})`
-        : `ROUND(${result.name})`;
-    if (arg2) {
-        const arg2_num = convertNum(arg2.value);
-        if (arg2_num === null) {
-            value = null;
+    const value = arg1.value !== null ? arg1.value : arg2.value;
+    const { type } = _unionType$1([arg1, arg2]);
+    return { err: null, name: `IFNULL(${arg1.name}, ${arg2.name})`, value, type };
+}
+function ifFunc(expr, state) {
+    assertArgCount(expr, 3);
+    const condition = getValue(expr.args.value[0], state);
+    const trueValue = getValue(expr.args.value[1], state);
+    const falseValue = getValue(expr.args.value[2], state);
+    const err = condition.err ?? trueValue.err ?? falseValue.err ?? null;
+    let value;
+    let type = 'longlong';
+    if (!err) {
+        type = _unionType$1([trueValue, falseValue]).type;
+        const condResult = convertNum(condition.value);
+        let result_type;
+        if (condResult === null || condResult === 0) {
+            value = falseValue.value;
+            result_type = falseValue.type;
         }
         else {
-            decimals = Math.round(arg2_num);
+            value = trueValue.value;
+            result_type = trueValue.type;
+        }
+        if (result_type !== type && type === 'datetime') {
+            value = convertDateTime({ value, timeZone: state.session.timeZone });
         }
     }
-    if (value === null) {
-        result.value = null;
+    return {
+        err,
+        name: `IF(${condition.name}, ${trueValue.name}, ${falseValue.name})`,
+        value,
+        type,
+    };
+}
+function greatest(expr, state) {
+    return _compare(expr, state, 'GREATEST', _gtList, (a, b) => a > b);
+}
+function least(expr, state) {
+    return _compare(expr, state, 'LEAST', _ltList, (a, b) => a < b);
+}
+function _gtList(list, timeZone, convert) {
+    const convert_list = [];
+    let decimals = 0;
+    for (const item of list) {
+        const ret = convert(item.value, undefined);
+        if (ret) {
+            convert_list.push(ret);
+            decimals = Math.max(decimals, ret.getDecimals?.() ?? 0);
+        }
+        else {
+            decimals = Math.max(decimals, getDecimals$1(item));
+        }
     }
-    else if (decimals === 0) {
-        result.value = _mysqlRound(value);
+    let value = undefined;
+    for (const converted of convert_list) {
+        if (value === undefined || converted.gt(value)) {
+            value = converted;
+        }
     }
-    else if (decimals > 0) {
-        result.value = Number(value.toFixed(decimals));
+    if (value && value.getDecimals?.() !== decimals) {
+        value = convert(value, decimals) ?? '';
+    }
+    return { value: value ?? null, decimals };
+}
+function _ltList(list, timeZone, convert) {
+    const convert_list = [];
+    for (const item of list) {
+        const ret = convert(item.value, undefined);
+        if (ret) {
+            convert_list.push(ret);
+        }
+    }
+    let value = undefined;
+    let decimals = 0;
+    if (convert_list.length !== list.length) {
+        let val = undefined;
+        for (const item of list) {
+            const item_s = convertString({ value: item.value, timeZone }) ?? '';
+            if (val === undefined || item_s < val) {
+                val = item_s;
+            }
+        }
+        value = val;
     }
     else {
-        // Negative decimals - round to nearest 10, 100, 1000, etc.
-        const factor = Math.pow(10, -decimals);
-        result.value = _mysqlRound(value / factor) * factor;
-    }
-    if (result.type === 'string') {
-        result.type = 'double';
-    }
-    return result;
-}
-function _mysqlRound(x) {
-    return x >= 0 ? Math.round(x) : -Math.round(-x);
-}
-function mod(expr, state) {
-    assertArgCountParse(expr, 2);
-    const arg1 = getValue(expr.args.value[0], state);
-    const arg2 = getValue(expr.args.value[1], state);
-    return modHelper(arg1, arg2, `MOD(${arg1.name}, ${arg2.name})`);
-}
-function _resolveTypeForRounding(result) {
-    if (result.value === null || result.type === 'string') {
-        return 'double';
-    }
-    else if (result.type === 'number') {
-        return 'longlong';
-    }
-    return result.type;
-}
-function pow(expr, state) {
-    assertArgCount(expr, 2);
-    const arg1 = getValue(expr.args.value[0], state);
-    const arg2 = getValue(expr.args.value[1], state);
-    const err = arg1.err || arg2.err;
-    let value;
-    const name = `POW(${arg1.name}, ${arg2.name})`;
-    if (!err && (arg1.value === null || arg2.value === null)) {
-        value = null;
-    }
-    else if (!err) {
-        const num1 = convertNum(arg1.value);
-        const num2 = convertNum(arg2.value);
-        value = num1 !== null && num2 !== null ? Math.pow(num1, num2) : null;
-    }
-    return { err, name, value, type: 'double' };
-}
-function sqrt(expr, state) {
-    assertArgCount(expr, 1);
-    const result = getValue(expr.args.value[0], state);
-    result.name = `SQRT(${result.name})`;
-    result.type = 'double';
-    if (!result.err && result.value !== null) {
-        const num = convertNum(result.value);
-        result.value = num !== null && num >= 0 ? Math.sqrt(num) : null;
-    }
-    return result;
-}
-function sign(expr, state) {
-    assertArgCount(expr, 1);
-    const result = getValue(expr.args.value[0], state);
-    result.name = `SIGN(${result.name})`;
-    result.type = 'longlong';
-    if (!result.err && result.value !== null) {
-        const num = convertNum(result.value);
-        result.value = num !== null ? Math.sign(num) : null;
-    }
-    return result;
-}
-function bin(expr, state) {
-    assertArgCount(expr, 1);
-    const result = getValue(expr.args.value[0], state);
-    result.name = `BIN(${result.name})`;
-    result.type = 'string';
-    if (!result.err && result.value !== null) {
-        const num = convertNum(result.value);
-        if (num !== null) {
-            const bigNum = BigInt(Math.trunc(num));
-            // Convert to unsigned 64-bit
-            const unsigned = bigNum < 0n ? (1n << 64n) + bigNum : bigNum;
-            result.value = unsigned.toString(2);
-        }
-        else {
-            result.value = null;
-        }
-    }
-    return result;
-}
-function oct(expr, state) {
-    assertArgCount(expr, 1);
-    const result = getValue(expr.args.value[0], state);
-    result.name = `OCT(${result.name})`;
-    result.type = 'string';
-    if (!result.err && result.value !== null) {
-        const num = convertNum(result.value);
-        if (num !== null) {
-            const bigNum = BigInt(Math.trunc(num));
-            // Convert to unsigned 64-bit
-            const unsigned = bigNum < 0n ? (1n << 64n) + bigNum : bigNum;
-            result.value = unsigned.toString(8);
-        }
-        else {
-            result.value = null;
-        }
-    }
-    return result;
-}
-function pi(_expr, _state) {
-    return { err: null, name: 'PI()', value: Math.PI, type: 'double' };
-}
-function degrees(expr, state) {
-    assertArgCount(expr, 1);
-    const result = getValue(expr.args.value[0], state);
-    result.name = `DEGREES(${result.name})`;
-    result.type = 'double';
-    if (!result.err && result.value !== null) {
-        const num = convertNum(result.value);
-        result.value = num !== null ? (num * 180) / Math.PI : null;
-    }
-    return result;
-}
-function radians(expr, state) {
-    assertArgCount(expr, 1);
-    const result = getValue(expr.args.value[0], state);
-    result.name = `RADIANS(${result.name})`;
-    result.type = 'double';
-    if (!result.err && result.value !== null) {
-        const num = convertNum(result.value);
-        result.value = num !== null ? (num * Math.PI) / 180 : null;
-    }
-    return result;
-}
-function exp(expr, state) {
-    assertArgCount(expr, 1);
-    const result = getValue(expr.args.value[0], state);
-    result.name = `EXP(${result.name})`;
-    result.type = 'double';
-    if (!result.err && result.value !== null) {
-        const num = convertNum(result.value);
-        result.value = num !== null ? Math.exp(num) : null;
-    }
-    return result;
-}
-function ln(expr, state) {
-    assertArgCount(expr, 1);
-    const result = getValue(expr.args.value[0], state);
-    result.name = `LN(${result.name})`;
-    result.type = 'double';
-    if (!result.err && result.value !== null) {
-        const num = convertNum(result.value);
-        result.value = num !== null && num > 0 ? Math.log(num) : null;
-    }
-    return result;
-}
-function log(expr, state) {
-    assertArgCount(expr, 1, 2);
-    const arg1 = getValue(expr.args.value[0], state);
-    const arg2 = getValue(expr.args.value[1], state);
-    const err = arg1.err || arg2.err;
-    let value;
-    const name = arg2.value !== undefined
-        ? `LOG(${arg1.name}, ${arg2.name})`
-        : `LOG(${arg1.name})`;
-    if (!err &&
-        (arg1.value === null || (arg2.value !== undefined && arg2.value === null))) {
-        value = null;
-    }
-    else if (!err) {
-        const num1 = convertNum(arg1.value);
-        if (arg2.value !== undefined) {
-            const num2 = convertNum(arg2.value);
-            value =
-                num1 !== null && num1 > 0 && num2 !== null && num2 > 0
-                    ? Math.log(num2) / Math.log(num1)
-                    : null;
-        }
-        else {
-            value = num1 !== null && num1 > 0 ? Math.log(num1) : null;
-        }
-    }
-    return { err, name, value, type: 'double' };
-}
-function log2(expr, state) {
-    assertArgCount(expr, 1);
-    const result = getValue(expr.args.value[0], state);
-    result.name = `LOG2(${result.name})`;
-    result.type = 'double';
-    if (!result.err && result.value !== null) {
-        const num = convertNum(result.value);
-        result.value = num !== null && num > 0 ? Math.log2(num) : null;
-    }
-    return result;
-}
-function log10(expr, state) {
-    assertArgCount(expr, 1);
-    const result = getValue(expr.args.value[0], state);
-    result.name = `LOG10(${result.name})`;
-    result.type = 'double';
-    if (!result.err && result.value !== null) {
-        const num = convertNum(result.value);
-        result.value = num !== null && num > 0 ? Math.log10(num) : null;
-    }
-    return result;
-}
-function acos(expr, state) {
-    assertArgCount(expr, 1);
-    const result = getValue(expr.args.value[0], state);
-    result.name = `ACOS(${result.name})`;
-    result.type = 'double';
-    if (!result.err && result.value !== null) {
-        const num = convertNum(result.value);
-        result.value =
-            num !== null && num >= -1 && num <= 1 ? Math.acos(num) : null;
-    }
-    return result;
-}
-function asin(expr, state) {
-    assertArgCount(expr, 1);
-    const result = getValue(expr.args.value[0], state);
-    result.name = `ASIN(${result.name})`;
-    result.type = 'double';
-    if (!result.err && result.value !== null) {
-        const num = convertNum(result.value);
-        result.value =
-            num !== null && num >= -1 && num <= 1 ? Math.asin(num) : null;
-    }
-    return result;
-}
-function atan(expr, state) {
-    assertArgCount(expr, 1);
-    const result = getValue(expr.args.value[0], state);
-    result.name = `ATAN(${result.name})`;
-    result.type = 'double';
-    if (!result.err && result.value !== null) {
-        const num = convertNum(result.value);
-        result.value = num !== null ? Math.atan(num) : null;
-    }
-    return result;
-}
-function atan2(expr, state) {
-    assertArgCount(expr, 2);
-    const arg1 = getValue(expr.args.value[0], state);
-    const arg2 = getValue(expr.args.value[1], state);
-    const err = arg1.err || arg2.err;
-    let value;
-    const name = `ATAN2(${arg1.name}, ${arg2.name})`;
-    if (!err && (arg1.value === null || arg2.value === null)) {
-        value = null;
-    }
-    else if (!err) {
-        const num1 = convertNum(arg1.value);
-        const num2 = convertNum(arg2.value);
-        value = num1 !== null && num2 !== null ? Math.atan2(num1, num2) : null;
-    }
-    return { err, name, value, type: 'double' };
-}
-function cos(expr, state) {
-    assertArgCount(expr, 1);
-    const result = getValue(expr.args.value[0], state);
-    result.name = `COS(${result.name})`;
-    result.type = 'double';
-    if (!result.err && result.value !== null) {
-        const num = convertNum(result.value);
-        result.value = num !== null ? Math.cos(num) : null;
-    }
-    return result;
-}
-function sin(expr, state) {
-    assertArgCount(expr, 1);
-    const result = getValue(expr.args.value[0], state);
-    result.name = `SIN(${result.name})`;
-    result.type = 'double';
-    if (!result.err && result.value !== null) {
-        const num = convertNum(result.value);
-        result.value = num !== null ? Math.sin(num) : null;
-    }
-    return result;
-}
-function tan(expr, state) {
-    assertArgCount(expr, 1);
-    const result = getValue(expr.args.value[0], state);
-    result.name = `TAN(${result.name})`;
-    result.type = 'double';
-    if (!result.err && result.value !== null) {
-        const num = convertNum(result.value);
-        result.value = num !== null ? Math.tan(num) : null;
-    }
-    return result;
-}
-function cot(expr, state) {
-    assertArgCount(expr, 1);
-    const result = getValue(expr.args.value[0], state);
-    result.name = `COT(${result.name})`;
-    result.type = 'double';
-    if (!result.err && result.value !== null) {
-        const num = convertNum(result.value);
-        if (num !== null) {
-            const cotValue = 1 / Math.tan(num);
-            if (!isFinite(cotValue)) {
-                result.err = 'ER_DATA_OUT_OF_RANGE';
-                result.value = null;
-            }
-            else {
-                result.value = cotValue;
+        decimals = convert_list.reduce((memo, converted) => {
+            const dec = converted.getDecimals?.() ?? 0;
+            return Math.max(memo, dec);
+        }, 0);
+        let val = undefined;
+        for (const converted of convert_list) {
+            if (val === undefined || val.gt(converted)) {
+                val = converted;
             }
         }
+        if (val && val.getDecimals?.() !== decimals) {
+            value = convert(val, decimals) ?? '';
+        }
         else {
-            result.value = null;
+            value = val;
         }
     }
-    return result;
+    return { value: value ?? null, decimals };
+}
+function _unionType$1(list) {
+    let compare_type;
+    const types = list.map((e) => e.type);
+    if (types.includes('datetime')) {
+        compare_type = 'datetime';
+    }
+    else if (types.includes('date')) {
+        if (types.includes('time') &&
+            types.every((t) => t === 'date' || t === 'time' || t === 'null')) {
+            compare_type = 'datetime';
+        }
+        else {
+            compare_type = 'date';
+        }
+    }
+    else if (types.includes('time')) {
+        compare_type = 'time';
+    }
+    else if (types.includes('string')) {
+        compare_type = 'string';
+    }
+    else if (types.includes('double')) {
+        compare_type = 'double';
+    }
+    else if (types.includes('number')) {
+        compare_type = 'number';
+    }
+    else if (types.includes('longlong')) {
+        compare_type = 'longlong';
+    }
+    else if (types.every((t) => t === 'null')) {
+        compare_type = 'null';
+    }
+    else {
+        compare_type = 'string';
+    }
+    let type = compare_type;
+    if (type === 'datetime' || type === 'date') {
+        if (types.some((t) => t !== 'datetime' && t !== 'date' && t !== 'time' && t !== 'null')) {
+            type = 'string';
+        }
+    }
+    else if (type === 'time') {
+        if (types.some((t) => t !== 'time' && t !== 'null')) {
+            compare_type = 'string';
+            type = 'string';
+        }
+    }
+    return { compare_type, type };
+}
+function _compare(expr, state, functionName, dateCompare, nativeCompare) {
+    assertArgCount(expr, 2, Infinity);
+    const { timeZone } = state.session;
+    let value;
+    const names = [];
+    const values = expr.args.value.map((sub) => getValue(sub, state));
+    for (const sub of values) {
+        names.push(sub.name ?? '');
+        if (sub.err) {
+            return sub;
+        }
+        if (sub.value === null) {
+            value = null;
+        }
+    }
+    const { compare_type, type } = _unionType$1(values);
+    let decimals = 0;
+    let convert_func = undefined;
+    if (value !== null) {
+        switch (compare_type) {
+            case 'datetime':
+                convert_func = convertDateTime;
+            // eslint-disable-next-line no-fallthrough
+            case 'date':
+                convert_func ??= convertDate;
+            // eslint-disable-next-line no-fallthrough
+            case 'time':
+                convert_func ??= convertTime;
+                {
+                    const ret = dateCompare(values, timeZone, (val, dec) => convert_func?.({ value: val, timeZone, decimals: dec }) ?? null);
+                    if (ret === null) {
+                        value = null;
+                    }
+                    else {
+                        decimals = ret.decimals;
+                        if (ret.value &&
+                            type === 'string' &&
+                            typeof ret.value !== 'string') {
+                            value = ret.value.toString({ timeZone, decimals });
+                        }
+                        else {
+                            value = ret.value;
+                        }
+                    }
+                }
+                break;
+            case 'longlong':
+                {
+                    let val = undefined;
+                    for (const sub of values) {
+                        if (typeof val === 'bigint' || typeof sub.value === 'bigint') {
+                            const val_big = BigInt(sub.value);
+                            if (val === undefined || nativeCompare(val_big, val)) {
+                                val = val_big;
+                            }
+                        }
+                        else {
+                            const val_num = Number(sub.value);
+                            if (val === undefined || nativeCompare(val_num, val)) {
+                                val = val_num;
+                            }
+                        }
+                    }
+                    value = val;
+                }
+                break;
+            case 'double':
+            case 'number':
+                {
+                    let val = undefined;
+                    for (const sub of values) {
+                        const val_n = Number(sub.value);
+                        if (val === undefined || nativeCompare(val_n, val)) {
+                            val = val_n;
+                        }
+                    }
+                    value = val;
+                }
+                break;
+            default:
+            case 'string':
+                {
+                    let val = undefined;
+                    for (const sub of values) {
+                        const val_s = String(sub.value);
+                        if (val === undefined || nativeCompare(val_s, val)) {
+                            val = val_s;
+                        }
+                    }
+                    value = val;
+                }
+                break;
+        }
+    }
+    return {
+        err: null,
+        value,
+        type,
+        name: `${functionName}(${names.join(', ')})`,
+        decimals,
+    };
 }
 
-function length(expr, state) {
+function now(expr, state) {
+    assertArgCount(expr, 0, 1);
+    let decimals = 0;
+    let name = 'NOW()';
+    if (expr.args.value[0]) {
+        if (expr.args.value[0].type === 'bool') {
+            return { err: 'ER_PARSE_ERROR', type: 'datetime', value: null };
+        }
+        const result = getValue(expr.args.value[0], state);
+        if (result.err) {
+            return result;
+        }
+        if (result.type !== 'longlong') {
+            return { err: 'ER_PARSE_ERROR', type: 'datetime', value: null };
+        }
+        decimals = Math.round(convertNum(result.value) ?? 0);
+        if (decimals < 0) {
+            return { err: 'ER_PARSE_ERROR', type: 'datetime', value: null };
+        }
+        else if (decimals > 6) {
+            return { err: 'ER_TOO_BIG_PRECISION', type: 'datetime', value: null };
+        }
+        name = `NOW(${result.name ?? ''})`;
+    }
+    return {
+        err: null,
+        type: 'datetime',
+        value: new SQLDateTime({ time: state.session.timestamp, decimals }),
+        name,
+    };
+}
+function from_unixtime(expr, state) {
     assertArgCount(expr, 1);
     const result = getValue(expr.args.value[0], state);
-    result.name = `LENGTH(${result.name})`;
-    result.type = 'longlong';
+    result.name = `FROM_UNIXTIME(${result.name})`;
+    result.type = 'datetime';
     if (!result.err && result.value !== null) {
-        result.value = Buffer.byteLength(String(result.value), 'utf8');
-    }
-    return result;
-}
-function char_length(expr, state) {
-    assertArgCount(expr, 1);
-    const result = getValue(expr.args.value[0], state);
-    result.name = `CHAR_LENGTH(${result.name})`;
-    result.type = 'longlong';
-    if (!result.err && result.value !== null) {
-        const str = String(result.value);
-        result.value = [...str].length;
-    }
-    return result;
-}
-function concat(expr, state) {
-    const arg_count = expr.args?.value?.length ?? 0;
-    if (arg_count === 0 || !Array.isArray(expr.args?.value)) {
-        throw new SQLError({
-            err: 'ER_WRONG_PARAMCOUNT_TO_NATIVE_FCT',
-            args: ['CONCAT'],
-        });
-    }
-    let err = null;
-    let value = '';
-    let has_blob = false;
-    expr.args.value.every((sub) => {
-        const result = getValue(sub, state);
-        if (result.type === 'long_blob' || result.type === 'medium_blob') {
-            has_blob = true;
-        }
-        if (!err && result.err) {
-            err = result.err;
-        }
-        else if (result.value === null) {
-            value = null;
-        }
-        else {
-            value += String(result.value);
-        }
-        return value !== null;
-    });
-    return { err, value, type: has_blob ? 'long_blob' : 'string' };
-}
-function left(expr, state) {
-    assertArgCountParse(expr, 2);
-    const result = getValue(expr.args.value[0], state);
-    const len_result = getValue(expr.args.value[1], state);
-    result.name = `LEFT(${result.name ?? ''}, ${len_result.name ?? ''})`;
-    result.err = result.err || len_result.err;
-    result.type = 'string';
-    if (!result.err && (result.value === null || len_result.value === null)) {
-        result.value = null;
-    }
-    else if (!result.err) {
-        const len = Math.round(convertNum(len_result.value) ?? 0);
-        result.value = String(result.value).substring(0, len);
-    }
-    return result;
-}
-function right(expr, state) {
-    assertArgCountParse(expr, 2);
-    const result = getValue(expr.args.value[0], state);
-    const len_result = getValue(expr.args.value[1], state);
-    result.name = `RIGHT(${result.name ?? ''}, ${len_result.name ?? ''})`;
-    result.err = result.err || len_result.err;
-    result.type = 'string';
-    if (!result.err && (result.value === null || len_result.value === null)) {
-        result.value = null;
-    }
-    else if (!result.err) {
-        const len = Math.round(convertNum(len_result.value) ?? 0);
-        if (len <= 0) {
-            result.value = '';
-        }
-        else {
-            result.value = String(result.value).slice(-len);
-        }
-    }
-    return result;
-}
-function lower(expr, state) {
-    assertArgCount(expr, 1);
-    const result = getValue(expr.args.value[0], state);
-    result.name = `LOWER(${result.name})`;
-    result.type = 'string';
-    if (!result.err && result.value !== null) {
-        result.value = String(result.value).toLowerCase();
-    }
-    return result;
-}
-function upper(expr, state) {
-    assertArgCount(expr, 1);
-    const result = getValue(expr.args.value[0], state);
-    result.name = `UPPER(${result.name})`;
-    result.type = 'string';
-    if (!result.err && result.value !== null) {
-        result.value = String(result.value).toUpperCase();
-    }
-    return result;
-}
-function trim(expr, state) {
-    assertArgCountParse(expr, 1);
-    const result = getValue(expr.args.value[0], state);
-    result.name = `TRIM(${result.name})`;
-    result.type = 'string';
-    if (!result.err && result.value !== null) {
-        result.value = String(result.value).trim();
-    }
-    return result;
-}
-function ltrim(expr, state) {
-    assertArgCount(expr, 1);
-    const result = getValue(expr.args.value[0], state);
-    result.name = `LTRIM(${result.name})`;
-    result.type = 'string';
-    if (!result.err && result.value !== null) {
-        result.value = String(result.value).trimStart();
-    }
-    return result;
-}
-function rtrim(expr, state) {
-    assertArgCount(expr, 1);
-    const result = getValue(expr.args.value[0], state);
-    result.name = `RTRIM(${result.name})`;
-    result.type = 'string';
-    if (!result.err && result.value !== null) {
-        result.value = String(result.value).trimEnd();
-    }
-    return result;
-}
-function reverse(expr, state) {
-    assertArgCountParse(expr, 1);
-    const result = getValue(expr.args.value[0], state);
-    result.name = `REVERSE(${result.name})`;
-    result.type = 'string';
-    if (!result.err && result.value !== null) {
-        result.value = String(result.value).split('').reverse().join('');
-    }
-    return result;
-}
-function repeat(expr, state) {
-    assertArgCountParse(expr, 2);
-    const arg1 = getValue(expr.args.value[0], state);
-    const arg2 = getValue(expr.args.value[1], state);
-    const err = arg1.err || arg2.err;
-    let value;
-    let type;
-    const name = `REPEAT(${arg1.name}, ${arg2.name})`;
-    if (!err && arg2.value === null) {
-        value = null;
-        type = 'long_blob';
-    }
-    else if (!err && arg1.value === null) {
-        value = null;
-        type = 'string';
-    }
-    else if (!err) {
-        const count = convertNum(arg2.value);
-        value =
-            count !== null && count > 0
-                ? String(arg1.value).repeat(Math.round(count))
-                : '';
-        type = 'string';
-    }
-    else {
-        type = 'long_blob';
-    }
-    return { err, name, value, type };
-}
-function substring(expr, state) {
-    assertArgCountParse(expr, 2, 3);
-    const arg1 = getValue(expr.args.value[0], state);
-    const arg2 = getValue(expr.args.value[1], state);
-    const hasThirdArg = expr.args.value[2] !== undefined;
-    const arg3 = hasThirdArg ? getValue(expr.args.value[2], state) : null;
-    const err = arg1.err || arg2.err || (arg3?.err ?? null);
-    let value;
-    const name = hasThirdArg
-        ? `SUBSTRING(${arg1.name}, ${arg2.name}, ${arg3?.name ?? ''})`
-        : `SUBSTRING(${arg1.name}, ${arg2.name})`;
-    if (!err &&
-        (arg1.value === null ||
-            arg2.value === null ||
-            (hasThirdArg && arg3?.value === null))) {
-        value = null;
-    }
-    else if (!err) {
-        const str = String(arg1.value);
-        const pos = convertNum(arg2.value);
-        const len = hasThirdArg ? convertNum(arg3?.value) : null;
-        if (pos === null || (hasThirdArg && len === null)) {
-            value = null;
-        }
-        else {
-            const posInt = Math.round(pos);
-            // Position 0 returns empty string
-            if (posInt === 0) {
-                value = '';
+        const unix_time = convertNum(result.value);
+        if (unix_time !== null) {
+            let decimals = 0;
+            if (typeof result.value === 'string') {
+                decimals = 6;
             }
             else {
-                const start = posInt < 0 ? str.length + posInt : posInt - 1;
-                value =
-                    len !== null
-                        ? str.substring(start, start + Math.round(len))
-                        : str.substring(start);
+                const unix_s = String(unix_time);
+                const index = unix_s.indexOf('.');
+                if (index !== -1) {
+                    const dec = unix_s.length - index - 1;
+                    decimals = Math.min(dec, 6);
+                }
             }
+            result.value = createSQLDateTime({ time: unix_time, decimals });
         }
     }
-    return { err, name, value, type: 'string' };
+    return result;
 }
-function replace(expr, state) {
-    assertArgCountParse(expr, 3);
-    const arg1 = getValue(expr.args.value[0], state);
-    const arg2 = getValue(expr.args.value[1], state);
-    const arg3 = getValue(expr.args.value[2], state);
-    const err = arg1.err || arg2.err || arg3.err || null;
-    let value;
-    const name = `REPLACE(${arg1.name}, ${arg2.name}, ${arg3.name})`;
-    if (!err &&
-        (arg1.value === null || arg2.value === null || arg3.value === null)) {
-        value = null;
-    }
-    else if (!err) {
-        const str1 = convertString({
-            value: arg1.value,
-            decimals: arg1.decimals,
-            timeZone: state.session.timeZone,
-        });
-        const str2 = convertString({
-            value: arg2.value,
-            decimals: arg2.decimals,
-            timeZone: state.session.timeZone,
-        });
-        const str3 = convertString({
-            value: arg3.value,
-            decimals: arg3.decimals,
-            timeZone: state.session.timeZone,
-        });
-        // Empty search string returns original string
-        if (str2 === '') {
-            value = str1;
-        }
-        else {
-            value = str1?.replaceAll(str2 ?? '', str3 ?? '') ?? null;
-        }
-    }
-    return { err, name, value, type: 'string' };
-}
-function ascii(expr, state) {
+function date(expr, state) {
     assertArgCountParse(expr, 1);
     const result = getValue(expr.args.value[0], state);
-    result.name = `ASCII(${result.name})`;
-    result.type = 'longlong';
+    result.name = `DATE(${result.name})`;
+    result.type = 'date';
     if (!result.err && result.value !== null) {
-        const str = String(result.value);
-        result.value = str.length > 0 ? str.charCodeAt(0) : 0;
+        result.value = convertDate({
+            value: result.value,
+            timeZone: state.session.timeZone,
+        });
     }
     return result;
 }
-function ord(expr, state) {
-    assertArgCount(expr, 1);
-    const result = getValue(expr.args.value[0], state);
-    result.name = `ORD(${result.name})`;
-    result.type = 'longlong';
-    if (!result.err && result.value !== null) {
-        const str = String(result.value);
-        result.value = str.length > 0 ? str.codePointAt(0) : 0;
-    }
-    return result;
+function curdate(expr, state) {
+    assertArgCount(expr, 0);
+    const value = new SQLDate({
+        time: state.session.timestamp,
+        timeZone: state.session.timeZone,
+    });
+    const name = getFunctionName(expr.name) === 'CURDATE' ? 'CURDATE()' : 'CURRENT_DATE';
+    return { err: null, value, name, type: 'date' };
 }
-function space(expr, state) {
-    assertArgCount(expr, 1);
-    const result = getValue(expr.args.value[0], state);
-    result.name = `SPACE(${result.name})`;
-    result.type = 'string';
-    if (!result.err && result.value !== null) {
-        const count = convertNum(result.value);
-        result.value =
-            count !== null && count > 0 ? ' '.repeat(Math.round(count)) : '';
-    }
-    return result;
-}
-function hex(expr, state) {
-    assertArgCount(expr, 1);
-    const result = getValue(expr.args.value[0], state);
-    result.name = `HEX(${result.name})`;
-    result.type = 'string';
-    if (!result.err && result.value !== null) {
-        if (typeof result.value === 'number' || typeof result.value === 'bigint') {
-            const num = typeof result.value === 'bigint'
-                ? result.value
-                : BigInt(Math.round(result.value));
-            // Convert to unsigned 64-bit
-            const unsigned = num < 0n ? (1n << 64n) + num : num;
-            result.value = unsigned.toString(16).toUpperCase();
+function unix_timestamp(expr, state) {
+    assertArgCount(expr, 0, 1);
+    const result = {
+        err: null,
+        name: `UNIX_TIMESTAMP()`,
+        type: 'longlong',
+        value: BigInt(Math.floor(state.session.timestamp)),
+    };
+    if (expr.args.value[0]) {
+        const val = getValue(expr.args.value[0], state);
+        if (val.err) {
+            return val;
         }
-        else if (Buffer.isBuffer(result.value)) {
-            result.value = result.value.toString('hex').toUpperCase();
+        result.name = `UNIX_TIMESTAMP(${val.name})`;
+        if (val.value === null) {
+            result.value = null;
         }
         else {
-            result.value = Buffer.from(String(result.value))
-                .toString('hex')
-                .toUpperCase();
+            const dt = convertDateTime({
+                value: val.value,
+                timeZone: state.session.timeZone,
+            });
+            if (dt === null) {
+                result.value = 0;
+                if (typeof val.value === 'string') {
+                    result.type = 'decimal';
+                }
+            }
+            else {
+                result.value = dt.getTime();
+            }
         }
     }
     return result;
 }
-function unhex(expr, state) {
+function year(expr, state) {
+    assertArgCountParse(expr, 1);
+    const result = getValue(expr.args.value[0], state);
+    result.name = `YEAR(${result.name})`;
+    result.type = 'longlong';
+    if (!result.err && result.value !== null) {
+        const dt = convertDateTime({
+            value: result.value,
+            timeZone: state.session.timeZone,
+        });
+        result.value = dt ? dt.toDate(state.session.timeZone).getFullYear() : null;
+    }
+    return result;
+}
+function month(expr, state) {
+    assertArgCountParse(expr, 1);
+    const result = getValue(expr.args.value[0], state);
+    result.name = `MONTH(${result.name})`;
+    result.type = 'longlong';
+    if (!result.err && result.value !== null) {
+        const dt = convertDateTime({
+            value: result.value,
+            timeZone: state.session.timeZone,
+        });
+        result.value = dt ? dt.toDate(state.session.timeZone).getMonth() + 1 : null;
+    }
+    return result;
+}
+function day(expr, state) {
+    assertArgCountParse(expr, 1);
+    const result = getValue(expr.args.value[0], state);
+    result.name = `DAY(${result.name})`;
+    result.type = 'longlong';
+    if (!result.err && result.value !== null) {
+        const dt = convertDateTime({
+            value: result.value,
+            timeZone: state.session.timeZone,
+        });
+        result.value = dt ? dt.toDate(state.session.timeZone).getDate() : null;
+    }
+    return result;
+}
+function dayofweek(expr, state) {
     assertArgCount(expr, 1);
     const result = getValue(expr.args.value[0], state);
-    result.name = `UNHEX(${result.name})`;
-    result.type = 'buffer';
+    result.name = `DAYOFWEEK(${result.name})`;
+    result.type = 'longlong';
     if (!result.err && result.value !== null) {
-        let str = String(result.value);
-        if (/^[0-9A-Fa-f]*$/.test(str)) {
-            // Pad odd-length strings with leading zero
-            if (str.length % 2 === 1) {
-                str = '0' + str;
-            }
-            result.value = Buffer.from(str, 'hex');
+        const dt = convertDateTime({
+            value: result.value,
+            timeZone: state.session.timeZone,
+        });
+        result.value = dt ? dt.toDate(state.session.timeZone).getDay() + 1 : null;
+    }
+    return result;
+}
+function dayofyear(expr, state) {
+    assertArgCount(expr, 1);
+    const result = getValue(expr.args.value[0], state);
+    result.name = `DAYOFYEAR(${result.name})`;
+    result.type = 'longlong';
+    if (!result.err && result.value !== null) {
+        const dt = convertDateTime({
+            value: result.value,
+            timeZone: state.session.timeZone,
+        });
+        if (dt) {
+            const dateObj = dt.toDate(state.session.timeZone);
+            const start = new Date(dateObj.getFullYear(), 0, 0);
+            const diff = dateObj.getTime() - start.getTime();
+            const oneDay = 1000 * 60 * 60 * 24;
+            result.value = Math.floor(diff / oneDay);
         }
         else {
             result.value = null;
@@ -5153,181 +6006,137 @@ function unhex(expr, state) {
     }
     return result;
 }
-function concat_ws(expr, state) {
-    const arg_count = expr.args?.value?.length ?? 0;
-    if (arg_count < 2 || !Array.isArray(expr.args?.value)) {
-        throw new SQLError({
-            err: 'ER_WRONG_PARAMCOUNT_TO_NATIVE_FCT',
-            args: ['CONCAT_WS'],
+function weekday(expr, state) {
+    assertArgCount(expr, 1);
+    const result = getValue(expr.args.value[0], state);
+    result.name = `WEEKDAY(${result.name})`;
+    result.type = 'longlong';
+    if (!result.err && result.value !== null) {
+        const dt = convertDateTime({
+            value: result.value,
+            timeZone: state.session.timeZone,
         });
-    }
-    const sep_result = getValue(expr.args.value[0], state);
-    if (sep_result.err || sep_result.value === null) {
-        return {
-            err: sep_result.err,
-            value: null,
-            type: 'string',
-            name: 'CONCAT_WS()',
-        };
-    }
-    const separator = String(sep_result.value);
-    const parts = [];
-    for (let i = 1; i < expr.args.value.length; i++) {
-        const result = getValue(expr.args.value[i], state);
-        if (result.err) {
-            return {
-                err: result.err,
-                value: null,
-                type: 'string',
-                name: 'CONCAT_WS()',
-            };
+        if (dt) {
+            const dayOfWeek = dt.toDate(state.session.timeZone).getDay();
+            result.value = (dayOfWeek + 6) % 7;
         }
-        if (result.value !== null) {
-            parts.push(String(result.value));
+        else {
+            result.value = null;
         }
     }
+    return result;
+}
+function quarter(expr, state) {
+    assertArgCount(expr, 1);
+    const result = getValue(expr.args.value[0], state);
+    result.name = `QUARTER(${result.name})`;
+    result.type = 'longlong';
+    if (!result.err && result.value !== null) {
+        const dt = convertDateTime({
+            value: result.value,
+            timeZone: state.session.timeZone,
+        });
+        result.value = dt
+            ? Math.floor(dt.toDate(state.session.timeZone).getMonth() / 3) + 1
+            : null;
+    }
+    return result;
+}
+function utc_date(expr, state) {
+    assertArgCount(expr, 0);
     return {
         err: null,
-        value: parts.join(separator),
-        type: 'string',
-        name: 'CONCAT_WS()',
+        name: 'UTC_DATE()',
+        value: new SQLDate({ time: state.session.timestamp, timeZone: 'UTC' }),
+        type: 'date',
     };
 }
-function lpad(expr, state) {
-    assertArgCount(expr, 3);
-    const str_result = getValue(expr.args.value[0], state);
-    const len_result = getValue(expr.args.value[1], state);
-    const pad_result = getValue(expr.args.value[2], state);
-    const err = str_result.err || len_result.err || pad_result.err || null;
-    if (err ||
-        str_result.value === null ||
-        len_result.value === null ||
-        pad_result.value === null) {
-        return { err, value: null, type: 'string' };
-    }
-    const str = String(str_result.value);
-    const len = Math.round(convertNum(len_result.value) ?? 0);
-    const pad = String(pad_result.value);
-    if (len < 0) {
-        return { err: null, value: null, type: 'long_blob' };
-    }
-    if (pad.length === 0) {
-        return { err: null, value: '', type: 'string' };
-    }
-    if (str.length >= len) {
-        return { err: null, value: str.substring(0, len), type: 'string' };
-    }
-    const padLen = len - str.length;
-    const fullPads = Math.floor(padLen / pad.length);
-    const remainder = padLen % pad.length;
-    return {
-        err: null,
-        value: pad.repeat(fullPads) + pad.substring(0, remainder) + str,
-        type: 'string',
-    };
-}
-function rpad(expr, state) {
-    assertArgCount(expr, 3);
-    const str_result = getValue(expr.args.value[0], state);
-    const len_result = getValue(expr.args.value[1], state);
-    const pad_result = getValue(expr.args.value[2], state);
-    const err = str_result.err || len_result.err || pad_result.err || null;
-    if (err ||
-        str_result.value === null ||
-        len_result.value === null ||
-        pad_result.value === null) {
-        return { err, value: null, type: 'string' };
-    }
-    const str = String(str_result.value);
-    const len = Math.round(convertNum(len_result.value) ?? 0);
-    const pad = String(pad_result.value);
-    if (len < 0) {
-        return { err: null, value: null, type: 'long_blob' };
-    }
-    if (pad.length === 0) {
-        return { err: null, value: '', type: 'string' };
-    }
-    if (str.length >= len) {
-        return { err: null, value: str.substring(0, len), type: 'string' };
-    }
-    const padLen = len - str.length;
-    const fullPads = Math.floor(padLen / pad.length);
-    const remainder = padLen % pad.length;
-    return {
-        err: null,
-        value: str + pad.repeat(fullPads) + pad.substring(0, remainder),
-        type: 'string',
-    };
-}
-function locate(expr, state) {
-    assertArgCount(expr, 2, 3);
-    const substr_result = getValue(expr.args.value[0], state);
-    const str_result = getValue(expr.args.value[1], state);
-    const pos_result = getValue(expr.args.value[2], state);
-    const err = substr_result.err || str_result.err || pos_result?.err || null;
-    if (err || substr_result.value === null || str_result.value === null) {
-        return { err, value: null, type: 'longlong' };
-    }
-    const substr = convertString({
-        value: substr_result.value,
-        decimals: substr_result.decimals,
-        timeZone: state.session.timeZone,
-    }) ?? '';
-    const str = convertString({
-        value: str_result.value,
-        decimals: str_result.decimals,
-        timeZone: state.session.timeZone,
-    }) ?? '';
-    const pos = pos_result?.value !== undefined && pos_result?.value !== null
-        ? (convertNum(pos_result.value) ?? 1)
-        : 1;
-    const posInt = Math.round(pos);
-    if (posInt < 1) {
-        return { err: null, value: 0, type: 'longlong' };
-    }
-    const index = str.indexOf(substr, posInt - 1);
-    return { err: null, value: index === -1 ? 0 : index + 1, type: 'longlong' };
-}
-function instr(expr, state) {
-    assertArgCount(expr, 2);
-    const str_result = getValue(expr.args.value[0], state);
-    const substr_result = getValue(expr.args.value[1], state);
-    const err = str_result.err || substr_result.err || null;
-    if (err || str_result.value === null || substr_result.value === null) {
-        return { err, value: null, type: 'longlong' };
-    }
-    const str = String(str_result.value);
-    const substr = String(substr_result.value);
-    const index = str.indexOf(substr);
-    return { err: null, value: index === -1 ? 0 : index + 1, type: 'longlong' };
-}
-function strcmp(expr, state) {
-    assertArgCount(expr, 2);
-    const str1_result = getValue(expr.args.value[0], state);
-    const str2_result = getValue(expr.args.value[1], state);
-    const err = str1_result.err || str2_result.err || null;
-    if (err || str1_result.value === null || str2_result.value === null) {
-        return { err, value: null, type: 'longlong' };
-    }
-    const str1 = convertString({
-        value: str1_result.value,
-        decimals: str1_result.decimals,
-        timeZone: state.session.timeZone,
-    }) ?? '';
-    const str2 = convertString({
-        value: str2_result.value,
-        decimals: str2_result.decimals,
-        timeZone: state.session.timeZone,
-    }) ?? '';
-    if (str1 < str2) {
-        return { err: null, value: -1, type: 'longlong' };
-    }
-    else if (str1 > str2) {
-        return { err: null, value: 1, type: 'longlong' };
+function utc_timestamp(expr, state) {
+    assertArgCount(expr, 0, 1);
+    const args = expr.args.value;
+    const arg = Array.isArray(args) && args.length > 0 ? args[0] : undefined;
+    const result = arg
+        ? getValue(arg, state)
+        : { err: null, value: undefined, type: 'undefined', name: '' };
+    result.name = 'UTC_TIMESTAMP()';
+    if (!result.err) {
+        const decimals = typeof result.value === 'number' ? result.value : 0;
+        if (decimals > 6) {
+            result.err = 'ER_TOO_BIG_PRECISION';
+        }
+        result.value = new SQLDateTime({ time: state.session.timestamp, decimals });
+        result.type = 'datetime';
     }
     else {
-        return { err: null, value: 0, type: 'longlong' };
+        result.value = new SQLDateTime({
+            time: state.session.timestamp,
+            decimals: 0,
+        });
+        result.type = 'datetime';
     }
+    return result;
+}
+function from_days(expr, state) {
+    assertArgCount(expr, 1);
+    const result = getValue(expr.args.value[0], state);
+    result.name = `FROM_DAYS(${result.name})`;
+    result.type = 'date';
+    if (!result.err && result.value !== null) {
+        const dayNum = convertNum(result.value);
+        if (dayNum !== null) {
+            if (dayNum < 366) {
+                result.value = '0000-00-00';
+            }
+            else {
+                const time = (dayNum - 719528) * 86400;
+                result.value = new SQLDate({ time, timeZone: 'UTC' });
+            }
+        }
+        else {
+            result.value = null;
+        }
+    }
+    return result;
+}
+function to_days(expr, state) {
+    assertArgCount(expr, 1);
+    const result = getValue(expr.args.value[0], state);
+    result.name = `TO_DAYS(${result.name})`;
+    result.type = 'longlong';
+    if (!result.err && result.value !== null) {
+        const dt = convertDate({
+            value: result.value,
+            timeZone: state.session.timeZone,
+        });
+        if (dt) {
+            const time = dt.getTime();
+            result.value = Math.floor(time / 86400) + 719528;
+        }
+        else {
+            result.value = null;
+        }
+    }
+    return result;
+}
+function to_seconds(expr, state) {
+    assertArgCount(expr, 1);
+    const result = getValue(expr.args.value[0], state);
+    result.name = `TO_SECONDS(${result.name})`;
+    result.type = 'longlong';
+    if (!result.err && result.value !== null) {
+        const dt = convertDateTime({
+            value: result.value,
+            timeZone: state.session.timeZone,
+        });
+        if (dt) {
+            const time = dt.getTime();
+            result.value = BigInt(Math.floor(time + 62167219200));
+        }
+        else {
+            result.value = null;
+        }
+    }
+    return result;
 }
 
 const FORMAT_LONG_NUMBER = new Intl.DateTimeFormat('en-US', {
@@ -5383,7 +6192,7 @@ function dateFormat(date, format) {
             format_map.set(formatter, cached);
         }
         const found = cached.find((part) => part.type === type);
-        return found?.value || '';
+        return found?.value ?? '';
     }
     function _time(formatter) {
         return (_getPart(formatter, 'hour') +
@@ -5596,7 +6405,7 @@ class SQLInterval {
     _add(datetime, mult, timeZone) {
         let old_time = datetime.getTime();
         let fraction = datetime.getFraction();
-        let type = undefined;
+        let type;
         if (datetime instanceof SQLDateTime) {
             type = 'datetime';
         }
@@ -5642,7 +6451,7 @@ class SQLInterval {
                 value = createSQLDateTime({ time, fraction, decimals });
             }
         }
-        return { type: type ?? 'datetime', value };
+        return { type, value };
     }
     add(datetime, timeZone) {
         return this._add(datetime, 1, timeZone);
@@ -5665,9 +6474,9 @@ function createSQLInterval(value, unit_name) {
     const number = unit ? _convertNumber(value, unit, unit_name) : null;
     if (number !== null) {
         const force_date = unit_name in FORCE_DATE;
-        let decimals = DECIMALS[unit_name] || 0;
+        let decimals = DECIMALS[unit_name] ?? 0;
         if (!decimals && unit_name.endsWith('second')) {
-            decimals = getDecimals$1(value, 6);
+            decimals = getDecimals(value, 6);
             if (typeof value === 'string' && decimals) {
                 decimals = 6;
             }
@@ -5710,7 +6519,7 @@ function _convertNumber(value, unit, unit_name) {
         }
     }
     else {
-        ret = Number(convertNum(value));
+        ret = convertNum(value);
         if (ret !== null) {
             if (unit_name !== 'second') {
                 ret = Math.trunc(ret);
@@ -5738,69 +6547,11 @@ function _addMonth(old_time, number) {
     return old_time + delta / 1000;
 }
 
-function now(expr, state) {
-    const arg_count = expr.args?.value?.length ?? 0;
-    if (arg_count > 1) {
-        throw new SQLError({
-            err: 'ER_WRONG_PARAMCOUNT_TO_NATIVE_FCT',
-            args: ['NOW'],
-        });
-    }
-    const result = getValue(expr.args?.value?.[0], state);
-    result.name = expr.args ? `NOW(${result.name ?? ''})` : 'CURRENT_TIMESTAMP';
-    if (!result.err && result.type) {
-        const decimals = typeof result.value === 'number' ? result.value : 0;
-        if (decimals > 6) {
-            result.err = 'ER_TOO_BIG_PRECISION';
-        }
-        result.value = new SQLDateTime({ time: state.session.timestamp, decimals });
-        result.type = 'datetime';
-    }
-    return result;
-}
-function from_unixtime(expr, state) {
-    assertArgCount(expr, 1);
-    const result = getValue(expr.args.value[0], state);
-    result.name = `FROM_UNIXTIME(${result.name})`;
-    result.type = 'datetime';
-    if (!result.err && result.value !== null) {
-        const unix_time = convertNum(result.value);
-        if (unix_time !== null) {
-            let decimals = 0;
-            if (typeof result.value === 'string') {
-                decimals = 6;
-            }
-            else {
-                const unix_s = String(unix_time);
-                const index = unix_s.indexOf('.');
-                if (index !== -1) {
-                    const dec = unix_s.length - index - 1;
-                    decimals = Math.min(dec, 6);
-                }
-            }
-            result.value = createSQLDateTime({ time: unix_time, decimals });
-        }
-    }
-    return result;
-}
-function date(expr, state) {
-    assertArgCountParse(expr, 1);
-    const result = getValue(expr.args.value[0], state);
-    result.name = `DATE(${result.name})`;
-    result.type = 'date';
-    if (!result.err && result.value !== null) {
-        result.value = convertDate({
-            value: result.value,
-            timeZone: state.session.timeZone,
-        });
-    }
-    return result;
-}
 function date_format(expr, state) {
     assertArgCount(expr, 2);
     const date_arg = getValue(expr.args.value[0], state);
     const format = getValue(expr.args.value[1], state);
-    const err = date_arg.err || format.err;
+    const err = date_arg.err ?? format.err;
     let value;
     const name = `DATE_FORMAT(${date_arg.name}, ${format.name})`;
     if (!err && (date_arg.value === null || format.value === null)) {
@@ -5825,115 +6576,19 @@ function datediff(expr, state) {
     const { timeZone } = state.session;
     const expr1 = getValue(expr.args.value[0], state);
     const expr2 = getValue(expr.args.value[1], state);
-    const err = expr1.err || expr2.err;
+    const err = expr1.err ?? expr2.err;
     let value;
     const name = `DATEDIFF(${expr1.name}, ${expr2.name})`;
     if (!err && (expr1.value === null || expr2.value === null)) {
         value = null;
     }
     else if (!err) {
-        const result = convertDateTime({ value: expr1.value, timeZone })?.diff?.(convertDateTime({ value: expr2.value, timeZone }));
+        const dt1 = convertDateTime({ value: expr1.value, timeZone });
+        const dt2 = convertDateTime({ value: expr2.value, timeZone });
+        const result = dt1?.diff(dt2);
         value = result !== undefined ? result : null;
     }
     return { err, name, value, type: 'longlong' };
-}
-function curdate(expr, state) {
-    const arg_count = expr.args?.value?.length ?? 0;
-    if (arg_count > 0) {
-        throw new SQLError({
-            err: 'ER_WRONG_PARAMCOUNT_TO_NATIVE_FCT',
-            args: ['CURDATE'],
-        });
-    }
-    const value = new SQLDate({
-        time: state.session.timestamp,
-        timeZone: state.session.timeZone,
-    });
-    const name = expr.args ? 'CURDATE()' : 'CURRENT_DATE';
-    return { err: null, value, name, type: 'date' };
-}
-function unix_timestamp(expr, state) {
-    const arg_count = expr.args?.value?.length ?? 0;
-    if (arg_count > 1) {
-        throw new SQLError({
-            err: 'ER_WRONG_PARAMCOUNT_TO_NATIVE_FCT',
-            args: ['UNIX_TIMESTAMP'],
-        });
-    }
-    const result = {
-        err: null,
-        name: `UNIX_TIMESTAMP()`,
-        type: 'longlong',
-        value: BigInt(Math.floor(Date.now() / 1000)),
-    };
-    if (expr.args?.value?.[0]) {
-        const val = getValue(expr.args.value[0], state);
-        if (val.err) {
-            return val;
-        }
-        result.name = `UNIX_TIMESTAMP(${val.name})`;
-        if (val.value === null) {
-            result.value = null;
-        }
-        else {
-            const dt = convertDateTime({
-                value: val.value,
-                timeZone: state.session.timeZone,
-            });
-            if (dt === null) {
-                result.value = 0;
-                if (typeof val.value === 'string') {
-                    result.type = 'decimal';
-                }
-            }
-            else {
-                result.value = dt.getTime();
-            }
-        }
-    }
-    return result;
-}
-function year(expr, state) {
-    assertArgCountParse(expr, 1);
-    const result = getValue(expr.args.value[0], state);
-    result.name = `YEAR(${result.name})`;
-    result.type = 'longlong';
-    if (!result.err && result.value !== null) {
-        const dt = convertDateTime({
-            value: result.value,
-            timeZone: state.session.timeZone,
-        });
-        result.value = dt ? dt.toDate(state.session.timeZone).getFullYear() : null;
-    }
-    return result;
-}
-function month(expr, state) {
-    assertArgCountParse(expr, 1);
-    const result = getValue(expr.args.value[0], state);
-    result.name = `MONTH(${result.name})`;
-    result.type = 'longlong';
-    if (!result.err && result.value !== null) {
-        const dt = convertDateTime({
-            value: result.value,
-            timeZone: state.session.timeZone,
-        });
-        result.value = dt ? dt.toDate(state.session.timeZone).getMonth() + 1 : null;
-    }
-    return result;
-}
-function day(expr, state) {
-    assertArgCountParse(expr, 1);
-    const result = getValue(expr.args.value[0], state);
-    result.name = `DAY(${result.name})`;
-    result.type = 'longlong';
-    if (!result.err && result.value !== null) {
-        const dt = convertDateTime({
-            value: result.value,
-            timeZone: state.session.timeZone,
-        });
-        result.value = dt ? dt.toDate(state.session.timeZone).getDate() : null;
-    }
-    return result;
 }
 function date_add(expr, state) {
     assertArgCountParse(expr, 2);
@@ -5969,7 +6624,7 @@ function date_sub(expr, state) {
     assertArgCountParse(expr, 2);
     const date_arg = getValue(expr.args.value[0], state);
     const interval_arg = getValue(expr.args.value[1], state);
-    let err = date_arg.err || interval_arg.err;
+    let err = date_arg.err ?? interval_arg.err;
     let value = null;
     const type = 'char';
     const name = `DATE_SUB(${date_arg.name}, ${interval_arg.name})`;
@@ -5995,7 +6650,7 @@ function timestampdiff(expr, state) {
     const unit_arg = expr.args.value[0];
     const start_arg = getValue(expr.args.value[1], state);
     const end_arg = getValue(expr.args.value[2], state);
-    const err = start_arg.err || end_arg.err;
+    const err = start_arg.err ?? end_arg.err;
     let value = null;
     const unitValue = unit_arg && 'value' in unit_arg ? unit_arg.value : undefined;
     const name = `TIMESTAMPDIFF(${unitValue}, ${start_arg.name}, ${end_arg.name})`;
@@ -6059,20 +6714,6 @@ function timestampdiff(expr, state) {
     }
     return { err, name, value, type: 'longlong' };
 }
-function dayofweek(expr, state) {
-    assertArgCount(expr, 1);
-    const result = getValue(expr.args.value[0], state);
-    result.name = `DAYOFWEEK(${result.name})`;
-    result.type = 'longlong';
-    if (!result.err && result.value !== null) {
-        const dt = convertDateTime({
-            value: result.value,
-            timeZone: state.session.timeZone,
-        });
-        result.value = dt ? dt.toDate(state.session.timeZone).getDay() + 1 : null;
-    }
-    return result;
-}
 function dayname(expr, state) {
     assertArgCount(expr, 1);
     const result = getValue(expr.args.value[0], state);
@@ -6111,36 +6752,13 @@ function monthname(expr, state) {
     }
     return result;
 }
-function dayofyear(expr, state) {
-    assertArgCount(expr, 1);
-    const result = getValue(expr.args.value[0], state);
-    result.name = `DAYOFYEAR(${result.name})`;
-    result.type = 'longlong';
-    if (!result.err && result.value !== null) {
-        const dt = convertDateTime({
-            value: result.value,
-            timeZone: state.session.timeZone,
-        });
-        if (dt) {
-            const dateObj = dt.toDate(state.session.timeZone);
-            const start = new Date(dateObj.getFullYear(), 0, 0);
-            const diff = dateObj.getTime() - start.getTime();
-            const oneDay = 1000 * 60 * 60 * 24;
-            result.value = Math.floor(diff / oneDay);
-        }
-        else {
-            result.value = null;
-        }
-    }
-    return result;
-}
 function week(expr, state) {
     assertArgCount(expr, 1, 2);
     const date_arg = getValue(expr.args.value[0], state);
     const mode_arg = getValue(expr.args.value[1], state);
     const mode = Math.round(mode_arg.value !== null ? (convertNum(mode_arg.value) ?? 0) : 0);
     const result = {
-        err: date_arg.err || mode_arg.err,
+        err: date_arg.err ?? mode_arg.err,
         name: `WEEK(${date_arg.name}${mode_arg.value !== null ? ', ' + mode_arg.name : ''})`,
         value: null,
         type: 'longlong',
@@ -6164,42 +6782,6 @@ function week(expr, state) {
                 result.value = Math.floor((dayOfYear - daysToFirstWeek - 1) / 7) + 1;
             }
         }
-    }
-    return result;
-}
-function weekday(expr, state) {
-    assertArgCount(expr, 1);
-    const result = getValue(expr.args.value[0], state);
-    result.name = `WEEKDAY(${result.name})`;
-    result.type = 'longlong';
-    if (!result.err && result.value !== null) {
-        const dt = convertDateTime({
-            value: result.value,
-            timeZone: state.session.timeZone,
-        });
-        if (dt) {
-            const dayOfWeek = dt.toDate(state.session.timeZone).getDay();
-            result.value = (dayOfWeek + 6) % 7;
-        }
-        else {
-            result.value = null;
-        }
-    }
-    return result;
-}
-function quarter(expr, state) {
-    assertArgCount(expr, 1);
-    const result = getValue(expr.args.value[0], state);
-    result.name = `QUARTER(${result.name})`;
-    result.type = 'longlong';
-    if (!result.err && result.value !== null) {
-        const dt = convertDateTime({
-            value: result.value,
-            timeZone: state.session.timeZone,
-        });
-        result.value = dt
-            ? Math.floor(dt.toDate(state.session.timeZone).getMonth() / 3) + 1
-            : null;
     }
     return result;
 }
@@ -6258,7 +6840,7 @@ function yearweek(expr, state) {
     const mode_arg = getValue(expr.args.value[1], state);
     const mode = mode_arg.value !== null ? (convertNum(mode_arg.value) ?? 0) : 0;
     const result = {
-        err: date_arg.err || mode_arg.err,
+        err: date_arg.err ?? mode_arg.err,
         name: `YEARWEEK(${date_arg.name}${mode_arg.value !== null ? ', ' + mode_arg.name : ''})`,
         value: null,
         type: 'longlong',
@@ -6295,17 +6877,1600 @@ function yearweek(expr, state) {
     }
     return result;
 }
+function makedate(expr, state) {
+    assertArgCount(expr, 2);
+    const year_arg = getValue(expr.args.value[0], state);
+    const dayofyear_arg = getValue(expr.args.value[1], state);
+    const err = year_arg.err ?? dayofyear_arg.err;
+    let value = null;
+    const name = `MAKEDATE(${year_arg.name}, ${dayofyear_arg.name})`;
+    if (!err && year_arg.value !== null && dayofyear_arg.value !== null) {
+        const yearNum = Math.round(convertNum(year_arg.value) ?? 0);
+        const dayOfYear = Math.round(convertNum(dayofyear_arg.value) ?? 0);
+        if (dayOfYear > 0) {
+            const dateObj = new Date(yearNum, 0, dayOfYear);
+            const time = dateObj.getTime() / 1000;
+            value = new SQLDate({ time, timeZone: state.session.timeZone });
+        }
+    }
+    return { err, name, value, type: 'date' };
+}
+
+function ln(expr, state) {
+    assertArgCount(expr, 1);
+    const result = getValue(expr.args.value[0], state);
+    result.name = `LN(${result.name})`;
+    result.type = 'double';
+    if (!result.err && result.value !== null) {
+        const num = convertNum(result.value);
+        result.value = num !== null && num > 0 ? Math.log(num) : null;
+    }
+    return result;
+}
+function log(expr, state) {
+    assertArgCount(expr, 1, 2);
+    const arg1 = getValue(expr.args.value[0], state);
+    const arg2 = getValue(expr.args.value[1], state);
+    const err = arg1.err ?? arg2.err;
+    let value;
+    const name = arg2.value !== undefined
+        ? `LOG(${arg1.name}, ${arg2.name})`
+        : `LOG(${arg1.name})`;
+    if (!err &&
+        (arg1.value === null || (arg2.value !== undefined && arg2.value === null))) {
+        value = null;
+    }
+    else if (!err) {
+        const num1 = convertNum(arg1.value);
+        if (arg2.value !== undefined) {
+            const num2 = convertNum(arg2.value);
+            value =
+                num1 !== null && num1 > 0 && num2 !== null && num2 > 0
+                    ? Math.log(num2) / Math.log(num1)
+                    : null;
+        }
+        else {
+            value = num1 !== null && num1 > 0 ? Math.log(num1) : null;
+        }
+    }
+    return { err, name, value, type: 'double' };
+}
+function log2(expr, state) {
+    assertArgCount(expr, 1);
+    const result = getValue(expr.args.value[0], state);
+    result.name = `LOG2(${result.name})`;
+    result.type = 'double';
+    if (!result.err && result.value !== null) {
+        const num = convertNum(result.value);
+        result.value = num !== null && num > 0 ? Math.log2(num) : null;
+    }
+    return result;
+}
+function log10(expr, state) {
+    assertArgCount(expr, 1);
+    const result = getValue(expr.args.value[0], state);
+    result.name = `LOG10(${result.name})`;
+    result.type = 'double';
+    if (!result.err && result.value !== null) {
+        const num = convertNum(result.value);
+        result.value = num !== null && num > 0 ? Math.log10(num) : null;
+    }
+    return result;
+}
+function acos(expr, state) {
+    assertArgCount(expr, 1);
+    const result = getValue(expr.args.value[0], state);
+    result.name = `ACOS(${result.name})`;
+    result.type = 'double';
+    if (!result.err && result.value !== null) {
+        const num = convertNum(result.value);
+        result.value =
+            num !== null && num >= -1 && num <= 1 ? Math.acos(num) : null;
+    }
+    return result;
+}
+function asin(expr, state) {
+    assertArgCount(expr, 1);
+    const result = getValue(expr.args.value[0], state);
+    result.name = `ASIN(${result.name})`;
+    result.type = 'double';
+    if (!result.err && result.value !== null) {
+        const num = convertNum(result.value);
+        result.value =
+            num !== null && num >= -1 && num <= 1 ? Math.asin(num) : null;
+    }
+    return result;
+}
+function atan(expr, state) {
+    assertArgCount(expr, 1);
+    const result = getValue(expr.args.value[0], state);
+    result.name = `ATAN(${result.name})`;
+    result.type = 'double';
+    if (!result.err && result.value !== null) {
+        const num = convertNum(result.value);
+        result.value = num !== null ? Math.atan(num) : null;
+    }
+    return result;
+}
+function atan2(expr, state) {
+    assertArgCount(expr, 2);
+    const arg1 = getValue(expr.args.value[0], state);
+    const arg2 = getValue(expr.args.value[1], state);
+    const err = arg1.err ?? arg2.err;
+    let value;
+    const name = `ATAN2(${arg1.name}, ${arg2.name})`;
+    if (!err && (arg1.value === null || arg2.value === null)) {
+        value = null;
+    }
+    else if (!err) {
+        const num1 = convertNum(arg1.value);
+        const num2 = convertNum(arg2.value);
+        value = num1 !== null && num2 !== null ? Math.atan2(num1, num2) : null;
+    }
+    return { err, name, value, type: 'double' };
+}
+function cos(expr, state) {
+    assertArgCount(expr, 1);
+    const result = getValue(expr.args.value[0], state);
+    result.name = `COS(${result.name})`;
+    result.type = 'double';
+    if (!result.err && result.value !== null) {
+        const num = convertNum(result.value);
+        result.value = num !== null ? Math.cos(num) : null;
+    }
+    return result;
+}
+function sin(expr, state) {
+    assertArgCount(expr, 1);
+    const result = getValue(expr.args.value[0], state);
+    result.name = `SIN(${result.name})`;
+    result.type = 'double';
+    if (!result.err && result.value !== null) {
+        const num = convertNum(result.value);
+        result.value = num !== null ? Math.sin(num) : null;
+    }
+    return result;
+}
+function tan(expr, state) {
+    assertArgCount(expr, 1);
+    const result = getValue(expr.args.value[0], state);
+    result.name = `TAN(${result.name})`;
+    result.type = 'double';
+    if (!result.err && result.value !== null) {
+        const num = convertNum(result.value);
+        result.value = num !== null ? Math.tan(num) : null;
+    }
+    return result;
+}
+function cot(expr, state) {
+    assertArgCount(expr, 1);
+    const result = getValue(expr.args.value[0], state);
+    result.name = `COT(${result.name})`;
+    result.type = 'double';
+    if (!result.err && result.value !== null) {
+        const num = convertNum(result.value);
+        if (num !== null) {
+            const cotValue = 1 / Math.tan(num);
+            if (!isFinite(cotValue)) {
+                result.err = 'ER_DATA_OUT_OF_RANGE';
+                result.value = null;
+            }
+            else {
+                result.value = cotValue;
+            }
+        }
+        else {
+            result.value = null;
+        }
+    }
+    return result;
+}
+function bin(expr, state) {
+    assertArgCount(expr, 1);
+    const result = getValue(expr.args.value[0], state);
+    result.name = `BIN(${result.name})`;
+    result.type = 'string';
+    if (!result.err && result.value !== null) {
+        const num = convertNum(result.value);
+        if (num !== null) {
+            const bigNum = BigInt(Math.trunc(num));
+            const unsigned = bigNum < 0n ? (1n << 64n) + bigNum : bigNum;
+            result.value = unsigned.toString(2);
+        }
+        else {
+            result.value = null;
+        }
+    }
+    return result;
+}
+function oct(expr, state) {
+    assertArgCount(expr, 1);
+    const result = getValue(expr.args.value[0], state);
+    result.name = `OCT(${result.name})`;
+    result.type = 'string';
+    if (!result.err && result.value !== null) {
+        const num = convertNum(result.value);
+        if (num !== null) {
+            const bigNum = BigInt(Math.trunc(num));
+            const unsigned = bigNum < 0n ? (1n << 64n) + bigNum : bigNum;
+            result.value = unsigned.toString(8);
+        }
+        else {
+            result.value = null;
+        }
+    }
+    return result;
+}
+function bit_count(expr, state) {
+    assertArgCount(expr, 1);
+    const result = getValue(expr.args.value[0], state);
+    result.name = `BIT_COUNT(${result.name})`;
+    result.type = 'longlong';
+    if (!result.err && result.value !== null) {
+        const num = convertNum(result.value);
+        if (num !== null) {
+            const bigNum = BigInt(Math.round(num));
+            const unsigned = bigNum < 0n ? (1n << 64n) + bigNum : bigNum;
+            result.value = unsigned.toString(2).replace(/0/g, '').length;
+        }
+        else {
+            result.value = null;
+        }
+    }
+    return result;
+}
+function conv(expr, state) {
+    assertArgCount(expr, 3);
+    const arg1 = getValue(expr.args.value[0], state);
+    const arg2 = getValue(expr.args.value[1], state);
+    const arg3 = getValue(expr.args.value[2], state);
+    const err = arg1.err ?? arg2.err ?? arg3.err;
+    const name = `CONV(${arg1.name}, ${arg2.name}, ${arg3.name})`;
+    let value = null;
+    if (!err &&
+        arg1.value !== null &&
+        arg2.value !== null &&
+        arg3.value !== null) {
+        const from_base = Math.round(convertNum(arg2.value) ?? 0);
+        const to_base = Math.round(convertNum(arg3.value) ?? 0);
+        if (from_base >= 2 && from_base <= 36 && to_base >= 2 && to_base <= 36) {
+            try {
+                const str = String(arg1.value).trim();
+                const is_negative = str.startsWith('-');
+                const num_str = is_negative ? str.slice(1) : str;
+                const decimal = parseInt(num_str, from_base);
+                if (!isNaN(decimal)) {
+                    if (is_negative) {
+                        const unsigned = (1n << 64n) + BigInt(-decimal);
+                        value = unsigned.toString(to_base).toUpperCase();
+                    }
+                    else {
+                        value = decimal.toString(to_base).toUpperCase();
+                    }
+                }
+            }
+            catch {
+                value = null;
+            }
+        }
+    }
+    return { err, name, value, type: 'string' };
+}
+function truncate_func(expr, state) {
+    assertArgCount(expr, 2);
+    const arg1 = getValue(expr.args.value[0], state);
+    if (arg1.err) {
+        return arg1;
+    }
+    const arg2 = getValue(expr.args.value[1], state);
+    if (arg2.err) {
+        return arg2;
+    }
+    const name = `TRUNCATE(${arg1.name}, ${arg2.name})`;
+    let value = null;
+    const err = arg1.err ?? arg2.err;
+    let decimals = 0;
+    let type = 'double';
+    if (arg1.value === null) {
+        type = 'double';
+    }
+    else if (arg2.value !== null) {
+        decimals = Math.round(convertNum(arg2.value) ?? 0);
+        type = decimals < 0 ? 'longlong' : 'number';
+    }
+    else {
+        type = 'number';
+    }
+    if (!err && arg1.value !== null && arg2.value !== null) {
+        const num = convertNum(arg1.value);
+        if (num !== null) {
+            const multiplier = Math.pow(10, decimals);
+            value = Math.trunc(num * multiplier) / multiplier;
+        }
+    }
+    return {
+        err,
+        name,
+        value,
+        type,
+        decimals: type === 'number' ? Math.max(0, decimals) : undefined,
+    };
+}
+function rand(expr, state) {
+    assertArgCount(expr, 0, 1);
+    const arg_count = expr.args.value.length;
+    const name = 'RAND()';
+    let value;
+    if (arg_count === 1) {
+        const seed_arg = getValue(expr.args.value[0], state);
+        if (seed_arg.err) {
+            return seed_arg;
+        }
+        if (seed_arg.value !== null) {
+            const seed = Math.floor(convertNum(seed_arg.value) ?? 0);
+            const x = Math.sin(seed) * 10000;
+            value = x - Math.floor(x);
+        }
+        else {
+            value = Math.random();
+        }
+    }
+    else {
+        value = Math.random();
+    }
+    return { err: null, name, value, type: 'double' };
+}
+
+function abs(expr, state) {
+    assertArgCount(expr, 1);
+    const result = getValue(expr.args.value[0], state);
+    result.name = `ABS(${result.name})`;
+    if (!result.err && result.value !== null) {
+        const num = convertNum(result.value);
+        result.value = num !== null ? Math.abs(num) : null;
+        result.type = result.type === 'string' ? 'double' : result.type;
+    }
+    else {
+        result.type = 'double';
+    }
+    return result;
+}
+function ceil(expr, state) {
+    assertArgCount(expr, 1);
+    const result = getValue(expr.args.value[0], state);
+    result.name = `CEIL(${result.name})`;
+    if (!result.err && result.value !== null) {
+        const num = convertNum(result.value);
+        result.value = num === null ? null : Math.ceil(num);
+    }
+    result.type = _resolveTypeForRounding(result);
+    return result;
+}
+function floor(expr, state) {
+    assertArgCount(expr, 1);
+    const result = getValue(expr.args.value[0], state);
+    result.name = `FLOOR(${result.name})`;
+    if (!result.err && result.value !== null) {
+        const num = convertNum(result.value);
+        result.value = num !== null ? Math.floor(num) : null;
+    }
+    result.type = _resolveTypeForRounding(result);
+    return result;
+}
+function round(expr, state) {
+    assertArgCount(expr, 1, 2);
+    const result = getValue(expr.args.value[0], state);
+    const arg2 = expr.args.value[1]
+        ? getValue(expr.args.value[1], state)
+        : undefined;
+    if (result.err) {
+        return result;
+    }
+    if (arg2 && arg2.err) {
+        return arg2;
+    }
+    if (result.value === null) {
+        result.type = 'double';
+    }
+    let value = convertNum(result.value);
+    let decimals = 0;
+    result.name = arg2
+        ? `ROUND(${result.name}, ${arg2.name})`
+        : `ROUND(${result.name})`;
+    if (arg2) {
+        const arg2_num = convertNum(arg2.value);
+        if (arg2_num === null) {
+            value = null;
+        }
+        else {
+            decimals = Math.round(arg2_num);
+        }
+    }
+    if (value === null) {
+        result.value = null;
+    }
+    else if (decimals === 0) {
+        result.value = _mysqlRound(value);
+    }
+    else if (decimals > 0) {
+        result.value = Number(value.toFixed(decimals));
+    }
+    else {
+        const factor = Math.pow(10, -decimals);
+        result.value = _mysqlRound(value / factor) * factor;
+    }
+    if (result.type === 'string') {
+        result.type = 'double';
+    }
+    return result;
+}
+function _mysqlRound(x) {
+    return x >= 0 ? Math.round(x) : -Math.round(-x);
+}
+function mod(expr, state) {
+    assertArgCountParse(expr, 2);
+    const arg1 = getValue(expr.args.value[0], state);
+    const arg2 = getValue(expr.args.value[1], state);
+    return modHelper(arg1, arg2, `MOD(${arg1.name}, ${arg2.name})`);
+}
+function _resolveTypeForRounding(result) {
+    if (result.value === null || result.type === 'string') {
+        return 'double';
+    }
+    else if (result.type === 'number') {
+        return 'longlong';
+    }
+    return result.type;
+}
+function pow(expr, state) {
+    assertArgCount(expr, 2);
+    const arg1 = getValue(expr.args.value[0], state);
+    const arg2 = getValue(expr.args.value[1], state);
+    const err = arg1.err ?? arg2.err;
+    let value;
+    const name = `POW(${arg1.name}, ${arg2.name})`;
+    if (!err && (arg1.value === null || arg2.value === null)) {
+        value = null;
+    }
+    else if (!err) {
+        const num1 = convertNum(arg1.value);
+        const num2 = convertNum(arg2.value);
+        value = num1 !== null && num2 !== null ? Math.pow(num1, num2) : null;
+    }
+    return { err, name, value, type: 'double' };
+}
+function sqrt(expr, state) {
+    assertArgCount(expr, 1);
+    const result = getValue(expr.args.value[0], state);
+    result.name = `SQRT(${result.name})`;
+    result.type = 'double';
+    if (!result.err && result.value !== null) {
+        const num = convertNum(result.value);
+        result.value = num !== null && num >= 0 ? Math.sqrt(num) : null;
+    }
+    return result;
+}
+function sign(expr, state) {
+    assertArgCount(expr, 1);
+    const result = getValue(expr.args.value[0], state);
+    result.name = `SIGN(${result.name})`;
+    result.type = 'longlong';
+    if (!result.err && result.value !== null) {
+        const num = convertNum(result.value);
+        result.value = num !== null ? Math.sign(num) : null;
+    }
+    return result;
+}
+function pi(_expr, _state) {
+    return { err: null, name: 'PI()', value: Math.PI, type: 'double' };
+}
+function degrees(expr, state) {
+    assertArgCount(expr, 1);
+    const result = getValue(expr.args.value[0], state);
+    result.name = `DEGREES(${result.name})`;
+    result.type = 'double';
+    if (!result.err && result.value !== null) {
+        const num = convertNum(result.value);
+        result.value = num !== null ? (num * 180) / Math.PI : null;
+    }
+    return result;
+}
+function radians(expr, state) {
+    assertArgCount(expr, 1);
+    const result = getValue(expr.args.value[0], state);
+    result.name = `RADIANS(${result.name})`;
+    result.type = 'double';
+    if (!result.err && result.value !== null) {
+        const num = convertNum(result.value);
+        result.value = num !== null ? (num * Math.PI) / 180 : null;
+    }
+    return result;
+}
+function exp(expr, state) {
+    assertArgCount(expr, 1);
+    const result = getValue(expr.args.value[0], state);
+    result.name = `EXP(${result.name})`;
+    result.type = 'double';
+    if (!result.err && result.value !== null) {
+        const num = convertNum(result.value);
+        result.value = num !== null ? Math.exp(num) : null;
+    }
+    return result;
+}
+
+function database(expr, state) {
+    assertArgCountParse(expr, 0);
+    return {
+        err: null,
+        value: state.session.getCurrentDatabase(),
+        type: 'string',
+    };
+}
+function isnull(expr, state) {
+    assertArgCount(expr, 1);
+    const result = getValue(expr.args.value[0], state);
+    result.name = `ISNULL(${result.name})`;
+    result.type = 'longlong';
+    if (!result.err) {
+        result.value = result.value === null ? 1 : 0;
+    }
+    return result;
+}
+function sleep(expr, state) {
+    assertArgCount(expr, 1);
+    const result = getValue(expr.args.value[0], state);
+    result.name = `SLEEP(${result.name})`;
+    const sleep_ms = convertNum(result.value);
+    if (sleep_ms !== null && sleep_ms > 0) {
+        result.sleep_ms = sleep_ms * 1000;
+    }
+    // SLEEP returns 0 on success in MySQL
+    result.value = 0;
+    result.type = 'longlong';
+    return result;
+}
+function not$2(expr, state) {
+    assertArgCount(expr, 1);
+    const result = getValue(expr.args.value[0], state);
+    result.name = `NOT(${result.name})`;
+    result.type = 'longlong';
+    if (!result.err && result.value !== null) {
+        const num = convertNum(result.value);
+        result.value = num ? 0 : 1;
+    }
+    return result;
+}
+function user(expr, _state) {
+    assertArgCountParse(expr, 0);
+    return { err: null, value: 'root@localhost', type: 'string' };
+}
+function version(expr, _state) {
+    assertArgCountParse(expr, 0);
+    return { err: null, value: '8.0.0-dynamosql', type: 'string' };
+}
+function connection_id(expr, state) {
+    assertArgCountParse(expr, 0);
+    return { err: null, value: state.session.threadId, type: 'longlong' };
+}
+
+function elt(expr, state) {
+    assertArgCount(expr, 2, Infinity);
+    const arg_count = expr.args.value.length;
+    const index_result = getValue(expr.args.value[0], state);
+    if (index_result.err) {
+        return index_result;
+    }
+    let value = null;
+    if (index_result.value !== null) {
+        const index = Math.round(convertNum(index_result.value) ?? 0);
+        if (index >= 1 && index < arg_count) {
+            const elem_result = getValue(expr.args.value[index], state);
+            if (elem_result.err) {
+                return elem_result;
+            }
+            value = elem_result.value;
+        }
+    }
+    return { err: null, value, type: 'string' };
+}
+function field(expr, state) {
+    assertArgCount(expr, 2, Infinity);
+    const arg_count = expr.args.value.length;
+    const search_result = getValue(expr.args.value[0], state);
+    if (search_result.err) {
+        return search_result;
+    }
+    let value = 0;
+    if (search_result.value !== null) {
+        const search_str = String(search_result.value);
+        for (let i = 1; i < arg_count; i++) {
+            const elem_result = getValue(expr.args.value[i], state);
+            if (elem_result.err) {
+                return elem_result;
+            }
+            if (elem_result.value !== null &&
+                String(elem_result.value) === search_str) {
+                value = i;
+                break;
+            }
+        }
+    }
+    return { err: null, value, type: 'longlong' };
+}
+function find_in_set(expr, state) {
+    assertArgCount(expr, 2);
+    const str_result = getValue(expr.args.value[0], state);
+    const strlist_result = getValue(expr.args.value[1], state);
+    const name = `FIND_IN_SET(${str_result.name}, ${strlist_result.name})`;
+    const err = str_result.err ?? strlist_result.err ?? null;
+    if (err) {
+        return { err, value: null, type: 'longlong' };
+    }
+    let value = 0;
+    if (str_result.value === null || strlist_result.value === null) {
+        value = null;
+    }
+    else {
+        const search = String(str_result.value);
+        const list = String(strlist_result.value).split(',');
+        for (let i = 0; i < list.length; i++) {
+            if (list[i] === search) {
+                value = i + 1;
+                break;
+            }
+        }
+    }
+    return { err: null, name, value, type: 'longlong' };
+}
+function make_set(expr, state) {
+    assertArgCount(expr, 2, Infinity);
+    const arg_count = expr.args.value.length;
+    const bits_result = getValue(expr.args.value[0], state);
+    if (bits_result.err) {
+        return bits_result;
+    }
+    let value = null;
+    if (bits_result.value !== null) {
+        const bits = Math.round(convertNum(bits_result.value) ?? 0);
+        const parts = [];
+        for (let i = 1; i < arg_count; i++) {
+            if (bits & (1 << (i - 1))) {
+                const elem_result = getValue(expr.args.value[i], state);
+                if (elem_result.err) {
+                    return elem_result;
+                }
+                if (elem_result.value !== null) {
+                    parts.push(String(elem_result.value));
+                }
+            }
+        }
+        value = parts.join(',');
+    }
+    return { err: null, value, type: 'string' };
+}
+function export_set(expr, state) {
+    assertArgCount(expr, 3, 5);
+    const arg_count = expr.args.value.length;
+    const bits_result = getValue(expr.args.value[0], state);
+    const on_result = getValue(expr.args.value[1], state);
+    const off_result = getValue(expr.args.value[2], state);
+    const sep_result = arg_count > 3
+        ? getValue(expr.args.value[3], state)
+        : { err: null, value: ',' };
+    const num_bits_result = arg_count > 4
+        ? getValue(expr.args.value[4], state)
+        : { err: null, value: 64 };
+    const err = bits_result.err ??
+        on_result.err ??
+        off_result.err ??
+        sep_result.err ??
+        num_bits_result.err ??
+        null;
+    if (err) {
+        return { err, value: null, type: 'string' };
+    }
+    let value = null;
+    if (bits_result.value !== null &&
+        on_result.value !== null &&
+        off_result.value !== null) {
+        const bits = Math.round(convertNum(bits_result.value) ?? 0);
+        const on = String(on_result.value);
+        const off = String(off_result.value);
+        const sep = sep_result.value !== null ? String(sep_result.value) : ',';
+        const num_bits = Math.min(64, Math.round(convertNum(num_bits_result.value) ?? 64));
+        const parts = [];
+        for (let i = 0; i < num_bits; i++) {
+            parts.push(bits & (1 << i) ? on : off);
+        }
+        value = parts.join(sep);
+    }
+    return { err: null, value, type: 'string' };
+}
+function format_func(expr, state) {
+    assertArgCount(expr, 2, 3);
+    const num_result = getValue(expr.args.value[0], state);
+    const decimals_result = getValue(expr.args.value[1], state);
+    const err = num_result.err ?? decimals_result.err ?? null;
+    if (err) {
+        return { err, value: null, type: 'string' };
+    }
+    let value = null;
+    if (num_result.value !== null && decimals_result.value !== null) {
+        const num = convertNum(num_result.value) ?? 0;
+        const decimals = Math.max(0, Math.round(convertNum(decimals_result.value) ?? 0));
+        const fixed = num.toFixed(decimals);
+        const parts = fixed.split('.');
+        if (parts[0]) {
+            parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+        }
+        value = parts.join('.');
+    }
+    return { err: null, value, type: 'string' };
+}
+function char_func(expr, state) {
+    assertArgCount(expr, 1, Infinity);
+    const arg_count = expr.args.value.length;
+    const chars = [];
+    for (let i = 0; i < arg_count; i++) {
+        const arg_result = getValue(expr.args.value[i], state);
+        if (arg_result.err) {
+            return arg_result;
+        }
+        if (arg_result.value !== null) {
+            const code = Math.round(convertNum(arg_result.value) ?? 0);
+            if (code > 0) {
+                chars.push(code);
+            }
+        }
+    }
+    const value = String.fromCodePoint(...chars);
+    return { err: null, value, type: 'string' };
+}
+
+function length(expr, state) {
+    assertArgCount(expr, 1);
+    const result = getValue(expr.args.value[0], state);
+    result.name = `LENGTH(${result.name})`;
+    result.type = 'longlong';
+    if (!result.err && result.value !== null) {
+        result.value = Buffer.byteLength(String(result.value), 'utf8');
+    }
+    return result;
+}
+function char_length(expr, state) {
+    assertArgCount(expr, 1);
+    const result = getValue(expr.args.value[0], state);
+    result.name = `CHAR_LENGTH(${result.name})`;
+    result.type = 'longlong';
+    if (!result.err && result.value !== null) {
+        const str = String(result.value);
+        // eslint-disable-next-line @typescript-eslint/no-misused-spread
+        result.value = [...str].length;
+    }
+    return result;
+}
+function concat(expr, state) {
+    assertArgCount(expr, 1, Infinity);
+    let err = null;
+    let value = '';
+    const results = expr.args.value.map((sub) => getValue(sub, state));
+    for (const result of results) {
+        if (result.err) {
+            err = result.err;
+        }
+        else if (result.value === null) {
+            value = null;
+            break;
+        }
+        else {
+            value += String(result.value);
+        }
+    }
+    const has_blob = results.some((r) => r.type === 'long_blob' || r.type === 'medium_blob');
+    return { err, value, type: has_blob ? 'long_blob' : 'string' };
+}
+function left(expr, state) {
+    assertArgCountParse(expr, 2);
+    const result = getValue(expr.args.value[0], state);
+    const len_result = getValue(expr.args.value[1], state);
+    result.name = `LEFT(${result.name ?? ''}, ${len_result.name ?? ''})`;
+    result.err ??= len_result.err;
+    result.type = 'string';
+    if (!result.err && (result.value === null || len_result.value === null)) {
+        result.value = null;
+    }
+    else if (!result.err) {
+        const len = Math.round(convertNum(len_result.value) ?? 0);
+        result.value = String(result.value).substring(0, len);
+    }
+    return result;
+}
+function right(expr, state) {
+    assertArgCountParse(expr, 2);
+    const result = getValue(expr.args.value[0], state);
+    const len_result = getValue(expr.args.value[1], state);
+    result.name = `RIGHT(${result.name ?? ''}, ${len_result.name ?? ''})`;
+    result.err ??= len_result.err;
+    result.type = 'string';
+    if (!result.err && (result.value === null || len_result.value === null)) {
+        result.value = null;
+    }
+    else if (!result.err) {
+        const len = Math.round(convertNum(len_result.value) ?? 0);
+        if (len <= 0) {
+            result.value = '';
+        }
+        else {
+            result.value = String(result.value).slice(-len);
+        }
+    }
+    return result;
+}
+function lower(expr, state) {
+    assertArgCount(expr, 1);
+    const result = getValue(expr.args.value[0], state);
+    result.name = `LOWER(${result.name})`;
+    result.type = 'string';
+    if (!result.err && result.value !== null) {
+        result.value = String(result.value).toLowerCase();
+    }
+    return result;
+}
+function upper(expr, state) {
+    assertArgCount(expr, 1);
+    const result = getValue(expr.args.value[0], state);
+    result.name = `UPPER(${result.name})`;
+    result.type = 'string';
+    if (!result.err && result.value !== null) {
+        result.value = String(result.value).toUpperCase();
+    }
+    return result;
+}
+function trim(expr, state) {
+    assertArgCountParse(expr, 1);
+    const result = getValue(expr.args.value[0], state);
+    result.name = `TRIM(${result.name})`;
+    result.type = 'string';
+    if (!result.err && result.value !== null) {
+        result.value = String(result.value).trim();
+    }
+    return result;
+}
+function ltrim(expr, state) {
+    assertArgCount(expr, 1);
+    const result = getValue(expr.args.value[0], state);
+    result.name = `LTRIM(${result.name})`;
+    result.type = 'string';
+    if (!result.err && result.value !== null) {
+        result.value = String(result.value).trimStart();
+    }
+    return result;
+}
+function rtrim(expr, state) {
+    assertArgCount(expr, 1);
+    const result = getValue(expr.args.value[0], state);
+    result.name = `RTRIM(${result.name})`;
+    result.type = 'string';
+    if (!result.err && result.value !== null) {
+        result.value = String(result.value).trimEnd();
+    }
+    return result;
+}
+function reverse(expr, state) {
+    assertArgCountParse(expr, 1);
+    const result = getValue(expr.args.value[0], state);
+    result.name = `REVERSE(${result.name})`;
+    result.type = 'string';
+    if (!result.err && result.value !== null) {
+        result.value = String(result.value).split('').reverse().join('');
+    }
+    return result;
+}
+function repeat(expr, state) {
+    assertArgCountParse(expr, 2);
+    const arg1 = getValue(expr.args.value[0], state);
+    const arg2 = getValue(expr.args.value[1], state);
+    const err = arg1.err ?? arg2.err;
+    let value;
+    let type;
+    const name = `REPEAT(${arg1.name}, ${arg2.name})`;
+    if (!err && arg2.value === null) {
+        value = null;
+        type = 'long_blob';
+    }
+    else if (!err && arg1.value === null) {
+        value = null;
+        type = 'string';
+    }
+    else if (!err) {
+        const count = convertNum(arg2.value);
+        value =
+            count !== null && count > 0
+                ? String(arg1.value).repeat(Math.round(count))
+                : '';
+        type = 'string';
+    }
+    else {
+        type = 'long_blob';
+    }
+    return { err, name, value, type };
+}
+function substring(expr, state) {
+    assertArgCountParse(expr, 2, 3);
+    const arg1 = getValue(expr.args.value[0], state);
+    const arg2 = getValue(expr.args.value[1], state);
+    const hasThirdArg = expr.args.value[2] !== undefined;
+    const arg3 = hasThirdArg ? getValue(expr.args.value[2], state) : null;
+    const err = arg1.err ?? arg2.err ?? arg3?.err ?? null;
+    let value;
+    const name = hasThirdArg
+        ? `SUBSTRING(${arg1.name}, ${arg2.name}, ${arg3?.name ?? ''})`
+        : `SUBSTRING(${arg1.name}, ${arg2.name})`;
+    if (!err &&
+        (arg1.value === null ||
+            arg2.value === null ||
+            (hasThirdArg && arg3?.value === null))) {
+        value = null;
+    }
+    else if (!err) {
+        const str = String(arg1.value);
+        const pos = convertNum(arg2.value);
+        const len = hasThirdArg ? convertNum(arg3?.value) : null;
+        if (pos === null || (hasThirdArg && len === null)) {
+            value = null;
+        }
+        else {
+            const posInt = Math.round(pos);
+            if (posInt === 0) {
+                value = '';
+            }
+            else {
+                const start = posInt < 0 ? str.length + posInt : posInt - 1;
+                value =
+                    len !== null
+                        ? str.substring(start, start + Math.round(len))
+                        : str.substring(start);
+            }
+        }
+    }
+    return { err, name, value, type: 'string' };
+}
+function replace(expr, state) {
+    assertArgCountParse(expr, 3);
+    const arg1 = getValue(expr.args.value[0], state);
+    const arg2 = getValue(expr.args.value[1], state);
+    const arg3 = getValue(expr.args.value[2], state);
+    const err = arg1.err ?? arg2.err ?? arg3.err ?? null;
+    let value;
+    const name = `REPLACE(${arg1.name}, ${arg2.name}, ${arg3.name})`;
+    if (!err &&
+        (arg1.value === null || arg2.value === null || arg3.value === null)) {
+        value = null;
+    }
+    else if (!err) {
+        const str1 = convertString({
+            value: arg1.value,
+            decimals: arg1.decimals,
+            timeZone: state.session.timeZone,
+        });
+        const str2 = convertString({
+            value: arg2.value,
+            decimals: arg2.decimals,
+            timeZone: state.session.timeZone,
+        });
+        const str3 = convertString({
+            value: arg3.value,
+            decimals: arg3.decimals,
+            timeZone: state.session.timeZone,
+        });
+        if (str2 === '') {
+            value = str1;
+        }
+        else {
+            value = str1?.replaceAll(str2 ?? '', str3 ?? '') ?? null;
+        }
+    }
+    return { err, name, value, type: 'string' };
+}
+function ascii(expr, state) {
+    assertArgCountParse(expr, 1);
+    const result = getValue(expr.args.value[0], state);
+    result.name = `ASCII(${result.name})`;
+    result.type = 'longlong';
+    if (!result.err && result.value !== null) {
+        const str = String(result.value);
+        result.value = str.length > 0 ? str.charCodeAt(0) : 0;
+    }
+    return result;
+}
+function ord(expr, state) {
+    assertArgCount(expr, 1);
+    const result = getValue(expr.args.value[0], state);
+    result.name = `ORD(${result.name})`;
+    result.type = 'longlong';
+    if (!result.err && result.value !== null) {
+        const str = String(result.value);
+        result.value = str.length > 0 ? str.codePointAt(0) : 0;
+    }
+    return result;
+}
+function space(expr, state) {
+    assertArgCount(expr, 1);
+    const result = getValue(expr.args.value[0], state);
+    result.name = `SPACE(${result.name})`;
+    result.type = 'string';
+    if (!result.err && result.value !== null) {
+        const count = convertNum(result.value);
+        result.value =
+            count !== null && count > 0 ? ' '.repeat(Math.round(count)) : '';
+    }
+    return result;
+}
+function concat_ws(expr, state) {
+    assertArgCount(expr, 2, Infinity);
+    const sep_result = getValue(expr.args.value[0], state);
+    if (sep_result.err || sep_result.value === null) {
+        return {
+            err: sep_result.err,
+            value: null,
+            type: 'string',
+            name: 'CONCAT_WS()',
+        };
+    }
+    const separator = String(sep_result.value);
+    const parts = [];
+    for (let i = 1; i < expr.args.value.length; i++) {
+        const result = getValue(expr.args.value[i], state);
+        if (result.err) {
+            return {
+                err: result.err,
+                value: null,
+                type: 'string',
+                name: 'CONCAT_WS()',
+            };
+        }
+        if (result.value !== null) {
+            parts.push(String(result.value));
+        }
+    }
+    return {
+        err: null,
+        value: parts.join(separator),
+        type: 'string',
+        name: 'CONCAT_WS()',
+    };
+}
+function lpad(expr, state) {
+    assertArgCount(expr, 3);
+    const str_result = getValue(expr.args.value[0], state);
+    const len_result = getValue(expr.args.value[1], state);
+    const pad_result = getValue(expr.args.value[2], state);
+    const err = str_result.err ?? len_result.err ?? pad_result.err ?? null;
+    if (err ||
+        str_result.value === null ||
+        len_result.value === null ||
+        pad_result.value === null) {
+        return { err, value: null, type: 'string' };
+    }
+    const str = String(str_result.value);
+    const len = Math.round(convertNum(len_result.value) ?? 0);
+    const pad = String(pad_result.value);
+    if (len < 0) {
+        return { err: null, value: null, type: 'long_blob' };
+    }
+    if (pad.length === 0) {
+        return { err: null, value: '', type: 'string' };
+    }
+    if (str.length >= len) {
+        return { err: null, value: str.substring(0, len), type: 'string' };
+    }
+    const padLen = len - str.length;
+    const fullPads = Math.floor(padLen / pad.length);
+    const remainder = padLen % pad.length;
+    return {
+        err: null,
+        value: pad.repeat(fullPads) + pad.substring(0, remainder) + str,
+        type: 'string',
+    };
+}
+function rpad(expr, state) {
+    assertArgCount(expr, 3);
+    const str_result = getValue(expr.args.value[0], state);
+    const len_result = getValue(expr.args.value[1], state);
+    const pad_result = getValue(expr.args.value[2], state);
+    const err = str_result.err ?? len_result.err ?? pad_result.err ?? null;
+    if (err ||
+        str_result.value === null ||
+        len_result.value === null ||
+        pad_result.value === null) {
+        return { err, value: null, type: 'string' };
+    }
+    const str = String(str_result.value);
+    const len = Math.round(convertNum(len_result.value) ?? 0);
+    const pad = String(pad_result.value);
+    if (len < 0) {
+        return { err: null, value: null, type: 'long_blob' };
+    }
+    if (pad.length === 0) {
+        return { err: null, value: '', type: 'string' };
+    }
+    if (str.length >= len) {
+        return { err: null, value: str.substring(0, len), type: 'string' };
+    }
+    const padLen = len - str.length;
+    const fullPads = Math.floor(padLen / pad.length);
+    const remainder = padLen % pad.length;
+    return {
+        err: null,
+        value: str + pad.repeat(fullPads) + pad.substring(0, remainder),
+        type: 'string',
+    };
+}
+function locate(expr, state) {
+    assertArgCount(expr, 2, 3);
+    const substr_result = getValue(expr.args.value[0], state);
+    const str_result = getValue(expr.args.value[1], state);
+    const pos_result = getValue(expr.args.value[2], state);
+    const err = substr_result.err ?? str_result.err ?? pos_result.err ?? null;
+    if (err || substr_result.value === null || str_result.value === null) {
+        return { err, value: null, type: 'longlong' };
+    }
+    const substr = convertString({
+        value: substr_result.value,
+        decimals: substr_result.decimals,
+        timeZone: state.session.timeZone,
+    }) ?? '';
+    const str = convertString({
+        value: str_result.value,
+        decimals: str_result.decimals,
+        timeZone: state.session.timeZone,
+    }) ?? '';
+    const pos = pos_result.value !== undefined && pos_result.value !== null
+        ? (convertNum(pos_result.value) ?? 1)
+        : 1;
+    const posInt = Math.round(pos);
+    if (posInt < 1) {
+        return { err: null, value: 0, type: 'longlong' };
+    }
+    const index = str.indexOf(substr, posInt - 1);
+    return { err: null, value: index === -1 ? 0 : index + 1, type: 'longlong' };
+}
+function instr(expr, state) {
+    assertArgCount(expr, 2);
+    const str_result = getValue(expr.args.value[0], state);
+    const substr_result = getValue(expr.args.value[1], state);
+    const err = str_result.err ?? substr_result.err ?? null;
+    if (err || str_result.value === null || substr_result.value === null) {
+        return { err, value: null, type: 'longlong' };
+    }
+    const str = String(str_result.value);
+    const substr = String(substr_result.value);
+    const index = str.indexOf(substr);
+    return { err: null, value: index === -1 ? 0 : index + 1, type: 'longlong' };
+}
+function strcmp(expr, state) {
+    assertArgCount(expr, 2);
+    const str1_result = getValue(expr.args.value[0], state);
+    const str2_result = getValue(expr.args.value[1], state);
+    const err = str1_result.err ?? str2_result.err ?? null;
+    if (err || str1_result.value === null || str2_result.value === null) {
+        return { err, value: null, type: 'longlong' };
+    }
+    const str1 = convertString({
+        value: str1_result.value,
+        decimals: str1_result.decimals,
+        timeZone: state.session.timeZone,
+    }) ?? '';
+    const str2 = convertString({
+        value: str2_result.value,
+        decimals: str2_result.decimals,
+        timeZone: state.session.timeZone,
+    }) ?? '';
+    if (str1 < str2) {
+        return { err: null, value: -1, type: 'longlong' };
+    }
+    else if (str1 > str2) {
+        return { err: null, value: 1, type: 'longlong' };
+    }
+    else {
+        return { err: null, value: 0, type: 'longlong' };
+    }
+}
+function substring_index(expr, state) {
+    assertArgCount(expr, 3);
+    const str_result = getValue(expr.args.value[0], state);
+    const delim_result = getValue(expr.args.value[1], state);
+    const count_result = getValue(expr.args.value[2], state);
+    const err = str_result.err ?? delim_result.err ?? count_result.err ?? null;
+    if (err) {
+        return { err, value: null, type: 'string' };
+    }
+    let value = null;
+    if (str_result.value !== null &&
+        delim_result.value !== null &&
+        count_result.value !== null) {
+        const str = String(str_result.value);
+        const delim = String(delim_result.value);
+        const count = Math.round(convertNum(count_result.value) ?? 0);
+        if (count === 0 || delim === '') {
+            value = '';
+        }
+        else if (count > 0) {
+            const parts = str.split(delim);
+            value = parts.slice(0, count).join(delim);
+        }
+        else {
+            const parts = str.split(delim);
+            value = parts.slice(count).join(delim);
+        }
+    }
+    return { err: null, value, type: 'string' };
+}
+function insert_func(expr, state) {
+    assertArgCount(expr, 4);
+    const str_result = getValue(expr.args.value[0], state);
+    const pos_result = getValue(expr.args.value[1], state);
+    const len_result = getValue(expr.args.value[2], state);
+    const newstr_result = getValue(expr.args.value[3], state);
+    const err = str_result.err ??
+        pos_result.err ??
+        len_result.err ??
+        newstr_result.err ??
+        null;
+    if (err) {
+        return { err, value: null, type: 'string' };
+    }
+    let value = null;
+    if (str_result.value !== null &&
+        pos_result.value !== null &&
+        len_result.value !== null &&
+        newstr_result.value !== null) {
+        const str = String(str_result.value);
+        const pos = Math.round(convertNum(pos_result.value) ?? 0);
+        const len = Math.round(convertNum(len_result.value) ?? 0);
+        const newstr = String(newstr_result.value);
+        if (pos < 1 || pos > str.length) {
+            value = str;
+        }
+        else {
+            const start = pos - 1;
+            value = str.substring(0, start) + newstr + str.substring(start + len);
+        }
+    }
+    return { err, value, type: 'string' };
+}
+
+function hex(expr, state) {
+    assertArgCount(expr, 1);
+    const result = getValue(expr.args.value[0], state);
+    result.name = `HEX(${result.name})`;
+    result.type = 'string';
+    if (!result.err && result.value !== null) {
+        if (typeof result.value === 'number' || typeof result.value === 'bigint') {
+            const num = typeof result.value === 'bigint'
+                ? result.value
+                : BigInt(Math.round(result.value));
+            const unsigned = num < 0n ? (1n << 64n) + num : num;
+            result.value = unsigned.toString(16).toUpperCase();
+        }
+        else if (Buffer.isBuffer(result.value)) {
+            result.value = result.value.toString('hex').toUpperCase();
+        }
+        else {
+            result.value = Buffer.from(String(result.value))
+                .toString('hex')
+                .toUpperCase();
+        }
+    }
+    return result;
+}
+function unhex(expr, state) {
+    assertArgCount(expr, 1);
+    const result = getValue(expr.args.value[0], state);
+    result.name = `UNHEX(${result.name})`;
+    result.type = 'buffer';
+    if (!result.err && result.value !== null) {
+        let str = String(result.value);
+        if (/^[0-9A-Fa-f]*$/.test(str)) {
+            if (str.length % 2 === 1) {
+                str = '0' + str;
+            }
+            result.value = Buffer.from(str, 'hex');
+        }
+        else {
+            result.value = null;
+        }
+    }
+    return result;
+}
+function charset(expr, state) {
+    assertArgCount(expr, 1);
+    const arg = getValue(expr.args.value[0], state);
+    if (arg.err) {
+        return arg;
+    }
+    const value = arg.type === 'string' ? 'utf8mb4' : 'binary';
+    return { err: null, value, type: 'string' };
+}
+function collation(expr, state) {
+    assertArgCount(expr, 1);
+    const arg = getValue(expr.args.value[0], state);
+    if (arg.err) {
+        return arg;
+    }
+    const value = arg.type === 'string' ? 'utf8mb4_general_ci' : 'binary';
+    return { err: null, value, type: 'string' };
+}
+function bit_length(expr, state) {
+    assertArgCount(expr, 1);
+    const result = getValue(expr.args.value[0], state);
+    result.name = `BIT_LENGTH(${result.name})`;
+    result.type = 'longlong';
+    if (!result.err && result.value !== null) {
+        result.value = Buffer.byteLength(String(result.value), 'utf8') * 8;
+    }
+    return result;
+}
+function soundex(expr, state) {
+    assertArgCount(expr, 1);
+    const arg = getValue(expr.args.value[0], state);
+    const name = `SOUNDEX(${arg.name})`;
+    if (arg.err) {
+        return { ...arg, name };
+    }
+    let value = arg.value;
+    if (value !== null) {
+        const str = String(value).toUpperCase();
+        if (str.length === 0) {
+            value = '';
+        }
+        else {
+            const codes = {
+                B: '1',
+                F: '1',
+                P: '1',
+                V: '1',
+                C: '2',
+                G: '2',
+                J: '2',
+                K: '2',
+                Q: '2',
+                S: '2',
+                X: '2',
+                Z: '2',
+                D: '3',
+                T: '3',
+                L: '4',
+                M: '5',
+                N: '5',
+                R: '6',
+            };
+            let result = str[0] ?? '';
+            let prev = codes[str[0] ?? ''] ?? '';
+            for (let i = 1; i < str.length && result.length < 4; i++) {
+                const char = str[i];
+                const code = char ? codes[char] : undefined;
+                if (code && code !== prev) {
+                    result += code;
+                }
+                if (code) {
+                    prev = code;
+                }
+            }
+            value = result.padEnd(4, '0');
+        }
+    }
+    return { err: null, name, value, type: 'string' };
+}
+function quote(expr, state) {
+    assertArgCount(expr, 1);
+    const arg = getValue(expr.args.value[0], state);
+    const name = `QUOTE(${arg.name})`;
+    if (arg.err) {
+        return { ...arg, name };
+    }
+    let value = arg.value;
+    if (value === null) {
+        value = 'NULL';
+    }
+    else {
+        const str = String(value);
+        value = "'" + str.replace(/[\\']/g, '\\$&').replace(/\0/g, '\\0') + "'";
+    }
+    return { err: null, name, value, type: 'string' };
+}
+function md5(expr, state) {
+    assertArgCount(expr, 1);
+    const result = getValue(expr.args.value[0], state);
+    result.name = `MD5(${result.name})`;
+    result.type = 'string';
+    if (!result.err && result.value !== null) {
+        const hash = crypto__namespace.createHash('md5');
+        hash.update(String(result.value));
+        result.value = hash.digest('hex');
+    }
+    return result;
+}
+function sha1(expr, state) {
+    assertArgCount(expr, 1);
+    const result = getValue(expr.args.value[0], state);
+    result.name = `SHA1(${result.name})`;
+    result.type = 'string';
+    if (!result.err && result.value !== null) {
+        const hash = crypto__namespace.createHash('sha1');
+        hash.update(String(result.value));
+        result.value = hash.digest('hex');
+    }
+    return result;
+}
+function sha2(expr, state) {
+    assertArgCount(expr, 2);
+    const arg1 = getValue(expr.args.value[0], state);
+    const arg2 = getValue(expr.args.value[1], state);
+    const err = arg1.err ?? arg2.err;
+    const name = `SHA2(${arg1.name}, ${arg2.name})`;
+    let value = null;
+    if (!err && arg1.value !== null && arg2.value !== null) {
+        const bits = Math.round(convertNum(arg2.value) ?? 0);
+        const algorithm = bits === 224
+            ? 'sha224'
+            : bits === 256
+                ? 'sha256'
+                : bits === 384
+                    ? 'sha384'
+                    : bits === 512
+                        ? 'sha512'
+                        : null;
+        if (algorithm) {
+            const hash = crypto__namespace.createHash(algorithm);
+            hash.update(String(arg1.value));
+            value = hash.digest('hex');
+        }
+    }
+    return { err, name, value, type: 'string' };
+}
+function crc32(expr, state) {
+    assertArgCount(expr, 1);
+    const result = getValue(expr.args.value[0], state);
+    result.name = `CRC32(${result.name})`;
+    result.type = 'longlong';
+    if (!result.err && result.value !== null) {
+        const str = String(result.value);
+        const buffer = Buffer.from(str, 'utf8');
+        let crc = 0xffffffff;
+        for (const byte of buffer) {
+            crc ^= byte;
+            for (let j = 0; j < 8; j++) {
+                crc = crc & 1 ? (crc >>> 1) ^ 0xedb88320 : crc >>> 1;
+            }
+        }
+        result.value = (crc ^ 0xffffffff) >>> 0;
+    }
+    return result;
+}
+function to_base64(expr, state) {
+    assertArgCount(expr, 1);
+    const result = getValue(expr.args.value[0], state);
+    result.name = `TO_BASE64(${result.name})`;
+    result.type = 'string';
+    if (!result.err && result.value !== null) {
+        const buffer = Buffer.from(String(result.value), 'utf8');
+        result.value = buffer.toString('base64');
+    }
+    return result;
+}
+function from_base64(expr, state) {
+    assertArgCount(expr, 1);
+    const result = getValue(expr.args.value[0], state);
+    result.name = `FROM_BASE64(${result.name})`;
+    result.type = 'string';
+    if (!result.err && result.value !== null) {
+        try {
+            const buffer = Buffer.from(String(result.value), 'base64');
+            result.value = buffer.toString('binary');
+        }
+        catch {
+            result.value = null;
+        }
+    }
+    return result;
+}
+function uuid(_expr, _state) {
+    return {
+        err: null,
+        name: 'UUID()',
+        value: crypto__namespace.randomUUID(),
+        type: 'string',
+    };
+}
+function is_uuid(expr, state) {
+    assertArgCount(expr, 1);
+    const result = getValue(expr.args.value[0], state);
+    result.name = `IS_UUID(${result.name})`;
+    result.type = 'longlong';
+    if (!result.err && result.value !== null) {
+        const str = String(result.value);
+        const uuid_regex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+        result.value = uuid_regex.test(str) ? 1 : 0;
+    }
+    return result;
+}
+function inet_aton(expr, state) {
+    assertArgCount(expr, 1);
+    const result = getValue(expr.args.value[0], state);
+    result.name = `INET_ATON(${result.name})`;
+    result.type = 'longlong';
+    if (!result.err && result.value !== null) {
+        const str = String(result.value).trim();
+        const parts = str.split('.');
+        if (parts.length > 4 || parts.length === 0) {
+            result.value = null;
+        }
+        else {
+            let num = 0;
+            for (let i = 0; i < parts.length - 1; i++) {
+                const part_str = parts[i];
+                if (!part_str) {
+                    result.value = null;
+                    return result;
+                }
+                const part = parseInt(part_str, 10);
+                if (isNaN(part) || part < 0 || part > 255) {
+                    result.value = null;
+                    return result;
+                }
+                num = num * 256 + part;
+            }
+            const last_str = parts[parts.length - 1];
+            if (!last_str) {
+                result.value = null;
+                return result;
+            }
+            const lastPart = parseInt(last_str, 10);
+            if (isNaN(lastPart) || lastPart < 0) {
+                result.value = null;
+                return result;
+            }
+            const shift = 4 - parts.length;
+            const maxLast = Math.pow(256, shift + 1) - 1;
+            if (lastPart > maxLast) {
+                result.value = null;
+                return result;
+            }
+            result.value = num * Math.pow(256, shift + 1) + lastPart;
+        }
+    }
+    return result;
+}
+function inet_ntoa(expr, state) {
+    assertArgCount(expr, 1);
+    const result = getValue(expr.args.value[0], state);
+    result.name = `INET_NTOA(${result.name})`;
+    result.type = 'string';
+    if (!result.err && result.value !== null) {
+        const num = convertNum(result.value);
+        if (num === null || num < 0 || num > 4294967295) {
+            result.value = null;
+        }
+        else {
+            const n = Math.floor(num);
+            result.value = `${(n >>> 24) & 0xff}.${(n >>> 16) & 0xff}.${(n >>> 8) & 0xff}.${n & 0xff}`;
+        }
+    }
+    return result;
+}
 
 const DAY = 24 * 60 * 60;
 function curtime(expr, state) {
-    const result = getValue(expr.args?.value?.[0], state);
+    const firstArg = expr.args?.value ? expr.args.value[0] : undefined;
+    const result = getValue(firstArg, state);
     result.name = expr.args ? `CURTIME(${result.name ?? ''})` : 'CURRENT_TIME';
-    if (!result.err && result.type) {
+    if (!result.err) {
         const decimals = typeof result.value === 'number' ? result.value : 0;
         if (decimals > 6) {
             result.err = 'ER_TOO_BIG_PRECISION';
         }
-        const currentTime = (Date.now() / 1000) % DAY;
+        const currentTime = state.session.timestamp % DAY;
         result.value = createSQLTime({ time: currentTime, decimals });
         result.type = 'time';
     }
@@ -6401,414 +8566,81 @@ function time(expr, state) {
     }
     return result;
 }
-
-function getDecimalsForString(s) {
-    return _scaleNumberString(s);
-}
-function getDecimals(result) {
-    if (result.decimals !== undefined) {
-        return result.decimals;
-    }
-    else if (result.value instanceof SQLDateTime) {
-        return result.value.getDecimals();
-    }
-    else if (result.value instanceof SQLTime) {
-        return result.value.getDecimals();
-    }
-    else {
-        switch (result.type) {
-            case 'string':
-            case 'double':
-                return 31;
-            case 'decimal':
-            case 'number':
-                if (typeof result.value === 'number') {
-                    return _scaleNumber(result.value);
-                }
-                break;
-        }
-    }
-    return 0;
-}
-function _scaleNumber(n) {
-    return _scaleNumberString(String(n));
-}
-function _scaleNumberString(s) {
-    const e = s.indexOf('e');
-    if (e !== -1) {
-        const coeff = s.slice(0, e);
-        const exp = parseInt(s.slice(e + 1), 10);
-        const dot = coeff.indexOf('.');
-        const digits = dot === -1 ? 0 : coeff.length - dot - 1;
-        return Math.max(0, digits - exp);
-    }
-    const i = s.indexOf('.');
-    return i === -1 ? 0 : s.length - i - 1;
-}
-
-function coalesce(expr, state) {
-    const arg_count = expr.args?.value?.length ?? 0;
-    if (arg_count === 0 || !Array.isArray(expr.args?.value)) {
-        throw new SQLError({ err: 'ER_PARSE_ERROR' });
-    }
-    let err = null;
-    let value = null;
-    const names = [];
-    const values = [];
-    for (const sub of expr.args.value) {
-        const result = getValue(sub, state);
-        names.push(result.name ?? '');
-        values.push(result);
-        if (result.err) {
-            err = result.err;
-            break;
-        }
-        else if (value === null && result.value !== null) {
-            value = result.value;
-        }
-    }
-    const { type } = _unionType$1(values);
-    return { err, name: `COALESCE(${names.join(', ')}`, value, type };
-}
-function ifnull(expr, state) {
-    assertArgCount(expr, 2);
-    const arg1 = getValue(expr.args.value[0], state);
-    const arg2 = getValue(expr.args.value[1], state);
-    if (arg1.err) {
-        return arg1;
-    }
-    if (arg2.err) {
-        return arg2;
-    }
-    const value = arg1.value !== null ? arg1.value : arg2.value;
-    const { type } = _unionType$1([arg1, arg2]);
-    return { err: null, name: `IFNULL(${arg1.name}, ${arg2.name})`, value, type };
-}
-function greatest(expr, state) {
-    return _compare(expr, state, 'GREATEST', _gtList, (a, b) => a > b);
-}
-function least(expr, state) {
-    return _compare(expr, state, 'LEAST', _ltList, (a, b) => a < b);
-}
-function _gtList(list, timeZone, convert) {
-    const convert_list = [];
-    let decimals = 0;
-    for (const item of list) {
-        const ret = convert(item.value, undefined);
-        if (ret) {
-            convert_list.push(ret);
-            decimals = Math.max(decimals, ret.getDecimals?.() ?? 0);
-        }
-        else {
-            decimals = Math.max(decimals, getDecimals(item));
-        }
-    }
-    let value = undefined;
-    for (const converted of convert_list) {
-        if (value === undefined || converted.gt(value)) {
-            value = converted;
-        }
-    }
-    if (value && value.getDecimals?.() !== decimals) {
-        value = convert(value, decimals) ?? '';
-    }
-    return { value: value ?? null, decimals };
-}
-function _ltList(list, timeZone, convert) {
-    const convert_list = [];
-    for (const item of list) {
-        const ret = convert(item.value, undefined);
-        if (ret) {
-            convert_list.push(ret);
-        }
-    }
-    let value = undefined;
-    let decimals = 0;
-    if (convert_list.length !== list.length) {
-        let val = undefined;
-        for (const item of list) {
-            const item_s = convertString({ value: item.value, timeZone }) ?? '';
-            if (val === undefined || item_s < val) {
-                val = item_s;
-            }
-        }
-        value = val;
-    }
-    else {
-        decimals = convert_list.reduce((memo, converted) => {
-            const dec = converted.getDecimals?.() ?? 0;
-            return Math.max(memo, dec);
-        }, 0);
-        let val = undefined;
-        for (const converted of convert_list) {
-            if (val === undefined || val.gt(converted)) {
-                val = converted;
-            }
-        }
-        if (val && val.getDecimals?.() !== decimals) {
-            value = convert(val, decimals) ?? '';
-        }
-        else {
-            value = val;
-        }
-    }
-    return { value: value ?? null, decimals };
-}
-function _unionType$1(list) {
-    let compare_type;
-    const types = list.map((e) => e.type);
-    if (types.includes('datetime')) {
-        compare_type = 'datetime';
-    }
-    else if (types.includes('date')) {
-        if (types.includes('time') &&
-            types.every((t) => t === 'date' || t === 'time' || t === 'null')) {
-            compare_type = 'datetime';
-        }
-        else {
-            compare_type = 'date';
-        }
-    }
-    else if (types.includes('time')) {
-        compare_type = 'time';
-    }
-    else if (types.includes('string')) {
-        compare_type = 'string';
-    }
-    else if (types.includes('double')) {
-        compare_type = 'double';
-    }
-    else if (types.includes('number')) {
-        compare_type = 'number';
-    }
-    else if (types.includes('longlong')) {
-        compare_type = 'longlong';
-    }
-    else if (types.every((t) => t === 'null')) {
-        compare_type = 'null';
-    }
-    else {
-        compare_type = 'string';
-    }
-    let type = compare_type;
-    if (type === 'datetime' || type === 'date') {
-        if (types.some((t) => t !== 'datetime' && t !== 'date' && t !== 'time' && t !== 'null')) {
-            type = 'string';
-        }
-    }
-    else if (type === 'time') {
-        if (types.some((t) => t !== 'time' && t !== 'null')) {
-            compare_type = 'string';
-            type = 'string';
-        }
-    }
-    return { compare_type, type };
-}
-function _compare(expr, state, functionName, dateCompare, nativeCompare) {
-    const arg_count = expr.args?.value?.length ?? 0;
-    if (arg_count < 2 || !Array.isArray(expr.args?.value)) {
-        throw new SQLError({
-            err: 'ER_WRONG_PARAMCOUNT_TO_NATIVE_FCT',
-            args: [functionName],
-        });
-    }
-    const { timeZone } = state.session;
-    let value;
-    const names = [];
-    const values = expr.args.value.map((sub) => getValue(sub, state));
-    for (const sub of values) {
-        names.push(sub.name ?? '');
-        if (sub.err) {
-            return sub;
-        }
-        if (sub.value === null) {
-            value = null;
-        }
-    }
-    const { compare_type, type } = _unionType$1(values);
-    let decimals = 0;
-    let convert_func = undefined;
-    if (value !== null) {
-        switch (compare_type) {
-            case 'datetime':
-                convert_func = convertDateTime;
-            // eslint-disable-next-line no-fallthrough
-            case 'date':
-                convert_func ??= convertDate;
-            // eslint-disable-next-line no-fallthrough
-            case 'time':
-                convert_func ??= convertTime;
-                {
-                    const ret = dateCompare(values, timeZone, (val, dec) => convert_func?.({ value: val, timeZone, decimals: dec }) ?? null);
-                    if (ret === null) {
-                        value = null;
-                    }
-                    else {
-                        decimals = ret.decimals;
-                        if (ret.value &&
-                            type === 'string' &&
-                            typeof ret.value !== 'string') {
-                            value = ret.value.toString({ timeZone, decimals });
-                        }
-                        else {
-                            value = ret.value;
-                        }
-                    }
-                }
-                break;
-            case 'longlong':
-                {
-                    let val = undefined;
-                    for (const sub of values) {
-                        if (typeof val === 'bigint' || typeof sub.value === 'bigint') {
-                            const val_big = BigInt(sub.value);
-                            if (val === undefined || nativeCompare(val_big, val)) {
-                                val = val_big;
-                            }
-                        }
-                        else {
-                            const val_num = Number(sub.value);
-                            if (val === undefined || nativeCompare(val_num, val)) {
-                                val = val_num;
-                            }
-                        }
-                    }
-                    value = val;
-                }
-                break;
-            case 'double':
-            case 'number':
-                {
-                    let val = undefined;
-                    for (const sub of values) {
-                        const val_n = Number(sub.value);
-                        if (val === undefined || nativeCompare(val_n, val)) {
-                            val = val_n;
-                        }
-                    }
-                    value = val;
-                }
-                break;
-            default:
-            case 'string':
-                {
-                    let val = undefined;
-                    for (const sub of values) {
-                        const val_s = String(sub.value);
-                        if (val === undefined || nativeCompare(val_s, val)) {
-                            val = val_s;
-                        }
-                    }
-                    value = val;
-                }
-                break;
-        }
-    }
-    return {
-        err: null,
-        value,
-        type,
-        name: `${functionName}(${names.join(', ')})`,
-        decimals,
-    };
-}
-
-function database(expr, state) {
-    assertArgCountParse(expr, 0);
-    return {
-        err: null,
-        value: state.session.getCurrentDatabase(),
-        type: 'string',
-    };
-}
-function isnull(expr, state) {
-    assertArgCount(expr, 1);
-    const result = getValue(expr.args.value[0], state);
-    result.name = `ISNULL(${result.name})`;
-    result.type = 'longlong';
+function utc_time(expr, state) {
+    assertArgCount(expr, 0, 1);
+    const args = expr.args.value;
+    const arg = Array.isArray(args) && args.length > 0 ? args[0] : undefined;
+    const result = arg
+        ? getValue(arg, state)
+        : { err: null, value: undefined, type: 'undefined', name: '' };
+    result.name = 'UTC_TIME()';
     if (!result.err) {
-        result.value = result.value === null ? 1 : 0;
+        const decimals = typeof result.value === 'number' ? result.value : 0;
+        if (decimals > 6) {
+            result.err = 'ER_TOO_BIG_PRECISION';
+        }
+        const currentTime = state.session.timestamp % DAY;
+        result.value = createSQLTime({ time: currentTime, decimals });
+        result.type = 'time';
     }
     return result;
 }
-function sleep(expr, state) {
+function sec_to_time(expr, state) {
     assertArgCount(expr, 1);
     const result = getValue(expr.args.value[0], state);
-    result.name = `SLEEP(${result.name})`;
-    const sleep_ms = convertNum(result.value);
-    if (sleep_ms !== null && sleep_ms > 0) {
-        result.sleep_ms = sleep_ms * 1000;
+    result.name = `SEC_TO_TIME(${result.name})`;
+    result.type = 'time';
+    if (!result.err && result.value !== null) {
+        const seconds = convertNum(result.value);
+        if (seconds !== null) {
+            result.value = createSQLTime({ time: seconds, decimals: 0 });
+        }
+        else {
+            result.value = null;
+        }
     }
-    // SLEEP returns 0 on success in MySQL
-    result.value = 0;
-    result.type = 'longlong';
     return result;
 }
-function not$2(expr, state) {
+function time_to_sec(expr, state) {
     assertArgCount(expr, 1);
     const result = getValue(expr.args.value[0], state);
-    result.name = `NOT(${result.name})`;
+    result.name = `TIME_TO_SEC(${result.name})`;
     result.type = 'longlong';
     if (!result.err && result.value !== null) {
-        const num = convertNum(result.value);
-        result.value = num ? 0 : 1;
+        const dt = convertTime({
+            value: result.value,
+            timeZone: state.session.timeZone,
+        });
+        if (dt) {
+            result.value = Math.floor(dt.getTime());
+        }
+        else {
+            result.value = null;
+        }
     }
     return result;
 }
-function ifFunc(expr, state) {
+function maketime(expr, state) {
     assertArgCount(expr, 3);
-    const condition = getValue(expr.args.value[0], state);
-    const trueValue = getValue(expr.args.value[1], state);
-    const falseValue = getValue(expr.args.value[2], state);
-    const err = condition.err || trueValue.err || falseValue.err || null;
-    let value;
-    let type;
-    const name = `IF(${condition.name}, ${trueValue.name}, ${falseValue.name})`;
-    if (!err) {
-        const condResult = convertNum(condition.value);
-        if (condResult === null || condResult === 0) {
-            value = falseValue.value;
-        }
-        else {
-            value = trueValue.value;
-        }
-        // Use union type logic from func_comp.ts
-        const types = [trueValue.type, falseValue.type];
-        if (types.includes('datetime')) {
-            type = 'datetime';
-        }
-        else if (types.includes('date')) {
-            type = 'date';
-        }
-        else if (types.includes('time')) {
-            type = 'time';
-        }
-        else if (types.includes('string')) {
-            type = 'string';
-        }
-        else if (types.includes('double')) {
-            type = 'double';
-        }
-        else if (types.includes('number')) {
-            type = 'number';
-        }
-        else if (types.includes('longlong')) {
-            type = 'longlong';
-        }
-        else {
-            type = 'string';
-        }
-        // If temporal type mixed with non-temporal, return string
-        if (type === 'datetime' || type === 'date' || type === 'time') {
-            if (types.some((t) => t !== type && t !== 'null')) {
-                type = 'string';
-            }
+    const hour_arg = getValue(expr.args.value[0], state);
+    const minute_arg = getValue(expr.args.value[1], state);
+    const second_arg = getValue(expr.args.value[2], state);
+    const err = hour_arg.err ?? minute_arg.err ?? second_arg.err;
+    let value = null;
+    const name = `MAKETIME(${hour_arg.name}, ${minute_arg.name}, ${second_arg.name})`;
+    if (!err &&
+        hour_arg.value !== null &&
+        minute_arg.value !== null &&
+        second_arg.value !== null) {
+        const hourNum = convertNum(hour_arg.value) ?? 0;
+        const minuteNum = Math.round(convertNum(minute_arg.value) ?? 0);
+        const secondNum = convertNum(second_arg.value) ?? 0;
+        if (minuteNum >= 0 && minuteNum < 60 && secondNum >= 0 && secondNum < 60) {
+            const totalSeconds = hourNum * 3600 + minuteNum * 60 + secondNum;
+            value = createSQLTime({ time: totalSeconds, decimals: 0 });
         }
     }
-    else {
-        type = 'longlong';
-    }
-    return { err, name, value, type };
+    return { err, name, value, type: 'time' };
 }
 
 const methods$2 = {
@@ -6848,6 +8680,30 @@ const methods$2 = {
     instr,
     position: locate,
     strcmp,
+    charset,
+    collation,
+    bit_length,
+    soundex,
+    quote,
+    elt,
+    field,
+    find_in_set,
+    substring_index,
+    insert: insert_func,
+    make_set,
+    export_set,
+    format: format_func,
+    char: char_func,
+    md5,
+    sha1,
+    sha: sha1,
+    sha2,
+    to_base64,
+    from_base64,
+    uuid,
+    is_uuid,
+    inet_aton,
+    inet_ntoa,
     abs,
     ceil,
     ceiling: ceil,
@@ -6859,6 +8715,11 @@ const methods$2 = {
     sqrt,
     sign,
     bin,
+    bit_count,
+    crc32,
+    conv,
+    truncate: truncate_func,
+    rand,
     oct,
     pi,
     degrees,
@@ -6921,6 +8782,22 @@ const methods$2 = {
     last_day,
     weekofyear,
     yearweek,
+    utc_date,
+    utc_time,
+    utc_timestamp,
+    from_days,
+    to_days,
+    to_seconds,
+    sec_to_time,
+    time_to_sec,
+    makedate,
+    maketime,
+    user,
+    current_user: user,
+    session_user: user,
+    system_user: user,
+    version,
+    connection_id,
 };
 
 function interval(expr, state) {
@@ -6964,163 +8841,6 @@ function minus$1(expr, state) {
     return result;
 }
 const methods = { '+': plus, '!': not$1, not: not$1, '-': minus$1 };
-
-const SYSTEM_VARIABLE_TYPES = {
-    COLLATION_CONNECTION: 'VAR_STRING',
-    DIV_PRECISION_INCREMENT: 'LONGLONG',
-    SQL_MODE: 'VAR_STRING',
-    SYSTEM_TIME_ZONE: 'VAR_STRING',
-    TIME_ZONE: 'VAR_STRING',
-    LAST_INSERT_ID: 'LONGLONG',
-    INSERT_ID: 'LONGLONG',
-    TIMESTAMP: 'DOUBLE',
-};
-
-const SYSTEM_TIME_ZONE = _getSystemTimezone();
-class GlobalSettings {
-    _collationConnection = 'utf8mb4_0900_ai_ci';
-    _divPrecisionIncrement = 4;
-    _sqlMode = 'NO_ENGINE_SUBSTITUTION';
-    _timeZone = process.env.TZ ?? SYSTEM_TIME_ZONE;
-    get collationConnection() {
-        return this._collationConnection;
-    }
-    get divPrecisionIncrement() {
-        return this._divPrecisionIncrement;
-    }
-    get timeZone() {
-        return this._timeZone;
-    }
-    get sqlMode() {
-        return this._sqlMode;
-    }
-    get systemTimeZone() {
-        return SYSTEM_TIME_ZONE;
-    }
-    getGlobalVariable(name) {
-        const name_uc = name.toUpperCase();
-        const type = SYSTEM_VARIABLE_TYPES[name_uc];
-        switch (name_uc) {
-            case 'COLLATION_CONNECTION':
-                return { value: this.collationConnection, type };
-            case 'DIV_PRECISION_INCREMENT':
-                return { value: this.divPrecisionIncrement, type };
-            case 'TIME_ZONE':
-                return { value: this.timeZone, type };
-            case 'SQL_MODE':
-                return { value: this.sqlMode, type };
-            case 'SYSTEM_TIME_ZONE':
-                return { value: this.systemTimeZone, type };
-        }
-        return undefined;
-    }
-    setGlobalVariable(name, value) {
-        const name_uc = name.toUpperCase();
-        switch (name_uc) {
-            case 'COLLATION_CONNECTION':
-                this._collationConnection = String(value);
-                return;
-            case 'DIV_PRECISION_INCREMENT':
-                this._divPrecisionIncrement = Number(value);
-                return;
-            case 'TIME_ZONE':
-                this._timeZone = String(value);
-                return;
-            case 'SQL_MODE':
-                this._sqlMode = String(value);
-                return;
-        }
-        throw new SQLError({ err: 'ER_UNKNOWN_SYSTEM_VARIABLE', args: [name] });
-    }
-}
-var GlobalSettings$1 = new GlobalSettings();
-function _getSystemTimezone() {
-    try {
-        const local = new Date()
-            .toLocaleString('en-US', { timeZoneName: 'short' })
-            .split(' ')
-            ?.pop()
-            ?.trim();
-        if (local && local.length === 3) {
-            return local;
-        }
-    }
-    catch {
-        // noop
-    }
-    return Intl.DateTimeFormat().resolvedOptions().timeZone;
-}
-
-function getDatabaseFromTable(ast) {
-    if (ast.type === 'create') {
-        if (Array.isArray(ast.table)) {
-            return ast.table[0]?.db;
-        }
-        else if (ast.table) {
-            return ast.table.db ?? undefined;
-        }
-    }
-    return undefined;
-}
-function getTableFromTable(ast) {
-    if (ast.type === 'create') {
-        if (Array.isArray(ast.table)) {
-            return ast.table[0]?.table;
-        }
-        else if (ast.table) {
-            return ast.table.table;
-        }
-    }
-    return undefined;
-}
-function getDatabaseFromUpdate(ast) {
-    if (ast.type === 'update') {
-        if (Array.isArray(ast.from)) {
-            return ast.from[0]?.db;
-        }
-    }
-    return undefined;
-}
-// Helper to extract function name from node-sql-parser AST format
-function getFunctionName(nameObj) {
-    if (typeof nameObj === 'string') {
-        return nameObj;
-    }
-    if (nameObj?.name && Array.isArray(nameObj.name)) {
-        return nameObj.name.map((n) => n.value).join('.');
-    }
-    return String(nameObj);
-}
-// Helper to extract database name from node-sql-parser AST format
-function getDatabaseName(dbObj) {
-    if (typeof dbObj === 'string') {
-        return dbObj;
-    }
-    if (dbObj?.schema && Array.isArray(dbObj.schema)) {
-        return dbObj.schema[0]?.value || '';
-    }
-    return String(dbObj);
-}
-function walkColumnRefs(object, cb) {
-    if (object &&
-        typeof object === 'object' &&
-        'type' in object &&
-        object.type === 'column_ref') {
-        cb(object);
-    }
-    else {
-        let array;
-        if (Array.isArray(object)) {
-            array = object;
-        }
-        else if (object && typeof object === 'object') {
-            array = Object.values(object);
-        }
-        array?.forEach?.((child) => {
-            walkColumnRefs(child, cb);
-        });
-    }
-}
 
 function getValue(expr, state) {
     const { session, row } = state;
@@ -7191,9 +8911,7 @@ function getValue(expr, state) {
         const func = methods$2[funcName.toLowerCase()];
         if (typeof func === 'function') {
             result = func(funcExpr, state);
-            if (!result.name) {
-                result.name = funcName + '()';
-            }
+            result.name ??= funcName + '()';
         }
         else {
             shared.logger.trace('expression.getValue: unknown function:', funcName);
@@ -7206,9 +8924,7 @@ function getValue(expr, state) {
         const func = methods$5[funcName.toLowerCase()];
         if (func) {
             result = func(aggrExpr, state);
-            if (!result.name) {
-                result.name = funcName + '()';
-            }
+            result.name ??= funcName + '()';
         }
         else {
             shared.logger.trace('expression.getValue: unknown aggregate:', funcName);
@@ -7220,9 +8936,7 @@ function getValue(expr, state) {
         const func = methods$4[binExpr.operator.toLowerCase()];
         if (func) {
             result = func(binExpr, state);
-            if (!result.name) {
-                result.name = binExpr.operator;
-            }
+            result.name ??= binExpr.operator;
         }
         else {
             shared.logger.trace('expression.getValue: unknown binary operator:', binExpr.operator);
@@ -7234,9 +8948,7 @@ function getValue(expr, state) {
         const func = methods[unaryExpr.operator.toLowerCase()];
         if (func) {
             result = func(unaryExpr, state);
-            if (!result.name) {
-                result.name = unaryExpr.operator;
-            }
+            result.name ??= unaryExpr.operator;
         }
         else {
             shared.logger.trace('expression.getValue: unknown unanary operator:', unaryExpr.operator);
@@ -7252,9 +8964,7 @@ function getValue(expr, state) {
         const func = methods$3[dataType.toLowerCase()];
         if (func) {
             result = func(castExpr, state);
-            if (!result.name) {
-                result.name = `CAST(? AS ${dataType})`;
-            }
+            result.name ??= `CAST(? AS ${dataType})`;
         }
         else {
             shared.logger.trace('expression.getValue: unknown cast type:', dataType);
@@ -7265,7 +8975,7 @@ function getValue(expr, state) {
         const varExpr = expr;
         const { prefix, members } = varExpr;
         const scope = members.length > 0 ? varExpr.name.toLowerCase() : '';
-        const name = members?.[0] ?? varExpr.name;
+        const name = members.length > 0 ? members[0] : varExpr.name;
         result.name = prefix + (scope ? scope + '.' : '') + name;
         if (prefix === '@@') {
             let val;
@@ -7316,6 +9026,30 @@ function getValue(expr, state) {
             result.err = 'unsupported';
         }
     }
+    else if (type === 'assign') {
+        // Handle := assignment operator
+        const assignExpr = expr;
+        const rightResult = getValue(assignExpr.right, state);
+        if (rightResult.err) {
+            result = rightResult;
+        }
+        else {
+            const varExpr = assignExpr.left;
+            if (varExpr.prefix === '@') {
+                const name = varExpr.name;
+                session.setVariable(name, {
+                    value: rightResult.value,
+                    type: rightResult.type,
+                });
+                result.value = rightResult.value;
+                result.type = rightResult.type;
+                result.name = `@${name} := ${rightResult.name}`;
+            }
+            else {
+                result.err = { err: 'syntax_err', args: [':='] };
+            }
+        }
+    }
     else if (type === 'column_ref') {
         const colRef = expr;
         let columnName;
@@ -7324,7 +9058,7 @@ function getValue(expr, state) {
             columnValue = colRef.column;
             columnName = String(columnValue);
         }
-        else if ('expr' in colRef && colRef.expr && 'column' in colRef.expr) {
+        else if ('expr' in colRef && 'column' in colRef.expr) {
             columnValue = colRef.expr.column;
             columnName = String(columnValue);
         }
@@ -7332,19 +9066,26 @@ function getValue(expr, state) {
             columnName = String(colRef);
         }
         result.name = columnName;
-        if (row && colRef._resultIndex !== undefined && colRef._resultIndex >= 0) {
-            const output_result = row['@@result']?.[colRef._resultIndex];
+        const refInfo = state.columnRefMap?.get(colRef);
+        if (row && refInfo?.resultIndex !== undefined && refInfo.resultIndex >= 0) {
+            const output_result = 'result' in row ? row.result[refInfo.resultIndex] : undefined;
             result.value = output_result?.value;
             result.type = output_result?.type ?? 'string';
         }
         else if (row) {
-            const fromKey = colRef.from?.key;
-            const cell = fromKey
-                ? row[fromKey]?.[columnName]
-                : undefined;
+            const from = refInfo?.from;
+            let cell;
+            if (from) {
+                const fromData = row.source.get(from);
+                if (fromData &&
+                    typeof fromData === 'object' &&
+                    columnName in fromData) {
+                    cell = fromData[columnName];
+                }
+            }
             const decode = _decodeCell(cell);
-            result.type = decode?.type ?? 'string';
-            result.value = decode?.value;
+            result.type = decode.type;
+            result.value = decode.value;
         }
         else {
             result.err = 'no_row_list';
@@ -7355,7 +9096,7 @@ function getValue(expr, state) {
         shared.logger.error('unsupported expr:', expr);
         result.err = 'unsupported';
     }
-    if (result.type === 'undefined' || result.type === undefined) {
+    if (result.type === 'undefined') {
         result.type = result.value === null ? 'null' : typeof result.value;
     }
     if (result.name === undefined && result.value !== undefined) {
@@ -7413,15 +9154,15 @@ function constantFixup(func) {
 function and(expr, state) {
     const left = convertWhere(expr.left, state);
     const right = convertWhere(expr.right, state);
-    if (left.err === 'unsupported' && state?.default_true) {
+    if (left.err === 'unsupported' && state.default_true) {
         left.err = null;
         left.value = 1;
     }
-    if (right.err === 'unsupported' && state?.default_true) {
+    if (right.err === 'unsupported' && state.default_true) {
         right.err = null;
         right.value = 1;
     }
-    const err = left.err || right.err;
+    const err = left.err ?? right.err;
     let value;
     if (!left.value || !right.value) {
         value = 0;
@@ -7443,9 +9184,9 @@ function and(expr, state) {
 function or(expr, state) {
     const left = convertWhere(expr.left, state);
     const right = convertWhere(expr.right, state);
-    let err = left.err || right.err;
+    let err = left.err ?? right.err;
     let value;
-    if (err === 'unsupported' && state?.default_true) {
+    if (err === 'unsupported' && state.default_true) {
         value = 1;
         err = null;
     }
@@ -7478,7 +9219,7 @@ function _in(expr, state) {
     }
     else {
         const rightExpr = expr.right;
-        const count = rightExpr.value?.length || 0;
+        const count = rightExpr.value?.length ?? 0;
         const list = [];
         for (let i = 0; i < count; i++) {
             const right = convertWhere(rightExpr.value[i], state);
@@ -7494,16 +9235,14 @@ function _in(expr, state) {
                 list.push(right.value);
             }
         }
-        if (value === undefined) {
-            value = `${left.value} IN (${list.join(',')})`;
-        }
+        value ??= `${left.value} IN (${list.join(',')})`;
     }
     return { err, value };
 }
 function _comparator(expr, state, op) {
     const left = convertWhere(expr.left, state);
     const right = convertWhere(expr.right, state);
-    const err = left.err || right.err;
+    const err = left.err ?? right.err;
     const value = `${left.value} ${op} ${right.value}`;
     return { err, value };
 }
@@ -7586,38 +9325,32 @@ const _isNotOp = constantFixup(isNot);
 const _between = constantFixup(unsupported);
 const _not = constantFixup(not);
 const _minus = constantFixup(minus);
-
-var ConvertExpression = /*#__PURE__*/Object.freeze({
-    __proto__: null,
-    "!": _not,
-    "!=": _notEqual,
-    "-": _minus,
-    "<": _lt,
-    "<=": _lte,
-    "<>": _notEqual,
-    "=": _equal,
-    ">": _gt,
-    ">=": _gte,
+var ConvertExpression = {
+    '=': _equal,
+    '!=': _notEqual,
+    '<>': _notEqual,
+    '>': _gt,
+    '<': _lt,
+    '>=': _gte,
+    '<=': _lte,
     and: _and,
-    between: _between,
+    or: _or,
     in: _inOp,
     is: _isOp,
-    "is not": _isNotOp,
+    'is not': _isNotOp,
+    between: _between,
     not: _not,
-    or: _or
-});
+    '!': _not,
+    '-': _minus,
+};
 
 function foo(_expr, _state) {
     return { err: 'unsupported', value: null };
 }
-
-var Functions = /*#__PURE__*/Object.freeze({
-    __proto__: null,
-    foo: foo
-});
+var Functions = { foo };
 
 function convertWhere(expr, state) {
-    const { from_key } = state;
+    const { from } = state;
     let err = null;
     let value = null;
     if (expr) {
@@ -7641,7 +9374,7 @@ function convertWhere(expr, state) {
             const funcExpr = expr;
             const funcName = getFunctionName(funcExpr.name);
             const func = Functions[funcName.toLowerCase()];
-            if (func && typeof func === 'function') {
+            if (func) {
                 const result = func(funcExpr, state);
                 if (result.err) {
                     err = result.err;
@@ -7672,7 +9405,8 @@ function convertWhere(expr, state) {
         }
         else if (type === 'column_ref') {
             const colRef = expr;
-            if ('from' in colRef && colRef.from?.key === from_key) {
+            const refInfo = state.columnRefMap?.get(colRef);
+            if (refInfo?.from === from) {
                 const colRefItem = colRef;
                 const col = colRefItem.column;
                 value = String(col);
@@ -7695,32 +9429,21 @@ function convertWhere(expr, state) {
     return { err, value };
 }
 
-async function singleDelete$2(params) {
-    const { dynamodb, session, ast } = params;
-    const { from, where } = ast;
-    let no_single = false;
-    const result = convertWhere(where, { session, from_key: from?.[0]?.key });
-    if (result.err) {
-        no_single = true;
-    }
-    else if (from.length > 1) {
-        no_single = true;
-    }
-    else if (!result.value) {
-        no_single = true;
-    }
-    if (no_single) {
+async function singleDelete(params) {
+    const { dynamodb, session, from, where, columnRefMap } = params;
+    const result = convertWhere(where, { session, from, columnRefMap });
+    if (result.err || !result.value) {
         throw new NoSingleOperationError();
     }
     const sql = `
-DELETE FROM ${escapeIdentifier(from[0]?.table ?? '')}
+DELETE FROM ${escapeIdentifier(from.table)}
 WHERE ${result.value}
 RETURNING ALL OLD *
 `;
     try {
         const results = await dynamodb.queryQL(sql);
         const resultArray = Array.isArray(results[0]) ? results[0] : results;
-        return { affectedRows: resultArray?.length || 0 };
+        return { affectedRows: resultArray.length };
     }
     catch (err) {
         if (err instanceof Error) {
@@ -7735,11 +9458,8 @@ RETURNING ALL OLD *
         throw err;
     }
 }
-async function multipleDelete$2(params) {
+async function multipleDelete(params) {
     const { dynamodb, list } = params;
-    if (!list) {
-        return { affectedRows: 0 };
-    }
     let affectedRows = 0;
     for (const object of list) {
         const { table, key_list, delete_list } = object;
@@ -7759,7 +9479,7 @@ async function multipleDelete$2(params) {
     return { affectedRows };
 }
 
-async function insertRowList$2(params) {
+async function insertRowList(params) {
     if (params.list.length === 0) {
         return { affectedRows: 0 };
     }
@@ -7821,14 +9541,14 @@ async function _insertIgnoreReplace(params) {
                 }
             }
             if (Array.isArray(err)) {
-                let thrownError = null;
+                let thrownError;
                 err.forEach((item_err) => {
-                    if (item_err?.Code === 'DuplicateItem') {
+                    if (item_err.Code === 'DuplicateItem') {
                         affectedRows--;
                     }
-                    else if (!thrownError && item_err) {
+                    else {
                         affectedRows--;
-                        thrownError = convertError(item_err);
+                        thrownError ??= convertError(item_err);
                     }
                 });
                 if (thrownError) {
@@ -7916,30 +9636,32 @@ function _escapeItem(item) {
     return s;
 }
 
-async function getRowList$2(params) {
+async function getRowList(params) {
     const { list } = params;
-    const source_map = {};
-    const column_map = {};
+    const source_map = new Map();
+    const column_map = new Map();
     for (const from of list) {
-        const { results, column_list } = await _getFromTable$2({ ...params, from });
-        source_map[from.key] = results;
-        column_map[from.key] = column_list;
+        const { results, column_list } = await _getFromTable({ ...params, from });
+        source_map.set(from, results);
+        column_map.set(from, column_list);
     }
     return { source_map, column_map };
 }
-async function _getFromTable$2(params) {
-    const { dynamodb, session, from, where } = params;
-    const { table, _requestSet, _requestAll, join } = from;
-    const request_columns = [..._requestSet];
-    const columns = _requestAll || request_columns.length === 0
+async function _getFromTable(params) {
+    const { dynamodb, session, from, where, requestSets, requestAll, columnRefMap, } = params;
+    const { table } = from;
+    const requestSet = requestSets.get(from) ?? new Set();
+    const isRequestAll = requestAll.get(from) ?? false;
+    const request_columns = [...requestSet];
+    const columns = isRequestAll || request_columns.length === 0
         ? '*'
         : request_columns.map(escapeIdentifier).join(',');
     let sql = `SELECT ${columns} FROM ${escapeIdentifier(table)}`;
     // Don't push down WHERE clause for LEFT JOIN tables (right side of join)
     // The WHERE clause must be applied after the join
-    const is_left_join = join ? join.indexOf('LEFT') >= 0 : false;
+    const is_left_join = from.join ? from.join.indexOf('LEFT') >= 0 : false;
     const where_result = where && !is_left_join
-        ? convertWhere(where, { session, from_key: from.key, default_true: true })
+        ? convertWhere(where, { session, from, default_true: true, columnRefMap })
         : null;
     if (!where_result?.err && where_result?.value) {
         sql += ' WHERE ' + where_result.value;
@@ -7950,7 +9672,7 @@ async function _getFromTable$2(params) {
             ? results[0]
             : results;
         let column_list;
-        if (_requestAll) {
+        if (isRequestAll) {
             const response_set = new Set();
             for (const result of result_array) {
                 for (const key in result) {
@@ -7973,23 +9695,16 @@ async function _getFromTable$2(params) {
     }
 }
 
-async function singleUpdate$2(params) {
-    const { dynamodb, session, ast } = params;
-    const { set, from, where } = ast;
-    const where_result = convertWhere(where, {
-        session,
-        from_key: from?.[0]?.key,
-    });
-    if (where_result.err) {
-        throw new NoSingleOperationError();
-    }
-    if (!from || from.length > 1 || !where_result.value) {
+async function singleUpdate(params) {
+    const { dynamodb, session, set, from, where, columnRefMap } = params;
+    const where_result = convertWhere(where, { session, from, columnRefMap });
+    if (where_result.err || !where_result.value) {
         throw new NoSingleOperationError();
     }
     const value_list = set.map((object) => {
         const { value } = object;
         let ret;
-        const result = convertWhere(value, { session, from_key: from?.[0]?.key });
+        const result = convertWhere(value, { session, from, columnRefMap });
         if (result.err) {
             throw new NoSingleOperationError();
         }
@@ -8002,7 +9717,7 @@ async function singleUpdate$2(params) {
         .map((object, i) => escapeIdentifier(object.column) + ' = ' + value_list[i])
         .join(', ');
     const sql = `
-UPDATE ${escapeIdentifier(from[0]?.table ?? '')}
+UPDATE ${escapeIdentifier(from.table)}
 SET ${sets}
 WHERE ${where_result.value}
 RETURNING MODIFIED OLD *
@@ -8014,7 +9729,7 @@ RETURNING MODIFIED OLD *
         set.forEach((object, i) => {
             const { column } = object;
             const value = value_list[i];
-            if (value !== escapeValue(valueToNative(resultArray?.[0]?.[column] ?? null))) {
+            if (value !== escapeValue(valueToNative(resultArray[0]?.[column] ?? null))) {
                 result.changedRows = 1;
             }
         });
@@ -8033,11 +9748,8 @@ RETURNING MODIFIED OLD *
         throw err;
     }
 }
-async function multipleUpdate$2(params) {
+async function multipleUpdate(params) {
     const { dynamodb, list } = params;
-    if (!list) {
-        return { affectedRows: 0, changedRows: 0 };
-    }
     let affectedRows = 0;
     let changedRows = 0;
     for (const object of list) {
@@ -8064,572 +9776,10 @@ async function multipleUpdate$2(params) {
     return { affectedRows, changedRows };
 }
 
-async function commit$3(_params) { }
-async function rollback$3(_params) { }
-
-var RawEngine = /*#__PURE__*/Object.freeze({
-    __proto__: null,
-    addColumn: addColumn$2,
-    commit: commit$3,
-    createIndex: createIndex$2,
-    createTable: createTable$3,
-    deleteIndex: deleteIndex$2,
-    dropTable: dropTable$3,
-    getRowList: getRowList$2,
-    getTableInfo: getTableInfo$2,
-    getTableList: getTableList$3,
-    insertRowList: insertRowList$2,
-    multipleDelete: multipleDelete$2,
-    multipleUpdate: multipleUpdate$2,
-    rollback: rollback$3,
-    singleDelete: singleDelete$2,
-    singleUpdate: singleUpdate$2
-});
-
-const g_tableMap = new Map();
-function getTable(database, table, session) {
-    const data = session.getTempTable(database, table) ??
-        g_tableMap.get(`${database}.${table}`);
-    if (data) {
-        const updates = txGetData(database, table, session)?.data;
-        if (updates) {
-            return Object.assign({}, data, updates);
-        }
-        else {
-            return data;
-        }
-    }
-    return null;
-}
-function updateTableData(database, table, session, updates) {
-    const data = session.getTempTable(database, table) ??
-        g_tableMap.get(`${database}.${table}`);
-    if (data) {
-        Object.assign(data, updates);
-    }
-}
-function txSaveData(database, table, session, data) {
-    const tx = session.getTransaction();
-    if (tx) {
-        const existing = tx.getData('memory') ?? {};
-        existing[`${database}.${table}`] = { database, table, data };
-        tx.setData('memory', existing);
-    }
-}
-function txGetData(database, table, session) {
-    const tx = session.getTransaction();
-    if (tx) {
-        return tx.getData('memory')?.[`${database}.${table}`];
-    }
-    return undefined;
-}
-function saveTable(database, table, data) {
-    g_tableMap.set(`${database}.${table}`, data);
-}
-function deleteTable(database, table) {
-    g_tableMap.delete(`${database}.${table}`);
-}
-
-async function getTableInfo$1(params) {
-    const { session, database, table } = params;
-    const data = getTable(database, table, session);
-    if (data) {
-        return {
-            table,
-            primary_key: data.primary_key,
-            column_list: data.column_list,
-            is_open: false,
-        };
-    }
-    throw new SQLError({ err: 'table_not_found', args: [table] });
-}
-async function getTableList$2(_params) {
-    return [];
-}
-async function createTable$2(params) {
-    const { session, database, table, primary_key, column_list, is_temp } = params;
-    if (primary_key.length === 0) {
-        throw new SQLError({
-            err: 'unsupported',
-            message: 'primary key is required',
-        });
-    }
-    const data = {
-        column_list,
-        primary_key,
-        row_list: [],
-        primary_map: new Map(),
-    };
-    if (is_temp) {
-        session.saveTempTable(database, table, data);
-    }
-    else {
-        saveTable(database, table, data);
-    }
-}
-async function dropTable$2(params) {
-    const { session, database, table } = params;
-    if (session.getTempTable(database, table)) {
-        session.deleteTempTable(database, table);
-    }
-    else {
-        deleteTable(database, table);
-    }
-}
-async function addColumn$1(_params) { }
-async function createIndex$1(_params) { }
-async function deleteIndex$1(_params) { }
-
-async function singleDelete$1(_params) {
-    throw new NoSingleOperationError();
-}
-async function multipleDelete$1(params) {
-    const { session, list } = params;
-    if (!list) {
-        return { affectedRows: 0 };
-    }
-    let affectedRows = 0;
-    for (const changes of list) {
-        const { database, table, delete_list } = changes;
-        const data = getTable(database, table, session);
-        if (!data) {
-            throw new SQLError('table_not_found');
-        }
-        const row_list = data.row_list.slice();
-        const primary_map = new Map(data.primary_map);
-        for (const object of delete_list) {
-            const key_list = object.map((key) => key.value);
-            const delete_key = JSON.stringify(key_list);
-            const index = primary_map.get(delete_key);
-            if (index !== undefined && index >= 0) {
-                primary_map.delete(delete_key);
-                row_list.splice(index, 1);
-                const deletedIndex = index;
-                primary_map.forEach((value, key) => {
-                    if (value > deletedIndex) {
-                        primary_map.set(key, value - 1);
-                    }
-                });
-                affectedRows++;
-            }
-            else {
-                shared.logger.info('memory.delete: failed to find key:', key_list, 'for table:', table);
-            }
-        }
-        txSaveData(database, table, session, { row_list, primary_map });
-    }
-    return { affectedRows };
-}
-
-async function insertRowList$1(params) {
-    const { session, database, table, list, duplicate_mode } = params;
-    const data = getTable(database, table, session);
-    if (list.length === 0) {
-        return { affectedRows: 0 };
-    }
-    if (!data) {
-        throw new SQLError('table_not_found');
-    }
-    const { primary_key } = data;
-    const row_list = data.row_list.slice();
-    const primary_map = new Map(data.primary_map);
-    let affectedRows = 0;
-    for (const row of list) {
-        _transformRow(row);
-        const key_values = primary_key.map((key) => row[key.name]?.value);
-        const key = JSON.stringify(key_values);
-        const index = primary_map.get(key);
-        if (index === undefined) {
-            primary_map.set(key, row_list.push(row) - 1);
-            affectedRows++;
-        }
-        else if (duplicate_mode === 'replace') {
-            const existingRow = row_list[index];
-            if (existingRow && !_rowEqual(existingRow, row)) {
-                affectedRows++;
-            }
-            row_list[index] = row;
-            affectedRows++;
-        }
-        else if (!duplicate_mode) {
-            throw new SQLError({
-                err: 'dup_primary_key_entry',
-                args: [primary_key, key_values],
-            });
-        }
-    }
-    txSaveData(database, table, session, { row_list, primary_map });
-    return { affectedRows };
-}
-function _transformRow(row) {
-    for (const key in row) {
-        const cell = row[key];
-        if (cell) {
-            row[key] = { type: cell.type, value: cell.value };
-        }
-    }
-}
-function _rowEqual(a, b) {
-    const keys_a = Object.keys(a);
-    return keys_a.every((key) => {
-        return a[key]?.value === b[key]?.value;
-    });
-}
-
-async function getRowList$1(params) {
-    const { list } = params;
-    const source_map = {};
-    const column_map = {};
-    for (const from of list) {
-        const { row_list, column_list } = _getFromTable$1({ ...params, from });
-        source_map[from.key] = row_list;
-        column_map[from.key] = column_list;
-    }
-    return { source_map, column_map };
-}
-function _getFromTable$1(params) {
-    const { session, from } = params;
-    const { db, table } = from;
-    const data = getTable(db, table, session);
-    if (!data) {
-        throw new SQLError('table_not_found');
-    }
-    return {
-        row_list: data.row_list ?? [],
-        column_list: data.column_list?.map((column) => column.name) || [],
-    };
-}
-
-async function singleUpdate$1(_params) {
-    throw new NoSingleOperationError();
-}
-async function multipleUpdate$1(params) {
-    const { session, list } = params;
-    if (!list) {
-        return { affectedRows: 0, changedRows: 0 };
-    }
-    let affectedRows = 0;
-    let changedRows = 0;
-    for (const changes of list) {
-        const { database, table, update_list } = changes;
-        const data = getTable(database, table, session);
-        if (!data) {
-            throw new SQLError('table_not_found');
-        }
-        const row_list = data.row_list.slice();
-        const primary_map = new Map(data.primary_map);
-        for (const update of update_list) {
-            const { set_list } = update;
-            const key_list = update.key.map((key) => key.value);
-            const update_key = JSON.stringify(key_list);
-            const index = primary_map.get(update_key);
-            if (index !== undefined && index >= 0) {
-                const old_row = row_list[index];
-                if (!old_row) {
-                    continue;
-                }
-                const new_row = Object.assign({}, old_row);
-                let changed = false;
-                for (const set of set_list) {
-                    new_row[set.column] = _transformCell(set.value);
-                    if (old_row[set.column]?.value !== new_row[set.column]?.value) {
-                        changed = true;
-                    }
-                }
-                const new_key = _makePrimaryKey(data.primary_key, new_row);
-                if (new_key !== update_key && primary_map.has(new_key)) {
-                    throw new SQLError({
-                        err: 'dup_primary_key_entry',
-                        args: [data.primary_key, new_key],
-                    });
-                }
-                else if (new_key !== update_key) {
-                    primary_map.delete(update_key);
-                    primary_map.set(new_key, index);
-                }
-                row_list[index] = new_row;
-                affectedRows++;
-                if (changed) {
-                    changedRows++;
-                }
-            }
-            else {
-                shared.logger.error('memory.update: failed to find key:', key_list, 'for table:', table);
-            }
-        }
-        txSaveData(database, table, session, { row_list, primary_map });
-    }
-    return { affectedRows, changedRows };
-}
-function _transformCell(cell) {
-    return { value: cell.value, type: cell.type };
-}
-function _makePrimaryKey(primary_key, row) {
-    const key_values = primary_key.map((key) => row[key.name]?.value);
-    return JSON.stringify(key_values);
-}
-
-async function commit$2(params) {
-    const { session, data } = params;
-    for (const key in data) {
-        const entry = data[key];
-        if (entry) {
-            updateTableData(entry.database, entry.table, session, entry.data);
-        }
-    }
-}
-async function rollback$2(_params) { }
-
-var MemoryEngine = /*#__PURE__*/Object.freeze({
-    __proto__: null,
-    addColumn: addColumn$1,
-    commit: commit$2,
-    createIndex: createIndex$1,
-    createTable: createTable$2,
-    deleteIndex: deleteIndex$1,
-    dropTable: dropTable$2,
-    getRowList: getRowList$1,
-    getTableInfo: getTableInfo$1,
-    getTableList: getTableList$2,
-    insertRowList: insertRowList$1,
-    multipleDelete: multipleDelete$1,
-    multipleUpdate: multipleUpdate$1,
-    rollback: rollback$2,
-    singleDelete: singleDelete$1,
-    singleUpdate: singleUpdate$1
-});
-
-async function getTableInfo(params) {
-    const { table } = params;
-    return { table, primary_key: [], column_list: [], is_open: false };
-}
-async function getTableList$1(_params) {
-    return ['SCHEMATA', 'TABLES', 'COLUMNS'];
-}
-
-function deepClone(input) {
-    const seen = new WeakMap();
-    function _clone(value) {
-        if (value === null || typeof value !== 'object') {
-            return value;
-        }
-        const cached = seen.get(value);
-        if (cached !== undefined) {
-            return cached;
-        }
-        else if (Array.isArray(value)) {
-            const arr = [];
-            seen.set(value, arr);
-            for (const item of value) {
-                arr.push(_clone(item));
-            }
-            return arr;
-        }
-        else if (value instanceof Map) {
-            const result = new Map();
-            seen.set(value, result);
-            for (const [k, v] of value) {
-                result.set(_clone(k), _clone(v));
-            }
-            return result;
-        }
-        else if (value instanceof Set) {
-            const result = new Set();
-            seen.set(value, result);
-            for (const v of value) {
-                result.add(_clone(v));
-            }
-            return result;
-        }
-        const obj = {};
-        seen.set(value, obj);
-        for (const key in value) {
-            if (Object.prototype.hasOwnProperty.call(value, key)) {
-                obj[key] = _clone(value[key]);
-            }
-        }
-        return obj;
-    }
-    return _clone(input);
-}
-
-const CATALOG_LIST = [
-    {
-        CATALOG_NAME: { value: 'def', type: 'string' },
-        CATALOG_DESCRIPTION: { value: 'Primary catalog', type: 'string' },
-        CATALOG_OWNER: { value: 'SYSTEM', type: 'string' },
-    },
-];
-async function getRowList(params) {
-    const { list } = params;
-    const source_map = {};
-    const column_map = {};
-    for (const from of list) {
-        const { results, column_list } = await _getFromTable({ ...params, from });
-        source_map[from.key] = results;
-        column_map[from.key] = column_list;
-    }
-    return { source_map, column_map };
-}
-async function _getFromTable(params) {
-    const { dynamodb } = params;
-    const table = params.from.table.toLowerCase();
-    if (table === 'catalogs') {
-        return {
-            results: deepClone(CATALOG_LIST),
-            column_list: Object.keys(CATALOG_LIST[0]),
-        };
-    }
-    else if (table === 'schemata') {
-        const list = getDatabaseList();
-        const results = list.map(_dbToSchemata);
-        return { results, column_list: Object.keys(results[0] ?? {}) };
-    }
-    else if (table === 'tables') {
-        const list = getDatabaseList();
-        const results = [];
-        for (const database of list) {
-            const tables = await getTableList({ dynamodb, database });
-            for (const found of tables) {
-                results.push(_tableToTable(database, found));
-            }
-        }
-        return { results, column_list: Object.keys(results[0] ?? {}) };
-    }
-    else {
-        throw new SQLError({
-            err: 'ER_BAD_TABLE_ERROR',
-            args: [params.from.table],
-        });
-    }
-}
-function _dbToSchemata(database) {
-    return {
-        CATALOG_NAME: { value: 'def', type: 'string' },
-        SCHEMA_NAME: { value: database, type: 'string' },
-        DEFAULT_CHARACTER_SET_NAME: { value: 'utf8mb4', type: 'string' },
-        DEFAULT_COLLATION_NAME: { value: 'utf8mb4_0900_as_cs', type: 'string' },
-        SQL_PATH: { value: null, type: 'null' },
-        DEFAULT_ENCRYPTION: { value: 'NO', type: 'char' },
-    };
-}
-function _tableToTable(database, table) {
-    return {
-        TABLE_CATALOG: { value: 'def', type: 'string' },
-        TABLE_SCHEMA: { value: database, type: 'string' },
-        TABLE_NAME: { value: table, type: 'string' },
-        TABLE_TYPE: { value: 'BASE TABLE', type: 'string' },
-        ENGINE: { value: null, type: 'string' },
-        VERSION: { value: 10n, type: 'longlong' },
-        ROW_FORMAT: { value: 'Dynamic', type: 'string' },
-        TABLE_ROWS: { value: 0n, type: 'longlong' },
-        AVG_ROW_LENGTH: { value: 0n, type: 'longlong' },
-        DATA_LENGTH: { value: 0n, type: 'longlong' },
-        MAX_DATA_LENGTH: { value: 0n, type: 'longlong' },
-        INDEX_LENGTH: { value: 0n, type: 'longlong' },
-        DATA_FREE: { value: 0n, type: 'longlong' },
-        AUTO_INCREMENT: { value: null, type: 'string' },
-        CREATE_TIME: {
-            value: new SQLDateTime({ time: Date.now() / 1000 }),
-            type: 'datetime',
-        },
-        UPDATE_TIME: { value: null, type: 'datetime' },
-        CHECK_TIME: { value: null, type: 'datetime' },
-        TABLE_COLLATION: { value: null, type: 'string' },
-        CHECKSUM: { value: null, type: 'longlong' },
-        CREATE_OPTIONS: { value: '', type: 'string' },
-        TABLE_COMMENT: { value: '', type: 'string' },
-    };
-}
-/*
-{
-    TABLE_CATALOG: 'def',
-    TABLE_SCHEMA: '_dynamodb',
-    TABLE_NAME: 'otherother',
-    TABLE_TYPE: 'BASE TABLE',
-    ENGINE: 'InnoDB',
-    VERSION: 10n,
-    ROW_FORMAT: 'Dynamic',
-    TABLE_ROWS: 0n,
-    AVG_ROW_LENGTH: 0n,
-    DATA_LENGTH: 16384n,
-    MAX_DATA_LENGTH: 0n,
-    INDEX_LENGTH: 0n,
-    DATA_FREE: 0n,
-    AUTO_INCREMENT: null,
-    CREATE_TIME: '2025-11-25 16:43:42',
-    UPDATE_TIME: null,
-    CHECK_TIME: null,
-    TABLE_COLLATION: 'utf8mb4_0900_ai_ci',
-    CHECKSUM: null,
-    CREATE_OPTIONS: '',
-    TABLE_COMMENT: ''
-  }*/
-
 async function commit$1(_params) { }
 async function rollback$1(_params) { }
-async function createTable$1() {
-    throw new SQLError({
-        code: 'ER_DBACCESS_DENIED_ERROR',
-        args: ['user', 'information_schema'],
-    });
-}
-async function dropTable$1() {
-    throw new SQLError({
-        code: 'ER_DBACCESS_DENIED_ERROR',
-        args: ['user', 'information_schema'],
-    });
-}
-async function createIndex() {
-    throw new SQLError({
-        code: 'ER_DBACCESS_DENIED_ERROR',
-        args: ['user', 'information_schema'],
-    });
-}
-async function deleteIndex() {
-    throw new SQLError({
-        code: 'ER_DBACCESS_DENIED_ERROR',
-        args: ['user', 'information_schema'],
-    });
-}
-async function addColumn() {
-    throw new SQLError({
-        code: 'ER_DBACCESS_DENIED_ERROR',
-        args: ['user', 'information_schema'],
-    });
-}
-async function singleDelete() {
-    throw new SQLError({
-        code: 'ER_DBACCESS_DENIED_ERROR',
-        args: ['user', 'information_schema'],
-    });
-}
-async function multipleDelete() {
-    throw new SQLError({
-        code: 'ER_DBACCESS_DENIED_ERROR',
-        args: ['user', 'information_schema'],
-    });
-}
-async function singleUpdate() {
-    throw new SQLError({
-        code: 'ER_DBACCESS_DENIED_ERROR',
-        args: ['user', 'information_schema'],
-    });
-}
-async function multipleUpdate() {
-    throw new SQLError({
-        code: 'ER_DBACCESS_DENIED_ERROR',
-        args: ['user', 'information_schema'],
-    });
-}
-async function insertRowList() {
-    throw new SQLError({
-        code: 'ER_DBACCESS_DENIED_ERROR',
-        args: ['user', 'information_schema'],
-    });
-}
 
-var InformationSchemaEngine = /*#__PURE__*/Object.freeze({
+var RawEngine = /*#__PURE__*/Object.freeze({
     __proto__: null,
     addColumn: addColumn,
     commit: commit$1,
@@ -8900,7 +10050,7 @@ async function createTable(params) {
     const { session, database, table, is_temp } = params;
     const table_engine = is_temp
         ? 'memory'
-        : (params.table_engine?.toLowerCase?.() ?? 'raw');
+        : (params.table_engine?.toLowerCase() ?? 'raw');
     if (database === '_dynamodb' && table_engine !== 'raw') {
         throw new SQLError('access_denied');
     }
@@ -8916,20 +10066,12 @@ async function createTable(params) {
     }
     else {
         const engine = getEngineByName(table_engine);
-        if (engine) {
-            await engine.createTable(params);
-            if (!is_temp) {
-                const schema = g_schemaMap.get(database);
-                if (schema) {
-                    schema.set(table, { table_engine });
-                }
+        await engine.createTable(params);
+        if (!is_temp) {
+            const schema = g_schemaMap.get(database);
+            if (schema) {
+                schema.set(table, { table_engine });
             }
-        }
-        else {
-            throw new SQLError({
-                err: 'ER_UNKNOWN_STORAGE_ENGINE',
-                args: [table_engine],
-            });
         }
     }
 }
@@ -8960,7 +10102,7 @@ async function dropTable(params) {
 
 async function query$9(params) {
     const { dynamodb, session, ast } = params;
-    const action = ast?.expr?.action?.value?.toLowerCase();
+    const action = ast.expr?.action?.value?.toLowerCase();
     if (action === 'begin' || action === 'start') {
         startTransaction({ session, auto_commit: false });
     }
@@ -9042,25 +10184,22 @@ async function _txEach(params, callback) {
 
 async function query$8(params) {
     const { ast, dynamodb, session } = params;
-    const firstTable = ast.table?.[0];
+    const firstTable = ast.table[0];
     const dbRaw = firstTable && 'db' in firstTable ? firstTable.db : null;
     const database = dbRaw ?? session.getCurrentDatabase();
     const table = firstTable && 'table' in firstTable ? firstTable.table : undefined;
     const engine = getEngine(database ?? undefined, table, session);
-    if (ast.table && database) {
+    if (database) {
         const opts = { dynamodb, ast, engine, session };
         await run(_runAlterTable, opts);
     }
-    else if (ast.table) {
-        throw new SQLError('no_current_database');
-    }
     else {
-        throw new SQLError('unsupported');
+        throw new SQLError('no_current_database');
     }
 }
 async function _runAlterTable(params) {
     const { ast, dynamodb, engine, session } = params;
-    const firstTable = ast.table?.[0];
+    const firstTable = ast.table[0];
     const table = firstTable && 'table' in firstTable ? firstTable.table : undefined;
     if (!table) {
         throw new SQLError('bad_table_name');
@@ -9069,7 +10208,7 @@ async function _runAlterTable(params) {
     // Process column additions
     for (const def of ast.expr) {
         if (def.resource === 'column' && def.action === 'add') {
-            const column_name = def.column?.column;
+            const column_name = def.column.column;
             const type = def.definition?.dataType;
             column_list.push({ name: column_name, type });
             const opts = {
@@ -9084,14 +10223,14 @@ async function _runAlterTable(params) {
     // Process index operations
     for (const def of ast.expr) {
         if (def.resource === 'index' && def.action === 'add') {
-            const key_list = def.definition?.map?.((sub) => {
+            const key_list = def.definition?.map((sub) => {
                 const column_def = column_list.find((col) => col.name === sub.column);
                 return {
                     name: sub.column,
                     order_by: sub.order_by,
-                    type: column_def?.type || 'string',
+                    type: column_def?.type ?? 'string',
                 };
-            }) || [];
+            }) ?? [];
             const opts = {
                 dynamodb,
                 session,
@@ -9122,6 +10261,189 @@ async function _runAlterTable(params) {
                     });
                 }
                 throw err;
+            }
+        }
+    }
+}
+
+function resolveReferences(ast, current_database) {
+    const requestSets = new Map();
+    const requestAll = new Map();
+    const columnRefMap = new Map();
+    const setListMap = new Map();
+    const table_map = {};
+    const db_map = {};
+    const fromRaw = ast.type === 'select' || ast.type === 'delete' ? ast.from : ast.table;
+    const from = Array.isArray(fromRaw) ? fromRaw : null;
+    from?.forEach((fromEntry) => {
+        if ('table' in fromEntry) {
+            if (!fromEntry.db) {
+                if (!current_database) {
+                    throw new SQLError('no_current_database');
+                }
+                else {
+                    fromEntry.db = current_database;
+                }
+            }
+            requestSets.set(fromEntry, new Set());
+            requestAll.set(fromEntry, false);
+            if (fromEntry.as) {
+                table_map[fromEntry.as] = fromEntry;
+            }
+            else {
+                if (!table_map[fromEntry.table ?? '']) {
+                    table_map[fromEntry.table ?? ''] = fromEntry;
+                }
+                db_map[fromEntry.db] ??= {};
+                const dbEntry = db_map[fromEntry.db];
+                if (dbEntry && fromEntry.table) {
+                    dbEntry[fromEntry.table] = fromEntry;
+                }
+            }
+        }
+    });
+    const tableRaw = ast.type === 'update' ? null : ast.table;
+    const table = Array.isArray(tableRaw) ? tableRaw : null;
+    table?.forEach((object) => {
+        const obj = object;
+        const fromEntry = obj.db
+            ? db_map[obj.db]?.[obj.table]
+            : table_map[obj.table];
+        if (!fromEntry) {
+            throw new SQLError({ err: 'table_not_found', args: [obj.table] });
+        }
+        else {
+            obj.from = fromEntry;
+        }
+    });
+    const name_cache = {};
+    const columns = ast.type === 'select' ? ast.columns : undefined;
+    const set = ast.type === 'update' ? ast.set : undefined;
+    const where = ast.where;
+    [from, columns, where].forEach((item) => {
+        walkColumnRefs(item, (object) => {
+            _resolveObject(object, ast, db_map, table_map, name_cache, requestSets, requestAll, columnRefMap, setListMap);
+        });
+    });
+    set?.forEach((item) => {
+        walkColumnRefs(item, (object) => {
+            _resolveObject(object, ast, db_map, table_map, name_cache, requestSets, requestAll, columnRefMap, setListMap);
+        });
+        _resolveObject(item, ast, db_map, table_map, name_cache, requestSets, requestAll, columnRefMap, setListMap);
+    });
+    const result_map = {};
+    columns?.forEach((column, i) => {
+        const col = column;
+        if (col.as) {
+            result_map[col.as] = i;
+        }
+        else if (col.expr?.type === 'column_ref') {
+            result_map[col.expr.column ?? ''] = i;
+        }
+    });
+    if (ast.type === 'select') {
+        const groupby = ast.groupby ? ast.groupby.columns : undefined;
+        if (groupby !== undefined) {
+            walkColumnRefs(groupby, (object) => {
+                _resolveObject(object, ast, db_map, table_map, name_cache, requestSets, requestAll, columnRefMap, setListMap);
+            });
+        }
+    }
+    const orderby = ast.type === 'select'
+        ? ast.orderby
+        : ast.orderby;
+    const having = ast.type === 'select' ? ast.having : undefined;
+    [orderby, having].forEach((item) => {
+        walkColumnRefs(item, (object) => {
+            _resolveObject(object, ast, db_map, table_map, name_cache, requestSets, requestAll, columnRefMap, setListMap, result_map);
+        });
+    });
+    return { requestSets, requestAll, columnRefMap, setListMap };
+}
+function _resolveObject(object, ast, db_map, table_map, name_cache, requestSets, requestAll, columnRefMap, setListMap, result_map) {
+    const fixup_object = object;
+    if (fixup_object.db &&
+        typeof fixup_object.db === 'object' &&
+        fixup_object.db.value) {
+        fixup_object.db = fixup_object.db.value;
+    }
+    if (fixup_object.table &&
+        typeof fixup_object.table === 'object' &&
+        fixup_object.table.value) {
+        fixup_object.table = fixup_object.table.value;
+    }
+    const obj = object;
+    if (obj.column === '*') {
+        if (obj.db) {
+            const from = db_map[obj.db]?.[obj.table ?? ''];
+            if (from) {
+                requestAll.set(from, true);
+            }
+            else {
+                throw new SQLError({ err: 'table_not_found', args: [obj.table] });
+            }
+        }
+        else if (obj.table) {
+            const astFrom = ast.type === 'update' ? ast.table : ast.from;
+            const matchingFrom = astFrom?.find((from) => {
+                const f = from;
+                return f.as === obj.table || (!f.as && f.table === obj.table);
+            });
+            if (matchingFrom) {
+                requestAll.set(matchingFrom, true);
+            }
+            else {
+                throw new SQLError({ err: 'table_not_found', args: [obj.table] });
+            }
+        }
+        else {
+            const astFrom = ast.type === 'update' ? ast.table : ast.from;
+            astFrom?.forEach((from) => {
+                requestAll.set(from, true);
+            });
+        }
+    }
+    else {
+        let add_cache = false;
+        let from;
+        if (obj.db) {
+            from = db_map[obj.db]?.[obj.table ?? ''];
+            add_cache = true;
+        }
+        else if (obj.table) {
+            from = table_map[obj.table];
+            add_cache = true;
+        }
+        else {
+            const index = result_map?.[obj.column ?? ''];
+            if (index !== undefined && index >= 0) {
+                columnRefMap.set(object, { resultIndex: index });
+            }
+            else {
+                const cached = name_cache[obj.column ?? ''];
+                const astFrom = ast.type === 'update' ? ast.table : ast.from;
+                from = cached ?? astFrom?.[0];
+            }
+        }
+        if (from) {
+            columnRefMap.set(object, { from: from });
+            if (obj.column) {
+                requestSets.get(from)?.add(obj.column);
+            }
+            setListMap.set(object, from);
+            if (add_cache && obj.column) {
+                name_cache[obj.column] = from;
+            }
+        }
+        else if (!columnRefMap.has(object)) {
+            if (obj.db && !db_map[obj.db]) {
+                throw new SQLError({ err: 'db_not_found', args: [obj.db] });
+            }
+            else if (obj.table) {
+                throw new SQLError({ err: 'table_not_found', args: [obj.table] });
+            }
+            else {
+                throw new SQLError({ err: 'column_not_found', args: [obj.column] });
             }
         }
     }
@@ -9379,269 +10701,6 @@ function convertType(type, nullable) {
     }
 }
 
-function resolveReferences(ast, current_database) {
-    const table_map = {};
-    const db_map = {};
-    const fromRaw = ast.type === 'select'
-        ? ast.from
-        : ast.type === 'delete'
-            ? ast.from
-            : ast.from;
-    const from = Array.isArray(fromRaw) ? fromRaw : null;
-    from?.forEach?.((fromItem) => {
-        const fromEntry = fromItem;
-        if (!fromEntry.db) {
-            if (!current_database) {
-                throw new SQLError('no_current_database');
-            }
-            else {
-                fromEntry.db = current_database;
-            }
-        }
-        if (!fromEntry._requestSet) {
-            fromEntry._requestSet = new Set();
-        }
-        fromEntry._requestAll = fromEntry._requestAll || false;
-        fromEntry.key = fromEntry.as || `${fromEntry.db}.${fromEntry.table}`;
-        if (fromEntry.as) {
-            table_map[fromEntry.as] = fromEntry;
-        }
-        else {
-            if (!table_map[fromEntry.table ?? '']) {
-                table_map[fromEntry.table ?? ''] = fromEntry;
-            }
-            if (!db_map[fromEntry.db]) {
-                db_map[fromEntry.db] = {};
-            }
-            const dbEntry = db_map[fromEntry.db];
-            if (dbEntry && fromEntry.table) {
-                dbEntry[fromEntry.table] = fromEntry;
-            }
-        }
-    });
-    const tableRaw = ast.type === 'update'
-        ? ast.table
-        : ast.table;
-    const table = Array.isArray(tableRaw) ? tableRaw : null;
-    table?.forEach?.((object) => {
-        const obj = object;
-        const fromEntry = obj.db
-            ? db_map[obj.db]?.[obj.table ?? '']
-            : table_map[obj.table ?? ''];
-        if (!fromEntry) {
-            throw new SQLError({ err: 'table_not_found', args: [obj.table] });
-        }
-        else {
-            obj.from = fromEntry;
-        }
-    });
-    const name_cache = {};
-    const columns = ast.type === 'select' ? ast.columns : undefined;
-    const set = ast.type === 'update' ? ast.set : undefined;
-    const where = ast.where;
-    [from, columns, where].forEach((item) => {
-        walkColumnRefs(item, (object) => {
-            _resolveObject(object, ast, db_map, table_map, name_cache);
-        });
-    });
-    set?.forEach((item) => {
-        walkColumnRefs(item, (object) => {
-            _resolveObject(object, ast, db_map, table_map, name_cache);
-        });
-        _resolveObject(item, ast, db_map, table_map, name_cache);
-    });
-    const result_map = {};
-    columns?.forEach?.((column, i) => {
-        const col = column;
-        if (col.as) {
-            result_map[col.as] = i;
-        }
-        else if (col.expr?.type === 'column_ref') {
-            result_map[col.expr.column ?? ''] = i;
-        }
-    });
-    const groupby = ast.type === 'select' ? ast.groupby?.columns : undefined;
-    if (groupby) {
-        walkColumnRefs(groupby, (object) => {
-            _resolveObject(object, ast, db_map, table_map, name_cache);
-        });
-    }
-    const orderby = ast.type === 'select'
-        ? ast.orderby
-        : ast.orderby;
-    const having = ast.type === 'select' ? ast.having : undefined;
-    [orderby, having].forEach((item) => {
-        walkColumnRefs(item, (object) => {
-            _resolveObject(object, ast, db_map, table_map, name_cache, result_map);
-        });
-    });
-}
-function _resolveObject(object, ast, db_map, table_map, name_cache, result_map) {
-    const fixup_object = object;
-    if (fixup_object.db &&
-        typeof fixup_object.db === 'object' &&
-        fixup_object.db.value) {
-        fixup_object.db = fixup_object.db.value;
-    }
-    if (fixup_object.table &&
-        typeof fixup_object.table === 'object' &&
-        fixup_object.table.value) {
-        fixup_object.table = fixup_object.table.value;
-    }
-    const obj = object;
-    if (obj.column === '*') {
-        if (obj.db) {
-            const from = db_map[obj.db]?.[obj.table ?? ''];
-            if (from) {
-                from._requestAll = true;
-            }
-            else {
-                throw new SQLError({ err: 'table_not_found', args: [obj.table] });
-            }
-        }
-        else if (obj.table) {
-            let found = false;
-            const astFrom = ast.from;
-            astFrom?.forEach?.((from) => {
-                if (from.as === obj.table || (!from.as && from.table === obj.table)) {
-                    from._requestAll = true;
-                    found = true;
-                }
-            });
-            if (!found) {
-                throw new SQLError({ err: 'table_not_found', args: [obj.table] });
-            }
-        }
-        else {
-            const astFrom = ast.from;
-            astFrom?.forEach?.((from) => {
-                from._requestAll = true;
-            });
-        }
-    }
-    else {
-        let add_cache = false;
-        let from;
-        if (obj.db) {
-            from = db_map[obj.db]?.[obj.table ?? ''];
-            add_cache = true;
-        }
-        else if (obj.table) {
-            from = table_map[obj.table];
-            add_cache = true;
-        }
-        else {
-            const index = result_map?.[obj.column ?? ''];
-            if (index !== undefined && index >= 0) {
-                obj._resultIndex = index;
-            }
-            else {
-                const cached = name_cache[obj.column ?? ''];
-                const astFrom = ast.from;
-                from = cached ?? astFrom?.[0];
-            }
-        }
-        if (from) {
-            obj.from = from;
-            from._requestSet?.add(obj.column ?? '');
-            if (add_cache && obj.column) {
-                name_cache[obj.column] = from;
-            }
-        }
-        else if (obj._resultIndex === undefined) {
-            if (obj.db && !db_map[obj.db]) {
-                throw new SQLError({ err: 'db_not_found', args: [obj.db] });
-            }
-            else if (obj.table) {
-                throw new SQLError({ err: 'table_not_found', args: [obj.table] });
-            }
-            else {
-                throw new SQLError({ err: 'column_not_found', args: [obj.column] });
-            }
-        }
-    }
-}
-
-function formJoin(params) {
-    const { source_map, from, where, session } = params;
-    const row_list = [];
-    from.forEach((from_table) => {
-        if (from_table.key) {
-            row_list[from_table.key] = [];
-        }
-        from_table.is_left = (from_table.join?.indexOf?.('LEFT') ?? -1) >= 0;
-    });
-    const output_count = _findRows(source_map, from, where, session, row_list, 0, 0);
-    row_list.length = output_count;
-    return row_list;
-}
-function _findRows(source_map, list, where, session, row_list, from_index, start_index) {
-    const from = list[from_index];
-    if (!from) {
-        throw new SQLError('Invalid from index');
-    }
-    const { key, on, is_left } = from;
-    const rows = key ? source_map[key] : undefined;
-    const row_count = rows?.length || (is_left ? 1 : 0);
-    let output_count = 0;
-    for (let i = 0; i < row_count; i++) {
-        const row_index = start_index + output_count;
-        if (!row_list[row_index]) {
-            row_list[row_index] = {};
-        }
-        const row = row_list[row_index];
-        if (!row) {
-            continue;
-        }
-        if (key) {
-            row[key] = rows?.[i] ?? null;
-        }
-        for (let j = 0; output_count > 0 && j < from_index; j++) {
-            const from_key = list[j]?.key;
-            const startRow = row_list[start_index];
-            if (from_key && startRow) {
-                row[from_key] = startRow[from_key];
-            }
-        }
-        let skip = false;
-        if (on) {
-            const result = getValue(on, { session, row });
-            if (result.err) {
-                throw new SQLError(result.err);
-            }
-            else if (!result.value) {
-                skip = true;
-            }
-        }
-        if (skip && is_left && output_count === 0 && i + 1 === row_count) {
-            if (key) {
-                row[key] = null;
-            }
-            skip = false;
-        }
-        if (!skip) {
-            const next_from = from_index + 1;
-            if (next_from < list.length) {
-                const result_count = _findRows(source_map, list, where, session, row_list, next_from, start_index + output_count);
-                output_count += result_count;
-            }
-            else if (where) {
-                const result = getValue(where, { session, row });
-                if (result.err) {
-                    throw new SQLError(result.err);
-                }
-                else if (result.value) {
-                    output_count++;
-                }
-            }
-            else {
-                output_count++;
-            }
-        }
-    }
-    return output_count;
-}
-
 function hasAggregate(ast) {
     if (Array.isArray(ast.columns)) {
         for (const column of ast.columns) {
@@ -9655,16 +10714,17 @@ function hasAggregate(ast) {
 function formImplicitGroup(params) {
     const { row_list } = params;
     if (row_list[0]) {
-        return [{ ...row_list[0], '@@group': row_list }];
+        return [{ ...row_list[0], group: row_list }];
     }
-    return row_list;
+    return [];
 }
 function formGroup(params) {
-    const { groupby, ast, row_list, session } = params;
+    const { groupby, ast, row_list, session, columnRefMap } = params;
     const group_exprs = [];
     for (const column of groupby.columns ?? []) {
         if (column.type === 'number') {
-            group_exprs.push(ast.columns[(column.value ?? 1) - 1]?.expr);
+            const index = typeof column.value === 'number' ? column.value : 1;
+            group_exprs.push(ast.columns[index - 1]?.expr);
         }
         else {
             group_exprs.push(column);
@@ -9674,7 +10734,7 @@ function formGroup(params) {
     const group_map = {};
     for (const row of row_list) {
         const key_list = group_exprs.map((group) => {
-            const result = getValue(group, { session, row });
+            const result = getValue(group, { session, row, columnRefMap });
             if (result.err) {
                 throw new SQLError(result.err);
             }
@@ -9684,12 +10744,10 @@ function formGroup(params) {
         for (let i = 0; i < count; i++) {
             const key = String(key_list[i]);
             if (i + 1 === count) {
-                if (!obj[key]) {
-                    obj[key] = [];
-                }
+                obj[key] ??= [];
             }
-            else if (!obj[key]) {
-                obj[key] = {};
+            else {
+                obj[key] ??= {};
             }
             obj = obj[key];
         }
@@ -9701,7 +10759,7 @@ function formGroup(params) {
 }
 function _unroll(list, obj) {
     if (Array.isArray(obj)) {
-        list.push({ ...obj[0], '@@group': obj });
+        list.push({ ...obj[0], group: obj });
     }
     else {
         const objMap = obj;
@@ -9728,6 +10786,83 @@ function _hasAgg(expr) {
     return false;
 }
 
+function formJoin(params) {
+    const { source_map, from, where, session, columnRefMap } = params;
+    const row_list = [];
+    from.forEach((from_table) => {
+        from_table.is_left = (from_table.join?.indexOf('LEFT') ?? -1) >= 0;
+    });
+    const output_count = _findRows(source_map, from, where, session, row_list, 0, 0, columnRefMap);
+    row_list.length = output_count;
+    return row_list;
+}
+function _findRows(source_map, list, where, session, row_list, from_index, start_index, columnRefMap) {
+    const from = list[from_index];
+    if (!from) {
+        throw new SQLError('Invalid from index');
+    }
+    const { on, is_left } = from;
+    const rows = source_map.get(from);
+    const row_count = rows?.length ?? (is_left ? 1 : 0);
+    let output_count = 0;
+    for (let i = 0; i < row_count; i++) {
+        const row_index = start_index + output_count;
+        row_list[row_index] ??= { source: new Map() };
+        const row = row_list[row_index];
+        if (rows) {
+            row.source.set(from, rows[i] ?? null);
+        }
+        for (let j = 0; output_count > 0 && j < from_index; j++) {
+            const prevFrom = list[j];
+            const startRow = row_list[start_index];
+            if (prevFrom && startRow) {
+                const value = startRow.source.get(prevFrom);
+                if (value !== undefined) {
+                    row.source.set(prevFrom, value);
+                }
+            }
+        }
+        let skip = false;
+        if (on) {
+            const result = getValue(on, {
+                session,
+                row,
+                columnRefMap,
+            });
+            if (result.err) {
+                throw new SQLError(result.err);
+            }
+            else if (!result.value) {
+                skip = true;
+            }
+        }
+        if (skip && is_left && output_count === 0 && i + 1 === row_count) {
+            row.source.set(from, null);
+            skip = false;
+        }
+        if (!skip) {
+            const next_from = from_index + 1;
+            if (next_from < list.length) {
+                const result_count = _findRows(source_map, list, where, session, row_list, next_from, start_index + output_count, columnRefMap);
+                output_count += result_count;
+            }
+            else if (where) {
+                const result = getValue(where, { session, row, columnRefMap });
+                if (result.err) {
+                    throw new SQLError(result.err);
+                }
+                else if (result.value) {
+                    output_count++;
+                }
+            }
+            else {
+                output_count++;
+            }
+        }
+    }
+    return output_count;
+}
+
 function sort(row_list, orderby, state) {
     row_list.sort(_sort.bind(null, orderby, state));
 }
@@ -9736,9 +10871,9 @@ function _sort(orderby, state, a, b) {
         const { expr } = order;
         const func = order.type !== 'DESC' ? _asc : _desc;
         const exprObj = expr;
-        if (exprObj?.type === 'number') {
-            const index = (exprObj.value ?? 1) - 1;
-            const result = func(a['@@result']?.[index]?.value, b['@@result']?.[index]?.value, state.columns?.[index]);
+        if (exprObj.type === 'number') {
+            const index = typeof exprObj.value === 'number' ? exprObj.value - 1 : 0;
+            const result = func(a.result[index]?.value, b.result[index]?.value, state.columns?.[index]);
             if (result !== 0) {
                 return result;
             }
@@ -9799,9 +10934,13 @@ function _convertNum(value) {
     return ret;
 }
 
+function isBaseFrom$2(from) {
+    return 'table' in from && typeof from.table === 'string';
+}
 async function query$7(params) {
     const { rows, columns } = await internalQuery(params);
-    for (const row of rows ?? []) {
+    for (const row of rows) {
+        // eslint-disable-next-line @typescript-eslint/no-for-in-array
         for (const key in row) {
             row[key] = row[key]?.value;
         }
@@ -9811,48 +10950,75 @@ async function query$7(params) {
 async function internalQuery(params) {
     const { ast, session, dynamodb } = params;
     const current_database = session.getCurrentDatabase();
+    let requestSets = new Map();
+    let requestAll = new Map();
+    let columnRefMap = params.columnRefMap ?? new Map();
     if (!params.skip_resolve) {
-        resolveReferences(ast, current_database ?? undefined);
+        const requestInfo = resolveReferences(ast, current_database ?? undefined);
+        requestSets = requestInfo.requestSets;
+        requestAll = requestInfo.requestAll;
+        columnRefMap = requestInfo.columnRefMap;
     }
-    const from = ast?.from;
-    let source_map = {};
-    let column_map = {};
-    if (from?.length) {
-        const db = from[0]?.db;
-        const table = from[0]?.table;
-        const engine = getEngine(db, table, session);
-        const opts = { session, dynamodb, list: from, where: ast.where };
+    const from = ast.type === 'update' ? ast.table : ast.from;
+    let source_map = new Map();
+    let column_map = new Map();
+    if (from && Array.isArray(from) && from.length > 0) {
+        const first = from[0];
+        if (!first || !isBaseFrom$2(first)) {
+            throw new SQLError('Invalid from clause');
+        }
+        const db = first.db;
+        const table = first.table;
+        const engine = getEngine(db ?? undefined, table, session);
+        const opts = {
+            session,
+            dynamodb,
+            list: from,
+            where: ast.where,
+            requestSets,
+            requestAll,
+            columnRefMap,
+        };
         const result = await engine.getRowList(opts);
         source_map = result.source_map;
         column_map = result.column_map;
     }
-    return _evaluateReturn({ ...params, source_map, column_map });
+    return _evaluateReturn({
+        ...params,
+        source_map,
+        column_map,
+        requestSets,
+        columnRefMap,
+    });
 }
 async function _evaluateReturn(params) {
-    const { session, source_map, ast } = params;
-    const query_columns = _expandStarColumns(params);
+    const { session, source_map, ast, columnRefMap } = params;
+    const query_columns = _expandStarColumns({ ...params, ast, columnRefMap });
     const { where, groupby } = ast;
-    const from = ast.from;
+    const from = ast.type === 'update' ? ast.table : ast.from;
     let row_list = [];
     let sleep_ms = 0;
     if (from) {
-        row_list = formJoin({ source_map, from, where, session });
+        row_list = formJoin({ source_map, from, where, session, columnRefMap });
     }
     else {
-        row_list = [{ 0: {} }];
+        row_list = [{ source: new Map() }];
     }
-    if (groupby) {
-        row_list = formGroup({ groupby, ast, row_list, session });
+    let grouped_list = row_list;
+    if (groupby?.columns) {
+        grouped_list = formGroup({ groupby, ast, row_list, session, columnRefMap });
     }
     else if (hasAggregate(ast)) {
-        row_list = formImplicitGroup({ row_list});
+        grouped_list = formImplicitGroup({ row_list});
     }
-    for (const row of row_list) {
+    const result_list = [];
+    for (const row of grouped_list) {
         const output_row = [];
         for (const column of query_columns) {
             const result = getValue(column.expr, {
                 session,
                 row,
+                columnRefMap,
             });
             if (result.err) {
                 throw new SQLError(result.err);
@@ -9861,9 +11027,7 @@ async function _evaluateReturn(params) {
             if (result.type !== column.result_type) {
                 column.result_type = _unionType(column.result_type, result.type);
             }
-            if (!column.result_name) {
-                column.result_name = result.name;
-            }
+            column.result_name ??= result.name;
             if (result.value === null) {
                 column.result_nullable = true;
             }
@@ -9871,72 +11035,86 @@ async function _evaluateReturn(params) {
                 sleep_ms = result.sleep_ms;
             }
         }
-        row['@@result'] = output_row;
+        result_list.push({ ...row, result: output_row });
     }
     const columns = [];
     for (const column of query_columns) {
         const column_type = convertType(column.result_type, column.result_nullable);
-        column_type.db = column.expr?.from?.db ?? column.expr.db ?? column.db ?? '';
+        // Get table info from columnRefMap if this is a column_ref
+        let fromInfo = null;
+        if (column.expr.type === 'column_ref') {
+            const refInfo = columnRefMap.get(column.expr);
+            if (refInfo?.from && isBaseFrom$2(refInfo.from)) {
+                fromInfo = refInfo.from;
+            }
+        }
+        column_type.db = fromInfo?.db ?? column.expr.db ?? column.db ?? '';
         column_type.orgName = column.result_name ?? '';
         column_type.name = column.as ?? column_type.orgName;
-        column_type.orgTable = column.expr?.from?.table ?? '';
-        column_type.table = column.expr?.from?.as ?? column_type.orgTable;
+        column_type.orgTable = fromInfo?.table ?? '';
+        column_type.table = fromInfo?.as ?? column_type.orgTable;
         columns.push(column_type);
     }
-    if (ast.orderby && row_list) {
-        sort(row_list, ast.orderby, { session, columns });
+    if (ast.orderby) {
+        sort(result_list, ast.orderby, { session, columns, columnRefMap });
     }
     let start = 0;
-    let end = row_list.length;
+    let end = result_list.length;
     if (ast.limit) {
-        if (ast.limit?.seperator === 'offset') {
-            start = ast.limit.value[1]?.value ?? 0;
-            end = Math.min(end, start + (ast.limit.value[0]?.value ?? 0));
+        if (ast.limit.seperator === 'offset') {
+            const offsetValue = ast.limit.value[1];
+            const limitValue = ast.limit.value[0];
+            start = offsetValue ? offsetValue.value : 0;
+            end = Math.min(end, start + (limitValue ? limitValue.value : 0));
         }
-        else if (ast.limit?.value?.length > 1) {
-            start = ast.limit.value[0]?.value ?? 0;
-            end = Math.min(end, start + (ast.limit.value[1]?.value ?? 0));
+        else if (ast.limit.value.length > 1) {
+            const offsetValue = ast.limit.value[0];
+            const limitValue = ast.limit.value[1];
+            start = offsetValue ? offsetValue.value : 0;
+            end = Math.min(end, start + (limitValue ? limitValue.value : 0));
         }
-        else if (ast.limit) {
-            end = Math.min(end, ast.limit.value[0]?.value ?? 0);
+        else {
+            const limitValue = ast.limit.value[0];
+            end = Math.min(end, limitValue ? limitValue.value : 0);
         }
     }
-    row_list = row_list.slice(start, end);
-    const rows = row_list.map((row) => row['@@result']);
+    const final_list = result_list.slice(start, end);
+    const rows = final_list.map((row) => row.result);
     if (sleep_ms) {
         await promises.setTimeout(sleep_ms);
     }
-    return { rows, columns, row_list };
+    return { rows, columns, row_list: final_list };
 }
 function _expandStarColumns(params) {
-    const { ast, column_map } = params;
+    const { ast, column_map, requestSets, columnRefMap } = params;
     const ret = [];
-    for (const column of ast?.columns ?? []) {
+    for (const column of ast.columns ?? []) {
         if (column?.expr?.type === 'column_ref' && column.expr.column === '*') {
             const { db, table } = column.expr;
-            const from_list = Array.isArray(ast.from)
-                ? ast.from
-                : [];
+            const from_list = Array.isArray(ast.from) ? ast.from : [];
             for (const from of from_list) {
+                if (!isBaseFrom$2(from)) {
+                    continue;
+                }
                 if ((!db && !table) ||
                     (db && from.db === db && from.table === table && !from.as) ||
                     (!db && from.table === table && !from.as) ||
                     (!db && from.as === table)) {
-                    const column_list = column_map[from.key ?? ''];
+                    const column_list = column_map.get(from);
                     if (column_list && !column_list.length) {
-                        from._requestSet?.forEach((name) => column_list.push(name));
+                        const requestSet = requestSets.get(from);
+                        requestSet?.forEach((name) => column_list.push(name));
                     }
                     column_list?.forEach((name) => {
-                        ret.push({
-                            expr: {
-                                type: 'column_ref',
-                                db: from.as ? null : from.db,
-                                table: from.as ? from.as : from.table,
-                                column: name,
-                                from: from,
-                            },
-                            as: null,
-                        });
+                        const colRef = {
+                            type: 'column_ref',
+                            db: from.as ? null : from.db,
+                            table: from.as ?? from.table,
+                            column: name,
+                        };
+                        // Add to columnRefMap so it can be looked up later
+                        columnRefMap.set(colRef, { from });
+                        ret.push({ expr: colRef, as: null });
                     });
                 }
             }
@@ -10013,12 +11191,9 @@ async function _createTable(params) {
     const primary_key = [];
     for (const def of ast.create_definitions ?? []) {
         if (def.resource === 'column' &&
-            def.column?.type === 'column_ref' &&
-            typeof def.column?.column === 'string') {
-            const col = {
-                name: def.column?.column ?? '',
-                type: def.definition?.dataType ?? 'string',
-            };
+            def.column.type === 'column_ref' &&
+            typeof def.column.column === 'string') {
+            const col = { name: def.column.column, type: def.definition.dataType };
             column_list.push(col);
             const def_key = def;
             if (def_key.primary_key === 'primary key') {
@@ -10107,7 +11282,7 @@ function makeEngineGroups(session, list) {
     const ret = [];
     for (const obj of list) {
         const { database, table } = obj;
-        const engine = getEngine(database, table, session);
+        const engine = getEngine(database ?? undefined, table, session);
         const found = ret.find((group) => group.engine === engine);
         if (found) {
             found.list.push(obj);
@@ -10120,25 +11295,31 @@ function makeEngineGroups(session, list) {
 }
 
 async function runSelect(params) {
-    const { dynamodb, session, ast } = params;
+    const { dynamodb, session, ast, requestSets, columnRefMap } = params;
     const result_list = [];
-    if (!ast.from || !Array.isArray(ast.from)) {
+    const from_list = ast.type === 'update' ? ast.table : ast.from;
+    if (!from_list || !Array.isArray(from_list)) {
         return result_list;
     }
     // Get table info for all tables
-    for (const object of ast.from) {
+    const keyListMap = new Map();
+    for (const object of from_list) {
         if (!('db' in object) || !('table' in object)) {
             continue;
         }
         const { db, table } = object;
-        const engine = getEngine(db ?? '', table, session);
-        const opts = { dynamodb, session, database: db ?? '', table };
+        if (!db || !table) {
+            continue;
+        }
+        const engine = getEngine(db, table, session);
+        const opts = { dynamodb, session, database: db, table };
         try {
             const result = await engine.getTableInfo(opts);
-            if (result?.primary_key?.length > 0) {
-                const extendedObject = object;
-                extendedObject._keyList = result.primary_key.map((key) => key.name);
-                extendedObject._keyList.forEach((key) => extendedObject._requestSet.add(key));
+            if (result.primary_key.length > 0) {
+                const key_list = result.primary_key.map((pkKey) => pkKey.name);
+                keyListMap.set(object, key_list);
+                const requestSet = requestSets.get(object);
+                key_list.forEach((keyName) => requestSet?.add(keyName));
             }
             else {
                 throw new SQLError('bad_schema');
@@ -10150,20 +11331,13 @@ async function runSelect(params) {
         }
     }
     // Run the select query
-    const opts = {
-        dynamodb,
-        session,
-        ast: ast,
-        skip_resolve: true,
-    };
+    const opts = { dynamodb, session, ast, skip_resolve: true, columnRefMap };
     const { row_list } = await internalQuery(opts);
-    for (const object of ast.from) {
-        const extendedObject = object;
-        const from_key = extendedObject.key;
-        const key_list = extendedObject._keyList;
+    for (const object of from_list) {
+        const key_list = keyListMap.get(object) ?? [];
         const collection = new Map();
         for (const row of row_list) {
-            const rowValue = row[from_key];
+            const rowValue = row.source.get(object);
             const keys = key_list.map((key) => {
                 if (rowValue && typeof rowValue === 'object' && key in rowValue) {
                     return rowValue[key];
@@ -10174,7 +11348,7 @@ async function runSelect(params) {
                 _addCollection(collection, keys, row);
             }
         }
-        const result = { key: from_key, list: [] };
+        const result = { from: object, key_list, list: [] };
         result_list.push(result);
         collection.forEach((value0, key0) => {
             if (key_list.length > 1) {
@@ -10203,26 +11377,41 @@ function _addCollection(collection, keys, value) {
     }
 }
 
+function isBaseFrom$1(from) {
+    return 'table' in from && typeof from.table === 'string';
+}
 async function query$5(params) {
     const { ast, session } = params;
     const current_database = session.getCurrentDatabase() ?? undefined;
-    resolveReferences(ast, current_database);
-    const firstFrom = ast.from?.[0];
+    const requestInfo = resolveReferences(ast, current_database);
+    const firstFrom = ast.from[0];
     const database = (firstFrom && 'db' in firstFrom ? firstFrom.db : null) ?? undefined;
     if (!database) {
         throw new SQLError('no_current_database');
     }
-    return await run(_runDelete, params);
+    return await run(_runDelete, {
+        ...params,
+        ...requestInfo,
+    });
 }
 async function _runDelete(params) {
-    const { ast, session, dynamodb } = params;
-    const firstFrom = ast.from?.[0];
-    const database = (firstFrom && 'db' in firstFrom ? firstFrom.db : null) ?? undefined;
-    const table = firstFrom && 'table' in firstFrom ? firstFrom.table : undefined;
+    const { ast, session, dynamodb, columnRefMap } = params;
+    const firstFrom = ast.from[0];
+    if (!firstFrom || !isBaseFrom$1(firstFrom)) {
+        throw new SQLError('Invalid from clause');
+    }
+    const database = firstFrom.db ?? undefined;
+    const table = firstFrom.table;
     const engine = getEngine(database, table, session);
     if (ast.from.length === 1) {
         try {
-            const opts = { dynamodb, session, ast };
+            const opts = {
+                dynamodb,
+                session,
+                from: firstFrom,
+                where: ast.where,
+                columnRefMap,
+            };
             const result = await engine.singleDelete(opts);
             return { affectedRows: result.affectedRows };
         }
@@ -10244,13 +11433,16 @@ async function _multipleDelete(params) {
     const result_list = await runSelect(params);
     const from_list = [];
     for (const object of ast.table) {
-        const from_key = object.from.key;
-        const list = result_list.find((result) => result.key === from_key)?.list;
+        const found = result_list.find((result) => result.from === object.from);
+        const list = found?.list;
+        if (!isBaseFrom$1(object.from)) {
+            continue;
+        }
         if (list && list.length > 0) {
             from_list.push({
-                database: object.from.db,
+                database: object.from.db ?? '',
                 table: object.from.table,
-                key_list: object.from._keyList,
+                key_list: found.key_list,
                 delete_list: list.map((i) => i.key),
             });
         }
@@ -10279,9 +11471,9 @@ async function query$4(params) {
     else if (ast.keyword === 'table') {
         const nameArray = Array.isArray(ast.name) ? ast.name : [ast.name];
         const firstTable = nameArray[0];
-        const database = (firstTable && 'db' in firstTable ? firstTable.db : null) ??
+        const database = ('db' in firstTable ? firstTable.db : null) ??
             session.getCurrentDatabase();
-        const table = firstTable && 'table' in firstTable ? firstTable.table : undefined;
+        const table = 'table' in firstTable ? firstTable.table : undefined;
         if (!database) {
             throw new SQLError('no_current_database');
         }
@@ -10305,312 +11497,6 @@ async function query$4(params) {
         shared.logger.error('unsupported:', ast);
         throw new SQLError('unsupported');
     }
-}
-
-async function query$3(params) {
-    const { ast, session } = params;
-    const duplicate_mode = ast.type === 'replace'
-        ? 'replace'
-        : ast.prefix === 'ignore into'
-            ? 'ignore'
-            : null;
-    const database = ast.table?.[0]?.db || session.getCurrentDatabase();
-    const table = ast.table?.[0]?.table;
-    if (!database) {
-        throw new SQLError('no_current_database');
-    }
-    _checkAst(ast);
-    const engine = getEngine(database, table, session);
-    const opts = { ...params, database, engine, duplicate_mode };
-    return await run(_runInsert, opts);
-}
-async function _runInsert(params) {
-    const { ast, session, engine, dynamodb, duplicate_mode } = params;
-    const table = ast.table?.[0]?.table;
-    let list;
-    // Build the list of rows to insert
-    if (ast.set && ast.set.length > 0) {
-        const obj = {};
-        for (const item of ast.set) {
-            const expr_result = getValue(item.value, { session });
-            if (expr_result.err) {
-                throw new SQLError(expr_result.err);
-            }
-            obj[item.column] = expr_result;
-        }
-        list = [obj];
-    }
-    else if (ast.columns &&
-        ast.columns.length > 0 &&
-        ast.values.type === 'select') {
-        const opts = { ast: ast.values, session, dynamodb };
-        const { rows } = await internalQuery(opts);
-        list = rows.map((row) => {
-            const obj = {};
-            ast.columns?.forEach((name, i) => {
-                obj[name] = row[i];
-            });
-            return obj;
-        });
-    }
-    else if (ast.columns && ast.columns.length > 0) {
-        list = [];
-        const values = ast.values?.type === 'values' ? ast.values.values : [];
-        if (Array.isArray(values)) {
-            values.forEach((row, i) => {
-                const obj = {};
-                if (ast.columns && row.value.length === ast.columns.length) {
-                    ast.columns.forEach((name, j) => {
-                        const expr_result = getValue(row.value[j], {
-                            session,
-                        });
-                        if (expr_result.err) {
-                            throw new SQLError(expr_result.err);
-                        }
-                        obj[name] = expr_result;
-                    });
-                    list.push(obj);
-                }
-                else {
-                    throw new SQLError({ err: 'ER_WRONG_VALUE_COUNT_ON_ROW', args: [i] });
-                }
-            });
-        }
-    }
-    else {
-        shared.logger.error('unsupported insert without column names');
-        throw new SQLError('unsupported');
-    }
-    // Insert the rows
-    if (list.length > 0) {
-        const opts = {
-            dynamodb,
-            session,
-            database: params.database,
-            table,
-            list,
-            duplicate_mode: duplicate_mode ?? undefined,
-        };
-        try {
-            return await engine.insertRowList(opts);
-        }
-        catch (err) {
-            const error = err;
-            const err_str = String(error?.message || '').toLowerCase();
-            if (error?.message === 'resource_not_found' ||
-                error?.err === 'resource_not_found' ||
-                error?.name === 'ResourceNotFoundException' ||
-                err_str.includes('resource not found')) {
-                throw new SQLError({
-                    err: 'table_not_found',
-                    args: error?.args || [table],
-                });
-            }
-            throw err;
-        }
-    }
-    else {
-        return { affectedRows: 0 };
-    }
-}
-function _checkAst(ast) {
-    if (ast.values?.type === 'select') {
-        if (ast.columns?.length !== ast.values.columns?.length) {
-            throw new SQLError({ err: 'ER_WRONG_VALUE_COUNT_ON_ROW', args: [1] });
-        }
-    }
-}
-
-async function query$2(params) {
-    const { ast } = params;
-    const expr = ast?.expr;
-    if (Array.isArray(expr)) {
-        for (const e of expr) {
-            if (e && 'type' in e && e.type === 'assign') {
-                await _handleAssignment(e, params);
-            }
-            else {
-                throw new SQLError('unsupported');
-            }
-        }
-    }
-    else {
-        throw new SQLError('unsupported');
-    }
-}
-async function _handleAssignment(expr, params) {
-    const { session } = params;
-    const { left, right } = expr;
-    if (left?.type !== 'var') {
-        throw new SQLError('unsupported');
-    }
-    let result;
-    if (right?.type === 'select') {
-        const { rows } = await internalQuery({
-            ...params,
-            ast: right,
-        });
-        if (rows && rows[0]?.[0]) {
-            result = rows[0][0];
-        }
-        else {
-            result = { err: null, value: null, type: 'null' };
-        }
-    }
-    else {
-        result = getValue(right, { session });
-        if (result.err) {
-            throw new SQLError(result.err);
-        }
-    }
-    const { prefix, members } = left;
-    const scope = members.length > 0 ? left.name.toLowerCase() : '';
-    const firstMember = members[0];
-    const name = members.length > 0 && typeof firstMember === 'string'
-        ? firstMember
-        : left.name;
-    if (prefix === '@') {
-        session.setVariable(left.name, result);
-    }
-    else if (prefix === '@@' || prefix === null) {
-        if (scope === 'global') {
-            GlobalSettings$1.setGlobalVariable(String(name), result.value);
-        }
-        else if (scope === 'session' || !scope) {
-            session.setSessionVariable(String(name), result.value);
-        }
-    }
-    else {
-        shared.logger.error('set_handler._handleAssignment: unsupported left:', left);
-        throw new SQLError('unsupported');
-    }
-}
-
-async function query$1(params) {
-    const { ast, session, dynamodb } = params;
-    if (ast.keyword === 'databases') {
-        const column = Object.assign(convertType('string'), {
-            table: 'SCHEMATA',
-            orgTable: 'schemata',
-            name: 'Database',
-            orgName: 'Database',
-        });
-        const list = getDatabaseList();
-        const rows = list?.map?.((item) => [item]);
-        return { rows, columns: [column] };
-    }
-    else if (ast.keyword === 'tables') {
-        const database = session.getCurrentDatabase();
-        if (!database) {
-            throw new SQLError('no_current_database');
-        }
-        const name = 'Tables_in_' + database;
-        const column = Object.assign(convertType('string'), {
-            db: database,
-            table: 'TABLES',
-            orgTable: 'tables',
-            name,
-            orgName: name,
-        });
-        const list = await getTableList({ dynamodb, database });
-        const rows = list?.map?.((item) => [item]);
-        return { rows, columns: [column] };
-    }
-    else {
-        throw new SQLError('unsupported');
-    }
-}
-
-async function query(params) {
-    const { ast, session } = params;
-    const current_database = session.getCurrentDatabase() ?? undefined;
-    // Temporarily add from property for resolveReferences
-    ast.from = (ast.table ?? []);
-    ast.table = null;
-    resolveReferences(ast, current_database);
-    const database = getDatabaseFromUpdate(ast);
-    if (!database) {
-        throw new SQLError('no_current_database');
-    }
-    return await run(_runUpdate, {
-        ...params,
-        ast,
-    });
-}
-async function _runUpdate(params) {
-    const { ast, session, dynamodb } = params;
-    if (!ast.from || !ast.from[0]) {
-        throw new SQLError('no_current_database');
-    }
-    const { db, table } = ast.from[0];
-    const engine = getEngine(db, table, session);
-    if (ast.from.length === 1) {
-        const opts = { dynamodb, session, ast };
-        try {
-            return await engine.singleUpdate(opts);
-        }
-        catch (err) {
-            if (err instanceof NoSingleOperationError) {
-                return await _multipleUpdate(params);
-            }
-            throw err;
-        }
-    }
-    else {
-        return await _multipleUpdate(params);
-    }
-}
-async function _multipleUpdate(params) {
-    const { dynamodb, session, ast } = params;
-    let affectedRows = 0;
-    let changedRows = 0;
-    // Get rows to update
-    const result_list = await runSelect(params);
-    ast.from.forEach((object) => {
-        const from_key = object.key;
-        const list = result_list.find((result) => result.key === from_key)?.list;
-        object._updateList = [];
-        list?.forEach?.(({ key, row }) => {
-            const set_list = ast.set
-                .filter((set_item) => set_item.from?.key === from_key)
-                .map((set_item) => {
-                const expr_result = getValue(set_item.value, {
-                    session,
-                    row: row,
-                });
-                if (expr_result.err) {
-                    throw new SQLError(expr_result.err);
-                }
-                return { column: set_item.column, value: expr_result };
-            });
-            if (set_list.length > 0) {
-                if (!object._updateList) {
-                    object._updateList = [];
-                }
-                object._updateList.push({ key, set_list });
-            }
-        });
-    });
-    // Update rows
-    const from_list = ast.from
-        .map((obj) => ({
-        database: obj.db ?? '',
-        table: obj.table ?? '',
-        key_list: obj._keyList ?? [],
-        update_list: obj._updateList ?? [],
-    }))
-        .filter((obj) => obj.update_list.length > 0);
-    if (from_list.length > 0) {
-        const groups = makeEngineGroups(session, from_list);
-        for (const group of groups) {
-            const { engine, list } = group;
-            const opts = { dynamodb, session, list };
-            const result = await engine.multipleUpdate(opts);
-            affectedRows += result.affectedRows;
-            changedRows += result.changedRows;
-        }
-    }
-    return { affectedRows, changedRows };
 }
 
 function typeCast(value, column, options, timeZone) {
@@ -10729,6 +11615,317 @@ function _jsonParse(obj) {
     }
 }
 
+async function query$3(params) {
+    const { ast, session } = params;
+    const duplicate_mode = ast.type === 'replace'
+        ? 'replace'
+        : ast.prefix === 'ignore into'
+            ? 'ignore'
+            : null;
+    const database = ast.table?.[0]?.db ?? session.getCurrentDatabase();
+    const table = ast.table?.[0]?.table;
+    if (!database) {
+        throw new SQLError('no_current_database');
+    }
+    _checkAst(ast);
+    const engine = getEngine(database, table, session);
+    const opts = { ...params, database, engine, duplicate_mode };
+    return await run(_runInsert, opts);
+}
+async function _runInsert(params) {
+    const { ast, session, engine, dynamodb, duplicate_mode } = params;
+    const table = ast.table?.[0]?.table;
+    let list;
+    // Build the list of rows to insert
+    if (ast.set && ast.set.length > 0) {
+        const obj = {};
+        for (const item of ast.set) {
+            const expr_result = getValue(item.value, { session });
+            if (expr_result.err) {
+                throw new SQLError(expr_result.err);
+            }
+            obj[item.column] = expr_result;
+        }
+        list = [obj];
+    }
+    else if (ast.columns &&
+        ast.columns.length > 0 &&
+        ast.values &&
+        ast.values.type === 'select') {
+        const opts = { ast: ast.values, session, dynamodb };
+        const { rows } = await internalQuery(opts);
+        list = rows.map((row) => {
+            const obj = {};
+            ast.columns?.forEach((name, i) => {
+                obj[name] = row[i];
+            });
+            return obj;
+        });
+    }
+    else if (ast.columns && ast.columns.length > 0) {
+        list = [];
+        const values = ast.values?.type === 'values' ? ast.values.values : [];
+        if (Array.isArray(values)) {
+            values.forEach((row, i) => {
+                const obj = {};
+                if (ast.columns && row.value.length === ast.columns.length) {
+                    ast.columns.forEach((name, j) => {
+                        const expr_result = getValue(row.value[j], {
+                            session,
+                        });
+                        if (expr_result.err) {
+                            throw new SQLError(expr_result.err);
+                        }
+                        obj[name] = expr_result;
+                    });
+                    list.push(obj);
+                }
+                else {
+                    throw new SQLError({ err: 'ER_WRONG_VALUE_COUNT_ON_ROW', args: [i] });
+                }
+            });
+        }
+    }
+    else {
+        shared.logger.error('unsupported insert without column names');
+        throw new SQLError('unsupported');
+    }
+    // Insert the rows
+    if (list.length > 0) {
+        const opts = {
+            dynamodb,
+            session,
+            database: params.database,
+            table,
+            list,
+            duplicate_mode: duplicate_mode ?? undefined,
+        };
+        try {
+            return await engine.insertRowList(opts);
+        }
+        catch (err) {
+            const error = err;
+            const err_str = String(error.message ?? '').toLowerCase();
+            if (error.message === 'resource_not_found' ||
+                error.err === 'resource_not_found' ||
+                error.name === 'ResourceNotFoundException' ||
+                err_str.includes('resource not found')) {
+                throw new SQLError({
+                    err: 'table_not_found',
+                    args: error.args ?? [table],
+                });
+            }
+            throw err;
+        }
+    }
+    else {
+        return { affectedRows: 0 };
+    }
+}
+function _checkAst(ast) {
+    if (ast.values?.type === 'select') {
+        if (ast.columns?.length !== ast.values.columns.length) {
+            throw new SQLError({ err: 'ER_WRONG_VALUE_COUNT_ON_ROW', args: [1] });
+        }
+    }
+}
+
+async function query$2(params) {
+    const { ast } = params;
+    const expr = ast.expr;
+    for (const e of expr) {
+        await _handleAssignment(e, params);
+    }
+}
+async function _handleAssignment(expr, params) {
+    const { session } = params;
+    const { left, right } = expr;
+    let result;
+    if (right.type === 'select') {
+        const { rows } = await internalQuery({
+            ...params,
+            ast: right,
+        });
+        if (rows[0]?.[0]) {
+            result = rows[0][0];
+        }
+        else {
+            result = { err: null, value: null, type: 'null' };
+        }
+    }
+    else {
+        result = getValue(right, { session });
+        if (result.err) {
+            throw new SQLError(result.err);
+        }
+    }
+    const { prefix, members } = left;
+    const scope = members.length > 0 ? left.name.toLowerCase() : '';
+    const firstMember = members[0];
+    const name = members.length > 0 && typeof firstMember === 'string'
+        ? firstMember
+        : left.name;
+    if (prefix === '@') {
+        session.setVariable(left.name, result);
+    }
+    else if (prefix === '@@' || prefix === null) {
+        if (scope === 'global') {
+            GlobalSettings$1.setGlobalVariable(String(name), result.value);
+        }
+        else if (scope === 'session' || !scope) {
+            session.setSessionVariable(String(name), result.value);
+        }
+    }
+    else {
+        shared.logger.error('set_handler._handleAssignment: unsupported left:', left);
+        throw new SQLError('unsupported');
+    }
+}
+
+async function query$1(params) {
+    const { ast, session, dynamodb } = params;
+    if (ast.keyword === 'databases') {
+        const column = Object.assign(convertType('string'), {
+            table: 'SCHEMATA',
+            orgTable: 'schemata',
+            name: 'Database',
+            orgName: 'Database',
+        });
+        const list = getDatabaseList();
+        const rows = list.map((item) => [item]);
+        return { rows, columns: [column] };
+    }
+    else if (ast.keyword === 'tables') {
+        const database = session.getCurrentDatabase();
+        if (!database) {
+            throw new SQLError('no_current_database');
+        }
+        const name = 'Tables_in_' + database;
+        const column = Object.assign(convertType('string'), {
+            db: database,
+            table: 'TABLES',
+            orgTable: 'tables',
+            name,
+            orgName: name,
+        });
+        const list = await getTableList({ dynamodb, database });
+        const rows = list.map((item) => [item]);
+        return { rows, columns: [column] };
+    }
+    else {
+        throw new SQLError('unsupported');
+    }
+}
+
+function isBaseFrom(from) {
+    return 'table' in from && typeof from.table === 'string';
+}
+async function query(params) {
+    const { ast, session } = params;
+    const current_database = session.getCurrentDatabase() ?? undefined;
+    const requestInfo = resolveReferences(ast, current_database);
+    const database = getDatabaseFromUpdate(ast);
+    if (!database) {
+        throw new SQLError('no_current_database');
+    }
+    return await run(_runUpdate, {
+        ...params,
+        ...requestInfo,
+        ast,
+    });
+}
+async function _runUpdate(params) {
+    const { ast, session, dynamodb, columnRefMap } = params;
+    if (!ast.table || !ast.table[0]) {
+        throw new SQLError('no_current_database');
+    }
+    const firstFrom = ast.table[0];
+    if (!isBaseFrom(firstFrom)) {
+        throw new SQLError('Invalid from clause');
+    }
+    const { db, table } = firstFrom;
+    const engine = getEngine(db ?? undefined, table, session);
+    if (ast.table.length === 1) {
+        const opts = {
+            dynamodb,
+            session,
+            from: firstFrom,
+            set: ast.set,
+            where: ast.where,
+            columnRefMap,
+        };
+        try {
+            return await engine.singleUpdate(opts);
+        }
+        catch (err) {
+            if (err instanceof NoSingleOperationError) {
+                return await _multipleUpdate(params);
+            }
+            throw err;
+        }
+    }
+    else {
+        return await _multipleUpdate(params);
+    }
+}
+async function _multipleUpdate(params) {
+    const { dynamodb, session, ast, columnRefMap, setListMap } = params;
+    let affectedRows = 0;
+    let changedRows = 0;
+    // Get rows to update
+    const result_list = await runSelect(params);
+    const updateListMap = new Map();
+    ast.table?.forEach((object) => {
+        const found = result_list.find((result) => result.from === object);
+        const list = found?.list;
+        const updateList = [];
+        list?.forEach(({ key, row }) => {
+            const set_list = ast.set
+                .filter((set_item) => setListMap.get(set_item) === object)
+                .map((set_item) => {
+                const item = set_item;
+                const expr_result = getValue(item.value, {
+                    session,
+                    row: row,
+                    columnRefMap,
+                });
+                if (expr_result.err) {
+                    throw new SQLError(expr_result.err);
+                }
+                return { column: item.column, value: expr_result };
+            });
+            if (set_list.length > 0) {
+                updateList.push({ key, set_list });
+            }
+        });
+        updateListMap.set(object, updateList);
+    });
+    // Update rows
+    const from_list = (ast.table ?? [])
+        .filter(isBaseFrom)
+        .map((obj) => {
+        const found = result_list.find((result) => result.from === obj);
+        return {
+            database: obj.db ?? '',
+            table: obj.table,
+            key_list: found?.key_list ?? [],
+            update_list: updateListMap.get(obj) ?? [],
+        };
+    })
+        .filter((obj) => obj.update_list.length > 0);
+    if (from_list.length > 0) {
+        const groups = makeEngineGroups(session, from_list);
+        for (const group of groups) {
+            const { engine, list } = group;
+            const opts = { dynamodb, session, list };
+            const result = await engine.multipleUpdate(opts);
+            affectedRows += result.affectedRows;
+            changedRows += result.changedRows;
+        }
+    }
+    return { affectedRows, changedRows };
+}
+
 const g_parser = new mysqlExports.Parser();
 const DEFAULT_RESULT = {
     fieldCount: 0,
@@ -10749,7 +11946,7 @@ class Query extends node_events.EventEmitter {
         this._session = params.session;
         this.sql = params.sql;
         this.values = params.values;
-        this.typeCast = params.typeCast ?? params.session.typeCast ?? true;
+        this.typeCast = params.typeCast ?? params.session.typeCast;
         this.nestedTables = params.nestTables ?? false;
     }
     start() { }
@@ -10808,7 +12005,7 @@ class Query extends node_events.EventEmitter {
     }
     async _singleQuery(ast) {
         const params = { dynamodb: this._session.dynamodb, session: this._session };
-        const type = ast?.type;
+        const type = ast.type;
         switch (type) {
             case 'alter':
                 await query$8({ ...params, ast });
@@ -10859,10 +12056,7 @@ class Query extends node_events.EventEmitter {
                 return { result: DEFAULT_RESULT, columns: undefined };
             default: {
                 shared.logger.error('unsupported statement type:', type);
-                throw new SQLError({
-                    err: 'unsupported_type',
-                    args: [type ?? 'unknown'],
-                });
+                throw new SQLError({ err: 'unsupported_type', args: [type] });
             }
         }
     }
@@ -10879,10 +12073,7 @@ class Query extends node_events.EventEmitter {
                     obj[`${column.table}${this.nestedTables}${column.name}`] = value;
                 }
                 else {
-                    const tableObj = obj[column.table];
-                    if (!tableObj) {
-                        obj[column.table] = {};
-                    }
+                    obj[column.table] ??= {};
                     obj[column.table][column.name] = value;
                 }
             });
@@ -10988,7 +12179,7 @@ class Session extends SQLMode {
     }
     constructor(params) {
         super(GlobalSettings$1.sqlMode);
-        this.config = params || {};
+        this.config = params ?? {};
         this.dynamodb = createDynamoDB(params);
         this.multipleStatements = Boolean(params?.multipleStatements ?? false);
         this.resultObjects = Boolean(params?.resultObjects ?? true);
@@ -11003,7 +12194,7 @@ class Session extends SQLMode {
             this.typeCastOptions.bigNumType = 'bigint';
         }
         else if (params?.supportBigNumbers) {
-            if (params?.bigNumberStrings) {
+            if (params.bigNumberStrings) {
                 this.typeCastOptions.bigNumType = 'string';
             }
             else {
@@ -11149,13 +12340,13 @@ class Session extends SQLMode {
             opts.values = values;
         }
         if (opts.values !== undefined) {
-            opts.sql = SqlString__namespace.format(opts.sql ?? '', opts.values);
+            opts.sql = SqlString__namespace.format(opts.sql, opts.values);
         }
         const query = new Query({ ...opts, session: this });
         void this._run(query, done);
         return query;
     }
-    createQuery = this.query;
+    createQuery = this.query.bind(this);
     escape = SqlString__namespace.escape;
     escapeId = SqlString__namespace.escapeId;
     format = SqlString__namespace.format;

@@ -8,11 +8,7 @@ import { runSelect } from './helpers/select_modify';
 import * as SchemaManager from './schema_manager';
 import * as TransactionManager from './transaction_manager';
 
-import type {
-  UpdateAST,
-  SetListWithValue,
-  ExtendedExpressionValue,
-} from './ast_types';
+import type { SetListWithValue, ExtendedExpressionValue } from './ast_types';
 import type { UpdateChange, EngineValue } from './engine';
 import type {
   HandlerParams,
@@ -20,20 +16,17 @@ import type {
   SourceRowResult,
 } from './handler_types';
 import type { RequestInfo } from './helpers/column_ref_helper';
-import type { From, BaseFrom } from 'node-sql-parser';
+import type { From, BaseFrom, Update } from 'node-sql-parser';
 
 function isBaseFrom(from: From): from is BaseFrom {
   return 'table' in from && typeof from.table === 'string';
 }
 
 export async function query(
-  params: HandlerParams<UpdateAST>
+  params: HandlerParams<Update>
 ): Promise<ChangedResult> {
   const { ast, session } = params;
   const current_database = session.getCurrentDatabase() ?? undefined;
-  // Temporarily add from property for resolveReferences
-  ast.from = ast.table ?? [];
-  ast.table = null;
   const requestInfo = resolveReferences(ast, current_database);
   const database = getDatabaseFromUpdate(ast);
   if (!database) {
@@ -46,19 +39,19 @@ export async function query(
   });
 }
 async function _runUpdate(
-  params: HandlerParams<UpdateAST> & RequestInfo
+  params: HandlerParams<Update> & RequestInfo
 ): Promise<ChangedResult> {
   const { ast, session, dynamodb, columnRefMap } = params;
-  if (!ast.from || !ast.from[0]) {
+  if (!ast.table || !ast.table[0]) {
     throw new SQLError('no_current_database');
   }
-  const firstFrom = ast.from[0];
+  const firstFrom = ast.table[0];
   if (!isBaseFrom(firstFrom)) {
     throw new SQLError('Invalid from clause');
   }
   const { db, table } = firstFrom;
   const engine = SchemaManager.getEngine(db ?? undefined, table, session);
-  if (ast.from.length === 1) {
+  if (ast.table.length === 1) {
     const opts = {
       dynamodb,
       session,
@@ -80,7 +73,7 @@ async function _runUpdate(
   }
 }
 async function _multipleUpdate(
-  params: HandlerParams<UpdateAST> & RequestInfo
+  params: HandlerParams<Update> & RequestInfo
 ): Promise<ChangedResult> {
   const { dynamodb, session, ast, columnRefMap, setListMap } = params;
   let affectedRows = 0;
@@ -94,7 +87,7 @@ async function _multipleUpdate(
     { key: EngineValue[]; set_list: SetListWithValue[] }[]
   >();
 
-  ast.from?.forEach((object) => {
+  ast.table?.forEach((object) => {
     const found = result_list.find((result) => result.from === object);
     const list = found?.list;
     const updateList: { key: EngineValue[]; set_list: SetListWithValue[] }[] =
@@ -125,7 +118,7 @@ async function _multipleUpdate(
   });
 
   // Update rows
-  const from_list = (ast.from ?? [])
+  const from_list = (ast.table ?? [])
     .filter(isBaseFrom)
     .map((obj) => {
       const found = result_list.find((result) => result.from === obj);

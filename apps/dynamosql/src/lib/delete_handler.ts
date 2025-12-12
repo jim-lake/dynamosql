@@ -6,18 +6,17 @@ import { runSelect } from './helpers/select_modify';
 import * as SchemaManager from './schema_manager';
 import * as TransactionManager from './transaction_manager';
 
-import type { DeleteAST } from './ast_types';
 import type { EngineValue } from './engine';
 import type { HandlerParams, AffectedResult } from './handler_types';
 import type { RequestInfo } from './helpers/column_ref_helper';
-import type { BaseFrom, From } from 'node-sql-parser';
+import type { BaseFrom, Delete, From } from 'node-sql-parser';
 
 function isBaseFrom(from: From): from is BaseFrom {
   return 'table' in from && typeof from.table === 'string';
 }
 
 export async function query(
-  params: HandlerParams<DeleteAST>
+  params: HandlerParams<Delete>
 ): Promise<AffectedResult> {
   const { ast, session } = params;
   const current_database = session.getCurrentDatabase() ?? undefined;
@@ -35,7 +34,7 @@ export async function query(
 }
 
 async function _runDelete(
-  params: HandlerParams<DeleteAST> & RequestInfo
+  params: HandlerParams<Delete> & RequestInfo
 ): Promise<AffectedResult> {
   const { ast, session, dynamodb, columnRefMap } = params;
   const firstFrom = ast.from[0];
@@ -69,7 +68,7 @@ async function _runDelete(
 }
 
 async function _multipleDelete(
-  params: HandlerParams<DeleteAST> & RequestInfo
+  params: HandlerParams<Delete> & RequestInfo
 ): Promise<AffectedResult> {
   const { dynamodb, session, ast } = params;
   let affectedRows = 0;

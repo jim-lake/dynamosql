@@ -52,43 +52,34 @@ export function resolveReferences(
   const table_map: TableMap = {};
   const db_map: DbMap = {};
   const fromRaw =
-    ast.type === 'select'
-      ? ast.from
-      : ast.type === 'delete'
-        ? ast.from
-        : (ast as Update & { from?: From[] }).from;
+    ast.type === 'select' || ast.type === 'delete' ? ast.from : ast.table;
   const from = Array.isArray(fromRaw) ? fromRaw : null;
-  from?.forEach((fromItem: From) => {
-    const fromEntry = fromItem as TableMapEntry & {
-      db?: string;
-      table?: string;
-    };
-    if (!fromEntry.db) {
-      if (!current_database) {
-        throw new SQLError('no_current_database');
+  from?.forEach((fromEntry: From) => {
+    if ('table' in fromEntry) {
+      if (!fromEntry.db) {
+        if (!current_database) {
+          throw new SQLError('no_current_database');
+        } else {
+          fromEntry.db = current_database;
+        }
+      }
+      requestSets.set(fromEntry, new Set());
+      requestAll.set(fromEntry, false);
+      if (fromEntry.as) {
+        table_map[fromEntry.as] = fromEntry;
       } else {
-        fromEntry.db = current_database;
-      }
-    }
-    requestSets.set(fromItem, new Set());
-    requestAll.set(fromItem, false);
-    if (fromEntry.as) {
-      table_map[fromEntry.as] = fromEntry;
-    } else {
-      if (!table_map[fromEntry.table ?? '']) {
-        table_map[fromEntry.table ?? ''] = fromEntry;
-      }
-      db_map[fromEntry.db] ??= {};
-      const dbEntry = db_map[fromEntry.db];
-      if (dbEntry && fromEntry.table) {
-        dbEntry[fromEntry.table] = fromEntry;
+        if (!table_map[fromEntry.table ?? '']) {
+          table_map[fromEntry.table ?? ''] = fromEntry;
+        }
+        db_map[fromEntry.db] ??= {};
+        const dbEntry = db_map[fromEntry.db];
+        if (dbEntry && fromEntry.table) {
+          dbEntry[fromEntry.table] = fromEntry;
+        }
       }
     }
   });
-  const tableRaw =
-    ast.type === 'update'
-      ? ast.table
-      : (ast as Select & { table?: From[] }).table;
+  const tableRaw = ast.type === 'update' ? null : ast.table;
   const table = Array.isArray(tableRaw) ? tableRaw : null;
   table?.forEach((object: From & { from?: TableMapEntry }) => {
     const obj = object as BaseFrom & { from?: TableMapEntry };
@@ -250,7 +241,7 @@ function _resolveObject(
         throw new SQLError({ err: 'table_not_found', args: [obj.table] });
       }
     } else if (obj.table) {
-      const astFrom = (ast as { from?: From[] }).from;
+      const astFrom = ast.type === 'update' ? ast.table : ast.from;
       const matchingFrom = astFrom?.find((from: From) => {
         const f = from as TableMapEntry;
         return f.as === obj.table || (!f.as && f.table === obj.table);
@@ -261,7 +252,7 @@ function _resolveObject(
         throw new SQLError({ err: 'table_not_found', args: [obj.table] });
       }
     } else {
-      const astFrom = (ast as { from?: From[] }).from;
+      const astFrom = ast.type === 'update' ? ast.table : ast.from;
       astFrom?.forEach((from: From) => {
         requestAll.set(from, true);
       });
@@ -281,7 +272,7 @@ function _resolveObject(
         columnRefMap.set(object as ColumnRef, { resultIndex: index });
       } else {
         const cached = name_cache[obj.column ?? ''];
-        const astFrom = (ast as { from?: TableMapEntry[] }).from;
+        const astFrom = ast.type === 'update' ? ast.table : ast.from;
         from = cached ?? astFrom?.[0];
       }
     }

@@ -1,4 +1,4 @@
-import * as crypto from 'crypto';
+import * as crypto from 'node:crypto';
 
 import { assertArgCount } from '../helpers/arg_count';
 import { convertNum } from '../helpers/sql_conversion';

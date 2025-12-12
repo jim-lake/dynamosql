@@ -25,7 +25,7 @@
   },
   "dependencies": {
     "@aws-sdk/client-dynamodb": "^3.922.0",
-    "node-sql-parser": "5.3.13",
+    "node-sql-parser": "*",
     "sqlstring": "2.3.3"
   },
   "devDependencies": {
