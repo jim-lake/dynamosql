@@ -13,9 +13,9 @@ import type {
 } from 'node-sql-parser';
 
 interface TableMapEntry {
-  db?: string;
+  db?: string | null;
   table?: string;
-  as?: string;
+  as?: string | null;
   key?: string;
 }
 
@@ -71,15 +71,19 @@ export function resolveReferences(
         if (!table_map[fromEntry.table ?? '']) {
           table_map[fromEntry.table ?? ''] = fromEntry;
         }
-        db_map[fromEntry.db] ??= {};
-        const dbEntry = db_map[fromEntry.db];
-        if (dbEntry && fromEntry.table) {
+        // db is guaranteed to be set by the check above
+        const db = fromEntry.db;
+        if (!db_map[db]) {
+          db_map[db] = {};
+        }
+        const dbEntry = db_map[db];
+        if (fromEntry.table) {
           dbEntry[fromEntry.table] = fromEntry;
         }
       }
     }
   });
-  const tableRaw = ast.type === 'update' ? null : ast.table;
+  const tableRaw = ast.type === 'delete' ? ast.table : null;
   const table = Array.isArray(tableRaw) ? tableRaw : null;
   table?.forEach((object: From & { from?: TableMapEntry }) => {
     const obj = object as BaseFrom & { from?: TableMapEntry };
@@ -242,10 +246,12 @@ function _resolveObject(
       }
     } else if (obj.table) {
       const astFrom = ast.type === 'update' ? ast.table : ast.from;
-      const matchingFrom = astFrom?.find((from: From) => {
-        const f = from as TableMapEntry;
-        return f.as === obj.table || (!f.as && f.table === obj.table);
-      });
+      const matchingFrom = Array.isArray(astFrom)
+        ? astFrom.find((from: From) => {
+            const f = from as TableMapEntry;
+            return f.as === obj.table || (!f.as && f.table === obj.table);
+          })
+        : undefined;
       if (matchingFrom) {
         requestAll.set(matchingFrom, true);
       } else {
@@ -253,9 +259,11 @@ function _resolveObject(
       }
     } else {
       const astFrom = ast.type === 'update' ? ast.table : ast.from;
-      astFrom?.forEach((from: From) => {
-        requestAll.set(from, true);
-      });
+      if (Array.isArray(astFrom)) {
+        astFrom.forEach((from: From) => {
+          requestAll.set(from, true);
+        });
+      }
     }
   } else {
     let add_cache = false;
@@ -273,7 +281,12 @@ function _resolveObject(
       } else {
         const cached = name_cache[obj.column ?? ''];
         const astFrom = ast.type === 'update' ? ast.table : ast.from;
-        from = cached ?? astFrom?.[0];
+        const firstFrom = Array.isArray(astFrom) ? astFrom[0] : undefined;
+        from =
+          cached ??
+          (firstFrom && 'table' in firstFrom
+            ? (firstFrom as TableMapEntry)
+            : undefined);
       }
     }
     if (from) {

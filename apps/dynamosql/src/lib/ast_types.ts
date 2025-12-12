@@ -40,7 +40,7 @@ export interface AssignExpr {
   type: 'assign';
   left: VarExpr;
   symbol: '=' | ':=';
-  right: ExpressionValue | { ast: Select; };
+  right: ExpressionValue | { ast: Select };
 }
 
 export interface SetStatement {

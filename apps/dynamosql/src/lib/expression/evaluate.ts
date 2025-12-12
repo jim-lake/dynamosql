@@ -231,7 +231,16 @@ export function getValue(
   } else if (type === 'assign') {
     // Handle := assignment operator
     const assignExpr = expr as AssignExpr;
-    const rightResult = getValue(assignExpr.right, state);
+    const right = assignExpr.right;
+    const rightResult =
+      'ast' in right
+        ? {
+            err: { err: 'ER_OPERAND_COLUMNS', args: ['1'] },
+            value: undefined,
+            type: 'undefined' as const,
+            name: undefined,
+          }
+        : getValue(right as ExtendedExpressionValue, state);
     if (rightResult.err) {
       result = rightResult;
     } else {

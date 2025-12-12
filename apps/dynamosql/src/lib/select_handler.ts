@@ -135,14 +135,18 @@ async function _evaluateReturn(
   params: EvaluateReturnParams
 ): Promise<InternalQueryResult> {
   const { session, source_map, ast, columnRefMap } = params;
-  const query_columns = _expandStarColumns({ ...params, ast, columnRefMap });
+  const query_columns =
+    ast.type === 'select'
+      ? _expandStarColumns({ ...params, ast, columnRefMap })
+      : [];
 
-  const { where, groupby } = ast;
+  const where = ast.where;
+  const groupby = ast.type === 'select' ? ast.groupby : undefined;
   const from = ast.type === 'update' ? ast.table : ast.from;
   let row_list: SourceRow[] = [];
   let sleep_ms = 0;
 
-  if (from) {
+  if (from && Array.isArray(from)) {
     row_list = formJoin({ source_map, from, where, session, columnRefMap });
   } else {
     row_list = [{ source: new Map() }];
@@ -150,9 +154,9 @@ async function _evaluateReturn(
 
   let grouped_list: (SourceRow | SourceRowGroup)[] = row_list;
 
-  if (groupby?.columns) {
+  if (groupby?.columns && ast.type === 'select') {
     grouped_list = formGroup({ groupby, ast, row_list, session, columnRefMap });
-  } else if (hasAggregate(ast)) {
+  } else if (ast.type === 'select' && hasAggregate(ast)) {
     grouped_list = formImplicitGroup({ ast, row_list, session, columnRefMap });
   }
 
