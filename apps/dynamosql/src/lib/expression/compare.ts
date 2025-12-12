@@ -35,14 +35,17 @@ export function inOp(expr: Binary, state: EvaluationState): EvaluationResult {
     for (const item of list) {
       const right = getValue(item, state);
       names.push(right.name ?? '');
-      const new_left = { ...left };
-      _convertCompare(new_left, right, state.session.timeZone);
       if (right.err) {
         return right;
       }
+      const [left_val, right_val] = _convertCompare(
+        left,
+        right,
+        state.session.timeZone
+      );
       if (right.value === null) {
         value = null;
-      } else if (new_left.value === right.value) {
+      } else if (left_val === right_val) {
         value = 1;
         break;
       }
@@ -89,9 +92,12 @@ export function nullif(
 
   if (!err) {
     const origValue = arg1.value;
-    _convertCompare(arg1, arg2, state.session.timeZone);
-    const isEqual =
-      arg1.value !== null && arg2.value !== null && arg1.value === arg2.value;
+    const [left_val, right_val] = _convertCompare(
+      arg1,
+      arg2,
+      state.session.timeZone
+    );
+    const isEqual = left_val !== null && left_val === right_val;
 
     value = isEqual ? null : origValue;
 
@@ -109,55 +115,71 @@ function _convertCompare(
   left: EvaluationResult,
   right: EvaluationResult,
   timeZone: string
-): void {
-  if (
-    left.value !== null &&
-    right.value !== null &&
-    left.value !== right.value
-  ) {
-    if (
-      (_isDateLike(left.value) || _isDateLike(right.value)) &&
-      left.type !== right.type
-    ) {
-      const type = _unionDateTime(left.value, right.value);
-      if (type === 'datetime') {
-        const left_dt = convertDateTime({
-          value: left.value,
-          decimals: 6,
-          timeZone,
-        });
-        const right_dt = convertDateTime({
-          value: right.value,
-          decimals: 6,
-          timeZone,
-        });
-        if (left_dt && right_dt) {
-          left.value = left_dt.toDate(timeZone).getTime();
-          right.value = right_dt.toDate(timeZone).getTime();
-        }
-      }
+): [number, number] | [string, string] | [null, null] {
+  let left_val = left.value;
+  let right_val = right.value;
+
+  if (left_val === null || right_val === null) {
+    return [null, null];
+  }
+
+  if (left_val === right_val) {
+    if (typeof left_val === 'number') {
+      return [left_val, right_val as number];
     }
-    if (
-      typeof left.value === 'number' ||
-      typeof right.value === 'number' ||
-      left.type === 'number' ||
-      right.type === 'number'
-    ) {
-      left.value = convertNum(left.value);
-      right.value = convertNum(right.value);
-    } else {
-      if (left.value instanceof SQLDateTime) {
-        left.value = left.value.toString({ timeZone });
-      } else {
-        left.value = String(left.value).trimEnd();
-      }
-      if (right.value instanceof SQLDateTime) {
-        right.value = right.value.toString({ timeZone });
-      } else {
-        right.value = String(right.value).trimEnd();
+    // Convert to string for other equal values
+    return [String(left_val), String(right_val)];
+  }
+
+  if (
+    (_isDateLike(left_val) || _isDateLike(right_val)) &&
+    left.type !== right.type
+  ) {
+    const type = _unionDateTime(left_val, right_val);
+    if (type === 'datetime') {
+      const left_dt = convertDateTime({
+        value: left_val,
+        decimals: 6,
+        timeZone,
+      });
+      const right_dt = convertDateTime({
+        value: right_val,
+        decimals: 6,
+        timeZone,
+      });
+      if (left_dt && right_dt) {
+        left_val = left_dt.toDate(timeZone).getTime();
+        right_val = right_dt.toDate(timeZone).getTime();
       }
     }
   }
+
+  if (
+    typeof left_val === 'number' ||
+    typeof right_val === 'number' ||
+    left.type === 'number' ||
+    right.type === 'number'
+  ) {
+    const left_num = convertNum(left_val);
+    const right_num = convertNum(right_val);
+    if (left_num === null || right_num === null) {
+      return [null, null];
+    }
+    return [left_num, right_num];
+  }
+
+  if (left_val instanceof SQLDateTime) {
+    left_val = left_val.toString({ timeZone });
+  } else {
+    left_val = String(left_val).trimEnd();
+  }
+  if (right_val instanceof SQLDateTime) {
+    right_val = right_val.toString({ timeZone });
+  } else {
+    right_val = String(right_val).trimEnd();
+  }
+
+  return [left_val as string, right_val as string];
 }
 function _equal(
   expr: Binary,
@@ -170,16 +192,17 @@ function _equal(
   const name = (left.name ?? '') + op + (right.name ?? '');
   let value: unknown = 0;
   if (!err) {
-    _convertCompare(left, right, state.session.timeZone);
-    if (left.value === null || right.value === null) {
+    const [left_val, right_val] = _convertCompare(
+      left,
+      right,
+      state.session.timeZone
+    );
+    if (left_val === null) {
       value = null;
-    } else if (left.value === right.value) {
+    } else if (left_val === right_val) {
       value = 1;
-    } else if (
-      typeof left.value === 'string' &&
-      typeof right.value === 'string'
-    ) {
-      value = left.value.localeCompare(right.value) === 0 ? 1 : 0;
+    } else if (typeof left_val === 'string' && typeof right_val === 'string') {
+      value = left_val.localeCompare(right_val) === 0 ? 1 : 0;
     }
   }
   return { err, value, name, type: 'longlong' };
@@ -199,21 +222,19 @@ function _gt(
     : (left.name ?? '') + op + (right.name ?? '');
   let value: unknown = 0;
   if (!err) {
-    _convertCompare(left, right, state.session.timeZone);
-    if (left.value === null || right.value === null) {
+    const [left_val, right_val] = _convertCompare(
+      left,
+      right,
+      state.session.timeZone
+    );
+    if (left_val === null) {
       value = null;
-    } else if (left.value === right.value) {
+    } else if (left_val === right_val) {
       value = 0;
-    } else if (
-      typeof left.value === 'number' &&
-      typeof right.value === 'number'
-    ) {
-      value = left.value > right.value ? 1 : 0;
-    } else if (
-      typeof left.value === 'string' &&
-      typeof right.value === 'string'
-    ) {
-      value = left.value.localeCompare(right.value) > 0 ? 1 : 0;
+    } else if (typeof left_val === 'number' && typeof right_val === 'number') {
+      value = left_val > right_val ? 1 : 0;
+    } else if (typeof left_val === 'string' && typeof right_val === 'string') {
+      value = left_val.localeCompare(right_val) > 0 ? 1 : 0;
     }
   }
   return { err, value, name, type: 'longlong' };
@@ -233,24 +254,22 @@ function _gte(
     : (left.name ?? '') + op + (right.name ?? '');
   let value: unknown = 0;
   if (!err) {
-    _convertCompare(left, right, state.session.timeZone);
-    if (left.value === null || right.value === null) {
+    const [left_val, right_val] = _convertCompare(
+      left,
+      right,
+      state.session.timeZone
+    );
+    if (left_val === null) {
       value = null;
-    } else if (left.value === right.value) {
+    } else if (left_val === right_val) {
       value = 1;
-    } else if (
-      typeof left.value === 'number' &&
-      typeof right.value === 'number'
-    ) {
-      const leftNum = convertNum(left.value);
-      const rightNum = convertNum(right.value);
+    } else if (typeof left_val === 'number' && typeof right_val === 'number') {
+      const leftNum = convertNum(left_val);
+      const rightNum = convertNum(right_val);
       value =
         leftNum !== null && rightNum !== null && leftNum >= rightNum ? 1 : 0;
-    } else if (
-      typeof left.value === 'string' &&
-      typeof right.value === 'string'
-    ) {
-      value = left.value.localeCompare(right.value) >= 0 ? 1 : 0;
+    } else if (typeof left_val === 'string' && typeof right_val === 'string') {
+      value = left_val.localeCompare(right_val) >= 0 ? 1 : 0;
     }
   }
   return { err, value, type: 'longlong', name };

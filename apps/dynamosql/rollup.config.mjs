@@ -5,11 +5,8 @@ import dts from 'rollup-plugin-dts';
 
 function isExternal(id) {
   return (
-    [
-      '@aws-sdk/client-dynamodb',
-      'big-integer',
-      'sqlstring',
-    ].includes(id) || id.startsWith('node:')
+    ['@aws-sdk/client-dynamodb', 'big-integer', 'sqlstring'].includes(id) ||
+    id.startsWith('node:')
   );
 }
 
