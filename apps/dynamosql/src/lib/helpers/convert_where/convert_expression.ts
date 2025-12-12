@@ -22,6 +22,7 @@ function constantFixup(func: ConvertFunc): ConvertFunc {
       value:
         typeof result.value === 'string' ||
         typeof result.value === 'number' ||
+        typeof result.value === 'boolean' ||
         result.value === null
           ? result.value
           : String(result.value),
@@ -42,7 +43,7 @@ function and(expr: Binary, state: ConvertWhereState): ConvertResult {
   }
 
   const err = left.err ?? right.err;
-  let value: string | number | null;
+  let value: string | number | boolean | null;
   if (!left.value || !right.value) {
     value = 0;
   } else if (left.value === 1 && right.value === 1) {
@@ -61,7 +62,7 @@ function or(expr: Binary, state: ConvertWhereState): ConvertResult {
   const left = convertWhere(expr.left, state);
   const right = convertWhere(expr.right, state);
   let err = left.err ?? right.err;
-  let value: string | number | null;
+  let value: string | number | boolean | null;
   if (err === 'unsupported' && state.default_true) {
     value = 1;
     err = null;
@@ -82,7 +83,7 @@ function or(expr: Binary, state: ConvertWhereState): ConvertResult {
 function _in(expr: Binary, state: ConvertWhereState): ConvertResult {
   const left = convertWhere(expr.left, state);
   let err: string | null = null;
-  let value: string | number | null = null;
+  let value: string | number | boolean | null = null;
   if (left.err) {
     err = left.err;
   } else if (left.value === null) {
@@ -90,7 +91,7 @@ function _in(expr: Binary, state: ConvertWhereState): ConvertResult {
   } else {
     const rightExpr = expr.right as { value?: unknown[] };
     const count = rightExpr.value?.length ?? 0;
-    const list: (string | number | null)[] = [];
+    const list: (string | number | boolean | null)[] = [];
     for (let i = 0; i < count; i++) {
       const right = convertWhere(rightExpr.value![i] as ExpressionValue, state);
       if (right.err) {

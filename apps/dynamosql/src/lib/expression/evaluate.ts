@@ -23,20 +23,8 @@ import type {
   SourceRowResultGroup,
 } from '../handler_types';
 import type { ColumnRefInfo } from '../helpers/column_ref_helper';
-import type {
-  ExpressionValue,
-  VarExpr,
-  UnaryExpr,
-  AssignExpr,
-} from 'node-sql-parser';
-import type {
-  Function,
-  AggrFunc,
-  Binary,
-  Interval as IntervalType,
-  ColumnRef,
-  Cast as CastType,
-} from 'node-sql-parser';
+import type { ExpressionValue } from 'node-sql-parser';
+import type { Interval as IntervalType, ColumnRef } from 'node-sql-parser';
 
 export interface EvaluationState {
   session: Session;
@@ -116,10 +104,10 @@ export function getValue(
       | ((expr: IntervalType, state: EvaluationState) => EvaluationResult)
       | undefined;
     if (typeof intervalFunc === 'function') {
-      result = intervalFunc(expr as IntervalType, state);
+      result = intervalFunc(expr, state);
     }
   } else if (type === 'function') {
-    const funcExpr = expr as Function;
+    const funcExpr = expr;
     const funcName = getFunctionName(funcExpr.name);
     const func = Functions[funcName.toLowerCase()];
     if (typeof func === 'function') {
@@ -130,7 +118,7 @@ export function getValue(
       result.err = { err: 'ER_SP_DOES_NOT_EXIST', args: [funcName] };
     }
   } else if (type === 'aggr_func') {
-    const aggrExpr = expr as AggrFunc;
+    const aggrExpr = expr;
     const funcName = getFunctionName(aggrExpr.name);
     const func = AggregateFunctions[funcName.toLowerCase()];
     if (func) {
@@ -141,7 +129,7 @@ export function getValue(
       result.err = { err: 'ER_SP_DOES_NOT_EXIST', args: [funcName] };
     }
   } else if (type === 'binary_expr') {
-    const binExpr = expr as Binary;
+    const binExpr = expr;
     const func = BinaryExpression[binExpr.operator.toLowerCase()];
     if (func) {
       result = func(binExpr, state);
@@ -154,7 +142,7 @@ export function getValue(
       result.err = { err: 'ER_SP_DOES_NOT_EXIST', args: [binExpr.operator] };
     }
   } else if (type === 'unary_expr') {
-    const unaryExpr = expr as UnaryExpr;
+    const unaryExpr = expr;
     const func = UnaryExpression[unaryExpr.operator.toLowerCase()];
     if (func) {
       result = func(unaryExpr, state);
@@ -167,7 +155,7 @@ export function getValue(
       result.err = { err: 'ER_SP_DOES_NOT_EXIST', args: [unaryExpr.operator] };
     }
   } else if (type === 'cast') {
-    const castExpr = expr as CastType;
+    const castExpr = expr;
     const target = Array.isArray(castExpr.target)
       ? castExpr.target[0]
       : castExpr.target;
@@ -181,7 +169,7 @@ export function getValue(
       result.err = { err: 'ER_SP_DOES_NOT_EXIST', args: [dataType] };
     }
   } else if (type === 'var') {
-    const varExpr = expr as VarExpr;
+    const varExpr = expr;
     const { prefix, members } = varExpr;
     const scope = members.length > 0 ? varExpr.name.toLowerCase() : '';
     const name =
@@ -235,7 +223,7 @@ export function getValue(
     }
   } else if (type === 'assign') {
     // Handle := assignment operator
-    const assignExpr = expr as AssignExpr;
+    const assignExpr = expr;
     const right = assignExpr.right;
     const rightResult =
       'ast' in right
@@ -296,7 +284,7 @@ export function getValue(
           typeof fromData === 'object' &&
           columnName in fromData
         ) {
-          cell = fromData[columnName] as EngineValue;
+          cell = fromData[columnName];
         }
       }
       const decode = _decodeCell(cell);

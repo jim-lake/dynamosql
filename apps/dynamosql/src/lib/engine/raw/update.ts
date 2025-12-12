@@ -28,7 +28,7 @@ export async function singleUpdate(
   }
   const value_list = set.map((object) => {
     const { value } = object;
-    let ret: string | number | null | undefined;
+    let ret: string | number | boolean | null | undefined;
     const result = convertWhere(value, { session, from, columnRefMap });
     if (result.err) {
       throw new NoSingleOperationError();

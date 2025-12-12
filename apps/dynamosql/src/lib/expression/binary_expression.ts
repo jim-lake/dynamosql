@@ -85,24 +85,16 @@ function _is(
   let right;
   let right_name;
 
-  // Type guard: check if rightExpr is a Value type
-  if (
-    typeof rightExpr === 'object' &&
-    'value' in rightExpr &&
-    !('type' in rightExpr && rightExpr.type === 'expr_list')
-  ) {
-    if (rightExpr.value === null) {
-      right = null;
-      right_name = 'NULL';
-    } else if (rightExpr.value === true) {
-      right = true;
-      right_name = 'TRUE';
-    } else if (rightExpr.value === false) {
-      right = false;
-      right_name = 'FALSE';
-    } else {
-      result.err ??= { err: 'syntax_err', args: [op] };
-    }
+  // Check if rightExpr is a Value type with null, true, or false
+  if (rightExpr.type === 'null') {
+    right = null;
+    right_name = 'NULL';
+  } else if (rightExpr.type === 'bool' && rightExpr.value === true) {
+    right = true;
+    right_name = 'TRUE';
+  } else if (rightExpr.type === 'bool' && rightExpr.value === false) {
+    right = false;
+    right_name = 'FALSE';
   } else {
     result.err ??= { err: 'syntax_err', args: [op] };
   }
@@ -204,7 +196,7 @@ function between(expr: Binary, state: EvaluationState): EvaluationResult {
       type: 'binary_expr',
       operator: '>=',
       left: expr.left,
-      right: expr.right.value[0],
+      right: expr.right.value[0]!,
     },
     state
   );
@@ -217,7 +209,7 @@ function between(expr: Binary, state: EvaluationState): EvaluationResult {
       type: 'binary_expr',
       operator: '<=',
       left: expr.left,
-      right: expr.right.value[1],
+      right: expr.right.value[1]!,
     },
     state
   );

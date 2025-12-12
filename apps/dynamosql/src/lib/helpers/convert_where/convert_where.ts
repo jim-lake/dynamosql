@@ -6,7 +6,7 @@ import Functions from './functions';
 
 import type { Session } from '../../../session';
 import type { ColumnRefInfo } from '../column_ref_helper';
-import type { ExpressionValue, UnaryExpr } from 'node-sql-parser';
+import type { ExpressionValue } from 'node-sql-parser';
 import type {
   Function as FunctionType,
   Binary,
@@ -24,7 +24,7 @@ export interface ConvertWhereState {
 
 export interface ConvertResult {
   err: string | null;
-  value: string | number | null;
+  value: string | number | boolean | null;
 }
 export function convertWhere(
   expr: ExpressionValue | Binary | FunctionType | null | undefined,
@@ -32,7 +32,7 @@ export function convertWhere(
 ): ConvertResult {
   const { from } = state;
   let err: string | null = null;
-  let value: string | number | null = null;
+  let value: string | number | boolean | null = null;
 
   if (expr) {
     const { type } = expr;
@@ -47,7 +47,7 @@ export function convertWhere(
     } else if (type === 'bool') {
       value = expr.value;
     } else if (type === 'function') {
-      const funcExpr = expr as FunctionType;
+      const funcExpr = expr;
       const funcName = getFunctionName(funcExpr.name);
       const func = Functions[funcName.toLowerCase()];
       if (func) {
@@ -61,7 +61,7 @@ export function convertWhere(
         err = 'unsupported';
       }
     } else if (type === 'binary_expr' || type === 'unary_expr') {
-      const opExpr = expr as Binary | UnaryExpr;
+      const opExpr = expr;
       const func = ConvertExpression[opExpr.operator.toLowerCase()];
       if (func) {
         const result = func(opExpr, state);

@@ -8,7 +8,6 @@ import * as SelectHandler from './select_handler';
 import * as TransactionManager from './transaction_manager';
 
 import type { Engine, EvaluationResultRow } from './engine';
-import type { EvaluationResult } from './expression';
 import type { HandlerParams, AffectedResult } from './handler_types';
 import type { Insert_Replace, SetList } from 'node-sql-parser';
 
@@ -75,7 +74,7 @@ async function _runInsert(
     list = rows.map((row) => {
       const obj: EvaluationResultRow = {};
       ast.columns?.forEach((name: string, i: number) => {
-        obj[name] = row[i] as EvaluationResult;
+        obj[name] = row[i]!;
       });
       return obj;
     });

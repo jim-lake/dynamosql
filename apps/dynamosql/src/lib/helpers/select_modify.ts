@@ -72,7 +72,7 @@ export async function runSelect(
       const rowValue = row.source.get(object);
       const keys = key_list.map((key: string) => {
         if (rowValue && typeof rowValue === 'object' && key in rowValue) {
-          return rowValue[key] as EngineValue;
+          return rowValue[key];
         }
         return undefined;
       });
@@ -83,12 +83,10 @@ export async function runSelect(
     const result: SelectResultItem = { from: object, key_list, list: [] };
     result_list.push(result);
     collection.forEach((value0: unknown, key0: EngineValue) => {
-      if (key_list.length > 1) {
-        (value0 as Map<EngineValue, unknown>).forEach(
-          (value1: unknown, key1: EngineValue) => {
-            result.list.push({ key: [key0, key1], row: value1 });
-          }
-        );
+      if (key_list.length > 1 && value0 instanceof Map) {
+        value0.forEach((value1: unknown, key1: EngineValue) => {
+          result.list.push({ key: [key0, key1], row: value1 });
+        });
       } else {
         result.list.push({ key: [key0], row: value0 });
       }
@@ -109,7 +107,9 @@ function _addCollection(
       sub_map = new Map<EngineValue, unknown>();
       collection.set(keys[0]!, sub_map);
     }
-    (sub_map as Map<EngineValue, unknown>).set(keys[1]!, value);
+    if (sub_map instanceof Map) {
+      sub_map.set(keys[1]!, value);
+    }
   } else {
     collection.set(keys[0]!, value);
   }

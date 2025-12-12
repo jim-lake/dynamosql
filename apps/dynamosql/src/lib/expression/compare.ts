@@ -31,7 +31,7 @@ export function inOp(expr: Binary, state: EvaluationState): EvaluationResult {
   if (left.value === null) {
     value = null;
   } else if (expr.right.type === 'expr_list') {
-    const list = expr.right.value ?? [];
+    const list = expr.right.value;
     for (const item of list) {
       const right = getValue(item, state);
       names.push(right.name ?? '');

@@ -96,8 +96,11 @@ export interface ValueExpr<T = string | number | boolean> {
     | "default"
     | "time"
     | "timestamp"
-    | "var_string";
+    | "var_string"
+    | "number"
+    | "bigint";
   value: T;
+  loc?: LocationRange;
 }
 
 export type SortDirection = 'ASC' | 'DESC' | 'asc' | 'desc';
@@ -199,7 +202,7 @@ export interface Interval {
 
 export type Param = { type: "param"; value: string; loc?: LocationRange };
 
-export type Value = { type: string; value: any; loc?: LocationRange };
+export type Value = ValueExpr;
 
 export type Binary = {
   type: "binary_expr";
@@ -244,7 +247,8 @@ export type ExpressionValue =
   | Interval
   | VarExpr
   | UnaryExpr
-  | AssignExpr;
+  | AssignExpr
+  | ExprList;
 
 export type ExprList = {
   type: "expr_list";
