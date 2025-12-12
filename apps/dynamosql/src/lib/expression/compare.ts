@@ -127,7 +127,6 @@ function _convertCompare(
     if (typeof left_val === 'number') {
       return [left_val, right_val as number];
     }
-    // Convert to string for other equal values
     return [String(left_val), String(right_val)];
   }
 
@@ -148,8 +147,8 @@ function _convertCompare(
         timeZone,
       });
       if (left_dt && right_dt) {
-        left_val = left_dt.toDate(timeZone).getTime();
-        right_val = right_dt.toDate(timeZone).getTime();
+        left_val = left_dt.toUTCTime();
+        right_val = right_dt.toUTCTime();
       }
     }
   }
@@ -173,6 +172,7 @@ function _convertCompare(
   } else {
     left_val = String(left_val).trimEnd();
   }
+
   if (right_val instanceof SQLDateTime) {
     right_val = right_val.toString({ timeZone });
   } else {

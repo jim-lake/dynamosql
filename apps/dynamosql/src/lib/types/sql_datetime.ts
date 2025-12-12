@@ -110,6 +110,9 @@ export class SQLDateTime {
     }
     return ret;
   }
+  toUTCTime(): number {
+    return this._time + this._fraction;
+  }
   gt(other: SQLDateTime): boolean {
     const time_diff = this._time - other.getTime();
     if (time_diff === 0) {
