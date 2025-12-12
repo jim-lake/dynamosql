@@ -4,20 +4,14 @@ import typescript from '@rollup/plugin-typescript';
 import dts from 'rollup-plugin-dts';
 
 function isExternal(id) {
-  return (
-    [
-      '@aws-sdk/client-dynamodb',
-      'big-integer',
-      'sqlstring',
-    ].includes(id) || id.startsWith('node:')
-  );
+  return id.startsWith('node:');
 }
 
 export default [
   {
     input: 'src/index.ts',
     output: {
-      file: 'dist/dynamosql.js',
+      file: 'dist/index.js',
       format: 'cjs',
       sourcemap: true,
       sourcemapExcludeSources: true,
@@ -31,7 +25,7 @@ export default [
   },
   {
     input: 'src/index.ts',
-    output: { file: 'dist/dynamosql.d.ts', format: 'es' },
+    output: { file: 'dist/index.d.ts', format: 'es' },
     plugins: [dts()],
     external: isExternal,
   },
