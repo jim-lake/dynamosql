@@ -68,14 +68,12 @@ export function resolveReferences(
       if (fromEntry.as) {
         table_map[fromEntry.as] = fromEntry;
       } else {
-        if (!table_map[fromEntry.table ?? '']) {
-          table_map[fromEntry.table ?? ''] = fromEntry;
+        if (fromEntry.table && !table_map[fromEntry.table]) {
+          table_map[fromEntry.table] = fromEntry;
         }
         // db is guaranteed to be set by the check above
         const db = fromEntry.db;
-        if (!db_map[db]) {
-          db_map[db] = {};
-        }
+        db_map[db] ??= {};
         const dbEntry = db_map[db];
         if (fromEntry.table) {
           dbEntry[fromEntry.table] = fromEntry;
