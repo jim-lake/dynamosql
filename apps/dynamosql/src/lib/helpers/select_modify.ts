@@ -5,15 +5,22 @@ import { getEngine } from '../schema_manager';
 import { internalQuery } from '../select_handler';
 
 import type { EngineValue } from '../engine';
-import type { HandlerParams } from '../handler_types';
 import type { RequestInfo } from './column_ref_helper';
+import type { HandlerParams } from '../handler_types';
+import type { SourceRowResult } from '../handler_types';
 import type { Select, Delete, From, Update } from 'node-sql-parser';
 
+export interface KeyRowResult {
+  key: EngineValue[];
+  row: SourceRowResult;
+}
 export interface SelectResultItem {
   from: From;
   key_list: string[];
-  list: { key: EngineValue[]; row: unknown }[];
+  list: KeyRowResult[];
 }
+
+type SourceRowOrMap = SourceRowResult | Map<EngineValue, SourceRowResult>;
 
 export type SelectModifyAST = Select | Update | Delete;
 
@@ -67,50 +74,59 @@ export async function runSelect(
 
   for (const object of from_list) {
     const key_list = keyListMap.get(object) ?? [];
-    const collection = new Map<EngineValue, unknown>();
+    const collection = new Map<EngineValue, SourceRowOrMap>();
     for (const row of row_list) {
-      const rowValue = row.source.get(object);
-      const keys = key_list.map((key: string) => {
-        if (rowValue && typeof rowValue === 'object' && key in rowValue) {
-          return rowValue[key];
+      const sourceRow = row.source.get(object);
+      let keys: [EngineValue] | [EngineValue, EngineValue] | undefined;
+      const key0 = key_list[0];
+      if (key0 && sourceRow) {
+        const value0 = sourceRow[key0];
+        if (value0 !== undefined) {
+          const key1 = key_list[1];
+          if (key1) {
+            const value1 = sourceRow[key1];
+            if (value1 !== undefined && keys) {
+              keys = [value0, value1];
+            }
+          } else {
+            keys = [value0];
+          }
         }
-        return undefined;
-      });
-      if (!keys.includes(undefined)) {
-        _addCollection(collection, keys as EngineValue[], row);
+      }
+      if (keys) {
+        _addCollection(collection, keys, row);
       }
     }
     const result: SelectResultItem = { from: object, key_list, list: [] };
     result_list.push(result);
-    collection.forEach((value0: unknown, key0: EngineValue) => {
+    collection.forEach((value0: SourceRowOrMap, key0: EngineValue) => {
       if (key_list.length > 1 && value0 instanceof Map) {
-        value0.forEach((value1: unknown, key1: EngineValue) => {
+        value0.forEach((value1: SourceRowResult, key1: EngineValue) => {
           result.list.push({ key: [key0, key1], row: value1 });
         });
       } else {
-        result.list.push({ key: [key0], row: value0 });
+        result.list.push({ key: [key0], row: value0 as SourceRowResult });
       }
     });
   }
 
   return result_list;
 }
-
 function _addCollection(
-  collection: Map<EngineValue, unknown>,
-  keys: EngineValue[],
-  value: unknown
+  collection: Map<EngineValue, SourceRowOrMap>,
+  keys: [EngineValue] | [EngineValue, EngineValue],
+  value: SourceRowResult
 ): void {
   if (keys.length > 1) {
-    let sub_map = collection.get(keys[0]!);
+    let sub_map = collection.get(keys[0]);
     if (!sub_map) {
-      sub_map = new Map<EngineValue, unknown>();
-      collection.set(keys[0]!, sub_map);
+      sub_map = new Map<EngineValue, SourceRowResult>();
+      collection.set(keys[0], sub_map);
     }
     if (sub_map instanceof Map) {
       sub_map.set(keys[1]!, value);
     }
   } else {
-    collection.set(keys[0]!, value);
+    collection.set(keys[0], value);
   }
 }

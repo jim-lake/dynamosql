@@ -10,7 +10,7 @@ import { formJoin } from './helpers/join';
 import { sort } from './helpers/sort';
 import * as SchemaManager from './schema_manager';
 
-import type { Row, FromJoin } from './engine';
+import type { Row } from './engine';
 import type {
   HandlerParams,
   DynamoDBClient,
@@ -31,8 +31,16 @@ export type SourceMap = Map<From, Row[]>;
 
 type ColumnMap = Map<From, string[]>;
 
-function isBaseFrom(from: From): from is BaseFrom {
+function _isBaseFrom(from: From): from is BaseFrom {
   return 'table' in from && typeof from.table === 'string';
+}
+function _isBaseFromList(list: From[]): list is BaseFrom[] {
+  for (const from of list) {
+    if (!_isBaseFrom(from)) {
+      return false;
+    }
+  }
+  return true;
 }
 
 interface QueryColumn {
@@ -93,18 +101,18 @@ export async function internalQuery(
   const from = ast.type === 'update' ? ast.table : ast.from;
   let source_map: SourceMap = new Map();
   let column_map: ColumnMap = new Map();
-  if (from && Array.isArray(from) && from.length > 0) {
-    const first = from[0];
-    if (!first || !isBaseFrom(first)) {
+  if (from && Array.isArray(from) && from[0]) {
+    if (!_isBaseFromList(from)) {
       throw new SQLError('Invalid from clause');
     }
+    const first = from[0];
     const db = first.db;
     const table = first.table;
     const engine = SchemaManager.getEngine(db ?? undefined, table, session);
     const opts = {
       session,
       dynamodb,
-      list: from as FromJoin[],
+      list: from,
       where: ast.where,
       requestSets,
       requestAll,
@@ -195,7 +203,7 @@ async function _evaluateReturn(
     let fromInfo: BaseFrom | null = null;
     if (column.expr.type === 'column_ref') {
       const refInfo = columnRefMap.get(column.expr as ColumnRef);
-      if (refInfo?.from && isBaseFrom(refInfo.from)) {
+      if (refInfo?.from && _isBaseFrom(refInfo.from)) {
         fromInfo = refInfo.from;
       }
     }
@@ -256,7 +264,7 @@ function _expandStarColumns(params: ExpandStarColumnsParams): QueryColumn[] {
       const { db, table } = column.expr;
       const from_list = Array.isArray(ast.from) ? ast.from : [];
       for (const from of from_list) {
-        if (!isBaseFrom(from)) {
+        if (!_isBaseFrom(from)) {
           continue;
         }
         if (
@@ -272,11 +280,11 @@ function _expandStarColumns(params: ExpandStarColumnsParams): QueryColumn[] {
           }
           column_list?.forEach((name: string) => {
             const colRef = {
-              type: 'column_ref',
+              type: 'column_ref' as const,
               db: from.as ? null : from.db,
               table: from.as ?? from.table,
               column: name,
-            } as ColumnRef;
+            };
             // Add to columnRefMap so it can be looked up later
             columnRefMap.set(colRef, { from });
             ret.push({ expr: colRef, as: null });
@@ -284,7 +292,7 @@ function _expandStarColumns(params: ExpandStarColumnsParams): QueryColumn[] {
         }
       }
     } else {
-      ret.push(column as QueryColumn);
+      ret.push(column);
     }
   }
   return ret;

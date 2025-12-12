@@ -10,13 +10,8 @@ import * as TransactionManager from './transaction_manager';
 
 import type { UpdateChange, EngineValue } from './engine';
 import type { EvaluationResult } from './expression';
-import type {
-  HandlerParams,
-  ChangedResult,
-  SourceRowResult,
-} from './handler_types';
+import type { HandlerParams, ChangedResult } from './handler_types';
 import type { RequestInfo } from './helpers/column_ref_helper';
-import type { ExpressionValue } from 'node-sql-parser';
 import type { From, BaseFrom, Update } from 'node-sql-parser';
 
 export interface SetListWithValue {
@@ -100,12 +95,11 @@ async function _multipleUpdate(
       [];
     list?.forEach(({ key, row }) => {
       const set_list = ast.set
-        .filter((set_item) => setListMap.get(set_item) === object)
-        .map((set_item) => {
-          const item = set_item as { column: string; value: ExpressionValue };
+        .filter((item) => setListMap.get(item) === object)
+        .map((item) => {
           const expr_result = Expression.getValue(item.value, {
             session,
-            row: row as SourceRowResult,
+            row,
             columnRefMap,
           });
           if (expr_result.err) {

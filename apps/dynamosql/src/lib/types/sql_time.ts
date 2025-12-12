@@ -36,9 +36,8 @@ export class SQLTime {
     return this._decimals;
   }
   toString(params?: SQLTimeToStringParams): string {
-    let ret;
     if (isNaN(this._time)) {
-      ret = '';
+      return '';
     } else {
       let seconds = this._time;
       if (params?.timeZone) {
@@ -53,19 +52,25 @@ export class SQLTime {
       if (neg) {
         seconds = -seconds;
       }
+      const decimals = Math.min(params?.decimals ?? this._decimals, 6);
+      const final_seconds = seconds % 60;
+      let ret_secs = final_seconds.toFixed(decimals);
+      if (ret_secs.startsWith('60')) {
+        // seconds overflowed on rounding and printing, carry and correct
+        ret_secs = '0' + ret_secs.slice(1);
+        seconds += 60;
+      }
+
       const hours = Math.floor(seconds / HOUR);
       seconds -= hours * HOUR;
       const minutes = Math.floor(seconds / MINUTE);
       seconds -= minutes * MINUTE;
 
-      const decimals = Math.min(params?.decimals ?? this._decimals, 6);
-      let ret_secs = seconds.toFixed(decimals);
       if (ret_secs.length < (decimals > 0 ? decimals + 3 : 2)) {
         ret_secs = '0' + ret_secs;
       }
-      ret = `${neg}${_pad(hours)}:${_pad(minutes)}:${ret_secs}`;
+      return `${neg}${_pad(hours)}:${_pad(minutes)}:${ret_secs}`;
     }
-    return ret;
   }
   toSQLDateTime(decimals?: number): SQLDateTime {
     const now = Date.now() / 1000;

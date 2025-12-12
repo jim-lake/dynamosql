@@ -82,13 +82,11 @@ async function _runInsert(
     list = [];
     const values = ast.values?.type === 'values' ? ast.values.values : [];
     if (Array.isArray(values)) {
-      values.forEach((row: { value: unknown[] }, i: number) => {
+      values.forEach((row, i: number) => {
         const obj: EvaluationResultRow = {};
         if (ast.columns && row.value.length === ast.columns.length) {
           ast.columns.forEach((name: string, j: number) => {
-            const expr_result = Expression.getValue(row.value[j] as never, {
-              session,
-            });
+            const expr_result = Expression.getValue(row.value[j], { session });
             if (expr_result.err) {
               throw new SQLError(expr_result.err);
             }

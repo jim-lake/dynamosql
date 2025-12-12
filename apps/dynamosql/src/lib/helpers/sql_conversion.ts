@@ -203,7 +203,11 @@ export function convertTime(params: ConvertTimeParams): SQLTime | null {
   const { value } = params;
   let { decimals } = params;
   if (value instanceof SQLTime) {
-    return value;
+    if (decimals === undefined || value.getDecimals() === decimals) {
+      return value;
+    } else {
+      return new SQLTime({ time: value.getTime(), decimals });
+    }
   } else if (value instanceof SQLDateTime) {
     const time = (value.getTime() % DAY) + value.getFraction();
     return createSQLTime({ time, decimals: value.getDecimals() });
