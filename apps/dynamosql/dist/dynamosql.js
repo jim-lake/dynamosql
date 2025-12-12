@@ -4683,7 +4683,7 @@ function inOp(expr, state) {
         value = null;
     }
     else if (expr.right.type === 'expr_list') {
-        const list = expr.right.value ?? [];
+        const list = expr.right.value;
         for (const item of list) {
             const right = getValue(item, state);
             names.push(right.name ?? '');
@@ -5209,25 +5209,18 @@ function _is$1(expr, state, op) {
     const rightExpr = expr.right;
     let right;
     let right_name;
-    // Type guard: check if rightExpr is a Value type
-    if (typeof rightExpr === 'object' &&
-        'value' in rightExpr &&
-        !('type' in rightExpr && rightExpr.type === 'expr_list')) {
-        if (rightExpr.value === null) {
-            right = null;
-            right_name = 'NULL';
-        }
-        else if (rightExpr.value === true) {
-            right = true;
-            right_name = 'TRUE';
-        }
-        else if (rightExpr.value === false) {
-            right = false;
-            right_name = 'FALSE';
-        }
-        else {
-            result.err ??= { err: 'syntax_err', args: [op] };
-        }
+    // Check if rightExpr is a Value type with null, true, or false
+    if (rightExpr.type === 'null') {
+        right = null;
+        right_name = 'NULL';
+    }
+    else if (rightExpr.type === 'bool' && rightExpr.value === true) {
+        right = true;
+        right_name = 'TRUE';
+    }
+    else if (rightExpr.type === 'bool' && rightExpr.value === false) {
+        right = false;
+        right_name = 'FALSE';
     }
     else {
         result.err ??= { err: 'syntax_err', args: [op] };
@@ -8859,9 +8852,15 @@ function getValue(expr, state) {
         }
         else {
             result.value = Number(expr.value);
-            if (typeof expr.value === 'string' && expr.value.includes('.')) {
-                result.type = 'number';
-                result.decimals = getDecimalsForString(expr.value);
+            if (typeof expr.value === 'string') {
+                if (expr.value.includes('e')) {
+                    result.type = 'double';
+                    result.decimals = 31;
+                }
+                else if (expr.value.includes('.')) {
+                    result.type = 'number';
+                    result.decimals = getDecimalsForString(expr.value);
+                }
             }
             else {
                 result.type = Number.isInteger(result.value) ? 'longlong' : 'number';
@@ -9029,7 +9028,15 @@ function getValue(expr, state) {
     else if (type === 'assign') {
         // Handle := assignment operator
         const assignExpr = expr;
-        const rightResult = getValue(assignExpr.right, state);
+        const right = assignExpr.right;
+        const rightResult = 'ast' in right
+            ? {
+                err: { err: 'ER_OPERAND_COLUMNS', args: ['1'] },
+                value: undefined,
+                type: 'undefined',
+                name: undefined,
+            }
+            : getValue(right, state);
         if (rightResult.err) {
             result = rightResult;
         }
@@ -9145,6 +9152,7 @@ function constantFixup(func) {
             err: null,
             value: typeof result.value === 'string' ||
                 typeof result.value === 'number' ||
+                typeof result.value === 'boolean' ||
                 result.value === null
                 ? result.value
                 : String(result.value),
@@ -10291,18 +10299,20 @@ function resolveReferences(ast, current_database) {
                 table_map[fromEntry.as] = fromEntry;
             }
             else {
-                if (!table_map[fromEntry.table ?? '']) {
-                    table_map[fromEntry.table ?? ''] = fromEntry;
+                if (fromEntry.table && !table_map[fromEntry.table]) {
+                    table_map[fromEntry.table] = fromEntry;
                 }
-                db_map[fromEntry.db] ??= {};
-                const dbEntry = db_map[fromEntry.db];
-                if (dbEntry && fromEntry.table) {
+                // db is guaranteed to be set by the check above
+                const db = fromEntry.db;
+                db_map[db] ??= {};
+                const dbEntry = db_map[db];
+                if (fromEntry.table) {
                     dbEntry[fromEntry.table] = fromEntry;
                 }
             }
         }
     });
-    const tableRaw = ast.type === 'update' ? null : ast.table;
+    const tableRaw = ast.type === 'delete' ? ast.table : null;
     const table = Array.isArray(tableRaw) ? tableRaw : null;
     table?.forEach((object) => {
         const obj = object;
@@ -10385,10 +10395,12 @@ function _resolveObject(object, ast, db_map, table_map, name_cache, requestSets,
         }
         else if (obj.table) {
             const astFrom = ast.type === 'update' ? ast.table : ast.from;
-            const matchingFrom = astFrom?.find((from) => {
-                const f = from;
-                return f.as === obj.table || (!f.as && f.table === obj.table);
-            });
+            const matchingFrom = Array.isArray(astFrom)
+                ? astFrom.find((from) => {
+                    const f = from;
+                    return f.as === obj.table || (!f.as && f.table === obj.table);
+                })
+                : undefined;
             if (matchingFrom) {
                 requestAll.set(matchingFrom, true);
             }
@@ -10398,9 +10410,11 @@ function _resolveObject(object, ast, db_map, table_map, name_cache, requestSets,
         }
         else {
             const astFrom = ast.type === 'update' ? ast.table : ast.from;
-            astFrom?.forEach((from) => {
-                requestAll.set(from, true);
-            });
+            if (Array.isArray(astFrom)) {
+                astFrom.forEach((from) => {
+                    requestAll.set(from, true);
+                });
+            }
         }
     }
     else {
@@ -10422,7 +10436,12 @@ function _resolveObject(object, ast, db_map, table_map, name_cache, requestSets,
             else {
                 const cached = name_cache[obj.column ?? ''];
                 const astFrom = ast.type === 'update' ? ast.table : ast.from;
-                from = cached ?? astFrom?.[0];
+                const firstFrom = Array.isArray(astFrom) ? astFrom[0] : undefined;
+                from =
+                    cached ??
+                        (firstFrom && 'table' in firstFrom
+                            ? firstFrom
+                            : undefined);
             }
         }
         if (from) {
@@ -10499,7 +10518,7 @@ function convertType(type, nullable) {
                 length: 23,
                 type: exports.Types.DOUBLE,
                 flags: flags | FIELD_FLAGS.BINARY,
-                decimals: 6,
+                decimals: 31,
                 zeroFill: false,
                 protocol41: true,
             };
@@ -10993,22 +11012,25 @@ async function internalQuery(params) {
 }
 async function _evaluateReturn(params) {
     const { session, source_map, ast, columnRefMap } = params;
-    const query_columns = _expandStarColumns({ ...params, ast, columnRefMap });
-    const { where, groupby } = ast;
+    const query_columns = ast.type === 'select'
+        ? _expandStarColumns({ ...params, ast, columnRefMap })
+        : [];
+    const where = ast.where;
+    const groupby = ast.type === 'select' ? ast.groupby : undefined;
     const from = ast.type === 'update' ? ast.table : ast.from;
     let row_list = [];
     let sleep_ms = 0;
-    if (from) {
+    if (from && Array.isArray(from)) {
         row_list = formJoin({ source_map, from, where, session, columnRefMap });
     }
     else {
         row_list = [{ source: new Map() }];
     }
     let grouped_list = row_list;
-    if (groupby?.columns) {
+    if (groupby?.columns && ast.type === 'select') {
         grouped_list = formGroup({ groupby, ast, row_list, session, columnRefMap });
     }
-    else if (hasAggregate(ast)) {
+    else if (ast.type === 'select' && hasAggregate(ast)) {
         grouped_list = formImplicitGroup({ row_list});
     }
     const result_list = [];
@@ -11351,7 +11373,7 @@ async function runSelect(params) {
         const result = { from: object, key_list, list: [] };
         result_list.push(result);
         collection.forEach((value0, key0) => {
-            if (key_list.length > 1) {
+            if (key_list.length > 1 && value0 instanceof Map) {
                 value0.forEach((value1, key1) => {
                     result.list.push({ key: [key0, key1], row: value1 });
                 });
@@ -11370,7 +11392,9 @@ function _addCollection(collection, keys, value) {
             sub_map = new Map();
             collection.set(keys[0], sub_map);
         }
-        sub_map.set(keys[1], value);
+        if (sub_map instanceof Map) {
+            sub_map.set(keys[1], value);
+        }
     }
     else {
         collection.set(keys[0], value);
