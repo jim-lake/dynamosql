@@ -1,11 +1,11 @@
-import type { ExtendedAST } from '../ast_types';
+import type { AST } from 'node-sql-parser';
 import type { FunctionName, BaseFrom, From } from 'node-sql-parser';
 
 function isBaseFrom(from: From): from is BaseFrom {
   return 'table' in from && typeof from.table === 'string';
 }
 
-export function getDatabaseFromTable(ast: ExtendedAST): string | undefined {
+export function getDatabaseFromTable(ast: AST): string | undefined {
   if (ast.type === 'create') {
     if (Array.isArray(ast.table)) {
       return ast.table[0]?.db;
@@ -15,7 +15,7 @@ export function getDatabaseFromTable(ast: ExtendedAST): string | undefined {
   }
   return undefined;
 }
-export function getTableFromTable(ast: ExtendedAST): string | undefined {
+export function getTableFromTable(ast: AST): string | undefined {
   if (ast.type === 'create') {
     if (Array.isArray(ast.table)) {
       return ast.table[0]?.table;
@@ -25,7 +25,7 @@ export function getTableFromTable(ast: ExtendedAST): string | undefined {
   }
   return undefined;
 }
-export function getDatabaseFromUpdate(ast: ExtendedAST): string | undefined {
+export function getDatabaseFromUpdate(ast: AST): string | undefined {
   if (ast.type === 'update') {
     if (Array.isArray(ast.table) && ast.table[0] && isBaseFrom(ast.table[0])) {
       return ast.table[0].db ?? '';

@@ -212,6 +212,26 @@ export type Binary = {
 
 export type Expr = Binary;
 
+export interface VarExpr {
+  type: 'var';
+  name: string;
+  members: ExpressionValue[];
+  prefix: string | null;
+}
+
+export interface UnaryExpr {
+  type: 'unary_expr';
+  operator: string;
+  expr: ExpressionValue;
+}
+
+export interface AssignExpr {
+  type: 'assign';
+  left: VarExpr;
+  symbol: '=' | ':=';
+  right: ExpressionValue | { ast: Select };
+}
+
 export type ExpressionValue =
   | ColumnRef
   | Param
@@ -221,7 +241,10 @@ export type ExpressionValue =
   | Value
   | Binary
   | Cast
-  | Interval;
+  | Interval
+  | VarExpr
+  | UnaryExpr
+  | AssignExpr;
 
 export type ExprList = {
   type: "expr_list";
@@ -383,6 +406,7 @@ export type ColumnDefinitionOptList = {
   auto_increment?: "auto_increment";
   unique?: "unique" | "unique key";
   primary?: "key" | "primary key";
+  primary_key?: "key" | "primary key";
   comment?: KeywordComment;
   collate?: { collate: CollateExpr };
   column_format?: { column_format: any };
@@ -534,6 +558,24 @@ export interface Drop {
   name: any[];
 }
 
+export interface Show {
+  type: 'show';
+  keyword: string;
+  expr?: ExpressionValue;
+  from?: From[];
+}
+
+export interface SetStatement {
+  type: 'set';
+  keyword: string | null;
+  expr: AssignExpr[];
+}
+
+export interface Transaction {
+  type: 'transaction';
+  expr?: { action?: { value?: string } };
+}
+
 export type AST =
   | Use
   | Select
@@ -542,7 +584,10 @@ export type AST =
   | Delete
   | Alter
   | Create
-  | Drop;
+  | Drop
+  | Show
+  | SetStatement
+  | Transaction;
 
 export class Parser {
   constructor();

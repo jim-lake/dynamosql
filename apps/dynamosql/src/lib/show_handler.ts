@@ -3,9 +3,9 @@ import { SQLError } from '../error';
 import { convertType } from './helpers/column_type_helper';
 import * as SchemaManager from './schema_manager';
 
-import type { Show } from './ast_types';
 import type { HandlerParams } from './handler_types';
 import type { FieldInfo } from '../types';
+import type { Show } from 'node-sql-parser';
 
 export interface ShowResult {
   rows: string[][];

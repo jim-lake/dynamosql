@@ -3,19 +3,16 @@ import { getValue } from '../../expression';
 import { convertWhere } from './convert_where';
 
 import type { ConvertWhereState, ConvertResult } from './convert_where';
-import type { ExtendedExpressionValue, UnaryExpr } from '../../ast_types';
+import type { ExpressionValue, UnaryExpr } from 'node-sql-parser';
 import type { Binary } from 'node-sql-parser';
 
 type ConvertFunc = (
-  expr: ExtendedExpressionValue,
+  expr: ExpressionValue,
   state: ConvertWhereState
 ) => ConvertResult;
 
 function constantFixup(func: ConvertFunc): ConvertFunc {
-  return (
-    expr: ExtendedExpressionValue,
-    state: ConvertWhereState
-  ): ConvertResult => {
+  return (expr: ExpressionValue, state: ConvertWhereState): ConvertResult => {
     const result = getValue(expr, state);
     if (result.err) {
       return func(expr, state);
@@ -95,10 +92,7 @@ function _in(expr: Binary, state: ConvertWhereState): ConvertResult {
     const count = rightExpr.value?.length ?? 0;
     const list: (string | number | null)[] = [];
     for (let i = 0; i < count; i++) {
-      const right = convertWhere(
-        rightExpr.value![i] as ExtendedExpressionValue,
-        state
-      );
+      const right = convertWhere(rightExpr.value![i] as ExpressionValue, state);
       if (right.err) {
         err = right.err;
         break;
@@ -183,10 +177,7 @@ function _is(
   return { err, value };
 }
 
-function not(
-  expr: ExtendedExpressionValue,
-  state: ConvertWhereState
-): ConvertResult {
+function not(expr: ExpressionValue, state: ConvertWhereState): ConvertResult {
   const unaryExpr = expr as UnaryExpr;
   const result = convertWhere(unaryExpr.expr, state);
   if (!result.err) {
@@ -195,10 +186,7 @@ function not(
   return result;
 }
 
-function minus(
-  expr: ExtendedExpressionValue,
-  state: ConvertWhereState
-): ConvertResult {
+function minus(expr: ExpressionValue, state: ConvertWhereState): ConvertResult {
   const unaryExpr = expr as UnaryExpr;
   const result = convertWhere(unaryExpr.expr, state);
   if (!result.err) {

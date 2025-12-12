@@ -11,11 +11,11 @@ import {
 import * as SchemaManager from './schema_manager';
 import * as SelectHandler from './select_handler';
 
-import type { ExtendedColumnDefinitionOptList } from './ast_types';
 import type { ColumnDef, KeyDef, EvaluationResultRow } from './engine';
 import type { HandlerParams, AffectedResult } from './handler_types';
 import type { FieldInfo } from '../types';
 import type { EvaluationResult } from './expression';
+import type { ColumnDefinitionOptList } from 'node-sql-parser';
 import type { Create } from 'node-sql-parser';
 
 export async function query(
@@ -81,7 +81,7 @@ async function _createTable(
     ) {
       const col = { name: def.column.column, type: def.definition.dataType };
       column_list.push(col);
-      const def_key = def as ExtendedColumnDefinitionOptList;
+      const def_key = def as ColumnDefinitionOptList;
       if (def_key.primary_key === 'primary key') {
         primary_key.push(col);
       }

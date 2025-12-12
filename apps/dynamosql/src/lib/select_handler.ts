@@ -10,7 +10,6 @@ import { formJoin } from './helpers/join';
 import { sort } from './helpers/sort';
 import * as SchemaManager from './schema_manager';
 
-import type { ExtendedExpressionValue } from './ast_types';
 import type { Row, FromJoin } from './engine';
 import type {
   HandlerParams,
@@ -25,6 +24,7 @@ import type { EvaluationResult } from './expression';
 import type { Session } from '../session';
 import type { ColumnRefInfo } from './helpers/column_ref_helper';
 import type { SelectModifyAST } from './helpers/select_modify';
+import type { ExpressionValue } from 'node-sql-parser';
 import type { Select, ColumnRef, From, BaseFrom } from 'node-sql-parser';
 
 export type SourceMap = Map<From, Row[]>;
@@ -36,7 +36,7 @@ function isBaseFrom(from: From): from is BaseFrom {
 }
 
 interface QueryColumn {
-  expr: ExtendedExpressionValue & {
+  expr: ExpressionValue & {
     db?: string | null;
     from?: { db?: string; table?: string; as?: string };
   };

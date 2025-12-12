@@ -15,12 +15,6 @@ import { methods as UnaryExpression } from './unary_expression';
 
 import type { SQLError } from '../../error';
 import type { Session } from '../../session';
-import type {
-  ExtendedExpressionValue,
-  VarExpr,
-  UnaryExpr,
-  AssignExpr,
-} from '../ast_types';
 import type { EngineValue, CellValue } from '../engine';
 import type {
   SourceRow,
@@ -29,6 +23,12 @@ import type {
   SourceRowResultGroup,
 } from '../handler_types';
 import type { ColumnRefInfo } from '../helpers/column_ref_helper';
+import type {
+  ExpressionValue,
+  VarExpr,
+  UnaryExpr,
+  AssignExpr,
+} from 'node-sql-parser';
 import type {
   Function,
   AggrFunc,
@@ -55,7 +55,7 @@ export interface EvaluationResult extends EvaluationValue {
 }
 
 export function getValue(
-  expr: ExtendedExpressionValue | undefined,
+  expr: ExpressionValue | undefined,
   state: EvaluationState
 ): EvaluationResult {
   const { session, row } = state;
@@ -240,7 +240,7 @@ export function getValue(
             type: 'undefined' as const,
             name: undefined,
           }
-        : getValue(right as ExtendedExpressionValue, state);
+        : getValue(right, state);
     if (rightResult.err) {
       result = rightResult;
     } else {

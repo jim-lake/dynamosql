@@ -1,11 +1,11 @@
 import { SQLError } from '../../error';
 import { getValue } from '../expression';
 
-import type { Session } from '../../session';
-import type { ExtendedExpressionValue } from '../ast_types';
 import type { ColumnRefInfo } from './column_ref_helper';
+import type { Session } from '../../session';
 import type { SourceRow } from '../handler_types';
 import type { SourceMap } from '../select_handler';
+import type { ExpressionValue } from 'node-sql-parser';
 import type { From, Binary, Function, ColumnRef } from 'node-sql-parser';
 
 export interface FormJoinParams {
@@ -74,7 +74,7 @@ function _findRows(
 
     let skip = false;
     if (on) {
-      const result = getValue(on as ExtendedExpressionValue, {
+      const result = getValue(on as ExpressionValue, {
         session,
         row,
         columnRefMap,

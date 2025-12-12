@@ -17,7 +17,6 @@ import * as TransactionManager from './lib/transaction_manager';
 import * as UpdateHandler from './lib/update_handler';
 import { Types } from './types';
 
-import type { ExtendedAST } from './lib/ast_types';
 import type { AffectedResult, ChangedResult } from './lib/handler_types';
 import type { Session } from './session';
 import type {
@@ -27,6 +26,7 @@ import type {
   TypeCast,
   QueryListResult,
 } from './types';
+import type { AST } from 'node-sql-parser';
 import type { Use } from 'node-sql-parser';
 import type { Readable, ReadableOptions } from 'node:stream';
 
@@ -118,7 +118,7 @@ export class Query extends EventEmitter {
     }
   }
 
-  private async _singleQuery(ast: ExtendedAST): Promise<SingleQueryResult> {
+  private async _singleQuery(ast: AST): Promise<SingleQueryResult> {
     const params = { dynamodb: this._session.dynamodb, session: this._session };
 
     const type = ast.type;
@@ -244,14 +244,14 @@ export class Query extends EventEmitter {
 interface PegError {
   location?: { start?: { line?: number; column?: number } };
 }
-function _astify(sql: string): ExtendedAST[] {
-  let list: ExtendedAST[] = [];
+function _astify(sql: string): AST[] {
+  let list: AST[] = [];
   try {
     const result = g_parser.astify(sql, { database: 'MySQL' });
     if (Array.isArray(result)) {
-      list = result as ExtendedAST[];
+      list = result;
     } else {
-      list = [result as ExtendedAST];
+      list = [result];
     }
   } catch (e: unknown) {
     logger.error('parse error:', e);

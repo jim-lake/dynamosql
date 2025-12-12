@@ -5,8 +5,8 @@ import ConvertExpression from './convert_expression';
 import Functions from './functions';
 
 import type { Session } from '../../../session';
-import type { ExtendedExpressionValue, UnaryExpr } from '../../ast_types';
 import type { ColumnRefInfo } from '../column_ref_helper';
+import type { ExpressionValue, UnaryExpr } from 'node-sql-parser';
 import type {
   Function as FunctionType,
   Binary,
@@ -27,7 +27,7 @@ export interface ConvertResult {
   value: string | number | null;
 }
 export function convertWhere(
-  expr: ExtendedExpressionValue | Binary | FunctionType | null | undefined,
+  expr: ExpressionValue | Binary | FunctionType | null | undefined,
   state: ConvertWhereState
 ): ConvertResult {
   const { from } = state;

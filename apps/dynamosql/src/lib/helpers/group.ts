@@ -1,9 +1,8 @@
 import { SQLError } from '../../error';
 import { getValue } from '../expression';
 
-import type { Session } from '../../session';
-import type { ExtendedExpressionValue } from '../ast_types';
 import type { ColumnRefInfo } from './column_ref_helper';
+import type { Session } from '../../session';
 import type { SourceRow, SourceRowGroup } from '../handler_types';
 import type {
   ExpressionValue,
@@ -46,7 +45,7 @@ export function formImplicitGroup(
 export function formGroup(params: FormGroupParams): SourceRowGroup[] {
   const { groupby, ast, row_list, session, columnRefMap } = params;
 
-  const group_exprs: ExtendedExpressionValue[] = [];
+  const group_exprs: ExpressionValue[] = [];
   for (const column of groupby.columns ?? []) {
     if (column.type === 'number') {
       const index = typeof column.value === 'number' ? column.value : 1;

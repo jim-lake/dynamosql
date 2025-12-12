@@ -3,7 +3,7 @@ import { convertNum } from '../helpers/sql_conversion';
 import { getValue } from './evaluate';
 
 import type { EvaluationState, EvaluationResult } from './evaluate';
-import type { UnaryExpr } from '../ast_types';
+import type { UnaryExpr } from 'node-sql-parser';
 
 function plus(expr: UnaryExpr, state: EvaluationState): EvaluationResult {
   return getValue(expr.expr, state);
