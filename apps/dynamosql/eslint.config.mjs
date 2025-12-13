@@ -89,6 +89,7 @@ export default tseslint.config(
       },
     },
     rules: {
+      '@typescript-eslint/no-non-null-assertion': 'warn',
       '@typescript-eslint/consistent-type-imports': [
         'error',
         {
@@ -120,7 +121,6 @@ export default tseslint.config(
       '@typescript-eslint/only-throw-error': 0,
       '@typescript-eslint/no-base-to-string': 0,
       '@typescript-eslint/restrict-plus-operands': 0,
-      '@typescript-eslint/no-non-null-assertion': 0,
       '@typescript-eslint/restrict-template-expressions': 0,
       '@typescript-eslint/require-await': 0,
       '@typescript-eslint/no-unnecessary-condition': 'error',

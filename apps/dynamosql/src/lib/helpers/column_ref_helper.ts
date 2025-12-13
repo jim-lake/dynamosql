@@ -34,7 +34,6 @@ function isBaseFrom(from: From): from is BaseFrom {
   return 'table' in from && typeof from.table === 'string';
 }
 
-
 export interface ColumnRefInfo {
   resultIndex?: number;
   from?: From;
@@ -90,7 +89,9 @@ export function resolveReferences(
   const tableRaw = ast.type === 'delete' ? ast.table : null;
   const table = Array.isArray(tableRaw) ? tableRaw : null;
   table?.forEach((object: From & { from?: TableMapEntry }) => {
-    if (!isBaseFrom(object)) {return;}
+    if (!isBaseFrom(object)) {
+      return;
+    }
     const fromEntry = object.db
       ? db_map[object.db]?.[object.table]
       : table_map[object.table];
@@ -157,10 +158,16 @@ export function resolveReferences(
     } else if (col.expr.type === 'column_ref') {
       const colExpr = col.expr as ColumnRef;
       if ('column' in colExpr) {
-        const colName = typeof colExpr.column === 'string' ? colExpr.column : colExpr.column.expr.value;
+        const colName =
+          typeof colExpr.column === 'string'
+            ? colExpr.column
+            : colExpr.column.expr.value;
         result_map[String(colName)] = i;
       } else if ('expr' in colExpr) {
-        const colName = typeof colExpr.expr.column === 'string' ? colExpr.expr.column : colExpr.expr.column.expr.value;
+        const colName =
+          typeof colExpr.expr.column === 'string'
+            ? colExpr.expr.column
+            : colExpr.expr.column.expr.value;
         result_map[String(colName)] = i;
       }
     }
@@ -254,8 +261,12 @@ function _resolveObject(
       const astFrom = ast.type === 'update' ? ast.table : ast.from;
       const matchingFrom = Array.isArray(astFrom)
         ? astFrom.find((from: From) => {
-            if (!isBaseFrom(from)) {return false;}
-            return from.as === obj.table || (!from.as && from.table === obj.table);
+            if (!isBaseFrom(from)) {
+              return false;
+            }
+            return (
+              from.as === obj.table || (!from.as && from.table === obj.table)
+            );
           })
         : undefined;
       if (matchingFrom) {
@@ -289,10 +300,7 @@ function _resolveObject(
         const astFrom = ast.type === 'update' ? ast.table : ast.from;
         const firstFrom = Array.isArray(astFrom) ? astFrom[0] : undefined;
         from =
-          cached ??
-          (firstFrom && 'table' in firstFrom
-            ? firstFrom
-            : undefined);
+          cached ?? (firstFrom && 'table' in firstFrom ? firstFrom : undefined);
       }
     }
     if (from) {

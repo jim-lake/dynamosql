@@ -48,18 +48,18 @@ export async function createTable(params: CreateTableParams): Promise<void> {
     primary_map: new Map(),
   };
   if (is_temp) {
-    session!.saveTempTable(database!, table, data);
+    session.saveTempTable(database, table, data);
   } else {
-    Storage.saveTable(database!, table, data);
+    Storage.saveTable(database, table, data);
   }
 }
 
 export async function dropTable(params: DropTableParams): Promise<void> {
   const { session, database, table } = params;
-  if (session!.getTempTable(database!, table)) {
-    session!.deleteTempTable(database!, table);
+  if (session.getTempTable(database, table)) {
+    session.deleteTempTable(database, table);
   } else {
-    Storage.deleteTable(database!, table);
+    Storage.deleteTable(database, table);
   }
 }
 

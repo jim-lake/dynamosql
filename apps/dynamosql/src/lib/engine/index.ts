@@ -79,15 +79,15 @@ export interface CreateTableParams {
   table: string;
   primary_key: ColumnDef[];
   column_list: ColumnDef[];
-  session?: Session;
-  database?: string;
+  session: Session;
+  database: string;
   is_temp?: boolean;
 }
 export interface DropTableParams {
   dynamodb: DynamoDBClient;
   table: string;
-  session?: Session;
-  database?: string;
+  session: Session;
+  database: string;
 }
 export interface KeyDef {
   name: string;

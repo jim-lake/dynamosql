@@ -58,46 +58,48 @@ async function _runAlterTable(
   for (const def of ast.expr) {
     if (def.resource === 'index') {
       if (def.action === 'add') {
-      const key_list =
-        def.definition?.map((sub) => {
-          const column_def = column_list.find((col) => col.name === sub.column);
-          return {
-            name: sub.column,
-            order_by: sub.order_by,
-            type: column_def?.type ?? 'string',
-          };
-        }) ?? [];
+        const key_list =
+          def.definition?.map((sub) => {
+            const column_def = column_list.find(
+              (col) => col.name === sub.column
+            );
+            return {
+              name: sub.column,
+              order_by: sub.order_by,
+              type: column_def?.type ?? 'string',
+            };
+          }) ?? [];
 
-      const opts = {
-        dynamodb,
-        session,
-        table,
-        index_name: def.index,
-        key_list,
-      };
+        const opts = {
+          dynamodb,
+          session,
+          table,
+          index_name: def.index,
+          key_list,
+        };
 
-      try {
-        await engine.createIndex(opts);
-      } catch (err) {
-        if (err instanceof Error && err.message === 'index_exists') {
-          throw new SQLError({ err: 'ER_DUP_KEYNAME', args: [def.index] });
+        try {
+          await engine.createIndex(opts);
+        } catch (err) {
+          if (err instanceof Error && err.message === 'index_exists') {
+            throw new SQLError({ err: 'ER_DUP_KEYNAME', args: [def.index] });
+          }
+          throw err;
         }
-        throw err;
-      }
       } else {
-      const opts = { dynamodb, session, table, index_name: def.index };
+        const opts = { dynamodb, session, table, index_name: def.index };
 
-      try {
-        await engine.deleteIndex(opts);
-      } catch (err) {
-        if (err instanceof Error && err.message === 'index_not_found') {
-          throw new SQLError({
-            err: 'ER_CANT_DROP_FIELD_OR_KEY',
-            args: [def.index],
-          });
+        try {
+          await engine.deleteIndex(opts);
+        } catch (err) {
+          if (err instanceof Error && err.message === 'index_not_found') {
+            throw new SQLError({
+              err: 'ER_CANT_DROP_FIELD_OR_KEY',
+              args: [def.index],
+            });
+          }
+          throw err;
         }
-        throw err;
-      }
       }
     }
   }
