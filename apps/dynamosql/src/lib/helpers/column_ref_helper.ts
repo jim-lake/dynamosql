@@ -184,10 +184,7 @@ export function resolveReferences(
       });
     }
   }
-  const orderby =
-    ast.type === 'select'
-      ? ast.orderby
-      : (ast as { orderby?: unknown }).orderby;
+  const orderby = ast.orderby;
   const having = ast.type === 'select' ? ast.having : undefined;
   [orderby, having].forEach((item: unknown) => {
     walkColumnRefs(item, (object: unknown) => {
