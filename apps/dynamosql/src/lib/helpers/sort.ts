@@ -90,14 +90,13 @@ function _desc(
 }
 
 function _convertNum(value: unknown): number {
-  let ret = value as number;
   if (value === '') {
-    ret = 0;
+    return 0;
   } else if (typeof value === 'string') {
-    ret = parseFloat(value);
-    if (isNaN(ret)) {
-      ret = 0;
-    }
+    const ret = parseFloat(value);
+    return isNaN(ret) ? 0 : ret;
+  } else if (typeof value === 'number') {
+    return value;
   }
-  return ret;
+  return 0;
 }

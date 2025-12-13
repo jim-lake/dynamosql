@@ -124,8 +124,8 @@ function _convertCompare(
   }
 
   if (left_val === right_val) {
-    if (typeof left_val === 'number') {
-      return [left_val, right_val as number];
+    if (typeof left_val === 'number' && typeof right_val === 'number') {
+      return [left_val, right_val];
     }
     return [String(left_val), String(right_val)];
   }

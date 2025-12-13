@@ -69,7 +69,7 @@ export async function query(
       row[key] = row[key]?.value as never;
     }
   }
-  return { rows: rows as unknown[][], columns };
+  return { rows, columns };
 }
 export interface InternalQueryParams {
   ast: SelectModifyAST;
