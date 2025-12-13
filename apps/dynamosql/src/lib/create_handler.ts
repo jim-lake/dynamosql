@@ -15,7 +15,6 @@ import type { ColumnDef, KeyDef, EvaluationResultRow } from './engine';
 import type { HandlerParams, AffectedResult } from './handler_types';
 import type { FieldInfo } from '../types';
 import type { EvaluationResult } from './expression';
-import type { ColumnDefinitionOptList } from 'node-sql-parser';
 import type { Create } from 'node-sql-parser';
 
 export async function query(
@@ -81,8 +80,7 @@ async function _createTable(
     ) {
       const col = { name: def.column.column, type: def.definition.dataType };
       column_list.push(col);
-      const def_key = def as ColumnDefinitionOptList;
-      if (def_key.primary_key === 'primary key') {
+      if (def.primary_key === 'primary key') {
         primary_key.push(col);
       }
     } else if (
@@ -116,9 +114,7 @@ async function _createTable(
         }
       });
       if (!duplicate_mode) {
-        const keys = primary_key.map(
-          ({ name }) => (obj[name] as { value: unknown }).value
-        );
+        const keys = primary_key.map(({ name }) => obj[name]?.value);
         if (!trackFirstSeen(track, keys)) {
           throw new SQLError({
             err: 'dup_primary_key_entry',

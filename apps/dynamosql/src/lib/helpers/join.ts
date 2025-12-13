@@ -5,7 +5,6 @@ import type { ColumnRefInfo } from './column_ref_helper';
 import type { Session } from '../../session';
 import type { SourceRow } from '../handler_types';
 import type { SourceMap } from '../select_handler';
-import type { ExpressionValue } from 'node-sql-parser';
 import type { From, Binary, Function, ColumnRef } from 'node-sql-parser';
 
 export interface FormJoinParams {
@@ -18,9 +17,6 @@ export interface FormJoinParams {
 export function formJoin(params: FormJoinParams): SourceRow[] {
   const { source_map, from, where, session, columnRefMap } = params;
   const row_list: SourceRow[] = [];
-  from.forEach((from_table: From & { is_left?: boolean; join?: string }) => {
-    from_table.is_left = (from_table.join?.indexOf('LEFT') ?? -1) >= 0;
-  });
   const output_count = _findRows(
     source_map,
     from,
@@ -36,7 +32,7 @@ export function formJoin(params: FormJoinParams): SourceRow[] {
 }
 function _findRows(
   source_map: SourceMap,
-  list: (From & { on?: unknown; is_left?: boolean })[],
+  list: From[],
   where: Binary | Function | null,
   session: Session,
   row_list: SourceRow[],
@@ -48,7 +44,8 @@ function _findRows(
   if (!from) {
     throw new SQLError('Invalid from index');
   }
-  const { on, is_left } = from;
+  const is_left = 'join' in from && from.join.includes('LEFT');
+  const on = 'on' in from ? from.on : undefined;
   const rows = source_map.get(from);
   const row_count = rows?.length ?? (is_left ? 1 : 0);
 
@@ -74,11 +71,7 @@ function _findRows(
 
     let skip = false;
     if (on) {
-      const result = getValue(on as ExpressionValue, {
-        session,
-        row,
-        columnRefMap,
-      });
+      const result = getValue(on, { session, row, columnRefMap });
       if (result.err) {
         throw new SQLError(result.err);
       } else if (!result.value) {

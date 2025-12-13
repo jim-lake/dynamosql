@@ -5,7 +5,7 @@ import { SQLError } from '../error';
 import * as SchemaManager from './schema_manager';
 
 import type { HandlerParams } from './handler_types';
-import type { Drop, From } from 'node-sql-parser';
+import type { Drop } from 'node-sql-parser';
 
 interface DropExtended extends Drop {
   prefix?: string;
@@ -23,8 +23,13 @@ export async function query(
     await SchemaManager.dropDatabase({ ...params, database: dbName });
     return;
   } else if (ast.keyword === 'table') {
-    const nameArray = Array.isArray(ast.name) ? ast.name : [ast.name];
-    const firstTable = nameArray[0] as From;
+    if (!Array.isArray(ast.name)) {
+      throw new SQLError('invalid_drop_table');
+    }
+    const firstTable = ast.name[0];
+    if (!firstTable) {
+      throw new SQLError('invalid_drop_table');
+    }
     const database =
       ('db' in firstTable ? firstTable.db : null) ??
       session.getCurrentDatabase();

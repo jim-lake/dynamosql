@@ -8,7 +8,7 @@ const FORMAT_LONG_NUMBER = new Intl.DateTimeFormat('en-US', {
   second: '2-digit',
   fractionalSecondDigits: 3,
   hour12: false,
-} as Intl.DateTimeFormatOptions);
+});
 
 const FORMAT_SHORT_NUMBER = new Intl.DateTimeFormat('en-US', {
   weekday: 'short',
@@ -20,7 +20,7 @@ const FORMAT_SHORT_NUMBER = new Intl.DateTimeFormat('en-US', {
   second: 'numeric',
   fractionalSecondDigits: 3,
   hour12: false,
-} as Intl.DateTimeFormatOptions);
+});
 
 const FORMAT_LONG_NUMBER_12H = new Intl.DateTimeFormat('en-US', {
   hour: '2-digit',
@@ -28,7 +28,7 @@ const FORMAT_LONG_NUMBER_12H = new Intl.DateTimeFormat('en-US', {
   second: '2-digit',
   fractionalSecondDigits: 3,
   hour12: true,
-} as Intl.DateTimeFormatOptions);
+});
 
 const FORMAT_SHORT_NUMBER_12H = new Intl.DateTimeFormat('en-US', {
   hour: 'numeric',
@@ -36,7 +36,7 @@ const FORMAT_SHORT_NUMBER_12H = new Intl.DateTimeFormat('en-US', {
   second: 'numeric',
   fractionalSecondDigits: 3,
   hour12: true,
-} as Intl.DateTimeFormatOptions);
+});
 
 const FORMAT_LONG_TEXT = new Intl.DateTimeFormat('en-US', {
   weekday: 'long',

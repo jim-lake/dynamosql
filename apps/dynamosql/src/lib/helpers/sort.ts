@@ -31,9 +31,8 @@ function _sort(
   for (const order of orderby) {
     const { expr } = order;
     const func = order.type !== 'DESC' ? _asc : _desc;
-    const exprObj = expr as { type?: string; value?: number };
-    if (exprObj.type === 'number') {
-      const index = typeof exprObj.value === 'number' ? exprObj.value - 1 : 0;
+    if (expr.type === 'number' && typeof expr.value === 'number') {
+      const index = expr.value - 1;
       const result = func(
         a.result[index]?.value,
         b.result[index]?.value,

@@ -44,7 +44,7 @@ export interface BaseFrom {
 export interface Join extends BaseFrom {
   join: "INNER JOIN" | "LEFT JOIN" | "RIGHT JOIN";
   using?: string[];
-  on?: Binary;
+  on?: ExpressionValue;
 }
 export interface TableExpr {
   expr: {
@@ -70,7 +70,7 @@ export interface Limit {
 }
 export interface OrderBy {
   type: "ASC" | "DESC";
-  expr: any;
+  expr: ExpressionValue;
   loc?: LocationRange;
 }
 
@@ -438,7 +438,7 @@ export type IndexOption = {
 
 export type CreateIndexDefinition = {
   index?: string;
-  definition: ColumnRef[];
+  definition: ExpressionValue[];
   keyword: "index" | "key";
   index_type?: IndexType;
   resource: "index";
@@ -559,7 +559,7 @@ export interface Create {
 export interface Drop {
   type: "drop";
   keyword: string;
-  name: any[];
+  name: From[] | string;
 }
 
 export interface Show {
