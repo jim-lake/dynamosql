@@ -89,10 +89,10 @@ function _is(
   if (rightExpr.type === 'null') {
     right = null;
     right_name = 'NULL';
-  } else if (rightExpr.type === 'bool' && rightExpr.value === true) {
+  } else if (rightExpr.type === 'bool' && rightExpr.value) {
     right = true;
     right_name = 'TRUE';
-  } else if (rightExpr.type === 'bool' && rightExpr.value === false) {
+  } else if (rightExpr.type === 'bool' && !rightExpr.value) {
     right = false;
     right_name = 'FALSE';
   } else {

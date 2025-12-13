@@ -40,9 +40,9 @@ async function _runAlterTable(
 
   // Process column additions
   for (const def of ast.expr) {
-    if (def.resource === 'column' && def.action === 'add') {
+    if (def.resource === 'column') {
       const column_name = def.column.column;
-      const type = def.definition?.dataType;
+      const type = def.definition?.dataType ?? 'string';
       column_list.push({ name: column_name, type });
       const opts = {
         dynamodb,
@@ -56,11 +56,10 @@ async function _runAlterTable(
 
   // Process index operations
   for (const def of ast.expr) {
-    if (def.resource === 'index' && def.action === 'add') {
+    if (def.resource === 'index') {
+      if (def.action === 'add') {
       const key_list =
-        (
-          def.definition as { column: string; order_by?: string }[] | undefined
-        )?.map((sub) => {
+        def.definition?.map((sub) => {
           const column_def = column_list.find((col) => col.name === sub.column);
           return {
             name: sub.column,
@@ -85,7 +84,7 @@ async function _runAlterTable(
         }
         throw err;
       }
-    } else if (def.resource === 'index' && def.action === 'drop') {
+      } else {
       const opts = { dynamodb, session, table, index_name: def.index };
 
       try {
@@ -98,6 +97,7 @@ async function _runAlterTable(
           });
         }
         throw err;
+      }
       }
     }
   }

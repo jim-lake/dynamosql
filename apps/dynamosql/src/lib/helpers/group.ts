@@ -13,7 +13,7 @@ import type {
 
 export interface GroupBy {
   columns: ExpressionValue[] | null;
-  modifiers: ValueExpr<string>[];
+  modifiers: ValueExpr[];
 }
 export interface FormGroupParams {
   groupby: GroupBy;

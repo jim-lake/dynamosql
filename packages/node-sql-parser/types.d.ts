@@ -74,34 +74,45 @@ export interface OrderBy {
   loc?: LocationRange;
 }
 
-export interface ValueExpr<T = string | number | boolean> {
-  type:
-    | "backticks_quote_string"
-    | "string"
-    | "regex_string"
-    | "hex_string"
-    | "full_hex_string"
-    | "natural_string"
-    | "bit_string"
-    | "double_quote_string"
-    | "single_quote_string"
-    | "boolean"
-    | "bool"
-    | "null"
-    | "star"
-    | "param"
-    | "origin"
-    | "date"
-    | "datetime"
-    | "default"
-    | "time"
-    | "timestamp"
-    | "var_string"
-    | "number"
-    | "bigint";
-  value: T;
-  loc?: LocationRange;
-}
+export type ValueExpr =
+  | {
+      type: "hex_string" | "full_hex_string";
+      value: string;
+      loc?: LocationRange;
+    }
+  | {
+      type: "number" | "bigint";
+      value: string | number;
+      loc?: LocationRange;
+    }
+  | {
+      type: "boolean" | "bool";
+      value: boolean;
+      loc?: LocationRange;
+    }
+  | {
+      type:
+        | "backticks_quote_string"
+        | "string"
+        | "regex_string"
+        | "natural_string"
+        | "bit_string"
+        | "double_quote_string"
+        | "single_quote_string"
+        | "null"
+        | "star"
+        | "param"
+        | "origin"
+        | "date"
+        | "datetime"
+        | "default"
+        | "time"
+        | "timestamp"
+        | "var_string";
+      value: string | number | boolean;
+      loc?: LocationRange;
+    };
+
 
 export type SortDirection = 'ASC' | 'DESC' | 'asc' | 'desc';
 
@@ -178,7 +189,7 @@ export interface AggrFunc {
 
 export type FunctionName = {
   schema?: { value: string; type: string };
-  name: ValueExpr<string>[];
+  name: ValueExpr[];
 };
 export interface Function {
   type: "function";
@@ -189,7 +200,7 @@ export interface Function {
 }
 export interface Column {
   expr: ExpressionValue;
-  as: ValueExpr<string> | string | null;
+  as: ValueExpr | string | null;
   type?: string;
   loc?: LocationRange;
 }
@@ -218,7 +229,7 @@ export type Expr = Binary;
 export interface VarExpr {
   type: 'var';
   name: string;
-  members: ExpressionValue[];
+  members: string[];
   prefix: string | null;
 }
 
@@ -290,7 +301,7 @@ export interface Select {
   columns: any[] | Column[];
   from: From[] | TableExpr | null ;
   where: Binary | Function | null;
-  groupby: { columns: ColumnRef[] | null, modifiers: ValueExpr<string>[] };
+  groupby: { columns: ColumnRef[] | null, modifiers: ValueExpr[] };
   having: any[] | null;
   orderby: OrderBy[] | null;
   limit: Limit | null;
@@ -347,10 +358,29 @@ export interface Delete {
   returning?: Returning
 }
 
+export type AlterExpr =
+  | {
+      resource: 'column';
+      action: 'add';
+      column: { column: string };
+      definition?: { dataType?: string };
+    }
+  | {
+      resource: 'index';
+      action: 'add';
+      index: string;
+      definition?: { column: string; order_by?: string }[];
+    }
+  | {
+      resource: 'index';
+      action: 'drop';
+      index: string;
+    };
+
 export interface Alter {
   type: "alter";
   table: From[];
-  expr: any;
+  expr: AlterExpr[];
   loc?: LocationRange;
 }
 

@@ -166,9 +166,9 @@ function _is(
     const rightExpr = expr.right;
     if (rightExpr.type === 'null') {
       right = 'NULL';
-    } else if (rightExpr.type === 'bool' && rightExpr.value === true) {
+    } else if (rightExpr.type === 'bool' && rightExpr.value) {
       right = 'TRUE';
-    } else if (rightExpr.type === 'bool' && rightExpr.value === false) {
+    } else if (rightExpr.type === 'bool' && !rightExpr.value) {
       right = 'FALSE';
     } else {
       err = 'syntax_err';

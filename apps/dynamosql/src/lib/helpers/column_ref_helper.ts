@@ -10,6 +10,7 @@ import type {
   SetList,
   BaseFrom,
   ColumnRef,
+  Column,
 } from 'node-sql-parser';
 
 interface TableMapEntry {
@@ -19,15 +20,20 @@ interface TableMapEntry {
   key?: string;
 }
 
-type TableMap = Record<string, TableMapEntry>;
+type TableMap = Record<string, BaseFrom>;
 
-type DbMap = Record<string, Record<string, TableMapEntry>>;
+type DbMap = Record<string, Record<string, BaseFrom>>;
 
 type ResultMap = Record<string, number>;
 
 type SelectWithOptionalGroupBy = Omit<Select, 'groupby'> & {
   groupby?: { columns?: unknown };
 };
+
+function isBaseFrom(from: From): from is BaseFrom {
+  return 'table' in from && typeof from.table === 'string';
+}
+
 
 export interface ColumnRefInfo {
   resultIndex?: number;
@@ -84,14 +90,14 @@ export function resolveReferences(
   const tableRaw = ast.type === 'delete' ? ast.table : null;
   const table = Array.isArray(tableRaw) ? tableRaw : null;
   table?.forEach((object: From & { from?: TableMapEntry }) => {
-    const obj = object as BaseFrom & { from?: TableMapEntry };
-    const fromEntry = obj.db
-      ? db_map[obj.db]?.[obj.table]
-      : table_map[obj.table];
+    if (!isBaseFrom(object)) {return;}
+    const fromEntry = object.db
+      ? db_map[object.db]?.[object.table]
+      : table_map[object.table];
     if (!fromEntry) {
-      throw new SQLError({ err: 'table_not_found', args: [obj.table] });
+      throw new SQLError({ err: 'table_not_found', args: [object.table] });
     } else {
-      obj.from = fromEntry;
+      object.from = fromEntry;
     }
   });
 
@@ -143,15 +149,20 @@ export function resolveReferences(
   });
 
   const result_map: ResultMap = {};
-  columns?.forEach((column: unknown, i: number) => {
-    const col = column as {
-      as?: string;
-      expr?: { type?: string; column?: string };
-    };
+  columns?.forEach((column: Column, i: number) => {
+    const col = column;
     if (col.as) {
-      result_map[col.as] = i;
-    } else if (col.expr?.type === 'column_ref') {
-      result_map[col.expr.column ?? ''] = i;
+      const asStr = typeof col.as === 'string' ? col.as : col.as.value;
+      result_map[String(asStr)] = i;
+    } else if (col.expr.type === 'column_ref') {
+      const colExpr = col.expr as ColumnRef;
+      if ('column' in colExpr) {
+        const colName = typeof colExpr.column === 'string' ? colExpr.column : colExpr.column.expr.value;
+        result_map[String(colName)] = i;
+      } else if ('expr' in colExpr) {
+        const colName = typeof colExpr.expr.column === 'string' ? colExpr.expr.column : colExpr.expr.column.expr.value;
+        result_map[String(colName)] = i;
+      }
     }
   });
 
@@ -238,7 +249,7 @@ function _resolveObject(
     if (obj.db) {
       const from = db_map[obj.db]?.[obj.table ?? ''];
       if (from) {
-        requestAll.set(from as From, true);
+        requestAll.set(from, true);
       } else {
         throw new SQLError({ err: 'table_not_found', args: [obj.table] });
       }
@@ -246,8 +257,8 @@ function _resolveObject(
       const astFrom = ast.type === 'update' ? ast.table : ast.from;
       const matchingFrom = Array.isArray(astFrom)
         ? astFrom.find((from: From) => {
-            const f = from as TableMapEntry;
-            return f.as === obj.table || (!f.as && f.table === obj.table);
+            if (!isBaseFrom(from)) {return false;}
+            return from.as === obj.table || (!from.as && from.table === obj.table);
           })
         : undefined;
       if (matchingFrom) {
@@ -265,7 +276,7 @@ function _resolveObject(
     }
   } else {
     let add_cache = false;
-    let from: TableMapEntry | undefined;
+    let from: BaseFrom | undefined;
     if (obj.db) {
       from = db_map[obj.db]?.[obj.table ?? ''];
       add_cache = true;
@@ -283,16 +294,16 @@ function _resolveObject(
         from =
           cached ??
           (firstFrom && 'table' in firstFrom
-            ? (firstFrom as TableMapEntry)
+            ? firstFrom
             : undefined);
       }
     }
     if (from) {
-      columnRefMap.set(object as ColumnRef, { from: from as From });
+      columnRefMap.set(object as ColumnRef, { from: from });
       if (obj.column) {
-        requestSets.get(from as From)?.add(obj.column);
+        requestSets.get(from)?.add(obj.column);
       }
-      setListMap.set(object as SetList, from as From);
+      setListMap.set(object as SetList, from);
       if (add_cache && obj.column) {
         name_cache[obj.column] = from;
       }

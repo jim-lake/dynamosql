@@ -96,8 +96,8 @@ export function getValue(
     result.name = expr.value ? 'TRUE' : 'FALSE';
     result.type = 'longlong';
   } else if (type === 'hex_string' || type === 'full_hex_string') {
-    result.value = Buffer.from(expr.value as string, 'hex');
-    result.name = 'x' + (expr.value as string).slice(0, 10);
+    result.value = Buffer.from(expr.value, 'hex');
+    result.name = 'x' + expr.value.slice(0, 10);
     result.type = 'buffer';
   } else if (type === 'interval') {
     const intervalFunc = Interval.interval as
@@ -172,8 +172,7 @@ export function getValue(
     const varExpr = expr;
     const { prefix, members } = varExpr;
     const scope = members.length > 0 ? varExpr.name.toLowerCase() : '';
-    const name =
-      members.length > 0 ? (members[0] as unknown as string) : varExpr.name;
+    const name = members[0] ?? varExpr.name;
     result.name = prefix + (scope ? scope + '.' : '') + name;
     if (prefix === '@@') {
       let val: EvaluationValue | undefined;
