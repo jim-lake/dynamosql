@@ -94,7 +94,7 @@ async function _insertIgnoreReplace(
       }
       if (Array.isArray(err)) {
         let thrownError: Error | undefined;
-        (err as { Code?: string }[]).forEach((item_err) => {
+        err.forEach((item_err) => {
           if (item_err.Code === 'DuplicateItem') {
             affectedRows--;
           } else {
@@ -106,7 +106,7 @@ async function _insertIgnoreReplace(
           throw thrownError;
         }
       } else {
-        throw err as Error;
+        throw err;
       }
     }
   } else {
@@ -175,7 +175,7 @@ async function _insertNoIgnore(params: InsertParams): Promise<AffectedResult> {
       }
     }
 
-    throw err as Error;
+    throw err;
   }
 }
 
