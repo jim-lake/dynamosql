@@ -69,9 +69,9 @@ export function formGroup(params: FormGroupParams): SourceRowGroup[] {
     for (let i = 0; i < count; i++) {
       const key = String(key_list[i]);
       if (i + 1 === count) {
-        (obj as Record<string, unknown[]>)[key] ??= [];
+        obj[key] ??= [];
       } else {
-        (obj as Record<string, Record<string, unknown>>)[key] ??= {};
+        obj[key] ??= {};
       }
       obj = obj[key] as Record<string, unknown[] | Record<string, unknown>>;
     }
