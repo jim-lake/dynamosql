@@ -118,13 +118,14 @@ function _addCollection(
   value: SourceRowResult
 ): void {
   if (keys.length > 1) {
-    let sub_map = collection.get(keys[0]);
+    const [key0, key1] = keys as [EngineValue, EngineValue];
+    let sub_map = collection.get(key0);
     if (!sub_map) {
       sub_map = new Map<EngineValue, SourceRowResult>();
-      collection.set(keys[0], sub_map);
+      collection.set(key0, sub_map);
     }
     if (sub_map instanceof Map) {
-      sub_map.set(keys[1]!, value);
+      sub_map.set(key1, value);
     }
   } else {
     collection.set(keys[0], value);

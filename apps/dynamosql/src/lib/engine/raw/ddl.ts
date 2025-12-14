@@ -38,15 +38,23 @@ export async function getTableInfo(
     throw new Error('bad_data');
   }
 
-  const column_list = data.Table.AttributeDefinitions.map((def) => ({
-    name: def.AttributeName!,
-    type: TYPE_MAP[def.AttributeType!] ?? 'string',
-  }));
+  const column_list = data.Table.AttributeDefinitions.map((def) => {
+    if (!def.AttributeName || !def.AttributeType) {
+      throw new Error('bad_data');
+    }
+    return {
+      name: def.AttributeName,
+      type: TYPE_MAP[def.AttributeType] ?? 'string',
+    };
+  });
   const primary_key = data.Table.KeySchema.map((key) => {
+    if (!key.AttributeName) {
+      throw new Error('bad_data');
+    }
     const type =
       column_list.find((col) => col.name === key.AttributeName)?.type ??
       'string';
-    return { name: key.AttributeName!, type };
+    return { name: key.AttributeName, type };
   });
 
   return { table, primary_key, column_list, is_open: true };

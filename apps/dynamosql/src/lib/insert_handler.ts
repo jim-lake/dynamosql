@@ -74,7 +74,10 @@ async function _runInsert(
     list = rows.map((row) => {
       const obj: EvaluationResultRow = {};
       ast.columns?.forEach((name: string, i: number) => {
-        obj[name] = row[i]!;
+        const value = row[i];
+        if (value !== undefined) {
+          obj[name] = value;
+        }
       });
       return obj;
     });

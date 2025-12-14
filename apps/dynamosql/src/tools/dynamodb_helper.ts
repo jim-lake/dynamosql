@@ -251,8 +251,8 @@ export function convertSuccess(result: DynamoDBResponse): ConvertSuccessResult {
         err[i] = convertError(item.Error) as Error;
       }
       const converted = convertResult(item);
-      if (converted?.[0]) {
-        ret![i] = converted[0];
+      if (converted?.[0] && ret) {
+        ret[i] = converted[0];
       }
     });
   } else {

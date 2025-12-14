@@ -40,7 +40,12 @@ async function _insertIgnoreReplace(
       if (!result.Table?.KeySchema) {
         throw new Error('Invalid table schema');
       }
-      const key_list = result.Table.KeySchema.map((k) => k.AttributeName!);
+      const key_list = result.Table.KeySchema.map((k) => {
+        if (!k.AttributeName) {
+          throw new Error('Invalid table schema');
+        }
+        return k.AttributeName;
+      });
       const track = new Map();
       if (duplicate_mode === 'replace') {
         list.reverse();

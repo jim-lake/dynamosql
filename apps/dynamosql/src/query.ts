@@ -204,8 +204,11 @@ export class Query extends EventEmitter {
     columns: FieldInfo[]
   ): unknown[][] {
     for (const row of result) {
-      for (let i = 0; i < columns.length; i++) {
-        row[i] = this._convertCell(row[i], columns[i]!);
+      for (let i = 0; i < columns.length && i < row.length; i++) {
+        const column = columns[i];
+        if (column) {
+          row[i] = this._convertCell(row[i], column);
+        }
       }
     }
     return result;

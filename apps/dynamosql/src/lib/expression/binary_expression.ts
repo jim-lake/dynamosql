@@ -170,12 +170,23 @@ function between(expr: Binary, state: EvaluationState): EvaluationResult {
     };
   }
 
-  const min_result = getValue(expr.right.value[0], state);
+  const minExpr = expr.right.value[0];
+  const maxExpr = expr.right.value[1];
+  if (!minExpr || !maxExpr) {
+    return {
+      err: { err: 'syntax_err', args: ['BETWEEN'] },
+      value: null,
+      name: '',
+      type: 'longlong',
+    };
+  }
+
+  const min_result = getValue(minExpr, state);
   if (min_result.err) {
     return min_result;
   }
 
-  const max_result = getValue(expr.right.value[1], state);
+  const max_result = getValue(maxExpr, state);
   if (max_result.err) {
     return max_result;
   }
@@ -196,7 +207,7 @@ function between(expr: Binary, state: EvaluationState): EvaluationResult {
       type: 'binary_expr',
       operator: '>=',
       left: expr.left,
-      right: expr.right.value[0]!,
+      right: minExpr,
     },
     state
   );
@@ -209,7 +220,7 @@ function between(expr: Binary, state: EvaluationState): EvaluationResult {
       type: 'binary_expr',
       operator: '<=',
       left: expr.left,
-      right: expr.right.value[1]!,
+      right: maxExpr,
     },
     state
   );
