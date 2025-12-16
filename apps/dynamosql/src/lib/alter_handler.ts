@@ -43,7 +43,7 @@ async function _runAlterTable(
     if (def.resource === 'column' && 'action' in def && def.action === 'add') {
       const addDef = def;
       const column_name = addDef.column.column;
-      const type = addDef.definition?.dataType ?? 'string';
+      const type = addDef.definition.dataType;
       column_list.push({ name: column_name, type });
       const opts = {
         dynamodb,
@@ -60,17 +60,16 @@ async function _runAlterTable(
     if (def.resource === 'index' && 'action' in def) {
       if (def.action === 'add') {
         const addIndexDef = def;
-        const key_list =
-          addIndexDef.definition?.map((sub) => {
-            const column_def = column_list.find(
-              (col) => col.name === sub.column
-            );
-            return {
-              name: sub.column,
-              order_by: sub.order_by,
-              type: column_def?.type ?? 'string',
-            };
-          }) ?? [];
+        const key_list = addIndexDef.definition.map((sub) => {
+          const column_def = column_list.find(
+            (col) => col.name === sub.column
+          );
+          return {
+            name: sub.column,
+            order_by: sub.order_by,
+            type: column_def?.type ?? 'string',
+          };
+        });
 
         const opts = {
           dynamodb,
@@ -91,7 +90,8 @@ async function _runAlterTable(
           }
           throw err;
         }
-      } else if (def.action === 'drop') {
+      } else {
+        // action === 'drop'
         const dropIndexDef = def;
         const opts = {
           dynamodb,

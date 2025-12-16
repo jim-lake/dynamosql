@@ -75,11 +75,7 @@ async function _createTable(
   const primary_key: KeyDef[] = [];
 
   for (const def of ast.create_definitions ?? []) {
-    if (
-      def.resource === 'column' &&
-      def.column.type === 'column_ref' &&
-      typeof def.column.column === 'string'
-    ) {
+    if (def.resource === 'column') {
       const col = { name: def.column.column, type: def.definition.dataType };
       column_list.push(col);
       if (def.primary_key === 'primary key') {
@@ -90,12 +86,9 @@ async function _createTable(
       def.constraint_type === 'primary key'
     ) {
       for (const sub of def.definition) {
-        if (sub.type === 'column_ref' && typeof sub.column === 'string') {
-          const type =
-            column_list.find((col) => col.name === sub.column)?.type ??
-            'string';
-          primary_key.push({ name: sub.column, type });
-        }
+        const type =
+          column_list.find((col) => col.name === sub.column)?.type ?? 'string';
+        primary_key.push({ name: sub.column, type });
       }
     }
   }

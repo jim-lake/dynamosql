@@ -261,7 +261,6 @@ function _expandStarColumns(params: ExpandStarColumnsParams): QueryColumn[] {
   const ret: QueryColumn[] = [];
   for (const column of ast.columns ?? []) {
     if (
-      column &&
       'type' in column.expr &&
       column.expr.type === 'column_ref' &&
       column.expr.column === '*'
