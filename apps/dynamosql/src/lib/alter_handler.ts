@@ -40,9 +40,10 @@ async function _runAlterTable(
 
   // Process column additions
   for (const def of ast.expr) {
-    if (def.resource === 'column') {
-      const column_name = def.column.column;
-      const type = def.definition?.dataType ?? 'string';
+    if (def.resource === 'column' && 'action' in def && def.action === 'add') {
+      const addDef = def;
+      const column_name = addDef.column.column;
+      const type = addDef.definition?.dataType ?? 'string';
       column_list.push({ name: column_name, type });
       const opts = {
         dynamodb,
@@ -56,10 +57,11 @@ async function _runAlterTable(
 
   // Process index operations
   for (const def of ast.expr) {
-    if (def.resource === 'index') {
+    if (def.resource === 'index' && 'action' in def) {
       if (def.action === 'add') {
+        const addIndexDef = def;
         const key_list =
-          def.definition?.map((sub) => {
+          addIndexDef.definition?.map((sub) => {
             const column_def = column_list.find(
               (col) => col.name === sub.column
             );
@@ -74,7 +76,7 @@ async function _runAlterTable(
           dynamodb,
           session,
           table,
-          index_name: def.index,
+          index_name: addIndexDef.index,
           key_list,
         };
 
@@ -82,12 +84,21 @@ async function _runAlterTable(
           await engine.createIndex(opts);
         } catch (err) {
           if (err instanceof Error && err.message === 'index_exists') {
-            throw new SQLError({ err: 'ER_DUP_KEYNAME', args: [def.index] });
+            throw new SQLError({
+              err: 'ER_DUP_KEYNAME',
+              args: [addIndexDef.index],
+            });
           }
           throw err;
         }
-      } else {
-        const opts = { dynamodb, session, table, index_name: def.index };
+      } else if (def.action === 'drop') {
+        const dropIndexDef = def;
+        const opts = {
+          dynamodb,
+          session,
+          table,
+          index_name: dropIndexDef.index,
+        };
 
         try {
           await engine.deleteIndex(opts);
@@ -95,7 +106,7 @@ async function _runAlterTable(
           if (err instanceof Error && err.message === 'index_not_found') {
             throw new SQLError({
               err: 'ER_CANT_DROP_FIELD_OR_KEY',
-              args: [def.index],
+              args: [dropIndexDef.index],
             });
           }
           throw err;

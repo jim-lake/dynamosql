@@ -7,13 +7,20 @@ import type { SourceRow, SourceRowGroup } from '../handler_types';
 import type {
   ExpressionValue,
   Select,
-  ValueExpr,
   ColumnRef,
+  DataType,
+  ExprList,
+  Extract,
+  FulltextSearch,
+  Star,
+  Assign,
+  NumberValue,
+  OriginValue,
 } from 'node-sql-parser';
 
 export interface GroupBy {
-  columns: ExpressionValue[] | null;
-  modifiers: ValueExpr[];
+  columns: (ColumnRef | NumberValue)[] | null;
+  modifiers: (OriginValue | null)[];
 }
 export interface FormGroupParams {
   groupby: GroupBy;
@@ -26,7 +33,7 @@ export interface FormGroupParams {
 export function hasAggregate(ast: Select): boolean {
   if (Array.isArray(ast.columns)) {
     for (const column of ast.columns) {
-      if (_hasAgg(column)) {
+      if (_hasAgg(column.expr)) {
         return true;
       }
     }
@@ -47,9 +54,12 @@ export function formGroup(params: FormGroupParams): SourceRowGroup[] {
 
   const group_exprs: ExpressionValue[] = [];
   for (const column of groupby.columns ?? []) {
-    if (column.type === 'number') {
+    if ('type' in column && column.type === 'number') {
       const index = typeof column.value === 'number' ? column.value : 1;
-      group_exprs.push(ast.columns[index - 1]?.expr);
+      const colExpr = ast.columns[index - 1]?.expr;
+      if (colExpr) {
+        group_exprs.push(colExpr as ExpressionValue);
+      }
     } else {
       group_exprs.push(column);
     }
@@ -92,10 +102,22 @@ function _unroll(list: SourceRowGroup[], obj: unknown): void {
     }
   }
 }
-function _hasAgg(expr: ExpressionValue): boolean {
+function _hasAgg(
+  expr:
+    | ExpressionValue
+    | DataType
+    | ExprList
+    | Extract
+    | FulltextSearch
+    | Star
+    | Assign
+): boolean {
   if (
-    expr.type === 'aggr_func' ||
-    ('expr' in expr && expr.expr && expr.expr.type === 'aggr_func')
+    ('type' in expr && expr.type === 'aggr_func') ||
+    ('expr' in expr &&
+      expr.expr &&
+      'type' in expr.expr &&
+      expr.expr.type === 'aggr_func')
   ) {
     return true;
   }
@@ -106,7 +128,7 @@ function _hasAgg(expr: ExpressionValue): boolean {
     Array.isArray(expr.args.value)
   ) {
     for (const sub of expr.args.value) {
-      if (_hasAgg(sub)) {
+      if (_hasAgg(sub as ExpressionValue)) {
         return true;
       }
     }

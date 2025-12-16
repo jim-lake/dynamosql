@@ -4,12 +4,8 @@ import { getFunctionName } from './ast_helper';
 
 import type { Function } from 'node-sql-parser';
 
-type FunctionWithOptionalArgs = Omit<Function, 'args'> & {
-  args?: { type?: string; value?: unknown };
-};
-
 export function assertArgCount(
-  expr: FunctionWithOptionalArgs,
+  expr: Function,
   min: number,
   max?: number
 ): asserts expr is Function & { args: { value: unknown[] } } {
@@ -46,7 +42,7 @@ export function assertArgCount(
 }
 
 export function assertArgCountParse(
-  expr: FunctionWithOptionalArgs,
+  expr: Function,
   min: number,
   max?: number
 ): asserts expr is Function & { args: { value: unknown[] } } {

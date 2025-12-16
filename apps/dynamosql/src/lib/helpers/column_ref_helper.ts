@@ -27,7 +27,7 @@ type DbMap = Record<string, Record<string, BaseFrom>>;
 type ResultMap = Record<string, number>;
 
 type SelectWithOptionalGroupBy = Omit<Select, 'groupby'> & {
-  groupby?: { columns?: unknown };
+  groupby?: { columns?: unknown } | null;
 };
 
 function isBaseFrom(from: From): from is BaseFrom {
@@ -153,21 +153,25 @@ export function resolveReferences(
   columns?.forEach((column: Column, i: number) => {
     const col = column;
     if (col.as) {
-      const asStr = typeof col.as === 'string' ? col.as : col.as.value;
+      const asStr =
+        typeof col.as === 'string'
+          ? col.as
+          : (col.as as { value: string }).value;
       result_map[String(asStr)] = i;
-    } else if (col.expr.type === 'column_ref') {
-      const colExpr = col.expr as ColumnRef;
-      if ('column' in colExpr) {
+    } else if ('type' in col.expr && col.expr.type === 'column_ref') {
+      const colExpr = col.expr;
+      if ('column' in colExpr && colExpr.column) {
         const colName =
           typeof colExpr.column === 'string'
             ? colExpr.column
-            : colExpr.column.expr.value;
+            : (colExpr.column as { expr: { value: string } }).expr.value;
         result_map[String(colName)] = i;
-      } else if ('expr' in colExpr) {
+      } else if ('expr' in colExpr && colExpr.expr) {
+        const nestedExpr = colExpr.expr as ColumnRef;
         const colName =
-          typeof colExpr.expr.column === 'string'
-            ? colExpr.expr.column
-            : colExpr.expr.column.expr.value;
+          typeof nestedExpr.column === 'string'
+            ? nestedExpr.column
+            : (nestedExpr.column as { expr: { value: string } }).expr.value;
         result_map[String(colName)] = i;
       }
     }

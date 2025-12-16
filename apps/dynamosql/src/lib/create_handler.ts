@@ -15,7 +15,7 @@ import type { ColumnDef, KeyDef, EvaluationResultRow } from './engine';
 import type { HandlerParams, AffectedResult } from './handler_types';
 import type { FieldInfo } from '../types';
 import type { EvaluationResult } from './expression';
-import type { Create } from 'node-sql-parser';
+import type { Create, CreateTable, CreateDatabase } from 'node-sql-parser';
 
 export async function query(
   params: HandlerParams<Create>
@@ -38,16 +38,17 @@ async function _createDatabase(
   params: HandlerParams<Create>
 ): Promise<AffectedResult> {
   const { ast } = params;
-  if (!ast.database) {
+  const dbAst = ast as CreateDatabase;
+  if (!dbAst.database) {
     throw new SQLError('bad_database_name');
   }
-  const name = getDatabaseName(ast.database);
+  const name = getDatabaseName(dbAst.database);
   try {
     SchemaManager.createDatabase(name);
     return { affectedRows: 1 };
   } catch (err) {
     if (err instanceof SQLError && err.code === 'ER_DB_CREATE_EXISTS') {
-      if (ast.if_not_exists) {
+      if (dbAst.if_not_exists) {
         return { affectedRows: 0 };
       } else {
         throw err;
@@ -61,7 +62,8 @@ async function _createDatabase(
 async function _createTable(
   params: HandlerParams<Create>
 ): Promise<AffectedResult> {
-  const { ast, session, dynamodb } = params;
+  const { ast: astRaw, session, dynamodb } = params;
+  const ast = astRaw as CreateTable;
   const database = getDatabaseFromTable(ast) ?? session.getCurrentDatabase();
   const table = getTableFromTable(ast);
   if (!table) {
@@ -128,7 +130,7 @@ async function _createTable(
 
   let table_engine: string | undefined;
   for (const opt of ast.table_options ?? []) {
-    if (opt.keyword === 'engine') {
+    if (opt.keyword === 'engine' && typeof opt.value === 'string') {
       table_engine = opt.value;
     }
   }

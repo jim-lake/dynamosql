@@ -6,7 +6,13 @@ import { SQLTime } from '../types/sql_time';
 import { getValue } from './evaluate';
 
 import type { EvaluationState, EvaluationResult } from './evaluate';
-import type { Binary, ExpressionValue, Function } from 'node-sql-parser';
+import type {
+  Binary,
+  ExpressionValue,
+  Function,
+  ExprList,
+  Extract,
+} from 'node-sql-parser';
 
 export function equal(expr: Binary, state: EvaluationState): EvaluationResult {
   return _equal(expr, state, ' = ');
@@ -30,24 +36,26 @@ export function inOp(expr: Binary, state: EvaluationState): EvaluationResult {
   const names: string[] = [];
   if (left.value === null) {
     value = null;
-  } else if (expr.right.type === 'expr_list') {
+  } else if ('type' in expr.right && expr.right.type === 'expr_list') {
     const list = expr.right.value;
-    for (const item of list) {
-      const right = getValue(item, state);
-      names.push(right.name ?? '');
-      if (right.err) {
-        return right;
-      }
-      const [left_val, right_val] = _convertCompare(
-        left,
-        right,
-        state.session.timeZone
-      );
-      if (right.value === null) {
-        value = null;
-      } else if (left_val === right_val) {
-        value = 1;
-        break;
+    if (list) {
+      for (const item of list) {
+        const right = getValue(item, state);
+        names.push(right.name ?? '');
+        if (right.err) {
+          return right;
+        }
+        const [left_val, right_val] = _convertCompare(
+          left,
+          right,
+          state.session.timeZone
+        );
+        if (right.value === null) {
+          value = null;
+        } else if (left_val === right_val) {
+          value = 1;
+          break;
+        }
       }
     }
   }
@@ -210,8 +218,8 @@ function _equal(
   return { err, value, name, type: 'longlong' };
 }
 function _gt(
-  expr_left: ExpressionValue,
-  expr_right: ExpressionValue,
+  expr_left: ExpressionValue | ExprList | Extract,
+  expr_right: ExpressionValue | ExprList | Extract,
   state: EvaluationState,
   op: string,
   flip: boolean
@@ -242,8 +250,8 @@ function _gt(
   return { err, value, name, type: 'longlong' };
 }
 function _gte(
-  expr_left: ExpressionValue,
-  expr_right: ExpressionValue,
+  expr_left: ExpressionValue | ExprList | Extract,
+  expr_right: ExpressionValue | ExprList | Extract,
   state: EvaluationState,
   op: string,
   flip: boolean

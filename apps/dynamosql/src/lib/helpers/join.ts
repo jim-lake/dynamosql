@@ -5,12 +5,19 @@ import type { ColumnRefInfo } from './column_ref_helper';
 import type { Session } from '../../session';
 import type { SourceRow } from '../handler_types';
 import type { SourceMap } from '../select_handler';
-import type { From, Binary, Function, ColumnRef } from 'node-sql-parser';
+import type {
+  From,
+  Binary,
+  Function,
+  ColumnRef,
+  Unary,
+  FulltextSearch,
+} from 'node-sql-parser';
 
 export interface FormJoinParams {
   source_map: SourceMap;
   from: From[];
-  where: Binary | Function | null;
+  where: Binary | Function | Unary | FulltextSearch | ColumnRef | null;
   session: Session;
   columnRefMap: Map<ColumnRef, ColumnRefInfo>;
 }
@@ -33,7 +40,7 @@ export function formJoin(params: FormJoinParams): SourceRow[] {
 function _findRows(
   source_map: SourceMap,
   list: From[],
-  where: Binary | Function | null,
+  where: Binary | Function | Unary | FulltextSearch | ColumnRef | null,
   session: Session,
   row_list: SourceRow[],
   from_index: number,

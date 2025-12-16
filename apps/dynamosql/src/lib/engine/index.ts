@@ -18,6 +18,8 @@ import type {
   Join,
   Binary,
   Function,
+  Unary,
+  FulltextSearch,
   ColumnRef,
   BaseFrom,
   From,
@@ -109,7 +111,7 @@ export interface RowListParams {
   dynamodb: DynamoDBClient;
   session: Session;
   list: FromJoin[];
-  where?: Binary | Function | null;
+  where?: Binary | Function | Unary | FulltextSearch | ColumnRef | null;
   requestSets: Map<From, Set<string>>;
   requestAll: Map<From, boolean>;
   columnRefMap: Map<ColumnRef, ColumnRefInfo>;
@@ -124,7 +126,7 @@ export interface DeleteParams {
   dynamodb: DynamoDBClient;
   session: Session;
   from: BaseFrom;
-  where: Binary | Function | null;
+  where: Binary | Function | Unary | FulltextSearch | null;
   columnRefMap: Map<ColumnRef, ColumnRefInfo>;
 }
 export interface MultiDeleteParams {
@@ -151,7 +153,7 @@ export interface UpdateParams {
   session: Session;
   set: SetList[];
   from: BaseFrom;
-  where: Binary | Function | null;
+  where: Binary | Function | Unary | FulltextSearch | null;
   columnRefMap: Map<ColumnRef, ColumnRefInfo>;
 }
 export interface MultiUpdateParams {

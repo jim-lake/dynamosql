@@ -3,12 +3,12 @@ import { convertNum } from '../helpers/sql_conversion';
 import { getValue } from './evaluate';
 
 import type { EvaluationState, EvaluationResult } from './evaluate';
-import type { UnaryExpr } from 'node-sql-parser';
+import type { Unary } from 'node-sql-parser';
 
-function plus(expr: UnaryExpr, state: EvaluationState): EvaluationResult {
+function plus(expr: Unary, state: EvaluationState): EvaluationResult {
   return getValue(expr.expr, state);
 }
-function not(expr: UnaryExpr, state: EvaluationState): EvaluationResult {
+function not(expr: Unary, state: EvaluationState): EvaluationResult {
   const result = getValue(expr.expr, state);
   result.name = 'NOT ' + result.name;
   result.type = 'longlong';
@@ -17,7 +17,7 @@ function not(expr: UnaryExpr, state: EvaluationState): EvaluationResult {
   }
   return result;
 }
-function minus(expr: UnaryExpr, state: EvaluationState): EvaluationResult {
+function minus(expr: Unary, state: EvaluationState): EvaluationResult {
   const result = getValue(expr.expr, state);
   result.name = '-' + result.name;
   if (!result.err) {
@@ -35,5 +35,5 @@ function minus(expr: UnaryExpr, state: EvaluationState): EvaluationResult {
 }
 export const methods: Record<
   string,
-  undefined | ((expr: UnaryExpr, state: EvaluationState) => EvaluationResult)
+  undefined | ((expr: Unary, state: EvaluationState) => EvaluationResult)
 > = { '+': plus, '!': not, not, '-': minus };

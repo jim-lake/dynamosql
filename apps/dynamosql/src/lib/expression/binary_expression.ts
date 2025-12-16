@@ -5,7 +5,12 @@ import { getValue } from './evaluate';
 import { plus, minus, div, mul, mod, intDiv } from './math';
 
 import type { EvaluationState, EvaluationResult } from './evaluate';
-import type { Binary } from 'node-sql-parser';
+import type {
+  Binary,
+  ExpressionValue,
+  ExprList,
+  Extract,
+} from 'node-sql-parser';
 
 function and(expr: Binary, state: EvaluationState): EvaluationResult {
   const left = getValue(expr.left, state);
@@ -86,13 +91,23 @@ function _is(
   let right_name;
 
   // Check if rightExpr is a Value type with null, true, or false
-  if (rightExpr.type === 'null') {
+  if ('type' in rightExpr && rightExpr.type === 'null') {
     right = null;
     right_name = 'NULL';
-  } else if (rightExpr.type === 'bool' && rightExpr.value) {
+  } else if (
+    'type' in rightExpr &&
+    rightExpr.type === 'bool' &&
+    'value' in rightExpr &&
+    rightExpr.value
+  ) {
     right = true;
     right_name = 'TRUE';
-  } else if (rightExpr.type === 'bool' && !rightExpr.value) {
+  } else if (
+    'type' in rightExpr &&
+    rightExpr.type === 'bool' &&
+    'value' in rightExpr &&
+    !rightExpr.value
+  ) {
     right = false;
     right_name = 'FALSE';
   } else {
@@ -203,7 +218,12 @@ function between(expr: Binary, state: EvaluationState): EvaluationResult {
 
   // Use >= and <= comparison logic
   const gte_result = gte(
-    { type: 'binary_expr', operator: '>=', left: expr.left, right: minExpr },
+    {
+      type: 'binary_expr',
+      operator: '>=',
+      left: expr.left,
+      right: minExpr as ExpressionValue | ExprList | Extract,
+    },
     state
   );
   if (gte_result.err || gte_result.value === null) {
@@ -211,7 +231,12 @@ function between(expr: Binary, state: EvaluationState): EvaluationResult {
   }
 
   const lte_result = lte(
-    { type: 'binary_expr', operator: '<=', left: expr.left, right: maxExpr },
+    {
+      type: 'binary_expr',
+      operator: '<=',
+      left: expr.left,
+      right: maxExpr as ExpressionValue | ExprList | Extract,
+    },
     state
   );
   if (lte_result.err || lte_result.value === null) {

@@ -7,26 +7,20 @@ import * as SchemaManager from './schema_manager';
 import type { HandlerParams } from './handler_types';
 import type { Drop } from 'node-sql-parser';
 
-interface DropExtended extends Drop {
-  prefix?: string;
-}
-
-export async function query(
-  params: HandlerParams<DropExtended>
-): Promise<void> {
+export async function query(params: HandlerParams<Drop>): Promise<void> {
   const { ast, session, dynamodb } = params;
 
-  if (ast.keyword === 'database') {
-    const dbName = Array.isArray(ast.name)
-      ? String(ast.name[0])
-      : String(ast.name);
+  if (ast.keyword === 'database' || ast.keyword === 'schema') {
+    const dbAst = ast;
+    const dbName = String(dbAst.name);
     await SchemaManager.dropDatabase({ ...params, database: dbName });
     return;
   } else if (ast.keyword === 'table') {
-    if (!Array.isArray(ast.name)) {
+    const tableAst = ast;
+    if (!Array.isArray(tableAst.name)) {
       throw new SQLError('invalid_drop_table');
     }
-    const firstTable = ast.name[0];
+    const firstTable = tableAst.name[0];
     if (!firstTable) {
       throw new SQLError('invalid_drop_table');
     }

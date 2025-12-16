@@ -3,8 +3,7 @@ import { getValue } from '../../expression';
 import { convertWhere } from './convert_where';
 
 import type { ConvertWhereState, ConvertResult } from './convert_where';
-import type { ExpressionValue } from 'node-sql-parser';
-import type { Binary } from 'node-sql-parser';
+import type { ExpressionValue, Binary } from 'node-sql-parser';
 
 type ConvertFunc = (
   expr: ExpressionValue,
@@ -88,23 +87,32 @@ function _in(expr: Binary, state: ConvertWhereState): ConvertResult {
     err = left.err;
   } else if (left.value === null) {
     value = null;
-  } else if (expr.right.type === 'expr_list') {
+  } else if ('type' in expr.right && expr.right.type === 'expr_list') {
     const rightExpr = expr.right;
-    const count = rightExpr.value.length;
-    const list: (string | number | boolean | null)[] = [];
-    for (let i = 0; i < count; i++) {
-      const right = convertWhere(rightExpr.value[i], state);
-      if (right.err) {
-        err = right.err;
-        break;
-      } else if (right.value === null) {
-        value = null;
-        break;
-      } else {
-        list.push(right.value);
+    const rightValue = rightExpr.value;
+    if (!rightValue) {
+      err = 'unsupported';
+    } else {
+      const count = rightValue.length;
+      const list: (string | number | boolean | null)[] = [];
+      for (let i = 0; i < count; i++) {
+        const item = rightValue[i];
+        if (!item) {
+          continue;
+        }
+        const right = convertWhere(item, state);
+        if (right.err) {
+          err = right.err;
+          break;
+        } else if (right.value === null) {
+          value = null;
+          break;
+        } else {
+          list.push(right.value);
+        }
       }
+      value ??= `${left.value} IN (${list.join(',')})`;
     }
-    value ??= `${left.value} IN (${list.join(',')})`;
   }
   return { err, value };
 }
@@ -164,11 +172,21 @@ function _is(
   let err = left.err;
   if (!err) {
     const rightExpr = expr.right;
-    if (rightExpr.type === 'null') {
+    if ('type' in rightExpr && rightExpr.type === 'null') {
       right = 'NULL';
-    } else if (rightExpr.type === 'bool' && rightExpr.value) {
+    } else if (
+      'type' in rightExpr &&
+      rightExpr.type === 'bool' &&
+      'value' in rightExpr &&
+      rightExpr.value
+    ) {
       right = 'TRUE';
-    } else if (rightExpr.type === 'bool' && !rightExpr.value) {
+    } else if (
+      'type' in rightExpr &&
+      rightExpr.type === 'bool' &&
+      'value' in rightExpr &&
+      !rightExpr.value
+    ) {
       right = 'FALSE';
     } else {
       err = 'syntax_err';
@@ -179,7 +197,7 @@ function _is(
 }
 
 function not(expr: ExpressionValue, state: ConvertWhereState): ConvertResult {
-  if (expr.type !== 'unary_expr') {
+  if (!('type' in expr) || expr.type !== 'unary_expr') {
     return { err: 'syntax_err', value: null };
   }
   const result = convertWhere(expr.expr, state);
@@ -190,7 +208,7 @@ function not(expr: ExpressionValue, state: ConvertWhereState): ConvertResult {
 }
 
 function minus(expr: ExpressionValue, state: ConvertWhereState): ConvertResult {
-  if (expr.type !== 'unary_expr') {
+  if (!('type' in expr) || expr.type !== 'unary_expr') {
     return { err: 'syntax_err', value: null };
   }
   const result = convertWhere(expr.expr, state);

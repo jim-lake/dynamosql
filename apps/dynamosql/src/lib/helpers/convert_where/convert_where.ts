@@ -10,6 +10,11 @@ import type { ExpressionValue } from 'node-sql-parser';
 import type {
   Function as FunctionType,
   Binary,
+  Unary,
+  FulltextSearch,
+  Extract,
+  ExprList,
+  DataType,
   ColumnRef,
   From,
 } from 'node-sql-parser';
@@ -26,24 +31,34 @@ export interface ConvertResult {
   value: string | number | boolean | null;
 }
 export function convertWhere(
-  expr: ExpressionValue | Binary | FunctionType | null | undefined,
+  expr:
+    | ExpressionValue
+    | Binary
+    | FunctionType
+    | Unary
+    | FulltextSearch
+    | Extract
+    | ExprList
+    | DataType
+    | null
+    | undefined,
   state: ConvertWhereState
 ): ConvertResult {
   const { from } = state;
   let err: string | null = null;
   let value: string | number | boolean | null = null;
 
-  if (expr) {
+  if (expr && 'type' in expr) {
     const { type } = expr;
-    if (type === 'number') {
+    if (type === 'number' && 'value' in expr) {
       value = expr.value;
-    } else if (type === 'double_quote_string') {
+    } else if (type === 'double_quote_string' && 'value' in expr) {
       value = `'${expr.value}'`;
-    } else if (type === 'single_quote_string') {
+    } else if (type === 'single_quote_string' && 'value' in expr) {
       value = `'${expr.value}'`;
     } else if (type === 'null') {
       value = null;
-    } else if (type === 'bool') {
+    } else if (type === 'bool' && 'value' in expr) {
       value = expr.value;
     } else if (type === 'function') {
       const funcExpr = expr;

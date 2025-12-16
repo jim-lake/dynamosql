@@ -1,26 +1,32 @@
-import type { AST } from 'node-sql-parser';
+import type { AST, CreateTable } from 'node-sql-parser';
 import type { FunctionName, BaseFrom, From } from 'node-sql-parser';
 
 function isBaseFrom(from: From): from is BaseFrom {
   return 'table' in from && typeof from.table === 'string';
 }
 
+function isCreateTable(ast: AST): ast is CreateTable {
+  return ast.type === 'create' && 'table' in ast;
+}
+
 export function getDatabaseFromTable(ast: AST): string | undefined {
-  if (ast.type === 'create') {
-    if (Array.isArray(ast.table)) {
-      return ast.table[0]?.db;
-    } else if (ast.table) {
-      return ast.table.db ?? undefined;
+  if (isCreateTable(ast)) {
+    const table = ast.table;
+    if (Array.isArray(table)) {
+      return table[0]?.db ?? undefined;
+    } else {
+      return (table as BaseFrom).db ?? undefined;
     }
   }
   return undefined;
 }
 export function getTableFromTable(ast: AST): string | undefined {
-  if (ast.type === 'create') {
-    if (Array.isArray(ast.table)) {
-      return ast.table[0]?.table;
-    } else if (ast.table) {
-      return ast.table.table;
+  if (isCreateTable(ast)) {
+    const table = ast.table;
+    if (Array.isArray(table)) {
+      return table[0]?.table;
+    } else {
+      return (table as BaseFrom).table;
     }
   }
   return undefined;

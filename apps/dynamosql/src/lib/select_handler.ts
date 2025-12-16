@@ -24,7 +24,7 @@ import type { EvaluationResult } from './expression';
 import type { Session } from '../session';
 import type { ColumnRefInfo } from './helpers/column_ref_helper';
 import type { SelectModifyAST } from './helpers/select_modify';
-import type { ExpressionValue } from 'node-sql-parser';
+import type { ExpressionValue, Extract, FulltextSearch } from 'node-sql-parser';
 import type { Select, ColumnRef, From, BaseFrom } from 'node-sql-parser';
 
 export type SourceMap = Map<From, Row[]>;
@@ -44,7 +44,7 @@ function _isBaseFromList(list: From[]): list is BaseFrom[] {
 }
 
 interface QueryColumn {
-  expr: ExpressionValue & {
+  expr: (ExpressionValue | Extract | FulltextSearch) & {
     db?: string | null;
     from?: { db?: string; table?: string; as?: string };
   };
@@ -201,8 +201,8 @@ async function _evaluateReturn(
 
     // Get table info from columnRefMap if this is a column_ref
     let fromInfo: BaseFrom | null = null;
-    if (column.expr.type === 'column_ref') {
-      const refInfo = columnRefMap.get(column.expr);
+    if ('type' in column.expr && column.expr.type === 'column_ref') {
+      const refInfo = columnRefMap.get(column.expr as ColumnRef);
       if (refInfo?.from && _isBaseFrom(refInfo.from)) {
         fromInfo = refInfo.from;
       }
@@ -260,19 +260,21 @@ function _expandStarColumns(params: ExpandStarColumnsParams): QueryColumn[] {
   const { ast, column_map, requestSets, columnRefMap } = params;
   const ret: QueryColumn[] = [];
   for (const column of ast.columns ?? []) {
-    if (column?.expr?.type === 'column_ref' && column.expr.column === '*') {
-      const { db, table } = column.expr;
+    if (
+      column &&
+      'type' in column.expr &&
+      column.expr.type === 'column_ref' &&
+      column.expr.column === '*'
+    ) {
+      const colExpr = column.expr;
+      const table = colExpr.table;
       const from_list = Array.isArray(ast.from) ? ast.from : [];
       for (const from of from_list) {
         if (!_isBaseFrom(from)) {
           continue;
         }
-        if (
-          (!db && !table) ||
-          (db && from.db === db && from.table === table && !from.as) ||
-          (!db && from.table === table && !from.as) ||
-          (!db && from.as === table)
-        ) {
+        // Match if no table specified, or table matches from.table or from.as
+        if (!table || (from.table === table && !from.as) || from.as === table) {
           const column_list = column_map.get(from);
           if (column_list && !column_list.length) {
             const requestSet = requestSets.get(from);
@@ -292,7 +294,8 @@ function _expandStarColumns(params: ExpandStarColumnsParams): QueryColumn[] {
         }
       }
     } else {
-      ret.push(column);
+      // Star and Assign are handled elsewhere, so this should be safe
+      ret.push(column as QueryColumn);
     }
   }
   return ret;

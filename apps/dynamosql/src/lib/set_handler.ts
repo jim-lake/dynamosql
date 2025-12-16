@@ -8,11 +8,9 @@ import * as SelectHandler from './select_handler';
 
 import type { EvaluationResult } from './expression';
 import type { HandlerParams } from './handler_types';
-import type { AssignExpr, SetStatement } from 'node-sql-parser';
+import type { Set, SetAssign, Select } from 'node-sql-parser';
 
-export async function query(
-  params: HandlerParams<SetStatement>
-): Promise<void> {
+export async function query(params: HandlerParams<Set>): Promise<void> {
   const { ast } = params;
   const expr = ast.expr;
   for (const e of expr) {
@@ -21,8 +19,8 @@ export async function query(
 }
 
 async function _handleAssignment(
-  expr: AssignExpr,
-  params: HandlerParams<SetStatement>
+  expr: SetAssign,
+  params: HandlerParams<Set>
 ): Promise<void> {
   const { session } = params;
   const { left, right } = expr;
@@ -30,7 +28,7 @@ async function _handleAssignment(
   if ('ast' in right) {
     const { rows } = await SelectHandler.internalQuery({
       ...params,
-      ast: right.ast,
+      ast: right.ast as Select,
     });
     if (rows[0]?.[0]) {
       result = rows[0][0];

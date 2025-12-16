@@ -23,7 +23,22 @@ import type {
   SourceRowResultGroup,
 } from '../handler_types';
 import type { ColumnRefInfo } from '../helpers/column_ref_helper';
-import type { ExpressionValue } from 'node-sql-parser';
+import type {
+  ExpressionValue,
+  DataType,
+  ExprList,
+  Extract,
+  FulltextSearch,
+  Function as FunctionExpr,
+  AggrFunc,
+  Binary,
+  Unary,
+  Cast as CastExpr,
+  Var,
+  Assign,
+  ColumnRefItem,
+  ValueExpr,
+} from 'node-sql-parser';
 import type { Interval as IntervalType, ColumnRef } from 'node-sql-parser';
 
 export interface EvaluationState {
@@ -42,8 +57,112 @@ export interface EvaluationResult extends EvaluationValue {
   sleep_ms?: number;
 }
 
+// Type guards
+function isValueExpr(expr: unknown): expr is ValueExpr {
+  return (
+    typeof expr === 'object' &&
+    expr !== null &&
+    'type' in expr &&
+    (expr.type === 'number' ||
+      expr.type === 'bigint' ||
+      expr.type === 'double_quote_string' ||
+      expr.type === 'single_quote_string' ||
+      expr.type === 'null' ||
+      expr.type === 'bool' ||
+      expr.type === 'hex_string' ||
+      expr.type === 'full_hex_string')
+  );
+}
+
+function isFunction(expr: unknown): expr is FunctionExpr {
+  return (
+    typeof expr === 'object' &&
+    expr !== null &&
+    'type' in expr &&
+    expr.type === 'function'
+  );
+}
+
+function isAggrFunc(expr: unknown): expr is AggrFunc {
+  return (
+    typeof expr === 'object' &&
+    expr !== null &&
+    'type' in expr &&
+    expr.type === 'aggr_func'
+  );
+}
+
+function isBinary(expr: unknown): expr is Binary {
+  return (
+    typeof expr === 'object' &&
+    expr !== null &&
+    'type' in expr &&
+    expr.type === 'binary_expr'
+  );
+}
+
+function isUnary(expr: unknown): expr is Unary {
+  return (
+    typeof expr === 'object' &&
+    expr !== null &&
+    'type' in expr &&
+    expr.type === 'unary_expr'
+  );
+}
+
+function isCast(expr: unknown): expr is CastExpr {
+  return (
+    typeof expr === 'object' &&
+    expr !== null &&
+    'type' in expr &&
+    expr.type === 'cast'
+  );
+}
+
+function isVar(expr: unknown): expr is Var {
+  return (
+    typeof expr === 'object' &&
+    expr !== null &&
+    'type' in expr &&
+    expr.type === 'var'
+  );
+}
+
+function isAssign(expr: unknown): expr is Assign {
+  return (
+    typeof expr === 'object' &&
+    expr !== null &&
+    'type' in expr &&
+    expr.type === 'assign'
+  );
+}
+
+function isColumnRef(expr: unknown): expr is ColumnRefItem {
+  return (
+    typeof expr === 'object' &&
+    expr !== null &&
+    'type' in expr &&
+    expr.type === 'column_ref'
+  );
+}
+
+function isInterval(expr: unknown): expr is IntervalType {
+  return (
+    typeof expr === 'object' &&
+    expr !== null &&
+    'type' in expr &&
+    expr.type === 'interval'
+  );
+}
+
 export function getValue(
-  expr: ExpressionValue | undefined,
+  expr:
+    | ExpressionValue
+    | DataType
+    | ExprList
+    | Extract
+    | FulltextSearch
+    | undefined,
   state: EvaluationState
 ): EvaluationResult {
   const { session, row } = state;
@@ -54,125 +173,135 @@ export function getValue(
     name: undefined,
   };
 
-  const type = expr?.type;
   if (!expr) {
     // no expression results in undefined
-  } else if (type === 'number') {
-    if (typeof expr.value === 'number') {
-      result.value = expr.value;
-      result.type = Number.isInteger(result.value) ? 'longlong' : 'number';
-    } else {
-      result.value = Number(expr.value);
-      if (typeof expr.value === 'string') {
-        if (expr.value.includes('e')) {
-          result.type = 'double';
-          result.decimals = 31;
-        } else if (expr.value.includes('.')) {
-          result.type = 'number';
-          result.decimals = getDecimalsForString(expr.value);
-        }
-      } else {
+  } else if ('dataType' in expr) {
+    // DataType - shouldn't be evaluated as a value
+    result.err = { err: 'ER_PARSE_ERROR' };
+  } else if ('type' in expr && expr.type === 'expr_list') {
+    // ExprList - shouldn't be evaluated as a single value
+    result.err = { err: 'ER_PARSE_ERROR' };
+  } else if ('type' in expr && expr.type === 'extract') {
+    // Extract - EXTRACT(field FROM source) - not yet implemented
+    result.err = { err: 'ER_NOT_SUPPORTED_YET' };
+  } else if ('type' in expr && expr.type === 'fulltext_search') {
+    // FulltextSearch - MATCH(...) AGAINST(...) - not yet implemented
+    result.err = { err: 'ER_NOT_SUPPORTED_YET' };
+  } else if (isValueExpr(expr)) {
+    const type = expr.type;
+    if (type === 'number') {
+      const value = expr.value;
+      if (typeof value === 'number') {
+        result.value = value;
         result.type = Number.isInteger(result.value) ? 'longlong' : 'number';
+      } else if (value !== null) {
+        result.value = Number(value);
+        if (typeof value === 'string') {
+          if (value.includes('e')) {
+            result.type = 'double';
+            result.decimals = 31;
+          } else if (value.includes('.')) {
+            result.type = 'number';
+            result.decimals = getDecimalsForString(value);
+          }
+        } else {
+          result.type = Number.isInteger(result.value) ? 'longlong' : 'number';
+        }
       }
+    } else if (type === 'bigint') {
+      const val = toBigInt(expr.value);
+      if (val === null) {
+        result.err = { err: 'ER_ILLEGAL_VALUE_FOR_TYPE', args: [expr.value] };
+      } else {
+        result.value = val;
+        result.type = 'bigint';
+      }
+    } else if (type === 'double_quote_string') {
+      result.value = expr.value;
+      result.name = `"${result.value}"`;
+    } else if (type === 'single_quote_string') {
+      result.value = expr.value;
+      result.name = `'${result.value}'`;
+    } else if (type === 'null') {
+      result.value = null;
+    } else if (type === 'bool') {
+      result.value = expr.value ? 1 : 0;
+      result.name = expr.value ? 'TRUE' : 'FALSE';
+      result.type = 'longlong';
+    } else if (type === 'hex_string' || type === 'full_hex_string') {
+      const value = expr.value;
+      if (typeof value === 'string') {
+        result.value = Buffer.from(value, 'hex');
+        result.name = 'x' + value.slice(0, 10);
+      }
+      result.type = 'buffer';
     }
-  } else if (type === 'bigint') {
-    const val = toBigInt(expr.value);
-    if (val === null) {
-      result.err = { err: 'ER_ILLEGAL_VALUE_FOR_TYPE', args: [expr.value] };
-    } else {
-      result.value = val;
-      result.type = 'bigint';
-    }
-  } else if (type === 'double_quote_string') {
-    result.value = expr.value;
-    result.name = `"${result.value}"`;
-  } else if (type === 'single_quote_string') {
-    result.value = expr.value;
-    result.name = `'${result.value}'`;
-  } else if (type === 'null') {
-    result.value = null;
-  } else if (type === 'bool') {
-    result.value = expr.value ? 1 : 0;
-    result.name = expr.value ? 'TRUE' : 'FALSE';
-    result.type = 'longlong';
-  } else if (type === 'hex_string' || type === 'full_hex_string') {
-    result.value = Buffer.from(expr.value, 'hex');
-    result.name = 'x' + expr.value.slice(0, 10);
-    result.type = 'buffer';
-  } else if (type === 'interval') {
+  } else if (isInterval(expr)) {
     const intervalFunc = Interval.interval as
       | ((expr: IntervalType, state: EvaluationState) => EvaluationResult)
       | undefined;
     if (typeof intervalFunc === 'function') {
       result = intervalFunc(expr, state);
     }
-  } else if (type === 'function') {
-    const funcExpr = expr;
-    const funcName = getFunctionName(funcExpr.name);
+  } else if (isFunction(expr)) {
+    const funcName = getFunctionName(expr.name);
     const func = Functions[funcName.toLowerCase()];
     if (typeof func === 'function') {
-      result = func(funcExpr, state);
+      result = func(expr, state);
       result.name ??= funcName + '()';
     } else {
       logger.trace('expression.getValue: unknown function:', funcName);
       result.err = { err: 'ER_SP_DOES_NOT_EXIST', args: [funcName] };
     }
-  } else if (type === 'aggr_func') {
-    const aggrExpr = expr;
-    const funcName = getFunctionName(aggrExpr.name);
+  } else if (isAggrFunc(expr)) {
+    const funcName = getFunctionName(expr.name);
     const func = AggregateFunctions[funcName.toLowerCase()];
     if (func) {
-      result = func(aggrExpr, state);
+      result = func(expr, state);
       result.name ??= funcName + '()';
     } else {
       logger.trace('expression.getValue: unknown aggregate:', funcName);
       result.err = { err: 'ER_SP_DOES_NOT_EXIST', args: [funcName] };
     }
-  } else if (type === 'binary_expr') {
-    const binExpr = expr;
-    const func = BinaryExpression[binExpr.operator.toLowerCase()];
+  } else if (isBinary(expr)) {
+    const func = BinaryExpression[expr.operator.toLowerCase()];
     if (func) {
-      result = func(binExpr, state);
-      result.name ??= binExpr.operator;
+      result = func(expr, state);
+      result.name ??= expr.operator;
     } else {
       logger.trace(
         'expression.getValue: unknown binary operator:',
-        binExpr.operator
+        expr.operator
       );
-      result.err = { err: 'ER_SP_DOES_NOT_EXIST', args: [binExpr.operator] };
+      result.err = { err: 'ER_SP_DOES_NOT_EXIST', args: [expr.operator] };
     }
-  } else if (type === 'unary_expr') {
-    const unaryExpr = expr;
-    const func = UnaryExpression[unaryExpr.operator.toLowerCase()];
+  } else if (isUnary(expr)) {
+    const func = UnaryExpression[expr.operator.toLowerCase()];
     if (func) {
-      result = func(unaryExpr, state);
-      result.name ??= unaryExpr.operator;
+      result = func(expr, state);
+      result.name ??= expr.operator;
     } else {
       logger.trace(
         'expression.getValue: unknown unanary operator:',
-        unaryExpr.operator
+        expr.operator
       );
-      result.err = { err: 'ER_SP_DOES_NOT_EXIST', args: [unaryExpr.operator] };
+      result.err = { err: 'ER_SP_DOES_NOT_EXIST', args: [expr.operator] };
     }
-  } else if (type === 'cast') {
-    const castExpr = expr;
-    const target = Array.isArray(castExpr.target)
-      ? castExpr.target[0]
-      : castExpr.target;
+  } else if (isCast(expr)) {
+    const target = Array.isArray(expr.target) ? expr.target[0] : expr.target;
     const dataType = target?.dataType ?? '';
     const func = Cast[dataType.toLowerCase()];
     if (func) {
-      result = func(castExpr, state);
+      result = func(expr, state);
       result.name ??= `CAST(? AS ${dataType})`;
     } else {
       logger.trace('expression.getValue: unknown cast type:', dataType);
       result.err = { err: 'ER_SP_DOES_NOT_EXIST', args: [dataType] };
     }
-  } else if (type === 'var') {
-    const varExpr = expr;
-    const { prefix, members } = varExpr;
-    const scope = members.length > 0 ? varExpr.name.toLowerCase() : '';
-    const name = members[0] ?? varExpr.name;
+  } else if (isVar(expr)) {
+    const { prefix, members } = expr;
+    const scope = members.length > 0 ? expr.name.toLowerCase() : '';
+    const name = members[0] ?? expr.name;
     result.name = prefix + (scope ? scope + '.' : '') + name;
     if (prefix === '@@') {
       let val: EvaluationValue | undefined;
@@ -191,8 +320,8 @@ export function getValue(
       } else {
         logger.trace(
           'expression.getValue: unknown system variable:',
-          varExpr.name,
-          varExpr.members
+          expr.name,
+          expr.members
         );
         result.err = { err: 'ER_UNKNOWN_SYSTEM_VARIABLE', args: [name] };
       }
@@ -220,10 +349,9 @@ export function getValue(
     } else {
       result.err = 'unsupported';
     }
-  } else if (type === 'assign') {
+  } else if (isAssign(expr)) {
     // Handle := assignment operator
-    const assignExpr = expr;
-    const right = assignExpr.right;
+    const right = expr.right;
     const rightResult =
       'ast' in right
         ? {
@@ -236,7 +364,7 @@ export function getValue(
     if (rightResult.err) {
       result = rightResult;
     } else {
-      const varExpr = assignExpr.left;
+      const varExpr = expr.left;
       if (varExpr.prefix === '@') {
         const name = varExpr.name;
         session.setVariable(name, {
@@ -250,13 +378,12 @@ export function getValue(
         result.err = { err: 'syntax_err', args: [':='] };
       }
     }
-  } else if (type === 'column_ref') {
-    const colRef = expr;
-    const columnValue = colRef.column;
+  } else if (isColumnRef(expr)) {
+    const columnValue = expr.column;
     const columnName = String(columnValue);
 
     result.name = columnName;
-    const refInfo = state.columnRefMap?.get(colRef);
+    const refInfo = state.columnRefMap?.get(expr);
     if (row && refInfo?.resultIndex !== undefined && refInfo.resultIndex >= 0) {
       const output_result =
         'result' in row ? row.result[refInfo.resultIndex] : undefined;

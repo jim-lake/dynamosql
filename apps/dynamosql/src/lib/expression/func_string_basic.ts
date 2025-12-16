@@ -4,7 +4,7 @@ import { convertNum, convertString } from '../helpers/sql_conversion';
 import { getValue } from './evaluate';
 
 import type { EvaluationState, EvaluationResult } from './evaluate';
-import type { Function, ExpressionValue } from 'node-sql-parser';
+import type { Function } from 'node-sql-parser';
 
 export function length(
   expr: Function,
@@ -41,9 +41,7 @@ export function concat(
   assertArgCount(expr, 1, Infinity);
   let err: EvaluationResult['err'] = null;
   let value: string | null = '';
-  const results = expr.args.value.map((sub: ExpressionValue) =>
-    getValue(sub, state)
-  );
+  const results = expr.args.value.map((sub) => getValue(sub, state));
 
   for (const result of results) {
     if (result.err) {

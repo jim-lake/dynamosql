@@ -29,8 +29,13 @@ export async function query(
         ? 'ignore'
         : null;
 
-  const database = ast.table?.[0]?.db ?? session.getCurrentDatabase();
-  const table = ast.table?.[0]?.table;
+  const tableArray = Array.isArray(ast.table) ? ast.table : [ast.table];
+  const firstTable = tableArray[0];
+  const database =
+    (firstTable && 'db' in firstTable ? firstTable.db : null) ??
+    session.getCurrentDatabase();
+  const table =
+    firstTable && 'table' in firstTable ? firstTable.table : undefined;
   if (!database) {
     throw new SQLError('no_current_database');
   }
@@ -49,7 +54,10 @@ async function _runInsert(
   }
 ): Promise<AffectedResult> {
   const { ast, session, engine, dynamodb, duplicate_mode } = params;
-  const table = ast.table?.[0]?.table;
+  const tableArray = Array.isArray(ast.table) ? ast.table : [ast.table];
+  const firstTable = tableArray[0];
+  const table =
+    firstTable && 'table' in firstTable ? firstTable.table : undefined;
   let list: EvaluationResultRow[];
 
   // Build the list of rows to insert
@@ -107,6 +115,9 @@ async function _runInsert(
   }
 
   // Insert the rows
+  if (!table) {
+    throw new SQLError('bad_table_name');
+  }
   if (list.length > 0) {
     const opts = {
       dynamodb,

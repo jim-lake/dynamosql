@@ -11,6 +11,13 @@ import type { HandlerParams, AffectedResult } from './handler_types';
 import type { RequestInfo } from './helpers/column_ref_helper';
 import type { BaseFrom, Delete, From } from 'node-sql-parser';
 
+// The actual runtime structure has a 'from' property, but the types say it's From & { addition?: boolean }
+// The types are incomplete/wrong, so we define the actual structure
+interface DeleteTableItem {
+  from: From;
+  addition?: boolean;
+}
+
 function isBaseFrom(from: From): from is BaseFrom {
   return 'table' in from && typeof from.table === 'string';
 }
@@ -83,7 +90,7 @@ async function _multipleDelete(
     delete_list: EngineValue[][];
   }[] = [];
 
-  for (const object of ast.table) {
+  for (const object of (ast.table ?? []) as unknown as DeleteTableItem[]) {
     const found = result_list.find((result) => result.from === object.from);
     const list = found?.list;
     if (!isBaseFrom(object.from)) {

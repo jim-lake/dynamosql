@@ -18,10 +18,11 @@ export function now(expr: Function, state: EvaluationState): EvaluationResult {
   let decimals = 0;
   let name = 'NOW()';
   if (expr.args.value[0]) {
-    if (expr.args.value[0].type === 'bool') {
+    const firstArg = expr.args.value[0];
+    if ('type' in firstArg && firstArg.type === 'bool') {
       return { err: 'ER_PARSE_ERROR', type: 'datetime', value: null };
     }
-    const result = getValue(expr.args.value[0], state);
+    const result = getValue(firstArg, state);
     if (result.err) {
       return result;
     }
