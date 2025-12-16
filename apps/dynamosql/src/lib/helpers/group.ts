@@ -18,6 +18,20 @@ import type {
   OriginValue,
 } from 'node-sql-parser';
 
+function isExpressionValue(
+  expr: ExpressionValue | ExtractFunc | Star | FulltextSearch | Assign
+): expr is ExpressionValue {
+  if (typeof expr !== 'object') {
+    return false;
+  }
+  if ('type' in expr) {
+    const type = expr.type;
+    // Star, FulltextSearch, and Assign have specific type values
+    return type !== 'star' && type !== 'fulltext_search' && type !== 'assign';
+  }
+  return false;
+}
+
 export interface GroupBy {
   columns: (ColumnRef | NumberValue)[] | null;
   modifiers: (OriginValue | null)[];
@@ -57,8 +71,8 @@ export function formGroup(params: FormGroupParams): SourceRowGroup[] {
     if ('type' in column && column.type === 'number') {
       const index = typeof column.value === 'number' ? column.value : 1;
       const colExpr = ast.columns[index - 1]?.expr;
-      if (colExpr) {
-        group_exprs.push(colExpr as ExpressionValue);
+      if (colExpr && isExpressionValue(colExpr)) {
+        group_exprs.push(colExpr);
       }
     } else {
       group_exprs.push(column);
@@ -78,27 +92,41 @@ export function formGroup(params: FormGroupParams): SourceRowGroup[] {
     let obj: Record<string, unknown[] | Record<string, unknown>> = group_map;
     for (let i = 0; i < count; i++) {
       const key = String(key_list[i]);
-      if (i + 1 === count) {
-        obj[key] ??= [];
+      const isLast = i + 1 === count;
+      obj[key] ??= isLast ? [] : {};
+
+      if (isLast) {
+        // At the last level, obj[key] is an array
+        const arr = obj[key];
+        if (Array.isArray(arr)) {
+          arr.push(row);
+        }
       } else {
-        obj[key] ??= {};
+        // At intermediate levels, obj[key] is an object
+        const next = obj[key];
+        if (!Array.isArray(next)) {
+          obj = next as Record<string, unknown[] | Record<string, unknown>>;
+        }
       }
-      obj = obj[key] as Record<string, unknown[] | Record<string, unknown>>;
     }
-    (obj as unknown as unknown[]).push(row);
   }
 
   const output_list: SourceRowGroup[] = [];
   _unroll(output_list, group_map);
   return output_list;
 }
+function isRecord(
+  value: unknown
+): value is Record<string, unknown[] | Record<string, unknown>> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
 function _unroll(list: SourceRowGroup[], obj: unknown): void {
   if (Array.isArray(obj)) {
     list.push({ ...obj[0], group: obj });
-  } else {
-    const objMap = obj as Record<string, unknown>;
-    for (const key in objMap) {
-      _unroll(list, objMap[key]);
+  } else if (isRecord(obj)) {
+    for (const key in obj) {
+      _unroll(list, obj[key]);
     }
   }
 }
@@ -128,7 +156,8 @@ function _hasAgg(
     Array.isArray(expr.args.value)
   ) {
     for (const sub of expr.args.value) {
-      if (_hasAgg(sub as ExpressionValue)) {
+      // sub can be ExpressionValue | DataType | ExprList, all of which are in our union type
+      if (_hasAgg(sub)) {
         return true;
       }
     }

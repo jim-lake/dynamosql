@@ -29,6 +29,9 @@ class GlobalSettings {
 
   public getGlobalVariable(name: string): EvaluationValue | undefined {
     const name_uc = name.toUpperCase();
+    if (!(name_uc in SYSTEM_VARIABLE_TYPES)) {
+      return undefined;
+    }
     const type =
       SYSTEM_VARIABLE_TYPES[name_uc as keyof typeof SYSTEM_VARIABLE_TYPES];
     switch (name_uc) {

@@ -384,16 +384,16 @@ function _pad4(num: unknown): string {
   return String(num).padStart(4, '0');
 }
 function _fix2year(num: unknown): string | number {
-  let ret: string | number = num as string | number;
   if (typeof num === 'string' && num.length <= 2) {
     const parsed = parseInt(num, 10);
     if (parsed >= 0 && parsed <= 69) {
-      ret = parsed + 2000;
+      return parsed + 2000;
     } else if (parsed >= 70 && parsed <= 99) {
-      ret = parsed + 1900;
+      return parsed + 1900;
     }
   }
-  return ret;
+  // Return as-is if not a 2-digit string
+  return typeof num === 'string' || typeof num === 'number' ? num : String(num);
 }
 function _partsToTime(
   type: string,

@@ -11,23 +11,13 @@ function isCreateTable(ast: AST): ast is CreateTable {
 
 export function getDatabaseFromTable(ast: AST): string | undefined {
   if (isCreateTable(ast)) {
-    const table = ast.table;
-    if (Array.isArray(table)) {
-      return table[0]?.db ?? undefined;
-    } else {
-      return (table as BaseFrom).db ?? undefined;
-    }
+    return ast.table[0]?.db ?? undefined;
   }
   return undefined;
 }
 export function getTableFromTable(ast: AST): string | undefined {
   if (isCreateTable(ast)) {
-    const table = ast.table;
-    if (Array.isArray(table)) {
-      return table[0]?.table;
-    } else {
-      return (table as BaseFrom).table;
-    }
+    return ast.table[0]?.table;
   }
   return undefined;
 }

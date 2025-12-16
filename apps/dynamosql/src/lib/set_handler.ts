@@ -10,7 +10,9 @@ import type { EvaluationResult } from './expression';
 import type { HandlerParams } from './handler_types';
 import type { SetStatement, SetAssign, Select } from 'node-sql-parser';
 
-export async function query(params: HandlerParams<SetStatement>): Promise<void> {
+export async function query(
+  params: HandlerParams<SetStatement>
+): Promise<void> {
   const { ast } = params;
   const expr = ast.expr;
   for (const e of expr) {

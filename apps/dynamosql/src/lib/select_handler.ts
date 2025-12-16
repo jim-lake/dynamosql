@@ -24,7 +24,11 @@ import type { EvaluationResult } from './expression';
 import type { Session } from '../session';
 import type { ColumnRefInfo } from './helpers/column_ref_helper';
 import type { SelectModifyAST } from './helpers/select_modify';
-import type { ExpressionValue, ExtractFunc, FulltextSearch } from 'node-sql-parser';
+import type {
+  ExpressionValue,
+  ExtractFunc,
+  FulltextSearch,
+} from 'node-sql-parser';
 import type { Select, ColumnRef, From, BaseFrom } from 'node-sql-parser';
 
 export type SourceMap = Map<From, Row[]>;

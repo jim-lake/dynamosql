@@ -299,7 +299,10 @@ export function _compare(
           let val: bigint | number | undefined = undefined;
           for (const sub of values) {
             if (typeof val === 'bigint' || typeof sub.value === 'bigint') {
-              const val_big = BigInt(sub.value as number);
+              const val_big =
+                typeof sub.value === 'bigint'
+                  ? sub.value
+                  : BigInt(Number(sub.value));
               if (val === undefined || nativeCompare(val_big, val)) {
                 val = val_big;
               }

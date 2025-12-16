@@ -112,13 +112,19 @@ export async function runSelect(
 
   return result_list;
 }
+function isTwoElementTuple(
+  keys: [EngineValue] | [EngineValue, EngineValue]
+): keys is [EngineValue, EngineValue] {
+  return keys.length > 1;
+}
+
 function _addCollection(
   collection: Map<EngineValue, SourceRowOrMap>,
   keys: [EngineValue] | [EngineValue, EngineValue],
   value: SourceRowResult
 ): void {
-  if (keys.length > 1) {
-    const [key0, key1] = keys as [EngineValue, EngineValue];
+  if (isTwoElementTuple(keys)) {
+    const [key0, key1] = keys;
     let sub_map = collection.get(key0);
     if (!sub_map) {
       sub_map = new Map<EngineValue, SourceRowResult>();

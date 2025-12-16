@@ -61,9 +61,7 @@ async function _runAlterTable(
       if (def.action === 'add') {
         const addIndexDef = def;
         const key_list = addIndexDef.definition.map((sub) => {
-          const column_def = column_list.find(
-            (col) => col.name === sub.column
-          );
+          const column_def = column_list.find((col) => col.name === sub.column);
           return {
             name: sub.column,
             order_by: sub.order_by,

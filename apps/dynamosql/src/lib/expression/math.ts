@@ -5,13 +5,17 @@ import {
 } from '../helpers/sql_conversion';
 import { SQLDate } from '../types/sql_date';
 import { SQLDateTime } from '../types/sql_datetime';
+import { SQLInterval } from '../types/sql_interval';
 import { SQLTime } from '../types/sql_time';
 
 import { getValue } from './evaluate';
 
 import type { EvaluationState, EvaluationResult } from './evaluate';
-import type { SQLInterval } from '../types/sql_interval';
 import type { Binary } from 'node-sql-parser';
+
+function isSQLInterval(value: unknown): value is SQLInterval {
+  return value instanceof SQLInterval;
+}
 
 export function plus(expr: Binary, state: EvaluationState): EvaluationResult {
   const result = _numBothSides(expr, state, ' + ', true);
@@ -180,8 +184,12 @@ function _numBothSides(
     if (left.value === null || right.value === null) {
       value = null;
       type = 'double';
-    } else if (allow_interval && left.type === 'interval') {
-      interval = left.value as typeof interval;
+    } else if (
+      allow_interval &&
+      left.type === 'interval' &&
+      isSQLInterval(left.value)
+    ) {
+      interval = left.value;
       if (
         right.value instanceof SQLDateTime ||
         right.value instanceof SQLDate ||
@@ -200,8 +208,12 @@ function _numBothSides(
       } else {
         value = null;
       }
-    } else if (allow_interval && right.type === 'interval') {
-      interval = right.value as typeof interval;
+    } else if (
+      allow_interval &&
+      right.type === 'interval' &&
+      isSQLInterval(right.value)
+    ) {
+      interval = right.value;
       if (
         left.value instanceof SQLDateTime ||
         left.value instanceof SQLTime ||

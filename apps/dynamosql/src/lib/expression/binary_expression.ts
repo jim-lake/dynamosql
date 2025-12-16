@@ -12,6 +12,14 @@ import type {
   ExtractFunc,
 } from 'node-sql-parser';
 
+function isExprList(
+  value: ExpressionValue | ExprList | ExtractFunc
+): value is ExprList {
+  return (
+    typeof value === 'object' && 'type' in value && value.type === 'expr_list'
+  );
+}
+
 function and(expr: Binary, state: EvaluationState): EvaluationResult {
   const left = getValue(expr.left, state);
   let err = left.err;
@@ -170,10 +178,7 @@ function between(expr: Binary, state: EvaluationState): EvaluationResult {
 
   // Right side should be expr_list with 2 values
   if (
-    typeof expr.right !== 'object' ||
-    !('type' in expr.right) ||
-    expr.right.type !== 'expr_list' ||
-    !('value' in expr.right) ||
+    !isExprList(expr.right) ||
     !Array.isArray(expr.right.value) ||
     expr.right.value.length !== 2
   ) {
@@ -187,7 +192,14 @@ function between(expr: Binary, state: EvaluationState): EvaluationResult {
 
   const minExpr = expr.right.value[0];
   const maxExpr = expr.right.value[1];
-  if (!minExpr || !maxExpr) {
+
+  // DataType shouldn't appear in BETWEEN expressions
+  if (
+    !minExpr ||
+    !maxExpr ||
+    (typeof minExpr === 'object' && 'dataType' in minExpr) ||
+    (typeof maxExpr === 'object' && 'dataType' in maxExpr)
+  ) {
     return {
       err: { err: 'syntax_err', args: ['BETWEEN'] },
       value: null,
@@ -218,12 +230,7 @@ function between(expr: Binary, state: EvaluationState): EvaluationResult {
 
   // Use >= and <= comparison logic
   const gte_result = gte(
-    {
-      type: 'binary_expr',
-      operator: '>=',
-      left: expr.left,
-      right: minExpr as ExpressionValue | ExprList | ExtractFunc,
-    },
+    { type: 'binary_expr', operator: '>=', left: expr.left, right: minExpr },
     state
   );
   if (gte_result.err || gte_result.value === null) {
@@ -231,12 +238,7 @@ function between(expr: Binary, state: EvaluationState): EvaluationResult {
   }
 
   const lte_result = lte(
-    {
-      type: 'binary_expr',
-      operator: '<=',
-      left: expr.left,
-      right: maxExpr as ExpressionValue | ExprList | ExtractFunc,
-    },
+    { type: 'binary_expr', operator: '<=', left: expr.left, right: maxExpr },
     state
   );
   if (lte_result.err || lte_result.value === null) {
