@@ -203,12 +203,7 @@ function between(expr: Binary, state: EvaluationState): EvaluationResult {
 
   // Use >= and <= comparison logic
   const gte_result = gte(
-    {
-      type: 'binary_expr',
-      operator: '>=',
-      left: expr.left,
-      right: minExpr,
-    },
+    { type: 'binary_expr', operator: '>=', left: expr.left, right: minExpr },
     state
   );
   if (gte_result.err || gte_result.value === null) {
@@ -216,12 +211,7 @@ function between(expr: Binary, state: EvaluationState): EvaluationResult {
   }
 
   const lte_result = lte(
-    {
-      type: 'binary_expr',
-      operator: '<=',
-      left: expr.left,
-      right: maxExpr,
-    },
+    { type: 'binary_expr', operator: '<=', left: expr.left, right: maxExpr },
     state
   );
   if (lte_result.err || lte_result.value === null) {

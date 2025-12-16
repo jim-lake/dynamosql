@@ -26,8 +26,7 @@ import type {
   TypeCast,
   QueryListResult,
 } from './types';
-import type { AST } from 'node-sql-parser';
-import type { Use } from 'node-sql-parser';
+import type { AST, Use } from 'node-sql-parser';
 import type { Readable, ReadableOptions } from 'node:stream';
 
 const g_parser = new Parser();
@@ -250,7 +249,7 @@ interface PegError {
 function _astify(sql: string): AST[] {
   let list: AST[] = [];
   try {
-    const result = g_parser.astify(sql, { database: 'MySQL' });
+    const result = g_parser.astify(sql, { database: 'MySQL' }) as AST[] | AST;
     if (Array.isArray(result)) {
       list = result;
     } else {
