@@ -9,7 +9,7 @@ import type {
   Binary,
   ExpressionValue,
   ExprList,
-  Extract,
+  ExtractFunc,
 } from 'node-sql-parser';
 
 function and(expr: Binary, state: EvaluationState): EvaluationResult {
@@ -222,7 +222,7 @@ function between(expr: Binary, state: EvaluationState): EvaluationResult {
       type: 'binary_expr',
       operator: '>=',
       left: expr.left,
-      right: minExpr as ExpressionValue | ExprList | Extract,
+      right: minExpr as ExpressionValue | ExprList | ExtractFunc,
     },
     state
   );
@@ -235,7 +235,7 @@ function between(expr: Binary, state: EvaluationState): EvaluationResult {
       type: 'binary_expr',
       operator: '<=',
       left: expr.left,
-      right: maxExpr as ExpressionValue | ExprList | Extract,
+      right: maxExpr as ExpressionValue | ExprList | ExtractFunc,
     },
     state
   );

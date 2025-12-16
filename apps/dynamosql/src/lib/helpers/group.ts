@@ -10,7 +10,7 @@ import type {
   ColumnRef,
   DataType,
   ExprList,
-  Extract,
+  ExtractFunc,
   FulltextSearch,
   Star,
   Assign,
@@ -107,7 +107,7 @@ function _hasAgg(
     | ExpressionValue
     | DataType
     | ExprList
-    | Extract
+    | ExtractFunc
     | FulltextSearch
     | Star
     | Assign

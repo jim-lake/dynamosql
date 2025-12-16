@@ -24,7 +24,7 @@ import type { EvaluationResult } from './expression';
 import type { Session } from '../session';
 import type { ColumnRefInfo } from './helpers/column_ref_helper';
 import type { SelectModifyAST } from './helpers/select_modify';
-import type { ExpressionValue, Extract, FulltextSearch } from 'node-sql-parser';
+import type { ExpressionValue, ExtractFunc, FulltextSearch } from 'node-sql-parser';
 import type { Select, ColumnRef, From, BaseFrom } from 'node-sql-parser';
 
 export type SourceMap = Map<From, Row[]>;
@@ -44,7 +44,7 @@ function _isBaseFromList(list: From[]): list is BaseFrom[] {
 }
 
 interface QueryColumn {
-  expr: (ExpressionValue | Extract | FulltextSearch) & {
+  expr: (ExpressionValue | ExtractFunc | FulltextSearch) & {
     db?: string | null;
     from?: { db?: string; table?: string; as?: string };
   };

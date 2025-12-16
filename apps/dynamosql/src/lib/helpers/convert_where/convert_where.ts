@@ -12,7 +12,7 @@ import type {
   Binary,
   Unary,
   FulltextSearch,
-  Extract,
+  ExtractFunc,
   ExprList,
   DataType,
   ColumnRef,
@@ -37,7 +37,7 @@ export function convertWhere(
     | FunctionType
     | Unary
     | FulltextSearch
-    | Extract
+    | ExtractFunc
     | ExprList
     | DataType
     | null

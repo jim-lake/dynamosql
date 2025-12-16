@@ -27,7 +27,7 @@ import type {
   ExpressionValue,
   DataType,
   ExprList,
-  Extract,
+  ExtractFunc,
   FulltextSearch,
   Function as FunctionExpr,
   AggrFunc,
@@ -160,7 +160,7 @@ export function getValue(
     | ExpressionValue
     | DataType
     | ExprList
-    | Extract
+    | ExtractFunc
     | FulltextSearch
     | undefined,
   state: EvaluationState

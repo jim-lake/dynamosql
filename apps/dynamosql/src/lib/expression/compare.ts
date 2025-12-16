@@ -11,7 +11,7 @@ import type {
   ExpressionValue,
   Function,
   ExprList,
-  Extract,
+  ExtractFunc,
 } from 'node-sql-parser';
 
 export function equal(expr: Binary, state: EvaluationState): EvaluationResult {
@@ -218,8 +218,8 @@ function _equal(
   return { err, value, name, type: 'longlong' };
 }
 function _gt(
-  expr_left: ExpressionValue | ExprList | Extract,
-  expr_right: ExpressionValue | ExprList | Extract,
+  expr_left: ExpressionValue | ExprList | ExtractFunc,
+  expr_right: ExpressionValue | ExprList | ExtractFunc,
   state: EvaluationState,
   op: string,
   flip: boolean
@@ -250,8 +250,8 @@ function _gt(
   return { err, value, name, type: 'longlong' };
 }
 function _gte(
-  expr_left: ExpressionValue | ExprList | Extract,
-  expr_right: ExpressionValue | ExprList | Extract,
+  expr_left: ExpressionValue | ExprList | ExtractFunc,
+  expr_right: ExpressionValue | ExprList | ExtractFunc,
   state: EvaluationState,
   op: string,
   flip: boolean
