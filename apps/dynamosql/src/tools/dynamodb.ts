@@ -141,6 +141,8 @@ export class DynamoDB {
     return this._iterSend({ command, signal: params.signal });
   }
 
+  async queryQL(list: string | QueryQLParams): Promise<ItemRecord[]>;
+  async queryQL(list: (string | QueryQLParams)[]): Promise<ItemRecord[][]>;
   async queryQL(
     list: string | QueryQLParams | (string | QueryQLParams)[]
   ): Promise<ItemRecord[] | ItemRecord[][]> {
