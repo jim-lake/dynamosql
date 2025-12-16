@@ -54,15 +54,15 @@ async function _getFromTable(
   }
 
   try {
-    const results = await dynamodb.queryQL(sql);
-    const result_array = Array.isArray(results[0])
-      ? results[0]
-      : (results as ItemRecord[]);
+    const iter = dynamodb.queryQLIter({ sql });
+    const results: ItemRecord[] = [];
+    for await (const batch of iter) {
+      results.push(...batch);
+    }
     let column_list: string[];
-
     if (isRequestAll) {
       const response_set = new Set<string>();
-      for (const result of result_array) {
+      for (const result of results) {
         for (const key in result) {
           response_set.add(key);
         }
@@ -71,8 +71,7 @@ async function _getFromTable(
     } else {
       column_list = request_columns;
     }
-
-    return { results: result_array, column_list };
+    return { results, column_list };
   } catch (err: unknown) {
     if (err instanceof Error && err.message === 'resource_not_found') {
       throw new SQLError({ err: 'table_not_found', args: [table] });

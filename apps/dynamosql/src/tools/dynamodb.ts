@@ -10,6 +10,7 @@ import {
   ListTablesCommand,
   UpdateTableCommand,
   KeyType,
+  ReturnValuesOnConditionCheckFailure,
 } from '@aws-sdk/client-dynamodb';
 
 import {
@@ -31,7 +32,6 @@ import type {
   DynamoDBClientConfig,
   DescribeTableCommandOutput,
   KeySchemaElement,
-  ReturnValuesOnConditionCheckFailure,
   BillingMode,
   ProjectionType,
 } from '@aws-sdk/client-dynamodb';
@@ -65,15 +65,16 @@ export interface DynamoDBConstructorParams {
 }
 export interface QueryQLParams {
   sql: string;
-  return?: string;
+  return?: ReturnValuesOnConditionCheckFailure;
+  signal?: AbortSignal;
 }
 export interface BatchQLParams {
   list: string[];
-  return?: string;
+  return?: ReturnValuesOnConditionCheckFailure;
 }
 export interface TransactionQLParams {
   list: string[];
-  return?: string;
+  return?: ReturnValuesOnConditionCheckFailure;
 }
 export interface DeleteItemsParams {
   table: string;
@@ -131,6 +132,14 @@ export class DynamoDB {
     this.client = new DynamoDBClient(opts);
     this.namespace = params?.namespace ?? '';
   }
+  public queryQLIter(params: QueryQLParams): AsyncIterable<ItemRecord[]> {
+    const command = new ExecuteStatementCommand({
+      Statement: namespacePartiQL(params.sql, this.namespace),
+      ReturnValuesOnConditionCheckFailure:
+        params.return ?? ReturnValuesOnConditionCheckFailure.NONE,
+    });
+    return this._iterSend({ command, signal: params.signal });
+  }
 
   async queryQL(
     list: string | QueryQLParams | (string | QueryQLParams)[]
@@ -151,25 +160,24 @@ export class DynamoDB {
       this.namespace
     );
     const returnVal =
-      typeof params === 'string' ? 'NONE' : (params.return ?? 'NONE');
-    const input = {
+      typeof params === 'string'
+        ? ReturnValuesOnConditionCheckFailure.NONE
+        : (params.return ?? ReturnValuesOnConditionCheckFailure.NONE);
+    const command = new ExecuteStatementCommand({
       Statement: sql,
-      ReturnValuesOnConditionCheckFailure:
-        returnVal as ReturnValuesOnConditionCheckFailure,
-    };
-    const command = new ExecuteStatementCommand(input);
+      ReturnValuesOnConditionCheckFailure: returnVal,
+    });
     return this._pagedSend(command);
   }
   async batchQL(params: string[] | BatchQLParams): Promise<ItemRecord[]> {
     const list = Array.isArray(params) ? params : params.list;
     const returnVal = Array.isArray(params)
-      ? 'NONE'
-      : (params.return ?? 'NONE');
+      ? ReturnValuesOnConditionCheckFailure.NONE
+      : (params.return ?? ReturnValuesOnConditionCheckFailure.NONE);
     const input = {
       Statements: list.map((sql: string) => ({
         Statement: namespacePartiQL(sql, this.namespace),
-        ReturnValuesOnConditionCheckFailure:
-          returnVal as ReturnValuesOnConditionCheckFailure,
+        ReturnValuesOnConditionCheckFailure: returnVal,
       })),
     };
     const command = new BatchExecuteStatementCommand(input);
@@ -202,8 +210,7 @@ export class DynamoDB {
     const input = {
       TransactStatements: list.map((sql: string) => ({
         Statement: namespacePartiQL(sql, this.namespace),
-        ReturnValuesOnConditionCheckFailure:
-          returnVal as ReturnValuesOnConditionCheckFailure,
+        ReturnValuesOnConditionCheckFailure: returnVal,
       })),
     };
     const command = new ExecuteTransactionCommand(input);
@@ -472,4 +479,28 @@ export class DynamoDB {
     }
     return results;
   }
+  private async *_iterSend(
+    params: IterSendParams
+  ): AsyncIterable<ItemRecord[]> {
+    for (;;) {
+      params.signal?.throwIfAborted();
+      try {
+        const result = await this.client.send(params.command);
+        const list = convertSuccess(result)[1];
+        if (list) {
+          yield list;
+        }
+        if (!result.NextToken) {
+          break;
+        }
+        params.command.input.NextToken = result.NextToken;
+      } catch (err: unknown) {
+        throw safeConvertError(err);
+      }
+    }
+  }
+}
+interface IterSendParams {
+  command: ExecuteStatementCommand;
+  signal?: AbortSignal;
 }
