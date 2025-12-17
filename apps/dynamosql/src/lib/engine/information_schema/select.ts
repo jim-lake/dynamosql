@@ -23,7 +23,7 @@ export async function getRowList(
 
   for (const from of list) {
     const { results, column_list } = await _getFromTable({ ...params, from });
-    sourceMap.set(from, results);
+    sourceMap.set(from, _listToItetator(results));
     columnMap.set(from, column_list);
   }
   return { sourceMap, columnMap };
@@ -97,4 +97,7 @@ function _tableToTable(database: string, table: string): Row {
     CREATE_OPTIONS: { value: '', type: 'string' },
     TABLE_COMMENT: { value: '', type: 'string' },
   };
+}
+async function* _listToItetator<T>(list: T[]) {
+  yield list;
 }

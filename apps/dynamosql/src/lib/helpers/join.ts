@@ -3,8 +3,8 @@ import { getValue } from '../expression';
 
 import type { ColumnRefInfo } from './column_ref_helper';
 import type { Session } from '../../session';
+import type { Row, SourceMap } from '../engine';
 import type { SourceRow } from '../handler_types';
-import type { SourceMap } from '../select_handler';
 import type {
   From,
   Binary,
@@ -21,11 +21,31 @@ export interface FormJoinParams {
   session: Session;
   columnRefMap: Map<ColumnRef, ColumnRefInfo>;
 }
-export function formJoin(params: FormJoinParams): SourceRow[] {
+export async function formJoin(params: FormJoinParams): Promise<SourceRow[]> {
   const { sourceMap, from, where, session, columnRefMap } = params;
+
+  const drainedMap = new Map<From, Row[]>();
+  const tasks: Promise<void>[] = [];
+  for (const [key, iter] of sourceMap) {
+    tasks.push(
+      (async () => {
+        let list: Row[] = [];
+        for await (const batch of iter) {
+          if (batch.length < 10_000) {
+            list.push(...batch);
+          } else {
+            list = list.concat(batch);
+          }
+        }
+        drainedMap.set(key, list);
+      })()
+    );
+  }
+  await Promise.all(tasks);
+
   const row_list: SourceRow[] = [];
   const output_count = _findRows(
-    sourceMap,
+    drainedMap,
     from,
     where,
     session,
@@ -38,7 +58,7 @@ export function formJoin(params: FormJoinParams): SourceRow[] {
   return row_list;
 }
 function _findRows(
-  sourceMap: SourceMap,
+  sourceMap: Map<From, Row[]>,
   list: From[],
   where: Binary | Function | Unary | FulltextSearch | ColumnRef | null,
   session: Session,

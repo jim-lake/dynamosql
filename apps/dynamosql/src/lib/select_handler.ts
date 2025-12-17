@@ -10,7 +10,7 @@ import { formGroup, formImplicitGroup, hasAggregate } from './helpers/group';
 import { formJoin } from './helpers/join';
 import { sort } from './helpers/sort';
 
-import type { Row } from './engine';
+import type { SourceMap } from './engine';
 import type {
   HandlerParams,
   DynamoDBClient,
@@ -30,8 +30,6 @@ import type {
   FulltextSearch,
 } from 'node-sql-parser';
 import type { Select, ColumnRef, From, BaseFrom } from 'node-sql-parser';
-
-export type SourceMap = Map<From, Row[]>;
 
 type ColumnMap = Map<From, string[]>;
 
@@ -176,7 +174,13 @@ async function _evaluateReturn(
   let sleep_ms = 0;
 
   if (from && Array.isArray(from)) {
-    row_list = formJoin({ sourceMap, from, where, session, columnRefMap });
+    row_list = await formJoin({
+      sourceMap,
+      from,
+      where,
+      session,
+      columnRefMap,
+    });
   } else {
     row_list = [{ source: new Map() }];
   }

@@ -5,7 +5,7 @@ import { escapeIdentifier } from '../../../tools/dynamodb_helper';
 import { convertWhere } from '../../helpers/convert_where';
 
 import type { ItemRecord } from '../../../tools/dynamodb';
-import type { FromJoin, Row, RowListParams, RowListResult } from '../index';
+import type { FromJoin, RowListParams, RowListResult } from '../index';
 
 export async function getRowList(
   params: RowListParams
@@ -15,11 +15,7 @@ export async function getRowList(
   const tasks = params.list.map(async (from) => {
     const { resultIter, columnList } = await _getFromTable({ ...params, from });
     columnMap.set(from, columnList);
-    const list: Row[] = [];
-    sourceMap.set(from, list);
-    for await (const batch of resultIter) {
-      list.push(...batch);
-    }
+    sourceMap.set(from, resultIter);
   });
   await Promise.all(tasks);
   return { sourceMap, columnMap };

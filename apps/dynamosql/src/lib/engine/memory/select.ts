@@ -15,7 +15,7 @@ export async function getRowList(
 
   for (const from of list) {
     const { row_list, column_list } = _getFromTable({ ...params, from });
-    sourceMap.set(from, row_list);
+    sourceMap.set(from, _listToItetator(row_list));
     columnMap.set(from, column_list);
   }
 
@@ -36,4 +36,7 @@ function _getFromTable(params: RowListParams & { from: BaseFrom }): {
     row_list: data.row_list,
     column_list: data.column_list.map((column) => column.name),
   };
+}
+async function* _listToItetator<T>(list: T[]) {
+  yield list;
 }

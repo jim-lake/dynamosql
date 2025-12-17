@@ -51,9 +51,11 @@ export interface CellValue {
 export type CellRow = Record<string, CellValue>;
 export type Row = CellRow | ItemRecord;
 export type EngineValue = CellValue | AttributeValue;
+export type SourceMap = Map<BaseFrom, AsyncIterable<Row[]>>;
+export type ColumnMap = Map<BaseFrom, string[]>;
 export interface RowListResult {
-  sourceMap: Map<BaseFrom, Row[]>;
-  columnMap: Map<BaseFrom, string[]>;
+  sourceMap: SourceMap;
+  columnMap: ColumnMap;
 }
 export interface TableData<T = Row> {
   database: string;
