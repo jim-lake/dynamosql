@@ -1,4 +1,5 @@
 import { SQLError } from '../../error';
+import { filterInPlace } from '../../tools/filter_in_place';
 import { getValue } from '../expression';
 
 import type { ColumnRefInfo } from './column_ref_helper';
@@ -24,117 +25,101 @@ export interface FormJoinParams {
 export async function formJoin(params: FormJoinParams): Promise<SourceRow[]> {
   const { sourceMap, from, where, session, columnRefMap } = params;
 
-  const drainedMap = new Map<From, Row[]>();
-  const tasks: Promise<void>[] = [];
-  for (const [key, iter] of sourceMap) {
-    tasks.push(
-      (async () => {
-        let list: Row[] = [];
-        for await (const batch of iter) {
-          if (batch.length < 10_000) {
-            list.push(...batch);
-          } else {
-            list = list.concat(batch);
-          }
-        }
-        drainedMap.set(key, list);
-      })()
-    );
+  const iter = _findRows(sourceMap, from, where, session, 0, columnRefMap);
+  let row_list: SourceRow[] = [];
+  for await (const batch of iter) {
+    if (batch.length < 10_000) {
+      row_list.push(...batch);
+    } else {
+      row_list = row_list.concat(batch);
+    }
   }
-  await Promise.all(tasks);
-
-  const row_list: SourceRow[] = [];
-  const output_count = _findRows(
-    drainedMap,
-    from,
-    where,
-    session,
-    row_list,
-    0,
-    0,
-    columnRefMap
-  );
-  row_list.length = output_count;
   return row_list;
 }
-function _findRows(
-  sourceMap: Map<From, Row[]>,
+async function* _findRows(
+  sourceMap: Map<From, AsyncIterable<Row[]>>,
   list: From[],
   where: Binary | Function | Unary | FulltextSearch | ColumnRef | null,
   session: Session,
-  row_list: SourceRow[],
   from_index: number,
-  start_index: number,
-  columnRefMap: Map<ColumnRef, ColumnRefInfo>
-): number {
+  columnRefMap: Map<ColumnRef, ColumnRefInfo>,
+  parentRows: SourceRow[] = []
+): AsyncIterable<SourceRow[]> {
   const from = list[from_index];
-  if (!from) {
-    throw new SQLError('Invalid from index');
-  }
-  const is_left = 'join' in from && from.join.includes('LEFT');
+  if (!from) {throw new SQLError('Invalid from index');}
+
+  const isLeft = 'join' in from && from.join.includes('LEFT');
   const on = 'on' in from ? from.on : undefined;
-  const rows = sourceMap.get(from);
-  const row_count = rows?.length ?? (is_left ? 1 : 0);
+  const rowsIterable = sourceMap.get(from);
 
-  let output_count = 0;
-  for (let i = 0; i < row_count; i++) {
-    const row_index = start_index + output_count;
-    row_list[row_index] ??= { source: new Map() };
-    const row = row_list[row_index];
+  const baseRows: SourceRow[] =
+    parentRows.length > 0 ? parentRows : [{ source: new Map() }];
 
-    if (rows) {
-      row.source.set(from, rows[i] ?? null);
-    }
-    for (let j = 0; output_count > 0 && j < from_index; j++) {
-      const prevFrom = list[j];
-      const startRow = row_list[start_index];
-      if (prevFrom && startRow) {
-        const value = startRow.source.get(prevFrom);
-        if (value !== undefined) {
-          row.source.set(prevFrom, value);
-        }
-      }
-    }
+  if (!rowsIterable && !isLeft) {return;}
 
-    let skip = false;
-    if (on) {
-      const result = getValue(on, { session, row, columnRefMap });
-      if (result.err) {
-        throw new SQLError(result.err);
-      } else if (!result.value) {
-        skip = true;
-      }
-    }
-    if (skip && is_left && output_count === 0 && i + 1 === row_count) {
-      row.source.set(from, null);
-      skip = false;
-    }
-
-    if (!skip) {
-      const next_from = from_index + 1;
-      if (next_from < list.length) {
-        const result_count = _findRows(
-          sourceMap,
-          list,
-          where,
-          session,
-          row_list,
-          next_from,
-          start_index + output_count,
-          columnRefMap
-        );
-        output_count += result_count;
-      } else if (where) {
-        const result = getValue(where, { session, row, columnRefMap });
-        if (result.err) {
-          throw new SQLError(result.err);
-        } else if (result.value) {
-          output_count++;
-        }
+  const asyncIter =
+    rowsIterable ??
+    (async function* () {
+      if (isLeft) {
+        yield [null];
       } else {
-        output_count++;
+        yield [];
+      }
+    })();
+
+  for await (const batch of asyncIter) {
+    const currentBatch = batch.length > 0 ? batch : isLeft ? [null] : [];
+    const amplifiedRows: SourceRow[] = [];
+    for (const parentRow of baseRows) {
+      const matchingRows: SourceRow[] = [];
+
+      for (const rowData of currentBatch) {
+        const row: SourceRow = { source: new Map(parentRow.source) };
+        row.source.set(from, rowData);
+
+        let skip = false;
+        if (on) {
+          const result = getValue(on, { session, row, columnRefMap });
+          if (result.err) {throw new SQLError(result.err);}
+          if (!result.value) {skip = true;}
+        }
+
+        if (!skip) {
+          matchingRows.push(row);
+        }
+      }
+
+      if (isLeft && matchingRows.length === 0) {
+        const row: SourceRow = { source: new Map(parentRow.source) };
+        row.source.set(from, null);
+        amplifiedRows.push(row);
+      } else {
+        amplifiedRows.push(...matchingRows);
+      }
+    }
+
+    if (from_index + 1 === list.length) {
+      if (where) {
+        filterInPlace(
+          amplifiedRows,
+          (row) => getValue(where, { session, row, columnRefMap }).value
+        );
+      }
+      if (amplifiedRows.length > 0) {
+        yield amplifiedRows;
+      }
+    } else {
+      for await (const nextBatch of _findRows(
+        sourceMap,
+        list,
+        where,
+        session,
+        from_index + 1,
+        columnRefMap,
+        amplifiedRows
+      )) {
+        yield nextBatch;
       }
     }
   }
-  return output_count;
 }

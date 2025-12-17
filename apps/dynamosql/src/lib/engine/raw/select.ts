@@ -52,7 +52,7 @@ async function _getFromTable(
     where && !is_left_join
       ? convertWhere(where, { session, from, default_true: true, columnRefMap })
       : null;
-  if (!where_result?.err && where_result?.value) {
+  if (!where_result?.err && where_result?.value && where_result.value !== 1) {
     sql += ' WHERE ' + where_result.value;
   }
 
