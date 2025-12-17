@@ -11,19 +11,27 @@ import type { BaseFrom } from 'node-sql-parser';
 export async function getRowList(
   params: RowListParams
 ): Promise<RowListResult> {
-  const { list } = params;
   const source_map: RowListResult['source_map'] = new Map<BaseFrom, Row[]>();
   const column_map: RowListResult['column_map'] = new Map<BaseFrom, string[]>();
-  for (const from of list) {
-    const { results, column_list } = await _getFromTable({ ...params, from });
-    source_map.set(from, results);
-    column_map.set(from, column_list);
-  }
+  const tasks = params.list.map(async (from) => {
+    const { resultIter, columnList } = await _getFromTable({ ...params, from });
+    column_map.set(from, columnList);
+    const list: Row[] = [];
+    source_map.set(from, list);
+    for await (const batch of resultIter) {
+      list.push(...batch);
+    }
+  });
+  await Promise.all(tasks);
   return { source_map, column_map };
+}
+interface InteralGetResult {
+  resultIter: AsyncIterable<ItemRecord[]>;
+  columnList: string[];
 }
 async function _getFromTable(
   params: RowListParams & { from: FromJoin }
-): Promise<{ results: ItemRecord[]; column_list: string[] }> {
+): Promise<InteralGetResult> {
   const {
     dynamodb,
     session,
@@ -55,28 +63,44 @@ async function _getFromTable(
 
   try {
     const iter = dynamodb.queryQLIter({ sql });
-    const results: ItemRecord[] = [];
-    for await (const batch of iter) {
-      results.push(...batch);
-    }
-    let column_list: string[];
+    let columnList: string[] = [];
+    let first_values: ItemRecord[] | undefined;
     if (isRequestAll) {
-      const response_set = new Set<string>();
-      for (const result of results) {
-        for (const key in result) {
-          response_set.add(key);
+      const first_batch = await iter.next();
+      if (!first_batch.done) {
+        first_values = first_batch.value;
+        const response_set = new Set<string>();
+        for (const result of first_batch.value) {
+          for (const key in result) {
+            response_set.add(key);
+          }
         }
+        columnList = [...response_set.keys()];
       }
-      column_list = [...response_set.keys()];
     } else {
-      column_list = request_columns;
+      columnList = request_columns;
     }
-    return { results, column_list };
+    async function* _makeIter(): AsyncIterable<ItemRecord[]> {
+      try {
+        if (first_values !== undefined) {
+          yield first_values;
+        }
+        for await (const batch of iter) {
+          yield batch;
+        }
+      } catch (err: unknown) {
+        throw _fixErr(err, table, sql);
+      }
+    }
+    return { resultIter: _makeIter(), columnList };
   } catch (err: unknown) {
-    if (err instanceof Error && err.message === 'resource_not_found') {
-      throw new SQLError({ err: 'table_not_found', args: [table] });
-    }
-    logger.error('raw_engine.getRowList err:', err, sql);
-    throw err;
+    throw _fixErr(err, table, sql);
   }
+}
+function _fixErr(err: unknown, table: string, sql: string) {
+  if (err instanceof Error && err.message === 'resource_not_found') {
+    return new SQLError({ err: 'table_not_found', args: [table] });
+  }
+  logger.error('raw_engine.getRowList err:', err, sql);
+  return err;
 }

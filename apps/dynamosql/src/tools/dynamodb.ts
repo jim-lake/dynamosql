@@ -132,7 +132,9 @@ export class DynamoDB {
     this.client = new DynamoDBClient(opts);
     this.namespace = params?.namespace ?? '';
   }
-  public queryQLIter(params: QueryQLParams): AsyncIterable<ItemRecord[]> {
+  public queryQLIter(
+    params: QueryQLParams
+  ): AsyncIterableIterator<ItemRecord[]> {
     const command = new ExecuteStatementCommand({
       Statement: namespacePartiQL(params.sql, this.namespace),
       ReturnValuesOnConditionCheckFailure:
@@ -483,7 +485,7 @@ export class DynamoDB {
   }
   private async *_iterSend(
     params: IterSendParams
-  ): AsyncIterable<ItemRecord[]> {
+  ): AsyncIterableIterator<ItemRecord[]> {
     for (;;) {
       params.signal?.throwIfAborted();
       try {
