@@ -5,10 +5,10 @@ import { SQLError } from '../error';
 import * as Expression from './expression';
 import { resolveReferences } from './helpers/column_ref_helper';
 import { convertType } from './helpers/column_type_helper';
+import { makeEngineGroups } from './helpers/engine_groups';
 import { formGroup, formImplicitGroup, hasAggregate } from './helpers/group';
 import { formJoin } from './helpers/join';
 import { sort } from './helpers/sort';
-import * as SchemaManager from './schema_manager';
 
 import type { Row } from './engine';
 import type {
@@ -110,33 +110,43 @@ export async function internalQuery(
     columnRefMap = requestInfo.columnRefMap;
   }
   const from = ast.type === 'update' ? ast.table : ast.from;
-  let source_map: SourceMap = new Map();
-  let column_map: ColumnMap = new Map();
-  if (from && Array.isArray(from) && from[0]) {
+  const sourceMap: SourceMap = new Map();
+  const columnMap: ColumnMap = new Map();
+  if (Array.isArray(from) && from[0]) {
     if (!_isBaseFromList(from)) {
       throw new SQLError('Invalid from clause');
     }
-    const first = from[0];
-    const db = first.db;
-    const table = first.table;
-    const engine = SchemaManager.getEngine(db ?? undefined, table, session);
-    const opts = {
-      session,
-      dynamodb,
-      list: from,
-      where: ast.where,
-      requestSets,
-      requestAll,
-      columnRefMap,
-    };
-    const result = await engine.getRowList(opts);
-    source_map = result.source_map;
-    column_map = result.column_map;
+    const list = from.map((item) => ({
+      database: item.db,
+      table: item.table,
+      item,
+    }));
+    const groups = makeEngineGroups(session, list);
+
+    const tasks = groups.map(async (group) => {
+      const opts = {
+        session,
+        dynamodb,
+        list: group.list.map((f) => f.item),
+        where: ast.where,
+        requestSets,
+        requestAll,
+        columnRefMap,
+      };
+      const result = await group.engine.getRowList(opts);
+      for (const [f, item] of result.sourceMap) {
+        sourceMap.set(f, item);
+      }
+      for (const [f, item] of result.columnMap) {
+        columnMap.set(f, item);
+      }
+    });
+    await Promise.all(tasks);
   }
   return _evaluateReturn({
     ...params,
-    source_map,
-    column_map,
+    sourceMap,
+    columnMap,
     requestSets,
     columnRefMap,
   });
@@ -145,15 +155,15 @@ interface EvaluateReturnParams {
   ast: SelectModifyAST;
   session: Session;
   dynamodb: DynamoDBClient;
-  source_map: SourceMap;
-  column_map: ColumnMap;
+  sourceMap: SourceMap;
+  columnMap: ColumnMap;
   requestSets: Map<From, Set<string>>;
   columnRefMap: Map<ColumnRef, ColumnRefInfo>;
 }
 async function _evaluateReturn(
   params: EvaluateReturnParams
 ): Promise<InternalQueryResult> {
-  const { session, source_map, ast, columnRefMap } = params;
+  const { session, sourceMap, ast, columnRefMap } = params;
   const query_columns =
     ast.type === 'select'
       ? _expandStarColumns({ ...params, ast, columnRefMap })
@@ -166,7 +176,7 @@ async function _evaluateReturn(
   let sleep_ms = 0;
 
   if (from && Array.isArray(from)) {
-    row_list = formJoin({ source_map, from, where, session, columnRefMap });
+    row_list = formJoin({ sourceMap, from, where, session, columnRefMap });
   } else {
     row_list = [{ source: new Map() }];
   }
@@ -263,12 +273,12 @@ interface ExpandStarColumnsParams {
     columns?: Select['columns'] | null;
     groupby?: Select['groupby'] | null;
   };
-  column_map: ColumnMap;
+  columnMap: ColumnMap;
   requestSets: Map<From, Set<string>>;
   columnRefMap: Map<ColumnRef, ColumnRefInfo>;
 }
 function _expandStarColumns(params: ExpandStarColumnsParams): QueryColumn[] {
-  const { ast, column_map, requestSets, columnRefMap } = params;
+  const { ast, columnMap, requestSets, columnRefMap } = params;
   const ret: QueryColumn[] = [];
   for (const column of ast.columns ?? []) {
     if (
@@ -285,7 +295,7 @@ function _expandStarColumns(params: ExpandStarColumnsParams): QueryColumn[] {
         }
         // Match if no table specified, or table matches from.table or from.as
         if (!table || (from.table === table && !from.as) || from.as === table) {
-          const column_list = column_map.get(from);
+          const column_list = columnMap.get(from);
           if (column_list && !column_list.length) {
             const requestSet = requestSets.get(from);
             requestSet?.forEach((name: string) => column_list.push(name));

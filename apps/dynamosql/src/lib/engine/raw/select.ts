@@ -6,24 +6,23 @@ import { convertWhere } from '../../helpers/convert_where';
 
 import type { ItemRecord } from '../../../tools/dynamodb';
 import type { FromJoin, Row, RowListParams, RowListResult } from '../index';
-import type { BaseFrom } from 'node-sql-parser';
 
 export async function getRowList(
   params: RowListParams
 ): Promise<RowListResult> {
-  const source_map: RowListResult['source_map'] = new Map<BaseFrom, Row[]>();
-  const column_map: RowListResult['column_map'] = new Map<BaseFrom, string[]>();
+  const sourceMap: RowListResult['sourceMap'] = new Map();
+  const columnMap: RowListResult['columnMap'] = new Map();
   const tasks = params.list.map(async (from) => {
     const { resultIter, columnList } = await _getFromTable({ ...params, from });
-    column_map.set(from, columnList);
+    columnMap.set(from, columnList);
     const list: Row[] = [];
-    source_map.set(from, list);
+    sourceMap.set(from, list);
     for await (const batch of resultIter) {
       list.push(...batch);
     }
   });
   await Promise.all(tasks);
-  return { source_map, column_map };
+  return { sourceMap, columnMap };
 }
 interface InteralGetResult {
   resultIter: AsyncIterable<ItemRecord[]>;

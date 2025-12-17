@@ -15,17 +15,17 @@ import type {
 } from 'node-sql-parser';
 
 export interface FormJoinParams {
-  source_map: SourceMap;
+  sourceMap: SourceMap;
   from: From[];
   where: Binary | Function | Unary | FulltextSearch | ColumnRef | null;
   session: Session;
   columnRefMap: Map<ColumnRef, ColumnRefInfo>;
 }
 export function formJoin(params: FormJoinParams): SourceRow[] {
-  const { source_map, from, where, session, columnRefMap } = params;
+  const { sourceMap, from, where, session, columnRefMap } = params;
   const row_list: SourceRow[] = [];
   const output_count = _findRows(
-    source_map,
+    sourceMap,
     from,
     where,
     session,
@@ -38,7 +38,7 @@ export function formJoin(params: FormJoinParams): SourceRow[] {
   return row_list;
 }
 function _findRows(
-  source_map: SourceMap,
+  sourceMap: SourceMap,
   list: From[],
   where: Binary | Function | Unary | FulltextSearch | ColumnRef | null,
   session: Session,
@@ -53,7 +53,7 @@ function _findRows(
   }
   const is_left = 'join' in from && from.join.includes('LEFT');
   const on = 'on' in from ? from.on : undefined;
-  const rows = source_map.get(from);
+  const rows = sourceMap.get(from);
   const row_count = rows?.length ?? (is_left ? 1 : 0);
 
   let output_count = 0;
@@ -94,7 +94,7 @@ function _findRows(
       const next_from = from_index + 1;
       if (next_from < list.length) {
         const result_count = _findRows(
-          source_map,
+          sourceMap,
           list,
           where,
           session,

@@ -52,8 +52,8 @@ export type CellRow = Record<string, CellValue>;
 export type Row = CellRow | ItemRecord;
 export type EngineValue = CellValue | AttributeValue;
 export interface RowListResult {
-  source_map: Map<BaseFrom, Row[]>;
-  column_map: Map<BaseFrom, string[]>;
+  sourceMap: Map<BaseFrom, Row[]>;
+  columnMap: Map<BaseFrom, string[]>;
 }
 export interface TableData<T = Row> {
   database: string;

@@ -2,27 +2,24 @@ import { SQLError } from '../../../error';
 
 import * as Storage from './storage';
 
-import type { RowListParams, Row } from '../index';
+import type { RowListParams, Row, RowListResult } from '../index';
 import type { BaseFrom } from 'node-sql-parser';
 
 export async function getRowList(
   params: RowListParams
-): Promise<{
-  source_map: Map<BaseFrom, Row[]>;
-  column_map: Map<BaseFrom, string[]>;
-}> {
+): Promise<RowListResult> {
   const { list } = params;
 
-  const source_map = new Map<BaseFrom, Row[]>();
-  const column_map = new Map<BaseFrom, string[]>();
+  const sourceMap: RowListResult['sourceMap'] = new Map();
+  const columnMap: RowListResult['columnMap'] = new Map();
 
   for (const from of list) {
     const { row_list, column_list } = _getFromTable({ ...params, from });
-    source_map.set(from, row_list);
-    column_map.set(from, column_list);
+    sourceMap.set(from, row_list);
+    columnMap.set(from, column_list);
   }
 
-  return { source_map, column_map };
+  return { sourceMap, columnMap };
 }
 
 function _getFromTable(params: RowListParams & { from: BaseFrom }): {

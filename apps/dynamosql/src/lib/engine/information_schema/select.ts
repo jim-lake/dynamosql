@@ -3,7 +3,7 @@ import { deepClone } from '../../../tools/clone';
 import { getDatabaseList, getTableList } from '../../schema_manager';
 import { SQLDateTime } from '../../types/sql_datetime';
 
-import type { RowListParams, Row } from '../index';
+import type { RowListParams, Row, RowListResult } from '../index';
 import type { BaseFrom } from 'node-sql-parser';
 
 const CATALOG_LIST = [
@@ -16,20 +16,17 @@ const CATALOG_LIST = [
 
 export async function getRowList(
   params: RowListParams
-): Promise<{
-  source_map: Map<BaseFrom, Row[]>;
-  column_map: Map<BaseFrom, string[]>;
-}> {
+): Promise<RowListResult> {
   const { list } = params;
-  const source_map = new Map<BaseFrom, Row[]>();
-  const column_map = new Map<BaseFrom, string[]>();
+  const sourceMap: RowListResult['sourceMap'] = new Map();
+  const columnMap: RowListResult['columnMap'] = new Map();
 
   for (const from of list) {
     const { results, column_list } = await _getFromTable({ ...params, from });
-    source_map.set(from, results);
-    column_map.set(from, column_list);
+    sourceMap.set(from, results);
+    columnMap.set(from, column_list);
   }
-  return { source_map, column_map };
+  return { sourceMap, columnMap };
 }
 async function _getFromTable(
   params: RowListParams & { from: BaseFrom }
