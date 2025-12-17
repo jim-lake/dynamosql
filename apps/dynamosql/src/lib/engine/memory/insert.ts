@@ -30,22 +30,22 @@ export async function insertRowList(
   let affectedRows = 0;
 
   for (const row of list) {
-    _transformRow(row);
+    const cellRow = _transformRow(row);
     const key_values = primary_key.map(
-      (key: ColumnDef) => row[key.name]?.value
+      (key: ColumnDef) => cellRow[key.name]?.value
     );
     const key = JSON.stringify(key_values);
     const index = primary_map.get(key);
 
     if (index === undefined) {
-      primary_map.set(key, row_list.push(row) - 1);
+      primary_map.set(key, row_list.push(cellRow) - 1);
       affectedRows++;
     } else if (duplicate_mode === 'replace') {
       const existingRow = row_list[index];
-      if (existingRow && !_rowEqual(existingRow, row)) {
+      if (existingRow && !_rowEqual(existingRow, cellRow)) {
         affectedRows++;
       }
-      row_list[index] = row;
+      row_list[index] = cellRow;
       affectedRows++;
     } else if (!duplicate_mode) {
       throw new SQLError({
@@ -58,13 +58,15 @@ export async function insertRowList(
   Storage.txSaveData(database, table, session, { row_list, primary_map });
   return { affectedRows };
 }
-function _transformRow(row: EvaluationResultRow) {
+function _transformRow(row: EvaluationResultRow): CellRow {
+  const result: CellRow = {};
   for (const key in row) {
     const cell = row[key];
     if (cell) {
-      row[key] = { type: cell.type, value: cell.value } as never;
+      result[key] = { type: cell.type, value: cell.value };
     }
   }
+  return result;
 }
 function _rowEqual(a: CellRow, b: CellRow): boolean {
   const keys_a = Object.keys(a);

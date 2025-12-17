@@ -8,7 +8,24 @@ import * as SelectHandler from './select_handler';
 
 import type { EvaluationResult } from './expression';
 import type { HandlerParams } from './handler_types';
-import type { SetStatement, SetAssign, Select } from 'node-sql-parser';
+import type {
+  SetStatement,
+  SetAssign,
+  Select,
+  ExpressionValue,
+  ExtractFunc,
+  FulltextSearch,
+} from 'node-sql-parser';
+
+interface SelectSubquery {
+  ast: Select;
+}
+
+function isSelectSubquery(
+  value: ExpressionValue | ExtractFunc | FulltextSearch
+): value is ExpressionValue & SelectSubquery {
+  return 'ast' in value;
+}
 
 export async function query(
   params: HandlerParams<SetStatement>
@@ -27,10 +44,10 @@ async function _handleAssignment(
   const { session } = params;
   const { left, right } = expr;
   let result: EvaluationResult;
-  if ('ast' in right) {
+  if (isSelectSubquery(right)) {
     const { rows } = await SelectHandler.internalQuery({
       ...params,
-      ast: right.ast as Select,
+      ast: right.ast,
     });
     if (rows[0]?.[0]) {
       result = rows[0][0];

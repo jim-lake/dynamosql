@@ -47,6 +47,12 @@ function _isBaseFromList(list: From[]): list is BaseFrom[] {
   return true;
 }
 
+function _isColumnRef(
+  expr: ExpressionValue | ExtractFunc | FulltextSearch
+): expr is ColumnRef {
+  return 'type' in expr && expr.type === 'column_ref';
+}
+
 interface QueryColumn {
   expr: (ExpressionValue | ExtractFunc | FulltextSearch) & {
     db?: string | null;
@@ -67,13 +73,14 @@ export async function query(
   params: HandlerParams<Select>
 ): Promise<SelectResult> {
   const { rows, columns } = await internalQuery(params);
-  for (const row of rows) {
-    // eslint-disable-next-line @typescript-eslint/no-for-in-array
-    for (const key in row) {
-      row[key] = row[key]?.value as never;
+  const transformedRows = rows.map((row) => {
+    const newRow: unknown[] = [];
+    for (let i = 0; i < row.length; i++) {
+      newRow[i] = row[i]?.value;
     }
-  }
-  return { rows, columns };
+    return newRow;
+  });
+  return { rows: transformedRows, columns };
 }
 export interface InternalQueryParams {
   ast: SelectModifyAST;
@@ -205,8 +212,8 @@ async function _evaluateReturn(
 
     // Get table info from columnRefMap if this is a column_ref
     let fromInfo: BaseFrom | null = null;
-    if ('type' in column.expr && column.expr.type === 'column_ref') {
-      const refInfo = columnRefMap.get(column.expr as ColumnRef);
+    if (_isColumnRef(column.expr)) {
+      const refInfo = columnRefMap.get(column.expr);
       if (refInfo?.from && _isBaseFrom(refInfo.from)) {
         fromInfo = refInfo.from;
       }
@@ -297,8 +304,10 @@ function _expandStarColumns(params: ExpandStarColumnsParams): QueryColumn[] {
         }
       }
     } else {
-      // Star and Assign are handled elsewhere, so this should be safe
-      ret.push(column as QueryColumn);
+      // Star and Assign are handled elsewhere
+      if ('expr' in column && 'as' in column) {
+        ret.push(column as QueryColumn);
+      }
     }
   }
   return ret;

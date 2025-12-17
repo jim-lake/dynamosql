@@ -12,7 +12,12 @@ import type {
   CellValue,
   CellRow,
   ColumnDef,
+  EngineValue,
 } from '../index';
+
+function isCellValue(value: EngineValue): value is CellValue {
+  return 'value' in value && !('S' in value || 'N' in value || 'B' in value);
+}
 
 export async function singleUpdate(
   _params: UpdateParams
@@ -40,7 +45,12 @@ export async function multipleUpdate(
 
     for (const update of update_list) {
       const { set_list } = update;
-      const key_list = update.key.map((key) => (key as CellValue).value);
+      const key_list = update.key.map((key) => {
+        if (!isCellValue(key)) {
+          throw new SQLError('invalid_key_type');
+        }
+        return key.value;
+      });
       const update_key = JSON.stringify(key_list);
       const index = primary_map.get(update_key);
 

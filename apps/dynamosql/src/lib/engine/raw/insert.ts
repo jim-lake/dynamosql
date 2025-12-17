@@ -104,7 +104,11 @@ async function _insertIgnoreReplace(
             affectedRows--;
           } else {
             affectedRows--;
-            thrownError ??= convertError(item_err) as Error;
+            const converted = convertError(item_err);
+            thrownError ??=
+              converted instanceof Error
+                ? converted
+                : new Error(String(converted));
           }
         });
         if (thrownError) {
@@ -115,8 +119,8 @@ async function _insertIgnoreReplace(
       }
     }
   } else {
-    list.forEach(_fixupItem);
-    const opts = { table, list: list as unknown as NativeType[] };
+    const nativeList = list.map(_fixupItem);
+    const opts = { table, list: nativeList };
     await dynamodb.putItems(opts);
     affectedRows = list.length;
   }
@@ -127,6 +131,20 @@ interface CancellationReason {
   Code?: string;
   Message?: string;
 }
+
+interface ErrorWithCancellationReasons extends Error {
+  CancellationReasons?: CancellationReason[];
+}
+
+function hasCancellationReasons(
+  err: Error
+): err is ErrorWithCancellationReasons {
+  return (
+    'CancellationReasons' in err &&
+    Array.isArray((err as ErrorWithCancellationReasons).CancellationReasons)
+  );
+}
+
 async function _insertNoIgnore(params: InsertParams): Promise<AffectedResult> {
   const { dynamodb, table, list } = params;
   const sql_list = list.map(
@@ -139,10 +157,12 @@ async function _insertNoIgnore(params: InsertParams): Promise<AffectedResult> {
     return { affectedRows: list.length };
   } catch (err: unknown) {
     if (err instanceof Error) {
-      const cancellationReasons = (
-        err as { CancellationReasons?: CancellationReason[] }
-      ).CancellationReasons;
-      if (err.name === 'TransactionCanceledException' && cancellationReasons) {
+      if (
+        err.name === 'TransactionCanceledException' &&
+        hasCancellationReasons(err) &&
+        err.CancellationReasons
+      ) {
+        const cancellationReasons = err.CancellationReasons;
         for (let i = 0; i < cancellationReasons.length; i++) {
           const reason = cancellationReasons[i];
           if (reason?.Code === 'ResourceNotFound') {
@@ -184,14 +204,15 @@ async function _insertNoIgnore(params: InsertParams): Promise<AffectedResult> {
   }
 }
 
-function _fixupItem(obj: EvaluationResultRow): NativeType {
-  for (const key in obj) {
-    const cell = obj[key];
+function _fixupItem(row: EvaluationResultRow): NativeType {
+  const result: Record<string, NativeType> = {};
+  for (const key in row) {
+    const cell = row[key];
     if (cell !== undefined) {
-      obj[key] = cell.value as never;
+      result[key] = cell.value as NativeType;
     }
   }
-  return obj as unknown as NativeType;
+  return result;
 }
 
 function _escapeItem(item: EvaluationResultRow): string {

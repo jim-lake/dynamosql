@@ -9,7 +9,12 @@ import type {
   MultiDeleteParams,
   AffectedResult,
   CellValue,
+  EngineValue,
 } from '../index';
+
+function isCellValue(value: EngineValue): value is CellValue {
+  return 'value' in value && !('S' in value || 'N' in value || 'B' in value);
+}
 
 export async function singleDelete(
   _params: DeleteParams
@@ -36,7 +41,12 @@ export async function multipleDelete(
     const primary_map = new Map<string, number>(data.primary_map);
 
     for (const object of delete_list) {
-      const key_list = object.map((key) => (key as CellValue).value);
+      const key_list = object.map((key) => {
+        if (!isCellValue(key)) {
+          throw new SQLError('invalid_key_type');
+        }
+        return key.value;
+      });
       const delete_key = JSON.stringify(key_list);
       const index = primary_map.get(delete_key);
 

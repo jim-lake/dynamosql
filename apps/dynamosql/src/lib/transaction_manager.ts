@@ -90,11 +90,13 @@ interface InternalCommitParams {
 }
 export async function commit(params: InternalCommitParams): Promise<void> {
   await _txEach(params, async ({ engine, ...other }) => {
+    // Cast necessary: TypeScript doesn't track that destructuring removes 'engine'
     await engine.commit(other as CommitParams);
   });
 }
 export async function rollback(params: InternalCommitParams): Promise<void> {
   await _txEach(params, async ({ engine, ...other }) => {
+    // Cast necessary: TypeScript doesn't track that destructuring removes 'engine'
     await engine.rollback(other as CommitParams);
   });
 }

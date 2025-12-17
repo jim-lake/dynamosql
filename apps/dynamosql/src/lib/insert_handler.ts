@@ -11,6 +11,17 @@ import type { Engine, EvaluationResultRow } from './engine';
 import type { HandlerParams, AffectedResult } from './handler_types';
 import type { Insert_Replace, SetList } from 'node-sql-parser';
 
+interface ErrorWithDetails {
+  message?: string;
+  err?: string;
+  name?: string;
+  args?: unknown[];
+}
+
+function isErrorWithDetails(err: unknown): err is ErrorWithDetails {
+  return typeof err === 'object' && err !== null;
+}
+
 interface InsertReplaceExtended extends Omit<Insert_Replace, 'values'> {
   set?: SetList[];
   values?: Insert_Replace['values'];
@@ -130,22 +141,19 @@ async function _runInsert(
     try {
       return await engine.insertRowList(opts);
     } catch (err: unknown) {
-      const error = err as {
-        message?: string;
-        err?: string;
-        name?: string;
-        args?: unknown[];
-      };
-      const err_str = String(error.message ?? '').toLowerCase();
+      if (!isErrorWithDetails(err)) {
+        throw err;
+      }
+      const err_str = String(err.message ?? '').toLowerCase();
       if (
-        error.message === 'resource_not_found' ||
-        error.err === 'resource_not_found' ||
-        error.name === 'ResourceNotFoundException' ||
+        err.message === 'resource_not_found' ||
+        err.err === 'resource_not_found' ||
+        err.name === 'ResourceNotFoundException' ||
         err_str.includes('resource not found')
       ) {
         throw new SQLError({
           err: 'table_not_found',
-          args: error.args ?? [table],
+          args: err.args ?? [table],
         });
       }
       throw err;

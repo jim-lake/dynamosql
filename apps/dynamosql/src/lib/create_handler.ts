@@ -17,38 +17,45 @@ import type { FieldInfo } from '../types';
 import type { EvaluationResult } from './expression';
 import type { Create, CreateTable, CreateDatabase } from 'node-sql-parser';
 
+function isCreateDatabase(ast: Create): ast is CreateDatabase {
+  return ast.keyword === 'database';
+}
+
+function isCreateTable(ast: Create): ast is CreateTable {
+  return ast.keyword === 'table';
+}
+
 export async function query(
   params: HandlerParams<Create>
 ): Promise<AffectedResult> {
   const { ast, session } = params;
   const database = getDatabaseFromTable(ast) ?? session.getCurrentDatabase();
 
-  if (ast.keyword === 'database') {
-    return await _createDatabase(params);
+  if (isCreateDatabase(ast)) {
+    return await _createDatabase({ ...params, ast });
   } else if (!database) {
     throw new SQLError('no_current_database');
-  } else if (ast.keyword === 'table') {
-    return await _createTable(params);
+  } else if (isCreateTable(ast)) {
+    return await _createTable({ ...params, ast });
   } else {
     logger.error('unsupported create:', ast.keyword);
     throw new SQLError('unsupported');
   }
 }
 async function _createDatabase(
-  params: HandlerParams<Create>
+  params: HandlerParams<CreateDatabase>
 ): Promise<AffectedResult> {
   const { ast } = params;
-  const dbAst = ast as CreateDatabase;
-  if (!dbAst.database) {
+  if (!ast.database) {
     throw new SQLError('bad_database_name');
   }
-  const name = getDatabaseName(dbAst.database);
+  const name = getDatabaseName(ast.database);
   try {
     SchemaManager.createDatabase(name);
     return { affectedRows: 1 };
   } catch (err) {
     if (err instanceof SQLError && err.code === 'ER_DB_CREATE_EXISTS') {
-      if (dbAst.if_not_exists) {
+      if (ast.if_not_exists) {
         return { affectedRows: 0 };
       } else {
         throw err;
@@ -60,10 +67,9 @@ async function _createDatabase(
   }
 }
 async function _createTable(
-  params: HandlerParams<Create>
+  params: HandlerParams<CreateTable>
 ): Promise<AffectedResult> {
-  const { ast: astRaw, session, dynamodb } = params;
-  const ast = astRaw as CreateTable;
+  const { ast, session, dynamodb } = params;
   const database = getDatabaseFromTable(ast) ?? session.getCurrentDatabase();
   const table = getTableFromTable(ast);
   if (!table) {

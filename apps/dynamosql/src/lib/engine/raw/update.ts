@@ -8,7 +8,7 @@ import {
 } from '../../../tools/dynamodb_helper';
 import { convertWhere } from '../../helpers/convert_where';
 
-import type { SetRowByKeys } from '../../../tools/dynamodb';
+import type { SetRowByKeys, ItemRecord } from '../../../tools/dynamodb';
 import type {
   MultiUpdateParams,
   UpdateParams,
@@ -52,7 +52,7 @@ RETURNING MODIFIED OLD *
     const results = await dynamodb.queryQL(sql);
     const resultArray = (
       Array.isArray(results[0]) ? results[0] : results
-    ) as Record<string, AttributeValue>[];
+    ) as ItemRecord[];
     const result = { affectedRows: 1, changedRows: 0 };
     set.forEach((object, i) => {
       const { column } = object;
@@ -87,18 +87,17 @@ export async function multipleUpdate(
 
   for (const object of list) {
     const { table, key_list, update_list } = object;
-    for (const item of update_list) {
-      for (const set of item.set_list) {
-        (set.value as CellValue) = (set.value as CellValue).value as CellValue;
-      }
-    }
+
+    const transformedList: SetRowByKeys[] = update_list.map((item) => ({
+      key: item.key as unknown as string[],
+      set_list: item.set_list.map((set) => ({
+        column: set.column,
+        value: (set.value as CellValue).value as AttributeValue | null | string,
+      })),
+    }));
 
     try {
-      await dynamodb.updateItems({
-        table,
-        key_list,
-        list: update_list as unknown as SetRowByKeys[],
-      });
+      await dynamodb.updateItems({ table, key_list, list: transformedList });
       affectedRows += update_list.length;
       changedRows += update_list.length;
     } catch (err) {

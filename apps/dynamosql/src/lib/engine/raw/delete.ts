@@ -48,6 +48,8 @@ export async function multipleDelete(
   for (const object of list) {
     const { table, key_list, delete_list } = object;
     try {
+      // Cast is necessary: EngineValue[][] -> KeyValue[][]
+      // For raw engine, EngineValue is always AttributeValue which is compatible with KeyValue
       await dynamodb.deleteItems({
         table,
         key_list,
