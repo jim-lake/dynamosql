@@ -181,17 +181,6 @@ async function _evaluateReturn(
       ? formJoin({ sourceMap, from, where, session, columnRefMap })
       : _listToItetator([{ source: new Map() }]);
 
-  /*
-  let row_list: SourceRow[] = [];
-  for await (const batch of row_iter) {
-    if (batch.length < 10_000) {
-      row_list.push(...batch);
-    } else {
-      row_list = row_list.concat(batch);
-    }
-  }
-  */
-
   let group_iter: AsyncIterable<SourceRow[] | SourceRowGroup[]>;
 
   if (groupby?.columns && ast.type === 'select') {
@@ -217,10 +206,6 @@ async function _evaluateReturn(
       columnRefMap,
     });
   }
-
-  //logger.inspect("result_list:", result_list);
-  //logger.inspect("columns:", columns);
-
   if (ast.limit) {
     result_iter = _makeLimit(result_iter, ast.limit);
   }

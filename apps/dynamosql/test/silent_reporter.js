@@ -35,23 +35,31 @@ class OneLineSummaryReporter {
 
     runner.on('pass', () => {
       this._maybePrintStart();
-      const old_count = this.suiteList[this.suiteIndex].total;
-      this.suiteList[this.suiteIndex].total++;
+      const suite = this.suiteList[this.suiteIndex];
       this.passes += 1;
-      if (process.stdout.isTTY) {
-        if (old_count > 0) {
-          process.stdout.write('\b'.repeat(String(old_count).length));
+      if (suite) {
+        const old_count = suite.total;
+        suite.total++;
+        if (process.stdout.isTTY) {
+          if (old_count > 0) {
+            process.stdout.write('\b'.repeat(String(old_count).length));
+          }
+          process.stdout.write(String(old_count + 1));
         }
-        process.stdout.write(String(old_count + 1));
       }
     });
     runner.on('fail', (test, err) => {
       this._maybePrintStart();
-      this.suiteList[this.suiteIndex].total++;
-      this.suiteList[this.suiteIndex].failList.push({ test, err });
       this.failures += 1;
-      const title = this.currentSuites.join(' > ');
-      console.log(`\n❌ ${title} > ${test.fullTitle()}`);
+      const suite = this.suiteList[this.suiteIndex];
+      if (suite) {
+        suite.total++;
+        suite.failList.push({ test, err });
+        const title = this.currentSuites.join(' > ');
+        console.log(`\n❌ ${title} > ${test.fullTitle()}`);
+      } else {
+        console.log(`\n❌ ${test.fullTitle()}`);
+      }
     });
     runner.once('end', () => {
       console.log(`\n${this.passes} passed, ${this.failures} failed`);

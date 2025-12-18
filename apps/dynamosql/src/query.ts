@@ -76,6 +76,7 @@ export class Query extends EventEmitter {
       return result;
     } catch (e) {
       this.emit('error', e);
+      this.emit('end');
       throw e;
     }
   }
@@ -104,6 +105,16 @@ export class Query extends EventEmitter {
         schema_list.push(columns);
       }
       if (list.length === 1) {
+        this.emit('fields', schema_list[0]);
+        if (Array.isArray(result_list[0])) {
+          if (this.listenerCount('result') > 0) {
+            for (const row of result_list[0]) {
+              this.emit('result', row);
+            }
+          }
+        } else {
+          this.emit('result', result_list[0]);
+        }
         return [result_list[0], schema_list[0]] as QueryListResult;
       } else {
         return [result_list, schema_list] as QueryListResult;
