@@ -6,8 +6,8 @@ import Functions from './functions';
 
 import type { Session } from '../../../session';
 import type { ColumnRefInfo } from '../column_ref_helper';
-import type { ExpressionValue } from 'node-sql-parser';
 import type {
+  ExpressionValue,
   Function as FunctionType,
   Binary,
   Unary,

@@ -39,7 +39,7 @@ export interface GroupBy {
 export interface FormGroupParams {
   groupby: GroupBy;
   ast: Select;
-  row_list: SourceRow[];
+  rowIter: AsyncIterable<SourceRow[]>;
   session: Session;
   columnRefMap: Map<ColumnRef, ColumnRefInfo>;
 }
@@ -54,17 +54,36 @@ export function hasAggregate(ast: Select): boolean {
   }
   return false;
 }
-export function formImplicitGroup(
+export async function* formImplicitGroup(
   params: Omit<FormGroupParams, 'groupby'>
-): SourceRowGroup[] {
-  const { row_list } = params;
-  if (row_list[0]) {
-    return [{ ...row_list[0], group: row_list }];
+): AsyncIterable<SourceRowGroup[]> {
+  const { rowIter } = params;
+  let row_list: SourceRow[] = [];
+  for await (const batch of rowIter) {
+    if (batch.length < 10_000) {
+      row_list.push(...batch);
+    } else {
+      row_list = row_list.concat(batch);
+    }
   }
-  return [];
+  if (row_list[0]) {
+    yield [{ ...row_list[0], group: row_list }];
+  } else {
+    yield [];
+  }
 }
-export function formGroup(params: FormGroupParams): SourceRowGroup[] {
-  const { groupby, ast, row_list, session, columnRefMap } = params;
+export async function* formGroup(
+  params: FormGroupParams
+): AsyncIterable<SourceRowGroup[]> {
+  const { groupby, ast, rowIter, session, columnRefMap } = params;
+  let row_list: SourceRow[] = [];
+  for await (const batch of rowIter) {
+    if (batch.length < 10_000) {
+      row_list.push(...batch);
+    } else {
+      row_list = row_list.concat(batch);
+    }
+  }
 
   const group_exprs: ExpressionValue[] = [];
   for (const column of groupby.columns ?? []) {
@@ -113,7 +132,7 @@ export function formGroup(params: FormGroupParams): SourceRowGroup[] {
 
   const output_list: SourceRowGroup[] = [];
   _unroll(output_list, group_map);
-  return output_list;
+  yield output_list;
 }
 function isRecord(
   value: unknown

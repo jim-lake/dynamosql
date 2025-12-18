@@ -25,11 +25,15 @@ import type { Session } from '../session';
 import type { ColumnRefInfo } from './helpers/column_ref_helper';
 import type { SelectModifyAST } from './helpers/select_modify';
 import type {
+  Select,
+  ColumnRef,
+  From,
+  BaseFrom,
+  Limit,
   ExpressionValue,
   ExtractFunc,
   FulltextSearch,
 } from 'node-sql-parser';
-import type { Select, ColumnRef, From, BaseFrom } from 'node-sql-parser';
 
 type ColumnMap = Map<From, string[]>;
 
@@ -78,6 +82,7 @@ export async function query(
     }
     return newRow;
   });
+  //logger.inspect("transformedRows:", transformedRows);
   return { rows: transformedRows, columns };
 }
 export interface InternalQueryParams {
@@ -162,7 +167,7 @@ async function _evaluateReturn(
   params: EvaluateReturnParams
 ): Promise<InternalQueryResult> {
   const { session, sourceMap, ast, columnRefMap } = params;
-  const query_columns =
+  const queryColumns =
     ast.type === 'select'
       ? _expandStarColumns({ ...params, ast, columnRefMap })
       : [];
@@ -170,58 +175,66 @@ async function _evaluateReturn(
   const where = ast.where;
   const groupby = ast.type === 'select' ? ast.groupby : undefined;
   const from = ast.type === 'update' ? ast.table : ast.from;
+
+  const rowIter =
+    from && Array.isArray(from)
+      ? formJoin({ sourceMap, from, where, session, columnRefMap })
+      : _listToItetator([{ source: new Map() }]);
+
+  /*
   let row_list: SourceRow[] = [];
-  let sleep_ms = 0;
-
-  if (from && Array.isArray(from)) {
-    row_list = await formJoin({
-      sourceMap,
-      from,
-      where,
-      session,
-      columnRefMap,
-    });
-  } else {
-    row_list = [{ source: new Map() }];
+  for await (const batch of row_iter) {
+    if (batch.length < 10_000) {
+      row_list.push(...batch);
+    } else {
+      row_list = row_list.concat(batch);
+    }
   }
+  */
 
-  let grouped_list: (SourceRow | SourceRowGroup)[] = row_list;
+  let group_iter: AsyncIterable<SourceRow[] | SourceRowGroup[]>;
 
   if (groupby?.columns && ast.type === 'select') {
-    grouped_list = formGroup({ groupby, ast, row_list, session, columnRefMap });
+    group_iter = formGroup({ groupby, ast, rowIter, session, columnRefMap });
   } else if (ast.type === 'select' && hasAggregate(ast)) {
-    grouped_list = formImplicitGroup({ ast, row_list, session, columnRefMap });
+    group_iter = formImplicitGroup({ ast, rowIter, session, columnRefMap });
+  } else {
+    group_iter = rowIter;
   }
 
-  const result_list: SourceRowResult[] = [];
-  for (const row of grouped_list) {
-    const output_row: EvaluationResult[] = [];
-    for (const column of query_columns) {
-      const result = Expression.getValue(column.expr, {
-        session,
-        row,
-        columnRefMap,
-      });
-      if (result.err) {
-        throw new SQLError(result.err);
-      }
-      output_row.push(result);
-      if (result.type !== column.result_type) {
-        column.result_type = _unionType(column.result_type, result.type);
-      }
-      column.result_name ??= result.name;
-      if (result.value === null) {
-        column.result_nullable = true;
-      }
-      if (result.sleep_ms) {
-        sleep_ms = result.sleep_ms;
-      }
-    }
-    result_list.push({ ...row, result: output_row });
-  }
+  let result_iter = _makeResults({
+    iter: group_iter,
+    queryColumns,
+    session,
+    columnRefMap,
+  });
 
   const columns: FieldInfo[] = [];
-  for (const column of query_columns) {
+  if (ast.orderby) {
+    result_iter = sort(result_iter, ast.orderby, {
+      session,
+      columns,
+      columnRefMap,
+    });
+  }
+
+  //logger.inspect("result_list:", result_list);
+  //logger.inspect("columns:", columns);
+
+  if (ast.limit) {
+    result_iter = _makeLimit(result_iter, ast.limit);
+  }
+
+  let row_list: SourceRowResult[] = [];
+  for await (const batch of result_iter) {
+    if (batch.length < 10_000) {
+      row_list.push(...batch);
+    } else {
+      row_list = row_list.concat(batch);
+    }
+  }
+
+  for (const column of queryColumns) {
     const column_type = convertType(column.result_type, column.result_nullable);
 
     // Get table info from columnRefMap if this is a column_ref
@@ -241,36 +254,9 @@ async function _evaluateReturn(
     columns.push(column_type);
   }
 
-  if (ast.orderby) {
-    sort(result_list, ast.orderby, { session, columns, columnRefMap });
-  }
+  const rows = row_list.map((row) => row.result);
 
-  let start = 0;
-  let end = result_list.length;
-  if (ast.limit) {
-    if (ast.limit.seperator === 'offset') {
-      const offsetValue = ast.limit.value[1];
-      const limitValue = ast.limit.value[0];
-      start = offsetValue ? offsetValue.value : 0;
-      end = Math.min(end, start + (limitValue ? limitValue.value : 0));
-    } else if (ast.limit.value.length > 1) {
-      const offsetValue = ast.limit.value[0];
-      const limitValue = ast.limit.value[1];
-      start = offsetValue ? offsetValue.value : 0;
-      end = Math.min(end, start + (limitValue ? limitValue.value : 0));
-    } else {
-      const limitValue = ast.limit.value[0];
-      end = Math.min(end, limitValue ? limitValue.value : 0);
-    }
-  }
-
-  const final_list = result_list.slice(start, end);
-  const rows = final_list.map((row) => row.result);
-
-  if (sleep_ms) {
-    await setTimeout(sleep_ms);
-  }
-  return { rows, columns, row_list: final_list };
+  return { rows, columns, row_list };
 }
 interface ExpandStarColumnsParams {
   ast: Omit<Select, 'columns' | 'groupby'> & {
@@ -325,6 +311,91 @@ function _expandStarColumns(params: ExpandStarColumnsParams): QueryColumn[] {
     }
   }
   return ret;
+}
+async function* _listToItetator<T>(list: T[]) {
+  yield list;
+}
+interface MakeResultsParams {
+  iter: AsyncIterable<SourceRowGroup[] | SourceRow[]>;
+  queryColumns: QueryColumn[];
+  session: Session;
+  columnRefMap: Map<ColumnRef, ColumnRefInfo>;
+  signal?: AbortSignal;
+}
+async function* _makeResults(
+  params: MakeResultsParams
+): AsyncIterable<SourceRowResult[]> {
+  const { iter, queryColumns, session, columnRefMap, signal } = params;
+  for await (const batch of iter) {
+    const result_list: SourceRowResult[] = [];
+    for (const row of batch) {
+      const output_row: EvaluationResult[] = [];
+      for (const column of queryColumns) {
+        const result = Expression.getValue(column.expr, {
+          session,
+          row,
+          columnRefMap,
+        });
+        if (result.err) {
+          throw new SQLError(result.err);
+        }
+        output_row.push(result);
+        if (result.type !== column.result_type) {
+          column.result_type = _unionType(column.result_type, result.type);
+        }
+        column.result_name ??= result.name;
+        if (result.value === null) {
+          column.result_nullable = true;
+        }
+        if (result.sleep_ms) {
+          await setTimeout(result.sleep_ms, undefined, { signal });
+        }
+      }
+      result_list.push({ ...row, result: output_row });
+    }
+    yield result_list;
+  }
+}
+async function* _makeLimit(
+  iter: AsyncIterable<SourceRowResult[]>,
+  limit: Limit
+) {
+  let skip_count = 0;
+  let send_count = 0;
+  if (limit.seperator === 'offset') {
+    const offsetValue = limit.value[1];
+    const limitValue = limit.value[0];
+    skip_count = offsetValue ? offsetValue.value : 0;
+    send_count = limitValue ? limitValue.value : 0;
+  } else if (limit.value.length > 1) {
+    const offsetValue = limit.value[0];
+    const limitValue = limit.value[1];
+    skip_count = offsetValue ? offsetValue.value : 0;
+    send_count = limitValue ? limitValue.value : 0;
+  } else {
+    const limitValue = limit.value[0];
+    send_count = limitValue ? limitValue.value : 0;
+  }
+  for await (const batch of iter) {
+    if (skip_count >= batch.length) {
+      skip_count -= batch.length;
+    } else {
+      if (skip_count > 0) {
+        batch.splice(0, skip_count);
+        skip_count = 0;
+      }
+      if (send_count >= batch.length) {
+        send_count -= batch.length;
+      } else {
+        batch.length = send_count;
+        send_count = 0;
+      }
+      yield batch;
+      if (send_count === 0) {
+        break;
+      }
+    }
+  }
 }
 function _unionType(
   old_type: string | undefined,

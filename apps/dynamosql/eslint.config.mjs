@@ -98,6 +98,7 @@ export default tseslint.config(
           fixStyle: 'separate-type-imports',
         },
       ],
+      'no-duplicate-imports': ['error', { allowSeparateTypeImports: true }],
       'import/order': [
         'error',
         {

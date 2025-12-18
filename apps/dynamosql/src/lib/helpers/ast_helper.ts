@@ -1,5 +1,10 @@
-import type { AST, CreateTable } from 'node-sql-parser';
-import type { FunctionName, BaseFrom, From } from 'node-sql-parser';
+import type {
+  AST,
+  CreateTable,
+  FunctionName,
+  BaseFrom,
+  From,
+} from 'node-sql-parser';
 
 function isBaseFrom(from: From): from is BaseFrom {
   return 'table' in from && typeof from.table === 'string';

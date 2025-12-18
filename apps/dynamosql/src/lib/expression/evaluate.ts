@@ -38,8 +38,9 @@ import type {
   Assign,
   ColumnRefItem,
   ValueExpr,
+  Interval as IntervalType,
+  ColumnRef,
 } from 'node-sql-parser';
-import type { Interval as IntervalType, ColumnRef } from 'node-sql-parser';
 
 export interface EvaluationState {
   session: Session;

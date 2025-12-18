@@ -13,15 +13,22 @@ export interface SortState {
   columns?: FieldInfo[];
   columnRefMap?: Map<ColumnRef, ColumnRefInfo>;
 }
-
-export function sort(
-  row_list: SourceRowResult[],
+export async function* sort(
+  iter: AsyncIterable<SourceRowResult[]>,
   orderby: OrderBy[],
   state: SortState
-): void {
-  row_list.sort(_sort.bind(null, orderby, state));
+): AsyncIterable<SourceRowResult[]> {
+  let result_list: SourceRowResult[] = [];
+  for await (const batch of iter) {
+    if (batch.length < 10_000) {
+      result_list.push(...batch);
+    } else {
+      result_list = result_list.concat(batch);
+    }
+  }
+  result_list.sort(_sort.bind(null, orderby, state));
+  yield result_list;
 }
-
 function _sort(
   orderby: OrderBy[],
   state: SortState,
@@ -41,7 +48,7 @@ function _sort(
       const result = func(
         a.result[index]?.value,
         b.result[index]?.value,
-        state.columns?.[index]
+        a.result[index]?.type //state.columns?.[index]
       );
       if (result !== 0) {
         return result;
@@ -75,6 +82,15 @@ function _asc(
     return 1;
   } else if (typeof a === 'number' && typeof b === 'number') {
     return a - b;
+  } else if (typeof a === 'bigint' && typeof b === 'bigint') {
+    const delta = a - b;
+    if (delta === 0n) {
+      return 0;
+    } else if (delta > 0) {
+      return 1;
+    } else {
+      return -1;
+    }
   } else if (
     (typeof column === 'object' && column.type === Types.NEWDECIMAL) ||
     column === 'number'

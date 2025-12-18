@@ -22,19 +22,10 @@ export interface FormJoinParams {
   session: Session;
   columnRefMap: Map<ColumnRef, ColumnRefInfo>;
 }
-export async function formJoin(params: FormJoinParams): Promise<SourceRow[]> {
+export function formJoin(params: FormJoinParams): AsyncIterable<SourceRow[]> {
   const { sourceMap, from, where, session, columnRefMap } = params;
 
-  const iter = _findRows(sourceMap, from, where, session, 0, columnRefMap);
-  let row_list: SourceRow[] = [];
-  for await (const batch of iter) {
-    if (batch.length < 10_000) {
-      row_list.push(...batch);
-    } else {
-      row_list = row_list.concat(batch);
-    }
-  }
-  return row_list;
+  return _findRows(sourceMap, from, where, session, 0, columnRefMap);
 }
 async function* _findRows(
   sourceMap: Map<From, AsyncIterable<Row[]>>,
@@ -46,7 +37,9 @@ async function* _findRows(
   parentRows: SourceRow[] = []
 ): AsyncIterable<SourceRow[]> {
   const from = list[from_index];
-  if (!from) {throw new SQLError('Invalid from index');}
+  if (!from) {
+    throw new SQLError('Invalid from index');
+  }
 
   const isLeft = 'join' in from && from.join.includes('LEFT');
   const on = 'on' in from ? from.on : undefined;
@@ -55,7 +48,9 @@ async function* _findRows(
   const baseRows: SourceRow[] =
     parentRows.length > 0 ? parentRows : [{ source: new Map() }];
 
-  if (!rowsIterable && !isLeft) {return;}
+  if (!rowsIterable && !isLeft) {
+    return;
+  }
 
   const asyncIter =
     rowsIterable ??
@@ -80,8 +75,12 @@ async function* _findRows(
         let skip = false;
         if (on) {
           const result = getValue(on, { session, row, columnRefMap });
-          if (result.err) {throw new SQLError(result.err);}
-          if (!result.value) {skip = true;}
+          if (result.err) {
+            throw new SQLError(result.err);
+          }
+          if (!result.value) {
+            skip = true;
+          }
         }
 
         if (!skip) {
