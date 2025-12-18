@@ -170,7 +170,7 @@ declare class Pool extends EventEmitter {
     constructor(args: PoolConfig);
     end(done?: (err?: MysqlError) => void): void;
     getConnection(done: (err: MysqlError | null, connection?: PoolConnection) => void): void;
-    query(opts: string | QueryOptions, values?: unknown, done?: QueryCallback): Query;
+    query(params: string | QueryOptions, values?: unknown, done?: QueryCallback): Query;
 }
 
 declare const createConnection: typeof createSession$1;

@@ -46,7 +46,9 @@ async function* _findRows(
   const rowsIterable = sourceMap.get(from);
 
   const baseRows: SourceRow[] =
-    parentRows.length > 0 ? parentRows : [{ source: new Map() }];
+    parentRows.length > 0
+      ? parentRows
+      : [{ source: new Map(), result: null, group: null }];
 
   if (!rowsIterable && !isLeft) {
     return;
@@ -69,7 +71,11 @@ async function* _findRows(
       const matchingRows: SourceRow[] = [];
 
       for (const rowData of currentBatch) {
-        const row: SourceRow = { source: new Map(parentRow.source) };
+        const row: SourceRow = {
+          source: new Map(parentRow.source),
+          result: null,
+          group: null,
+        };
         row.source.set(from, rowData);
 
         let skip = false;
@@ -89,7 +95,11 @@ async function* _findRows(
       }
 
       if (isLeft && matchingRows.length === 0) {
-        const row: SourceRow = { source: new Map(parentRow.source) };
+        const row: SourceRow = {
+          source: new Map(parentRow.source),
+          result: null,
+          group: null,
+        };
         row.source.set(from, null);
         amplifiedRows.push(row);
       } else {

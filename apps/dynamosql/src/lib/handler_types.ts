@@ -9,14 +9,28 @@ export type { ShowResult } from './show_handler';
 
 export type DynamoDBClient = ReturnType<typeof createDynamoDB>;
 
+type SourceMap = Map<From, Row | null>;
+
 export interface SourceRow {
-  source: Map<From, Row | null>;
+  source: SourceMap;
+  group: null | SourceRow[];
+  result: null | EvaluationResult[];
 }
-export type SourceRowResult = SourceRow & { result: EvaluationResult[] };
-export type SourceRowGroup = SourceRow & { group: SourceRow[] };
-export type SourceRowResultGroup = SourceRowResult & {
-  group: SourceRowResult[];
-};
+export interface SourceRowResult {
+  source: SourceMap;
+  group: null | SourceRow[];
+  result: EvaluationResult[];
+}
+export interface SourceRowGroup {
+  source: SourceMap;
+  group: SourceRow[];
+  result: null | EvaluationResult[];
+}
+export interface SourceRowResultGroup {
+  source: SourceMap;
+  group: SourceRow[];
+  result: EvaluationResult[];
+}
 
 export interface HandlerParams<T> {
   ast: T;

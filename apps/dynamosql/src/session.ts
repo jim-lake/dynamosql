@@ -43,6 +43,10 @@ export interface SqlValue {
   value: unknown;
 }
 
+export interface QueryParams extends QueryOptions {
+  collectResults?: boolean;
+}
+
 export class Session extends SQLMode implements PoolConnection {
   public readonly config: SessionConfig;
   public readonly state: string = 'connected';
@@ -233,7 +237,7 @@ export class Session extends SQLMode implements PoolConnection {
     }
   }
   query(
-    params: string | QueryOptions,
+    params: string | QueryParams,
     values?: unknown,
     done?: QueryCallback
   ): MysqlQuery {
@@ -241,11 +245,8 @@ export class Session extends SQLMode implements PoolConnection {
       done?.(new SQLError('released'));
       return undefined as unknown as MysqlQuery;
     }
-    const opts: QueryOptions =
-      typeof params === 'object' ? { ...params } : { sql: '' };
-    if (typeof params === 'string') {
-      opts.sql = params;
-    }
+    const opts: QueryParams =
+      typeof params === 'string' ? { sql: params } : { ...params };
     if (typeof values === 'function') {
       done = values as QueryCallback;
     } else if (values !== undefined) {
@@ -255,6 +256,7 @@ export class Session extends SQLMode implements PoolConnection {
     if (opts.values !== undefined) {
       opts.sql = SqlString.format(opts.sql, opts.values);
     }
+    opts.collectResults ??= Boolean(done);
     const query = new Query({ ...opts, session: this });
     void this._run(query, done);
     return query;

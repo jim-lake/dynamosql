@@ -67,7 +67,12 @@ export async function* formImplicitGroup(
     }
   }
   if (row_list[0]) {
-    yield [{ ...row_list[0], group: row_list }];
+    const group_row = {
+      source: row_list[0].source,
+      result: null,
+      group: row_list,
+    };
+    yield [group_row];
   } else {
     yield [];
   }

@@ -3,13 +3,13 @@ import { expect } from 'chai';
 import { promisify } from 'node:util';
 import { addUnitTest } from '../unit_helper';
 
-describe('Unit tests for query interface', async (t) => {
-  await addUnitTest(t, 'create connection', async (mod, config) => {
+describe('Unit tests for query interface', () => {
+  addUnitTest('create connection', async (mod, config) => {
     const conn = mod.createConnection(config);
     expect(conn.query).to.not.equal(null);
     conn.destroy();
   });
-  await addUnitTest(t, 'empty query', async (mod, config) => {
+  addUnitTest('empty query', async (mod, config) => {
     const conn = mod.createConnection(config);
     let err;
     try {
@@ -21,7 +21,7 @@ describe('Unit tests for query interface', async (t) => {
     }
     expect(err, 'should throw on empty query').to.not.be.undefined;
   });
-  await addUnitTest(t, 'empty query object', async (mod, config) => {
+  addUnitTest('empty query object', async (mod, config) => {
     const conn = mod.createConnection(config);
     try {
       const q = conn.query('', []);
@@ -32,7 +32,7 @@ describe('Unit tests for query interface', async (t) => {
       conn.destroy();
     }
   });
-  await addUnitTest(t, 'empty query object start', async (mod, config) => {
+  addUnitTest('empty query object start', async (mod, config) => {
     const conn = mod.createConnection(config);
     let err;
     try {
@@ -55,12 +55,12 @@ describe('Unit tests for query interface', async (t) => {
     }
     expect(err, 'should throw on empty query after start').to.not.be.undefined;
   });
-  await addUnitTest(t, 'error should still call end', async (mod, config) => {
+  addUnitTest('error should still call end', async (mod, config) => {
     const conn = mod.createConnection(config);
     let err;
     try {
       const q = conn.query('', []);
-      await new Promise<void>((resolve, reject) => {
+      await new Promise<void>((resolve) => {
         q.on('error', (error) => {
           logger.trace('on.error:', error);
           err = error;
@@ -77,16 +77,50 @@ describe('Unit tests for query interface', async (t) => {
     }
     expect(err, 'should throw on empty query after start').to.not.be.undefined;
   });
-  await addUnitTest(t, 'query events work', async (mod, config) => {
+  addUnitTest('query events work', async (mod, config) => {
     const conn = mod.createConnection(config);
-    let fields;
-    const rows = [];
+    const fields = [];
+    const results = [];
     try {
       await new Promise<void>((resolve, reject) => {
         const q = conn.query('SELECT 1 + 1 AS result', []);
         q.on('fields', (data) => {
           logger.trace('fields:', data);
-          fields = data;
+          fields.push(data);
+        });
+        q.on('result', (result) => {
+          logger.trace('result:', result);
+          results.push(result);
+        });
+        q.on('error', (err) => {
+          logger.trace('error:', err);
+          reject(err);
+        });
+        q.on('end', () => {
+          logger.trace('end');
+          resolve();
+        });
+      });
+    } finally {
+      conn.destroy();
+    }
+    expect(fields.length, 'fields should have 1 item').to.equal(1);
+    expect(fields[0].length, 'fields[0] should have 1 item').to.equal(1);
+    expect(results.length, 'results should have 1 item').to.equal(1);
+  });
+  addUnitTest('multi query events work', async (mod, config) => {
+    const conn = mod.createConnection({ ...config, multipleStatements: true });
+    const fields = [];
+    const rows = [];
+    try {
+      await new Promise<void>((resolve, reject) => {
+        const q = conn.query(
+          'SELECT 1 + 1 AS result; SELECT 1 + 2 AS result2;',
+          []
+        );
+        q.on('fields', (data) => {
+          logger.trace('fields:', data);
+          fields.push(data);
         });
         q.on('result', (row) => {
           logger.trace('result:', row);
@@ -104,10 +138,73 @@ describe('Unit tests for query interface', async (t) => {
     } finally {
       conn.destroy();
     }
-    expect(fields.length, 'fields should be an array').to.equal(1);
-    expect(rows.length, 'rows should have 1 item').to.equal(1);
+    expect(fields.length, 'fields should be an array').to.equal(2);
+    expect(rows.length, 'rows should have 1 item').to.equal(2);
   });
-  await addUnitTest(t, 'simple query', async (mod, config) => {
+  addUnitTest('set doesnt make fields events', async (mod, config) => {
+    const conn = mod.createConnection(config);
+    const fields = [];
+    const results = [];
+    try {
+      await new Promise<void>((resolve, reject) => {
+        const q = conn.query('SET @foo = 1', []);
+        q.on('fields', (data) => {
+          logger.trace('fields:', data);
+          fields = data;
+        });
+        q.on('result', (result) => {
+          logger.trace('result:', result);
+          results.push(result);
+        });
+        q.on('error', (err) => {
+          logger.trace('error:', err);
+          reject(err);
+        });
+        q.on('end', () => {
+          logger.trace('end');
+          resolve();
+        });
+      });
+    } finally {
+      conn.destroy();
+    }
+    expect(fields.length, 'fields should be empty').to.equal(0);
+    expect(results.length, 'results should have 1 item').to.equal(1);
+  });
+  addUnitTest('show creates field events', async (mod, config) => {
+    const conn = mod.createConnection({
+      ...config,
+      database: 'information_schema',
+    });
+    const fields = [];
+    const results = [];
+    try {
+      await new Promise<void>((resolve, reject) => {
+        const q = conn.query('SHOW TABLES', []);
+        q.on('fields', (data) => {
+          logger.trace('fields:', data);
+          fields.push(data);
+        });
+        q.on('result', (result) => {
+          logger.trace('result:', result);
+          results.push(result);
+        });
+        q.on('error', (err) => {
+          logger.trace('error:', err);
+          reject(err);
+        });
+        q.on('end', () => {
+          logger.trace('end');
+          resolve();
+        });
+      });
+    } finally {
+      conn.destroy();
+    }
+    expect(fields.length, 'fields should have 1 item').to.equal(1);
+    expect(results.length, 'results should multiple items').to.be.gt(0);
+  });
+  addUnitTest('simple query', async (mod, config) => {
     const conn = mod.createConnection(config);
     try {
       const result = await promisify(conn.query.bind(conn))(
@@ -119,7 +216,7 @@ describe('Unit tests for query interface', async (t) => {
       conn.destroy();
     }
   });
-  await addUnitTest(t, 'query with values', async (mod, config) => {
+  addUnitTest('query with values', async (mod, config) => {
     const conn = mod.createConnection(config);
     try {
       const result = await promisify(conn.query.bind(conn))(
@@ -132,7 +229,7 @@ describe('Unit tests for query interface', async (t) => {
       conn.destroy();
     }
   });
-  await addUnitTest(t, 'query with options object', async (mod, config) => {
+  addUnitTest('query with options object', async (mod, config) => {
     const conn = mod.createConnection(config);
     try {
       const result = await promisify(conn.query.bind(conn))({
@@ -144,7 +241,7 @@ describe('Unit tests for query interface', async (t) => {
       conn.destroy();
     }
   });
-  await addUnitTest(t, 'pool query', async (mod, config) => {
+  addUnitTest('pool query', async (mod, config) => {
     const pool = mod.createPool(config);
     try {
       const result = await promisify(pool.query.bind(pool))(
@@ -155,7 +252,7 @@ describe('Unit tests for query interface', async (t) => {
       pool.end();
     }
   });
-  await addUnitTest(t, 'pool getConnection', async (mod, config) => {
+  addUnitTest('pool getConnection', async (mod, config) => {
     const pool = mod.createPool(config);
     try {
       const conn = await promisify(pool.getConnection.bind(pool))();
@@ -168,19 +265,19 @@ describe('Unit tests for query interface', async (t) => {
       pool.end();
     }
   });
-  await addUnitTest(t, 'escape function', async (mod) => {
+  addUnitTest('escape function', async (mod) => {
     const escaped = mod.escape("test'value");
     expect(escaped).to.include("'test\\'value'");
   });
-  await addUnitTest(t, 'escapeId function', async (mod) => {
+  addUnitTest('escapeId function', async (mod) => {
     const escaped = mod.escapeId('table.column');
     expect(escaped).to.include('`');
   });
-  await addUnitTest(t, 'format function', async (mod) => {
+  addUnitTest('format function', async (mod) => {
     const formatted = mod.format('SELECT ? AS value', [123]);
     expect(formatted).to.include('123');
   });
-  await addUnitTest(t, 'connection escape', async (mod, config) => {
+  addUnitTest('connection escape', async (mod, config) => {
     const conn = mod.createConnection(config);
     try {
       const escaped = conn.escape("test'value");
@@ -189,7 +286,7 @@ describe('Unit tests for query interface', async (t) => {
       conn.destroy();
     }
   });
-  await addUnitTest(t, 'connection escapeId', async (mod, config) => {
+  addUnitTest('connection escapeId', async (mod, config) => {
     const conn = mod.createConnection(config);
     try {
       const escaped = conn.escapeId('column');
@@ -198,7 +295,7 @@ describe('Unit tests for query interface', async (t) => {
       conn.destroy();
     }
   });
-  await addUnitTest(t, 'connection format', async (mod, config) => {
+  addUnitTest('connection format', async (mod, config) => {
     const conn = mod.createConnection(config);
     try {
       const formatted = conn.format('SELECT ? AS value', [456]);
@@ -207,7 +304,7 @@ describe('Unit tests for query interface', async (t) => {
       conn.destroy();
     }
   });
-  await addUnitTest(t, 'pool escape', async (mod, config) => {
+  addUnitTest('pool escape', async (mod, config) => {
     const pool = mod.createPool(config);
     try {
       const escaped = pool.escape("test'value");
@@ -216,7 +313,7 @@ describe('Unit tests for query interface', async (t) => {
       pool.end();
     }
   });
-  await addUnitTest(t, 'pool escapeId', async (mod, config) => {
+  addUnitTest('pool escapeId', async (mod, config) => {
     const pool = mod.createPool(config);
     try {
       const escaped = pool.escapeId('column');
@@ -225,7 +322,7 @@ describe('Unit tests for query interface', async (t) => {
       pool.end();
     }
   });
-  await addUnitTest(t, 'connection state', async (mod, config) => {
+  addUnitTest('connection state', async (mod, config) => {
     const conn = mod.createConnection(config);
     try {
       expect(conn.state).to.be.a('string');
@@ -233,7 +330,7 @@ describe('Unit tests for query interface', async (t) => {
       conn.destroy();
     }
   });
-  await addUnitTest(t, 'connection threadId', async (mod, config) => {
+  addUnitTest('connection threadId', async (mod, config) => {
     const conn = mod.createConnection(config);
     try {
       expect(conn.threadId).to.not.be.undefined;
@@ -241,7 +338,7 @@ describe('Unit tests for query interface', async (t) => {
       conn.destroy();
     }
   });
-  await addUnitTest(t, 'connection destroy', async (mod, config) => {
+  addUnitTest('connection destroy', async (mod, config) => {
     const conn = mod.createConnection(config);
     conn.destroy();
   });

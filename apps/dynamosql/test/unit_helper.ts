@@ -9,7 +9,6 @@ const config = JSON.parse(
 );
 
 export function addUnitTest(
-  t: typeof test,
   name: string,
   testFunction: (lib: typeof mysql, config: any) => void | Promise<void>
 ) {

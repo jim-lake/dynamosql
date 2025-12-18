@@ -18,14 +18,8 @@ import * as UpdateHandler from './lib/update_handler';
 import { Types } from './types';
 
 import type { AffectedResult, ChangedResult } from './lib/handler_types';
-import type { Session } from './session';
-import type {
-  FieldInfo,
-  OkPacket,
-  QueryOptions,
-  TypeCast,
-  QueryListResult,
-} from './types';
+import type { Session, QueryParams } from './session';
+import type { FieldInfo, OkPacket, TypeCast, QueryListResult } from './types';
 import type { AST, Use } from 'node-sql-parser';
 import type { Readable, ReadableOptions } from 'node:stream';
 
@@ -40,13 +34,26 @@ const DEFAULT_RESULT: OkPacket = {
   protocol41: true,
 };
 
-export interface QueryConstructorParams extends QueryOptions {
+export interface QueryConstructorParams extends QueryParams {
   session: Session;
 }
 
 type SingleQueryResult =
-  | { result: AffectedResult | ChangedResult | OkPacket; columns: undefined }
-  | { result: unknown[][] | string[][]; columns: FieldInfo[] };
+  | {
+      result: AffectedResult | ChangedResult | OkPacket;
+      resultIter?: null;
+      columns: undefined;
+    }
+  | {
+      result: unknown[][] | string[][];
+      resultIter?: null;
+      columns: FieldInfo[];
+    }
+  | {
+      result: null;
+      resultIter: AsyncIterable<unknown[][]>;
+      columns: FieldInfo[];
+    };
 
 export class Query extends EventEmitter {
   private readonly _session: Session;
@@ -55,6 +62,7 @@ export class Query extends EventEmitter {
   readonly values: string[] | undefined;
   readonly typeCast: TypeCast | undefined;
   readonly nestedTables: boolean | string;
+  readonly collectResults: boolean;
 
   constructor(params: QueryConstructorParams) {
     super();
@@ -63,6 +71,7 @@ export class Query extends EventEmitter {
     this.values = params.values;
     this.typeCast = params.typeCast ?? params.session.typeCast;
     this.nestedTables = params.nestTables ?? false;
+    this.collectResults = params.collectResults ?? false;
   }
   start() {}
   stream(_options?: ReadableOptions): Readable {
@@ -94,27 +103,57 @@ export class Query extends EventEmitter {
     try {
       for (const ast of list) {
         this._session.startStatement();
-        const { result, columns } = await this._singleQuery(ast);
-        if (!Array.isArray(result)) {
-          result_list.push(Object.assign({}, DEFAULT_RESULT, result));
-        } else if (this._session.resultObjects) {
-          result_list.push(this._transformResultObject(result, columns ?? []));
-        } else {
-          result_list.push(this._transformResultArray(result, columns ?? []));
-        }
+        const { result, resultIter, columns } = await this._singleQuery(ast);
         schema_list.push(columns);
-      }
-      if (list.length === 1) {
-        this.emit('fields', schema_list[0]);
-        if (Array.isArray(result_list[0])) {
+        if (columns) {
+          this.emit('fields', columns);
+        }
+        if (resultIter) {
+          const has_listener = this.listenerCount('result') > 0;
+          if (this.collectResults || has_listener) {
+            let transformed_list: unknown[] = [];
+            for await (const batch of resultIter) {
+              const transformed_batch = this._session.resultObjects
+                ? this._transformResultObject(batch, columns)
+                : this._transformResultArray(batch, columns);
+              if (has_listener) {
+                for (const row of transformed_batch) {
+                  if (this.collectResults) {
+                    transformed_list.push(row);
+                  }
+                  this.emit('result', row);
+                }
+              } else {
+                if (transformed_batch.length > 10_000) {
+                  transformed_list = transformed_list.concat(transformed_batch);
+                } else {
+                  transformed_list.push(...transformed_batch);
+                }
+              }
+            }
+            if (this.collectResults) {
+              result_list.push(transformed_list);
+            }
+          }
+        } else if (!Array.isArray(result)) {
+          const single = Object.assign({}, DEFAULT_RESULT, result);
+          this.emit('result', single);
+          result_list.push(single);
+        } else {
+          const transformed_list = this._session.resultObjects
+            ? this._transformResultObject(result, columns ?? [])
+            : this._transformResultArray(result, columns ?? []);
           if (this.listenerCount('result') > 0) {
-            for (const row of result_list[0]) {
+            for (const row of transformed_list) {
               this.emit('result', row);
             }
           }
-        } else {
-          this.emit('result', result_list[0]);
+          if (this.collectResults) {
+            result_list.push(transformed_list);
+          }
         }
+      }
+      if (list.length === 1) {
         return [result_list[0], schema_list[0]] as QueryListResult;
       } else {
         return [result_list, schema_list] as QueryListResult;
@@ -160,11 +199,11 @@ export class Query extends EventEmitter {
         return { result: rows, columns };
       }
       case 'select': {
-        const { rows, columns } = await SelectHandler.query({
+        const { resultIter, columns } = await SelectHandler.query({
           ...params,
           ast: ast,
         });
-        return { result: rows, columns };
+        return { result: null, resultIter, columns };
       }
       case 'set':
         await SetHandler.query({ ...params, ast });

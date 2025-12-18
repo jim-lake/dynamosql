@@ -1964,6 +1964,9 @@ class GlobalSettings {
     }
     getGlobalVariable(name) {
         const name_uc = name.toUpperCase();
+        if (!(name_uc in SYSTEM_VARIABLE_TYPES)) {
+            return undefined;
+        }
         const type = SYSTEM_VARIABLE_TYPES[name_uc];
         switch (name_uc) {
             case 'COLLATION_CONNECTION':
@@ -2204,7 +2207,7 @@ function convertSuccess(result) {
                 err[i] = convertError(item.Error);
             }
             const converted = convertResult(item);
-            if (converted?.[0]) {
+            if (converted?.[0] && ret) {
                 ret[i] = converted[0];
             }
         });
@@ -2329,6 +2332,13 @@ class DynamoDB {
         this.client = new clientDynamodb.DynamoDBClient(opts);
         this.namespace = params?.namespace ?? '';
     }
+    queryQLIter(params) {
+        const command = new clientDynamodb.ExecuteStatementCommand({
+            Statement: namespacePartiQL(params.sql, this.namespace),
+            ReturnValuesOnConditionCheckFailure: params.return ?? clientDynamodb.ReturnValuesOnConditionCheckFailure.NONE,
+        });
+        return this._iterSend({ command, signal: params.signal });
+    }
     async queryQL(list) {
         if (!Array.isArray(list)) {
             return this._queryQL(list);
@@ -2341,19 +2351,20 @@ class DynamoDB {
     }
     async _queryQL(params) {
         const sql = namespacePartiQL(typeof params === 'string' ? params : params.sql, this.namespace);
-        const returnVal = typeof params === 'string' ? 'NONE' : (params.return ?? 'NONE');
-        const input = {
+        const returnVal = typeof params === 'string'
+            ? clientDynamodb.ReturnValuesOnConditionCheckFailure.NONE
+            : (params.return ?? clientDynamodb.ReturnValuesOnConditionCheckFailure.NONE);
+        const command = new clientDynamodb.ExecuteStatementCommand({
             Statement: sql,
             ReturnValuesOnConditionCheckFailure: returnVal,
-        };
-        const command = new clientDynamodb.ExecuteStatementCommand(input);
+        });
         return this._pagedSend(command);
     }
     async batchQL(params) {
         const list = Array.isArray(params) ? params : params.list;
         const returnVal = Array.isArray(params)
-            ? 'NONE'
-            : (params.return ?? 'NONE');
+            ? clientDynamodb.ReturnValuesOnConditionCheckFailure.NONE
+            : (params.return ?? clientDynamodb.ReturnValuesOnConditionCheckFailure.NONE);
         const input = {
             Statements: list.map((sql) => ({
                 Statement: namespacePartiQL(sql, this.namespace),
@@ -2649,6 +2660,25 @@ class DynamoDB {
             }
         }
         return results;
+    }
+    async *_iterSend(params) {
+        for (;;) {
+            params.signal?.throwIfAborted();
+            try {
+                const result = await this.client.send(params.command);
+                const list = convertSuccess(result)[1];
+                if (list) {
+                    yield list;
+                }
+                if (!result.NextToken) {
+                    break;
+                }
+                params.command.input.NextToken = result.NextToken;
+            }
+            catch (err) {
+                throw safeConvertError(err);
+            }
+        }
     }
 }
 
@@ -3074,6 +3104,9 @@ class SQLDateTime {
         }
         return ret;
     }
+    toUTCTime() {
+        return this._time + this._fraction;
+    }
     gt(other) {
         const time_diff = this._time - other.getTime();
         if (time_diff === 0) {
@@ -3117,14 +3150,14 @@ const CATALOG_LIST = [
 ];
 async function getRowList$2(params) {
     const { list } = params;
-    const source_map = new Map();
-    const column_map = new Map();
+    const sourceMap = new Map();
+    const columnMap = new Map();
     for (const from of list) {
         const { results, column_list } = await _getFromTable$2({ ...params, from });
-        source_map.set(from, results);
-        column_map.set(from, column_list);
+        sourceMap.set(from, _listToItetator$2(results));
+        columnMap.set(from, column_list);
     }
-    return { source_map, column_map };
+    return { sourceMap, columnMap };
 }
 async function _getFromTable$2(params) {
     const { dynamodb } = params;
@@ -3195,6 +3228,9 @@ function _tableToTable(database, table) {
         CREATE_OPTIONS: { value: '', type: 'string' },
         TABLE_COMMENT: { value: '', type: 'string' },
     };
+}
+async function* _listToItetator$2(list) {
+    yield list;
 }
 
 async function commit$3(_params) { }
@@ -3373,6 +3409,9 @@ async function addColumn$1(_params) { }
 async function createIndex$1(_params) { }
 async function deleteIndex$1(_params) { }
 
+function isCellValue$1(value) {
+    return 'value' in value && !('S' in value || 'N' in value || 'B' in value);
+}
 async function singleDelete$1(_params) {
     throw new NoSingleOperationError();
 }
@@ -3388,7 +3427,12 @@ async function multipleDelete$1(params) {
         const row_list = data.row_list.slice();
         const primary_map = new Map(data.primary_map);
         for (const object of delete_list) {
-            const key_list = object.map((key) => key.value);
+            const key_list = object.map((key) => {
+                if (!isCellValue$1(key)) {
+                    throw new SQLError('invalid_key_type');
+                }
+                return key.value;
+            });
             const delete_key = JSON.stringify(key_list);
             const index = primary_map.get(delete_key);
             if (index !== undefined && index >= 0) {
@@ -3425,20 +3469,20 @@ async function insertRowList$1(params) {
     const primary_map = new Map(data.primary_map);
     let affectedRows = 0;
     for (const row of list) {
-        _transformRow(row);
-        const key_values = primary_key.map((key) => row[key.name]?.value);
+        const cellRow = _transformRow(row);
+        const key_values = primary_key.map((key) => cellRow[key.name]?.value);
         const key = JSON.stringify(key_values);
         const index = primary_map.get(key);
         if (index === undefined) {
-            primary_map.set(key, row_list.push(row) - 1);
+            primary_map.set(key, row_list.push(cellRow) - 1);
             affectedRows++;
         }
         else if (duplicate_mode === 'replace') {
             const existingRow = row_list[index];
-            if (existingRow && !_rowEqual(existingRow, row)) {
+            if (existingRow && !_rowEqual(existingRow, cellRow)) {
                 affectedRows++;
             }
-            row_list[index] = row;
+            row_list[index] = cellRow;
             affectedRows++;
         }
         else if (!duplicate_mode) {
@@ -3452,12 +3496,14 @@ async function insertRowList$1(params) {
     return { affectedRows };
 }
 function _transformRow(row) {
+    const result = {};
     for (const key in row) {
         const cell = row[key];
         if (cell) {
-            row[key] = { type: cell.type, value: cell.value };
+            result[key] = { type: cell.type, value: cell.value };
         }
     }
+    return result;
 }
 function _rowEqual(a, b) {
     const keys_a = Object.keys(a);
@@ -3468,14 +3514,14 @@ function _rowEqual(a, b) {
 
 async function getRowList$1(params) {
     const { list } = params;
-    const source_map = new Map();
-    const column_map = new Map();
+    const sourceMap = new Map();
+    const columnMap = new Map();
     for (const from of list) {
         const { row_list, column_list } = _getFromTable$1({ ...params, from });
-        source_map.set(from, row_list);
-        column_map.set(from, column_list);
+        sourceMap.set(from, _listToItetator$1(row_list));
+        columnMap.set(from, column_list);
     }
-    return { source_map, column_map };
+    return { sourceMap, columnMap };
 }
 function _getFromTable$1(params) {
     const { session, from } = params;
@@ -3489,7 +3535,13 @@ function _getFromTable$1(params) {
         column_list: data.column_list.map((column) => column.name),
     };
 }
+async function* _listToItetator$1(list) {
+    yield list;
+}
 
+function isCellValue(value) {
+    return 'value' in value && !('S' in value || 'N' in value || 'B' in value);
+}
 async function singleUpdate$1(_params) {
     throw new NoSingleOperationError();
 }
@@ -3507,7 +3559,12 @@ async function multipleUpdate$1(params) {
         const primary_map = new Map(data.primary_map);
         for (const update of update_list) {
             const { set_list } = update;
-            const key_list = update.key.map((key) => key.value);
+            const key_list = update.key.map((key) => {
+                if (!isCellValue(key)) {
+                    throw new SQLError('invalid_key_type');
+                }
+                return key.value;
+            });
             const update_key = JSON.stringify(key_list);
             const index = primary_map.get(update_key);
             if (index !== undefined && index >= 0) {
@@ -3605,11 +3662,19 @@ async function getTableInfo(params) {
     if (!data.Table?.AttributeDefinitions || !data.Table.KeySchema) {
         throw new Error('bad_data');
     }
-    const column_list = data.Table.AttributeDefinitions.map((def) => ({
-        name: def.AttributeName,
-        type: TYPE_MAP[def.AttributeType] ?? 'string',
-    }));
+    const column_list = data.Table.AttributeDefinitions.map((def) => {
+        if (!def.AttributeName || !def.AttributeType) {
+            throw new Error('bad_data');
+        }
+        return {
+            name: def.AttributeName,
+            type: TYPE_MAP[def.AttributeType] ?? 'string',
+        };
+    });
     const primary_key = data.Table.KeySchema.map((key) => {
+        if (!key.AttributeName) {
+            throw new Error('bad_data');
+        }
         const type = column_list.find((col) => col.name === key.AttributeName)?.type ??
             'string';
         return { name: key.AttributeName, type };
@@ -3751,25 +3816,18 @@ function toBigInt(value) {
 function isBaseFrom$3(from) {
     return 'table' in from && typeof from.table === 'string';
 }
+function isCreateTable$1(ast) {
+    return ast.type === 'create' && 'table' in ast;
+}
 function getDatabaseFromTable(ast) {
-    if (ast.type === 'create') {
-        if (Array.isArray(ast.table)) {
-            return ast.table[0]?.db;
-        }
-        else if (ast.table) {
-            return ast.table.db ?? undefined;
-        }
+    if (isCreateTable$1(ast)) {
+        return ast.table[0]?.db ?? undefined;
     }
     return undefined;
 }
 function getTableFromTable(ast) {
-    if (ast.type === 'create') {
-        if (Array.isArray(ast.table)) {
-            return ast.table[0]?.table;
-        }
-        else if (ast.table) {
-            return ast.table.table;
-        }
+    if (isCreateTable$1(ast)) {
+        return ast.table[0]?.table;
     }
     return undefined;
 }
@@ -3845,9 +3903,8 @@ class SQLTime {
         return this._decimals;
     }
     toString(params) {
-        let ret;
         if (isNaN(this._time)) {
-            ret = '';
+            return '';
         }
         else {
             let seconds = this._time;
@@ -3862,18 +3919,23 @@ class SQLTime {
             if (neg) {
                 seconds = -seconds;
             }
+            const decimals = Math.min(params?.decimals ?? this._decimals, 6);
+            const final_seconds = seconds % 60;
+            let ret_secs = final_seconds.toFixed(decimals);
+            if (ret_secs.startsWith('60')) {
+                // seconds overflowed on rounding and printing, carry and correct
+                ret_secs = '0' + ret_secs.slice(1);
+                seconds += 60;
+            }
             const hours = Math.floor(seconds / HOUR$1);
             seconds -= hours * HOUR$1;
             const minutes = Math.floor(seconds / MINUTE$1);
             seconds -= minutes * MINUTE$1;
-            const decimals = Math.min(params?.decimals ?? this._decimals, 6);
-            let ret_secs = seconds.toFixed(decimals);
             if (ret_secs.length < (decimals > 0 ? decimals + 3 : 2)) {
                 ret_secs = '0' + ret_secs;
             }
-            ret = `${neg}${_pad(hours)}:${_pad(minutes)}:${ret_secs}`;
+            return `${neg}${_pad(hours)}:${_pad(minutes)}:${ret_secs}`;
         }
-        return ret;
     }
     toSQLDateTime(decimals) {
         const now = Date.now() / 1000;
@@ -4223,7 +4285,12 @@ function convertTime(params) {
     const { value } = params;
     let { decimals } = params;
     if (value instanceof SQLTime) {
-        return value;
+        if (decimals === undefined || value.getDecimals() === decimals) {
+            return value;
+        }
+        else {
+            return new SQLTime({ time: value.getTime(), decimals });
+        }
     }
     else if (value instanceof SQLDateTime) {
         const time = (value.getTime() % DAY$1) + value.getFraction();
@@ -4393,17 +4460,17 @@ function _pad4(num) {
     return String(num).padStart(4, '0');
 }
 function _fix2year(num) {
-    let ret = num;
     if (typeof num === 'string' && num.length <= 2) {
         const parsed = parseInt(num, 10);
         if (parsed >= 0 && parsed <= 69) {
-            ret = parsed + 2000;
+            return parsed + 2000;
         }
         else if (parsed >= 70 && parsed <= 99) {
-            ret = parsed + 1900;
+            return parsed + 1900;
         }
     }
-    return ret;
+    // Return as-is if not a 2-digit string
+    return typeof num === 'string' || typeof num === 'number' ? num : String(num);
 }
 function _partsToTime(type, year, month, day, hour, min, sec, fraction) {
     const iso = `${_pad4(year)}-${_pad2(month)}-${_pad2(day)}T${_pad2(hour)}:${_pad2(min)}:${_pad2(sec)}Z`;
@@ -4463,7 +4530,7 @@ function count(expr, state) {
     let err = null;
     let value = 0;
     let name = '';
-    if (expr.args.expr.type === 'star') {
+    if ('type' in expr.args.expr && expr.args.expr.type === 'star') {
         value = group.length;
         name = 'COUNT(*)';
     }
@@ -4823,22 +4890,23 @@ function inOp(expr, state) {
     if (left.value === null) {
         value = null;
     }
-    else if (expr.right.type === 'expr_list') {
+    else if ('type' in expr.right && expr.right.type === 'expr_list') {
         const list = expr.right.value;
-        for (const item of list) {
-            const right = getValue(item, state);
-            names.push(right.name ?? '');
-            const new_left = { ...left };
-            _convertCompare(new_left, right, state.session.timeZone);
-            if (right.err) {
-                return right;
-            }
-            if (right.value === null) {
-                value = null;
-            }
-            else if (new_left.value === right.value) {
-                value = 1;
-                break;
+        if (list) {
+            for (const item of list) {
+                const right = getValue(item, state);
+                names.push(right.name ?? '');
+                if (right.err) {
+                    return right;
+                }
+                const [left_val, right_val] = _convertCompare(left, right, state.session.timeZone);
+                if (right.value === null) {
+                    value = null;
+                }
+                else if (left_val === right_val) {
+                    value = 1;
+                    break;
+                }
             }
         }
     }
@@ -4879,8 +4947,8 @@ function nullif(expr, state) {
     const name = `NULLIF(${arg1.name}, ${arg2.name})`;
     if (!err) {
         const origValue = arg1.value;
-        _convertCompare(arg1, arg2, state.session.timeZone);
-        const isEqual = arg1.value !== null && arg2.value !== null && arg1.value === arg2.value;
+        const [left_val, right_val] = _convertCompare(arg1, arg2, state.session.timeZone);
+        const isEqual = left_val !== null && left_val === right_val;
         value = isEqual ? null : origValue;
         if (origValue instanceof SQLDate ||
             origValue instanceof SQLDateTime ||
@@ -4891,51 +4959,63 @@ function nullif(expr, state) {
     return { err, name, value, type };
 }
 function _convertCompare(left, right, timeZone) {
-    if (left.value !== null &&
-        right.value !== null &&
-        left.value !== right.value) {
-        if ((_isDateLike(left.value) || _isDateLike(right.value)) &&
-            left.type !== right.type) {
-            const type = _unionDateTime(left.value, right.value);
-            if (type === 'datetime') {
-                const left_dt = convertDateTime({
-                    value: left.value,
-                    decimals: 6,
-                    timeZone,
-                });
-                const right_dt = convertDateTime({
-                    value: right.value,
-                    decimals: 6,
-                    timeZone,
-                });
-                if (left_dt && right_dt) {
-                    left.value = left_dt.toDate(timeZone).getTime();
-                    right.value = right_dt.toDate(timeZone).getTime();
-                }
-            }
+    let left_val = left.value;
+    let right_val = right.value;
+    if (left_val === null || right_val === null) {
+        return [null, null];
+    }
+    if (left_val === right_val) {
+        if (typeof left_val === 'number' && typeof right_val === 'number') {
+            return [left_val, right_val];
         }
-        if (typeof left.value === 'number' ||
-            typeof right.value === 'number' ||
-            left.type === 'number' ||
-            right.type === 'number') {
-            left.value = convertNum(left.value);
-            right.value = convertNum(right.value);
-        }
-        else {
-            if (left.value instanceof SQLDateTime) {
-                left.value = left.value.toString({ timeZone });
-            }
-            else {
-                left.value = String(left.value).trimEnd();
-            }
-            if (right.value instanceof SQLDateTime) {
-                right.value = right.value.toString({ timeZone });
-            }
-            else {
-                right.value = String(right.value).trimEnd();
+        return [String(left_val), String(right_val)];
+    }
+    if ((_isDateLike(left_val) || _isDateLike(right_val)) &&
+        left.type !== right.type) {
+        const type = _unionDateTime(left_val, right_val);
+        if (type === 'datetime') {
+            const left_dt = convertDateTime({
+                value: left_val,
+                decimals: 6,
+                timeZone,
+            });
+            const right_dt = convertDateTime({
+                value: right_val,
+                decimals: 6,
+                timeZone,
+            });
+            if (left_dt && right_dt) {
+                left_val = left_dt.toUTCTime();
+                right_val = right_dt.toUTCTime();
             }
         }
     }
+    if (typeof left_val === 'number' ||
+        typeof right_val === 'number' ||
+        left.type === 'number' ||
+        right.type === 'number') {
+        const left_num = convertNum(left_val);
+        const right_num = convertNum(right_val);
+        if (left_num === null || right_num === null) {
+            return [null, null];
+        }
+        return [left_num, right_num];
+    }
+    let left_str;
+    if (left_val instanceof SQLDateTime) {
+        left_str = left_val.toString({ timeZone });
+    }
+    else {
+        left_str = String(left_val).trimEnd();
+    }
+    let right_str;
+    if (right_val instanceof SQLDateTime) {
+        right_str = right_val.toString({ timeZone });
+    }
+    else {
+        right_str = String(right_val).trimEnd();
+    }
+    return [left_str, right_str];
 }
 function _equal$1(expr, state, op) {
     const left = getValue(expr.left, state);
@@ -4944,16 +5024,15 @@ function _equal$1(expr, state, op) {
     const name = (left.name ?? '') + op + (right.name ?? '');
     let value = 0;
     if (!err) {
-        _convertCompare(left, right, state.session.timeZone);
-        if (left.value === null || right.value === null) {
+        const [left_val, right_val] = _convertCompare(left, right, state.session.timeZone);
+        if (left_val === null) {
             value = null;
         }
-        else if (left.value === right.value) {
+        else if (left_val === right_val) {
             value = 1;
         }
-        else if (typeof left.value === 'string' &&
-            typeof right.value === 'string') {
-            value = left.value.localeCompare(right.value) === 0 ? 1 : 0;
+        else if (typeof left_val === 'string' && typeof right_val === 'string') {
+            value = left_val.localeCompare(right_val) === 0 ? 1 : 0;
         }
     }
     return { err, value, name, type: 'longlong' };
@@ -4967,20 +5046,18 @@ function _gt$1(expr_left, expr_right, state, op, flip) {
         : (left.name ?? '') + op + (right.name ?? '');
     let value = 0;
     if (!err) {
-        _convertCompare(left, right, state.session.timeZone);
-        if (left.value === null || right.value === null) {
+        const [left_val, right_val] = _convertCompare(left, right, state.session.timeZone);
+        if (left_val === null) {
             value = null;
         }
-        else if (left.value === right.value) {
+        else if (left_val === right_val) {
             value = 0;
         }
-        else if (typeof left.value === 'number' &&
-            typeof right.value === 'number') {
-            value = left.value > right.value ? 1 : 0;
+        else if (typeof left_val === 'number' && typeof right_val === 'number') {
+            value = left_val > right_val ? 1 : 0;
         }
-        else if (typeof left.value === 'string' &&
-            typeof right.value === 'string') {
-            value = left.value.localeCompare(right.value) > 0 ? 1 : 0;
+        else if (typeof left_val === 'string' && typeof right_val === 'string') {
+            value = left_val.localeCompare(right_val) > 0 ? 1 : 0;
         }
     }
     return { err, value, name, type: 'longlong' };
@@ -4994,23 +5071,21 @@ function _gte$1(expr_left, expr_right, state, op, flip) {
         : (left.name ?? '') + op + (right.name ?? '');
     let value = 0;
     if (!err) {
-        _convertCompare(left, right, state.session.timeZone);
-        if (left.value === null || right.value === null) {
+        const [left_val, right_val] = _convertCompare(left, right, state.session.timeZone);
+        if (left_val === null) {
             value = null;
         }
-        else if (left.value === right.value) {
+        else if (left_val === right_val) {
             value = 1;
         }
-        else if (typeof left.value === 'number' &&
-            typeof right.value === 'number') {
-            const leftNum = convertNum(left.value);
-            const rightNum = convertNum(right.value);
+        else if (typeof left_val === 'number' && typeof right_val === 'number') {
+            const leftNum = convertNum(left_val);
+            const rightNum = convertNum(right_val);
             value =
                 leftNum !== null && rightNum !== null && leftNum >= rightNum ? 1 : 0;
         }
-        else if (typeof left.value === 'string' &&
-            typeof right.value === 'string') {
-            value = left.value.localeCompare(right.value) >= 0 ? 1 : 0;
+        else if (typeof left_val === 'string' && typeof right_val === 'string') {
+            value = left_val.localeCompare(right_val) >= 0 ? 1 : 0;
         }
     }
     return { err, value, type: 'longlong', name };
@@ -5031,6 +5106,227 @@ function _unionDateTime(value1, value2) {
     return undefined;
 }
 
+const SINGLE_TIME = {
+    microsecond: 0.000001,
+    second: 1,
+    minute: 60,
+    hour: 60 * 60,
+    day: 24 * 60 * 60,
+    week: 7 * 24 * 60 * 60,
+};
+const DOUBLE_TIME = {
+    second_microsecond: [1, 0.000001],
+    minute_microsecond: [60, 0.000001],
+    minute_second: [60, 1],
+    hour_microsecond: [60 * 60, 0.000001],
+    hour_second: [60 * 60, 1],
+    hour_minute: [60 * 60, 60],
+    day_microsecond: [24 * 60 * 60, 0.000001],
+    day_second: [24 * 60 * 60, 1],
+    day_minute: [24 * 60 * 60, 60],
+    day_hour: [24 * 60 * 60, 60 * 60],
+};
+const MONTH = {
+    month: 1,
+    quarter: 3,
+    year: 12,
+    year_month: [12, 1],
+};
+const FORCE_DATE = {
+    day: true,
+    week: true,
+    month: true,
+    quarter: true,
+    year: true,
+    day_microsecond: true,
+    day_second: true,
+    day_minute: true,
+    day_hour: true,
+    year_month: true,
+};
+const DECIMALS = {
+    microsecond: 6,
+    second_microsecond: 6,
+    minute_microsecond: 6,
+    hour_microsecond: 6,
+    day_microsecond: 6,
+};
+class SQLInterval {
+    _number;
+    _decimals;
+    _isMonth;
+    _forceDate;
+    constructor(number, decimals, is_month, force_date) {
+        this._isMonth = is_month;
+        this._forceDate = force_date;
+        this._decimals = decimals || 0;
+        if (this._decimals > 0) {
+            this._number = parseFloat(number.toFixed(this._decimals + 1).slice(0, -1));
+        }
+        else {
+            this._number = Math.trunc(number);
+        }
+    }
+    getNumber() {
+        return this._number;
+    }
+    isMonth() {
+        return this._isMonth;
+    }
+    forceDate() {
+        return this._forceDate;
+    }
+    toString() {
+        return null;
+    }
+    _add(datetime, mult, timeZone) {
+        let old_time = datetime.getTime();
+        let fraction = datetime.getFraction();
+        let type;
+        if (datetime instanceof SQLDateTime) {
+            type = 'datetime';
+        }
+        else if (datetime instanceof SQLDate && !this._forceDate) {
+            type = 'datetime';
+        }
+        else if (datetime instanceof SQLDate) {
+            type = 'date';
+        }
+        else if (this._forceDate) {
+            type = 'datetime';
+        }
+        else {
+            type = 'time';
+        }
+        const decimals = Math.max(datetime.getDecimals(), this._decimals);
+        const number = this._number * mult;
+        let value = null;
+        if (type === 'time') {
+            value = createSQLTime({ time: old_time + number, decimals });
+        }
+        else {
+            let time;
+            if (datetime instanceof SQLTime) {
+                const now = Date.now() / 1000;
+                old_time += now - (now % (24 * 60 * 60));
+            }
+            if (this._isMonth) {
+                time = _addMonth(old_time, number);
+            }
+            else {
+                const add_time = Math.floor(number);
+                time = old_time + add_time;
+                fraction += number - add_time;
+                const overflow = Math.floor(fraction);
+                time += overflow;
+                fraction -= overflow;
+            }
+            if (type === 'date') {
+                value = createSQLDate({ time, timeZone });
+            }
+            else {
+                value = createSQLDateTime({ time, fraction, decimals });
+            }
+        }
+        return { type, value };
+    }
+    add(datetime, timeZone) {
+        return this._add(datetime, 1, timeZone);
+    }
+    sub(datetime, timeZone) {
+        return this._add(datetime, -1, timeZone);
+    }
+}
+function createSQLInterval(value, unit_name) {
+    let is_month = false;
+    let unit;
+    if (unit_name in MONTH) {
+        is_month = true;
+        unit = MONTH[unit_name];
+    }
+    else {
+        unit = SINGLE_TIME[unit_name] ?? DOUBLE_TIME[unit_name];
+    }
+    let ret = null;
+    const number = unit ? _convertNumber(value, unit, unit_name) : null;
+    if (number !== null) {
+        const force_date = unit_name in FORCE_DATE;
+        let decimals = DECIMALS[unit_name] ?? 0;
+        if (!decimals && unit_name.endsWith('second')) {
+            decimals = getDecimals(value, 6);
+            if (typeof value === 'string' && decimals) {
+                decimals = 6;
+            }
+        }
+        ret = new SQLInterval(number, decimals, is_month, force_date);
+    }
+    return ret;
+}
+function _convertNumber(value, unit, unit_name) {
+    let ret = null;
+    if (Array.isArray(unit)) {
+        if (typeof value === 'number') {
+            const unitValue = unit[1];
+            if (unitValue !== undefined) {
+                ret = value * unitValue;
+            }
+        }
+        else {
+            const match = String(value).match(/\d+/g);
+            if (match &&
+                match.length === 2 &&
+                match[0] &&
+                match[1] &&
+                unit[0] !== undefined &&
+                unit[2] !== undefined) {
+                ret = parseInt(match[0]) * unit[0] + parseInt(match[1]) * unit[2];
+            }
+            else if (match &&
+                match.length === 1 &&
+                match[0] &&
+                unit[1] !== undefined) {
+                ret = parseInt(match[0]) * unit[1];
+            }
+            else if (match && match.length === 0) {
+                ret = 0;
+            }
+            else {
+                ret = null;
+            }
+        }
+    }
+    else {
+        ret = convertNum(value);
+        if (ret !== null) {
+            if (unit_name !== 'second') {
+                ret = Math.trunc(ret);
+            }
+            ret *= unit;
+        }
+    }
+    return ret;
+}
+function _addMonth(old_time, number) {
+    const date = new Date(old_time * 1000);
+    const start_time = date.getTime();
+    const new_months = date.getUTCFullYear() * 12 + date.getUTCMonth() + number;
+    const year = Math.floor(new_months / 12);
+    const month = new_months - year * 12;
+    let day = date.getUTCDate();
+    date.setUTCFullYear(year);
+    date.setUTCMonth(month);
+    while (date.getUTCMonth() !== month) {
+        date.setUTCMonth(0);
+        date.setUTCDate(day--);
+        date.setUTCMonth(month);
+    }
+    const delta = date.getTime() - start_time;
+    return old_time + delta / 1000;
+}
+
+function isSQLInterval(value) {
+    return value instanceof SQLInterval;
+}
 function plus$1(expr, state) {
     const result = _numBothSides(expr, state, ' + ', true);
     const { err, name, left_num, right_num, interval, datetime } = result;
@@ -5187,7 +5483,9 @@ function _numBothSides(expr, state, op, allow_interval) {
             value = null;
             type = 'double';
         }
-        else if (allow_interval && left.type === 'interval') {
+        else if (allow_interval &&
+            left.type === 'interval' &&
+            isSQLInterval(left.value)) {
             interval = left.value;
             if (right.value instanceof SQLDateTime ||
                 right.value instanceof SQLDate ||
@@ -5208,7 +5506,9 @@ function _numBothSides(expr, state, op, allow_interval) {
                 value = null;
             }
         }
-        else if (allow_interval && right.type === 'interval') {
+        else if (allow_interval &&
+            right.type === 'interval' &&
+            isSQLInterval(right.value)) {
             interval = right.value;
             if (left.value instanceof SQLDateTime ||
                 left.value instanceof SQLTime ||
@@ -5275,6 +5575,9 @@ function _unionNumberType(type1, type2, default_type) {
     return default_type;
 }
 
+function isExprList(value) {
+    return (typeof value === 'object' && 'type' in value && value.type === 'expr_list');
+}
 function and$1(expr, state) {
     const left = getValue(expr.left, state);
     let err = left.err;
@@ -5351,15 +5654,21 @@ function _is$1(expr, state, op) {
     let right;
     let right_name;
     // Check if rightExpr is a Value type with null, true, or false
-    if (rightExpr.type === 'null') {
+    if ('type' in rightExpr && rightExpr.type === 'null') {
         right = null;
         right_name = 'NULL';
     }
-    else if (rightExpr.type === 'bool' && rightExpr.value === true) {
+    else if ('type' in rightExpr &&
+        rightExpr.type === 'bool' &&
+        'value' in rightExpr &&
+        rightExpr.value) {
         right = true;
         right_name = 'TRUE';
     }
-    else if (rightExpr.type === 'bool' && rightExpr.value === false) {
+    else if ('type' in rightExpr &&
+        rightExpr.type === 'bool' &&
+        'value' in rightExpr &&
+        !rightExpr.value) {
         right = false;
         right_name = 'FALSE';
     }
@@ -5424,10 +5733,7 @@ function between(expr, state) {
         return value_result;
     }
     // Right side should be expr_list with 2 values
-    if (typeof expr.right !== 'object' ||
-        !('type' in expr.right) ||
-        expr.right.type !== 'expr_list' ||
-        !('value' in expr.right) ||
+    if (!isExprList(expr.right) ||
         !Array.isArray(expr.right.value) ||
         expr.right.value.length !== 2) {
         return {
@@ -5437,11 +5743,25 @@ function between(expr, state) {
             type: 'longlong',
         };
     }
-    const min_result = getValue(expr.right.value[0], state);
+    const minExpr = expr.right.value[0];
+    const maxExpr = expr.right.value[1];
+    // DataType shouldn't appear in BETWEEN expressions
+    if (!minExpr ||
+        !maxExpr ||
+        (typeof minExpr === 'object' && 'dataType' in minExpr) ||
+        (typeof maxExpr === 'object' && 'dataType' in maxExpr)) {
+        return {
+            err: { err: 'syntax_err', args: ['BETWEEN'] },
+            value: null,
+            name: '',
+            type: 'longlong',
+        };
+    }
+    const min_result = getValue(minExpr, state);
     if (min_result.err) {
         return min_result;
     }
-    const max_result = getValue(expr.right.value[1], state);
+    const max_result = getValue(maxExpr, state);
     if (max_result.err) {
         return max_result;
     }
@@ -5452,17 +5772,11 @@ function between(expr, state) {
         return { err: null, value: null, name, type: 'longlong' };
     }
     // Use >= and <= comparison logic
-    const gte_result = gte$1({
-        left: expr.left,
-        right: expr.right.value[0],
-    }, state);
+    const gte_result = gte$1({ left: expr.left, right: minExpr }, state);
     if (gte_result.err || gte_result.value === null) {
         return { err: gte_result.err, value: null, name, type: 'longlong' };
     }
-    const lte_result = lte$1({
-        left: expr.left,
-        right: expr.right.value[1],
-    }, state);
+    const lte_result = lte$1({ left: expr.left, right: maxExpr }, state);
     if (lte_result.err || lte_result.value === null) {
         return { err: lte_result.err, value: null, name, type: 'longlong' };
     }
@@ -5896,7 +6210,9 @@ function _compare(expr, state, functionName, dateCompare, nativeCompare) {
                     let val = undefined;
                     for (const sub of values) {
                         if (typeof val === 'bigint' || typeof sub.value === 'bigint') {
-                            const val_big = BigInt(sub.value);
+                            const val_big = typeof sub.value === 'bigint'
+                                ? sub.value
+                                : BigInt(Number(sub.value));
                             if (val === undefined || nativeCompare(val_big, val)) {
                                 val = val_big;
                             }
@@ -5953,10 +6269,11 @@ function now(expr, state) {
     let decimals = 0;
     let name = 'NOW()';
     if (expr.args.value[0]) {
-        if (expr.args.value[0].type === 'bool') {
+        const firstArg = expr.args.value[0];
+        if ('type' in firstArg && firstArg.type === 'bool') {
             return { err: 'ER_PARSE_ERROR', type: 'datetime', value: null };
         }
-        const result = getValue(expr.args.value[0], state);
+        const result = getValue(firstArg, state);
         if (result.err) {
             return result;
         }
@@ -6461,224 +6778,6 @@ function _nthNumber(number) {
         }
     }
     return ret;
-}
-
-const SINGLE_TIME = {
-    microsecond: 0.000001,
-    second: 1,
-    minute: 60,
-    hour: 60 * 60,
-    day: 24 * 60 * 60,
-    week: 7 * 24 * 60 * 60,
-};
-const DOUBLE_TIME = {
-    second_microsecond: [1, 0.000001],
-    minute_microsecond: [60, 0.000001],
-    minute_second: [60, 1],
-    hour_microsecond: [60 * 60, 0.000001],
-    hour_second: [60 * 60, 1],
-    hour_minute: [60 * 60, 60],
-    day_microsecond: [24 * 60 * 60, 0.000001],
-    day_second: [24 * 60 * 60, 1],
-    day_minute: [24 * 60 * 60, 60],
-    day_hour: [24 * 60 * 60, 60 * 60],
-};
-const MONTH = {
-    month: 1,
-    quarter: 3,
-    year: 12,
-    year_month: [12, 1],
-};
-const FORCE_DATE = {
-    day: true,
-    week: true,
-    month: true,
-    quarter: true,
-    year: true,
-    day_microsecond: true,
-    day_second: true,
-    day_minute: true,
-    day_hour: true,
-    year_month: true,
-};
-const DECIMALS = {
-    microsecond: 6,
-    second_microsecond: 6,
-    minute_microsecond: 6,
-    hour_microsecond: 6,
-    day_microsecond: 6,
-};
-class SQLInterval {
-    _number;
-    _decimals;
-    _isMonth;
-    _forceDate;
-    constructor(number, decimals, is_month, force_date) {
-        this._isMonth = is_month;
-        this._forceDate = force_date;
-        this._decimals = decimals || 0;
-        if (this._decimals > 0) {
-            this._number = parseFloat(number.toFixed(this._decimals + 1).slice(0, -1));
-        }
-        else {
-            this._number = Math.trunc(number);
-        }
-    }
-    getNumber() {
-        return this._number;
-    }
-    isMonth() {
-        return this._isMonth;
-    }
-    forceDate() {
-        return this._forceDate;
-    }
-    toString() {
-        return null;
-    }
-    _add(datetime, mult, timeZone) {
-        let old_time = datetime.getTime();
-        let fraction = datetime.getFraction();
-        let type;
-        if (datetime instanceof SQLDateTime) {
-            type = 'datetime';
-        }
-        else if (datetime instanceof SQLDate && !this._forceDate) {
-            type = 'datetime';
-        }
-        else if (datetime instanceof SQLDate) {
-            type = 'date';
-        }
-        else if (this._forceDate) {
-            type = 'datetime';
-        }
-        else {
-            type = 'time';
-        }
-        const decimals = Math.max(datetime.getDecimals(), this._decimals);
-        const number = this._number * mult;
-        let value = null;
-        if (type === 'time') {
-            value = createSQLTime({ time: old_time + number, decimals });
-        }
-        else {
-            let time;
-            if (datetime instanceof SQLTime) {
-                const now = Date.now() / 1000;
-                old_time += now - (now % (24 * 60 * 60));
-            }
-            if (this._isMonth) {
-                time = _addMonth(old_time, number);
-            }
-            else {
-                const add_time = Math.floor(number);
-                time = old_time + add_time;
-                fraction += number - add_time;
-                const overflow = Math.floor(fraction);
-                time += overflow;
-                fraction -= overflow;
-            }
-            if (type === 'date') {
-                value = createSQLDate({ time, timeZone });
-            }
-            else {
-                value = createSQLDateTime({ time, fraction, decimals });
-            }
-        }
-        return { type, value };
-    }
-    add(datetime, timeZone) {
-        return this._add(datetime, 1, timeZone);
-    }
-    sub(datetime, timeZone) {
-        return this._add(datetime, -1, timeZone);
-    }
-}
-function createSQLInterval(value, unit_name) {
-    let is_month = false;
-    let unit;
-    if (unit_name in MONTH) {
-        is_month = true;
-        unit = MONTH[unit_name];
-    }
-    else {
-        unit = SINGLE_TIME[unit_name] ?? DOUBLE_TIME[unit_name];
-    }
-    let ret = null;
-    const number = unit ? _convertNumber(value, unit, unit_name) : null;
-    if (number !== null) {
-        const force_date = unit_name in FORCE_DATE;
-        let decimals = DECIMALS[unit_name] ?? 0;
-        if (!decimals && unit_name.endsWith('second')) {
-            decimals = getDecimals(value, 6);
-            if (typeof value === 'string' && decimals) {
-                decimals = 6;
-            }
-        }
-        ret = new SQLInterval(number, decimals, is_month, force_date);
-    }
-    return ret;
-}
-function _convertNumber(value, unit, unit_name) {
-    let ret = null;
-    if (Array.isArray(unit)) {
-        if (typeof value === 'number') {
-            const unitValue = unit[1];
-            if (unitValue !== undefined) {
-                ret = value * unitValue;
-            }
-        }
-        else {
-            const match = String(value).match(/\d+/g);
-            if (match &&
-                match.length === 2 &&
-                match[0] &&
-                match[1] &&
-                unit[0] !== undefined &&
-                unit[2] !== undefined) {
-                ret = parseInt(match[0]) * unit[0] + parseInt(match[1]) * unit[2];
-            }
-            else if (match &&
-                match.length === 1 &&
-                match[0] &&
-                unit[1] !== undefined) {
-                ret = parseInt(match[0]) * unit[1];
-            }
-            else if (match && match.length === 0) {
-                ret = 0;
-            }
-            else {
-                ret = null;
-            }
-        }
-    }
-    else {
-        ret = convertNum(value);
-        if (ret !== null) {
-            if (unit_name !== 'second') {
-                ret = Math.trunc(ret);
-            }
-            ret *= unit;
-        }
-    }
-    return ret;
-}
-function _addMonth(old_time, number) {
-    const date = new Date(old_time * 1000);
-    const start_time = date.getTime();
-    const new_months = date.getUTCFullYear() * 12 + date.getUTCMonth() + number;
-    const year = Math.floor(new_months / 12);
-    const month = new_months - year * 12;
-    let day = date.getUTCDate();
-    date.setUTCFullYear(year);
-    date.setUTCMonth(month);
-    while (date.getUTCMonth() !== month) {
-        date.setUTCMonth(0);
-        date.setUTCDate(day--);
-        date.setUTCMonth(month);
-    }
-    const delta = date.getTime() - start_time;
-    return old_time + delta / 1000;
 }
 
 function date_format(expr, state) {
@@ -8976,6 +9075,74 @@ function minus$1(expr, state) {
 }
 const methods = { '+': plus, '!': not$1, not: not$1, '-': minus$1 };
 
+// Type guards
+function isValueExpr(expr) {
+    return (typeof expr === 'object' &&
+        expr !== null &&
+        'type' in expr &&
+        (expr.type === 'number' ||
+            expr.type === 'bigint' ||
+            expr.type === 'double_quote_string' ||
+            expr.type === 'single_quote_string' ||
+            expr.type === 'null' ||
+            expr.type === 'bool' ||
+            expr.type === 'hex_string' ||
+            expr.type === 'full_hex_string'));
+}
+function isFunction(expr) {
+    return (typeof expr === 'object' &&
+        expr !== null &&
+        'type' in expr &&
+        expr.type === 'function');
+}
+function isAggrFunc(expr) {
+    return (typeof expr === 'object' &&
+        expr !== null &&
+        'type' in expr &&
+        expr.type === 'aggr_func');
+}
+function isBinary(expr) {
+    return (typeof expr === 'object' &&
+        expr !== null &&
+        'type' in expr &&
+        expr.type === 'binary_expr');
+}
+function isUnary(expr) {
+    return (typeof expr === 'object' &&
+        expr !== null &&
+        'type' in expr &&
+        expr.type === 'unary_expr');
+}
+function isCast(expr) {
+    return (typeof expr === 'object' &&
+        expr !== null &&
+        'type' in expr &&
+        expr.type === 'cast');
+}
+function isVar(expr) {
+    return (typeof expr === 'object' &&
+        expr !== null &&
+        'type' in expr &&
+        expr.type === 'var');
+}
+function isAssign(expr) {
+    return (typeof expr === 'object' &&
+        expr !== null &&
+        'type' in expr &&
+        expr.type === 'assign');
+}
+function isColumnRef(expr) {
+    return (typeof expr === 'object' &&
+        expr !== null &&
+        'type' in expr &&
+        expr.type === 'column_ref');
+}
+function isInterval(expr) {
+    return (typeof expr === 'object' &&
+        expr !== null &&
+        'type' in expr &&
+        expr.type === 'interval');
+}
 function getValue(expr, state) {
     const { session, row } = state;
     let result = {
@@ -8984,73 +9151,94 @@ function getValue(expr, state) {
         value: undefined,
         name: undefined,
     };
-    const type = expr?.type;
     if (!expr) ;
-    else if (type === 'number') {
-        if (typeof expr.value === 'number') {
-            result.value = expr.value;
-            result.type = Number.isInteger(result.value) ? 'longlong' : 'number';
-        }
-        else {
-            result.value = Number(expr.value);
-            if (typeof expr.value === 'string') {
-                if (expr.value.includes('e')) {
-                    result.type = 'double';
-                    result.decimals = 31;
-                }
-                else if (expr.value.includes('.')) {
-                    result.type = 'number';
-                    result.decimals = getDecimalsForString(expr.value);
-                }
-            }
-            else {
+    else if ('dataType' in expr) {
+        // DataType - shouldn't be evaluated as a value
+        result.err = { err: 'ER_PARSE_ERROR' };
+    }
+    else if ('type' in expr && expr.type === 'expr_list') {
+        // ExprList - shouldn't be evaluated as a single value
+        result.err = { err: 'ER_PARSE_ERROR' };
+    }
+    else if ('type' in expr && expr.type === 'extract') {
+        // Extract - EXTRACT(field FROM source) - not yet implemented
+        result.err = { err: 'ER_NOT_SUPPORTED_YET' };
+    }
+    else if ('type' in expr && expr.type === 'fulltext_search') {
+        // FulltextSearch - MATCH(...) AGAINST(...) - not yet implemented
+        result.err = { err: 'ER_NOT_SUPPORTED_YET' };
+    }
+    else if (isValueExpr(expr)) {
+        const type = expr.type;
+        if (type === 'number') {
+            const value = expr.value;
+            if (typeof value === 'number') {
+                result.value = value;
                 result.type = Number.isInteger(result.value) ? 'longlong' : 'number';
             }
+            else if (value !== null) {
+                result.value = Number(value);
+                if (typeof value === 'string') {
+                    if (value.includes('e')) {
+                        result.type = 'double';
+                        result.decimals = 31;
+                    }
+                    else if (value.includes('.')) {
+                        result.type = 'number';
+                        result.decimals = getDecimalsForString(value);
+                    }
+                }
+                else {
+                    result.type = Number.isInteger(result.value) ? 'longlong' : 'number';
+                }
+            }
+        }
+        else if (type === 'bigint') {
+            const val = toBigInt(expr.value);
+            if (val === null) {
+                result.err = { err: 'ER_ILLEGAL_VALUE_FOR_TYPE', args: [expr.value] };
+            }
+            else {
+                result.value = val;
+                result.type = 'bigint';
+            }
+        }
+        else if (type === 'double_quote_string') {
+            result.value = expr.value;
+            result.name = `"${result.value}"`;
+        }
+        else if (type === 'single_quote_string') {
+            result.value = expr.value;
+            result.name = `'${result.value}'`;
+        }
+        else if (type === 'null') {
+            result.value = null;
+        }
+        else if (type === 'bool') {
+            result.value = expr.value ? 1 : 0;
+            result.name = expr.value ? 'TRUE' : 'FALSE';
+            result.type = 'longlong';
+        }
+        else if (type === 'hex_string' || type === 'full_hex_string') {
+            const value = expr.value;
+            if (typeof value === 'string') {
+                result.value = Buffer.from(value, 'hex');
+                result.name = 'x' + value.slice(0, 10);
+            }
+            result.type = 'buffer';
         }
     }
-    else if (type === 'bigint') {
-        const val = toBigInt(expr.value);
-        if (val === null) {
-            result.err = { err: 'ER_ILLEGAL_VALUE_FOR_TYPE', args: [expr.value] };
-        }
-        else {
-            result.value = val;
-            result.type = 'bigint';
-        }
-    }
-    else if (type === 'double_quote_string') {
-        result.value = expr.value;
-        result.name = `"${result.value}"`;
-    }
-    else if (type === 'single_quote_string') {
-        result.value = expr.value;
-        result.name = `'${result.value}'`;
-    }
-    else if (type === 'null') {
-        result.value = null;
-    }
-    else if (type === 'bool') {
-        result.value = expr.value ? 1 : 0;
-        result.name = expr.value ? 'TRUE' : 'FALSE';
-        result.type = 'longlong';
-    }
-    else if (type === 'hex_string' || type === 'full_hex_string') {
-        result.value = Buffer.from(expr.value, 'hex');
-        result.name = 'x' + expr.value.slice(0, 10);
-        result.type = 'buffer';
-    }
-    else if (type === 'interval') {
+    else if (isInterval(expr)) {
         const intervalFunc = methods$1.interval;
         if (typeof intervalFunc === 'function') {
             result = intervalFunc(expr, state);
         }
     }
-    else if (type === 'function') {
-        const funcExpr = expr;
-        const funcName = getFunctionName(funcExpr.name);
+    else if (isFunction(expr)) {
+        const funcName = getFunctionName(expr.name);
         const func = methods$2[funcName.toLowerCase()];
         if (typeof func === 'function') {
-            result = func(funcExpr, state);
+            result = func(expr, state);
             result.name ??= funcName + '()';
         }
         else {
@@ -9058,12 +9246,11 @@ function getValue(expr, state) {
             result.err = { err: 'ER_SP_DOES_NOT_EXIST', args: [funcName] };
         }
     }
-    else if (type === 'aggr_func') {
-        const aggrExpr = expr;
-        const funcName = getFunctionName(aggrExpr.name);
+    else if (isAggrFunc(expr)) {
+        const funcName = getFunctionName(expr.name);
         const func = methods$5[funcName.toLowerCase()];
         if (func) {
-            result = func(aggrExpr, state);
+            result = func(expr, state);
             result.name ??= funcName + '()';
         }
         else {
@@ -9071,39 +9258,34 @@ function getValue(expr, state) {
             result.err = { err: 'ER_SP_DOES_NOT_EXIST', args: [funcName] };
         }
     }
-    else if (type === 'binary_expr') {
-        const binExpr = expr;
-        const func = methods$4[binExpr.operator.toLowerCase()];
+    else if (isBinary(expr)) {
+        const func = methods$4[expr.operator.toLowerCase()];
         if (func) {
-            result = func(binExpr, state);
-            result.name ??= binExpr.operator;
+            result = func(expr, state);
+            result.name ??= expr.operator;
         }
         else {
-            distExports.logger.trace('expression.getValue: unknown binary operator:', binExpr.operator);
-            result.err = { err: 'ER_SP_DOES_NOT_EXIST', args: [binExpr.operator] };
+            distExports.logger.trace('expression.getValue: unknown binary operator:', expr.operator);
+            result.err = { err: 'ER_SP_DOES_NOT_EXIST', args: [expr.operator] };
         }
     }
-    else if (type === 'unary_expr') {
-        const unaryExpr = expr;
-        const func = methods[unaryExpr.operator.toLowerCase()];
+    else if (isUnary(expr)) {
+        const func = methods[expr.operator.toLowerCase()];
         if (func) {
-            result = func(unaryExpr, state);
-            result.name ??= unaryExpr.operator;
+            result = func(expr, state);
+            result.name ??= expr.operator;
         }
         else {
-            distExports.logger.trace('expression.getValue: unknown unanary operator:', unaryExpr.operator);
-            result.err = { err: 'ER_SP_DOES_NOT_EXIST', args: [unaryExpr.operator] };
+            distExports.logger.trace('expression.getValue: unknown unanary operator:', expr.operator);
+            result.err = { err: 'ER_SP_DOES_NOT_EXIST', args: [expr.operator] };
         }
     }
-    else if (type === 'cast') {
-        const castExpr = expr;
-        const target = Array.isArray(castExpr.target)
-            ? castExpr.target[0]
-            : castExpr.target;
+    else if (isCast(expr)) {
+        const target = Array.isArray(expr.target) ? expr.target[0] : expr.target;
         const dataType = target?.dataType ?? '';
         const func = methods$3[dataType.toLowerCase()];
         if (func) {
-            result = func(castExpr, state);
+            result = func(expr, state);
             result.name ??= `CAST(? AS ${dataType})`;
         }
         else {
@@ -9111,11 +9293,10 @@ function getValue(expr, state) {
             result.err = { err: 'ER_SP_DOES_NOT_EXIST', args: [dataType] };
         }
     }
-    else if (type === 'var') {
-        const varExpr = expr;
-        const { prefix, members } = varExpr;
-        const scope = members.length > 0 ? varExpr.name.toLowerCase() : '';
-        const name = members.length > 0 ? members[0] : varExpr.name;
+    else if (isVar(expr)) {
+        const { prefix, members } = expr;
+        const scope = members.length > 0 ? expr.name.toLowerCase() : '';
+        const name = members[0] ?? expr.name;
         result.name = prefix + (scope ? scope + '.' : '') + name;
         if (prefix === '@@') {
             let val;
@@ -9135,7 +9316,7 @@ function getValue(expr, state) {
                 result.type = val.type;
             }
             else {
-                distExports.logger.trace('expression.getValue: unknown system variable:', varExpr.name, varExpr.members);
+                distExports.logger.trace('expression.getValue: unknown system variable:', expr.name, expr.members);
                 result.err = { err: 'ER_UNKNOWN_SYSTEM_VARIABLE', args: [name] };
             }
         }
@@ -9166,10 +9347,9 @@ function getValue(expr, state) {
             result.err = 'unsupported';
         }
     }
-    else if (type === 'assign') {
+    else if (isAssign(expr)) {
         // Handle := assignment operator
-        const assignExpr = expr;
-        const right = assignExpr.right;
+        const right = expr.right;
         const rightResult = 'ast' in right
             ? {
                 err: { err: 'ER_OPERAND_COLUMNS', args: ['1'] },
@@ -9182,7 +9362,7 @@ function getValue(expr, state) {
             result = rightResult;
         }
         else {
-            const varExpr = assignExpr.left;
+            const varExpr = expr.left;
             if (varExpr.prefix === '@') {
                 const name = varExpr.name;
                 session.setVariable(name, {
@@ -9198,23 +9378,11 @@ function getValue(expr, state) {
             }
         }
     }
-    else if (type === 'column_ref') {
-        const colRef = expr;
-        let columnName;
-        let columnValue;
-        if ('column' in colRef) {
-            columnValue = colRef.column;
-            columnName = String(columnValue);
-        }
-        else if ('expr' in colRef && 'column' in colRef.expr) {
-            columnValue = colRef.expr.column;
-            columnName = String(columnValue);
-        }
-        else {
-            columnName = String(colRef);
-        }
+    else if (isColumnRef(expr)) {
+        const columnValue = expr.column;
+        const columnName = String(columnValue);
         result.name = columnName;
-        const refInfo = state.columnRefMap?.get(colRef);
+        const refInfo = state.columnRefMap?.get(expr);
         if (row && refInfo?.resultIndex !== undefined && refInfo.resultIndex >= 0) {
             const output_result = 'result' in row ? row.result[refInfo.resultIndex] : undefined;
             result.value = output_result?.value;
@@ -9366,25 +9534,35 @@ function _in(expr, state) {
     else if (left.value === null) {
         value = null;
     }
-    else {
+    else if ('type' in expr.right && expr.right.type === 'expr_list') {
         const rightExpr = expr.right;
-        const count = rightExpr.value?.length ?? 0;
-        const list = [];
-        for (let i = 0; i < count; i++) {
-            const right = convertWhere(rightExpr.value[i], state);
-            if (right.err) {
-                err = right.err;
-                break;
-            }
-            else if (right.value === null) {
-                value = null;
-                break;
-            }
-            else {
-                list.push(right.value);
-            }
+        const rightValue = rightExpr.value;
+        if (!rightValue) {
+            err = 'unsupported';
         }
-        value ??= `${left.value} IN (${list.join(',')})`;
+        else {
+            const count = rightValue.length;
+            const list = [];
+            for (let i = 0; i < count; i++) {
+                const item = rightValue[i];
+                if (!item) {
+                    continue;
+                }
+                const right = convertWhere(item, state);
+                if (right.err) {
+                    err = right.err;
+                    break;
+                }
+                else if (right.value === null) {
+                    value = null;
+                    break;
+                }
+                else {
+                    list.push(right.value);
+                }
+            }
+            value ??= `${left.value} IN (${list.join(',')})`;
+        }
     }
     return { err, value };
 }
@@ -9425,13 +9603,19 @@ function _is(expr, state, op) {
     let err = left.err;
     if (!err) {
         const rightExpr = expr.right;
-        if (rightExpr.value === null) {
+        if ('type' in rightExpr && rightExpr.type === 'null') {
             right = 'NULL';
         }
-        else if (rightExpr.value === true) {
+        else if ('type' in rightExpr &&
+            rightExpr.type === 'bool' &&
+            'value' in rightExpr &&
+            rightExpr.value) {
             right = 'TRUE';
         }
-        else if (rightExpr.value === false) {
+        else if ('type' in rightExpr &&
+            rightExpr.type === 'bool' &&
+            'value' in rightExpr &&
+            !rightExpr.value) {
             right = 'FALSE';
         }
         else {
@@ -9442,16 +9626,20 @@ function _is(expr, state, op) {
     return { err, value };
 }
 function not(expr, state) {
-    const unaryExpr = expr;
-    const result = convertWhere(unaryExpr.expr, state);
+    if (!('type' in expr) || expr.type !== 'unary_expr') {
+        return { err: 'syntax_err', value: null };
+    }
+    const result = convertWhere(expr.expr, state);
     if (!result.err) {
         result.value = 'NOT ' + result.value;
     }
     return result;
 }
 function minus(expr, state) {
-    const unaryExpr = expr;
-    const result = convertWhere(unaryExpr.expr, state);
+    if (!('type' in expr) || expr.type !== 'unary_expr') {
+        return { err: 'syntax_err', value: null };
+    }
+    const result = convertWhere(expr.expr, state);
     if (!result.err) {
         result.value = '-' + result.value;
     }
@@ -9502,21 +9690,21 @@ function convertWhere(expr, state) {
     const { from } = state;
     let err = null;
     let value = null;
-    if (expr) {
+    if (expr && 'type' in expr) {
         const { type } = expr;
-        if (type === 'number') {
+        if (type === 'number' && 'value' in expr) {
             value = expr.value;
         }
-        else if (type === 'double_quote_string') {
+        else if (type === 'double_quote_string' && 'value' in expr) {
             value = `'${expr.value}'`;
         }
-        else if (type === 'single_quote_string') {
+        else if (type === 'single_quote_string' && 'value' in expr) {
             value = `'${expr.value}'`;
         }
         else if (type === 'null') {
             value = null;
         }
-        else if (type === 'bool') {
+        else if (type === 'bool' && 'value' in expr) {
             value = expr.value;
         }
         else if (type === 'function') {
@@ -9556,8 +9744,7 @@ function convertWhere(expr, state) {
             const colRef = expr;
             const refInfo = state.columnRefMap?.get(colRef);
             if (refInfo?.from === from) {
-                const colRefItem = colRef;
-                const col = colRefItem.column;
+                const col = colRef.column;
                 value = String(col);
             }
             else {
@@ -9613,6 +9800,8 @@ async function multipleDelete(params) {
     for (const object of list) {
         const { table, key_list, delete_list } = object;
         try {
+            // Cast is necessary: EngineValue[][] -> KeyValue[][]
+            // For raw engine, EngineValue is always AttributeValue which is compatible with KeyValue
             await dynamodb.deleteItems({
                 table,
                 key_list,
@@ -9649,7 +9838,12 @@ async function _insertIgnoreReplace(params) {
             if (!result.Table?.KeySchema) {
                 throw new Error('Invalid table schema');
             }
-            const key_list = result.Table.KeySchema.map((k) => k.AttributeName);
+            const key_list = result.Table.KeySchema.map((k) => {
+                if (!k.AttributeName) {
+                    throw new Error('Invalid table schema');
+                }
+                return k.AttributeName;
+            });
             const track = new Map();
             if (duplicate_mode === 'replace') {
                 list.reverse();
@@ -9697,7 +9891,11 @@ async function _insertIgnoreReplace(params) {
                     }
                     else {
                         affectedRows--;
-                        thrownError ??= convertError(item_err);
+                        const converted = convertError(item_err);
+                        thrownError ??=
+                            converted instanceof Error
+                                ? converted
+                                : new Error(String(converted));
                     }
                 });
                 if (thrownError) {
@@ -9710,12 +9908,16 @@ async function _insertIgnoreReplace(params) {
         }
     }
     else {
-        list.forEach(_fixupItem);
-        const opts = { table, list: list };
+        const nativeList = list.map(_fixupItem);
+        const opts = { table, list: nativeList };
         await dynamodb.putItems(opts);
         affectedRows = list.length;
     }
     return { affectedRows };
+}
+function hasCancellationReasons(err) {
+    return ('CancellationReasons' in err &&
+        Array.isArray(err.CancellationReasons));
 }
 async function _insertNoIgnore(params) {
     const { dynamodb, table, list } = params;
@@ -9726,8 +9928,10 @@ async function _insertNoIgnore(params) {
     }
     catch (err) {
         if (err instanceof Error) {
-            const cancellationReasons = err.CancellationReasons;
-            if (err.name === 'TransactionCanceledException' && cancellationReasons) {
+            if (err.name === 'TransactionCanceledException' &&
+                hasCancellationReasons(err) &&
+                err.CancellationReasons) {
+                const cancellationReasons = err.CancellationReasons;
                 for (let i = 0; i < cancellationReasons.length; i++) {
                     const reason = cancellationReasons[i];
                     if (reason?.Code === 'ResourceNotFound') {
@@ -9767,14 +9971,15 @@ async function _insertNoIgnore(params) {
         throw err;
     }
 }
-function _fixupItem(obj) {
-    for (const key in obj) {
-        const cell = obj[key];
+function _fixupItem(row) {
+    const result = {};
+    for (const key in row) {
+        const cell = row[key];
         if (cell !== undefined) {
-            obj[key] = cell.value;
+            result[key] = cell.value;
         }
     }
-    return obj;
+    return result;
 }
 function _escapeItem(item) {
     let s = '{ ';
@@ -9786,15 +9991,15 @@ function _escapeItem(item) {
 }
 
 async function getRowList(params) {
-    const { list } = params;
-    const source_map = new Map();
-    const column_map = new Map();
-    for (const from of list) {
-        const { results, column_list } = await _getFromTable({ ...params, from });
-        source_map.set(from, results);
-        column_map.set(from, column_list);
-    }
-    return { source_map, column_map };
+    const sourceMap = new Map();
+    const columnMap = new Map();
+    const tasks = params.list.map(async (from) => {
+        const { resultIter, columnList } = await _getFromTable({ ...params, from });
+        columnMap.set(from, columnList);
+        sourceMap.set(from, resultIter);
+    });
+    await Promise.all(tasks);
+    return { sourceMap, columnMap };
 }
 async function _getFromTable(params) {
     const { dynamodb, session, from, where, requestSets, requestAll, columnRefMap, } = params;
@@ -9812,36 +10017,54 @@ async function _getFromTable(params) {
     const where_result = where && !is_left_join
         ? convertWhere(where, { session, from, default_true: true, columnRefMap })
         : null;
-    if (!where_result?.err && where_result?.value) {
+    if (!where_result?.err && where_result?.value && where_result.value !== 1) {
         sql += ' WHERE ' + where_result.value;
     }
     try {
-        const results = await dynamodb.queryQL(sql);
-        const result_array = Array.isArray(results[0])
-            ? results[0]
-            : results;
-        let column_list;
+        const iter = dynamodb.queryQLIter({ sql });
+        let columnList = [];
+        let first_values;
         if (isRequestAll) {
-            const response_set = new Set();
-            for (const result of result_array) {
-                for (const key in result) {
-                    response_set.add(key);
+            const first_batch = await iter.next();
+            if (!first_batch.done) {
+                first_values = first_batch.value;
+                const response_set = new Set();
+                for (const result of first_batch.value) {
+                    for (const key in result) {
+                        response_set.add(key);
+                    }
                 }
+                columnList = [...response_set.keys()];
             }
-            column_list = [...response_set.keys()];
         }
         else {
-            column_list = request_columns;
+            columnList = request_columns;
         }
-        return { results: result_array, column_list };
+        async function* _makeIter() {
+            try {
+                if (first_values !== undefined) {
+                    yield first_values;
+                }
+                for await (const batch of iter) {
+                    yield batch;
+                }
+            }
+            catch (err) {
+                throw _fixErr(err, table, sql);
+            }
+        }
+        return { resultIter: _makeIter(), columnList };
     }
     catch (err) {
-        if (err instanceof Error && err.message === 'resource_not_found') {
-            throw new SQLError({ err: 'table_not_found', args: [table] });
-        }
-        distExports.logger.error('raw_engine.getRowList err:', err, sql);
-        throw err;
+        throw _fixErr(err, table, sql);
     }
+}
+function _fixErr(err, table, sql) {
+    if (err instanceof Error && err.message === 'resource_not_found') {
+        return new SQLError({ err: 'table_not_found', args: [table] });
+    }
+    distExports.logger.error('raw_engine.getRowList err:', err, sql);
+    return err;
 }
 
 async function singleUpdate(params) {
@@ -9903,17 +10126,15 @@ async function multipleUpdate(params) {
     let changedRows = 0;
     for (const object of list) {
         const { table, key_list, update_list } = object;
-        for (const item of update_list) {
-            for (const set of item.set_list) {
-                set.value = set.value.value;
-            }
-        }
+        const transformedList = update_list.map((item) => ({
+            key: item.key,
+            set_list: item.set_list.map((set) => ({
+                column: set.column,
+                value: set.value.value,
+            })),
+        }));
         try {
-            await dynamodb.updateItems({
-                table,
-                key_list,
-                list: update_list,
-            });
+            await dynamodb.updateItems({ table, key_list, list: transformedList });
             affectedRows += update_list.length;
             changedRows += update_list.length;
         }
@@ -10251,7 +10472,7 @@ async function dropTable(params) {
 
 async function query$9(params) {
     const { dynamodb, session, ast } = params;
-    const action = ast.expr?.action?.value?.toLowerCase();
+    const action = ast.expr.action.value.toLowerCase();
     if (action === 'begin' || action === 'start') {
         startTransaction({ session, auto_commit: false });
     }
@@ -10310,11 +10531,13 @@ function startTransaction(params) {
 }
 async function commit(params) {
     await _txEach(params, async ({ engine, ...other }) => {
+        // Cast necessary: TypeScript doesn't track that destructuring removes 'engine'
         await engine.commit(other);
     });
 }
 async function rollback(params) {
     await _txEach(params, async ({ engine, ...other }) => {
+        // Cast necessary: TypeScript doesn't track that destructuring removes 'engine'
         await engine.rollback(other);
     });
 }
@@ -10356,9 +10579,10 @@ async function _runAlterTable(params) {
     const column_list = [];
     // Process column additions
     for (const def of ast.expr) {
-        if (def.resource === 'column' && def.action === 'add') {
-            const column_name = def.column.column;
-            const type = def.definition?.dataType;
+        if (def.resource === 'column' && 'action' in def && def.action === 'add') {
+            const addDef = def;
+            const column_name = addDef.column.column;
+            const type = addDef.definition.dataType;
             column_list.push({ name: column_name, type });
             const opts = {
                 dynamodb,
@@ -10371,50 +10595,66 @@ async function _runAlterTable(params) {
     }
     // Process index operations
     for (const def of ast.expr) {
-        if (def.resource === 'index' && def.action === 'add') {
-            const key_list = def.definition?.map((sub) => {
-                const column_def = column_list.find((col) => col.name === sub.column);
-                return {
-                    name: sub.column,
-                    order_by: sub.order_by,
-                    type: column_def?.type ?? 'string',
+        if (def.resource === 'index' && 'action' in def) {
+            if (def.action === 'add') {
+                const addIndexDef = def;
+                const key_list = addIndexDef.definition.map((sub) => {
+                    const column_def = column_list.find((col) => col.name === sub.column);
+                    return {
+                        name: sub.column,
+                        order_by: sub.order_by,
+                        type: column_def?.type ?? 'string',
+                    };
+                });
+                const opts = {
+                    dynamodb,
+                    session,
+                    table,
+                    index_name: addIndexDef.index,
+                    key_list,
                 };
-            }) ?? [];
-            const opts = {
-                dynamodb,
-                session,
-                table,
-                index_name: def.index,
-                key_list,
-            };
-            try {
-                await engine.createIndex(opts);
-            }
-            catch (err) {
-                if (err instanceof Error && err.message === 'index_exists') {
-                    throw new SQLError({ err: 'ER_DUP_KEYNAME', args: [def.index] });
+                try {
+                    await engine.createIndex(opts);
                 }
-                throw err;
-            }
-        }
-        else if (def.resource === 'index' && def.action === 'drop') {
-            const opts = { dynamodb, session, table, index_name: def.index };
-            try {
-                await engine.deleteIndex(opts);
-            }
-            catch (err) {
-                if (err instanceof Error && err.message === 'index_not_found') {
-                    throw new SQLError({
-                        err: 'ER_CANT_DROP_FIELD_OR_KEY',
-                        args: [def.index],
-                    });
+                catch (err) {
+                    if (err instanceof Error && err.message === 'index_exists') {
+                        throw new SQLError({
+                            err: 'ER_DUP_KEYNAME',
+                            args: [addIndexDef.index],
+                        });
+                    }
+                    throw err;
                 }
-                throw err;
+            }
+            else {
+                // action === 'drop'
+                const dropIndexDef = def;
+                const opts = {
+                    dynamodb,
+                    session,
+                    table,
+                    index_name: dropIndexDef.index,
+                };
+                try {
+                    await engine.deleteIndex(opts);
+                }
+                catch (err) {
+                    if (err instanceof Error && err.message === 'index_not_found') {
+                        throw new SQLError({
+                            err: 'ER_CANT_DROP_FIELD_OR_KEY',
+                            args: [dropIndexDef.index],
+                        });
+                    }
+                    throw err;
+                }
             }
         }
     }
 }
 
+function isBaseFrom$2(from) {
+    return 'table' in from && typeof from.table === 'string';
+}
 function resolveReferences(ast, current_database) {
     const requestSets = new Map();
     const requestAll = new Map();
@@ -10456,15 +10696,17 @@ function resolveReferences(ast, current_database) {
     const tableRaw = ast.type === 'delete' ? ast.table : null;
     const table = Array.isArray(tableRaw) ? tableRaw : null;
     table?.forEach((object) => {
-        const obj = object;
-        const fromEntry = obj.db
-            ? db_map[obj.db]?.[obj.table]
-            : table_map[obj.table];
+        if (!isBaseFrom$2(object)) {
+            return;
+        }
+        const fromEntry = object.db
+            ? db_map[object.db]?.[object.table]
+            : table_map[object.table];
         if (!fromEntry) {
-            throw new SQLError({ err: 'table_not_found', args: [obj.table] });
+            throw new SQLError({ err: 'table_not_found', args: [object.table] });
         }
         else {
-            obj.from = fromEntry;
+            object.from = fromEntry;
         }
     });
     const name_cache = {};
@@ -10486,10 +10728,26 @@ function resolveReferences(ast, current_database) {
     columns?.forEach((column, i) => {
         const col = column;
         if (col.as) {
-            result_map[col.as] = i;
+            const asStr = typeof col.as === 'string'
+                ? col.as
+                : col.as.value;
+            result_map[String(asStr)] = i;
         }
-        else if (col.expr?.type === 'column_ref') {
-            result_map[col.expr.column ?? ''] = i;
+        else if ('type' in col.expr && col.expr.type === 'column_ref') {
+            const colExpr = col.expr;
+            if ('column' in colExpr && colExpr.column) {
+                const colName = typeof colExpr.column === 'string'
+                    ? colExpr.column
+                    : colExpr.column.expr.value;
+                result_map[String(colName)] = i;
+            }
+            else if ('expr' in colExpr && colExpr.expr) {
+                const nestedExpr = colExpr.expr;
+                const colName = typeof nestedExpr.column === 'string'
+                    ? nestedExpr.column
+                    : nestedExpr.column.expr.value;
+                result_map[String(colName)] = i;
+            }
         }
     });
     if (ast.type === 'select') {
@@ -10500,9 +10758,7 @@ function resolveReferences(ast, current_database) {
             });
         }
     }
-    const orderby = ast.type === 'select'
-        ? ast.orderby
-        : ast.orderby;
+    const orderby = ast.orderby;
     const having = ast.type === 'select' ? ast.having : undefined;
     [orderby, having].forEach((item) => {
         walkColumnRefs(item, (object) => {
@@ -10538,8 +10794,10 @@ function _resolveObject(object, ast, db_map, table_map, name_cache, requestSets,
             const astFrom = ast.type === 'update' ? ast.table : ast.from;
             const matchingFrom = Array.isArray(astFrom)
                 ? astFrom.find((from) => {
-                    const f = from;
-                    return f.as === obj.table || (!f.as && f.table === obj.table);
+                    if (!isBaseFrom$2(from)) {
+                        return false;
+                    }
+                    return (from.as === obj.table || (!from.as && from.table === obj.table));
                 })
                 : undefined;
             if (matchingFrom) {
@@ -10579,10 +10837,7 @@ function _resolveObject(object, ast, db_map, table_map, name_cache, requestSets,
                 const astFrom = ast.type === 'update' ? ast.table : ast.from;
                 const firstFrom = Array.isArray(astFrom) ? astFrom[0] : undefined;
                 from =
-                    cached ??
-                        (firstFrom && 'table' in firstFrom
-                            ? firstFrom
-                            : undefined);
+                    cached ?? (firstFrom && 'table' in firstFrom ? firstFrom : undefined);
             }
         }
         if (from) {
@@ -10861,30 +11116,80 @@ function convertType(type, nullable) {
     }
 }
 
+function makeEngineGroups(session, list) {
+    const ret = [];
+    for (const obj of list) {
+        const { database, table } = obj;
+        const engine = getEngine(database ?? undefined, table, session);
+        const found = ret.find((group) => group.engine === engine);
+        if (found) {
+            found.list.push(obj);
+        }
+        else {
+            ret.push({ engine, list: [obj] });
+        }
+    }
+    return ret;
+}
+
+function isExpressionValue(expr) {
+    if (typeof expr !== 'object') {
+        return false;
+    }
+    if ('type' in expr) {
+        const type = expr.type;
+        // Star, FulltextSearch, and Assign have specific type values
+        return type !== 'star' && type !== 'fulltext_search' && type !== 'assign';
+    }
+    return false;
+}
 function hasAggregate(ast) {
     if (Array.isArray(ast.columns)) {
         for (const column of ast.columns) {
-            if (_hasAgg(column)) {
+            if (_hasAgg(column.expr)) {
                 return true;
             }
         }
     }
     return false;
 }
-function formImplicitGroup(params) {
-    const { row_list } = params;
-    if (row_list[0]) {
-        return [{ ...row_list[0], group: row_list }];
+async function* formImplicitGroup(params) {
+    const { rowIter } = params;
+    let row_list = [];
+    for await (const batch of rowIter) {
+        if (batch.length < 10_000) {
+            row_list.push(...batch);
+        }
+        else {
+            row_list = row_list.concat(batch);
+        }
     }
-    return [];
+    if (row_list[0]) {
+        yield [{ ...row_list[0], group: row_list }];
+    }
+    else {
+        yield [];
+    }
 }
-function formGroup(params) {
-    const { groupby, ast, row_list, session, columnRefMap } = params;
+async function* formGroup(params) {
+    const { groupby, ast, rowIter, session, columnRefMap } = params;
+    let row_list = [];
+    for await (const batch of rowIter) {
+        if (batch.length < 10_000) {
+            row_list.push(...batch);
+        }
+        else {
+            row_list = row_list.concat(batch);
+        }
+    }
     const group_exprs = [];
     for (const column of groupby.columns ?? []) {
-        if (column.type === 'number') {
+        if ('type' in column && column.type === 'number') {
             const index = typeof column.value === 'number' ? column.value : 1;
-            group_exprs.push(ast.columns[index - 1]?.expr);
+            const colExpr = ast.columns[index - 1]?.expr;
+            if (colExpr && isExpressionValue(colExpr)) {
+                group_exprs.push(colExpr);
+            }
         }
         else {
             group_exprs.push(column);
@@ -10903,34 +11208,47 @@ function formGroup(params) {
         let obj = group_map;
         for (let i = 0; i < count; i++) {
             const key = String(key_list[i]);
-            if (i + 1 === count) {
-                obj[key] ??= [];
+            const isLast = i + 1 === count;
+            obj[key] ??= isLast ? [] : {};
+            if (isLast) {
+                // At the last level, obj[key] is an array
+                const arr = obj[key];
+                if (Array.isArray(arr)) {
+                    arr.push(row);
+                }
             }
             else {
-                obj[key] ??= {};
+                // At intermediate levels, obj[key] is an object
+                const next = obj[key];
+                if (!Array.isArray(next)) {
+                    obj = next;
+                }
             }
-            obj = obj[key];
         }
-        obj.push(row);
     }
     const output_list = [];
     _unroll(output_list, group_map);
-    return output_list;
+    yield output_list;
+}
+function isRecord(value) {
+    return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 function _unroll(list, obj) {
     if (Array.isArray(obj)) {
         list.push({ ...obj[0], group: obj });
     }
-    else {
-        const objMap = obj;
-        for (const key in objMap) {
-            _unroll(list, objMap[key]);
+    else if (isRecord(obj)) {
+        for (const key in obj) {
+            _unroll(list, obj[key]);
         }
     }
 }
 function _hasAgg(expr) {
-    if (expr.type === 'aggr_func' ||
-        ('expr' in expr && expr.expr && expr.expr.type === 'aggr_func')) {
+    if (('type' in expr && expr.type === 'aggr_func') ||
+        ('expr' in expr &&
+            expr.expr &&
+            'type' in expr.expr &&
+            expr.expr.type === 'aggr_func')) {
         return true;
     }
     if ('args' in expr &&
@@ -10938,6 +11256,7 @@ function _hasAgg(expr) {
         'value' in expr.args &&
         Array.isArray(expr.args.value)) {
         for (const sub of expr.args.value) {
+            // sub can be ExpressionValue | DataType | ExprList, all of which are in our union type
             if (_hasAgg(sub)) {
                 return true;
             }
@@ -10946,94 +11265,113 @@ function _hasAgg(expr) {
     return false;
 }
 
-function formJoin(params) {
-    const { source_map, from, where, session, columnRefMap } = params;
-    const row_list = [];
-    from.forEach((from_table) => {
-        from_table.is_left = (from_table.join?.indexOf('LEFT') ?? -1) >= 0;
-    });
-    const output_count = _findRows(source_map, from, where, session, row_list, 0, 0, columnRefMap);
-    row_list.length = output_count;
-    return row_list;
+function filterInPlace(arr, callback) {
+    let writeIndex = 0;
+    for (let readIndex = 0; readIndex < arr.length; readIndex++) {
+        if (callback(arr[readIndex], readIndex, arr)) {
+            arr[writeIndex] = arr[readIndex];
+            writeIndex++;
+        }
+    }
+    arr.length = writeIndex;
 }
-function _findRows(source_map, list, where, session, row_list, from_index, start_index, columnRefMap) {
+
+function formJoin(params) {
+    const { sourceMap, from, where, session, columnRefMap } = params;
+    return _findRows(sourceMap, from, where, session, 0, columnRefMap);
+}
+async function* _findRows(sourceMap, list, where, session, from_index, columnRefMap, parentRows = []) {
     const from = list[from_index];
     if (!from) {
         throw new SQLError('Invalid from index');
     }
-    const { on, is_left } = from;
-    const rows = source_map.get(from);
-    const row_count = rows?.length ?? (is_left ? 1 : 0);
-    let output_count = 0;
-    for (let i = 0; i < row_count; i++) {
-        const row_index = start_index + output_count;
-        row_list[row_index] ??= { source: new Map() };
-        const row = row_list[row_index];
-        if (rows) {
-            row.source.set(from, rows[i] ?? null);
-        }
-        for (let j = 0; output_count > 0 && j < from_index; j++) {
-            const prevFrom = list[j];
-            const startRow = row_list[start_index];
-            if (prevFrom && startRow) {
-                const value = startRow.source.get(prevFrom);
-                if (value !== undefined) {
-                    row.source.set(prevFrom, value);
-                }
-            }
-        }
-        let skip = false;
-        if (on) {
-            const result = getValue(on, {
-                session,
-                row,
-                columnRefMap,
-            });
-            if (result.err) {
-                throw new SQLError(result.err);
-            }
-            else if (!result.value) {
-                skip = true;
-            }
-        }
-        if (skip && is_left && output_count === 0 && i + 1 === row_count) {
-            row.source.set(from, null);
-            skip = false;
-        }
-        if (!skip) {
-            const next_from = from_index + 1;
-            if (next_from < list.length) {
-                const result_count = _findRows(source_map, list, where, session, row_list, next_from, start_index + output_count, columnRefMap);
-                output_count += result_count;
-            }
-            else if (where) {
-                const result = getValue(where, { session, row, columnRefMap });
-                if (result.err) {
-                    throw new SQLError(result.err);
-                }
-                else if (result.value) {
-                    output_count++;
-                }
+    const isLeft = 'join' in from && from.join.includes('LEFT');
+    const on = 'on' in from ? from.on : undefined;
+    const rowsIterable = sourceMap.get(from);
+    const baseRows = parentRows.length > 0 ? parentRows : [{ source: new Map() }];
+    if (!rowsIterable && !isLeft) {
+        return;
+    }
+    const asyncIter = rowsIterable ??
+        (async function* () {
+            if (isLeft) {
+                yield [null];
             }
             else {
-                output_count++;
+                yield [];
+            }
+        })();
+    for await (const batch of asyncIter) {
+        const currentBatch = batch.length > 0 ? batch : isLeft ? [null] : [];
+        const amplifiedRows = [];
+        for (const parentRow of baseRows) {
+            const matchingRows = [];
+            for (const rowData of currentBatch) {
+                const row = { source: new Map(parentRow.source) };
+                row.source.set(from, rowData);
+                let skip = false;
+                if (on) {
+                    const result = getValue(on, { session, row, columnRefMap });
+                    if (result.err) {
+                        throw new SQLError(result.err);
+                    }
+                    if (!result.value) {
+                        skip = true;
+                    }
+                }
+                if (!skip) {
+                    matchingRows.push(row);
+                }
+            }
+            if (isLeft && matchingRows.length === 0) {
+                const row = { source: new Map(parentRow.source) };
+                row.source.set(from, null);
+                amplifiedRows.push(row);
+            }
+            else {
+                amplifiedRows.push(...matchingRows);
+            }
+        }
+        if (from_index + 1 === list.length) {
+            if (where) {
+                filterInPlace(amplifiedRows, (row) => getValue(where, { session, row, columnRefMap }).value);
+            }
+            if (amplifiedRows.length > 0) {
+                yield amplifiedRows;
+            }
+        }
+        else {
+            for await (const nextBatch of _findRows(sourceMap, list, where, session, from_index + 1, columnRefMap, amplifiedRows)) {
+                yield nextBatch;
             }
         }
     }
-    return output_count;
 }
 
-function sort(row_list, orderby, state) {
-    row_list.sort(_sort.bind(null, orderby, state));
+async function* sort(iter, orderby, state) {
+    let result_list = [];
+    for await (const batch of iter) {
+        if (batch.length < 10_000) {
+            result_list.push(...batch);
+        }
+        else {
+            result_list = result_list.concat(batch);
+        }
+    }
+    result_list.sort(_sort.bind(null, orderby, state));
+    yield result_list;
 }
 function _sort(orderby, state, a, b) {
     for (const order of orderby) {
         const { expr } = order;
         const func = order.type !== 'DESC' ? _asc : _desc;
-        const exprObj = expr;
-        if (exprObj.type === 'number') {
-            const index = typeof exprObj.value === 'number' ? exprObj.value - 1 : 0;
-            const result = func(a.result[index]?.value, b.result[index]?.value, state.columns?.[index]);
+        if ('type' in expr &&
+            expr.type === 'number' &&
+            'value' in expr &&
+            typeof expr.value === 'number') {
+            const index = expr.value - 1;
+            const result = func(a.result[index]?.value, b.result[index]?.value, a.result[index]?.type //state.columns?.[index]
+            );
             if (result !== 0) {
                 return result;
             }
@@ -11066,6 +11404,18 @@ function _asc(a, b, column) {
     else if (typeof a === 'number' && typeof b === 'number') {
         return a - b;
     }
+    else if (typeof a === 'bigint' && typeof b === 'bigint') {
+        const delta = a - b;
+        if (delta === 0n) {
+            return 0;
+        }
+        else if (delta > 0) {
+            return 1;
+        }
+        else {
+            return -1;
+        }
+    }
     else if ((typeof column === 'object' && column.type === exports.Types.NEWDECIMAL) ||
         column === 'number') {
         return _convertNum(a) - _convertNum(b);
@@ -11081,31 +11431,44 @@ function _desc(a, b, column) {
     return _asc(b, a, column);
 }
 function _convertNum(value) {
-    let ret = value;
     if (value === '') {
-        ret = 0;
+        return 0;
     }
     else if (typeof value === 'string') {
-        ret = parseFloat(value);
-        if (isNaN(ret)) {
-            ret = 0;
-        }
+        const ret = parseFloat(value);
+        return isNaN(ret) ? 0 : ret;
     }
-    return ret;
+    else if (typeof value === 'number') {
+        return value;
+    }
+    return 0;
 }
 
-function isBaseFrom$2(from) {
+function _isBaseFrom(from) {
     return 'table' in from && typeof from.table === 'string';
+}
+function _isBaseFromList(list) {
+    for (const from of list) {
+        if (!_isBaseFrom(from)) {
+            return false;
+        }
+    }
+    return true;
+}
+function _isColumnRef(expr) {
+    return 'type' in expr && expr.type === 'column_ref';
 }
 async function query$7(params) {
     const { rows, columns } = await internalQuery(params);
-    for (const row of rows) {
-        // eslint-disable-next-line @typescript-eslint/no-for-in-array
-        for (const key in row) {
-            row[key] = row[key]?.value;
+    const transformedRows = rows.map((row) => {
+        const newRow = [];
+        for (let i = 0; i < row.length; i++) {
+            newRow[i] = row[i]?.value;
         }
-    }
-    return { rows: rows, columns };
+        return newRow;
+    });
+    //logger.inspect("transformedRows:", transformedRows);
+    return { rows: transformedRows, columns };
 }
 async function internalQuery(params) {
     const { ast, session, dynamodb } = params;
@@ -11120,94 +11483,100 @@ async function internalQuery(params) {
         columnRefMap = requestInfo.columnRefMap;
     }
     const from = ast.type === 'update' ? ast.table : ast.from;
-    let source_map = new Map();
-    let column_map = new Map();
-    if (from && Array.isArray(from) && from.length > 0) {
-        const first = from[0];
-        if (!first || !isBaseFrom$2(first)) {
+    const sourceMap = new Map();
+    const columnMap = new Map();
+    if (Array.isArray(from) && from[0]) {
+        if (!_isBaseFromList(from)) {
             throw new SQLError('Invalid from clause');
         }
-        const db = first.db;
-        const table = first.table;
-        const engine = getEngine(db ?? undefined, table, session);
-        const opts = {
-            session,
-            dynamodb,
-            list: from,
-            where: ast.where,
-            requestSets,
-            requestAll,
-            columnRefMap,
-        };
-        const result = await engine.getRowList(opts);
-        source_map = result.source_map;
-        column_map = result.column_map;
+        const list = from.map((item) => ({
+            database: item.db,
+            table: item.table,
+            item,
+        }));
+        const groups = makeEngineGroups(session, list);
+        const tasks = groups.map(async (group) => {
+            const opts = {
+                session,
+                dynamodb,
+                list: group.list.map((f) => f.item),
+                where: ast.where,
+                requestSets,
+                requestAll,
+                columnRefMap,
+            };
+            const result = await group.engine.getRowList(opts);
+            for (const [f, item] of result.sourceMap) {
+                sourceMap.set(f, item);
+            }
+            for (const [f, item] of result.columnMap) {
+                columnMap.set(f, item);
+            }
+        });
+        await Promise.all(tasks);
     }
     return _evaluateReturn({
         ...params,
-        source_map,
-        column_map,
+        sourceMap,
+        columnMap,
         requestSets,
         columnRefMap,
     });
 }
 async function _evaluateReturn(params) {
-    const { session, source_map, ast, columnRefMap } = params;
-    const query_columns = ast.type === 'select'
+    const { session, sourceMap, ast, columnRefMap } = params;
+    const queryColumns = ast.type === 'select'
         ? _expandStarColumns({ ...params, ast, columnRefMap })
         : [];
     const where = ast.where;
     const groupby = ast.type === 'select' ? ast.groupby : undefined;
     const from = ast.type === 'update' ? ast.table : ast.from;
-    let row_list = [];
-    let sleep_ms = 0;
-    if (from && Array.isArray(from)) {
-        row_list = formJoin({ source_map, from, where, session, columnRefMap });
-    }
-    else {
-        row_list = [{ source: new Map() }];
-    }
-    let grouped_list = row_list;
+    const rowIter = from && Array.isArray(from)
+        ? formJoin({ sourceMap, from, where, session, columnRefMap })
+        : _listToItetator([{ source: new Map() }]);
+    let group_iter;
     if (groupby?.columns && ast.type === 'select') {
-        grouped_list = formGroup({ groupby, ast, row_list, session, columnRefMap });
+        group_iter = formGroup({ groupby, ast, rowIter, session, columnRefMap });
     }
     else if (ast.type === 'select' && hasAggregate(ast)) {
-        grouped_list = formImplicitGroup({ row_list});
+        group_iter = formImplicitGroup({ rowIter});
     }
-    const result_list = [];
-    for (const row of grouped_list) {
-        const output_row = [];
-        for (const column of query_columns) {
-            const result = getValue(column.expr, {
-                session,
-                row,
-                columnRefMap,
-            });
-            if (result.err) {
-                throw new SQLError(result.err);
-            }
-            output_row.push(result);
-            if (result.type !== column.result_type) {
-                column.result_type = _unionType(column.result_type, result.type);
-            }
-            column.result_name ??= result.name;
-            if (result.value === null) {
-                column.result_nullable = true;
-            }
-            if (result.sleep_ms) {
-                sleep_ms = result.sleep_ms;
-            }
-        }
-        result_list.push({ ...row, result: output_row });
+    else {
+        group_iter = rowIter;
     }
+    let result_iter = _makeResults({
+        iter: group_iter,
+        queryColumns,
+        session,
+        columnRefMap,
+    });
     const columns = [];
-    for (const column of query_columns) {
+    if (ast.orderby) {
+        result_iter = sort(result_iter, ast.orderby, {
+            session,
+            columns,
+            columnRefMap,
+        });
+    }
+    if (ast.limit) {
+        result_iter = _makeLimit(result_iter, ast.limit);
+    }
+    let row_list = [];
+    for await (const batch of result_iter) {
+        if (batch.length < 10_000) {
+            row_list.push(...batch);
+        }
+        else {
+            row_list = row_list.concat(batch);
+        }
+    }
+    for (const column of queryColumns) {
         const column_type = convertType(column.result_type, column.result_nullable);
         // Get table info from columnRefMap if this is a column_ref
         let fromInfo = null;
-        if (column.expr.type === 'column_ref') {
+        if (_isColumnRef(column.expr)) {
             const refInfo = columnRefMap.get(column.expr);
-            if (refInfo?.from && isBaseFrom$2(refInfo.from)) {
+            if (refInfo?.from && _isBaseFrom(refInfo.from)) {
                 fromInfo = refInfo.from;
             }
         }
@@ -11218,52 +11587,26 @@ async function _evaluateReturn(params) {
         column_type.table = fromInfo?.as ?? column_type.orgTable;
         columns.push(column_type);
     }
-    if (ast.orderby) {
-        sort(result_list, ast.orderby, { session, columns, columnRefMap });
-    }
-    let start = 0;
-    let end = result_list.length;
-    if (ast.limit) {
-        if (ast.limit.seperator === 'offset') {
-            const offsetValue = ast.limit.value[1];
-            const limitValue = ast.limit.value[0];
-            start = offsetValue ? offsetValue.value : 0;
-            end = Math.min(end, start + (limitValue ? limitValue.value : 0));
-        }
-        else if (ast.limit.value.length > 1) {
-            const offsetValue = ast.limit.value[0];
-            const limitValue = ast.limit.value[1];
-            start = offsetValue ? offsetValue.value : 0;
-            end = Math.min(end, start + (limitValue ? limitValue.value : 0));
-        }
-        else {
-            const limitValue = ast.limit.value[0];
-            end = Math.min(end, limitValue ? limitValue.value : 0);
-        }
-    }
-    const final_list = result_list.slice(start, end);
-    const rows = final_list.map((row) => row.result);
-    if (sleep_ms) {
-        await promises.setTimeout(sleep_ms);
-    }
-    return { rows, columns, row_list: final_list };
+    const rows = row_list.map((row) => row.result);
+    return { rows, columns, row_list };
 }
 function _expandStarColumns(params) {
-    const { ast, column_map, requestSets, columnRefMap } = params;
+    const { ast, columnMap, requestSets, columnRefMap } = params;
     const ret = [];
     for (const column of ast.columns ?? []) {
-        if (column?.expr?.type === 'column_ref' && column.expr.column === '*') {
-            const { db, table } = column.expr;
+        if ('type' in column.expr &&
+            column.expr.type === 'column_ref' &&
+            column.expr.column === '*') {
+            const colExpr = column.expr;
+            const table = colExpr.table;
             const from_list = Array.isArray(ast.from) ? ast.from : [];
             for (const from of from_list) {
-                if (!isBaseFrom$2(from)) {
+                if (!_isBaseFrom(from)) {
                     continue;
                 }
-                if ((!db && !table) ||
-                    (db && from.db === db && from.table === table && !from.as) ||
-                    (!db && from.table === table && !from.as) ||
-                    (!db && from.as === table)) {
-                    const column_list = column_map.get(from);
+                // Match if no table specified, or table matches from.table or from.as
+                if (!table || (from.table === table && !from.as) || from.as === table) {
+                    const column_list = columnMap.get(from);
                     if (column_list && !column_list.length) {
                         const requestSet = requestSets.get(from);
                         requestSet?.forEach((name) => column_list.push(name));
@@ -11283,10 +11626,90 @@ function _expandStarColumns(params) {
             }
         }
         else {
-            ret.push(column);
+            // Star and Assign are handled elsewhere
+            if ('expr' in column && 'as' in column) {
+                ret.push(column);
+            }
         }
     }
     return ret;
+}
+async function* _listToItetator(list) {
+    yield list;
+}
+async function* _makeResults(params) {
+    const { iter, queryColumns, session, columnRefMap, signal } = params;
+    for await (const batch of iter) {
+        const result_list = [];
+        for (const row of batch) {
+            const output_row = [];
+            for (const column of queryColumns) {
+                const result = getValue(column.expr, {
+                    session,
+                    row,
+                    columnRefMap,
+                });
+                if (result.err) {
+                    throw new SQLError(result.err);
+                }
+                output_row.push(result);
+                if (result.type !== column.result_type) {
+                    column.result_type = _unionType(column.result_type, result.type);
+                }
+                column.result_name ??= result.name;
+                if (result.value === null) {
+                    column.result_nullable = true;
+                }
+                if (result.sleep_ms) {
+                    await promises.setTimeout(result.sleep_ms, undefined, { signal });
+                }
+            }
+            result_list.push({ ...row, result: output_row });
+        }
+        yield result_list;
+    }
+}
+async function* _makeLimit(iter, limit) {
+    let skip_count = 0;
+    let send_count = 0;
+    if (limit.seperator === 'offset') {
+        const offsetValue = limit.value[1];
+        const limitValue = limit.value[0];
+        skip_count = offsetValue ? offsetValue.value : 0;
+        send_count = limitValue ? limitValue.value : 0;
+    }
+    else if (limit.value.length > 1) {
+        const offsetValue = limit.value[0];
+        const limitValue = limit.value[1];
+        skip_count = offsetValue ? offsetValue.value : 0;
+        send_count = limitValue ? limitValue.value : 0;
+    }
+    else {
+        const limitValue = limit.value[0];
+        send_count = limitValue ? limitValue.value : 0;
+    }
+    for await (const batch of iter) {
+        if (skip_count >= batch.length) {
+            skip_count -= batch.length;
+        }
+        else {
+            if (skip_count > 0) {
+                batch.splice(0, skip_count);
+                skip_count = 0;
+            }
+            if (send_count >= batch.length) {
+                send_count -= batch.length;
+            }
+            else {
+                batch.length = send_count;
+                send_count = 0;
+            }
+            yield batch;
+            if (send_count === 0) {
+                break;
+            }
+        }
+    }
 }
 function _unionType(old_type, new_type) {
     let ret = new_type ?? 'string';
@@ -11300,17 +11723,23 @@ function _unionType(old_type, new_type) {
     return ret;
 }
 
+function isCreateDatabase(ast) {
+    return ast.keyword === 'database';
+}
+function isCreateTable(ast) {
+    return ast.keyword === 'table';
+}
 async function query$6(params) {
     const { ast, session } = params;
     const database = getDatabaseFromTable(ast) ?? session.getCurrentDatabase();
-    if (ast.keyword === 'database') {
-        return await _createDatabase(params);
+    if (isCreateDatabase(ast)) {
+        return await _createDatabase({ ...params, ast });
     }
     else if (!database) {
         throw new SQLError('no_current_database');
     }
-    else if (ast.keyword === 'table') {
-        return await _createTable(params);
+    else if (isCreateTable(ast)) {
+        return await _createTable({ ...params, ast });
     }
     else {
         distExports.logger.error('unsupported create:', ast.keyword);
@@ -11353,24 +11782,18 @@ async function _createTable(params) {
     const column_list = [];
     const primary_key = [];
     for (const def of ast.create_definitions ?? []) {
-        if (def.resource === 'column' &&
-            def.column.type === 'column_ref' &&
-            typeof def.column.column === 'string') {
+        if (def.resource === 'column') {
             const col = { name: def.column.column, type: def.definition.dataType };
             column_list.push(col);
-            const def_key = def;
-            if (def_key.primary_key === 'primary key') {
+            if (def.primary_key === 'primary key') {
                 primary_key.push(col);
             }
         }
         else if (def.resource === 'constraint' &&
             def.constraint_type === 'primary key') {
             for (const sub of def.definition) {
-                if (sub.type === 'column_ref' && typeof sub.column === 'string') {
-                    const type = column_list.find((col) => col.name === sub.column)?.type ??
-                        'string';
-                    primary_key.push({ name: sub.column, type });
-                }
+                const type = column_list.find((col) => col.name === sub.column)?.type ?? 'string';
+                primary_key.push({ name: sub.column, type });
             }
         }
     }
@@ -11388,7 +11811,7 @@ async function _createTable(params) {
                 }
             });
             if (!duplicate_mode) {
-                const keys = primary_key.map(({ name }) => obj[name].value);
+                const keys = primary_key.map(({ name }) => obj[name]?.value);
                 if (!trackFirstSeen(track, keys)) {
                     throw new SQLError({
                         err: 'dup_primary_key_entry',
@@ -11401,7 +11824,7 @@ async function _createTable(params) {
     }
     let table_engine;
     for (const opt of ast.table_options ?? []) {
-        if (opt.keyword === 'engine') {
+        if (opt.keyword === 'engine' && typeof opt.value === 'string') {
             table_engine = opt.value;
         }
     }
@@ -11439,22 +11862,6 @@ async function _createTable(params) {
         return await engine.insertRowList(insertOpts);
     }
     return { affectedRows: 0 };
-}
-
-function makeEngineGroups(session, list) {
-    const ret = [];
-    for (const obj of list) {
-        const { database, table } = obj;
-        const engine = getEngine(database ?? undefined, table, session);
-        const found = ret.find((group) => group.engine === engine);
-        if (found) {
-            found.list.push(obj);
-        }
-        else {
-            ret.push({ engine, list: [obj] });
-        }
-    }
-    return ret;
 }
 
 async function runSelect(params) {
@@ -11500,14 +11907,25 @@ async function runSelect(params) {
         const key_list = keyListMap.get(object) ?? [];
         const collection = new Map();
         for (const row of row_list) {
-            const rowValue = row.source.get(object);
-            const keys = key_list.map((key) => {
-                if (rowValue && typeof rowValue === 'object' && key in rowValue) {
-                    return rowValue[key];
+            const sourceRow = row.source.get(object);
+            let keys;
+            const key0 = key_list[0];
+            if (key0 && sourceRow) {
+                const value0 = sourceRow[key0];
+                if (value0 !== undefined) {
+                    const key1 = key_list[1];
+                    if (key1) {
+                        const value1 = sourceRow[key1];
+                        if (value1 !== undefined && keys) {
+                            keys = [value0, value1];
+                        }
+                    }
+                    else {
+                        keys = [value0];
+                    }
                 }
-                return undefined;
-            });
-            if (!keys.includes(undefined)) {
+            }
+            if (keys) {
                 _addCollection(collection, keys, row);
             }
         }
@@ -11519,22 +11937,26 @@ async function runSelect(params) {
                     result.list.push({ key: [key0, key1], row: value1 });
                 });
             }
-            else {
+            else if (!(value0 instanceof Map)) {
                 result.list.push({ key: [key0], row: value0 });
             }
         });
     }
     return result_list;
 }
+function isTwoElementTuple(keys) {
+    return keys.length > 1;
+}
 function _addCollection(collection, keys, value) {
-    if (keys.length > 1) {
-        let sub_map = collection.get(keys[0]);
+    if (isTwoElementTuple(keys)) {
+        const [key0, key1] = keys;
+        let sub_map = collection.get(key0);
         if (!sub_map) {
             sub_map = new Map();
-            collection.set(keys[0], sub_map);
+            collection.set(key0, sub_map);
         }
         if (sub_map instanceof Map) {
-            sub_map.set(keys[1], value);
+            sub_map.set(key1, value);
         }
     }
     else {
@@ -11597,7 +12019,7 @@ async function _multipleDelete(params) {
     // Get rows to delete
     const result_list = await runSelect(params);
     const from_list = [];
-    for (const object of ast.table) {
+    for (const object of (ast.table ?? [])) {
         const found = result_list.find((result) => result.from === object.from);
         const list = found?.list;
         if (!isBaseFrom$1(object.from)) {
@@ -11626,16 +12048,21 @@ async function _multipleDelete(params) {
 
 async function query$4(params) {
     const { ast, session, dynamodb } = params;
-    if (ast.keyword === 'database') {
-        const dbName = Array.isArray(ast.name)
-            ? String(ast.name[0])
-            : String(ast.name);
+    if (ast.keyword === 'database' || ast.keyword === 'schema') {
+        const dbAst = ast;
+        const dbName = String(dbAst.name);
         await dropDatabase({ ...params, database: dbName });
         return;
     }
     else if (ast.keyword === 'table') {
-        const nameArray = Array.isArray(ast.name) ? ast.name : [ast.name];
-        const firstTable = nameArray[0];
+        const tableAst = ast;
+        if (!Array.isArray(tableAst.name)) {
+            throw new SQLError('invalid_drop_table');
+        }
+        const firstTable = tableAst.name[0];
+        if (!firstTable) {
+            throw new SQLError('invalid_drop_table');
+        }
         const database = ('db' in firstTable ? firstTable.db : null) ??
             session.getCurrentDatabase();
         const table = 'table' in firstTable ? firstTable.table : undefined;
@@ -11780,6 +12207,9 @@ function _jsonParse(obj) {
     }
 }
 
+function isErrorWithDetails(err) {
+    return typeof err === 'object' && err !== null;
+}
 async function query$3(params) {
     const { ast, session } = params;
     const duplicate_mode = ast.type === 'replace'
@@ -11787,8 +12217,11 @@ async function query$3(params) {
         : ast.prefix === 'ignore into'
             ? 'ignore'
             : null;
-    const database = ast.table?.[0]?.db ?? session.getCurrentDatabase();
-    const table = ast.table?.[0]?.table;
+    const tableArray = Array.isArray(ast.table) ? ast.table : [ast.table];
+    const firstTable = tableArray[0];
+    const database = (firstTable && 'db' in firstTable ? firstTable.db : null) ??
+        session.getCurrentDatabase();
+    const table = firstTable && 'table' in firstTable ? firstTable.table : undefined;
     if (!database) {
         throw new SQLError('no_current_database');
     }
@@ -11799,7 +12232,9 @@ async function query$3(params) {
 }
 async function _runInsert(params) {
     const { ast, session, engine, dynamodb, duplicate_mode } = params;
-    const table = ast.table?.[0]?.table;
+    const tableArray = Array.isArray(ast.table) ? ast.table : [ast.table];
+    const firstTable = tableArray[0];
+    const table = firstTable && 'table' in firstTable ? firstTable.table : undefined;
     let list;
     // Build the list of rows to insert
     if (ast.set && ast.set.length > 0) {
@@ -11822,7 +12257,10 @@ async function _runInsert(params) {
         list = rows.map((row) => {
             const obj = {};
             ast.columns?.forEach((name, i) => {
-                obj[name] = row[i];
+                const value = row[i];
+                if (value !== undefined) {
+                    obj[name] = value;
+                }
             });
             return obj;
         });
@@ -11835,9 +12273,7 @@ async function _runInsert(params) {
                 const obj = {};
                 if (ast.columns && row.value.length === ast.columns.length) {
                     ast.columns.forEach((name, j) => {
-                        const expr_result = getValue(row.value[j], {
-                            session,
-                        });
+                        const expr_result = getValue(row.value[j], { session });
                         if (expr_result.err) {
                             throw new SQLError(expr_result.err);
                         }
@@ -11856,6 +12292,9 @@ async function _runInsert(params) {
         throw new SQLError('unsupported');
     }
     // Insert the rows
+    if (!table) {
+        throw new SQLError('bad_table_name');
+    }
     if (list.length > 0) {
         const opts = {
             dynamodb,
@@ -11869,15 +12308,17 @@ async function _runInsert(params) {
             return await engine.insertRowList(opts);
         }
         catch (err) {
-            const error = err;
-            const err_str = String(error.message ?? '').toLowerCase();
-            if (error.message === 'resource_not_found' ||
-                error.err === 'resource_not_found' ||
-                error.name === 'ResourceNotFoundException' ||
+            if (!isErrorWithDetails(err)) {
+                throw err;
+            }
+            const err_str = String(err.message ?? '').toLowerCase();
+            if (err.message === 'resource_not_found' ||
+                err.err === 'resource_not_found' ||
+                err.name === 'ResourceNotFoundException' ||
                 err_str.includes('resource not found')) {
                 throw new SQLError({
                     err: 'table_not_found',
-                    args: error.args ?? [table],
+                    args: err.args ?? [table],
                 });
             }
             throw err;
@@ -11895,6 +12336,9 @@ function _checkAst(ast) {
     }
 }
 
+function isSelectSubquery(value) {
+    return 'ast' in value;
+}
 async function query$2(params) {
     const { ast } = params;
     const expr = ast.expr;
@@ -11906,7 +12350,7 @@ async function _handleAssignment(expr, params) {
     const { session } = params;
     const { left, right } = expr;
     let result;
-    if ('ast' in right) {
+    if (isSelectSubquery(right)) {
         const { rows } = await internalQuery({
             ...params,
             ast: right.ast,
@@ -12046,12 +12490,11 @@ async function _multipleUpdate(params) {
         const updateList = [];
         list?.forEach(({ key, row }) => {
             const set_list = ast.set
-                .filter((set_item) => setListMap.get(set_item) === object)
-                .map((set_item) => {
-                const item = set_item;
+                .filter((item) => setListMap.get(item) === object)
+                .map((item) => {
                 const expr_result = getValue(item.value, {
                     session,
-                    row: row,
+                    row,
                     columnRefMap,
                 });
                 if (expr_result.err) {
@@ -12126,6 +12569,7 @@ class Query extends node_events.EventEmitter {
         }
         catch (e) {
             this.emit('error', e);
+            this.emit('end');
             throw e;
         }
     }
@@ -12155,9 +12599,15 @@ class Query extends node_events.EventEmitter {
                 schema_list.push(columns);
             }
             if (list.length === 1) {
+                this._emitResult(schema_list[0], result_list[0]);
                 return [result_list[0], schema_list[0]];
             }
             else {
+                for (let i = 0; i < list.length; i++) {
+                    const schema = schema_list[i];
+                    const results = result_list[i];
+                    this._emitResult(schema, results);
+                }
                 return [result_list, schema_list];
             }
         }
@@ -12166,6 +12616,23 @@ class Query extends node_events.EventEmitter {
             sql_err.sql = this.sql;
             sql_err.index = result_list.length;
             throw sql_err;
+        }
+    }
+    _emitResult(schema, results) {
+        if (schema) {
+            this.emit('fields', schema);
+        }
+        if (results) {
+            if (Array.isArray(results)) {
+                if (this.listenerCount('result') > 0) {
+                    for (const row in results) {
+                        this.emit('result', row);
+                    }
+                }
+            }
+            else {
+                this.emit('result', results);
+            }
         }
     }
     async _singleQuery(ast) {
@@ -12248,8 +12715,11 @@ class Query extends node_events.EventEmitter {
     }
     _transformResultArray(result, columns) {
         for (const row of result) {
-            for (let i = 0; i < columns.length; i++) {
-                row[i] = this._convertCell(row[i], columns[i]);
+            for (let i = 0; i < columns.length && i < row.length; i++) {
+                const column = columns[i];
+                if (column) {
+                    row[i] = this._convertCell(row[i], column);
+                }
             }
         }
         return result;
@@ -12494,10 +12964,7 @@ class Session extends SQLMode {
             done?.(new SQLError('released'));
             return undefined;
         }
-        const opts = typeof params === 'object' ? { ...params } : { sql: '' };
-        if (typeof params === 'string') {
-            opts.sql = params;
-        }
+        const opts = typeof params === 'string' ? { sql: params } : { ...params };
         if (typeof values === 'function') {
             done = values;
         }
@@ -12506,6 +12973,9 @@ class Session extends SQLMode {
         }
         if (opts.values !== undefined) {
             opts.sql = SqlString__namespace.format(opts.sql, opts.values);
+        }
+        if (opts.collectResults === undefined) {
+            opts.collectResults = Boolean(done);
         }
         const query = new Query({ ...opts, session: this });
         void this._run(query, done);
@@ -12558,11 +13028,13 @@ class Pool extends node_events.EventEmitter {
     getConnection(done) {
         done(null, createSession$1(this.config));
     }
-    query(opts, values, done) {
+    query(params, values, done) {
         if (typeof values === 'function') {
             done = values;
             values = undefined;
         }
+        const opts = typeof params === 'string' ? { sql: params } : { ...params };
+        opts.collectResults = Boolean(done);
         const session = createSession$1(this.config);
         return session.query(opts, values, (error, results, fields) => {
             session.release();

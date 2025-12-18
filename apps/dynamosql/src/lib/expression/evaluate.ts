@@ -386,10 +386,13 @@ export function getValue(
     result.name = columnName;
     const refInfo = state.columnRefMap?.get(expr);
     if (row && refInfo?.resultIndex !== undefined && refInfo.resultIndex >= 0) {
-      const output_result =
-        'result' in row ? row.result[refInfo.resultIndex] : undefined;
-      result.value = output_result?.value;
-      result.type = output_result?.type ?? 'string';
+      const output_result = row.result
+        ? row.result[refInfo.resultIndex]
+        : undefined;
+      if (output_result) {
+        result.value = output_result.value;
+        result.type = output_result.type;
+      }
     } else if (row) {
       const from = refInfo?.from;
       let cell: EngineValue | null | undefined;

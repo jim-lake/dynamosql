@@ -67,23 +67,20 @@ interface QueryColumn {
   db?: string;
 }
 export interface SelectResult {
-  rows: unknown[][];
+  resultIter: AsyncIterable<unknown[][]>;
   columns: FieldInfo[];
 }
-
 export async function query(
   params: HandlerParams<Select>
 ): Promise<SelectResult> {
   const { rows, columns } = await internalQuery(params);
-  const transformedRows = rows.map((row) => {
-    const newRow: unknown[] = [];
-    for (let i = 0; i < row.length; i++) {
-      newRow[i] = row[i]?.value;
+  async function* _makeIter() {
+    for (const row of rows) {
+      const result_row = row.map((cell) => cell.value);
+      yield [result_row];
     }
-    return newRow;
-  });
-  //logger.inspect("transformedRows:", transformedRows);
-  return { rows: transformedRows, columns };
+  }
+  return { resultIter: _makeIter(), columns };
 }
 export interface InternalQueryParams {
   ast: SelectModifyAST;
@@ -179,9 +176,9 @@ async function _evaluateReturn(
   const rowIter =
     from && Array.isArray(from)
       ? formJoin({ sourceMap, from, where, session, columnRefMap })
-      : _listToItetator([{ source: new Map() }]);
+      : _listToItetator([{ source: new Map(), result: null, group: null }]);
 
-  let group_iter: AsyncIterable<SourceRow[] | SourceRowGroup[]>;
+  let group_iter: AsyncIterable<SourceRow[]>;
 
   if (groupby?.columns && ast.type === 'select') {
     group_iter = formGroup({ groupby, ast, rowIter, session, columnRefMap });
@@ -297,11 +294,11 @@ function _expandStarColumns(params: ExpandStarColumnsParams): QueryColumn[] {
   }
   return ret;
 }
-async function* _listToItetator<T>(list: T[]) {
+async function* _listToItetator(list: SourceRow[]): AsyncIterable<SourceRow[]> {
   yield list;
 }
 interface MakeResultsParams {
-  iter: AsyncIterable<SourceRowGroup[] | SourceRow[]>;
+  iter: AsyncIterable<SourceRow[]>;
   queryColumns: QueryColumn[];
   session: Session;
   columnRefMap: Map<ColumnRef, ColumnRefInfo>;
@@ -336,15 +333,22 @@ async function* _makeResults(
           await setTimeout(result.sleep_ms, undefined, { signal });
         }
       }
-      result_list.push({ ...row, result: output_row });
+      _makeResult(row, output_row);
+      result_list.push(row);
     }
     yield result_list;
   }
 }
+function _makeResult(
+  row: SourceRow | SourceRowGroup,
+  result: EvaluationResult[]
+): asserts row is SourceRowResult {
+  row.result = result;
+}
 async function* _makeLimit(
   iter: AsyncIterable<SourceRowResult[]>,
   limit: Limit
-) {
+): AsyncIterable<SourceRowResult[]> {
   let skip_count = 0;
   let send_count = 0;
   if (limit.seperator === 'offset') {

@@ -4,7 +4,7 @@ import * as SqlString from 'sqlstring';
 
 import * as Session from './session';
 
-import type { SessionConfig } from './session';
+import type { QueryParams, SessionConfig } from './session';
 import type {
   Query,
   PoolConnection,
@@ -40,7 +40,7 @@ export class Pool extends EventEmitter {
   }
 
   query(
-    opts: string | QueryOptions,
+    params: string | QueryOptions,
     values?: unknown,
     done?: QueryCallback
   ): Query {
@@ -48,6 +48,9 @@ export class Pool extends EventEmitter {
       done = values as QueryCallback;
       values = undefined;
     }
+    const opts: QueryParams =
+      typeof params === 'string' ? { sql: params } : { ...params };
+    opts.collectResults = Boolean(done);
     const session = Session.createSession(this.config);
     return session.query(
       opts,
