@@ -1,4 +1,5 @@
 import { SQLError } from '../../error';
+import { drainBoth } from '../../tools/drain_both';
 import { filterInPlace } from '../../tools/filter_in_place';
 import { getValue } from '../expression';
 
@@ -22,113 +23,162 @@ export interface FormJoinParams {
   session: Session;
   columnRefMap: Map<ColumnRef, ColumnRefInfo>;
 }
-export function formJoin(params: FormJoinParams): AsyncIterable<SourceRow[]> {
+export async function* formJoin(
+  params: FormJoinParams
+): AsyncIterableIterator<SourceRow[]> {
   const { sourceMap, from, where, session, columnRefMap } = params;
-
-  return _findRows(sourceMap, from, where, session, 0, columnRefMap);
-}
-async function* _findRows(
-  sourceMap: Map<From, AsyncIterable<Row[]>>,
-  list: From[],
-  where: Binary | Function | Unary | FulltextSearch | ColumnRef | null,
-  session: Session,
-  from_index: number,
-  columnRefMap: Map<ColumnRef, ColumnRefInfo>,
-  parentRows: SourceRow[] = []
-): AsyncIterable<SourceRow[]> {
-  const from = list[from_index];
-  if (!from) {
-    throw new SQLError('Invalid from index');
-  }
-
-  const isLeft = 'join' in from && from.join.includes('LEFT');
-  const on = 'on' in from ? from.on : undefined;
-  const rowsIterable = sourceMap.get(from);
-
-  const baseRows: SourceRow[] =
-    parentRows.length > 0
-      ? parentRows
-      : [{ source: new Map(), result: null, group: null }];
-
-  if (!rowsIterable && !isLeft) {
+  const first = from[0];
+  if (!first) {
     return;
   }
+  let upstream = _firstRowIter(first, sourceMap);
+  for (let i = 1; i < from.length; i++) {
+    upstream = _join(
+      upstream,
+      from[i] as From,
+      sourceMap,
+      session,
+      columnRefMap
+    );
+  }
 
-  const asyncIter =
-    rowsIterable ??
-    (async function* () {
-      if (isLeft) {
-        yield [null];
-      } else {
-        yield [];
-      }
-    })();
-
-  for await (const batch of asyncIter) {
-    const currentBatch = batch.length > 0 ? batch : isLeft ? [null] : [];
-    const amplifiedRows: SourceRow[] = [];
-    for (const parentRow of baseRows) {
-      const matchingRows: SourceRow[] = [];
-
-      for (const rowData of currentBatch) {
-        const row: SourceRow = {
-          source: new Map(parentRow.source),
-          result: null,
-          group: null,
-        };
-        row.source.set(from, rowData);
-
-        let skip = false;
-        if (on) {
-          const result = getValue(on, { session, row, columnRefMap });
+  for await (const batch of upstream) {
+    if (batch.length > 0) {
+      if (where) {
+        filterInPlace(batch, (row) => {
+          const result = getValue(where, { session, row, columnRefMap });
           if (result.err) {
             throw new SQLError(result.err);
           }
-          if (!result.value) {
-            skip = true;
-          }
-        }
-
-        if (!skip) {
-          matchingRows.push(row);
-        }
+          return result.value;
+        });
       }
 
-      if (isLeft && matchingRows.length === 0) {
-        const row: SourceRow = {
-          source: new Map(parentRow.source),
-          result: null,
-          group: null,
-        };
-        row.source.set(from, null);
-        amplifiedRows.push(row);
-      } else {
-        amplifiedRows.push(...matchingRows);
-      }
-    }
-
-    if (from_index + 1 === list.length) {
-      if (where) {
-        filterInPlace(
-          amplifiedRows,
-          (row) => getValue(where, { session, row, columnRefMap }).value
-        );
-      }
-      if (amplifiedRows.length > 0) {
-        yield amplifiedRows;
-      }
-    } else {
-      for await (const nextBatch of _findRows(
-        sourceMap,
-        list,
-        where,
-        session,
-        from_index + 1,
-        columnRefMap,
-        amplifiedRows
-      )) {
-        yield nextBatch;
+      if (batch.length > 0) {
+        yield batch;
       }
     }
   }
+}
+async function* _firstRowIter(
+  from: From,
+  sourceMap: Map<From, AsyncIterable<Row[]>>
+): AsyncIterable<SourceRow[]> {
+  const iter = sourceMap.get(from);
+  if (!iter) {
+    throw new Error('bad from');
+  }
+  for await (const batch of iter) {
+    const rows = batch.map((row) => {
+      const source = new Map();
+      source.set(from, row);
+      return { source, result: null, group: null };
+    });
+    if (rows.length > 0) {
+      yield rows;
+    }
+  }
+}
+function _join(
+  upstream: AsyncIterable<SourceRow[]>,
+  from: From,
+  sourceMap: Map<From, AsyncIterable<Row[]>>,
+  session: Session,
+  columnRefMap: Map<ColumnRef, ColumnRefInfo>
+): AsyncIterable<SourceRow[]> {
+  const isLeft = 'join' in from && from.join.includes('LEFT');
+  const on = 'on' in from ? from.on : undefined;
+  const childIter =
+    sourceMap.get(from) ??
+    (async function* () {
+      yield [];
+    })();
+
+  let parentRows: SourceRow[] = [];
+  let childRows: Row[] = [];
+
+  return drainBoth(
+    upstream,
+    childIter,
+    (parentBatch, childBatch, parentDone, childDone) => {
+      const outputs: SourceRow[] = [];
+
+      function _handleParentChild(parent: SourceRow, child: Row) {
+        if (on) {
+          const source = new Map(parent.source);
+          source.set(from, child);
+          const row = { source, result: null, group: null };
+          const result = getValue(on, { session, row, columnRefMap });
+          if (result.err) {
+            throw new SQLError(result.err);
+          } else if (result.value) {
+            outputs.push(row);
+            // sent flag
+            parent.source.set(from, child);
+          }
+        } else {
+          if (parent.source.has(from)) {
+            // mutate amplify
+            const source = new Map(parent.source);
+            source.set(from, child);
+            outputs.push({ source, result: null, group: null });
+          } else {
+            // sent flag
+            parent.source.set(from, child);
+            outputs.push(parent);
+          }
+        }
+      }
+
+      if (parentBatch && childRows.length === 0) {
+        // we handle the starting condition on incoming children
+        if (parentRows.length === 0) {
+          parentRows = parentBatch;
+        } else {
+          if (parentBatch.length > 10_000) {
+            parentRows = parentRows.concat(parentBatch);
+          } else {
+            parentRows.push(...parentBatch);
+          }
+        }
+      } else if (parentBatch) {
+        // check existing children against batch
+        for (const parent of parentBatch) {
+          parentRows.push(parent);
+          for (const child of childRows) {
+            _handleParentChild(parent, child);
+          }
+        }
+      }
+
+      if (childBatch && parentRows.length === 0) {
+        // other starting condition, will handle on incoming parents
+        if (childBatch.length > 10_000) {
+          childRows = childRows.concat(childBatch);
+        } else {
+          childRows.push(...childBatch);
+        }
+      } else if (childBatch) {
+        // iterate over all seen parents
+        for (const child of childBatch) {
+          childRows.push(child);
+          for (const parent of parentRows) {
+            _handleParentChild(parent, child);
+          }
+        }
+      }
+
+      if (childDone && isLeft && parentRows.length > 0) {
+        for (const parent of parentRows) {
+          if (!parent.source.has(from)) {
+            parent.source.set(from, null);
+            outputs.push(parent);
+          }
+        }
+        // all sent so dont keep track
+        parentRows = [];
+      }
+      return outputs.length > 0 ? outputs : undefined;
+    }
+  );
 }

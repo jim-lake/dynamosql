@@ -73,14 +73,31 @@ export interface SelectResult {
 export async function query(
   params: HandlerParams<Select>
 ): Promise<SelectResult> {
-  const { rows, columns } = await internalQuery(params);
-  async function* _makeIter() {
-    for (const row of rows) {
-      const result_row = row.map((cell) => cell.value);
-      yield [result_row];
+  const { resultIter, queryColumns, columnRefMap } = await _iterQuery(params);
+  // we pull the first batch to get columns calced right
+  let first_batch: SourceRowResult[] | undefined;
+  while (first_batch === undefined) {
+    const iter_result = await resultIter.next();
+    if (iter_result.done) {
+      break;
+    }
+    if (iter_result.value.length > 0) {
+      first_batch = iter_result.value;
+    }
+  }
+  const columns = _calcColumns(queryColumns, columnRefMap);
+  async function* _makeIter(): AsyncIterable<unknown[][]> {
+    if (first_batch) {
+      yield _transformBatch(first_batch);
+    }
+    for await (const batch of resultIter) {
+      yield _transformBatch(batch);
     }
   }
   return { resultIter: _makeIter(), columns };
+}
+function _transformBatch(batch: SourceRowResult[]): unknown[][] {
+  return batch.map((row) => row.result.map((cell) => cell.value));
 }
 export interface InternalQueryParams {
   ast: SelectModifyAST;
@@ -97,6 +114,28 @@ export interface InternalQueryResult {
 export async function internalQuery(
   params: InternalQueryParams
 ): Promise<InternalQueryResult> {
+  const { resultIter, queryColumns, columnRefMap } = await _iterQuery(params);
+
+  let row_list: SourceRowResult[] = [];
+  for await (const batch of resultIter) {
+    if (batch.length < 10_000) {
+      row_list.push(...batch);
+    } else {
+      row_list = row_list.concat(batch);
+    }
+  }
+  const columns = _calcColumns(queryColumns, columnRefMap);
+  const rows = row_list.map((row) => row.result);
+  return { rows, columns, row_list };
+}
+interface IterQueryResults {
+  resultIter: AsyncIterableIterator<SourceRowResult[]>;
+  queryColumns: QueryColumn[];
+  columnRefMap: Map<ColumnRef, ColumnRefInfo>;
+}
+async function _iterQuery(
+  params: InternalQueryParams
+): Promise<IterQueryResults> {
   const { ast, session, dynamodb } = params;
 
   const current_database = session.getCurrentDatabase();
@@ -162,7 +201,7 @@ interface EvaluateReturnParams {
 }
 async function _evaluateReturn(
   params: EvaluateReturnParams
-): Promise<InternalQueryResult> {
+): Promise<IterQueryResults> {
   const { session, sourceMap, ast, columnRefMap } = params;
   const queryColumns =
     ast.type === 'select'
@@ -188,7 +227,7 @@ async function _evaluateReturn(
     group_iter = rowIter;
   }
 
-  let result_iter = _makeResults({
+  let resultIter = _makeResults({
     iter: group_iter,
     queryColumns,
     session,
@@ -197,48 +236,17 @@ async function _evaluateReturn(
 
   const columns: FieldInfo[] = [];
   if (ast.orderby) {
-    result_iter = sort(result_iter, ast.orderby, {
+    resultIter = sort(resultIter, ast.orderby, {
       session,
       columns,
       columnRefMap,
     });
   }
   if (ast.limit) {
-    result_iter = _makeLimit(result_iter, ast.limit);
+    resultIter = _makeLimit(resultIter, ast.limit);
   }
 
-  let row_list: SourceRowResult[] = [];
-  for await (const batch of result_iter) {
-    if (batch.length < 10_000) {
-      row_list.push(...batch);
-    } else {
-      row_list = row_list.concat(batch);
-    }
-  }
-
-  for (const column of queryColumns) {
-    const column_type = convertType(column.result_type, column.result_nullable);
-
-    // Get table info from columnRefMap if this is a column_ref
-    let fromInfo: BaseFrom | null = null;
-    if (_isColumnRef(column.expr)) {
-      const refInfo = columnRefMap.get(column.expr);
-      if (refInfo?.from && _isBaseFrom(refInfo.from)) {
-        fromInfo = refInfo.from;
-      }
-    }
-
-    column_type.db = fromInfo?.db ?? column.expr.db ?? column.db ?? '';
-    column_type.orgName = column.result_name ?? '';
-    column_type.name = column.as ?? column_type.orgName;
-    column_type.orgTable = fromInfo?.table ?? '';
-    column_type.table = fromInfo?.as ?? column_type.orgTable;
-    columns.push(column_type);
-  }
-
-  const rows = row_list.map((row) => row.result);
-
-  return { rows, columns, row_list };
+  return { resultIter, queryColumns, columnRefMap };
 }
 interface ExpandStarColumnsParams {
   ast: Omit<Select, 'columns' | 'groupby'> & {
@@ -306,7 +314,7 @@ interface MakeResultsParams {
 }
 async function* _makeResults(
   params: MakeResultsParams
-): AsyncIterable<SourceRowResult[]> {
+): AsyncIterableIterator<SourceRowResult[]> {
   const { iter, queryColumns, session, columnRefMap, signal } = params;
   for await (const batch of iter) {
     const result_list: SourceRowResult[] = [];
@@ -346,9 +354,9 @@ function _makeResult(
   row.result = result;
 }
 async function* _makeLimit(
-  iter: AsyncIterable<SourceRowResult[]>,
+  iter: AsyncIterableIterator<SourceRowResult[]>,
   limit: Limit
-): AsyncIterable<SourceRowResult[]> {
+): AsyncIterableIterator<SourceRowResult[]> {
   let skip_count = 0;
   let send_count = 0;
   if (limit.seperator === 'offset') {
@@ -385,6 +393,32 @@ async function* _makeLimit(
       }
     }
   }
+}
+function _calcColumns(
+  queryColumns: QueryColumn[],
+  columnRefMap: Map<ColumnRef, ColumnRefInfo>
+) {
+  const columns: FieldInfo[] = [];
+  for (const column of queryColumns) {
+    const column_type = convertType(column.result_type, column.result_nullable);
+
+    // Get table info from columnRefMap if this is a column_ref
+    let fromInfo: BaseFrom | null = null;
+    if (_isColumnRef(column.expr)) {
+      const refInfo = columnRefMap.get(column.expr);
+      if (refInfo?.from && _isBaseFrom(refInfo.from)) {
+        fromInfo = refInfo.from;
+      }
+    }
+
+    column_type.db = fromInfo?.db ?? column.expr.db ?? column.db ?? '';
+    column_type.orgName = column.result_name ?? '';
+    column_type.name = column.as ?? column_type.orgName;
+    column_type.orgTable = fromInfo?.table ?? '';
+    column_type.table = fromInfo?.as ?? column_type.orgTable;
+    columns.push(column_type);
+  }
+  return columns;
 }
 function _unionType(
   old_type: string | undefined,

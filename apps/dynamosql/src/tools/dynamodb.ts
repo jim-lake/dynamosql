@@ -137,6 +137,7 @@ export class DynamoDB {
   ): AsyncIterableIterator<ItemRecord[]> {
     const command = new ExecuteStatementCommand({
       Statement: namespacePartiQL(params.sql, this.namespace),
+      Limit: 3,
       ReturnValuesOnConditionCheckFailure:
         params.return ?? ReturnValuesOnConditionCheckFailure.NONE,
     });

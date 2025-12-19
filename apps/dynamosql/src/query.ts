@@ -56,22 +56,23 @@ type SingleQueryResult =
     };
 
 export class Query extends EventEmitter {
+  private readonly _collectResults: boolean;
   private readonly _session: Session;
 
   readonly sql: string;
   readonly values: string[] | undefined;
   readonly typeCast: TypeCast | undefined;
   readonly nestedTables: boolean | string;
-  readonly collectResults: boolean;
 
   constructor(params: QueryConstructorParams) {
     super();
+    this._collectResults = params.collectResults ?? false;
     this._session = params.session;
+
     this.sql = params.sql;
     this.values = params.values;
     this.typeCast = params.typeCast ?? params.session.typeCast;
     this.nestedTables = params.nestTables ?? false;
-    this.collectResults = params.collectResults ?? false;
   }
   start() {}
   stream(_options?: ReadableOptions): Readable {
@@ -110,7 +111,7 @@ export class Query extends EventEmitter {
         }
         if (resultIter) {
           const has_listener = this.listenerCount('result') > 0;
-          if (this.collectResults || has_listener) {
+          if (this._collectResults || has_listener) {
             let transformed_list: unknown[] = [];
             for await (const batch of resultIter) {
               const transformed_batch = this._session.resultObjects
@@ -118,7 +119,7 @@ export class Query extends EventEmitter {
                 : this._transformResultArray(batch, columns);
               if (has_listener) {
                 for (const row of transformed_batch) {
-                  if (this.collectResults) {
+                  if (this._collectResults) {
                     transformed_list.push(row);
                   }
                   this.emit('result', row);
@@ -131,7 +132,7 @@ export class Query extends EventEmitter {
                 }
               }
             }
-            if (this.collectResults) {
+            if (this._collectResults) {
               result_list.push(transformed_list);
             }
           }
@@ -148,7 +149,7 @@ export class Query extends EventEmitter {
               this.emit('result', row);
             }
           }
-          if (this.collectResults) {
+          if (this._collectResults) {
             result_list.push(transformed_list);
           }
         }

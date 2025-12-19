@@ -14,10 +14,10 @@ export interface SortState {
   columnRefMap?: Map<ColumnRef, ColumnRefInfo>;
 }
 export async function* sort(
-  iter: AsyncIterable<SourceRowResult[]>,
+  iter: AsyncIterableIterator<SourceRowResult[]>,
   orderby: OrderBy[],
   state: SortState
-): AsyncIterable<SourceRowResult[]> {
+): AsyncIterableIterator<SourceRowResult[]> {
   let result_list: SourceRowResult[] = [];
   for await (const batch of iter) {
     if (batch.length < 10_000) {
