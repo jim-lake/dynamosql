@@ -119,12 +119,12 @@ function _join(
           }
         } else {
           if (parent.source.has(from)) {
-            // dup amplify
+            // amplifing parent, need to dup to mutate
             const source = new Map(parent.source);
             source.set(from, child);
             outputs.push({ source, result: null, group: null });
           } else {
-            // mutate, send and set sent flag
+            // not sent yet, so mutate, send and set sent flag
             parent.source.set(from, child);
             outputs.push(parent);
           }
@@ -143,7 +143,7 @@ function _join(
           }
         }
       } else if (parentBatch) {
-        // check existing children against batch
+        // check existing children against incoming batch
         for (const parent of parentBatch) {
           parentRows.push(parent);
           for (const child of childRows) {
@@ -160,7 +160,7 @@ function _join(
           childRows.push(...childBatch);
         }
       } else if (childBatch) {
-        // iterate over all seen parents
+        // iterate over all previous parents (including this callback)
         for (const child of childBatch) {
           childRows.push(child);
           for (const parent of parentRows) {
@@ -172,6 +172,7 @@ function _join(
       if (childDone && isLeft && parentRows.length > 0) {
         for (const parent of parentRows) {
           if (!parent.source.has(from)) {
+            // never flaged so mutate and send
             parent.source.set(from, null);
             outputs.push(parent);
           }
