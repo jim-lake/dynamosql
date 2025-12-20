@@ -112,18 +112,19 @@ function _join(
           if (result.err) {
             throw new SQLError(result.err);
           } else if (result.value) {
+            // send vigin constructed row
             outputs.push(row);
-            // sent flag
+            // set sent flag to supress left finalization
             parent.source.set(from, child);
           }
         } else {
           if (parent.source.has(from)) {
-            // mutate amplify
+            // dup amplify
             const source = new Map(parent.source);
             source.set(from, child);
             outputs.push({ source, result: null, group: null });
           } else {
-            // sent flag
+            // mutate, send and set sent flag
             parent.source.set(from, child);
             outputs.push(parent);
           }
