@@ -398,13 +398,7 @@ export function getValue(
       let cell: EngineValue | null | undefined;
       if (from) {
         const fromData = row.source.get(from);
-        if (
-          fromData &&
-          typeof fromData === 'object' &&
-          columnName in fromData
-        ) {
-          cell = fromData[columnName];
-        }
+        cell = fromData?.[columnName];
       }
       const decode = _decodeCell(cell);
       result.type = decode.type;
@@ -433,7 +427,7 @@ function _decodeCell(cell: EngineValue | null | undefined): {
   if (!cell) {
     return { type: 'null', value: null };
   } else if (_isCellValue(cell)) {
-    return { type: cell.type ?? typeof cell.value, value: cell.value };
+    return cell;
   } else {
     if (cell.NULL) {
       return { type: 'null', value: null };

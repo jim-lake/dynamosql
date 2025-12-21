@@ -3,6 +3,8 @@ import { SQLError } from '../../../error';
 import * as Storage from './storage';
 
 import type {
+  ColumnDefParam,
+  CellValue,
   TableInfoParams,
   TableInfo,
   TableListParams,
@@ -33,14 +35,21 @@ export async function getTableList(
   return [];
 }
 export async function createTable(params: CreateTableParams): Promise<void> {
-  const { session, database, table, primary_key, column_list, is_temp } =
-    params;
+  const { session, database, table, primary_key, is_temp } = params;
   if (primary_key.length === 0) {
     throw new SQLError({
       err: 'unsupported',
       message: 'primary key is required',
     });
   }
+  const column_list = params.column_list.map((col) => {
+    const { default: _ignore, ...other } = col;
+    return {
+      ...other,
+      name_lc: col.name.toLowerCase(),
+      defaultValue: Object.freeze(_getDefault(col)),
+    };
+  });
   const data = {
     column_list,
     primary_key,
@@ -53,7 +62,6 @@ export async function createTable(params: CreateTableParams): Promise<void> {
     Storage.saveTable(database, table, data);
   }
 }
-
 export async function dropTable(params: DropTableParams): Promise<void> {
   const { session, database, table } = params;
   if (session.getTempTable(database, table)) {
@@ -64,7 +72,21 @@ export async function dropTable(params: DropTableParams): Promise<void> {
 }
 
 export async function addColumn(_params: AddColumnParams): Promise<void> {}
-
 export async function createIndex(_params: IndexParams): Promise<void> {}
-
 export async function deleteIndex(_params: IndexParams): Promise<void> {}
+function _getDefault(column: ColumnDefParam): CellValue {
+  let value: unknown;
+  if (column.default !== undefined) {
+    value = column.default;
+  } else {
+    switch (column.type.toLowerCase()) {
+      case 'int':
+        value = 0;
+        break;
+      default:
+        value = null;
+        break;
+    }
+  }
+  return { type: column.type, value };
+}

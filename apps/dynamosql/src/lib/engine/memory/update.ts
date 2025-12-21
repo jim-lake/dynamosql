@@ -11,7 +11,6 @@ import type {
   ChangedResult,
   CellValue,
   CellRow,
-  ColumnDef,
   EngineValue,
 } from '../index';
 
@@ -103,7 +102,7 @@ export async function multipleUpdate(
 function _transformCell(cell: EvaluationResult): CellValue {
   return { value: cell.value, type: cell.type };
 }
-function _makePrimaryKey(primary_key: ColumnDef[], row: CellRow): string {
-  const key_values = primary_key.map((key) => row[key.name]?.value);
+function _makePrimaryKey(primary_key: string[], row: CellRow): string {
+  const key_values = primary_key.map((key) => row[key]?.value);
   return JSON.stringify(key_values);
 }

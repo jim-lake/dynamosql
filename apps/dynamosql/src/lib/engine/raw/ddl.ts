@@ -47,16 +47,9 @@ export async function getTableInfo(
       type: TYPE_MAP[def.AttributeType] ?? 'string',
     };
   });
-  const primary_key = data.Table.KeySchema.map((key) => {
-    if (!key.AttributeName) {
-      throw new Error('bad_data');
-    }
-    const type =
-      column_list.find((col) => col.name === key.AttributeName)?.type ??
-      'string';
-    return { name: key.AttributeName, type };
-  });
-
+  const primary_key = data.Table.KeySchema.map(
+    (key) => key.AttributeName ?? ''
+  );
   return { table, primary_key, column_list, is_open: true };
 }
 
@@ -72,9 +65,16 @@ export async function getTableList(params: TableListParams): Promise<string[]> {
 }
 
 export async function createTable(params: CreateTableParams): Promise<void> {
-  const { dynamodb, table, primary_key, ...other } = params;
+  const { dynamodb, table, ...other } = params;
+  const primary_key = params.primary_key.map((name) => {
+    const column = params.column_list.find((c) => c.name === name);
+    if (!column) {
+      throw new SQLError('bad_primary_key');
+    }
+    return column;
+  });
   const column_list = params.column_list.filter((column) =>
-    primary_key.find((key) => key.name === column.name)
+    primary_key.find((pk) => pk.name === column.name)
   );
   const opts = { ...other, table, primary_key, column_list };
 

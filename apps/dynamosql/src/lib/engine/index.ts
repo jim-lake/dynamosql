@@ -36,23 +36,36 @@ export type { AttributeValue } from '../../tools/dynamodb';
 export interface ColumnDef {
   name: string;
   type: string;
+  length?: number | null;
+  scale?: number | null;
+  charset?: string | null;
+  collation?: string | null;
+}
+export interface ColumnDefParam {
+  name: string;
+  type: string;
+  length: number | null;
+  scale: number | null;
+  charset: string | null;
+  collation: string | null;
+  default?: unknown;
 }
 export interface TableInfo {
   table: string;
-  primary_key: ColumnDef[];
-  column_list: ColumnDef[];
+  primary_key: readonly string[];
+  column_list: readonly ColumnDef[];
   is_open: boolean;
 }
 export type EvaluationResultRow = Record<string, EvaluationResult>;
 export interface CellValue {
-  type?: string;
+  type: string;
   value: unknown;
 }
 export type CellRow = Record<string, CellValue>;
 export type Row = CellRow | ItemRecord;
 export type EngineValue = CellValue | AttributeValue;
 export type SourceMap = Map<BaseFrom, AsyncIterable<Row[]>>;
-export type ColumnMap = Map<BaseFrom, string[]>;
+export type ColumnMap = Map<BaseFrom, readonly string[]>;
 export interface RowListResult {
   sourceMap: SourceMap;
   columnMap: ColumnMap;
@@ -81,8 +94,8 @@ export interface TableInfoParams {
 export interface CreateTableParams {
   dynamodb: DynamoDBClient;
   table: string;
-  primary_key: ColumnDef[];
-  column_list: ColumnDef[];
+  primary_key: string[];
+  column_list: ColumnDefParam[];
   session: Session;
   database: string;
   is_temp?: boolean;

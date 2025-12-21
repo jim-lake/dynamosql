@@ -1,9 +1,14 @@
 import type { Session } from '../../../session';
-import type { ColumnDef, CellRow } from '../index';
+import type { CellValue, ColumnDef, CellRow } from '../index';
+
+export interface MemoryColumnDef extends ColumnDef {
+  name_lc: string;
+  defaultValue: CellValue;
+}
 
 export interface TableData {
-  column_list: ColumnDef[];
-  primary_key: ColumnDef[];
+  column_list: MemoryColumnDef[];
+  primary_key: string[];
   row_list: CellRow[];
   primary_map: Map<string, number>;
 }

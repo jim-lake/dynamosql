@@ -27,7 +27,10 @@ export function getEngine(
   let ret: EngineType;
   const schema = database ? g_schemaMap.get(database) : undefined;
   const schema_table = table ? schema?.get(table) : undefined;
-  if (database === '_dynamodb') {
+  const temp_table = database && table && session.getTempTable(database, table);
+  if (temp_table !== undefined) {
+    ret = Engine.getEngineByName('memory');
+  } else if (database === '_dynamodb') {
     ret = Engine.getEngineByName('raw');
   } else if (database === 'information_schema') {
     ret = Engine.getEngineByName('information_schema');
@@ -35,8 +38,6 @@ export function getEngine(
     ret = Engine.getDatabaseError('');
   } else if (!schema) {
     ret = Engine.getDatabaseError(database);
-  } else if (table && session.getTempTable(database, table)) {
-    ret = Engine.getEngineByName('memory');
   } else if (schema_table) {
     ret = Engine.getEngineByName(schema_table.table_engine);
   } else {
@@ -121,11 +122,12 @@ export interface CreateTableParams extends EngineCreateTableParams {
 }
 export async function createTable(params: CreateTableParams): Promise<void> {
   const { session, database, table, is_temp } = params;
-  const table_engine = is_temp
-    ? 'memory'
-    : (params.table_engine?.toLowerCase() ?? 'raw');
+  const table_engine = params.table_engine?.toLowerCase() ?? 'raw';
 
-  if (database === '_dynamodb' && table_engine !== 'raw') {
+  if (is_temp) {
+    const engine = Engine.getEngineByName('memory');
+    await engine.createTable(params);
+  } else if (database === '_dynamodb' && table_engine !== 'raw') {
     throw new SQLError('access_denied');
   } else if (database === '_dynamodb') {
     const engine = Engine.getEngineByName('raw');
@@ -137,11 +139,9 @@ export async function createTable(params: CreateTableParams): Promise<void> {
   } else {
     const engine = Engine.getEngineByName(table_engine);
     await engine.createTable(params);
-    if (!is_temp) {
-      const schema = g_schemaMap.get(database);
-      if (schema) {
-        schema.set(table, { table_engine });
-      }
+    const schema = g_schemaMap.get(database);
+    if (schema) {
+      schema.set(table, { table_engine });
     }
   }
 }

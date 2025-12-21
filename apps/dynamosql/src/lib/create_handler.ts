@@ -11,7 +11,7 @@ import {
 import * as SchemaManager from './schema_manager';
 import * as SelectHandler from './select_handler';
 
-import type { ColumnDef, KeyDef, EvaluationResultRow } from './engine';
+import type { ColumnDefParam, EvaluationResultRow } from './engine';
 import type { HandlerParams, AffectedResult } from './handler_types';
 import type { FieldInfo } from '../types';
 import type { EvaluationResult } from './expression';
@@ -75,26 +75,31 @@ async function _createTable(
   if (!table) {
     throw new SQLError('bad_table_name');
   }
-
+  const is_temp = ast.temporary !== null;
   const duplicate_mode = ast.ignore_replace ?? undefined;
-  const column_list: ColumnDef[] = [];
-  const primary_key: KeyDef[] = [];
+  const column_list: ColumnDefParam[] = [];
+  const primary_key: string[] = [];
 
   for (const def of ast.create_definitions ?? []) {
     if (def.resource === 'column') {
-      const col = { name: def.column.column, type: def.definition.dataType };
+      const col = {
+        name: def.column.column,
+        type: def.definition.dataType,
+        length: def.definition.length ?? null,
+        scale: def.definition.scale ?? null,
+        charset: def.character_set?.value.value ?? null,
+        collation: def.collate?.collate?.name ?? null,
+      };
       column_list.push(col);
       if (def.primary_key === 'primary key') {
-        primary_key.push(col);
+        primary_key.push(col.name);
       }
     } else if (
       def.resource === 'constraint' &&
       def.constraint_type === 'primary key'
     ) {
       for (const sub of def.definition) {
-        const type =
-          column_list.find((col) => col.name === sub.column)?.type ?? 'string';
-        primary_key.push({ name: sub.column, type });
+        primary_key.push(sub.column);
       }
     }
   }
@@ -115,11 +120,11 @@ async function _createTable(
         }
       });
       if (!duplicate_mode) {
-        const keys = primary_key.map(({ name }) => obj[name]?.value);
+        const keys = primary_key.map((name) => obj[name]?.value);
         if (!trackFirstSeen(track, keys)) {
           throw new SQLError({
             err: 'dup_primary_key_entry',
-            args: [primary_key.map((key) => key.name), keys],
+            args: [primary_key.map((name) => name), keys],
           });
         }
       }
@@ -141,7 +146,7 @@ async function _createTable(
       table,
       column_list,
       primary_key,
-      is_temp: Boolean(ast.temporary),
+      is_temp,
       table_engine,
     };
     await SchemaManager.createTable(opts);

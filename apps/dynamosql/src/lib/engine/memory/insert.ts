@@ -2,12 +2,12 @@ import { SQLError } from '../../../error';
 
 import * as Storage from './storage';
 
+import type { MemoryColumnDef } from './storage';
 import type {
   EvaluationResultRow,
   InsertParams,
   AffectedResult,
   CellRow,
-  ColumnDef,
 } from '../index';
 
 export async function insertRowList(
@@ -30,10 +30,8 @@ export async function insertRowList(
   let affectedRows = 0;
 
   for (const row of list) {
-    const cellRow = _transformRow(row);
-    const key_values = primary_key.map(
-      (key: ColumnDef) => cellRow[key.name]?.value
-    );
+    const cellRow = _transformRow(row, data.column_list);
+    const key_values = primary_key.map((name) => cellRow[name]?.value);
     const key = JSON.stringify(key_values);
     const index = primary_map.get(key);
 
@@ -58,12 +56,17 @@ export async function insertRowList(
   Storage.txSaveData(database, table, session, { row_list, primary_map });
   return { affectedRows };
 }
-function _transformRow(row: EvaluationResultRow): CellRow {
+function _transformRow(
+  row: EvaluationResultRow,
+  column_list: readonly MemoryColumnDef[]
+): CellRow {
   const result: CellRow = {};
-  for (const key in row) {
-    const cell = row[key];
-    if (cell) {
-      result[key] = { type: cell.type, value: cell.value };
+  for (const column of column_list) {
+    const cell = row[column.name_lc];
+    if (cell !== undefined) {
+      result[column.name_lc] = { type: cell.type, value: cell.value };
+    } else {
+      result[column.name_lc] = column.defaultValue;
     }
   }
   return result;

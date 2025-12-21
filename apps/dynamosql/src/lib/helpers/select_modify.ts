@@ -36,7 +36,7 @@ export async function runSelect(
   }
 
   // Get table info for all tables
-  const keyListMap = new Map<From, string[]>();
+  const keyListMap = new Map<From, readonly string[]>();
   for (const object of from_list) {
     if (!('db' in object) || !('table' in object)) {
       continue;
@@ -51,12 +51,9 @@ export async function runSelect(
     try {
       const result = await engine.getTableInfo(opts);
       if (result.primary_key.length > 0) {
-        const key_list = result.primary_key.map(
-          (pkKey: { name: string }) => pkKey.name
-        );
-        keyListMap.set(object, key_list);
+        keyListMap.set(object, result.primary_key);
         const requestSet = requestSets.get(object);
-        key_list.forEach((keyName: string) => requestSet?.add(keyName));
+        result.primary_key.forEach((name: string) => requestSet?.add(name));
       } else {
         throw new SQLError('bad_schema');
       }
@@ -72,7 +69,7 @@ export async function runSelect(
   const { row_list } = await internalQuery(opts);
 
   for (const object of from_list) {
-    const key_list = keyListMap.get(object) ?? [];
+    const key_list = keyListMap.get(object)?.slice() ?? [];
     const collection = new Map<EngineValue, SourceRowOrMap>();
     for (const row of row_list) {
       const sourceRow = row.source.get(object);

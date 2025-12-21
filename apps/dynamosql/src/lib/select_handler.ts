@@ -10,7 +10,7 @@ import { formGroup, formImplicitGroup, hasAggregate } from './helpers/group';
 import { formJoin } from './helpers/join';
 import { sort } from './helpers/sort';
 
-import type { SourceMap } from './engine';
+import type { ColumnMap, SourceMap } from './engine';
 import type {
   HandlerParams,
   DynamoDBClient,
@@ -34,8 +34,6 @@ import type {
   ExtractFunc,
   FulltextSearch,
 } from 'node-sql-parser';
-
-type ColumnMap = Map<From, string[]>;
 
 function _isBaseFrom(from: From): from is BaseFrom {
   return 'table' in from && typeof from.table === 'string';
@@ -275,7 +273,7 @@ function _expandStarColumns(params: ExpandStarColumnsParams): QueryColumn[] {
         }
         // Match if no table specified, or table matches from.table or from.as
         if (!table || (from.table === table && !from.as) || from.as === table) {
-          const column_list = columnMap.get(from);
+          const column_list = columnMap.get(from)?.slice();
           if (column_list && !column_list.length) {
             const requestSet = requestSets.get(from);
             requestSet?.forEach((name: string) => column_list.push(name));
