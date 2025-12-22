@@ -133,7 +133,7 @@ export function utc_time(
   const arg = Array.isArray(args) && args.length > 0 ? args[0] : undefined;
   const result = arg
     ? getValue(arg, state)
-    : { err: null, value: undefined, type: 'undefined', name: '' };
+    : { err: null, value: undefined, type: 'null' as const, name: '' };
   result.name = 'UTC_TIME()';
   if (!result.err) {
     const decimals = typeof result.value === 'number' ? result.value : 0;

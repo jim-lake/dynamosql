@@ -71,7 +71,7 @@ export function date_add(
   const interval_arg = getValue(expr.args.value[1], state);
   let err = date_arg.err ?? interval_arg.err;
   let value: EvaluationResult['value'] = null;
-  let type = 'char';
+  let type: EvaluationResult['type'] = 'char';
   const name = `DATE_ADD(${date_arg.name}, ${interval_arg.name})`;
   if (
     !err &&

@@ -180,7 +180,7 @@ export function repeat(
   const arg2 = getValue(expr.args.value[1], state);
   const err = arg1.err ?? arg2.err;
   let value;
-  let type;
+  let type: EvaluationResult['type'];
   const name = `REPEAT(${arg1.name}, ${arg2.name})`;
 
   if (!err && arg2.value === null) {

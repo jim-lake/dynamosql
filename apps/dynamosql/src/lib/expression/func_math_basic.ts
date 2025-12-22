@@ -5,6 +5,7 @@ import { getValue } from './evaluate';
 import { modHelper } from './math';
 
 import type { EvaluationState, EvaluationResult } from './evaluate';
+import type { ValueType } from '../types/value_type';
 import type { Function } from 'node-sql-parser';
 
 export function abs(expr: Function, state: EvaluationState): EvaluationResult {
@@ -100,7 +101,7 @@ export function mod(expr: Function, state: EvaluationState): EvaluationResult {
   const arg2 = getValue(expr.args.value[1], state);
   return modHelper(arg1, arg2, `MOD(${arg1.name}, ${arg2.name})`);
 }
-function _resolveTypeForRounding(result: EvaluationResult): string {
+function _resolveTypeForRounding(result: EvaluationResult): ValueType {
   if (result.value === null || result.type === 'string') {
     return 'double';
   } else if (result.type === 'number') {

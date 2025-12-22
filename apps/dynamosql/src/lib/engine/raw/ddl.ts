@@ -2,6 +2,7 @@ import { logger } from '@dynamosql/shared';
 
 import { SQLError } from '../../../error';
 
+import type { ValueType } from '../../types/value_type';
 import type {
   TableInfoParams,
   TableInfo,
@@ -13,10 +14,10 @@ import type {
 } from '../index';
 import type { DescribeTableCommandOutput } from '@aws-sdk/client-dynamodb';
 
-const TYPE_MAP: Record<string, string> = {
+const TYPE_MAP: Record<string, ValueType> = {
   S: 'string',
   N: 'number',
-  B: 'buffer',
+  B: 'blob',
 } as const;
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));

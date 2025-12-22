@@ -67,7 +67,7 @@ function time(expr: Cast, state: EvaluationState): EvaluationResult {
 function signed(expr: Cast, state: EvaluationState): EvaluationResult {
   const result = getValue(expr.expr, state);
   result.name = `CAST(${result.name} AS SIGNED)`;
-  result.type = 'bigint';
+  result.type = 'longlong';
   if (!result.err && result.value !== null) {
     result.value = convertBigInt(result.value);
   }

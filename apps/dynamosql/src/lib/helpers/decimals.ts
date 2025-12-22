@@ -18,7 +18,6 @@ export function getDecimals(result: EvaluationResult): number {
       case 'string':
       case 'double':
         return 31;
-      case 'decimal':
       case 'number':
         if (typeof result.value === 'number') {
           return _scaleNumber(result.value);

@@ -11,6 +11,7 @@ import {
 import { getValue } from './evaluate';
 
 import type { EvaluationState, EvaluationResult } from './evaluate';
+import type { ValueType } from '../types/value_type';
 import type { Function } from 'node-sql-parser';
 
 export function coalesce(
@@ -68,7 +69,7 @@ export function ifFunc(
   if (!err) {
     type = _unionType([trueValue, falseValue]).type;
     const condResult = convertNum(condition.value);
-    let result_type: string;
+    let result_type: ValueType;
     if (condResult === null || condResult === 0) {
       value = falseValue.value;
       result_type = falseValue.type;
@@ -179,11 +180,11 @@ function _ltList<T extends Comparable<T>>(
   return { value: value ?? null, decimals };
 }
 interface UnionTypeResult {
-  compare_type: string;
-  type: string;
+  compare_type: ValueType;
+  type: ValueType;
 }
 function _unionType(list: EvaluationResult[]): UnionTypeResult {
-  let compare_type: string;
+  let compare_type: ValueType;
   const types = list.map((e) => e.type);
   if (types.includes('datetime')) {
     compare_type = 'datetime';

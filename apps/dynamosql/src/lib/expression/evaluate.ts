@@ -170,7 +170,7 @@ export function getValue(
   const { session, row } = state;
   let result: EvaluationResult = {
     err: null,
-    type: 'undefined',
+    type: 'null',
     value: undefined,
     name: undefined,
   };
@@ -216,7 +216,7 @@ export function getValue(
         result.err = { err: 'ER_ILLEGAL_VALUE_FOR_TYPE', args: [expr.value] };
       } else {
         result.value = val;
-        result.type = 'bigint';
+        result.type = 'longlong';
       }
     } else if (type === 'double_quote_string') {
       result.value = expr.value;
@@ -359,7 +359,7 @@ export function getValue(
         ? {
             err: { err: 'ER_OPERAND_COLUMNS', args: ['1'] },
             value: undefined,
-            type: 'undefined' as const,
+            type: 'null' as const,
             name: undefined,
           }
         : getValue(right, state);
@@ -413,8 +413,19 @@ export function getValue(
     result.err = 'unsupported';
   }
 
-  if (result.type === 'undefined') {
-    result.type = result.value === null ? 'null' : typeof result.value;
+  if (result.type === 'null' && result.value !== null && result.value !== undefined) {
+    // Infer type from value if type is still null but value exists
+    if (typeof result.value === 'number') {
+      result.type = 'double';
+    } else if (typeof result.value === 'string') {
+      result.type = 'string';
+    } else if (typeof result.value === 'boolean') {
+      result.type = 'bool';
+    } else if (Buffer.isBuffer(result.value)) {
+      result.type = 'blob';
+    } else {
+      result.type = 'string';
+    }
   }
   if (result.name === undefined && result.value !== undefined) {
     result.name = String(result.value);
@@ -422,7 +433,7 @@ export function getValue(
   return result;
 }
 function _decodeCell(cell: EngineValue | null | undefined): {
-  type: string;
+  type: ValueType;
   value: unknown;
 } {
   if (!cell) {
@@ -440,13 +451,12 @@ function _decodeCell(cell: EngineValue | null | undefined): {
       return { type: 'number', value: cell.N };
     }
     if (cell.BOOL !== undefined) {
-      return { type: 'boolean', value: cell.BOOL };
+      return { type: 'bool', value: cell.BOOL };
     }
     if (cell.M !== undefined) {
-      return { type: 'json', value: mapToObject(cell.M) };
+      return { type: 'string', value: mapToObject(cell.M) };
     }
-    const type = typeof cell;
-    return { type: type === 'object' ? 'json' : type, value: cell };
+    return { type: 'string', value: cell };
   }
 }
 function _isCellValue(cell: EngineValue): cell is CellValue {

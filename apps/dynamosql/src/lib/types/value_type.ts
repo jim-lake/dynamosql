@@ -14,7 +14,10 @@ export type ValueType =
   | 'number'
   | 'double'
   | 'text'
-  | 'blob';
+  | 'blob'
+  | 'buffer'
+  | 'long_blob'
+  | 'medium_blob';
 
 export function mysqlStringToValueType(s: string): ValueType {
   switch (s) {
@@ -68,6 +71,11 @@ export function valueTypeToMysqlType(type: ValueType): Types {
       return Types.DOUBLE;
     case 'blob':
     case 'text':
+    case 'buffer':
       return Types.BLOB;
+    case 'long_blob':
+      return Types.LONG_BLOB;
+    case 'medium_blob':
+      return Types.MEDIUM_BLOB;
   }
 }

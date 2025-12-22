@@ -124,7 +124,7 @@ export function unix_timestamp(
       if (dt === null) {
         result.value = 0;
         if (typeof val.value === 'string') {
-          result.type = 'decimal';
+          result.type = 'number';
         }
       } else {
         result.value = dt.getTime();
@@ -284,7 +284,7 @@ export function utc_timestamp(
   const arg = Array.isArray(args) && args.length > 0 ? args[0] : undefined;
   const result = arg
     ? getValue(arg, state)
-    : { err: null, value: undefined, type: 'undefined', name: '' };
+    : { err: null, value: undefined, type: 'null' as const, name: '' };
   result.name = 'UTC_TIMESTAMP()';
   if (!result.err) {
     const decimals = typeof result.value === 'number' ? result.value : 0;

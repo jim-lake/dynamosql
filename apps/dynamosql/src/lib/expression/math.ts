@@ -11,6 +11,7 @@ import { SQLTime } from '../types/sql_time';
 import { getValue } from './evaluate';
 
 import type { EvaluationState, EvaluationResult } from './evaluate';
+import type { ValueType } from '../types/value_type';
 import type { Binary } from 'node-sql-parser';
 
 function isSQLInterval(value: unknown): value is SQLInterval {
@@ -130,7 +131,7 @@ export function modHelper(
 ): EvaluationResult {
   const err = left.err ?? right.err;
   let value;
-  let type: string;
+  let type: EvaluationResult['type'];
 
   if (!err && (left.value === null || right.value === null)) {
     value = null;
@@ -260,7 +261,7 @@ function _numBothSides(
   }
   return { err, name, value, left_num, right_num, interval, datetime, type };
 }
-function _unionNumberType(type1: string, type2: string, default_type: string) {
+function _unionNumberType(type1: ValueType, type2: ValueType, default_type: ValueType): ValueType {
   if (type1 === 'string' || type2 === 'string') {
     return 'double';
   } else if (type1 === type2) {

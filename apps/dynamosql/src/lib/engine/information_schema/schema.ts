@@ -1,24 +1,26 @@
+import type { ValueType } from '../../types/value_type';
+
 export const CATALOGS_LIST = [
   {
-    catalog_name: { value: 'def', type: 'string' },
-    catalog_description: { value: 'Primary catalog', type: 'string' },
-    catalog_owner: { value: 'SYSTEM', type: 'string' },
+    catalog_name: { value: 'def', type: 'string' as const },
+    catalog_description: { value: 'Primary catalog', type: 'string' as const },
+    catalog_owner: { value: 'SYSTEM', type: 'string' as const },
   },
 ] as const;
-export const CATALOGS_COLUMNS = [
+export const CATALOGS_COLUMNS: readonly { name: string; type: ValueType }[] = [
   { name: 'CATALOG_NAME', type: 'string' },
   { name: 'CATALOG_DESCRIPTION', type: 'string' },
   { name: 'CATALOG_OWNER', type: 'string' },
 ];
-export const SCHEMATA_COLUMNS = [
+export const SCHEMATA_COLUMNS: readonly { name: string; type: ValueType; nullable?: boolean }[] = [
   { name: 'CATALOG_NAME', type: 'string', nullable: true },
   { name: 'SCHEMA_NAME', type: 'string', nullable: true },
   { name: 'DEFAULT_CHARACTER_SET_NAME', type: 'string', nullable: true },
   { name: 'DEFAULT_COLLATION_NAME', type: 'string', nullable: true },
   { name: 'SQL_PATH', type: 'string', nullable: true },
   { name: 'DEFAULT_ENCRYPTION', type: 'char' },
-] as const;
-export const TABLES_COLUMNS = [
+];
+export const TABLES_COLUMNS: readonly { name: string; type: ValueType }[] = [
   { name: 'TABLE_CATALOG', type: 'string' },
   { name: 'TABLE_SCHEMA', type: 'string' },
   { name: 'TABLE_NAME', type: 'string' },
@@ -39,8 +41,8 @@ export const TABLES_COLUMNS = [
   { name: 'CHECKSUM', type: 'longlong' },
   { name: 'CREATE_OPTIONS', type: 'string' },
   { name: 'TABLE_COMMENT', type: 'string' },
-] as const;
-export const COLUMNS_COLUMNS = [
+];
+export const COLUMNS_COLUMNS: readonly { name: string; type: ValueType }[] = [
   { name: 'TABLE_CATALOG', type: 'string' },
   { name: 'TABLE_SCHEMA', type: 'string' },
   { name: 'TABLE_NAME', type: 'string' },
@@ -63,7 +65,7 @@ export const COLUMNS_COLUMNS = [
   { name: 'COLUMN_COMMENT', type: 'text' },
   { name: 'GENERATION_EXPRESSION', type: 'text' },
   { name: 'SRS_ID', type: 'long' },
-] as const;
+];
 
 export const CATALOGS_NAMES: readonly string[] = CATALOGS_COLUMNS.map(
   (c) => c.name

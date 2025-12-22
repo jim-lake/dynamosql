@@ -2,6 +2,7 @@ import { SQLError } from '../error';
 
 import * as SchemaManager from './schema_manager';
 import * as TransactionManager from './transaction_manager';
+import { mysqlStringToValueType } from './types/value_type';
 
 import type { Engine, ColumnDef } from './engine';
 import type { HandlerParams } from './handler_types';
@@ -43,7 +44,7 @@ async function _runAlterTable(
     if (def.resource === 'column' && 'action' in def && def.action === 'add') {
       const addDef = def;
       const column_name = addDef.column.column;
-      const type = addDef.definition.dataType;
+      const type = mysqlStringToValueType(addDef.definition.dataType);
       column_list.push({ name: column_name, type });
       const opts = {
         dynamodb,

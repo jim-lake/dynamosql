@@ -10,6 +10,7 @@ import {
 } from './helpers/ast_helper';
 import * as SchemaManager from './schema_manager';
 import * as SelectHandler from './select_handler';
+import { mysqlStringToValueType } from './types/value_type';
 
 import type { ColumnDefParam, EvaluationResultRow } from './engine';
 import type { HandlerParams, AffectedResult } from './handler_types';
@@ -84,7 +85,7 @@ async function _createTable(
     if (def.resource === 'column') {
       const col = {
         name: def.column.column,
-        type: def.definition.dataType,
+        type: mysqlStringToValueType(def.definition.dataType),
         length: def.definition.length ?? null,
         scale: def.definition.scale ?? null,
         charset: def.character_set?.value.value ?? null,
