@@ -282,7 +282,7 @@ export function dynamoType(type: string): ScalarAttributeType {
     ret = 'N';
   } else if (type === 'number') {
     ret = 'N';
-  } else if (type === 'blob') {
+  } else if (type === 'buffer') {
     ret = 'B';
   }
   return ret;

@@ -145,14 +145,14 @@ export function convertType(type?: string, nullable?: boolean): FieldInfo {
         name: '',
         orgName: '',
         charsetNr: CHARSETS.BINARY,
-        length: 255,
+        length: 65535,
         type: Types.VAR_STRING,
-        flags: flags | FIELD_FLAGS.BINARY | FIELD_FLAGS.UNSIGNED,
+        flags: flags | FIELD_FLAGS.BINARY,
         decimals: 0,
         zeroFill: false,
         protocol41: true,
       };
-    case 'long_blob':
+    case 'text':
       return {
         catalog: 'def',
         db: '',
@@ -162,23 +162,7 @@ export function convertType(type?: string, nullable?: boolean): FieldInfo {
         orgName: '',
         charsetNr: CHARSETS.UTF8_GENERAL_CI,
         length: 150994944,
-        type: Types.LONG_BLOB,
-        flags,
-        decimals: 31,
-        zeroFill: false,
-        protocol41: true,
-      };
-    case 'medium_blob':
-      return {
-        catalog: 'def',
-        db: '',
-        table: '',
-        orgTable: '',
-        name: '',
-        orgName: '',
-        charsetNr: CHARSETS.BINARY,
-        length: 16777215,
-        type: Types.MEDIUM_BLOB,
+        type: Types.BLOB,
         flags,
         decimals: 31,
         zeroFill: false,

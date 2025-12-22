@@ -12,7 +12,11 @@ export const CATALOGS_COLUMNS: readonly { name: string; type: ValueType }[] = [
   { name: 'CATALOG_DESCRIPTION', type: 'string' },
   { name: 'CATALOG_OWNER', type: 'string' },
 ];
-export const SCHEMATA_COLUMNS: readonly { name: string; type: ValueType; nullable?: boolean }[] = [
+export const SCHEMATA_COLUMNS: readonly {
+  name: string;
+  type: ValueType;
+  nullable?: boolean;
+}[] = [
   { name: 'CATALOG_NAME', type: 'string', nullable: true },
   { name: 'SCHEMA_NAME', type: 'string', nullable: true },
   { name: 'DEFAULT_CHARACTER_SET_NAME', type: 'string', nullable: true },

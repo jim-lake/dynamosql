@@ -140,7 +140,7 @@ function _columnToColumns(
     COLUMN_KEY: { value: 'PRI', type: 'string' },
     EXTRA: { value: '', type: 'string' },
     PRIVILEGES: { value: 'select,insert,update,references', type: 'string' },
-    COLUMN_COMMENT: { value: '', type: 'blob' },
+    COLUMN_COMMENT: { value: '', type: 'text' },
     GENERATION_EXPRESSION: { value: '', type: 'text' },
     SRS_ID: { value: null, type: 'long' },
   };

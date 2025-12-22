@@ -54,10 +54,8 @@ export function concat(
     }
   }
 
-  const has_blob = results.some(
-    (r) => r.type === 'long_blob' || r.type === 'medium_blob'
-  );
-  return { err, value, type: has_blob ? 'long_blob' : 'string' };
+  const has_text = results.some((r) => r.type === 'text');
+  return { err, value, type: has_text ? 'text' : 'string' };
 }
 export function left(expr: Function, state: EvaluationState): EvaluationResult {
   assertArgCountParse(expr, 2);
@@ -185,7 +183,7 @@ export function repeat(
 
   if (!err && arg2.value === null) {
     value = null;
-    type = 'long_blob';
+    type = 'text';
   } else if (!err && arg1.value === null) {
     value = null;
     type = 'string';
@@ -197,7 +195,7 @@ export function repeat(
         : '';
     type = 'string';
   } else {
-    type = 'long_blob';
+    type = 'text';
   }
   return { err, name, value, type };
 }
@@ -381,7 +379,7 @@ export function lpad(expr: Function, state: EvaluationState): EvaluationResult {
   const len = Math.round(convertNum(len_result.value) ?? 0);
   const pad = String(pad_result.value);
   if (len < 0) {
-    return { err: null, value: null, type: 'long_blob' };
+    return { err: null, value: null, type: 'text' };
   }
   if (pad.length === 0) {
     return { err: null, value: '', type: 'string' };
@@ -416,7 +414,7 @@ export function rpad(expr: Function, state: EvaluationState): EvaluationResult {
   const len = Math.round(convertNum(len_result.value) ?? 0);
   const pad = String(pad_result.value);
   if (len < 0) {
-    return { err: null, value: null, type: 'long_blob' };
+    return { err: null, value: null, type: 'text' };
   }
   if (pad.length === 0) {
     return { err: null, value: '', type: 'string' };

@@ -334,16 +334,16 @@ export function getValue(
         result.type = 'string';
       } else {
         result.value = val.value;
-        // MySQL converts user variable types to blob/string types
-        if (val.type === 'string' || val.type === 'char') {
-          result.type = 'long_blob';
-        } else if (
+        // MySQL converts string/temporal user variable types to text, preserves numeric types
+        if (
+          val.type === 'string' ||
+          val.type === 'char' ||
           val.type === 'datetime' ||
           val.type === 'date' ||
           val.type === 'time' ||
           val.type === 'null'
         ) {
-          result.type = 'medium_blob';
+          result.type = 'text';
         } else {
           result.type = val.type;
         }
@@ -413,7 +413,11 @@ export function getValue(
     result.err = 'unsupported';
   }
 
-  if (result.type === 'null' && result.value !== null && result.value !== undefined) {
+  if (
+    result.type === 'null' &&
+    result.value !== null &&
+    result.value !== undefined
+  ) {
     // Infer type from value if type is still null but value exists
     if (typeof result.value === 'number') {
       result.type = 'double';
@@ -422,7 +426,7 @@ export function getValue(
     } else if (typeof result.value === 'boolean') {
       result.type = 'bool';
     } else if (Buffer.isBuffer(result.value)) {
-      result.type = 'blob';
+      result.type = 'buffer';
     } else {
       result.type = 'string';
     }

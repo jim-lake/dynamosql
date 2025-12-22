@@ -17,7 +17,7 @@ import type { DescribeTableCommandOutput } from '@aws-sdk/client-dynamodb';
 const TYPE_MAP: Record<string, ValueType> = {
   S: 'string',
   N: 'number',
-  B: 'blob',
+  B: 'buffer',
 } as const;
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));

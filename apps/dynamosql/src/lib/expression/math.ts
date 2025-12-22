@@ -261,7 +261,11 @@ function _numBothSides(
   }
   return { err, name, value, left_num, right_num, interval, datetime, type };
 }
-function _unionNumberType(type1: ValueType, type2: ValueType, default_type: ValueType): ValueType {
+function _unionNumberType(
+  type1: ValueType,
+  type2: ValueType,
+  default_type: ValueType
+): ValueType {
   if (type1 === 'string' || type2 === 'string') {
     return 'double';
   } else if (type1 === type2) {

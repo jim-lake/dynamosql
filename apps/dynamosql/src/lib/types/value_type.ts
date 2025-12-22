@@ -14,34 +14,31 @@ export type ValueType =
   | 'number'
   | 'double'
   | 'text'
-  | 'blob'
-  | 'buffer'
-  | 'long_blob'
-  | 'medium_blob';
+  | 'buffer';
 
 export function mysqlStringToValueType(s: string): ValueType {
   switch (s) {
-  case 'INT':
-    return 'long';
-  case 'BIGINT':
-    return 'longlong';
-  case 'VARCHAR':
-    return 'string';
-  case 'CHAR':
-    return 'char';
-  case 'TIMESTAMP':
-  case 'DATETIME':
-    return 'datetime';
-  case 'DATE':
-    return 'date';
-  case 'TIME':
-    return 'time';
-  case 'DECIMAL':
-    return 'number';
-  case 'BOOL':
-    return 'bool';
-  default:
-    return 'string';
+    case 'INT':
+      return 'long';
+    case 'BIGINT':
+      return 'longlong';
+    case 'VARCHAR':
+      return 'string';
+    case 'CHAR':
+      return 'char';
+    case 'TIMESTAMP':
+    case 'DATETIME':
+      return 'datetime';
+    case 'DATE':
+      return 'date';
+    case 'TIME':
+      return 'time';
+    case 'DECIMAL':
+      return 'number';
+    case 'BOOL':
+      return 'bool';
+    default:
+      return 'string';
   }
 }
 export function valueTypeToMysqlType(type: ValueType): Types {
@@ -69,13 +66,9 @@ export function valueTypeToMysqlType(type: ValueType): Types {
       return Types.NEWDECIMAL;
     case 'double':
       return Types.DOUBLE;
-    case 'blob':
     case 'text':
-    case 'buffer':
       return Types.BLOB;
-    case 'long_blob':
-      return Types.LONG_BLOB;
-    case 'medium_blob':
-      return Types.MEDIUM_BLOB;
+    case 'buffer':
+      return Types.VAR_STRING;
   }
 }
