@@ -3,6 +3,7 @@ import { Types } from '../../types';
 export type ValueType =
   | 'null'
   | 'bool'
+  | 'interval'
   | 'datetime'
   | 'date'
   | 'time'
@@ -50,6 +51,7 @@ export function valueTypeToMysqlType(type: ValueType): Types {
       return Types.DATETIME;
     case 'date':
       return Types.DATE;
+    case 'interval':
     case 'time':
       return Types.TIME;
     case 'string':
