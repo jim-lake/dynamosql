@@ -157,9 +157,19 @@ export function runTests(test_name, file_path, extra, maybe_skip) {
               const mysql_field = mysql_result.fields[i];
               const ddb_type = Types[ddb_field.type];
               const mysql_type = Types[mysql_field.type];
-              expect(ddb_type, `field ${ddb_field.name} type`).to.equal(
-                mysql_type
-              );
+              if (mysql_type === 'MEDIUM_BLOB' || mysql_type === 'LONG_BLOB') {
+                // these are legacy dumb codepaths in mysql,
+                // we standardize on blob, if anyone wants to make a very
+                // trivial fix to follow this dumb behavior without
+                // opening a can of worms that would be fine
+                expect(ddb_type, `field ${ddb_field.name} type`).to.equal(
+                  'BLOB'
+                );
+              } else {
+                expect(ddb_type, `field ${ddb_field.name} type`).to.equal(
+                  mysql_type
+                );
+              }
             }
           }
         }
