@@ -48,7 +48,7 @@ export const COLUMNS_COLUMNS = [
   { name: 'ORDINAL_POSITION', type: 'long' },
   { name: 'COLUMN_DEFAULT', type: 'text' },
   { name: 'IS_NULLABLE', type: 'string' },
-  { name: 'DATA_TYPE', type: 'longtext' },
+  { name: 'DATA_TYPE', type: 'text' },
   { name: 'CHARACTER_MAXIMUM_LENGTH', type: 'longlong' },
   { name: 'CHARACTER_OCTET_LENGTH', type: 'longlong' },
   { name: 'NUMERIC_PRECISION', type: 'longlong' },
@@ -56,13 +56,13 @@ export const COLUMNS_COLUMNS = [
   { name: 'DATETIME_PRECISION', type: 'longlong' },
   { name: 'CHARACTER_SET_NAME', type: 'string' },
   { name: 'COLLATION_NAME', type: 'string' },
-  { name: 'COLUMN_TYPE', type: 'mediumtext' },
+  { name: 'COLUMN_TYPE', type: 'text' },
   { name: 'COLUMN_KEY', type: 'string' },
   { name: 'EXTRA', type: 'string' },
   { name: 'PRIVILEGES', type: 'string' },
   { name: 'COLUMN_COMMENT', type: 'text' },
-  { name: 'GENERATION_EXPRESSION', type: 'longtext' },
-  { name: 'SRS_ID', type: 'int' },
+  { name: 'GENERATION_EXPRESSION', type: 'text' },
+  { name: 'SRS_ID', type: 'long' },
 ] as const;
 
 export const CATALOGS_NAMES: readonly string[] = CATALOGS_COLUMNS.map(

@@ -128,7 +128,7 @@ function _columnToColumns(
     ORDINAL_POSITION: { value: index + 1, type: 'long' },
     COLUMN_DEFAULT: { value: null, type: 'text' },
     IS_NULLABLE: { value: 'NO', type: 'string' },
-    DATA_TYPE: { value: column.type, type: 'longtext' },
+    DATA_TYPE: { value: column.type, type: 'text' },
     CHARACTER_MAXIMUM_LENGTH: { value: 255n, type: 'longlong' },
     CHARACTER_OCTET_LENGTH: { value: 1024n, type: 'longlong' },
     NUMERIC_PRECISION: { value: null, type: 'longlong' },
@@ -136,13 +136,13 @@ function _columnToColumns(
     DATETIME_PRECISION: { value: null, type: 'longlong' },
     CHARACTER_SET_NAME: { value: 'utf8mb4', type: 'string' },
     COLLATION_NAME: { value: 'utf8mb4_0900_ai_ci', type: 'string' },
-    COLUMN_TYPE: { value: 'varchar(256)', type: 'mediumtext' },
+    COLUMN_TYPE: { value: 'varchar(256)', type: 'text' },
     COLUMN_KEY: { value: 'PRI', type: 'string' },
     EXTRA: { value: '', type: 'string' },
     PRIVILEGES: { value: 'select,insert,update,references', type: 'string' },
-    COLUMN_COMMENT: { value: '', type: 'text' },
-    GENERATION_EXPRESSION: { value: '', type: 'longtext' },
-    SRS_ID: { value: null, type: 'int' },
+    COLUMN_COMMENT: { value: '', type: 'blob' },
+    GENERATION_EXPRESSION: { value: '', type: 'text' },
+    SRS_ID: { value: null, type: 'long' },
   };
 }
 async function* _listToItetator<T>(list: T[]) {

@@ -14,6 +14,7 @@ import type {
 } from '../handler_types';
 import type { ColumnRefInfo } from '../helpers/column_ref_helper';
 import type { Transaction } from '../transaction_manager';
+import type { ValueType } from '../types/value_type';
 import type {
   Join,
   Binary,
@@ -35,7 +36,7 @@ export type { AttributeValue } from '../../tools/dynamodb';
 
 export interface ColumnDef {
   name: string;
-  type: string;
+  type: ValueType;
   length?: number | null;
   scale?: number | null;
   charset?: string | null;
@@ -43,7 +44,7 @@ export interface ColumnDef {
 }
 export interface ColumnDefParam {
   name: string;
-  type: string;
+  type: ValueType;
   length: number | null;
   scale: number | null;
   charset: string | null;
@@ -58,7 +59,7 @@ export interface TableInfo {
 }
 export type EvaluationResultRow = Record<string, EvaluationResult>;
 export interface CellValue {
-  type: string;
+  type: ValueType;
   value: unknown;
 }
 export type CellRow = Record<string, CellValue>;
