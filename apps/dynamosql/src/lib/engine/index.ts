@@ -4,6 +4,7 @@ import * as InformationSchemaEngine from './information_schema';
 import * as MemoryEngine from './memory';
 import * as RawEngine from './raw';
 
+import type { COLLATIONS } from '../../constants/mysql';
 import type { Session } from '../../session';
 import type { AttributeValue, ItemRecord } from '../../tools/dynamodb';
 import type { EvaluationResult } from '../expression';
@@ -14,7 +15,7 @@ import type {
 } from '../handler_types';
 import type { ColumnRefInfo } from '../helpers/column_ref_helper';
 import type { Transaction } from '../transaction_manager';
-import type { ValueType } from '../types/value_type';
+import type { ValueType, MysqlType } from '../types/value_type';
 import type {
   Join,
   Binary,
@@ -37,18 +38,22 @@ export type { AttributeValue } from '../../tools/dynamodb';
 export interface ColumnDef {
   name: string;
   type: ValueType;
-  length?: number | null;
-  scale?: number | null;
-  charset?: string | null;
-  collation?: string | null;
+  mysqlType?: MysqlType;
+  length?: number;
+  decimals?: number;
+  collation?: COLLATIONS;
+  nullable?: boolean;
+  default?: unknown;
 }
 export interface ColumnDefParam {
   name: string;
   type: ValueType;
+  mysqlType: MysqlType;
   length: number | null;
-  scale: number | null;
+  decimals: number | null;
   charset: string | null;
-  collation: string | null;
+  collation: COLLATIONS | null;
+  nullable?: boolean;
   default?: unknown;
 }
 export interface TableInfo {
@@ -56,6 +61,16 @@ export interface TableInfo {
   primary_key: readonly string[];
   column_list: readonly ColumnDef[];
   is_open: boolean;
+}
+export type FromJoin = BaseFrom & Partial<Join>;
+export interface RowListParams {
+  dynamodb: DynamoDBClient;
+  session: Session;
+  list: FromJoin[];
+  where?: Binary | Function | Unary | FulltextSearch | ColumnRef | null;
+  requestSets: Map<From, Set<string>>;
+  requestAll: Map<From, boolean>;
+  columnRefMap: Map<ColumnRef, ColumnRefInfo>;
 }
 export type EvaluationResultRow = Record<string, EvaluationResult>;
 export interface CellValue {
@@ -66,10 +81,18 @@ export type CellRow = Record<string, CellValue>;
 export type Row = CellRow | ItemRecord;
 export type EngineValue = CellValue | AttributeValue;
 export type SourceMap = Map<BaseFrom, AsyncIterable<Row[]>>;
-export type ColumnMap = Map<BaseFrom, readonly string[]>;
+export type QueryColumnInfo = Omit<Partial<ColumnDef>, 'name'> & {
+  name: string;
+  name_lc: string;
+};
+export interface QueryTableInfo {
+  isCaseSensitive: boolean;
+  columns: readonly QueryColumnInfo[];
+}
+export type TableInfoMap = Map<BaseFrom, QueryTableInfo>;
 export interface RowListResult {
   sourceMap: SourceMap;
-  columnMap: ColumnMap;
+  tableInfoMap: TableInfoMap;
 }
 export interface TableData<T = Row> {
   database: string;
@@ -121,16 +144,6 @@ export interface AddColumnParams {
   dynamodb: DynamoDBClient;
   table: string;
   column: ColumnDef;
-}
-export type FromJoin = BaseFrom & Partial<Join>;
-export interface RowListParams {
-  dynamodb: DynamoDBClient;
-  session: Session;
-  list: FromJoin[];
-  where?: Binary | Function | Unary | FulltextSearch | ColumnRef | null;
-  requestSets: Map<From, Set<string>>;
-  requestAll: Map<From, boolean>;
-  columnRefMap: Map<ColumnRef, ColumnRefInfo>;
 }
 export interface DeleteChange {
   database: string;

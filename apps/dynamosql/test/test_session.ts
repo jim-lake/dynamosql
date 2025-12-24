@@ -4,7 +4,7 @@ const path = require('node:path');
 const config = tryRequire('../../../config');
 const dynamosql = require('../src');
 const { Types } = require('../src/types');
-const { CHARSETS, FIELD_FLAGS } = require('../src/constants/mysql');
+const { COLLATIONS, FIELD_FLAGS } = require('../src/constants/mysql');
 
 const sql = process.argv.slice(2).join(' ');
 if (!sql) {
@@ -56,7 +56,7 @@ session.query({ sql }, (err, results, fields) => {
       }
       for (const field of field_list) {
         if (typeof field === 'object') {
-          field.charsetNr = `${field.charsetNr} (${CHARSETS[field.charsetNr]})`;
+          field.charsetNr = `${field.charsetNr} (${COLLATIONS[field.charsetNr]})`;
           field.type = `${field.type} (${Types[field.type]})`;
           field.flags = `0x${field.flags.toString(16)} (${flagsToString(FIELD_FLAGS, field.flags)})`;
         }

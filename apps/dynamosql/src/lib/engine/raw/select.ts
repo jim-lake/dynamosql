@@ -4,25 +4,31 @@ import { SQLError } from '../../../error';
 import { escapeIdentifier } from '../../../tools/dynamodb_helper';
 import { convertWhere } from '../../helpers/convert_where';
 
+import type {
+  FromJoin,
+  RowListParams,
+  RowListResult,
+  QueryTableInfo,
+  QueryColumnInfo,
+} from '..';
 import type { ItemRecord } from '../../../tools/dynamodb';
-import type { FromJoin, RowListParams, RowListResult } from '../index';
 
 export async function getRowList(
   params: RowListParams
 ): Promise<RowListResult> {
   const sourceMap: RowListResult['sourceMap'] = new Map();
-  const columnMap: RowListResult['columnMap'] = new Map();
+  const tableInfoMap: RowListResult['tableInfoMap'] = new Map();
   const tasks = params.list.map(async (from) => {
-    const { resultIter, columnList } = await _getFromTable({ ...params, from });
-    columnMap.set(from, columnList);
+    const { resultIter, tableInfo } = await _getFromTable({ ...params, from });
     sourceMap.set(from, resultIter);
+    tableInfoMap.set(from, tableInfo);
   });
   await Promise.all(tasks);
-  return { sourceMap, columnMap };
+  return { sourceMap, tableInfoMap };
 }
 interface InteralGetResult {
   resultIter: AsyncIterable<ItemRecord[]>;
-  columnList: string[];
+  tableInfo: QueryTableInfo;
 }
 async function _getFromTable(
   params: RowListParams & { from: FromJoin }
@@ -40,11 +46,11 @@ async function _getFromTable(
   const requestSet = requestSets.get(from) ?? new Set<string>();
   const isRequestAll = requestAll.get(from) ?? false;
   const request_columns = [...requestSet];
-  const columns =
+  const column_sql =
     isRequestAll || request_columns.length === 0
       ? '*'
       : request_columns.map(escapeIdentifier).join(',');
-  let sql = `SELECT ${columns} FROM ${escapeIdentifier(table)}`;
+  let sql = `SELECT ${column_sql} FROM ${escapeIdentifier(table)}`;
   // Don't push down WHERE clause for LEFT JOIN tables (right side of join)
   // The WHERE clause must be applied after the join
   const is_left_join = from.join ? from.join.indexOf('LEFT') >= 0 : false;
@@ -58,22 +64,28 @@ async function _getFromTable(
 
   try {
     const iter = dynamodb.queryQLIter({ sql });
-    let columnList: string[] = [];
+    let columns: QueryColumnInfo[] = [];
     let first_values: ItemRecord[] | undefined;
     if (isRequestAll) {
       const first_batch = await iter.next();
       if (!first_batch.done) {
         first_values = first_batch.value;
-        const response_set = new Set<string>();
+        const response_map = new Map<string, QueryColumnInfo>();
         for (const result of first_batch.value) {
-          for (const key in result) {
-            response_set.add(key);
+          for (const name in result) {
+            const old = response_map.get(name);
+            if (!old) {
+              response_map.set(name, { name, name_lc: name.toLowerCase() });
+            }
           }
         }
-        columnList = [...response_set.keys()];
+        columns = [...response_map.values()];
       }
     } else {
-      columnList = request_columns;
+      columns = request_columns.map((name) => ({
+        name,
+        name_lc: name.toLowerCase(),
+      }));
     }
     async function* _makeIter(): AsyncIterable<ItemRecord[]> {
       try {
@@ -87,7 +99,10 @@ async function _getFromTable(
         throw _fixErr(err, table, sql);
       }
     }
-    return { resultIter: _makeIter(), columnList };
+    return {
+      resultIter: _makeIter(),
+      tableInfo: { isCaseSensitive: true, columns },
+    };
   } catch (err: unknown) {
     throw _fixErr(err, table, sql);
   }

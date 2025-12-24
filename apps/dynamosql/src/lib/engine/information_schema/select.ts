@@ -5,13 +5,19 @@ import { SQLDateTime } from '../../types/sql_datetime';
 
 import {
   CATALOGS_LIST,
-  CATALOGS_NAMES,
-  SCHEMATA_NAMES,
-  TABLES_NAMES,
-  COLUMNS_NAMES,
+  CATALOGS_INFO,
+  SCHEMATA_INFO,
+  TABLES_INFO,
+  COLUMNS_INFO,
 } from './schema';
 
-import type { ColumnDef, RowListParams, Row, RowListResult } from '../index';
+import type {
+  ColumnDef,
+  RowListParams,
+  Row,
+  RowListResult,
+  QueryTableInfo,
+} from '../index';
 import type { BaseFrom } from 'node-sql-parser';
 
 export async function getRowList(
@@ -19,26 +25,29 @@ export async function getRowList(
 ): Promise<RowListResult> {
   const { list } = params;
   const sourceMap: RowListResult['sourceMap'] = new Map();
-  const columnMap: RowListResult['columnMap'] = new Map();
+  const tableInfoMap: RowListResult['tableInfoMap'] = new Map();
 
   for (const from of list) {
-    const { results, column_list } = await _getFromTable({ ...params, from });
+    const { results, tableInfo } = await _getFromTable({ ...params, from });
     sourceMap.set(from, _listToItetator(results));
-    columnMap.set(from, column_list);
+    tableInfoMap.set(from, tableInfo);
   }
-  return { sourceMap, columnMap };
+  return { sourceMap, tableInfoMap };
 }
 async function _getFromTable(
   params: RowListParams & { from: BaseFrom }
-): Promise<{ results: Row[]; column_list: readonly string[] }> {
+): Promise<{ results: Row[]; tableInfo: QueryTableInfo }> {
   const { dynamodb, session } = params;
   switch (params.from.table.toLowerCase()) {
     case 'catalogs':
-      return { results: deepClone(CATALOGS_LIST), column_list: CATALOGS_NAMES };
+      return {
+        results: deepClone(CATALOGS_LIST),
+        tableInfo: deepClone(CATALOGS_INFO),
+      };
     case 'schemata': {
       const list = getDatabaseList();
       const results = list.map(_dbToSchemata);
-      return { results, column_list: SCHEMATA_NAMES };
+      return { results, tableInfo: deepClone(SCHEMATA_INFO) };
     }
     case 'tables': {
       const list = getDatabaseList();
@@ -49,7 +58,7 @@ async function _getFromTable(
           results.push(_tableToTable(database, found));
         }
       }
-      return { results, column_list: TABLES_NAMES };
+      return { results, tableInfo: deepClone(TABLES_INFO) };
     }
     case 'columns': {
       const list = getDatabaseList();
@@ -71,47 +80,47 @@ async function _getFromTable(
           );
         }
       }
-      return { results, column_list: COLUMNS_NAMES };
+      return { results, tableInfo: deepClone(COLUMNS_INFO) };
     }
   }
   throw new SQLError({ err: 'ER_BAD_TABLE_ERROR', args: [params.from.table] });
 }
 function _dbToSchemata(database: string): Row {
   return {
-    CATALOG_NAME: { value: 'def', type: 'string' },
-    SCHEMA_NAME: { value: database, type: 'string' },
-    DEFAULT_CHARACTER_SET_NAME: { value: 'utf8mb4', type: 'string' },
-    DEFAULT_COLLATION_NAME: { value: 'utf8mb4_0900_as_cs', type: 'string' },
-    SQL_PATH: { value: null, type: 'null' },
-    DEFAULT_ENCRYPTION: { value: 'NO', type: 'char' },
+    catalog_name: { value: 'def', type: 'string' },
+    schema_name: { value: database, type: 'string' },
+    default_character_set_name: { value: 'utf8mb4', type: 'string' },
+    default_collation_name: { value: 'utf8mb4_0900_as_cs', type: 'string' },
+    sql_path: { value: null, type: 'null' },
+    default_encryption: { value: 'NO', type: 'char' },
   };
 }
 function _tableToTable(database: string, table: string): Row {
   return {
-    TABLE_CATALOG: { value: 'def', type: 'string' },
-    TABLE_SCHEMA: { value: database, type: 'string' },
-    TABLE_NAME: { value: table, type: 'string' },
-    TABLE_TYPE: { value: 'BASE TABLE', type: 'string' },
-    ENGINE: { value: null, type: 'string' },
-    VERSION: { value: 10n, type: 'longlong' },
-    ROW_FORMAT: { value: 'Dynamic', type: 'string' },
-    TABLE_ROWS: { value: 0n, type: 'longlong' },
-    AVG_ROW_LENGTH: { value: 0n, type: 'longlong' },
-    DATA_LENGTH: { value: 0n, type: 'longlong' },
-    MAX_DATA_LENGTH: { value: 0n, type: 'longlong' },
-    INDEX_LENGTH: { value: 0n, type: 'longlong' },
-    DATA_FREE: { value: 0n, type: 'longlong' },
-    AUTO_INCREMENT: { value: null, type: 'string' },
-    CREATE_TIME: {
+    table_catalog: { value: 'def', type: 'string' },
+    table_schema: { value: database, type: 'string' },
+    table_name: { value: table, type: 'string' },
+    table_type: { value: 'BASE TABLE', type: 'string' },
+    engine: { value: null, type: 'string' },
+    version: { value: 10n, type: 'longlong' },
+    row_format: { value: 'Dynamic', type: 'string' },
+    table_rows: { value: 0n, type: 'longlong' },
+    avg_row_length: { value: 0n, type: 'longlong' },
+    data_length: { value: 0n, type: 'longlong' },
+    max_data_length: { value: 0n, type: 'longlong' },
+    index_length: { value: 0n, type: 'longlong' },
+    data_free: { value: 0n, type: 'longlong' },
+    auto_increment: { value: null, type: 'string' },
+    create_time: {
       value: new SQLDateTime({ time: Date.now() / 1000 }),
       type: 'datetime',
     },
-    UPDATE_TIME: { value: null, type: 'datetime' },
-    CHECK_TIME: { value: null, type: 'datetime' },
-    TABLE_COLLATION: { value: null, type: 'string' },
-    CHECKSUM: { value: null, type: 'longlong' },
-    CREATE_OPTIONS: { value: '', type: 'string' },
-    TABLE_COMMENT: { value: '', type: 'string' },
+    update_time: { value: null, type: 'datetime' },
+    check_time: { value: null, type: 'datetime' },
+    table_collation: { value: null, type: 'string' },
+    checksum: { value: null, type: 'longlong' },
+    create_options: { value: '', type: 'string' },
+    table_comment: { value: '', type: 'string' },
   };
 }
 function _columnToColumns(
@@ -121,28 +130,28 @@ function _columnToColumns(
   column: ColumnDef
 ): Row {
   return {
-    TABLE_CATALOG: { value: 'def', type: 'string' },
-    TABLE_SCHEMA: { value: database, type: 'string' },
-    TABLE_NAME: { value: table, type: 'string' },
-    COLUMN_NAME: { value: column.name, type: 'string' },
-    ORDINAL_POSITION: { value: index + 1, type: 'long' },
-    COLUMN_DEFAULT: { value: null, type: 'text' },
-    IS_NULLABLE: { value: 'NO', type: 'string' },
-    DATA_TYPE: { value: column.type, type: 'text' },
-    CHARACTER_MAXIMUM_LENGTH: { value: 255n, type: 'longlong' },
-    CHARACTER_OCTET_LENGTH: { value: 1024n, type: 'longlong' },
-    NUMERIC_PRECISION: { value: null, type: 'longlong' },
-    NUMERIC_SCALE: { value: null, type: 'longlong' },
-    DATETIME_PRECISION: { value: null, type: 'longlong' },
-    CHARACTER_SET_NAME: { value: 'utf8mb4', type: 'string' },
-    COLLATION_NAME: { value: 'utf8mb4_0900_ai_ci', type: 'string' },
-    COLUMN_TYPE: { value: 'varchar(256)', type: 'text' },
-    COLUMN_KEY: { value: 'PRI', type: 'string' },
-    EXTRA: { value: '', type: 'string' },
-    PRIVILEGES: { value: 'select,insert,update,references', type: 'string' },
-    COLUMN_COMMENT: { value: '', type: 'text' },
-    GENERATION_EXPRESSION: { value: '', type: 'text' },
-    SRS_ID: { value: null, type: 'long' },
+    table_catalog: { value: 'def', type: 'string' },
+    table_schema: { value: database, type: 'string' },
+    table_name: { value: table, type: 'string' },
+    column_name: { value: column.name, type: 'string' },
+    ordinal_position: { value: index + 1, type: 'long' },
+    column_default: { value: null, type: 'text' },
+    is_nullable: { value: 'no', type: 'string' },
+    data_type: { value: column.type, type: 'text' },
+    character_maximum_length: { value: 255n, type: 'longlong' },
+    character_octet_length: { value: 1024n, type: 'longlong' },
+    numeric_precision: { value: null, type: 'longlong' },
+    numeric_scale: { value: null, type: 'longlong' },
+    datetime_precision: { value: null, type: 'longlong' },
+    character_set_name: { value: 'utf8mb4', type: 'string' },
+    collation_name: { value: 'utf8mb4_0900_ai_ci', type: 'string' },
+    column_type: { value: 'varchar(256)', type: 'text' },
+    column_key: { value: 'pri', type: 'string' },
+    extra: { value: '', type: 'string' },
+    privileges: { value: 'select,insert,update,references', type: 'string' },
+    column_comment: { value: '', type: 'text' },
+    generation_expression: { value: '', type: 'text' },
+    srs_id: { value: null, type: 'long' },
   };
 }
 async function* _listToItetator<T>(list: T[]) {

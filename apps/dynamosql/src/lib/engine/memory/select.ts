@@ -2,29 +2,25 @@ import { SQLError } from '../../../error';
 
 import * as Storage from './storage';
 
-import type { RowListParams, Row, RowListResult } from '../index';
+import type { QueryTableInfo, RowListParams, Row, RowListResult } from '..';
 import type { BaseFrom } from 'node-sql-parser';
 
 export async function getRowList(
   params: RowListParams
 ): Promise<RowListResult> {
   const { list } = params;
-
   const sourceMap: RowListResult['sourceMap'] = new Map();
-  const columnMap: RowListResult['columnMap'] = new Map();
-
+  const tableInfoMap: RowListResult['tableInfoMap'] = new Map();
   for (const from of list) {
-    const { row_list, column_list } = _getFromTable({ ...params, from });
-    sourceMap.set(from, _listToItetator(row_list));
-    columnMap.set(from, column_list);
+    const { rowList, tableInfo } = _getFromTable({ ...params, from });
+    sourceMap.set(from, _listToItetator(rowList));
+    tableInfoMap.set(from, tableInfo);
   }
-
-  return { sourceMap, columnMap };
+  return { sourceMap, tableInfoMap };
 }
-
 function _getFromTable(params: RowListParams & { from: BaseFrom }): {
-  row_list: Row[];
-  column_list: string[];
+  rowList: Row[];
+  tableInfo: QueryTableInfo;
 } {
   const { session, from } = params;
   const { db, table } = from;
@@ -33,8 +29,8 @@ function _getFromTable(params: RowListParams & { from: BaseFrom }): {
     throw new SQLError('table_not_found');
   }
   return {
-    row_list: data.row_list,
-    column_list: data.column_list.map((column) => column.name),
+    rowList: data.row_list,
+    tableInfo: { isCaseSensitive: false, columns: data.column_list },
   };
 }
 async function* _listToItetator<T>(list: T[]) {

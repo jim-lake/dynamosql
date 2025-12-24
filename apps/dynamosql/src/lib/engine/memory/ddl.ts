@@ -13,6 +13,7 @@ import type {
   IndexParams,
   AddColumnParams,
 } from '../index';
+import type { MemoryColumnDef } from './storage';
 
 export async function getTableInfo(
   params: TableInfoParams
@@ -43,12 +44,20 @@ export async function createTable(params: CreateTableParams): Promise<void> {
     });
   }
   const column_list = params.column_list.map((col) => {
-    const { default: _ignore, ...other } = col;
-    return {
-      ...other,
+    const ret: MemoryColumnDef = {
+      name: col.name,
       name_lc: col.name.toLowerCase(),
+      type: col.type,
+      mysqlType: col.mysqlType,
       defaultValue: Object.freeze(_getDefault(col)),
     };
+    if (col.decimals !== null) {
+      ret.decimals = col.decimals;
+    }
+    if (col.nullable) {
+      ret.nullable = col.nullable;
+    }
+    return ret;
   });
   const data = {
     column_list,

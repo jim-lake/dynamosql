@@ -102,7 +102,7 @@ export enum FIELD_FLAGS {
   NUM = 32768,
 }
 
-export enum CHARSETS {
+export enum COLLATIONS {
   BIG5_CHINESE_CI = 1,
   LATIN2_CZECH_CS = 2,
   DEC8_SWEDISH_CI = 3,

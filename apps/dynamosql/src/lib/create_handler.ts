@@ -16,6 +16,7 @@ import type { ColumnDefParam, EvaluationResultRow } from './engine';
 import type { HandlerParams, AffectedResult } from './handler_types';
 import type { FieldInfo } from '../types';
 import type { EvaluationResult } from './expression';
+import type { MysqlType } from './types/value_type';
 import type { Create, CreateTable, CreateDatabase } from 'node-sql-parser';
 
 function isCreateDatabase(ast: Create): ast is CreateDatabase {
@@ -86,10 +87,11 @@ async function _createTable(
       const col = {
         name: def.column.column,
         type: mysqlStringToValueType(def.definition.dataType),
+        mysqlType: def.definition.dataType as MysqlType,
         length: def.definition.length ?? null,
-        scale: def.definition.scale ?? null,
+        decimals: def.definition.scale ?? null,
         charset: def.character_set?.value.value ?? null,
-        collation: def.collate?.collate?.name ?? null,
+        collation: null,
       };
       column_list.push(col);
       if (def.primary_key === 'primary key') {

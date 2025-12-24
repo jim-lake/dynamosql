@@ -10,7 +10,7 @@ import { formGroup, formImplicitGroup, hasAggregate } from './helpers/group';
 import { formJoin } from './helpers/join';
 import { sort } from './helpers/sort';
 
-import type { ColumnMap, SourceMap } from './engine';
+import type { QueryColumnInfo, TableInfoMap, SourceMap } from './engine';
 import type {
   HandlerParams,
   DynamoDBClient,
@@ -21,9 +21,11 @@ import type {
 } from './handler_types';
 import type { FieldInfo } from '../types';
 import type { EvaluationResult } from './expression';
+import type { COLLATIONS } from '../constants/mysql';
 import type { Session } from '../session';
 import type { ColumnRefInfo } from './helpers/column_ref_helper';
 import type { SelectModifyAST } from './helpers/select_modify';
+import type { MysqlType, ValueType } from './types/value_type';
 import type {
   Select,
   ColumnRef,
@@ -59,9 +61,16 @@ interface QueryColumn {
     from?: { db?: string; table?: string; as?: string };
   };
   as: string | null;
-  result_type?: string;
-  result_name?: string;
-  result_nullable?: boolean;
+  result: {
+    type?: ValueType | undefined;
+    mysqlType?: MysqlType | undefined;
+    name?: string | undefined;
+    orgName?: string | undefined;
+    length?: number | undefined;
+    decimals?: number | undefined;
+    collation?: COLLATIONS | undefined;
+    nullable?: boolean | undefined;
+  };
   db?: string;
 }
 export interface SelectResult {
@@ -148,7 +157,7 @@ async function _iterQuery(
   }
   const from = ast.type === 'update' ? ast.table : ast.from;
   const sourceMap: SourceMap = new Map();
-  const columnMap: ColumnMap = new Map();
+  const tableInfoMap: TableInfoMap = new Map();
   if (Array.isArray(from) && from[0]) {
     if (!_isBaseFromList(from)) {
       throw new SQLError('Invalid from clause');
@@ -174,8 +183,8 @@ async function _iterQuery(
       for (const [f, item] of result.sourceMap) {
         sourceMap.set(f, item);
       }
-      for (const [f, item] of result.columnMap) {
-        columnMap.set(f, item);
+      for (const [f, item] of result.tableInfoMap) {
+        tableInfoMap.set(f, item);
       }
     });
     await Promise.all(tasks);
@@ -183,7 +192,7 @@ async function _iterQuery(
   return _evaluateReturn({
     ...params,
     sourceMap,
-    columnMap,
+    tableInfoMap,
     requestSets,
     columnRefMap,
   });
@@ -193,7 +202,7 @@ interface EvaluateReturnParams {
   session: Session;
   dynamodb: DynamoDBClient;
   sourceMap: SourceMap;
-  columnMap: ColumnMap;
+  tableInfoMap: TableInfoMap;
   requestSets: Map<From, Set<string>>;
   columnRefMap: Map<ColumnRef, ColumnRefInfo>;
 }
@@ -251,50 +260,87 @@ interface ExpandStarColumnsParams {
     columns?: Select['columns'] | null;
     groupby?: Select['groupby'] | null;
   };
-  columnMap: ColumnMap;
+  tableInfoMap: TableInfoMap;
   requestSets: Map<From, Set<string>>;
   columnRefMap: Map<ColumnRef, ColumnRefInfo>;
 }
 function _expandStarColumns(params: ExpandStarColumnsParams): QueryColumn[] {
-  const { ast, columnMap, requestSets, columnRefMap } = params;
+  const { ast, tableInfoMap, columnRefMap } = params;
   const ret: QueryColumn[] = [];
+  const seen_columns = new Map<From, Set<string>>();
+
+  function _addSeen(from: From, col_name: string) {
+    let seen_set = seen_columns.get(from);
+    if (!seen_set) {
+      seen_set = new Set<string>();
+      seen_columns.set(from, seen_set);
+    }
+    seen_set.add(col_name);
+  }
+
   for (const column of ast.columns ?? []) {
-    if (
-      'type' in column.expr &&
-      column.expr.type === 'column_ref' &&
-      column.expr.column === '*'
-    ) {
-      const colExpr = column.expr;
-      const table = colExpr.table;
-      const from_list = Array.isArray(ast.from) ? ast.from : [];
-      for (const from of from_list) {
-        if (!_isBaseFrom(from)) {
-          continue;
-        }
-        // Match if no table specified, or table matches from.table or from.as
-        if (!table || (from.table === table && !from.as) || from.as === table) {
-          const column_list = columnMap.get(from)?.slice();
-          if (column_list && !column_list.length) {
-            const requestSet = requestSets.get(from);
-            requestSet?.forEach((name: string) => column_list.push(name));
+    if ('type' in column.expr && column.expr.type === 'column_ref') {
+      if (column.expr.column === '*') {
+        const table = column.expr.table;
+        const from_list = Array.isArray(ast.from) ? ast.from : [];
+        for (const from of from_list) {
+          if (!_isBaseFrom(from)) {
+            continue;
           }
-          column_list?.forEach((name: string) => {
-            const colRef = {
-              type: 'column_ref' as const,
-              db: from.as ? null : from.db,
-              table: from.as ?? from.table,
-              column: name,
-            };
-            // Add to columnRefMap so it can be looked up later
-            columnRefMap.set(colRef, { from });
-            ret.push({ expr: colRef, as: null });
-          });
+          // Match if no table specified, or table matches from.table or from.as
+          if (
+            !table ||
+            (from.table === table && !from.as) ||
+            from.as === table
+          ) {
+            const info = tableInfoMap.get(from);
+            const seen_set = seen_columns.get(from) ?? new Set();
+            info?.columns.forEach((c) => {
+              const col_name = info.isCaseSensitive
+                ? c.name
+                : c.name.toLowerCase();
+              if (!seen_set.has(col_name)) {
+                const colRef = {
+                  type: 'column_ref' as const,
+                  db: from.as ? null : from.db,
+                  table: from.as ?? from.table,
+                  column: c.name,
+                };
+                // Add to columnRefMap so it can be looked up later
+                columnRefMap.set(colRef, { from });
+                ret.push({
+                  expr: colRef,
+                  as: null,
+                  result: _makeResultColumn(c),
+                });
+              }
+            });
+          }
         }
+      } else {
+        const column_ref = columnRefMap.get(column.expr);
+        let result: QueryColumn['result'] = {};
+        if (column_ref?.from && _isBaseFrom(column_ref.from)) {
+          const info = tableInfoMap.get(column_ref.from);
+          if (info) {
+            const col_name = info.isCaseSensitive
+              ? column.expr.column
+              : column.expr.column.toLowerCase();
+            const found = info.isCaseSensitive
+              ? info.columns.find((c) => c.name === col_name)
+              : info.columns.find((c) => c.name_lc === col_name);
+            if (found) {
+              result = _makeResultColumn(found);
+            }
+            _addSeen(column_ref.from, col_name);
+          }
+        }
+        ret.push({ ...column, result } as QueryColumn);
       }
     } else {
       // Star and Assign are handled elsewhere
       if ('expr' in column && 'as' in column) {
-        ret.push(column as QueryColumn);
+        ret.push({ ...column, result: {} } as QueryColumn);
       }
     }
   }
@@ -328,12 +374,12 @@ async function* _makeResults(
           throw new SQLError(result.err);
         }
         output_row.push(result);
-        if (result.type !== column.result_type) {
-          column.result_type = _unionType(column.result_type, result.type);
+        if (result.type !== column.result.type) {
+          column.result.type = _unionType(column.result.type, result.type);
         }
-        column.result_name ??= result.name;
+        column.result.name ??= result.name;
         if (result.value === null) {
-          column.result_nullable = true;
+          column.result.nullable = true;
         }
         if (result.sleep_ms) {
           await setTimeout(result.sleep_ms, undefined, { signal });
@@ -395,10 +441,10 @@ async function* _makeLimit(
 function _calcColumns(
   queryColumns: QueryColumn[],
   columnRefMap: Map<ColumnRef, ColumnRefInfo>
-) {
-  const columns: FieldInfo[] = [];
+): FieldInfo[] {
+  const ret: FieldInfo[] = [];
   for (const column of queryColumns) {
-    const column_type = convertType(column.result_type, column.result_nullable);
+    const column_type = convertType(column.result);
 
     // Get table info from columnRefMap if this is a column_ref
     let fromInfo: BaseFrom | null = null;
@@ -410,18 +456,18 @@ function _calcColumns(
     }
 
     column_type.db = fromInfo?.db ?? column.expr.db ?? column.db ?? '';
-    column_type.orgName = column.result_name ?? '';
-    column_type.name = column.as ?? column_type.orgName;
+    column_type.orgName = column.result.orgName ?? column.result.name ?? '';
+    column_type.name = column.as ?? column.result.name ?? column_type.orgName;
     column_type.orgTable = fromInfo?.table ?? '';
     column_type.table = fromInfo?.as ?? column_type.orgTable;
-    columns.push(column_type);
+    ret.push(column_type);
   }
-  return columns;
+  return ret;
 }
 function _unionType(
-  old_type: string | undefined,
-  new_type: string | undefined
-): string {
+  old_type: ValueType | undefined,
+  new_type: ValueType | undefined
+): ValueType {
   let ret = new_type ?? 'string';
   if (!old_type || old_type === 'null') {
     // noop
@@ -431,4 +477,14 @@ function _unionType(
     ret = 'string';
   }
   return ret;
+}
+function _makeResultColumn(column: QueryColumnInfo): QueryColumn['result'] {
+  return {
+    mysqlType: column.mysqlType,
+    orgName: column.name,
+    length: column.length,
+    decimals: column.decimals,
+    collation: column.collation,
+    nullable: column.nullable,
+  };
 }

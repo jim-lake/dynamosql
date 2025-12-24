@@ -1,4 +1,4 @@
-import { CHARSETS } from '../../constants/mysql';
+import { COLLATIONS } from '../../constants/mysql';
 import { toBigInt } from '../../tools/safe_convert';
 import { Types } from '../../types';
 import { SQLDate } from '../types/sql_date';
@@ -81,7 +81,7 @@ export function typeCast(
       case Types.SET:
       case Types.VAR_STRING:
       case Types.STRING:
-        if (column.charsetNr === (CHARSETS.BINARY as number)) {
+        if (column.charsetNr === (COLLATIONS.BINARY as number)) {
           return Buffer.isBuffer(value) ? value : Buffer.from(String(value));
         } else {
           return String(value);

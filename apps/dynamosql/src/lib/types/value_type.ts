@@ -1,5 +1,3 @@
-import { Types } from '../../types';
-
 export type ValueType =
   | 'null'
   | 'bool'
@@ -14,7 +12,50 @@ export type ValueType =
   | 'number'
   | 'double'
   | 'text'
+  | 'json'
   | 'buffer';
+
+export type MysqlType =
+  | 'BOOLEAN'
+  | 'BLOB'
+  | 'TINYBLOB'
+  | 'MEDIUMBLOB'
+  | 'LONGBLOB'
+  | 'BINARY'
+  | 'VARBINARY'
+  | 'CHAR'
+  | 'VARCHAR'
+  | 'NUMERIC'
+  | 'DECIMAL'
+  | 'INT'
+  | 'SMALLINT'
+  | 'MEDIUMINT'
+  | 'TINYINT'
+  | 'BIGINT'
+  | 'FLOAT'
+  | 'DOUBLE'
+  | 'BIT'
+  | 'DATE'
+  | 'DATETIME'
+  | 'TIME'
+  | 'TIMESTAMP'
+  | 'YEAR'
+  | 'ENUM'
+  | 'SET'
+  | 'JSON'
+  | 'TINYTEXT'
+  | 'TEXT'
+  | 'MEDIUMTEXT'
+  | 'LONGTEXT'
+  | 'GEOMETRY'
+  | 'POINT'
+  | 'LINESTRING'
+  | 'POLYGON'
+  | 'MULTIPOINT'
+  | 'MULTILINESTRING'
+  | 'MULTIPOLYGON'
+  | 'GEOMETRYCOLLECTION'
+  | 'VECTOR';
 
 export function mysqlStringToValueType(s: string): ValueType {
   switch (s) {
@@ -39,36 +80,5 @@ export function mysqlStringToValueType(s: string): ValueType {
       return 'bool';
     default:
       return 'string';
-  }
-}
-export function valueTypeToMysqlType(type: ValueType): Types {
-  switch (type) {
-    case 'null':
-      return Types.NULL;
-    case 'bool':
-      return Types.TINY;
-    case 'datetime':
-      return Types.DATETIME;
-    case 'date':
-      return Types.DATE;
-    case 'interval':
-    case 'time':
-      return Types.TIME;
-    case 'string':
-      return Types.VAR_STRING;
-    case 'char':
-      return Types.STRING;
-    case 'long':
-      return Types.LONG;
-    case 'longlong':
-      return Types.LONGLONG;
-    case 'number':
-      return Types.NEWDECIMAL;
-    case 'double':
-      return Types.DOUBLE;
-    case 'text':
-      return Types.BLOB;
-    case 'buffer':
-      return Types.VAR_STRING;
   }
 }

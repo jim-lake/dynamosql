@@ -1,10 +1,10 @@
 import { SQLError } from '../../../error';
 
 import {
-  CATALOGS_COLUMNS,
-  SCHEMATA_COLUMNS,
-  TABLES_COLUMNS,
-  COLUMNS_COLUMNS,
+  CATALOGS_INFO,
+  SCHEMATA_INFO,
+  TABLES_INFO,
+  COLUMNS_INFO,
 } from './schema';
 
 import type { TableInfoParams, TableInfo, TableListParams } from '../index';
@@ -18,28 +18,28 @@ export async function getTableInfo(
       return {
         table,
         primary_key: [],
-        column_list: CATALOGS_COLUMNS,
+        column_list: CATALOGS_INFO.columns,
         is_open: false,
       };
     case 'schemata':
       return {
         table,
         primary_key: [],
-        column_list: SCHEMATA_COLUMNS,
+        column_list: SCHEMATA_INFO.columns,
         is_open: false,
       };
     case 'tables':
       return {
         table,
         primary_key: [],
-        column_list: TABLES_COLUMNS,
+        column_list: TABLES_INFO.columns,
         is_open: false,
       };
     case 'columns':
       return {
         table,
         primary_key: [],
-        column_list: COLUMNS_COLUMNS,
+        column_list: COLUMNS_INFO.columns,
         is_open: false,
       };
   }

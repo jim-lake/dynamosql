@@ -3,7 +3,7 @@ process.env.TZ = 'UTC';
 const mysql = require('mysql');
 const config = require('../../../config.json');
 const { Types } = require('../src/types');
-const { CHARSETS, FIELD_FLAGS } = require('../src/constants/mysql');
+const { COLLATIONS, FIELD_FLAGS } = require('../src/constants/mysql');
 
 const sql = process.argv.pop();
 const arg_len = process.argv.length;
@@ -55,7 +55,7 @@ conn.connect((err) => {
         }
         for (const field of field_list) {
           if (typeof field === 'object') {
-            field.charsetNr = `${field.charsetNr} (${CHARSETS[field.charsetNr]})`;
+            field.charsetNr = `${field.charsetNr} (${COLLATIONS[field.charsetNr]})`;
             field.type = `${field.type} (${Types[field.type]})`;
             field.flags = `0x${field.flags.toString(16)} (${flagsToString(FIELD_FLAGS, field.flags)})`;
           }
