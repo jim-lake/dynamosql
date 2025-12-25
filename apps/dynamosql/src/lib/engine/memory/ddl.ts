@@ -83,19 +83,12 @@ export async function dropTable(params: DropTableParams): Promise<void> {
 export async function addColumn(_params: AddColumnParams): Promise<void> {}
 export async function createIndex(_params: IndexParams): Promise<void> {}
 export async function deleteIndex(_params: IndexParams): Promise<void> {}
-function _getDefault(column: ColumnDefParam): CellValue {
-  let value: unknown;
+function _getDefault(column: ColumnDefParam): CellValue | undefined {
   if (column.default !== undefined) {
-    value = column.default;
+    return { type: column.type, value: column.default };
+  } else if (column.nullable !== false) {
+    return { type: column.type, value: null };
   } else {
-    switch (column.type.toLowerCase()) {
-      case 'int':
-        value = 0;
-        break;
-      default:
-        value = null;
-        break;
-    }
+    return undefined;
   }
-  return { type: column.type, value };
 }

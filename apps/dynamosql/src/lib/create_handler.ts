@@ -92,6 +92,7 @@ async function _createTable(
         decimals: def.definition.scale ?? null,
         charset: def.character_set?.value.value ?? null,
         collation: null,
+        nullable: def.nullable?.value !== 'not null',
       };
       column_list.push(col);
       if (def.primary_key === 'primary key') {

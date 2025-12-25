@@ -3,9 +3,8 @@ import { drainBoth } from '../../tools/drain_both';
 import { filterInPlace } from '../../tools/filter_in_place';
 import { getValue } from '../expression';
 
-import type { ColumnRefInfo } from './column_ref_helper';
-import type { Session } from '../../session';
 import type { Row, SourceMap } from '../engine';
+import type { EvaluationState } from '../expression';
 import type { SourceRow } from '../handler_types';
 import type {
   From,
@@ -20,33 +19,26 @@ export interface FormJoinParams {
   sourceMap: SourceMap;
   from: From[];
   where: Binary | Function | Unary | FulltextSearch | ColumnRef | null;
-  session: Session;
-  columnRefMap: Map<ColumnRef, ColumnRefInfo>;
+  state: EvaluationState;
 }
 export async function* formJoin(
   params: FormJoinParams
 ): AsyncIterableIterator<SourceRow[]> {
-  const { sourceMap, from, where, session, columnRefMap } = params;
+  const { sourceMap, from, where, state } = params;
   const first = from[0];
   if (!first) {
     return;
   }
   let upstream = _firstRowIter(first, sourceMap);
   for (let i = 1; i < from.length; i++) {
-    upstream = _join(
-      upstream,
-      from[i] as From,
-      sourceMap,
-      session,
-      columnRefMap
-    );
+    upstream = _join(upstream, from[i] as From, sourceMap, state);
   }
 
   for await (const batch of upstream) {
     if (batch.length > 0) {
       if (where) {
         filterInPlace(batch, (row) => {
-          const result = getValue(where, { session, row, columnRefMap });
+          const result = getValue(where, { ...state, row });
           if (result.err) {
             throw new SQLError(result.err);
           }
@@ -83,8 +75,7 @@ function _join(
   upstream: AsyncIterable<SourceRow[]>,
   from: From,
   sourceMap: Map<From, AsyncIterable<Row[]>>,
-  session: Session,
-  columnRefMap: Map<ColumnRef, ColumnRefInfo>
+  state: EvaluationState
 ): AsyncIterable<SourceRow[]> {
   const isLeft = 'join' in from && from.join.includes('LEFT');
   const on = 'on' in from ? from.on : undefined;
@@ -108,7 +99,7 @@ function _join(
           const source = new Map(parent.source);
           source.set(from, child);
           const row = { source, result: null, group: null };
-          const result = getValue(on, { session, row, columnRefMap });
+          const result = getValue(on, { ...state, row });
           if (result.err) {
             throw new SQLError(result.err);
           } else if (result.value) {

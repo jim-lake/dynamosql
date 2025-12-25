@@ -1,4 +1,4 @@
-import { COLLATIONS } from '../../constants/mysql';
+import { FIELD_FLAGS } from '../../constants/mysql';
 import { toBigInt } from '../../tools/safe_convert';
 import { Types } from '../../types';
 import { SQLDate } from '../types/sql_date';
@@ -81,7 +81,7 @@ export function typeCast(
       case Types.SET:
       case Types.VAR_STRING:
       case Types.STRING:
-        if (column.charsetNr === (COLLATIONS.BINARY as number)) {
+        if (column.flags & FIELD_FLAGS.BINARY) {
           return Buffer.isBuffer(value) ? value : Buffer.from(String(value));
         } else {
           return String(value);
@@ -100,7 +100,11 @@ export function typeCast(
       case Types.MEDIUM_BLOB:
       case Types.LONG_BLOB:
       case Types.BLOB:
-        return Buffer.isBuffer(value) ? value : Buffer.from(String(value));
+        if (column.flags & FIELD_FLAGS.BINARY) {
+          return Buffer.isBuffer(value) ? value : Buffer.from(String(value));
+        } else {
+          return String(value);
+        }
       default:
       case Types.NULL:
         return null;

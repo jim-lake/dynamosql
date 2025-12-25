@@ -3,7 +3,7 @@ import type { CellValue, ColumnDef, CellRow } from '../index';
 
 export interface MemoryColumnDef extends ColumnDef {
   name_lc: string;
-  defaultValue: CellValue;
+  defaultValue: CellValue | undefined;
 }
 
 export interface TableData {

@@ -2,21 +2,15 @@ import { SQLError } from '../../error';
 import { Types } from '../../types';
 import { getValue } from '../expression';
 
-import type { ColumnRefInfo } from './column_ref_helper';
-import type { Session } from '../../session';
 import type { FieldInfo } from '../../types';
+import type { EvaluationState } from '../expression';
 import type { SourceRowResult } from '../handler_types';
-import type { OrderBy, ColumnRef } from 'node-sql-parser';
+import type { OrderBy } from 'node-sql-parser';
 
-export interface SortState {
-  session: Session;
-  columns?: FieldInfo[];
-  columnRefMap?: Map<ColumnRef, ColumnRefInfo>;
-}
 export async function* sort(
   iter: AsyncIterableIterator<SourceRowResult[]>,
   orderby: OrderBy[],
-  state: SortState
+  state: EvaluationState
 ): AsyncIterableIterator<SourceRowResult[]> {
   let result_list: SourceRowResult[] = [];
   for await (const batch of iter) {
@@ -31,7 +25,7 @@ export async function* sort(
 }
 function _sort(
   orderby: OrderBy[],
-  state: SortState,
+  state: EvaluationState,
   a: SourceRowResult,
   b: SourceRowResult
 ): number {
@@ -48,7 +42,7 @@ function _sort(
       const result = func(
         a.result[index]?.value,
         b.result[index]?.value,
-        a.result[index]?.type //state.columns?.[index]
+        a.result[index]?.type
       );
       if (result !== 0) {
         return result;
@@ -68,7 +62,6 @@ function _sort(
   }
   return 0;
 }
-
 function _asc(
   a: unknown,
   b: unknown,
@@ -109,7 +102,6 @@ function _desc(
 ): number {
   return _asc(b, a, column);
 }
-
 function _convertNum(value: unknown): number {
   if (value === '') {
     return 0;

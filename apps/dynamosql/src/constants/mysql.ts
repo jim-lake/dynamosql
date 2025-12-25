@@ -83,7 +83,6 @@ export enum SERVER_COMMANDS {
   EOF = 254,
   ERROR = 255,
 }
-
 export enum FIELD_FLAGS {
   NOT_NULL = 1,
   PRI_KEY = 2,
@@ -101,7 +100,6 @@ export enum FIELD_FLAGS {
   ON_UPDATE_NOW = 8192,
   NUM = 32768,
 }
-
 export enum COLLATIONS {
   BIG5_CHINESE_CI = 1,
   LATIN2_CZECH_CS = 2,

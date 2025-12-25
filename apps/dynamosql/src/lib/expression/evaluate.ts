@@ -15,7 +15,7 @@ import { methods as UnaryExpression } from './unary_expression';
 
 import type { SQLError } from '../../error';
 import type { Session } from '../../session';
-import type { EngineValue, CellValue } from '../engine';
+import type { EngineValue, CellValue, TableInfoMap } from '../engine';
 import type {
   SourceRow,
   SourceRowResult,
@@ -47,6 +47,7 @@ export interface EvaluationState {
   session: Session;
   row?: SourceRow | SourceRowResult | SourceRowGroup | SourceRowResultGroup;
   columnRefMap?: Map<ColumnRef, ColumnRefInfo>;
+  tableInfoMap?: TableInfoMap;
 }
 export interface EvaluationValue {
   type: ValueType;
@@ -167,7 +168,7 @@ export function getValue(
     | undefined,
   state: EvaluationState
 ): EvaluationResult {
-  const { session, row } = state;
+  const { session, row, tableInfoMap } = state;
   let result: EvaluationResult = {
     err: null,
     type: 'null',
@@ -381,10 +382,9 @@ export function getValue(
       }
     }
   } else if (isColumnRef(expr)) {
-    const columnValue = expr.column;
-    const columnName = String(columnValue);
+    const col_name = String(expr.column);
 
-    result.name = columnName;
+    result.name = col_name;
     const refInfo = state.columnRefMap?.get(expr);
     if (row && refInfo?.resultIndex !== undefined && refInfo.resultIndex >= 0) {
       const output_result = row.result
@@ -398,15 +398,22 @@ export function getValue(
       const from = refInfo?.from;
       let cell: EngineValue | null | undefined;
       if (from) {
-        const fromData = row.source.get(from);
-        cell = fromData?.[columnName];
+        const from_row = row.source.get(from);
+        if (from_row) {
+          const info = tableInfoMap?.get(from);
+          if (info?.isCaseSensitive === false) {
+            cell = from_row[col_name.toLowerCase()];
+          } else {
+            cell = from_row[col_name];
+          }
+        }
       }
       const decode = _decodeCell(cell);
       result.type = decode.type;
       result.value = decode.value;
     } else {
       result.err = 'no_row_list';
-      result.value = columnName;
+      result.value = col_name;
     }
   } else {
     logger.error('unsupported expr:', expr);

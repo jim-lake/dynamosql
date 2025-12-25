@@ -65,6 +65,11 @@ function _transformRow(
     const cell = row[column.name_lc];
     if (cell !== undefined) {
       result[column.name_lc] = { type: cell.type, value: cell.value };
+    } else if (column.defaultValue === undefined) {
+      throw new SQLError({
+        err: 'ER_NO_DEFAULT_FOR_FIELD',
+        args: [column.name],
+      });
     } else {
       result[column.name_lc] = column.defaultValue;
     }

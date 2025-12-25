@@ -89,7 +89,7 @@ export interface QueryTableInfo {
   isCaseSensitive: boolean;
   columns: readonly QueryColumnInfo[];
 }
-export type TableInfoMap = Map<BaseFrom, QueryTableInfo>;
+export type TableInfoMap = Map<From, QueryTableInfo>;
 export interface RowListResult {
   sourceMap: SourceMap;
   tableInfoMap: TableInfoMap;

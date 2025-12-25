@@ -1,8 +1,7 @@
 import { SQLError } from '../../error';
 import { getValue } from '../expression';
 
-import type { ColumnRefInfo } from './column_ref_helper';
-import type { Session } from '../../session';
+import type { EvaluationState } from '../expression';
 import type { SourceRow, SourceRowGroup } from '../handler_types';
 import type {
   ExpressionValue,
@@ -40,10 +39,8 @@ export interface FormGroupParams {
   groupby: GroupBy;
   ast: Select;
   rowIter: AsyncIterable<SourceRow[]>;
-  session: Session;
-  columnRefMap: Map<ColumnRef, ColumnRefInfo>;
+  state: EvaluationState;
 }
-
 export function hasAggregate(ast: Select): boolean {
   if (Array.isArray(ast.columns)) {
     for (const column of ast.columns) {
@@ -80,7 +77,7 @@ export async function* formImplicitGroup(
 export async function* formGroup(
   params: FormGroupParams
 ): AsyncIterable<SourceRowGroup[]> {
-  const { groupby, ast, rowIter, session, columnRefMap } = params;
+  const { groupby, ast, rowIter, state } = params;
   let row_list: SourceRow[] = [];
   for await (const batch of rowIter) {
     if (batch.length < 10_000) {
@@ -107,7 +104,7 @@ export async function* formGroup(
   const group_map: Record<string, unknown[] | Record<string, unknown>> = {};
   for (const row of row_list) {
     const key_list = group_exprs.map((group) => {
-      const result = getValue(group, { session, row, columnRefMap });
+      const result = getValue(group, { ...state, row });
       if (result.err) {
         throw new SQLError(result.err);
       }

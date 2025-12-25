@@ -22,12 +22,16 @@ export function convertType(def: Partial<ColumnDef>): FieldInfo {
         break;
       case 'VARCHAR':
         type = Types.VAR_STRING;
+        charsetNr = COLLATIONS.UTF8MB4_GENERAL_CI;
         break;
       case 'CHAR':
-        charsetNr = COLLATIONS.UTF8_GENERAL_CI;
         type = Types.STRING;
+        charsetNr = COLLATIONS.UTF8MB4_GENERAL_CI;
         break;
       case 'TIMESTAMP':
+        type = Types.TIMESTAMP;
+        flags |= FIELD_FLAGS.BINARY;
+        break;
       case 'DATETIME':
         type = Types.DATETIME;
         flags |= FIELD_FLAGS.BINARY;
@@ -48,6 +52,33 @@ export function convertType(def: Partial<ColumnDef>): FieldInfo {
         type = Types.TINY;
         flags |= FIELD_FLAGS.BINARY;
         break;
+      case 'TEXT':
+      case 'TINYTEXT':
+      case 'MEDIUMTEXT':
+      case 'LONGTEXT':
+        type = Types.BLOB;
+        charsetNr = COLLATIONS.UTF8MB4_GENERAL_CI;
+        break;
+      case 'TINYBLOB':
+        type = Types.BLOB;
+        length = 255;
+        flags |= FIELD_FLAGS.BINARY | FIELD_FLAGS.BLOB;
+        break;
+      case 'BLOB':
+        type = Types.BLOB;
+        length = 65535;
+        flags |= FIELD_FLAGS.BINARY | FIELD_FLAGS.BLOB;
+        break;
+      case 'MEDIUMBLOB':
+        type = Types.BLOB;
+        length = 16777215;
+        flags |= FIELD_FLAGS.BINARY | FIELD_FLAGS.BLOB;
+        break;
+      case 'LONGBLOB':
+        type = Types.BLOB;
+        length = 4294967295;
+        flags |= FIELD_FLAGS.BINARY | FIELD_FLAGS.BLOB;
+        break;
       default:
         type = Types.VAR_STRING;
         break;
@@ -56,16 +87,18 @@ export function convertType(def: Partial<ColumnDef>): FieldInfo {
     switch (def.type) {
       case 'double':
         type = Types.DOUBLE;
+        flags |= FIELD_FLAGS.BINARY;
+        decimals = 31;
         break;
       case 'number':
-        length = 66;
         type = Types.NEWDECIMAL;
+        length = 66;
         flags |= FIELD_FLAGS.BINARY;
         decimals = 31;
         break;
       case 'longlong':
-        length = 66;
         type = Types.LONGLONG;
+        length = 66;
         flags |= FIELD_FLAGS.BINARY;
         break;
       case 'null':
@@ -73,46 +106,46 @@ export function convertType(def: Partial<ColumnDef>): FieldInfo {
         flags |= FIELD_FLAGS.BINARY;
         break;
       case 'json':
-        charsetNr = COLLATIONS.UTF8_GENERAL_CI;
-        length = 4294967295;
         type = Types.JSON;
+        charsetNr = COLLATIONS.UTF8MB4_GENERAL_CI;
+        length = 4294967295;
         break;
       case 'datetime':
-        length = 26;
         type = Types.DATETIME;
+        length = 26;
         flags |= FIELD_FLAGS.BINARY;
         break;
       case 'date':
-        length = 10;
         type = Types.DATE;
+        length = 10;
         flags |= FIELD_FLAGS.BINARY;
         break;
       case 'time':
-        length = 15;
         type = Types.TIME;
+        length = 15;
         flags |= FIELD_FLAGS.BINARY;
         break;
       case 'buffer':
-        length = 65535;
         type = Types.VAR_STRING;
+        length = 65535;
         flags |= FIELD_FLAGS.BINARY;
         break;
       case 'text':
-        charsetNr = COLLATIONS.UTF8_GENERAL_CI;
-        length = 150994944;
         type = Types.BLOB;
+        charsetNr = COLLATIONS.UTF8MB4_GENERAL_CI;
+        length = 150994944;
         decimals = 31;
         break;
       case 'char':
-        charsetNr = COLLATIONS.UTF8_GENERAL_CI;
-        length = 255;
         type = Types.STRING;
+        charsetNr = COLLATIONS.UTF8MB4_GENERAL_CI;
+        length = 255;
         break;
       case 'string':
       default:
-        charsetNr = COLLATIONS.UTF8_GENERAL_CI;
-        length = 255;
         type = Types.VAR_STRING;
+        charsetNr = COLLATIONS.UTF8MB4_GENERAL_CI;
+        length = 255;
         break;
     }
   }

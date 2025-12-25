@@ -4,13 +4,13 @@ import { SQLError } from '../error';
 
 import * as Expression from './expression';
 import { resolveReferences } from './helpers/column_ref_helper';
-import { convertType } from './helpers/column_type_helper';
 import { makeEngineGroups } from './helpers/engine_groups';
 import { formGroup, formImplicitGroup, hasAggregate } from './helpers/group';
 import { formJoin } from './helpers/join';
+import { expandStarColumns, calcColumns } from './helpers/query_columns';
 import { sort } from './helpers/sort';
 
-import type { QueryColumnInfo, TableInfoMap, SourceMap } from './engine';
+import type { TableInfoMap, SourceMap } from './engine';
 import type {
   HandlerParams,
   DynamoDBClient,
@@ -20,13 +20,14 @@ import type {
   SourceRowResultGroup,
 } from './handler_types';
 import type { FieldInfo } from '../types';
-import type { EvaluationResult } from './expression';
-import type { COLLATIONS } from '../constants/mysql';
+import type { EvaluationResult, EvaluationState } from './expression';
 import type { Session } from '../session';
 import type { ColumnRefInfo } from './helpers/column_ref_helper';
+import type { QueryColumn } from './helpers/query_columns';
 import type { SelectModifyAST } from './helpers/select_modify';
-import type { MysqlType, ValueType } from './types/value_type';
+import type { ValueType } from './types/value_type';
 import type {
+  AST,
   Select,
   ColumnRef,
   From,
@@ -54,25 +55,10 @@ function _isColumnRef(
 ): expr is ColumnRef {
   return 'type' in expr && expr.type === 'column_ref';
 }
-
-interface QueryColumn {
-  expr: (ExpressionValue | ExtractFunc | FulltextSearch) & {
-    db?: string | null;
-    from?: { db?: string; table?: string; as?: string };
-  };
-  as: string | null;
-  result: {
-    type?: ValueType | undefined;
-    mysqlType?: MysqlType | undefined;
-    name?: string | undefined;
-    orgName?: string | undefined;
-    length?: number | undefined;
-    decimals?: number | undefined;
-    collation?: COLLATIONS | undefined;
-    nullable?: boolean | undefined;
-  };
-  db?: string;
+function _isSelect(ast: AST): ast is Select {
+  return ast.type === 'select';
 }
+
 export interface SelectResult {
   resultIter: AsyncIterable<unknown[][]>;
   columns: FieldInfo[];
@@ -92,7 +78,7 @@ export async function query(
       first_batch = iter_result.value;
     }
   }
-  const columns = _calcColumns(queryColumns, columnRefMap);
+  const columns = calcColumns(queryColumns, columnRefMap);
   async function* _makeIter(): AsyncIterable<unknown[][]> {
     if (first_batch) {
       yield _transformBatch(first_batch);
@@ -131,7 +117,7 @@ export async function internalQuery(
       row_list = row_list.concat(batch);
     }
   }
-  const columns = _calcColumns(queryColumns, columnRefMap);
+  const columns = calcColumns(queryColumns, columnRefMap);
   const rows = row_list.map((row) => row.result);
   return { rows, columns, row_list };
 }
@@ -209,167 +195,60 @@ interface EvaluateReturnParams {
 async function _evaluateReturn(
   params: EvaluateReturnParams
 ): Promise<IterQueryResults> {
-  const { session, sourceMap, ast, columnRefMap } = params;
-  const queryColumns =
-    ast.type === 'select'
-      ? _expandStarColumns({ ...params, ast, columnRefMap })
-      : [];
+  const { ast, session, sourceMap, columnRefMap, tableInfoMap } = params;
+  const queryColumns = _isSelect(ast)
+    ? expandStarColumns({ ...params, ast })
+    : [];
 
   const where = ast.where;
   const groupby = ast.type === 'select' ? ast.groupby : undefined;
   const from = ast.type === 'update' ? ast.table : ast.from;
 
+  const state = { session, columnRefMap, tableInfoMap };
   const rowIter =
     from && Array.isArray(from)
-      ? formJoin({ sourceMap, from, where, session, columnRefMap })
+      ? formJoin({ sourceMap, from, where, state })
       : _listToItetator([{ source: new Map(), result: null, group: null }]);
 
   let group_iter: AsyncIterable<SourceRow[]>;
 
   if (groupby?.columns && ast.type === 'select') {
-    group_iter = formGroup({ groupby, ast, rowIter, session, columnRefMap });
+    group_iter = formGroup({ groupby, ast, rowIter, state });
   } else if (ast.type === 'select' && hasAggregate(ast)) {
-    group_iter = formImplicitGroup({ ast, rowIter, session, columnRefMap });
+    group_iter = formImplicitGroup({ ast, rowIter, state });
   } else {
     group_iter = rowIter;
   }
 
-  let resultIter = _makeResults({
-    iter: group_iter,
-    queryColumns,
-    session,
-    columnRefMap,
-  });
-
-  const columns: FieldInfo[] = [];
+  let resultIter = _makeResults({ iter: group_iter, queryColumns, state });
   if (ast.orderby) {
-    resultIter = sort(resultIter, ast.orderby, {
-      session,
-      columns,
-      columnRefMap,
-    });
+    resultIter = sort(resultIter, ast.orderby, state);
   }
   if (ast.limit) {
     resultIter = _makeLimit(resultIter, ast.limit);
   }
-
   return { resultIter, queryColumns, columnRefMap };
 }
-interface ExpandStarColumnsParams {
-  ast: Omit<Select, 'columns' | 'groupby'> & {
-    columns?: Select['columns'] | null;
-    groupby?: Select['groupby'] | null;
-  };
-  tableInfoMap: TableInfoMap;
-  requestSets: Map<From, Set<string>>;
-  columnRefMap: Map<ColumnRef, ColumnRefInfo>;
-}
-function _expandStarColumns(params: ExpandStarColumnsParams): QueryColumn[] {
-  const { ast, tableInfoMap, columnRefMap } = params;
-  const ret: QueryColumn[] = [];
-  const seen_columns = new Map<From, Set<string>>();
 
-  function _addSeen(from: From, col_name: string) {
-    let seen_set = seen_columns.get(from);
-    if (!seen_set) {
-      seen_set = new Set<string>();
-      seen_columns.set(from, seen_set);
-    }
-    seen_set.add(col_name);
-  }
-
-  for (const column of ast.columns ?? []) {
-    if ('type' in column.expr && column.expr.type === 'column_ref') {
-      if (column.expr.column === '*') {
-        const table = column.expr.table;
-        const from_list = Array.isArray(ast.from) ? ast.from : [];
-        for (const from of from_list) {
-          if (!_isBaseFrom(from)) {
-            continue;
-          }
-          // Match if no table specified, or table matches from.table or from.as
-          if (
-            !table ||
-            (from.table === table && !from.as) ||
-            from.as === table
-          ) {
-            const info = tableInfoMap.get(from);
-            const seen_set = seen_columns.get(from) ?? new Set();
-            info?.columns.forEach((c) => {
-              const col_name = info.isCaseSensitive
-                ? c.name
-                : c.name.toLowerCase();
-              if (!seen_set.has(col_name)) {
-                const colRef = {
-                  type: 'column_ref' as const,
-                  db: from.as ? null : from.db,
-                  table: from.as ?? from.table,
-                  column: c.name,
-                };
-                // Add to columnRefMap so it can be looked up later
-                columnRefMap.set(colRef, { from });
-                ret.push({
-                  expr: colRef,
-                  as: null,
-                  result: _makeResultColumn(c),
-                });
-              }
-            });
-          }
-        }
-      } else {
-        const column_ref = columnRefMap.get(column.expr);
-        let result: QueryColumn['result'] = {};
-        if (column_ref?.from && _isBaseFrom(column_ref.from)) {
-          const info = tableInfoMap.get(column_ref.from);
-          if (info) {
-            const col_name = info.isCaseSensitive
-              ? column.expr.column
-              : column.expr.column.toLowerCase();
-            const found = info.isCaseSensitive
-              ? info.columns.find((c) => c.name === col_name)
-              : info.columns.find((c) => c.name_lc === col_name);
-            if (found) {
-              result = _makeResultColumn(found);
-            }
-            _addSeen(column_ref.from, col_name);
-          }
-        }
-        ret.push({ ...column, result } as QueryColumn);
-      }
-    } else {
-      // Star and Assign are handled elsewhere
-      if ('expr' in column && 'as' in column) {
-        ret.push({ ...column, result: {} } as QueryColumn);
-      }
-    }
-  }
-  return ret;
-}
 async function* _listToItetator(list: SourceRow[]): AsyncIterable<SourceRow[]> {
   yield list;
 }
 interface MakeResultsParams {
   iter: AsyncIterable<SourceRow[]>;
   queryColumns: QueryColumn[];
-  session: Session;
-  columnRefMap: Map<ColumnRef, ColumnRefInfo>;
+  state: EvaluationState;
   signal?: AbortSignal;
 }
 async function* _makeResults(
   params: MakeResultsParams
 ): AsyncIterableIterator<SourceRowResult[]> {
-  const { iter, queryColumns, session, columnRefMap, signal } = params;
+  const { iter, queryColumns, state, signal } = params;
   for await (const batch of iter) {
     const result_list: SourceRowResult[] = [];
     for (const row of batch) {
       const output_row: EvaluationResult[] = [];
       for (const column of queryColumns) {
-        const result = Expression.getValue(column.expr, {
-          session,
-          row,
-          columnRefMap,
-        });
+        const result = Expression.getValue(column.expr, { ...state, row });
         if (result.err) {
           throw new SQLError(result.err);
         }
@@ -438,32 +317,6 @@ async function* _makeLimit(
     }
   }
 }
-function _calcColumns(
-  queryColumns: QueryColumn[],
-  columnRefMap: Map<ColumnRef, ColumnRefInfo>
-): FieldInfo[] {
-  const ret: FieldInfo[] = [];
-  for (const column of queryColumns) {
-    const column_type = convertType(column.result);
-
-    // Get table info from columnRefMap if this is a column_ref
-    let fromInfo: BaseFrom | null = null;
-    if (_isColumnRef(column.expr)) {
-      const refInfo = columnRefMap.get(column.expr);
-      if (refInfo?.from && _isBaseFrom(refInfo.from)) {
-        fromInfo = refInfo.from;
-      }
-    }
-
-    column_type.db = fromInfo?.db ?? column.expr.db ?? column.db ?? '';
-    column_type.orgName = column.result.orgName ?? column.result.name ?? '';
-    column_type.name = column.as ?? column.result.name ?? column_type.orgName;
-    column_type.orgTable = fromInfo?.table ?? '';
-    column_type.table = fromInfo?.as ?? column_type.orgTable;
-    ret.push(column_type);
-  }
-  return ret;
-}
 function _unionType(
   old_type: ValueType | undefined,
   new_type: ValueType | undefined
@@ -477,14 +330,4 @@ function _unionType(
     ret = 'string';
   }
   return ret;
-}
-function _makeResultColumn(column: QueryColumnInfo): QueryColumn['result'] {
-  return {
-    mysqlType: column.mysqlType,
-    orgName: column.name,
-    length: column.length,
-    decimals: column.decimals,
-    collation: column.collation,
-    nullable: column.nullable,
-  };
 }

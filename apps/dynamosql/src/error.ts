@@ -151,6 +151,10 @@ const ERROR_MAP: Record<string, ErrorMapEntry> = {
     code: 'ER_WRONG_PARAMCOUNT_TO_NATIVE_FCT',
     sqlMessage: errStr`Incorrect parameter count in the call to native function '${0}'`,
   },
+  ER_NO_DEFAULT_FOR_FIELD: {
+    code: 'ER_NO_DEFAULT_FOR_FIELD',
+    sqlMessage: errStr`Field '${0}' doesn't have a default value`,
+  },
 };
 
 export class SQLError extends Error {
