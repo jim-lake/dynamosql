@@ -47,16 +47,6 @@ export function expandStarColumns(
 ): QueryColumn[] {
   const { ast, tableInfoMap, columnRefMap } = params;
   const ret: QueryColumn[] = [];
-  const seen_columns = new Map<From, Set<string>>();
-
-  function _addSeen(from: From, col_name: string) {
-    let seen_set = seen_columns.get(from);
-    if (!seen_set) {
-      seen_set = new Set<string>();
-      seen_columns.set(from, seen_set);
-    }
-    seen_set.add(col_name);
-  }
 
   for (const column of ast.columns ?? []) {
     if ('type' in column.expr && column.expr.type === 'column_ref') {
@@ -74,23 +64,20 @@ export function expandStarColumns(
             from.as === table
           ) {
             const info = tableInfoMap.get(from);
-            const seen_set = seen_columns.get(from) ?? new Set();
             info?.columns.forEach((c) => {
-              if (!seen_set.has(c.name)) {
-                const colRef = {
-                  type: 'column_ref' as const,
-                  db: from.as ? null : from.db,
-                  table: from.as ?? from.table,
-                  column: c.name,
-                };
-                // Add to columnRefMap so it can be looked up later
-                columnRefMap.set(colRef, { from });
-                ret.push({
-                  expr: colRef,
-                  as: null,
-                  result: _makeResultColumn(c),
-                });
-              }
+              const colRef = {
+                type: 'column_ref' as const,
+                db: from.as ? null : from.db,
+                table: from.as ?? from.table,
+                column: c.name,
+              };
+              // Add to columnRefMap so it can be looked up later
+              columnRefMap.set(colRef, { from });
+              ret.push({
+                expr: colRef,
+                as: null,
+                result: _makeResultColumn(c),
+              });
             });
           }
         }
@@ -109,7 +96,6 @@ export function expandStarColumns(
             if (found) {
               result = _makeResultColumn(found);
             }
-            _addSeen(column_ref.from, column.expr.column);
           }
         }
         ret.push({ ...column, result } as QueryColumn);
