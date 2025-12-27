@@ -23,9 +23,12 @@ export async function getTableInfo(
   if (data) {
     return {
       table,
+      collation: data.collation,
       primary_key: data.primary_key,
       column_list: data.column_list,
       is_open: false,
+      rowCount: BigInt(data.row_list.length),
+      tableSize: 0n,
     };
   }
   throw new SQLError({ err: 'table_not_found', args: [table] });
@@ -51,17 +54,28 @@ export async function createTable(params: CreateTableParams): Promise<void> {
       mysqlType: col.mysqlType,
       defaultValue: Object.freeze(_getDefault(col)),
     };
+    if (col.length !== null) {
+      ret.length = col.length;
+    }
+    if (col.collation !== null) {
+      ret.collation = col.collation;
+    }
     if (col.decimals !== null) {
       ret.decimals = col.decimals;
     }
     if (col.nullable) {
       ret.nullable = col.nullable;
     }
+    if (col.comment) {
+      ret.comment = col.comment;
+    }
     return ret;
   });
   const data = {
+    table,
     column_list,
     primary_key,
+    collation: params.collation,
     row_list: [],
     primary_map: new Map(),
   };

@@ -3,10 +3,12 @@ import { SQLError } from '../error';
 import * as SchemaManager from './schema_manager';
 import * as TransactionManager from './transaction_manager';
 import { mysqlStringToValueType } from './types/value_type';
+import { makeCollation } from './helpers/collation';
 
-import type { Engine, ColumnDef } from './engine';
+import type { Engine, ColumnDef, ColumnDefParam } from './engine';
 import type { HandlerParams } from './handler_types';
 import type { Alter } from 'node-sql-parser';
+import type { MysqlType } from './types/value_type';
 
 export async function query(params: HandlerParams<Alter>): Promise<void> {
   const { ast, dynamodb, session } = params;
@@ -18,17 +20,16 @@ export async function query(params: HandlerParams<Alter>): Promise<void> {
   const engine = SchemaManager.getEngine(database ?? undefined, table, session);
 
   if (database) {
-    const opts = { dynamodb, ast, engine, session };
+    const opts = { dynamodb, ast, engine, session, database };
     await TransactionManager.run(_runAlterTable, opts);
   } else {
     throw new SQLError('no_current_database');
   }
 }
-
 async function _runAlterTable(
-  params: HandlerParams<Alter> & { engine: Engine }
+  params: HandlerParams<Alter> & { engine: Engine; database: string }
 ): Promise<void> {
-  const { ast, dynamodb, engine, session } = params;
+  const { ast, dynamodb, database, engine, session } = params;
   const firstTable = ast.table[0];
   const table =
     firstTable && 'table' in firstTable ? firstTable.table : undefined;
@@ -37,21 +38,34 @@ async function _runAlterTable(
     throw new SQLError('bad_table_name');
   }
 
-  const column_list: ColumnDef[] = [];
+  const info = await engine.getTableInfo({
+    dynamodb,
+    session,
+    database,
+    table,
+  });
+
+  const column_list: ColumnDefParam[] = [];
 
   // Process column additions
   for (const def of ast.expr) {
     if (def.resource === 'column' && 'action' in def && def.action === 'add') {
+      console.log(def);
       const addDef = def;
       const column_name = addDef.column.column;
-      const type = mysqlStringToValueType(addDef.definition.dataType);
-      column_list.push({ name: column_name, type });
-      const opts = {
-        dynamodb,
-        session,
-        table,
-        column: { name: column_name, type },
+      const mysqlType = addDef.definition.dataType as MysqlType;
+      const type = mysqlStringToValueType(mysqlType);
+      const column = {
+        name: column_name,
+        type,
+        mysqlType,
+        length: def.definition.length ?? null,
+        decimals: def.definition.scale ?? null,
+        collation: makeCollation(def, info.collation),
+        nullable: def.nullable?.value !== 'not null',
       };
+      column_list.push(column);
+      const opts = { dynamodb, session, table, column };
       await engine.addColumn(opts);
     }
   }

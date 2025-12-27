@@ -213,18 +213,19 @@ export async function dropTable(params: DropTableParams): Promise<void> {
   const database_lc = database.toLowerCase();
   const table_lc = table.toLowerCase();
   const schema = g_schemaMap.get(database_lc);
-  if (database_lc === '_dynamodb') {
+  const temp_table =
+    database_lc && table_lc && session.getTempTable(database_lc, table_lc);
+  if (temp_table) {
+    session.deleteTempTable(database_lc, table_lc);
+  } else if (database_lc === '_dynamodb') {
     const engine = Engine.getEngineByName('raw');
     await engine.dropTable(params);
-  } else if (session.getTempTable(database_lc, table_lc)) {
-    session.deleteTempTable(database_lc, table_lc);
   } else if (!schema || !schema.tables.has(table_lc)) {
     throw new SQLError('resource_not_found');
   } else {
     const engine = getEngine(database_lc, table_lc, session);
     try {
       await engine.dropTable(params);
-      schema.tables.delete(table_lc);
     } catch (err) {
       logger.error(
         'SchemaManager.dropTable: drop error but deleting table anyway: err:',

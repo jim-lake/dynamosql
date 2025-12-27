@@ -11,6 +11,7 @@ import {
   UpdateTableCommand,
   ProjectionType,
   KeyType,
+  BillingMode,
   ReturnValuesOnConditionCheckFailure,
 } from '@aws-sdk/client-dynamodb';
 
@@ -32,7 +33,6 @@ import type {
   DynamoDBClientConfig,
   DescribeTableCommandOutput,
   KeySchemaElement,
-  BillingMode,
 } from '@aws-sdk/client-dynamodb';
 import type { AwsCredentialIdentity } from '@aws-sdk/types';
 
@@ -96,7 +96,7 @@ export interface PutItemsParams {
 }
 export interface CreateTableParams {
   table: string;
-  billing_mode?: string;
+  billing_mode?: BillingMode;
   primary_key: KeyDefinition[];
 }
 export interface CreateIndexParams {
@@ -376,7 +376,7 @@ export class DynamoDB {
     }
     const input = {
       TableName: table,
-      BillingMode: (billing_mode ?? 'PAY_PER_REQUEST') as BillingMode,
+      BillingMode: billing_mode ?? BillingMode.PAY_PER_REQUEST,
       AttributeDefinitions: defs,
       KeySchema: schema,
     };

@@ -1,3 +1,4 @@
+import type { COLLATIONS } from '../../../constants/mysql';
 import type { Session } from '../../../session';
 import type { CellValue, ColumnDef, CellRow } from '../index';
 
@@ -7,6 +8,8 @@ export interface MemoryColumnDef extends ColumnDef {
 }
 
 export interface TableData {
+  table: string;
+  collation: COLLATIONS;
   column_list: MemoryColumnDef[];
   primary_key: string[];
   row_list: CellRow[];

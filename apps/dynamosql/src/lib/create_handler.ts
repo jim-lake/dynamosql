@@ -9,7 +9,8 @@ import {
   getDatabaseFromTable,
   getTableFromTable,
 } from './helpers/ast_helper';
-import { CHARSET_DEFAULT_COLLATION_MAP } from './helpers/charset';
+import { CHARSET_DEFAULT_COLLATION_MAP, getCharset } from './helpers/charset';
+import { makeCollation, getCollation } from './helpers/collation';
 import * as SchemaManager from './schema_manager';
 import * as SelectHandler from './select_handler';
 import { mysqlStringToValueType } from './types/value_type';
@@ -60,13 +61,13 @@ async function _createDatabase(
     switch (def.keyword) {
       case 'collate':
       case 'default collate':
-        collation = _getCollation(def.value.value);
+        collation = getCollation(def.value.value);
         break;
       case 'charset':
       case 'character set':
       case 'default charset':
       case 'default character set':
-        charset = _getCharset(def.value.value);
+        charset = getCharset(def.value.value);
         break;
     }
   }
@@ -110,13 +111,13 @@ async function _createTable(
         break;
       case 'collate':
       case 'default collate':
-        collation = _getCollation(opt.value.value);
+        collation = getCollation(opt.value.value);
         break;
       case 'charset':
       case 'character set':
       case 'default charset':
       case 'default character set':
-        charset = _getCharset(opt.value.value);
+        charset = getCharset(opt.value.value);
         break;
     }
   }
@@ -138,7 +139,7 @@ async function _createTable(
         mysqlType: def.definition.dataType,
         length: def.definition.length ?? null,
         decimals: def.definition.scale ?? null,
-        collation: _makeCollation(def, collation),
+        collation: makeCollation(def, collation),
         nullable: def.nullable?.value !== 'not null',
       };
       column_list.push(col);
@@ -218,49 +219,4 @@ async function _createTable(
     return await engine.insertRowList(insertOpts);
   }
   return { affectedRows: 0 };
-}
-function _makeCollation(
-  def: CreateColumnDefinition,
-  default_collation: COLLATIONS
-): COLLATIONS | null {
-  const mysqlType = def.definition.dataType;
-  switch (mysqlType) {
-    case 'VARCHAR':
-    case 'CHAR':
-    case 'TINYTEXT':
-    case 'TEXT':
-    case 'MEDIUMTEXT':
-    case 'LONGTEXT':
-    case 'ENUM':
-    case 'SET': {
-      const col_name = def.collate?.collate?.name;
-      if (col_name) {
-        return _getCollation(col_name);
-      }
-      const char_name = def.character_set?.value.value;
-      if (char_name) {
-        const charset = _getCharset(char_name);
-        return CHARSET_DEFAULT_COLLATION_MAP[charset];
-      }
-      return default_collation;
-    }
-    default:
-      return null;
-  }
-}
-function _getCollation(s: string): COLLATIONS {
-  const found = (COLLATIONS as unknown as Record<string, COLLATIONS>)[
-    s.toUpperCase()
-  ];
-  if (found === undefined) {
-    throw new SQLError({ err: 'ER_UNKNOWN_COLLATION', args: [s] });
-  }
-  return found;
-}
-function _getCharset(s: string): CHARSETS {
-  const found = (CHARSETS as Record<string, CHARSETS>)[s.toUpperCase()];
-  if (found === undefined) {
-    throw new SQLError({ err: 'ER_UNKNOWN_CHARACTER_SET', args: [s] });
-  }
-  return found;
 }

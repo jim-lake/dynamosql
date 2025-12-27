@@ -1,6 +1,8 @@
 import { logger } from '@dynamosql/shared';
+import { COLLATIONS } from '../../../constants/mysql';
 
 import { SQLError } from '../../../error';
+import { valueTypeToMysqlType } from '../../types/value_type';
 
 import type { ValueType } from '../../types/value_type';
 import type {
@@ -16,6 +18,12 @@ import type {
 import type { DescribeTableCommandOutput } from '@aws-sdk/client-dynamodb';
 
 const TYPE_MAP = { S: 'string', N: 'number', B: 'buffer' } as const;
+const MYSQL_TYPE_MAP = { S: 'VARCHAR', N: 'DECIMAL', B: 'BLOB' } as const;
+const COLLATION_MAP = {
+  S: COLLATIONS.UTF8MB4_0900_BIN,
+  N: undefined,
+  B: undefined,
+} as const;
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -23,29 +31,37 @@ export async function getTableInfo(
   params: TableInfoParams
 ): Promise<TableInfo> {
   const { dynamodb, table } = params;
-
-  let data: DescribeTableCommandOutput;
   try {
-    data = await dynamodb.getTable(table);
+    const data = await dynamodb.getTable(table);
+    if (!data.Table?.AttributeDefinitions || !data.Table.KeySchema) {
+      throw new Error('bad_data');
+    }
+
+    const column_list = data.Table.AttributeDefinitions.map((def) => {
+      if (!def.AttributeName || !def.AttributeType) {
+        throw new Error('bad_data');
+      }
+      const type = TYPE_MAP[def.AttributeType];
+      const mysqlType = MYSQL_TYPE_MAP[def.AttributeType];
+      const collation = COLLATION_MAP[def.AttributeType];
+      return { name: def.AttributeName, type, mysqlType, collation };
+    });
+    const primary_key = data.Table.KeySchema.map(
+      (key) => key.AttributeName ?? ''
+    );
+    return {
+      table,
+      collation: COLLATIONS.UTF8MB4_0900_BIN,
+      primary_key,
+      column_list,
+      is_open: true,
+      rowCount: BigInt(data.Table.ItemCount ?? 0),
+      tableSize: BigInt(data.Table.TableSizeBytes ?? 0),
+    };
   } catch (err) {
     logger.error('getTableInfo: err:', err, table);
     throw err;
   }
-
-  if (!data.Table?.AttributeDefinitions || !data.Table.KeySchema) {
-    throw new Error('bad_data');
-  }
-
-  const column_list = data.Table.AttributeDefinitions.map((def) => {
-    if (!def.AttributeName || !def.AttributeType) {
-      throw new Error('bad_data');
-    }
-    return { name: def.AttributeName, type: TYPE_MAP[def.AttributeType] };
-  });
-  const primary_key = data.Table.KeySchema.map(
-    (key) => key.AttributeName ?? ''
-  );
-  return { table, primary_key, column_list, is_open: true };
 }
 export async function getTableList(params: TableListParams): Promise<string[]> {
   const { dynamodb } = params;

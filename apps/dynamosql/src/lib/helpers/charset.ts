@@ -1,4 +1,5 @@
 import { CHARSETS, COLLATIONS } from '../../constants/mysql';
+import { SQLError } from '../../error';
 
 export const CHARSET_DEFAULT_COLLATION_MAP = {
   [CHARSETS.ARMSCII8]: COLLATIONS.ARMSCII8_GENERAL_CI,
@@ -319,3 +320,55 @@ export const COLLATION_CHARSET_MAP = {
   [COLLATIONS.UTF8_UNICODE_CI]: CHARSETS.UTF8,
   [COLLATIONS.UTF8_VIETNAMESE_CI]: CHARSETS.UTF8,
 } as const satisfies Readonly<Record<COLLATIONS, CHARSETS>>;
+
+export const CHARSET_BYTE_MAP = {
+  [CHARSETS.ARMSCII8]: 1,
+  [CHARSETS.ASCII]: 1,
+  [CHARSETS.BIG5]: 2,
+  [CHARSETS.BINARY]: 1,
+  [CHARSETS.CP1250]: 1,
+  [CHARSETS.CP1251]: 1,
+  [CHARSETS.CP1256]: 1,
+  [CHARSETS.CP1257]: 1,
+  [CHARSETS.CP850]: 1,
+  [CHARSETS.CP852]: 1,
+  [CHARSETS.CP866]: 1,
+  [CHARSETS.CP932]: 2,
+  [CHARSETS.DEC8]: 1,
+  [CHARSETS.EUCJPMS]: 2,
+  [CHARSETS.EUCKR]: 2,
+  [CHARSETS.GB18030]: 4,
+  [CHARSETS.GB2312]: 2,
+  [CHARSETS.GBK]: 2,
+  [CHARSETS.GEOSTD8]: 1,
+  [CHARSETS.GREEK]: 1,
+  [CHARSETS.HEBREW]: 1,
+  [CHARSETS.HP8]: 1,
+  [CHARSETS.KEYBCS2]: 1,
+  [CHARSETS.KOI8R]: 1,
+  [CHARSETS.KOI8U]: 1,
+  [CHARSETS.LATIN1]: 1,
+  [CHARSETS.LATIN2]: 1,
+  [CHARSETS.LATIN5]: 1,
+  [CHARSETS.LATIN7]: 1,
+  [CHARSETS.MACCE]: 1,
+  [CHARSETS.MACROMAN]: 1,
+  [CHARSETS.SJIS]: 2,
+  [CHARSETS.SWE7]: 1,
+  [CHARSETS.TIS620]: 1,
+  [CHARSETS.UCS2]: 2,
+  [CHARSETS.UJIS]: 3,
+  [CHARSETS.UTF16]: 2,
+  [CHARSETS.UTF16LE]: 2,
+  [CHARSETS.UTF32]: 4,
+  [CHARSETS.UTF8]: 3,
+  [CHARSETS.UTF8MB4]: 4,
+} as const satisfies Readonly<Record<CHARSETS, 1 | 2 | 3 | 4>>;
+
+export function getCharset(s: string): CHARSETS {
+  const found = (CHARSETS as Record<string, CHARSETS>)[s.toUpperCase()];
+  if (found === undefined) {
+    throw new SQLError({ err: 'ER_UNKNOWN_CHARACTER_SET', args: [s] });
+  }
+  return found;
+}

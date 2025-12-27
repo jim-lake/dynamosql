@@ -1,7 +1,14 @@
 import { SQLError } from '../../../error';
+import { COLLATIONS, CHARSETS } from '../../../constants/mysql';
 import { deepClone } from '../../../tools/clone';
-import { getEngine, getDatabaseList, getTableList } from '../../schema_manager';
+import {
+  getEngine,
+  getDatabaseList,
+  getDatabase,
+  getTableList,
+} from '../../schema_manager';
 import { SQLDateTime } from '../../types/sql_datetime';
+import { COLLATION_CHARSET_MAP, CHARSET_BYTE_MAP } from '../../helpers/charset';
 
 import {
   CATALOGS_LIST,
@@ -46,7 +53,10 @@ async function _getFromTable(
       };
     case 'schemata': {
       const list = getDatabaseList();
-      const results = list.map(_dbToSchemata);
+      const results: Row[] = [];
+      for (const name of list) {
+        results.push(_dbToSchemata(name));
+      }
       return { results, tableInfo: deepClone(SCHEMATA_INFO) };
     }
     case 'tables': {
@@ -54,8 +64,11 @@ async function _getFromTable(
       const results: Row[] = [];
       for (const database of list) {
         const tables = await getTableList({ dynamodb, database });
-        for (const found of tables) {
-          results.push(_tableToTable(database, found));
+        for (const table of tables) {
+          console.log(
+            Object.keys(await _tableToTable(database, table, params))
+          );
+          results.push(await _tableToTable(database, table, params));
         }
       }
       return { results, tableInfo: deepClone(TABLES_INFO) };
@@ -86,16 +99,26 @@ async function _getFromTable(
   throw new SQLError({ err: 'ER_BAD_TABLE_ERROR', args: [params.from.table] });
 }
 function _dbToSchemata(database: string): Row {
+  const db = getDatabase(database);
+  if (!db) {
+    throw new Error('bad_database');
+  }
+  const collation = COLLATIONS[db.collation].toLowerCase();
+  const charset = CHARSETS[COLLATION_CHARSET_MAP[db.collation]].toLowerCase();
   return {
     catalog_name: { value: 'def', type: 'string' },
     schema_name: { value: database, type: 'string' },
-    default_character_set_name: { value: 'utf8mb4', type: 'string' },
-    default_collation_name: { value: 'utf8mb4_0900_as_cs', type: 'string' },
+    default_character_set_name: { value: charset, type: 'string' },
+    default_collation_name: { value: collation, type: 'string' },
     sql_path: { value: null, type: 'null' },
     default_encryption: { value: 'NO', type: 'char' },
   };
 }
-function _tableToTable(database: string, table: string): Row {
+async function _tableToTable(
+  database: string,
+  table: string,
+  params: RowListParams
+): Promise<Row> {
   return {
     table_catalog: { value: 'def', type: 'string' },
     table_schema: { value: database, type: 'string' },
@@ -129,28 +152,75 @@ function _columnToColumns(
   index: number,
   column: ColumnDef
 ): Row {
+  console.log(column);
+  const collation_name = column.collation
+    ? COLLATIONS[column.collation].toLowerCase()
+    : null;
+  const charset = column.collation
+    ? COLLATION_CHARSET_MAP[column.collation]
+    : null;
+  const charset_name = charset ? CHARSETS[charset].toLowerCase() : null;
+  let character_maximum_length: number | null = null;
+  let charset_size: number | null = null;
+  let numeric_precision: number | null = null;
+  let numeric_scale: number | null = null;
+  let datetime_precision: number | null = null;
+  let column_type = column.mysqlType.toLowerCase();
+  switch (column.mysqlType) {
+    case 'INT':
+    case 'BIGINT':
+      break;
+    case 'VARCHAR':
+    case 'CHAR':
+      character_maximum_length = column.length ?? 255;
+      charset_size = charset ? CHARSET_BYTE_MAP[charset] : 1;
+      column_type += `(${character_maximum_length})`;
+      break;
+    case 'TIMESTAMP':
+    case 'DATETIME':
+    case 'TIME':
+      datetime_precision = column.decimals ?? 0;
+      break;
+    case 'DATE':
+      break;
+    case 'DECIMAL':
+      break;
+    case 'BOOLEAN':
+      break;
+  }
+  const character_octet_length =
+    character_maximum_length && charset_size
+      ? character_maximum_length * charset_size
+      : null;
+
   return {
     table_catalog: { value: 'def', type: 'string' },
     table_schema: { value: database, type: 'string' },
     table_name: { value: table, type: 'string' },
     column_name: { value: column.name, type: 'string' },
     ordinal_position: { value: index + 1, type: 'long' },
-    column_default: { value: null, type: 'text' },
-    is_nullable: { value: 'no', type: 'string' },
-    data_type: { value: column.type, type: 'text' },
-    character_maximum_length: { value: 255n, type: 'longlong' },
-    character_octet_length: { value: 1024n, type: 'longlong' },
-    numeric_precision: { value: null, type: 'longlong' },
-    numeric_scale: { value: null, type: 'longlong' },
-    datetime_precision: { value: null, type: 'longlong' },
-    character_set_name: { value: 'utf8mb4', type: 'string' },
-    collation_name: { value: 'utf8mb4_0900_ai_ci', type: 'string' },
-    column_type: { value: 'varchar(256)', type: 'text' },
+    column_default: { value: null, type: 'string' },
+    is_nullable: {
+      value: column.nullable === true ? 'yes' : 'no',
+      type: 'string',
+    },
+    data_type: { value: column.mysqlType.toLowerCase(), type: 'string' },
+    character_maximum_length: {
+      value: character_maximum_length,
+      type: 'longlong',
+    },
+    character_octet_length: { value: character_octet_length, type: 'longlong' },
+    numeric_precision: { value: numeric_precision, type: 'longlong' },
+    numeric_scale: { value: numeric_scale, type: 'longlong' },
+    datetime_precision: { value: datetime_precision, type: 'longlong' },
+    character_set_name: { value: charset_name, type: 'string' },
+    collation_name: { value: collation_name, type: 'string' },
+    column_type: { value: column_type, type: 'string' },
     column_key: { value: 'pri', type: 'string' },
     extra: { value: '', type: 'string' },
     privileges: { value: 'select,insert,update,references', type: 'string' },
-    column_comment: { value: '', type: 'text' },
-    generation_expression: { value: '', type: 'text' },
+    column_comment: { value: column.comment ?? '', type: 'string' },
+    generation_expression: { value: '', type: 'string' },
     srs_id: { value: null, type: 'long' },
   };
 }

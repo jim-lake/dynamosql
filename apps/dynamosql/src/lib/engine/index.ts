@@ -38,12 +38,13 @@ export type { AttributeValue } from '../../tools/dynamodb';
 export interface ColumnDef {
   name: string;
   type: ValueType;
-  mysqlType?: MysqlType;
+  mysqlType: MysqlType;
   length?: number;
   decimals?: number;
   collation?: COLLATIONS;
   nullable?: boolean;
   default?: unknown;
+  comment?: string;
 }
 export interface ColumnDefParam {
   name: string;
@@ -54,12 +55,16 @@ export interface ColumnDefParam {
   collation: COLLATIONS | null;
   nullable?: boolean;
   default?: unknown;
+  comment?: string;
 }
 export interface TableInfo {
   table: string;
+  collation: COLLATIONS | null;
   primary_key: readonly string[];
   column_list: readonly ColumnDef[];
   is_open: boolean;
+  rowCount: bigint;
+  tableSize: bigint;
 }
 export type FromJoin = BaseFrom & Partial<Join>;
 export interface RowListParams {
@@ -148,7 +153,7 @@ export interface DeleteIndexParams {
 export interface AddColumnParams {
   dynamodb: DynamoDBClient;
   table: string;
-  column: ColumnDef;
+  column: ColumnDefParam;
 }
 export interface DeleteChange {
   database: string;
