@@ -51,7 +51,6 @@ export interface ColumnDefParam {
   mysqlType: MysqlType;
   length: number | null;
   decimals: number | null;
-  charset: string | null;
   collation: COLLATIONS | null;
   nullable?: boolean;
   default?: unknown;

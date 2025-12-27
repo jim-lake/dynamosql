@@ -7,7 +7,7 @@ import type {
   ExpressionValue,
   Select,
   ColumnRef,
-  DataType,
+  ConvertDataType,
   ExprList,
   ExtractFunc,
   FulltextSearch,
@@ -154,7 +154,7 @@ function _unroll(list: SourceRowGroup[], obj: unknown): void {
 function _hasAgg(
   expr:
     | ExpressionValue
-    | DataType
+    | ConvertDataType
     | ExprList
     | ExtractFunc
     | FulltextSearch

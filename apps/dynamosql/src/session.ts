@@ -62,7 +62,7 @@ export class Session extends SQLMode implements PoolConnection {
   private readonly _localVariables = new Map<string, EvaluationValue>();
   private _transaction: Transaction | null = null;
   private _isReleased = false;
-  private readonly _tempTableMap = new Map<string, unknown>();
+  private readonly _tempTableMap = new Map<string, Map<string, unknown>>();
   private _isTimestampFixed = false;
 
   private _collationConnection: string;
@@ -216,25 +216,21 @@ export class Session extends SQLMode implements PoolConnection {
     return this._tempTableMap.keys();
   }
   getTempTable<T>(database: string, table: string): T | undefined {
-    return this._tempTableMap.get(`${database}.${table}`) as T | undefined;
+    return this._tempTableMap.get(database)?.get(table) as T | undefined;
   }
   saveTempTable(database: string, table: string, contents: unknown) {
-    this._tempTableMap.set(`${database}.${table}`, contents);
+    let db_map = this._tempTableMap.get(database);
+    if (!db_map) {
+      db_map = new Map();
+      this._tempTableMap.set(database, db_map);
+    }
+    db_map.set(table, contents);
   }
   deleteTempTable(database: string, table: string) {
-    this.dropTempTable(database, table);
+    this._tempTableMap.get(database)?.delete(table);
   }
-  dropTempTable(database: string, table?: string) {
-    const prefix = database + '.';
-    if (table) {
-      this._tempTableMap.delete(`${database}.${table}`);
-    } else {
-      for (const key of this._tempTableMap.keys()) {
-        if (key.startsWith(prefix)) {
-          this._tempTableMap.delete(key);
-        }
-      }
-    }
+  deleteTempTablesForDatabase(database: string) {
+    this._tempTableMap.delete(database);
   }
   query(
     params: string | QueryParams,

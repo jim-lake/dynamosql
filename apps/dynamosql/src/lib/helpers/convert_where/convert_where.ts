@@ -14,7 +14,7 @@ import type {
   FulltextSearch,
   ExtractFunc,
   ExprList,
-  DataType,
+  ConvertDataType,
   ColumnRef,
   From,
 } from 'node-sql-parser';
@@ -39,7 +39,7 @@ export function convertWhere(
     | FulltextSearch
     | ExtractFunc
     | ExprList
-    | DataType
+    | ConvertDataType
     | null
     | undefined,
   state: ConvertWhereState

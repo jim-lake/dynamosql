@@ -1,3 +1,5 @@
+export type { MysqlType } from 'node-sql-parser';
+
 export type ValueType =
   | 'null'
   | 'bool'
@@ -14,48 +16,6 @@ export type ValueType =
   | 'text'
   | 'json'
   | 'buffer';
-
-export type MysqlType =
-  | 'BOOLEAN'
-  | 'BLOB'
-  | 'TINYBLOB'
-  | 'MEDIUMBLOB'
-  | 'LONGBLOB'
-  | 'BINARY'
-  | 'VARBINARY'
-  | 'CHAR'
-  | 'VARCHAR'
-  | 'NUMERIC'
-  | 'DECIMAL'
-  | 'INT'
-  | 'SMALLINT'
-  | 'MEDIUMINT'
-  | 'TINYINT'
-  | 'BIGINT'
-  | 'FLOAT'
-  | 'DOUBLE'
-  | 'BIT'
-  | 'DATE'
-  | 'DATETIME'
-  | 'TIME'
-  | 'TIMESTAMP'
-  | 'YEAR'
-  | 'ENUM'
-  | 'SET'
-  | 'JSON'
-  | 'TINYTEXT'
-  | 'TEXT'
-  | 'MEDIUMTEXT'
-  | 'LONGTEXT'
-  | 'GEOMETRY'
-  | 'POINT'
-  | 'LINESTRING'
-  | 'POLYGON'
-  | 'MULTIPOINT'
-  | 'MULTILINESTRING'
-  | 'MULTIPOLYGON'
-  | 'GEOMETRYCOLLECTION'
-  | 'VECTOR';
 
 export function mysqlStringToValueType(s: string): ValueType {
   switch (s) {

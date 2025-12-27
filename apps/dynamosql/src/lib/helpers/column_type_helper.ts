@@ -150,9 +150,6 @@ export function convertType(def: Partial<ColumnDef>): FieldInfo {
     }
   }
 
-  if (def.collation !== undefined) {
-    charsetNr = def.collation;
-  }
   if (def.length !== undefined) {
     length = def.length;
   }

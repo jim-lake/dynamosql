@@ -26,7 +26,7 @@ import type { ColumnRefInfo } from '../helpers/column_ref_helper';
 import type { ValueType } from '../types/value_type';
 import type {
   ExpressionValue,
-  DataType,
+  ConvertDataType,
   ExprList,
   ExtractFunc,
   FulltextSearch,
@@ -161,7 +161,7 @@ function isInterval(expr: unknown): expr is IntervalType {
 export function getValue(
   expr:
     | ExpressionValue
-    | DataType
+    | ConvertDataType
     | ExprList
     | ExtractFunc
     | FulltextSearch

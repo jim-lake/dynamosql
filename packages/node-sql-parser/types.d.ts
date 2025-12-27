@@ -189,7 +189,7 @@ export interface Cast {
   expr: ExpressionValue;
   symbol: "as";
   target: {
-    dataType: string;
+    dataType: MysqlType | "SIGNED" | "UNSIGNED" | "SIGNED INTEGER" | "UNSIGNED INTEGER";
     quoted?: string;
   }[];
 }
@@ -301,7 +301,7 @@ export type ExpressionValue =
 
 export type ExprList = {
   type: "expr_list";
-  value: (ExpressionValue | DataType | ExprList)[] | null;
+  value: (ExpressionValue | ConvertDataType | ExprList)[] | null;
   loc?: LocationRange;
   parentheses?: boolean;
   separator?: string;
@@ -623,8 +623,33 @@ export type CollateExpr = {
   name?: string;
 };
 
+export type MysqlType =
+  | "CHAR" | "VARCHAR"
+  | "BINARY" | "VARBINARY"
+  | "TINYTEXT" | "TEXT" | "MEDIUMTEXT" | "LONGTEXT"
+  | "TINYBLOB" | "BLOB" | "MEDIUMBLOB" | "LONGBLOB"
+  | "TINYINT" | "SMALLINT" | "MEDIUMINT" | "INT" | "INTEGER" | "BIGINT"
+  | "FLOAT" | "DOUBLE" | "DECIMAL" | "NUMERIC"
+  | "BIT"
+  | "DATE" | "TIME" | "DATETIME" | "TIMESTAMP" | "YEAR"
+  | "BOOLEAN"
+  | "JSON"
+  | "ENUM" | "SET"
+  | "GEOMETRY" | "POINT" | "LINESTRING" | "POLYGON"
+  | "MULTIPOINT" | "MULTILINESTRING" | "MULTIPOLYGON" | "GEOMETRYCOLLECTION"
+  | "VECTOR";
+
+export type ConvertDataType = {
+  type: "datatype";
+  dataType: MysqlType | "SIGNED" | "UNSIGNED";
+  length?: number | null;
+  parentheses?: true;
+  scale?: number | null;
+  suffix?: ("UNSIGNED" | "ZEROFILL" | "SIGNED")[] | null;
+};
+
 export type DataType = {
-  dataType: string;
+  dataType: MysqlType;
   length?: number | null;
   parentheses?: true;
   scale?: number | null;
@@ -817,11 +842,18 @@ export interface CreateTable {
   loc?: LocationRange;
 }
 
+export type DatabaseOption = {
+  keyword: "character set" | "collate" | "default character set" | "default collate" | "charset" | "default charset";
+  symbol?: "=" | null;
+  value: DefaultValue;
+};
+
 export interface CreateDatabase {
   type: "create";
   keyword: "database";
   if_not_exists?: "IF NOT EXISTS" | null;
   database?: string | { schema: DefaultValue[] };
+  create_definitions?: DatabaseOption[] | null;
   loc?: LocationRange;
 }
 
@@ -830,6 +862,7 @@ export interface CreateSchema {
   keyword: "schema";
   if_not_exists?: "IF NOT EXISTS" | null;
   database?: string | { schema: DefaultValue[] };
+  create_definitions?: DatabaseOption[] | null;
   loc?: LocationRange;
 }
 
@@ -954,11 +987,26 @@ export type PasswordOption = {
   value: OriginValue | NumberValue | Interval;
 };
 
-export type TableOption = {
-  keyword: string;
-  symbol?: '=' | null;
-  value: ExpressionValue | DefaultValue | string | number;
-};
+export type TableOption =
+  | { keyword: 'engine'; symbol?: '=' | null; value: string }
+  | { keyword: 'auto_increment'; symbol?: '=' | null; value: number }
+  | { keyword: 'avg_row_length'; symbol?: '=' | null; value: number }
+  | { keyword: 'key_block_size'; symbol?: '=' | null; value: number }
+  | { keyword: 'max_rows'; symbol?: '=' | null; value: number }
+  | { keyword: 'min_rows'; symbol?: '=' | null; value: number }
+  | { keyword: 'stats_sample_pages'; symbol?: '=' | null; value: number }
+  | { keyword: 'checksum'; symbol?: '=' | null; value: string }
+  | { keyword: 'delay_key_write'; symbol?: '=' | null; value: string }
+  | { keyword: 'comment'; symbol?: '=' | null; value: string }
+  | { keyword: 'compression'; symbol?: '=' | null; value: string }
+  | { keyword: 'connection'; symbol?: '=' | null; value: string }
+  | { keyword: 'data directory'; symbol?: '=' | null; value: string }
+  | { keyword: 'index directory'; symbol?: '=' | null; value: string }
+  | { keyword: 'engine_attribute'; symbol?: '=' | null; value: string }
+  | { keyword: 'secondary_engine_attribute'; symbol?: '=' | null; value: string }
+  | { keyword: 'row_format'; symbol?: '=' | null; value: string }
+  | { keyword: 'charset' | 'character set' | 'default charset' | 'default character set'; symbol?: '=' | null; value: DefaultValue }
+  | { keyword: 'collate' | 'default collate'; symbol?: '=' | null; value: DefaultValue };
 
 export interface DropTable {
   type: "drop";

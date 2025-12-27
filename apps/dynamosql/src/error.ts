@@ -155,6 +155,14 @@ const ERROR_MAP: Record<string, ErrorMapEntry> = {
     code: 'ER_NO_DEFAULT_FOR_FIELD',
     sqlMessage: errStr`Field '${0}' doesn't have a default value`,
   },
+  ER_UNKNOWN_COLLATION: {
+    code: 'ER_UNKNOWN_COLLATION',
+    sqlMessage: errStr`Unknown collation: '${0}'`,
+  },
+  ER_UNKNOWN_CHARACTER_SET: {
+    code: 'ER_UNKNOWN_CHARACTER_SET',
+    sqlMessage: errStr`Uknown character set: '${0}'`,
+  },
 };
 
 export class SQLError extends Error {
