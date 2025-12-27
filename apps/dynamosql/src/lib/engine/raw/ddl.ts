@@ -2,7 +2,6 @@ import { logger } from '@dynamosql/shared';
 
 import { COLLATIONS } from '../../../constants/mysql';
 import { SQLError } from '../../../error';
-import { valueTypeToMysqlType } from '../../types/value_type';
 
 import type { ValueType } from '../../types/value_type';
 import type {
@@ -15,7 +14,6 @@ import type {
   DeleteIndexParams,
   AddColumnParams,
 } from '../index';
-import type { DescribeTableCommandOutput } from '@aws-sdk/client-dynamodb';
 
 const TYPE_MAP = { S: 'string', N: 'number', B: 'buffer' } as const;
 const MYSQL_TYPE_MAP = { S: 'VARCHAR', N: 'DECIMAL', B: 'BLOB' } as const;

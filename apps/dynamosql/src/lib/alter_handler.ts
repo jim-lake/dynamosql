@@ -5,9 +5,8 @@ import * as SchemaManager from './schema_manager';
 import * as TransactionManager from './transaction_manager';
 import { mysqlStringToValueType } from './types/value_type';
 
-import type { Engine, ColumnDef, ColumnDefParam } from './engine';
+import type { Engine, ColumnDefParam } from './engine';
 import type { HandlerParams } from './handler_types';
-import type { MysqlType } from './types/value_type';
 import type { Alter } from 'node-sql-parser';
 
 export async function query(params: HandlerParams<Alter>): Promise<void> {

@@ -65,9 +65,6 @@ async function _getFromTable(
       for (const database of list) {
         const tables = await getTableList({ dynamodb, database });
         for (const table of tables) {
-          console.log(
-            Object.keys(await _tableToTable(database, table, params))
-          );
           results.push(await _tableToTable(database, table, params));
         }
       }
@@ -117,7 +114,7 @@ function _dbToSchemata(database: string): Row {
 async function _tableToTable(
   database: string,
   table: string,
-  params: RowListParams
+  _params: RowListParams
 ): Promise<Row> {
   return {
     table_catalog: { value: 'def', type: 'string' },
@@ -152,7 +149,6 @@ function _columnToColumns(
   index: number,
   column: ColumnDef
 ): Row {
-  console.log(column);
   const collation_name = column.collation
     ? COLLATIONS[column.collation].toLowerCase()
     : null;

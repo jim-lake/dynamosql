@@ -1,30 +1,9 @@
-import { logger } from '@dynamosql/shared';
-
-import { CHARSETS, COLLATIONS } from '../../constants/mysql';
+import { COLLATIONS } from '../../constants/mysql';
 import { SQLError } from '../../error';
-import { trackFirstSeen } from '../../tools/util';
-import * as SchemaManager from '../schema_manager';
-import * as SelectHandler from '../select_handler';
-import { mysqlStringToValueType } from '../types/value_type';
 
-import {
-  getDatabaseName,
-  getDatabaseFromTable,
-  getTableFromTable,
-} from './ast_helper';
-import { CHARSET_DEFAULT_COLLATION_MAP } from './charset';
-import { getCharset } from './charset';
+import { CHARSET_DEFAULT_COLLATION_MAP, getCharset } from './charset';
 
-import type { FieldInfo } from '../../types';
-import type { ColumnDefParam, EvaluationResultRow } from '../engine';
-import type { EvaluationResult } from '../expression';
-import type { HandlerParams, AffectedResult } from '../handler_types';
-import type {
-  Create,
-  CreateTable,
-  CreateDatabase,
-  CreateColumnDefinition,
-} from 'node-sql-parser';
+import type { CreateColumnDefinition } from 'node-sql-parser';
 
 export function makeCollation(
   def: CreateColumnDefinition,

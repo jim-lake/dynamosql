@@ -24,7 +24,6 @@ import type {
   Create,
   CreateTable,
   CreateDatabase,
-  CreateColumnDefinition,
 } from 'node-sql-parser';
 
 function isCreateDatabase(ast: Create): ast is CreateDatabase {
