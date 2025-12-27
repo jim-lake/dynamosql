@@ -1,14 +1,14 @@
 import { SQLError } from '../error';
 
+import { makeCollation } from './helpers/collation';
 import * as SchemaManager from './schema_manager';
 import * as TransactionManager from './transaction_manager';
 import { mysqlStringToValueType } from './types/value_type';
-import { makeCollation } from './helpers/collation';
 
 import type { Engine, ColumnDef, ColumnDefParam } from './engine';
 import type { HandlerParams } from './handler_types';
-import type { Alter } from 'node-sql-parser';
 import type { MysqlType } from './types/value_type';
+import type { Alter } from 'node-sql-parser';
 
 export async function query(params: HandlerParams<Alter>): Promise<void> {
   const { ast, dynamodb, session } = params;
@@ -50,10 +50,9 @@ async function _runAlterTable(
   // Process column additions
   for (const def of ast.expr) {
     if (def.resource === 'column' && 'action' in def && def.action === 'add') {
-      console.log(def);
       const addDef = def;
       const column_name = addDef.column.column;
-      const mysqlType = addDef.definition.dataType as MysqlType;
+      const mysqlType = addDef.definition.dataType;
       const type = mysqlStringToValueType(mysqlType);
       const column = {
         name: column_name,

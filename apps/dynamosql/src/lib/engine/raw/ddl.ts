@@ -1,6 +1,6 @@
 import { logger } from '@dynamosql/shared';
-import { COLLATIONS } from '../../../constants/mysql';
 
+import { COLLATIONS } from '../../../constants/mysql';
 import { SQLError } from '../../../error';
 import { valueTypeToMysqlType } from '../../types/value_type';
 

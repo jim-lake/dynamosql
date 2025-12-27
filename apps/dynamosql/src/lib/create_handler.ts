@@ -1,6 +1,6 @@
 import { logger } from '@dynamosql/shared';
 
-import { CHARSETS, COLLATIONS } from '../constants/mysql';
+import { COLLATIONS } from '../constants/mysql';
 import { SQLError } from '../error';
 import { trackFirstSeen } from '../tools/util';
 
@@ -19,6 +19,7 @@ import type { ColumnDefParam, EvaluationResultRow } from './engine';
 import type { HandlerParams, AffectedResult } from './handler_types';
 import type { FieldInfo } from '../types';
 import type { EvaluationResult } from './expression';
+import type { CHARSETS } from '../constants/mysql';
 import type {
   Create,
   CreateTable,

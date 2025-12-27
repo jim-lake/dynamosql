@@ -3,6 +3,9 @@ import { logger } from '@dynamosql/shared';
 import { CHARSETS, COLLATIONS } from '../../constants/mysql';
 import { SQLError } from '../../error';
 import { trackFirstSeen } from '../../tools/util';
+import * as SchemaManager from '../schema_manager';
+import * as SelectHandler from '../select_handler';
+import { mysqlStringToValueType } from '../types/value_type';
 
 import {
   getDatabaseName,
@@ -10,15 +13,12 @@ import {
   getTableFromTable,
 } from './ast_helper';
 import { CHARSET_DEFAULT_COLLATION_MAP } from './charset';
-import * as SchemaManager from '../schema_manager';
-import * as SelectHandler from '../select_handler';
-import { mysqlStringToValueType } from '../types/value_type';
 import { getCharset } from './charset';
 
-import type { ColumnDefParam, EvaluationResultRow } from '../engine';
-import type { HandlerParams, AffectedResult } from '../handler_types';
 import type { FieldInfo } from '../../types';
+import type { ColumnDefParam, EvaluationResultRow } from '../engine';
 import type { EvaluationResult } from '../expression';
+import type { HandlerParams, AffectedResult } from '../handler_types';
 import type {
   Create,
   CreateTable,

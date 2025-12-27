@@ -1,6 +1,7 @@
-import { SQLError } from '../../../error';
 import { COLLATIONS, CHARSETS } from '../../../constants/mysql';
+import { SQLError } from '../../../error';
 import { deepClone } from '../../../tools/clone';
+import { COLLATION_CHARSET_MAP, CHARSET_BYTE_MAP } from '../../helpers/charset';
 import {
   getEngine,
   getDatabaseList,
@@ -8,7 +9,6 @@ import {
   getTableList,
 } from '../../schema_manager';
 import { SQLDateTime } from '../../types/sql_datetime';
-import { COLLATION_CHARSET_MAP, CHARSET_BYTE_MAP } from '../../helpers/charset';
 
 import {
   CATALOGS_LIST,
@@ -162,8 +162,8 @@ function _columnToColumns(
   const charset_name = charset ? CHARSETS[charset].toLowerCase() : null;
   let character_maximum_length: number | null = null;
   let charset_size: number | null = null;
-  let numeric_precision: number | null = null;
-  let numeric_scale: number | null = null;
+  const numeric_precision: number | null = null;
+  const numeric_scale: number | null = null;
   let datetime_precision: number | null = null;
   let column_type = column.mysqlType.toLowerCase();
   switch (column.mysqlType) {
