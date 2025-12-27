@@ -117,6 +117,7 @@ export interface TableInfoParams {
 export interface CreateTableParams {
   dynamodb: DynamoDBClient;
   table: string;
+  collation: COLLATIONS;
   primary_key: string[];
   column_list: ColumnDefParam[];
   session: Session;
@@ -131,13 +132,18 @@ export interface DropTableParams {
 }
 export interface KeyDef {
   name: string;
-  type: string;
+  type: ValueType;
 }
 export interface IndexParams {
   dynamodb: DynamoDBClient;
   table: string;
   index_name: string;
-  key_list?: KeyDef[];
+  key_list: KeyDef[];
+}
+export interface DeleteIndexParams {
+  dynamodb: DynamoDBClient;
+  table: string;
+  index_name: string;
 }
 export interface AddColumnParams {
   dynamodb: DynamoDBClient;
@@ -205,7 +211,7 @@ export interface Engine {
   createTable(params: CreateTableParams): Promise<void>;
   dropTable(params: DropTableParams): Promise<void>;
   createIndex(params: IndexParams): Promise<void>;
-  deleteIndex(params: IndexParams): Promise<void>;
+  deleteIndex(params: DeleteIndexParams): Promise<void>;
   addColumn(params: AddColumnParams): Promise<void>;
   getTableInfo(params: TableInfoParams): Promise<TableInfo>;
   getRowList(params: RowListParams): Promise<RowListResult>;

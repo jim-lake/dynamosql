@@ -10,15 +10,12 @@ import type {
   CreateTableParams,
   DropTableParams,
   IndexParams,
+  DeleteIndexParams,
   AddColumnParams,
 } from '../index';
 import type { DescribeTableCommandOutput } from '@aws-sdk/client-dynamodb';
 
-const TYPE_MAP: Record<string, ValueType> = {
-  S: 'string',
-  N: 'number',
-  B: 'buffer',
-} as const;
+const TYPE_MAP = { S: 'string', N: 'number', B: 'buffer' } as const;
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -43,17 +40,13 @@ export async function getTableInfo(
     if (!def.AttributeName || !def.AttributeType) {
       throw new Error('bad_data');
     }
-    return {
-      name: def.AttributeName,
-      type: TYPE_MAP[def.AttributeType] ?? 'string',
-    };
+    return { name: def.AttributeName, type: TYPE_MAP[def.AttributeType] };
   });
   const primary_key = data.Table.KeySchema.map(
     (key) => key.AttributeName ?? ''
   );
   return { table, primary_key, column_list, is_open: true };
 }
-
 export async function getTableList(params: TableListParams): Promise<string[]> {
   const { dynamodb } = params;
 
@@ -64,7 +57,6 @@ export async function getTableList(params: TableListParams): Promise<string[]> {
     throw err;
   }
 }
-
 export async function createTable(params: CreateTableParams): Promise<void> {
   const { dynamodb, table, ...other } = params;
   const primary_key = params.primary_key.map((name) => {
@@ -72,13 +64,9 @@ export async function createTable(params: CreateTableParams): Promise<void> {
     if (!column) {
       throw new SQLError('bad_primary_key');
     }
-    return column;
+    return { name: column.name, type: _valueToDynamoKeyType(column.type) };
   });
-  const column_list = params.column_list.filter((column) =>
-    primary_key.find((pk) => pk.name === column.name)
-  );
-  const opts = { ...other, table, primary_key, column_list };
-
+  const opts = { ...other, table, primary_key };
   try {
     await dynamodb.createTable(opts);
     await _waitForTable({ dynamodb, table });
@@ -124,12 +112,11 @@ export async function dropTable(params: DropTableParams): Promise<void> {
 export async function addColumn(_params: AddColumnParams): Promise<void> {}
 
 export async function createIndex(params: IndexParams): Promise<void> {
-  const { dynamodb, table, index_name, key_list } = params;
-  if (!key_list) {
-    throw new Error('key_list is required');
-  }
+  const { dynamodb, table, index_name } = params;
+  const key_list = params.key_list.map((key) => {
+    return { name: key.name, type: _valueToDynamoKeyType(key.type) };
+  });
   const opts = { table, index_name, key_list };
-
   try {
     await dynamodb.createIndex(opts);
     await _waitForTable({ dynamodb, table, index_name });
@@ -147,7 +134,7 @@ export async function createIndex(params: IndexParams): Promise<void> {
   }
 }
 
-export async function deleteIndex(params: IndexParams): Promise<void> {
+export async function deleteIndex(params: DeleteIndexParams): Promise<void> {
   const { dynamodb, table, index_name } = params;
 
   try {
@@ -198,5 +185,27 @@ async function _waitForTable(params: WaitForTableParams): Promise<void> {
       }
     }
     return;
+  }
+}
+function _valueToDynamoKeyType(type: ValueType): 'N' | 'B' | 'S' {
+  switch (type) {
+    case 'null':
+    case 'interval':
+    case 'datetime':
+    case 'date':
+    case 'time':
+    case 'string':
+    case 'char':
+    case 'text':
+    case 'json':
+      return 'S';
+    case 'bool':
+    case 'long':
+    case 'longlong':
+    case 'number':
+    case 'double':
+      return 'N';
+    case 'buffer':
+      return 'B';
   }
 }

@@ -183,7 +183,11 @@ export async function createTable(params: CreateTableParams): Promise<void> {
   } else if (is_temp) {
     const engine = Engine.getEngineByName('memory');
     await engine.createTable(params);
-  } else if (database_lc === '_dynamodb' && tableEngine !== 'raw') {
+  } else if (
+    database_lc === '_dynamodb' &&
+    tableEngine &&
+    tableEngine !== 'raw'
+  ) {
     throw new SQLError('access_denied');
   } else if (database_lc === '_dynamodb') {
     const engine = Engine.getEngineByName('raw');

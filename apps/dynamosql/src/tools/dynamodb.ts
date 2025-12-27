@@ -9,6 +9,7 @@ import {
   DescribeTableCommand,
   ListTablesCommand,
   UpdateTableCommand,
+  ProjectionType,
   KeyType,
   ReturnValuesOnConditionCheckFailure,
 } from '@aws-sdk/client-dynamodb';
@@ -21,7 +22,6 @@ import {
   convertSuccess,
   safeConvertSuccess,
   safeConvertError,
-  dynamoType,
   namespacePartiQL,
 } from './dynamodb_helper';
 import { parallelBatch } from './parallel_batch';
@@ -33,7 +33,6 @@ import type {
   DescribeTableCommandOutput,
   KeySchemaElement,
   BillingMode,
-  ProjectionType,
 } from '@aws-sdk/client-dynamodb';
 import type { AwsCredentialIdentity } from '@aws-sdk/types';
 
@@ -51,12 +50,9 @@ interface ErrorEntry {
   parent: unknown;
 }
 
-export interface ColumnDefinition {
-  name: string;
-  type: string;
-}
 export interface KeyDefinition {
   name: string;
+  type: 'B' | 'N' | 'S';
 }
 export interface DynamoDBConstructorParams {
   namespace?: string;
@@ -101,14 +97,13 @@ export interface PutItemsParams {
 export interface CreateTableParams {
   table: string;
   billing_mode?: string;
-  column_list: ColumnDefinition[];
   primary_key: KeyDefinition[];
 }
 export interface CreateIndexParams {
   table: string;
   index_name: string;
-  key_list: ColumnDefinition[];
-  projection_type?: string;
+  key_list: KeyDefinition[];
+  projection_type?: ProjectionType;
 }
 export interface DeleteIndexParams {
   table: string;
@@ -237,7 +232,6 @@ export class DynamoDB {
       throw safeConvertError(err);
     }
   }
-
   async deleteItems(params: DeleteItemsParams): Promise<ItemRecord[]> {
     const { table, key_list, list } = params;
     const prefix = `DELETE FROM ${escapeIdentifier(table)} WHERE `;
@@ -258,7 +252,6 @@ export class DynamoDB {
       return this.transactionQL(sql_list);
     });
   }
-
   async updateItems(params: UpdateItemsParams): Promise<ItemRecord[]> {
     const { table, key_list, list } = params;
     const prefix = `UPDATE ${escapeIdentifier(table)} SET `;
@@ -287,7 +280,6 @@ export class DynamoDB {
       return this.transactionQL(sql_list);
     });
   }
-
   async putItems(params: PutItemsParams): Promise<void> {
     const { list } = params;
     const table = `${this.namespace}${params.table}`;
@@ -333,7 +325,6 @@ export class DynamoDB {
       throw err_list;
     }
   }
-
   async getTableList(): Promise<string[]> {
     const namespace_len = this.namespace.length;
     const command = new ListTablesCommand({ Limit: 100 });
@@ -368,11 +359,11 @@ export class DynamoDB {
   }
 
   async createTable(params: CreateTableParams): Promise<void> {
-    const { billing_mode, column_list, primary_key } = params;
+    const { billing_mode, primary_key } = params;
     const table = `${this.namespace}${params.table}`;
-    const defs = column_list.map((column) => ({
+    const defs = primary_key.map((column) => ({
       AttributeName: column.name,
-      AttributeType: dynamoType(column.type),
+      AttributeType: column.type,
     }));
     const schema: KeySchemaElement[] = [
       { AttributeName: primary_key[0]?.name, KeyType: KeyType.HASH },
@@ -383,7 +374,6 @@ export class DynamoDB {
         KeyType: KeyType.RANGE,
       });
     }
-
     const input = {
       TableName: table,
       BillingMode: (billing_mode ?? 'PAY_PER_REQUEST') as BillingMode,
@@ -413,7 +403,7 @@ export class DynamoDB {
     const table = `${this.namespace}${params.table}`;
     const defs = key_list.map((item) => ({
       AttributeName: item.name,
-      AttributeType: dynamoType(item.type),
+      AttributeType: item.type,
     }));
     const schema: KeySchemaElement[] = [
       { AttributeName: key_list[0]?.name, KeyType: KeyType.HASH },
@@ -430,8 +420,7 @@ export class DynamoDB {
             IndexName: index_name,
             KeySchema: schema,
             Projection: {
-              ProjectionType: (projection_type ??
-                'KEYS_ONLY') as ProjectionType,
+              ProjectionType: projection_type ?? ProjectionType.KEYS_ONLY,
             },
           },
         },

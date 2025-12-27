@@ -97,7 +97,7 @@ async function _createTable(
   }
   const db_info = SchemaManager.getDatabase(database);
   if (!db_info) {
-    throw new SQLError('database_not_found');
+    throw new SQLError({ err: 'db_not_found', args: [database] });
   }
 
   let table_engine: string | undefined;
@@ -120,9 +120,10 @@ async function _createTable(
         break;
     }
   }
-  if (charset === undefined && collation === undefined) {
-    collation = db_info.collation;
+  if (charset && collation === undefined) {
+    collation = CHARSET_DEFAULT_COLLATION_MAP[charset];
   }
+  collation ??= db_info.collation;
 
   const is_temp = ast.temporary !== null;
   const duplicate_mode = ast.ignore_replace ?? undefined;
@@ -137,7 +138,7 @@ async function _createTable(
         mysqlType: def.definition.dataType,
         length: def.definition.length ?? null,
         decimals: def.definition.scale ?? null,
-        collation: _makeCollation(def, charset, collation),
+        collation: _makeCollation(def, collation),
         nullable: def.nullable?.value !== 'not null',
       };
       column_list.push(col);
@@ -155,7 +156,6 @@ async function _createTable(
   }
 
   let list: EvaluationResultRow[] | undefined;
-
   if (ast.as && ast.query_expr) {
     const opts = { ast: ast.query_expr, session, dynamodb };
     const { rows, columns } = await SelectHandler.internalQuery(opts);
@@ -188,6 +188,7 @@ async function _createTable(
       session,
       database,
       table,
+      collation,
       column_list,
       primary_key,
       is_temp,
@@ -212,7 +213,7 @@ async function _createTable(
       database,
       table,
       list,
-      duplicate_mode: duplicate_mode ?? undefined,
+      duplicate_mode,
     };
     return await engine.insertRowList(insertOpts);
   }
@@ -220,8 +221,7 @@ async function _createTable(
 }
 function _makeCollation(
   def: CreateColumnDefinition,
-  default_charset: CHARSETS | undefined,
-  default_collation: COLLATIONS | undefined
+  default_collation: COLLATIONS
 ): COLLATIONS | null {
   const mysqlType = def.definition.dataType;
   switch (mysqlType) {
@@ -242,10 +242,7 @@ function _makeCollation(
         const charset = _getCharset(char_name);
         return CHARSET_DEFAULT_COLLATION_MAP[charset];
       }
-      if (default_charset !== undefined) {
-        return CHARSET_DEFAULT_COLLATION_MAP[default_charset];
-      }
-      return default_collation ?? null;
+      return default_collation;
     }
     default:
       return null;
