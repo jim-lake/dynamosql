@@ -158,12 +158,14 @@ function _columnToColumns(
   const charset_name = charset ? CHARSETS[charset].toLowerCase() : null;
   let character_maximum_length: number | null = null;
   let charset_size: number | null = null;
-  const numeric_precision: number | null = null;
-  const numeric_scale: number | null = null;
+  let numeric_precision: number | null = null;
+  let numeric_scale: number | null = null;
   let datetime_precision: number | null = null;
   let column_type = column.mysqlType.toLowerCase();
   switch (column.mysqlType) {
     case 'INT':
+      numeric_precision = 10;
+      break;
     case 'BIGINT':
       break;
     case 'VARCHAR':
@@ -176,10 +178,14 @@ function _columnToColumns(
     case 'DATETIME':
     case 'TIME':
       datetime_precision = column.decimals ?? 0;
+      column_type += `(${datetime_precision})`;
       break;
     case 'DATE':
       break;
     case 'DECIMAL':
+      numeric_precision = column.length ?? 0;
+      numeric_scale = column.decimals ?? 0;
+      column_type += `(${numeric_precision},${numeric_scale})`;
       break;
     case 'BOOLEAN':
       break;

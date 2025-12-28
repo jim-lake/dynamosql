@@ -20,11 +20,7 @@ import type { HandlerParams, AffectedResult } from './handler_types';
 import type { FieldInfo } from '../types';
 import type { EvaluationResult } from './expression';
 import type { CHARSETS } from '../constants/mysql';
-import type {
-  Create,
-  CreateTable,
-  CreateDatabase,
-} from 'node-sql-parser';
+import type { Create, CreateTable, CreateDatabase } from 'node-sql-parser';
 
 function isCreateDatabase(ast: Create): ast is CreateDatabase {
   return ast.keyword === 'database';
@@ -138,7 +134,7 @@ async function _createTable(
         type: mysqlStringToValueType(def.definition.dataType),
         mysqlType: def.definition.dataType,
         length: def.definition.length ?? null,
-        decimals: def.definition.scale ?? null,
+        decimals: def.definition.scale ?? def.definition.length ?? null,
         collation: makeCollation(def, collation),
         nullable: def.nullable?.value !== 'not null',
       };

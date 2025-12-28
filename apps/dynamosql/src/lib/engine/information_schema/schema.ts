@@ -265,20 +265,20 @@ export const COLUMNS_INFO = {
     {
       name: 'NUMERIC_PRECISION',
       name_lc: 'numeric_precision',
-      type: 'longlong' as const,
-      mysqlType: 'BIGINT' as const,
+      type: 'number' as const,
+      mysqlType: 'INT' as const,
     },
     {
       name: 'NUMERIC_SCALE',
       name_lc: 'numeric_scale',
-      type: 'longlong' as const,
-      mysqlType: 'BIGINT' as const,
+      type: 'number' as const,
+      mysqlType: 'INT' as const,
     },
     {
       name: 'DATETIME_PRECISION',
       name_lc: 'datetime_precision',
-      type: 'longlong' as const,
-      mysqlType: 'BIGINT' as const,
+      type: 'number' as const,
+      mysqlType: 'INT' as const,
     },
     {
       name: 'CHARACTER_SET_NAME',
@@ -302,7 +302,7 @@ export const COLUMNS_INFO = {
       name: 'COLUMN_KEY',
       name_lc: 'column_key',
       type: 'string' as const,
-      mysqlType: 'VARCHAR' as const,
+      mysqlType: 'CHAR' as const,
     },
     {
       name: 'EXTRA',
@@ -319,8 +319,8 @@ export const COLUMNS_INFO = {
     {
       name: 'COLUMN_COMMENT',
       name_lc: 'column_comment',
-      type: 'text' as const,
-      mysqlType: 'TEXT' as const,
+      type: 'string' as const,
+      mysqlType: 'VARCHAR' as const,
     },
     {
       name: 'GENERATION_EXPRESSION',
