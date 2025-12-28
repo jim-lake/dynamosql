@@ -11,7 +11,7 @@ function sum(expr: AggrFunc, state: EvaluationState): EvaluationResult {
   let err: EvaluationResult['err'] = null;
   let value: number | null = 0;
   let name = '';
-  let hasString = false;
+  let type: EvaluationResult['type'] = 'number';
   for (const group_row of group) {
     const group_state: EvaluationState = { ...other, row: group_row };
     const result = getValue(expr.args.expr, group_state);
@@ -22,12 +22,16 @@ function sum(expr: AggrFunc, state: EvaluationState): EvaluationResult {
     if (result.err) {
       err = result.err;
       break;
+    } else if (result.type === 'null') {
+      type = 'double';
+      value = null;
+      break;
     } else if (result.value === null) {
       value = null;
       break;
     } else {
       if (result.type === 'string') {
-        hasString = true;
+        type = 'double';
       }
       const num = convertNum(result.value);
       if (num === null) {
@@ -37,7 +41,6 @@ function sum(expr: AggrFunc, state: EvaluationState): EvaluationResult {
       value += num;
     }
   }
-  const type = value === null || hasString ? 'double' : 'number';
   return { err, value, type, name };
 }
 function count(expr: AggrFunc, state: EvaluationState): EvaluationResult {

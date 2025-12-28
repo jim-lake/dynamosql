@@ -326,6 +326,11 @@ function _unionType(
     // noop
   } else if (new_type === 'null') {
     ret = old_type;
+  } else if (
+    (new_type === 'double' && old_type === 'number') ||
+    (new_type === 'number' && old_type === 'double')
+  ) {
+    ret = 'double';
   } else if (new_type !== old_type) {
     ret = 'string';
   }

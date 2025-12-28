@@ -90,9 +90,11 @@ function _asc(
   ) {
     return _convertNum(a) - _convertNum(b);
   } else if (typeof a === 'string' && typeof b === 'string') {
-    return a.localeCompare(b);
+    return a > b ? 1 : -1;
   } else {
-    return String(a).localeCompare(String(b));
+    const s_a = String(a);
+    const s_b = String(b);
+    return s_a === s_b ? 0 : s_a > s_b ? 1 : -1;
   }
 }
 function _desc(
