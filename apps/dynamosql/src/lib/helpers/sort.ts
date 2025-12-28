@@ -2,11 +2,23 @@ import { SQLError } from '../../error';
 import { Types } from '../../types';
 import { getValue } from '../expression';
 
+import type { COLLATIONS } from '../../constants/mysql';
 import type { FieldInfo } from '../../types';
 import type { EvaluationState } from '../expression';
 import type { SourceRowResult } from '../handler_types';
-import type { OrderBy } from 'node-sql-parser';
+import type {
+  ExpressionValue,
+  ConvertDataType,
+  ExprList,
+  ExtractFunc,
+  FulltextSearch,
+  OrderBy,
+} from 'node-sql-parser';
 
+interface OrderStep {
+  order: OrderBy;
+  collation: COLLATIONS | null;
+}
 export async function* sort(
   iter: AsyncIterableIterator<SourceRowResult[]>,
   orderby: OrderBy[],
@@ -20,16 +32,25 @@ export async function* sort(
       result_list = result_list.concat(batch);
     }
   }
-  result_list.sort(_sort.bind(null, orderby, state));
+  const row = result_list[0];
+  if (row) {
+    const orders: OrderStep[] = [];
+    for (const order of orderby) {
+      const collation = _getCollationForOrderBy(order, { ...state, row });
+      orders.push({ order, collation });
+    }
+    result_list.sort(_sort.bind(null, orders, state));
+  }
   yield result_list;
 }
 function _sort(
-  orderby: OrderBy[],
+  orders: OrderStep[],
   state: EvaluationState,
   a: SourceRowResult,
   b: SourceRowResult
 ): number {
-  for (const order of orderby) {
+  for (const step of orders) {
+    const { order } = step;
     const { expr } = order;
     const func = order.type !== 'DESC' ? _asc : _desc;
     if (
@@ -77,9 +98,7 @@ function _asc(
     return a - b;
   } else if (typeof a === 'bigint' && typeof b === 'bigint') {
     const delta = a - b;
-    if (delta === 0n) {
-      return 0;
-    } else if (delta > 0) {
+    if (delta > 0n) {
       return 1;
     } else {
       return -1;
@@ -114,4 +133,29 @@ function _convertNum(value: unknown): number {
     return value;
   }
   return 0;
+}
+function _getCollationForOrderBy(order: OrderBy, state: EvaluationState) {
+  const { expr } = order;
+  if (
+    'type' in expr &&
+    expr.type === 'number' &&
+    'value' in expr &&
+    typeof expr.value === 'number'
+  ) {
+    return null;
+  } else {
+    return _getCollation(expr, state);
+  }
+}
+function _getCollation(
+  expr:
+    | ExpressionValue
+    | ConvertDataType
+    | ExprList
+    | ExtractFunc
+    | FulltextSearch
+    | undefined,
+  state: EvaluationState
+): COLLATIONS | null {
+  return null;
 }
