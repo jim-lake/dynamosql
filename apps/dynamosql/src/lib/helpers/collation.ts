@@ -5,6 +5,7 @@ import { CHARSET_DEFAULT_COLLATION_MAP, getCharset } from './charset';
 
 import type { EvaluationState } from '../expression';
 import type {
+  Assign,
   CreateColumnDefinition,
   ConvertDataType,
   ExpressionValue,
@@ -95,6 +96,7 @@ export function stringCompare(
   }
 }
 type ExprArgument =
+  | Assign
   | ExpressionValue
   | ConvertDataType
   | ExprList
@@ -162,8 +164,23 @@ function _getExprCollation(
   }
   switch (expr.type) {
     case 'column_ref': {
-      // Column reference - get collation from column definition
-      // For now, return null and let it use connection default
+      const ref_info = state.columnRefMap?.get(expr);
+      if (ref_info?.from) {
+        const info = state.tableInfoMap?.get(ref_info.from);
+        if (info) {
+          const col_name = info.isCaseSensitive
+            ? String(expr.column)
+            : String(expr.column).toLowerCase();
+          const col = info.columns.find((c) =>
+            info.isCaseSensitive ? c.name === col_name : c.name_lc === col_name
+          );
+          if (col?.collation) {
+            return [col.collation, COERCIBILITY.COLUMN_TYPE];
+          }
+        }
+      } else if (ref_info?.column?.expr) {
+        return _getExprCollation(ref_info.column.expr, state);
+      }
       return [null, COERCIBILITY.IGNORABLE];
     }
     case 'binary_expr':

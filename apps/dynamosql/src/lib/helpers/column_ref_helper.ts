@@ -37,6 +37,7 @@ function isBaseFrom(from: From): from is BaseFrom {
 export interface ColumnRefInfo {
   resultIndex?: number;
   from?: From;
+  column?: Column;
 }
 
 export interface RequestInfo {
@@ -213,7 +214,13 @@ export function resolveReferences(
       );
     });
   });
-
+  if (columns) {
+    columnRefMap.forEach((ref) => {
+      if (ref.resultIndex !== undefined) {
+        ref.column = columns[ref.resultIndex];
+      }
+    });
+  }
   return { requestSets, requestAll, columnRefMap, setListMap };
 }
 

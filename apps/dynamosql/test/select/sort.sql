@@ -35,3 +35,15 @@ DELETE FROM _dynamodb.foo WHERE id = "777";
 DELETE FROM _dynamodb.foo WHERE id = "999";
 DELETE FROM _dynamodb.foo WHERE id = "667";
 SELECT id, other, comment FROM _dynamodb.foo ORDER BY id;
+
+CREATE TEMPORARY TABLE _dynamodb.temp_foo (id INT PRIMARY KEY, s1 VARCHAR(32) COLLATE UTF8MB4_0900_AI_CI, s2 VARCHAR(32) COLLATE UTF8MB4_0900_AS_CS);
+INSERT INTO _dynamodb.temp_foo (id, s1, s2) VALUES (1, "a", "a"), (2, "B", "à"), (3, "b", "b");
+SELECT id, s1, s2 FROM _dynamodb.temp_foo ORDER BY s1, id;
+SELECT id, s1, s2 FROM _dynamodb.temp_foo ORDER BY s2, id;
+SELECT id, s1, s2 FROM _dynamodb.temp_foo ORDER BY s1 DESC, id;
+SELECT id, s1, s2 FROM _dynamodb.temp_foo ORDER BY s2 DESC, id;
+SELECT id, s1, s2 FROM _dynamodb.temp_foo ORDER BY s1 COLLATE UTF8MB4_BIN, id;
+SELECT id, s1, s2 FROM _dynamodb.temp_foo ORDER BY s2 COLLATE UTF8MB4_BIN, id;
+SELECT id, s1, s2 FROM _dynamodb.temp_foo ORDER BY s1 COLLATE UTF8MB4_BIN DESC, id;
+SELECT id, s1, s2 FROM _dynamodb.temp_foo ORDER BY s2 COLLATE UTF8MB4_BIN DESC, id;
+DROP TABLE _dynamodb.temp_foo;
