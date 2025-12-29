@@ -1,12 +1,14 @@
+import { COLLATIONS } from './constants/mysql';
 import { SYSTEM_VARIABLE_TYPES } from './constants/system_variables';
 import { SQLError } from './error';
+import { getCollation } from './lib/helpers/collation';
 
 import type { EvaluationValue } from './lib/expression';
 
 const SYSTEM_TIME_ZONE = _getSystemTimezone();
 
 class GlobalSettings {
-  private _collationConnection = 'utf8mb4_0900_ai_ci';
+  private _collationConnection = COLLATIONS.UTF8MB4_0900_AI_CI;
   private _divPrecisionIncrement = 4;
   private _sqlMode = 'NO_ENGINE_SUBSTITUTION';
   private _timeZone = process.env.TZ ?? SYSTEM_TIME_ZONE;
@@ -36,7 +38,10 @@ class GlobalSettings {
       SYSTEM_VARIABLE_TYPES[name_uc as keyof typeof SYSTEM_VARIABLE_TYPES];
     switch (name_uc) {
       case 'COLLATION_CONNECTION':
-        return { value: this.collationConnection, type };
+        return {
+          value: COLLATIONS[this.collationConnection].toLowerCase(),
+          type,
+        };
       case 'DIV_PRECISION_INCREMENT':
         return { value: this.divPrecisionIncrement, type };
       case 'TIME_ZONE':
@@ -52,7 +57,7 @@ class GlobalSettings {
     const name_uc = name.toUpperCase();
     switch (name_uc) {
       case 'COLLATION_CONNECTION':
-        this._collationConnection = String(value);
+        this._collationConnection = getCollation(String(value));
         return;
       case 'DIV_PRECISION_INCREMENT':
         this._divPrecisionIncrement = Number(value);

@@ -2,28 +2,25 @@ import { SQLError } from '../../error';
 import { Types } from '../../types';
 import { getValue } from '../expression';
 
+import { getExprCollation, stringCompare } from './collation';
+
 import type { COLLATIONS } from '../../constants/mysql';
 import type { FieldInfo } from '../../types';
 import type { EvaluationState } from '../expression';
 import type { SourceRowResult } from '../handler_types';
-import type {
-  ExpressionValue,
-  ConvertDataType,
-  ExprList,
-  ExtractFunc,
-  FulltextSearch,
-  OrderBy,
-} from 'node-sql-parser';
+import type { QueryColumn } from '../helpers/query_columns';
+import type { OrderBy } from 'node-sql-parser';
 
-interface OrderStep {
-  order: OrderBy;
-  collation: COLLATIONS | null;
+export interface SortParams {
+  iter: AsyncIterableIterator<SourceRowResult[]>;
+  orderby: OrderBy[];
+  queryColumns: QueryColumn[];
+  state: EvaluationState;
 }
 export async function* sort(
-  iter: AsyncIterableIterator<SourceRowResult[]>,
-  orderby: OrderBy[],
-  state: EvaluationState
+  params: SortParams
 ): AsyncIterableIterator<SourceRowResult[]> {
+  const { iter, orderby, queryColumns, state } = params;
   let result_list: SourceRowResult[] = [];
   for await (const batch of iter) {
     if (batch.length < 10_000) {
@@ -36,12 +33,19 @@ export async function* sort(
   if (row) {
     const orders: OrderStep[] = [];
     for (const order of orderby) {
-      const collation = _getCollationForOrderBy(order, { ...state, row });
+      const collation = _getCollationForOrderBy(order, queryColumns, {
+        ...state,
+        row,
+      });
       orders.push({ order, collation });
     }
     result_list.sort(_sort.bind(null, orders, state));
   }
   yield result_list;
+}
+interface OrderStep {
+  order: OrderBy;
+  collation: COLLATIONS | null;
 }
 function _sort(
   orders: OrderStep[],
@@ -50,7 +54,7 @@ function _sort(
   b: SourceRowResult
 ): number {
   for (const step of orders) {
-    const { order } = step;
+    const { order, collation } = step;
     const { expr } = order;
     const func = order.type !== 'DESC' ? _asc : _desc;
     if (
@@ -63,7 +67,8 @@ function _sort(
       const result = func(
         a.result[index]?.value,
         b.result[index]?.value,
-        a.result[index]?.type
+        a.result[index]?.type,
+        collation
       );
       if (result !== 0) {
         return result;
@@ -75,7 +80,12 @@ function _sort(
       if (err) {
         throw new SQLError(err);
       }
-      const result = func(a_value.value, b_value.value, a_value.type);
+      const result = func(
+        a_value.value,
+        b_value.value,
+        a_value.type,
+        collation
+      );
       if (result !== 0) {
         return result;
       }
@@ -86,7 +96,8 @@ function _sort(
 function _asc(
   a: unknown,
   b: unknown,
-  column: FieldInfo | string | undefined
+  column: FieldInfo | string | undefined,
+  collation: COLLATIONS | null
 ): number {
   if (a === b) {
     return 0;
@@ -108,20 +119,19 @@ function _asc(
     column === 'number'
   ) {
     return _convertNum(a) - _convertNum(b);
-  } else if (typeof a === 'string' && typeof b === 'string') {
-    return a > b ? 1 : -1;
   } else {
     const s_a = String(a);
     const s_b = String(b);
-    return s_a === s_b ? 0 : s_a > s_b ? 1 : -1;
+    return stringCompare(s_a, s_b, collation);
   }
 }
 function _desc(
   a: unknown,
   b: unknown,
-  column: FieldInfo | string | undefined
+  column: FieldInfo | string | undefined,
+  collation: COLLATIONS | null
 ): number {
-  return _asc(b, a, column);
+  return _asc(b, a, column, collation);
 }
 function _convertNum(value: unknown): number {
   if (value === '') {
@@ -134,7 +144,11 @@ function _convertNum(value: unknown): number {
   }
   return 0;
 }
-function _getCollationForOrderBy(order: OrderBy, state: EvaluationState) {
+function _getCollationForOrderBy(
+  order: OrderBy,
+  queryColumns: QueryColumn[],
+  state: EvaluationState
+) {
   const { expr } = order;
   if (
     'type' in expr &&
@@ -142,20 +156,15 @@ function _getCollationForOrderBy(order: OrderBy, state: EvaluationState) {
     'value' in expr &&
     typeof expr.value === 'number'
   ) {
+    const index = expr.value - 1;
+    const column = queryColumns[index];
+    if (column && column.result.collation) {
+      return column.result.collation;
+    } else if (column) {
+      return getExprCollation(column.expr, state);
+    }
     return null;
   } else {
-    return _getCollation(expr, state);
+    return getExprCollation(expr, state);
   }
-}
-function _getCollation(
-  expr:
-    | ExpressionValue
-    | ConvertDataType
-    | ExprList
-    | ExtractFunc
-    | FulltextSearch
-    | undefined,
-  state: EvaluationState
-): COLLATIONS | null {
-  return null;
 }

@@ -1,3 +1,4 @@
+import { getExprCollation, stringCompare } from '../helpers/collation';
 import { convertNum, convertDateTime } from '../helpers/sql_conversion';
 import { SQLDate } from '../types/sql_date';
 import { SQLDateTime } from '../types/sql_datetime';
@@ -39,6 +40,7 @@ export function inOp(expr: Binary, state: EvaluationState): EvaluationResult {
   } else if ('type' in expr.right && expr.right.type === 'expr_list') {
     const list = expr.right.value;
     if (list) {
+      const collation = getExprCollation([expr.left, ...list], state);
       for (const item of list) {
         const right = getValue(item, state);
         names.push(right.name ?? '');
@@ -55,6 +57,11 @@ export function inOp(expr: Binary, state: EvaluationState): EvaluationResult {
         } else if (left_val === right_val) {
           value = 1;
           break;
+        } else if (typeof left_val === 'string') {
+          if (stringCompare(left_val, right_val, collation) === 0) {
+            value = 1;
+            break;
+          }
         }
       }
     }
@@ -212,7 +219,8 @@ function _equal(
     } else if (left_val === right_val) {
       value = 1;
     } else if (typeof left_val === 'string' && typeof right_val === 'string') {
-      value = left_val.localeCompare(right_val) === 0 ? 1 : 0;
+      const collation = getExprCollation(expr, state);
+      value = stringCompare(left_val, right_val, collation) === 0 ? 1 : 0;
     }
   }
   return { err, value, name, type: 'longlong' };
@@ -244,7 +252,8 @@ function _gt(
     } else if (typeof left_val === 'number' && typeof right_val === 'number') {
       value = left_val > right_val ? 1 : 0;
     } else if (typeof left_val === 'string' && typeof right_val === 'string') {
-      value = left_val.localeCompare(right_val) > 0 ? 1 : 0;
+      const collation = getExprCollation([expr_left, expr_right], state);
+      value = stringCompare(left_val, right_val, collation) > 0 ? 1 : 0;
     }
   }
   return { err, value, name, type: 'longlong' };
@@ -279,7 +288,8 @@ function _gte(
       value =
         leftNum !== null && rightNum !== null && leftNum >= rightNum ? 1 : 0;
     } else if (typeof left_val === 'string' && typeof right_val === 'string') {
-      value = left_val.localeCompare(right_val) >= 0 ? 1 : 0;
+      const collation = getExprCollation([expr_left, expr_right], state);
+      value = stringCompare(left_val, right_val, collation) >= 0 ? 1 : 0;
     }
   }
   return { err, value, type: 'longlong', name };

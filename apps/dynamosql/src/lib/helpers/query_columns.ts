@@ -1,3 +1,4 @@
+import { getCollation } from './collation';
 import { convertType } from './column_type_helper';
 
 import type { COLLATIONS } from '../../constants/mysql';
@@ -76,7 +77,7 @@ export function expandStarColumns(
               ret.push({
                 expr: colRef,
                 as: null,
-                result: _makeResultColumn(c),
+                result: _makeResultColumn(c, colRef),
               });
             });
           }
@@ -94,7 +95,7 @@ export function expandStarColumns(
               ? info.columns.find((c) => c.name === col_name)
               : info.columns.find((c) => c.name_lc === col_name);
             if (found) {
-              result = _makeResultColumn(found);
+              result = _makeResultColumn(found, column.expr);
             }
           }
         }
@@ -143,13 +144,18 @@ function _isColumnRef(
 ): expr is ColumnRef {
   return 'type' in expr && expr.type === 'column_ref';
 }
-function _makeResultColumn(column: QueryColumnInfo): QueryColumn['result'] {
+function _makeResultColumn(
+  column: QueryColumnInfo,
+  expr: ColumnRef
+): QueryColumn['result'] {
+  const col_name = expr.collate?.collate?.name;
+  const collation = col_name ? getCollation(col_name) : column.collation;
   return {
     mysqlType: column.mysqlType,
     orgName: column.name,
     length: column.length,
     decimals: column.decimals,
-    collation: column.collation,
+    collation,
     nullable: column.nullable,
   };
 }

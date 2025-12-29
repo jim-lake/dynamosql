@@ -3,7 +3,25 @@ import { SQLError } from '../../error';
 
 import { CHARSET_DEFAULT_COLLATION_MAP, getCharset } from './charset';
 
-import type { CreateColumnDefinition } from 'node-sql-parser';
+import type { EvaluationState } from '../expression';
+import type {
+  CreateColumnDefinition,
+  ConvertDataType,
+  ExpressionValue,
+  ExprList,
+  ExtractFunc,
+  FulltextSearch,
+} from 'node-sql-parser';
+
+export enum COERCIBILITY {
+  EXPLICIT = 0,
+  NO_COLLATION = 1,
+  COLUMN_TYPE = 2,
+  SYSTEM = 3,
+  STRING = 4,
+  NUMERIC = 5,
+  IGNORABLE = 6,
+}
 
 export function makeCollation(
   def: CreateColumnDefinition,
@@ -42,4 +60,150 @@ export function getCollation(s: string): COLLATIONS {
     throw new SQLError({ err: 'ER_UNKNOWN_COLLATION', args: [s] });
   }
   return found;
+}
+export function stringCompare(
+  s1: string,
+  s2: string,
+  collation: COLLATIONS | null
+): number {
+  if (s1 === s2) {
+    return 0;
+  }
+  switch (collation) {
+    case COLLATIONS.UTF8MB4_GENERAL_CI:
+    case COLLATIONS.UTF8MB4_0900_AI_CI:
+      return s1.localeCompare(s2, 'und', {
+        sensitivity: 'base',
+        ignorePunctuation: false,
+        numeric: false,
+        caseFirst: 'false',
+        usage: 'sort',
+      });
+    case COLLATIONS.UTF8MB4_0900_AS_CS:
+      return s1.localeCompare(s2, 'und', {
+        sensitivity: 'variant',
+        ignorePunctuation: false,
+        numeric: false,
+        caseFirst: 'false',
+        usage: 'sort',
+      });
+    case COLLATIONS.UTF8_BIN:
+    case COLLATIONS.UTF8MB4_0900_BIN:
+    case COLLATIONS.BINARY:
+    default:
+      return s1 > s2 ? 1 : -1;
+  }
+}
+type ExprArgument =
+  | ExpressionValue
+  | ConvertDataType
+  | ExprList
+  | ExtractFunc
+  | FulltextSearch
+  | undefined;
+export function getExprCollation(
+  expr: ExprArgument | ExprArgument[],
+  state: EvaluationState
+): COLLATIONS | null {
+  return _getExprCollation(expr, state)[0];
+}
+export function getExprCoercibility(
+  expr: ExprArgument | ExprArgument[],
+  state: EvaluationState
+): COERCIBILITY {
+  return _getExprCollation(expr, state)[1];
+}
+type ExprResult = [COLLATIONS | null, COERCIBILITY];
+function _getExprCollation(
+  expr: ExprArgument | ExprArgument[],
+  state: EvaluationState
+): ExprResult {
+  if (!expr) {
+    return [null, COERCIBILITY.IGNORABLE];
+  }
+  if (Array.isArray(expr)) {
+    if (expr.length === 0) {
+      return [null, COERCIBILITY.IGNORABLE];
+    }
+    const results = expr
+      .map((e) => _getExprCollation(e, state))
+      .sort(_sortCollate);
+    let current: ExprResult | undefined = undefined;
+    for (const result of results) {
+      if (current === undefined) {
+        current = result;
+      } else {
+        if (current[1] === result[1]) {
+          if (current[0] !== result[0]) {
+            throw new SQLError({
+              err: 'ER_CANT_AGGREGATE_2COLLATIONS',
+              args: [current[0], result[0]],
+            });
+          }
+        } else {
+          break;
+        }
+      }
+    }
+    if (current === undefined) {
+      return [null, COERCIBILITY.IGNORABLE];
+    }
+    return current;
+  }
+
+  if ('collate' in expr && expr.collate) {
+    const name = expr.collate.name ?? expr.collate.collate?.name;
+    if (name) {
+      return [getCollation(name), COERCIBILITY.EXPLICIT];
+    }
+  }
+  if (!('type' in expr)) {
+    return [null, COERCIBILITY.IGNORABLE];
+  }
+  switch (expr.type) {
+    case 'column_ref': {
+      // Column reference - get collation from column definition
+      // For now, return null and let it use connection default
+      return [null, COERCIBILITY.IGNORABLE];
+    }
+    case 'binary_expr':
+      return _getExprCollation([expr.left, expr.right], state);
+    case 'function': {
+      return [null, COERCIBILITY.IGNORABLE];
+    }
+    case 'cast': {
+      const firstTarget = expr.target[0];
+      if (firstTarget) {
+        const dataType = firstTarget.dataType.toUpperCase();
+        switch (dataType) {
+          case 'CHAR':
+          case 'VARCHAR':
+          case 'TEXT':
+            return [state.session.collationConnection, COERCIBILITY.STRING];
+        }
+      }
+      return [null, COERCIBILITY.IGNORABLE];
+    }
+    case 'single_quote_string':
+    case 'double_quote_string': {
+      const name = expr.suffix?.collate?.collate?.name;
+      if (name) {
+        return [getCollation(name), COERCIBILITY.EXPLICIT];
+      }
+      return [state.session.collationConnection, COERCIBILITY.STRING];
+    }
+    case 'unary_expr':
+      return _getExprCollation(expr.expr, state);
+    default:
+      return [null, COERCIBILITY.IGNORABLE];
+  }
+}
+function _sortCollate(a: ExprResult, b: ExprResult) {
+  if (a[1] === b[1]) {
+    return 0;
+  } else if (a[1] < b[1]) {
+    return -1;
+  } else {
+    return 1;
+  }
 }

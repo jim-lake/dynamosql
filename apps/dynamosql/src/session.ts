@@ -1,9 +1,11 @@
 import * as SqlString from 'sqlstring';
 
+import { COLLATIONS } from './constants/mysql';
 import { SYSTEM_VARIABLE_TYPES } from './constants/system_variables';
 import { SQLError } from './error';
 import GlobalSettings from './global_settings';
 import * as DynamoDB from './lib/dynamodb';
+import { getCollation } from './lib/helpers/collation';
 import { SQLMode } from './lib/helpers/sql_mode';
 import { offsetAtTime } from './lib/helpers/timezone';
 import { Query } from './query';
@@ -65,7 +67,7 @@ export class Session extends SQLMode implements PoolConnection {
   private readonly _tempTableMap = new Map<string, Map<string, unknown>>();
   private _isTimestampFixed = false;
 
-  private _collationConnection: string;
+  private _collationConnection: COLLATIONS;
   private _divPrecisionIncrement: number;
   private _timeZone: string;
   private _timestamp = 0;
@@ -148,7 +150,10 @@ export class Session extends SQLMode implements PoolConnection {
       SYSTEM_VARIABLE_TYPES[name_uc as keyof typeof SYSTEM_VARIABLE_TYPES];
     switch (name_uc) {
       case 'COLLATION_CONNECTION':
-        return { value: this.collationConnection, type };
+        return {
+          value: COLLATIONS[this.collationConnection].toLowerCase(),
+          type,
+        };
       case 'DIV_PRECISION_INCREMENT':
         return { value: this.divPrecisionIncrement, type };
       case 'TIME_ZONE':
@@ -168,7 +173,7 @@ export class Session extends SQLMode implements PoolConnection {
     const name_uc = name.toUpperCase();
     switch (name_uc) {
       case 'COLLATION_CONNECTION':
-        this._collationConnection = String(value);
+        this._collationConnection = getCollation(String(value));
         return;
       case 'DIV_PRECISION_INCREMENT':
         this._divPrecisionIncrement = Number(value);

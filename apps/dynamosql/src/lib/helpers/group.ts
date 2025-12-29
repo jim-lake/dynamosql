@@ -6,14 +6,12 @@ import type { SourceRow, SourceRowGroup } from '../handler_types';
 import type {
   ExpressionValue,
   Select,
-  ColumnRef,
   ConvertDataType,
   ExprList,
   ExtractFunc,
   FulltextSearch,
   Star,
   Assign,
-  NumberValue,
   OriginValue,
 } from 'node-sql-parser';
 
@@ -32,7 +30,7 @@ function isExpressionValue(
 }
 
 export interface GroupBy {
-  columns: (ColumnRef | NumberValue)[] | null;
+  columns: ExpressionValue[] | null;
   modifiers: (OriginValue | null)[];
 }
 export interface FormGroupParams {

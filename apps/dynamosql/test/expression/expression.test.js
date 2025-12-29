@@ -171,4 +171,7 @@ describe('Expression', function () {
     path.join(__dirname, 'operator_control_flow.sql'),
     { verify_field_types: true }
   );
+  runTests('collation.sql', path.join(__dirname, 'collation.sql'), {
+    verify_field_types: true,
+  });
 });

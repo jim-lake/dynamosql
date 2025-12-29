@@ -222,7 +222,12 @@ async function _evaluateReturn(
 
   let resultIter = _makeResults({ iter: group_iter, queryColumns, state });
   if (ast.orderby) {
-    resultIter = sort(resultIter, ast.orderby, state);
+    resultIter = sort({
+      iter: resultIter,
+      orderby: ast.orderby,
+      queryColumns,
+      state,
+    });
   }
   if (ast.limit) {
     resultIter = _makeLimit(resultIter, ast.limit);

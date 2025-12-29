@@ -161,7 +161,11 @@ const ERROR_MAP: Record<string, ErrorMapEntry> = {
   },
   ER_UNKNOWN_CHARACTER_SET: {
     code: 'ER_UNKNOWN_CHARACTER_SET',
-    sqlMessage: errStr`Uknown character set: '${0}'`,
+    sqlMessage: errStr`Unknown character set: '${0}'`,
+  },
+  ER_CANT_AGGREGATE_2COLLATIONS: {
+    code: 'ER_CANT_AGGREGATE_2COLLATIONS',
+    sqlMessage: errStr`Illegal mix of collations (${0}) and (${1}) for operation`,
   },
 };
 
