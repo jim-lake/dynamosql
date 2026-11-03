@@ -11,13 +11,7 @@ export interface NativeObject {
   [key: string]: NativeType | undefined;
 }
 export type NativeType =
-  | string
-  | number
-  | boolean
-  | null
-  | NativeObject
-  | Uint8Array
-  | NativeType[];
+  string | number | boolean | null | NativeObject | Uint8Array | NativeType[];
 
 export class NativeObjectClass {
   toString(): string {

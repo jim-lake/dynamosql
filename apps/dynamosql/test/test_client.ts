@@ -1,16 +1,16 @@
 process.env.TZ = 'UTC';
 
 const mysql = require('mysql');
-const config = require('../../../config.json');
 const { Types } = require('../src/types');
 const { COLLATIONS, FIELD_FLAGS } = require('../src/constants/mysql');
 
 const sql = process.argv.pop();
 const arg_len = process.argv.length;
 console.log('Arg_len:', arg_len);
-const host = arg_len > 3 ? process.argv[2] : config.db?.host;
+const host =
+  arg_len > 3 ? process.argv[2] : (process.env.DB_HOST ?? 'localhost');
 const port = parseInt(
-  arg_len > 4 ? process.argv[3] : (config.db?.port ?? 3306)
+  arg_len > 4 ? process.argv[3] : (process.env.DB_PORT ?? '3306')
 );
 console.log('host:', host);
 console.log('port:', port);
@@ -24,8 +24,8 @@ if (!sql || !host || !port) {
 const conn = mysql.createConnection({
   host,
   port,
-  user: config.db.user,
-  password: config.db.password,
+  user: process.env.DB_USER ?? 'root',
+  password: process.env.DB_PASSWORD ?? '',
   //database: config.db.database,
   //debug: true,
   charset: 'utf8mb4',

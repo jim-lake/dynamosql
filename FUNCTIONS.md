@@ -1,6 +1,6 @@
 # List of MySQL functions
 
-Taken from the 8.4 docs, a list of all the MySQL functions, exluding internal
+Taken from the 8.4.11 docs, a list of all the MySQL functions, exluding internal
 and geometry
 
 | Name                            | Supported | Description                                                                                                                                             |

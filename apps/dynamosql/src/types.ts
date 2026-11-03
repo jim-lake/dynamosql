@@ -126,11 +126,7 @@ export interface PoolConnection extends Connection {
 }
 export interface Connection extends EscapeFunctions, EventEmitter {
   state:
-    | 'connected'
-    | 'authenticated'
-    | 'disconnected'
-    | 'protocol_error'
-    | string;
+    'connected' | 'authenticated' | 'disconnected' | 'protocol_error' | string;
   threadId: number | null;
   createQuery: QueryFunction;
   query: QueryFunction;

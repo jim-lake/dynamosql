@@ -5,3 +5,5 @@ config*.json
 project.xcworkspace
 coverage
 .env*
+!.env.example
+.kiro

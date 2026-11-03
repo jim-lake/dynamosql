@@ -1,22 +1,21 @@
 const { expect } = require('chai');
 const fs = require('node:fs');
 const path = require('node:path');
-const config = require('../../../../config');
 const mysql = require('mysql');
 const Session = require('../../src/session');
 
 const mysql_conn = mysql.createConnection({
-  host: config.db.host,
-  port: config.db.port || 3306,
-  user: config.db.user,
-  password: config.db.password,
+  host: process.env.DB_HOST ?? 'localhost',
+  port: parseInt(process.env.DB_PORT ?? '3306'),
+  user: process.env.DB_USER ?? 'root',
+  password: process.env.DB_PASSWORD ?? '',
   //database: config.db.database,
   charset: 'utf8mb4',
   multipleStatements: true,
   dateStrings: true,
 });
 
-const namespace = process.env.DYNAMO_NAMESPACE ?? '';
+const namespace = process.env.DYNAMO_NAMESPACE ?? 'dynamosql_test';
 const region = process.env.AWS_REGION;
 console.log('namespace:', namespace);
 console.log('region:', region);

@@ -378,9 +378,7 @@ interface DateCompareListResult {
   decimals: number;
 }
 type DateCompareFunc =
-  | typeof convertDateTime
-  | typeof convertDate
-  | typeof convertTime;
+  typeof convertDateTime | typeof convertDate | typeof convertTime;
 function _dateCompareList(
   values: EvaluationResult[],
   type: ValueType,

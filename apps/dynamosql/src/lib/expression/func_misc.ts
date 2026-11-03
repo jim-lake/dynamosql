@@ -69,7 +69,7 @@ export function version(
   _state: EvaluationState
 ): EvaluationResult {
   assertArgCountParse(expr, 0);
-  return { err: null, value: '8.0.0-dynamosql', type: 'string' };
+  return { err: null, value: '8.4.0-dynamosql', type: 'string' };
 }
 export function connection_id(
   expr: Function,

@@ -421,8 +421,8 @@ interface ToNumber {
 function _isToNumber(value: unknown): value is ToNumber {
   return Boolean(
     value &&
-      typeof value === 'object' &&
-      'toNumber' in value &&
-      typeof value.toNumber === 'function'
+    typeof value === 'object' &&
+    'toNumber' in value &&
+    typeof value.toNumber === 'function'
   );
 }

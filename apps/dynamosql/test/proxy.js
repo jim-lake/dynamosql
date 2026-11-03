@@ -1,5 +1,4 @@
 const mysql = require('mysql2');
-const config = require('../../../config');
 
 const PORT = process.env.PORT ? parseInt(process.env.PORT) : 3306;
 const server = mysql.createServer();
@@ -9,7 +8,12 @@ console.log('mysql-proxy server listening:', PORT);
 server.on('connection', (conn) => {
   console.log('server: new connection');
 
-  const remote = mysql.createConnection(config.db);
+  const remote = mysql.createConnection({
+    host: process.env.DB_HOST ?? 'localhost',
+    port: parseInt(process.env.DB_PORT ?? '3306'),
+    user: process.env.DB_USER ?? 'root',
+    password: process.env.DB_PASSWORD ?? '',
+  });
   remote.connect((err) => {
     console.log('client: connect: err:', err);
     if (err) {

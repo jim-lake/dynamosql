@@ -1,6 +1,7 @@
 # dynamosql
 
 A MySQL compatible query engine with DynamoDB as the storage engine.
+It targets MySQL 8.4.11 compatibility.
 Currently useful in running queries against existing DynamoDB tables.
 Future goals are to provide a performant transactional MySQL compatible
 data store.

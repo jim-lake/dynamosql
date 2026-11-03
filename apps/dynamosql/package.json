@@ -21,17 +21,19 @@
     "test:quiet": "dotenv -- npx tsx --no-warnings ../../node_modules/.bin/mocha --no-clean --reporter test/silent_reporter.js 'test/**/*.test.js' 'test/**/*.test.ts'",
     "test:quiet:slow": "TEST_RUN_SLOW=1 dotenv -- npx tsx --no-warnings ../../node_modules/.bin/mocha --no-clean --reporter test/silent_reporter.js 'test/**/*.test.js' 'test/**/*.test.ts'",
     "query:mysql": "dotenv -- npx tsx test/test_client.js",
-    "query:session": "dotenv -- npx tsx test/test_session.js"
+    "query:session": "dotenv -- npx tsx test/test_session.js",
+    "example:query": "dotenv -- node examples/query.js"
   },
   "dependencies": {
     "@aws-sdk/client-dynamodb": "^3.922.0",
-    "node-sql-parser": "*",
     "sqlstring": "2.3.3"
   },
   "devDependencies": {
     "@dynamosql/lint": "*",
     "@types/mysql": "^2.15.27",
     "@types/sqlstring": "^2.3.2",
-    "mysql": "^2.18.1"
+    "mysql": "^2.18.1",
+    "node-sql-parser": "*",
+    "prettier": "^3.9.10"
   }
 }

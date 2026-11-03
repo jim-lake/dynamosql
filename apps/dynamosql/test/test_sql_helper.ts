@@ -2,7 +2,6 @@ process.env.TZ = 'UTC';
 
 const { assert, expect } = require('chai');
 const fs = require('node:fs');
-const config = require('../../../config.json');
 const mysql = require('mysql');
 const { createSession } = require('../src/session');
 
@@ -24,10 +23,10 @@ export function runTests(test_name, file_path, extra, maybe_skip) {
 
   const mysql_opts = Object.assign(
     {
-      host: config.db.host,
-      port: config.db.port ?? 3306,
-      user: config.db.user,
-      password: config.db.password,
+      host: process.env.DB_HOST ?? 'localhost',
+      port: parseInt(process.env.DB_PORT ?? '3306'),
+      user: process.env.DB_USER ?? 'root',
+      password: process.env.DB_PASSWORD ?? '',
       //database: config.db.database,
       dateStrings: true,
       charset: 'utf8mb4',
@@ -38,7 +37,7 @@ export function runTests(test_name, file_path, extra, maybe_skip) {
 
   const session_opts = Object.assign(
     {
-      namespace: process.env.DYNAMO_NAMESPACE ?? '',
+      namespace: process.env.DYNAMO_NAMESPACE ?? 'dynamosql_test',
       region: process.env.AWS_REGION,
       resultObjects: false,
       dateStrings: true,

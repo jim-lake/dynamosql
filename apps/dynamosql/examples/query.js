@@ -1,5 +1,4 @@
 const path = require('node:path');
-const config = tryRequire('../../../config');
 const dynamosql = require('..');
 
 const sql = process.argv.slice(2).join(' ');
@@ -9,16 +8,13 @@ if (!sql) {
 }
 console.log('sql:', sql);
 
-const opts = { multipleStatements: true };
-if (config.region) {
-  opts.region = config.region;
-}
-if (config.accessKeyId && config.secretAccessKey) {
-  opts.credentials = {
-    accessKeyId: config.accessKeyId,
-    secretAccessKey: config.secretAccessKey,
-  };
-}
+// AWS_REGION and AWS credentials are read from the environment (.env via
+// dotenv-cli, or the AWS SDK default chain).
+const opts = {
+  multipleStatements: true,
+  region: process.env.AWS_REGION,
+  namespace: process.env.DYNAMO_NAMESPACE ?? 'dynamosql_test',
+};
 
 const session = dynamosql.createSession(opts);
 if (!session) {
@@ -37,11 +33,3 @@ session.query(sql, (err, results, fields) => {
   }
   process.exit(err ? 1 : 0);
 });
-
-function tryRequire(file) {
-  try {
-    return require(file);
-  } catch {
-    return {};
-  }
-}

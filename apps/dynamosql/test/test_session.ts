@@ -1,7 +1,6 @@
 process.env.TZ = 'UTC';
 
 const path = require('node:path');
-const config = tryRequire('../../../config');
 const dynamosql = require('../src');
 const { Types } = require('../src/types');
 const { COLLATIONS, FIELD_FLAGS } = require('../src/constants/mysql');
@@ -14,7 +13,7 @@ if (!sql) {
 console.log('sql:', sql);
 
 const opts = {
-  namespace: process.env.DYNAMO_NAMESPACE ?? '',
+  namespace: process.env.DYNAMO_NAMESPACE ?? 'dynamosql_test',
   multipleStatements: true,
   dateStrings: true,
   resultObjects: true,
@@ -30,15 +29,6 @@ const opts = {
     return next();
   },
 };
-if (config.region) {
-  opts.region = config.region;
-}
-if (config.accessKeyId && config.secretAccessKey) {
-  opts.credentials = {
-    accessKeyId: config.accessKeyId,
-    secretAccessKey: config.secretAccessKey,
-  };
-}
 
 const session = dynamosql.createSession(opts);
 if (!session) {
@@ -70,13 +60,6 @@ session.query({ sql }, (err, results, fields) => {
   process.exit(err ? 1 : 0);
 });
 
-function tryRequire(modulePath) {
-  try {
-    return require(modulePath);
-  } catch {
-    return {};
-  }
-}
 function flagsToString<T extends Record<string, number>>(
   enumObj: T,
   value: number

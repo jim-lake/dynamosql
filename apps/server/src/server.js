@@ -41,7 +41,7 @@ class Server {
       session = new_session;
       conn.serverHandshake({
         protocolVersion: 10,
-        serverVersion: '8.0.0-dynamosql',
+        serverVersion: '8.4.0-dynamosql',
         connectionId: this._connectionId++,
         statusFlags: 2,
         characterSet: 255,
