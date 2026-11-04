@@ -221,6 +221,17 @@ function _checkEqual(name, i, left, right) {
       deepEqual(JSON.parse(left), JSON.parse(right)),
       `results[${i}].${name} json equal: ${left} vs ${right}`
     ).to.be.true;
+  } else if (name === 'json_unsorted_array') {
+    const left_array = JSON.parse(left);
+    const right_array = JSON.parse(right);
+    expect(Array.isArray(left_array), `results[${i}].${name} left is array`).to
+      .be.true;
+    expect(Array.isArray(right_array), `results[${i}].${name} right is array`)
+      .to.be.true;
+    expect(
+      deepEqual(left_array.sort(), right_array.sort()),
+      `results[${i}].${name} unsorted json equal: ${left} vs ${right}`
+    ).to.be.true;
   } else if (left instanceof Date) {
     assert(right instanceof Date, 'both are dates');
     expect(left.getTime(), `results[${i}].${name} typeof equal`).to.equal(

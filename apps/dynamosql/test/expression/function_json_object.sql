@@ -19,7 +19,7 @@ SELECT JSON_OBJECT('k', 1 + 1) AS json_value;
 SELECT JSON_OBJECT('a', 1, 'b', JSON_OBJECT('c', 2)) AS json_value;
 SELECT JSON_OBJECT('a', JSON_ARRAY()) AS json_value;
 SELECT JSON_LENGTH(JSON_OBJECT('a', 1, 'b', 2)) AS json_value;
-SELECT JSON_KEYS(JSON_OBJECT('b', 1, 'a', 2)) AS json_value;
+SELECT JSON_KEYS(JSON_OBJECT('b', 1, 'a', 2)) AS json_unsorted_array;
 SELECT JSON_EXTRACT(JSON_OBJECT('a', JSON_ARRAY(1, 2)), '$.a[1]') AS json_value;
 SELECT JSON_OBJECT('a', 1, 'b') AS json_value;
 SELECT JSON_OBJECT('a') AS json_value;

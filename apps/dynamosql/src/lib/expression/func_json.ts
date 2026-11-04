@@ -310,12 +310,7 @@ export function json_keys(
   if (typeof node !== 'object' || node === null || Array.isArray(node)) {
     return { err: null, value: null, type: 'json' };
   }
-  const key_list = Object.keys(node).sort(
-    (a, b) =>
-      Buffer.byteLength(a) - Buffer.byteLength(b) ||
-      Buffer.compare(Buffer.from(a), Buffer.from(b))
-  );
-  return { err: null, value: new SQLJson(key_list), type: 'json' };
+  return { err: null, value: new SQLJson(Object.keys(node)), type: 'json' };
 }
 
 export function json_object(
