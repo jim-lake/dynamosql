@@ -1,0 +1,13 @@
+-- JSON_STORAGE_FREE tests
+SELECT JSON_STORAGE_FREE('{"a":1}') AS json_value;
+SELECT JSON_STORAGE_FREE('[1,2]') AS json_value;
+SELECT JSON_STORAGE_FREE('"x"') AS json_value;
+SELECT JSON_STORAGE_FREE('null') AS json_value;
+SELECT JSON_STORAGE_FREE(NULL) AS json_value;
+SELECT JSON_STORAGE_FREE(JSON_OBJECT('a', 1)) AS json_value;
+SELECT JSON_STORAGE_FREE(CAST('[1]' AS JSON)) AS json_value;
+SELECT JSON_STORAGE_FREE('[1]') + 1 AS json_value;
+SELECT JSON_STORAGE_FREE('not json') AS json_value;
+SELECT JSON_STORAGE_FREE(5) AS json_value;
+SELECT JSON_STORAGE_FREE() AS json_value;
+SELECT JSON_STORAGE_FREE('[1]', '$') AS json_value;

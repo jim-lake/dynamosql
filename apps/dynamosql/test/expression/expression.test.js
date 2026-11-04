@@ -253,6 +253,26 @@ describe('Expression', function () {
     path.join(__dirname, 'function_json_overlaps.sql'),
     { verify_field_types: true }
   );
+  runTests(
+    'function_json_pretty.sql',
+    path.join(__dirname, 'function_json_pretty.sql'),
+    { verify_field_types: true }
+  );
+  runTests(
+    'function_json_search.sql',
+    path.join(__dirname, 'function_json_search.sql'),
+    { verify_field_types: true }
+  );
+  runTests(
+    'function_json_value.sql',
+    path.join(__dirname, 'function_json_value.sql'),
+    { verify_field_types: true }
+  );
+  runTests(
+    'function_json_storage_free.sql',
+    path.join(__dirname, 'function_json_storage_free.sql'),
+    { verify_field_types: true }
+  );
   runTests('function_inet.sql', path.join(__dirname, 'function_inet.sql'), {
     verify_field_types: true,
   });

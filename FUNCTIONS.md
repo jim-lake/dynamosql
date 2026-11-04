@@ -182,21 +182,21 @@ and geometry
 | JSON_OBJECT()                   |    ✅     | Create JSON object                                                                                                                                      |
 | JSON_OBJECTAGG()                |    ❌     | Return result set as a single JSON object                                                                                                               |
 | JSON_OVERLAPS()                 |    ✅     | Compares two JSON documents, returns TRUE (1) if these have any key-value pairs or array elements in common, otherwise FALSE (0)                        |
-| JSON_PRETTY()                   |    ❌     | Print a JSON document in human-readable format                                                                                                          |
+| JSON_PRETTY()                   |    ✅     | Print a JSON document in human-readable format                                                                                                          |
 | JSON_QUOTE()                    |    ✅     | Quote JSON document                                                                                                                                     |
 | JSON_REMOVE()                   |    ✅     | Remove data from JSON document                                                                                                                          |
 | JSON_REPLACE()                  |    ✅     | Replace values in JSON document                                                                                                                         |
 | JSON_SCHEMA_VALID()             |    ❌     | Validate JSON document against JSON schema; returns TRUE/1 if document validates against schema, or FALSE/0 if it does not                              |
 | JSON_SCHEMA_VALIDATION_REPORT() |    ❌     | Validate JSON document against JSON schema; returns report in JSON format on outcome on validation including success or failure and reasons for failure |
-| JSON_SEARCH()                   |    ❌     | Path to value within JSON document                                                                                                                      |
+| JSON_SEARCH()                   |    ✅     | Path to value within JSON document                                                                                                                      |
 | JSON_SET()                      |    ✅     | Insert data into JSON document                                                                                                                          |
-| JSON_STORAGE_FREE()             |    ❌     | Freed space within binary representation of JSON column value following partial update                                                                  |
+| JSON_STORAGE_FREE()             |    ✅     | Freed space within binary representation of JSON column value following partial update                                                                  |
 | JSON_STORAGE_SIZE()             |    ❌     | Space used for storage of binary representation of a JSON document                                                                                      |
 | JSON_TABLE()                    |    ❌     | Return data from a JSON expression as a relational table                                                                                                |
 | JSON_TYPE()                     |    ✅     | Type of JSON value                                                                                                                                      |
 | JSON_UNQUOTE()                  |    ✅     | Unquote JSON value                                                                                                                                      |
 | JSON_VALID()                    |    ✅     | Whether JSON value is valid                                                                                                                             |
-| JSON_VALUE()                    |    ❌     | Extract value from JSON document at location pointed to by path provided; return this value as VARCHAR(512) or specified type                           |
+| JSON_VALUE()                    |    ✅     | Extract value from JSON document at location pointed to by path provided; return this value as VARCHAR(512) or specified type                           |
 | LAG()                           |    ❌     | Value of argument from row lagging current row within partition                                                                                         |
 | LAST_INSERT_ID()                |    ❌     | Value of the AUTOINCREMENT column for the last INSERT                                                                                                   |
 | LAST_VALUE()                    |    ❌     | Value of argument from last row of window frame                                                                                                         |

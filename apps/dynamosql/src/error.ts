@@ -198,8 +198,11 @@ const ERROR_MAP: Record<string, ErrorMapEntry> = {
   },
   ER_JSON_BAD_ONE_OR_ALL_ARG: {
     code: 'ER_JSON_BAD_ONE_OR_ALL_ARG',
-    sqlMessage:
-      "The oneOrAll argument to json_contains_path may take these values: 'one' or 'all'.",
+    sqlMessage: errStr`The oneOrAll argument to ${0} may take these values: 'one' or 'all'.`,
+  },
+  ER_WRONG_ARGUMENTS: {
+    code: 'ER_WRONG_ARGUMENTS',
+    sqlMessage: errStr`Incorrect arguments to ${0}`,
   },
   ER_JSON_DOCUMENT_NULL_KEY: {
     code: 'ER_JSON_DOCUMENT_NULL_KEY',
