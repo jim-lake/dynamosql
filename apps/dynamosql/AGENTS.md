@@ -61,7 +61,7 @@ After any code change, run `npm run ts:check && npm run lint`, then `npm test`. 
 - Mocha timeout is 15 seconds per test.
 - Test directories: `select/`, `insert/`, `update/`, `delete/`, `replace/`, `join/`, `expression/`, `ddl/`, `memory/`, `client_opts/`, `unit_misc/`, `setup/`.
 - Each feature directory holds `.sql` query files and `.test.js` or `.test.ts` files that compare results. Follow the pattern of the neighboring tests.
-- Run a subset of tests by name with `npm run test -- --grep 'pattern'`. The pattern matches against the full test title, which is the SQL statement text for `.sql` tests.
+- Run a subset of tests by name with `npm test -- --grep 'pattern'`. Most tests come from `.sql` files: each statement in a `.sql` file becomes a test case titled with the statement text. Do not guess test file names for these. Search by a fragment of the SQL text instead, for example `npm test -- --grep 'JSON_ARRAY'`. Avoid `npm run test:single`. Very few `.test.js` files exist, so only use it when you have confirmed a specific `.test.js` or `.test.ts` file exists.
 - To run one query manually through the DynamoSQL engine, use `npm run query:session`. To run it through MySQL, use `npm run query:mysql`. Use these to compare the two outputs before writing a test.
 
 ## Code Conventions
