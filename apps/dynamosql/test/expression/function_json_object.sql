@@ -1,0 +1,27 @@
+-- JSON_OBJECT tests
+SELECT JSON_OBJECT() AS json_value;
+SELECT JSON_OBJECT('a', 1) AS json_value;
+SELECT JSON_OBJECT('a', 1, 'b', 'x') AS json_value;
+SELECT JSON_OBJECT('bb', 1, 'a', 2) AS json_value;
+SELECT JSON_OBJECT('a', 1, 'a', 2) AS json_value;
+SELECT JSON_OBJECT('a', 'x', 'a', NULL) AS json_value;
+SELECT JSON_OBJECT('a', NULL) AS json_value;
+SELECT JSON_OBJECT('a', 1.5, 'b', TRUE, 'c', FALSE) AS json_value;
+SELECT JSON_OBJECT('a', 1e20, 'b', 9007199254740993, 'c', -0.5) AS json_value;
+SELECT JSON_OBJECT('a', 'say "hi"', 'b', 'uni é 中') AS json_value;
+SELECT JSON_OBJECT('a', JSON_OBJECT('x', JSON_ARRAY(1, 2)), 'b', CAST('[1]' AS JSON)) AS json_value;
+SELECT JSON_OBJECT('a', CAST('2020-01-02' AS DATE), 'b', CAST('2020-01-02 03:04:05' AS DATETIME), 'c', CAST('03:04:05' AS TIME)) AS json_value;
+SELECT JSON_OBJECT('1', 'one', '10', 'ten', '2', 'two') AS json_value;
+SELECT JSON_OBJECT(1, 'x') AS json_value;
+SELECT JSON_OBJECT('', 1) AS json_value;
+SELECT JSON_OBJECT('a', 1 = 1, 'b', 'x' LIKE 'x') AS json_value;
+SELECT JSON_OBJECT('k', 1 + 1) AS json_value;
+SELECT JSON_OBJECT('a', 1, 'b', JSON_OBJECT('c', 2)) AS json_value;
+SELECT JSON_OBJECT('a', JSON_ARRAY()) AS json_value;
+SELECT JSON_LENGTH(JSON_OBJECT('a', 1, 'b', 2)) AS json_value;
+SELECT JSON_KEYS(JSON_OBJECT('b', 1, 'a', 2)) AS json_value;
+SELECT JSON_EXTRACT(JSON_OBJECT('a', JSON_ARRAY(1, 2)), '$.a[1]') AS json_value;
+SELECT JSON_OBJECT('a', 1, 'b') AS json_value;
+SELECT JSON_OBJECT('a') AS json_value;
+SELECT JSON_OBJECT(NULL, 1) AS json_value;
+SELECT JSON_OBJECT('a', 1, NULL, 2) AS json_value;

@@ -192,6 +192,23 @@ const ERROR_MAP: Record<string, ErrorMapEntry> = {
     sqlMessage:
       'In this situation, path expressions may not contain the * and ** tokens or an array range.',
   },
+  ER_JSON_VACUOUS_PATH: {
+    code: 'ER_JSON_VACUOUS_PATH',
+    sqlMessage: "The path expression '$' is not allowed in this context.",
+  },
+  ER_JSON_BAD_ONE_OR_ALL_ARG: {
+    code: 'ER_JSON_BAD_ONE_OR_ALL_ARG',
+    sqlMessage:
+      "The oneOrAll argument to json_contains_path may take these values: 'one' or 'all'.",
+  },
+  ER_JSON_DOCUMENT_NULL_KEY: {
+    code: 'ER_JSON_DOCUMENT_NULL_KEY',
+    sqlMessage: 'JSON documents may not contain NULL member names.',
+  },
+  ER_INVALID_JSON_PATH_ARRAY_CELL: {
+    code: 'ER_INVALID_JSON_PATH_ARRAY_CELL',
+    sqlMessage: 'A path expression is not a path to a cell in an array.',
+  },
   ER_INCORRECT_TYPE: {
     code: 'ER_INCORRECT_TYPE',
     sqlMessage: errStr`Incorrect type for argument ${0} in function ${1}.`,

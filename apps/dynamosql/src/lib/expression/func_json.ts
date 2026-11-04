@@ -12,6 +12,7 @@ type PathSegment =
   | { kind: 'index'; index: number; from_last: boolean };
 
 const NOT_FOUND = Symbol('not_found');
+const REMOVED = Symbol('removed');
 const TEXT_TYPES: string[] = ['string', 'char', 'text'];
 
 export function json_array(
@@ -78,6 +79,102 @@ export function json_array_append(
     );
   }
   return { err: null, value: new SQLJson(node), type: 'json' };
+}
+
+export function json_array_insert(
+  expr: Function,
+  state: EvaluationState
+): EvaluationResult {
+  assertArgCount(expr, 3, Infinity);
+  const arg_list = expr.args.value;
+  if (arg_list.length % 2 === 0) {
+    throw new SQLError({
+      err: 'ER_WRONG_PARAMCOUNT_TO_NATIVE_FCT',
+      args: ['JSON_ARRAY_INSERT'],
+    });
+  }
+  const { timeZone } = state.session;
+
+  const doc = getValue(arg_list[0], state);
+  const pair_list: {
+    path: EvaluationResult;
+    value: EvaluationResult;
+    position: number;
+  }[] = [];
+  for (let i = 1; i < arg_list.length; i += 2) {
+    pair_list.push({
+      path: getValue(arg_list[i], state),
+      value: getValue(arg_list[i + 1], state),
+      position: i + 2,
+    });
+  }
+  const failed = [
+    doc,
+    ...pair_list.flatMap(({ path, value }) => [path, value]),
+  ].find((result) => result.err);
+  if (failed) {
+    return failed;
+  }
+  if (doc.value === null || pair_list.some(({ path }) => path.value === null)) {
+    return { err: null, value: null, type: 'json' };
+  }
+
+  let node = SQLJson.parseText(doc, 'json_array_insert', 1);
+  for (const { path, value, position } of pair_list) {
+    const segment_list = _parsePath(String(path.value));
+    if (segment_list.at(-1)?.kind !== 'index') {
+      throw new SQLError({ err: 'ER_INVALID_JSON_PATH_ARRAY_CELL' });
+    }
+    node = _insertAt(
+      node,
+      segment_list,
+      SQLJson.toNode(value, timeZone, 'json_array_insert', position)
+    );
+  }
+  return { err: null, value: new SQLJson(node), type: 'json' };
+}
+
+export function json_contains_path(
+  expr: Function,
+  state: EvaluationState
+): EvaluationResult {
+  assertArgCount(expr, 3, Infinity);
+  const arg_list = expr.args.value;
+  const doc = getValue(arg_list[0], state);
+  const mode = getValue(arg_list[1], state);
+  if (doc.err) {
+    return doc;
+  }
+  if (mode.err) {
+    return mode;
+  }
+  if (doc.value === null || mode.value === null) {
+    return { err: null, value: null, type: 'longlong' };
+  }
+
+  const root = SQLJson.parseText(doc, 'json_contains_path', 1);
+  const mode_name = String(mode.value).toLowerCase();
+  if (mode_name !== 'one' && mode_name !== 'all') {
+    throw new SQLError({ err: 'ER_JSON_BAD_ONE_OR_ALL_ARG' });
+  }
+  for (const arg of arg_list.slice(2)) {
+    const path = getValue(arg, state);
+    if (path.err) {
+      return path;
+    }
+    if (path.value === null) {
+      return { err: null, value: null, type: 'longlong' };
+    }
+    const found = _lookup(root, _parsePath(String(path.value))) !== NOT_FOUND;
+    if (mode_name === 'one' && found) {
+      return { err: null, value: 1, type: 'longlong' };
+    }
+    if (mode_name === 'all' && !found) {
+      return { err: null, value: 0, type: 'longlong' };
+    }
+  }
+  const result = mode_name === 'one' ? 0 : 1;
+  return { err: null, value: result, type: 'longlong' };
 }
 
 export function json_extract(
@@ -221,6 +318,44 @@ export function json_keys(
   return { err: null, value: new SQLJson(key_list), type: 'json' };
 }
 
+export function json_object(
+  expr: Function,
+  state: EvaluationState
+): EvaluationResult {
+  assertArgCount(expr, 0, Infinity);
+  const arg_list = expr.args.value;
+  if (arg_list.length % 2 === 1) {
+    throw new SQLError({
+      err: 'ER_WRONG_PARAMCOUNT_TO_NATIVE_FCT',
+      args: ['JSON_OBJECT'],
+    });
+  }
+  const { timeZone } = state.session;
+  const entry_list: [string, unknown][] = [];
+  for (let i = 0; i < arg_list.length; i += 2) {
+    const key = getValue(arg_list[i], state);
+    const value = getValue(arg_list[i + 1], state);
+    if (key.err) {
+      return key;
+    }
+    if (value.err) {
+      return value;
+    }
+    if (key.value === null) {
+      throw new SQLError({ err: 'ER_JSON_DOCUMENT_NULL_KEY' });
+    }
+    entry_list.push([
+      String(key.value),
+      SQLJson.toNode(value, timeZone, 'json_object', i + 2),
+    ]);
+  }
+  return {
+    err: null,
+    value: new SQLJson(Object.fromEntries(entry_list)),
+    type: 'json',
+  };
+}
+
 export function json_quote(
   expr: Function,
   state: EvaluationState
@@ -241,6 +376,36 @@ export function json_quote(
     value: JSON.stringify(String(str.value)),
     type: 'string',
   };
+}
+
+export function json_remove(
+  expr: Function,
+  state: EvaluationState
+): EvaluationResult {
+  assertArgCount(expr, 2, Infinity);
+  const arg_list = expr.args.value;
+  const doc = getValue(arg_list[0], state);
+  const path_list = arg_list.slice(1).map((arg) => getValue(arg, state));
+  const failed = [doc, ...path_list].find((result) => result.err);
+  if (failed) {
+    return failed;
+  }
+  if (doc.value === null || path_list.some(({ value }) => value === null)) {
+    return { err: null, value: null, type: 'json' };
+  }
+
+  let node = SQLJson.parseText(doc, 'json_remove', 1);
+  for (const { value } of path_list) {
+    const segment_list = _parsePath(String(value));
+    if (segment_list.length === 0) {
+      throw new SQLError({ err: 'ER_JSON_VACUOUS_PATH' });
+    }
+    const result = _removeAt(node, segment_list);
+    if (result !== REMOVED) {
+      node = result;
+    }
+  }
+  return { err: null, value: new SQLJson(node), type: 'json' };
 }
 
 export function json_type(
@@ -454,4 +619,84 @@ function _appendAt(
   }
   // A non-array value behaves as a one-element array, so only index 0 reaches it.
   return segment.index === 0 ? _appendAt(node, rest, value) : node;
+}
+
+function _insertAt(
+  node: unknown,
+  path: PathSegment[],
+  value: unknown
+): unknown {
+  const [segment, ...rest] = path;
+  if (segment === undefined) {
+    return node;
+  } else if (segment.kind === 'key') {
+    if (
+      typeof node !== 'object' ||
+      node === null ||
+      Array.isArray(node) ||
+      !Object.hasOwn(node, segment.key)
+    ) {
+      return node;
+    }
+    const record = node as Record<string, unknown>;
+    return {
+      ...record,
+      [segment.key]: _insertAt(record[segment.key], rest, value),
+    };
+  } else if (!Array.isArray(node)) {
+    return node;
+  }
+  const index = _arrayIndex(segment, node.length);
+  if (rest.length === 0) {
+    const position = Math.min(Math.max(index, 0), node.length);
+    return [...node.slice(0, position), value, ...node.slice(position)];
+  }
+  if (index < 0 || index >= node.length) {
+    return node;
+  }
+  const copy: unknown[] = [...node];
+  copy[index] = _insertAt(node[index], rest, value);
+  return copy;
+}
+
+function _removeAt(node: unknown, path: PathSegment[]): unknown {
+  const [segment, ...rest] = path;
+  if (segment === undefined) {
+    return node;
+  } else if (segment.kind === 'key') {
+    if (
+      typeof node !== 'object' ||
+      node === null ||
+      Array.isArray(node) ||
+      !Object.hasOwn(node, segment.key)
+    ) {
+      return node;
+    }
+    const record = node as Record<string, unknown>;
+    const child =
+      rest.length === 0 ? REMOVED : _removeAt(record[segment.key], rest);
+    if (child === REMOVED) {
+      return Object.fromEntries(
+        Object.entries(record).filter(([key]) => key !== segment.key)
+      );
+    }
+    return { ...record, [segment.key]: child };
+  } else if (Array.isArray(node)) {
+    const index = _arrayIndex(segment, node.length);
+    if (index < 0 || index >= node.length) {
+      return node;
+    }
+    const child = rest.length === 0 ? REMOVED : _removeAt(node[index], rest);
+    if (child === REMOVED) {
+      return [...node.slice(0, index), ...node.slice(index + 1)];
+    }
+    const copy: unknown[] = [...node];
+    copy[index] = child;
+    return copy;
+  }
+  // A non-array value behaves as a one-element array, so only index 0 reaches it.
+  if (segment.index !== 0) {
+    return node;
+  }
+  return rest.length === 0 ? REMOVED : _removeAt(node, rest);
 }

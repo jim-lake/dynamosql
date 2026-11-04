@@ -193,6 +193,26 @@ describe('Expression', function () {
     path.join(__dirname, 'function_json_unquote.sql'),
     { verify_field_types: true }
   );
+  runTests(
+    'function_json_object.sql',
+    path.join(__dirname, 'function_json_object.sql'),
+    { verify_field_types: true }
+  );
+  runTests(
+    'function_json_contains_path.sql',
+    path.join(__dirname, 'function_json_contains_path.sql'),
+    { verify_field_types: true }
+  );
+  runTests(
+    'function_json_remove.sql',
+    path.join(__dirname, 'function_json_remove.sql'),
+    { verify_field_types: true }
+  );
+  runTests(
+    'function_json_array_insert.sql',
+    path.join(__dirname, 'function_json_array_insert.sql'),
+    { verify_field_types: true }
+  );
   runTests('function_inet.sql', path.join(__dirname, 'function_inet.sql'), {
     verify_field_types: true,
   });
