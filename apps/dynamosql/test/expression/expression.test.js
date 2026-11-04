@@ -233,6 +233,26 @@ describe('Expression', function () {
     path.join(__dirname, 'function_json_merge_preserve.sql'),
     { verify_field_types: true }
   );
+  runTests(
+    'function_json_merge.sql',
+    path.join(__dirname, 'function_json_merge.sql'),
+    { verify_field_types: true }
+  );
+  runTests(
+    'function_json_merge_patch.sql',
+    path.join(__dirname, 'function_json_merge_patch.sql'),
+    { verify_field_types: true }
+  );
+  runTests(
+    'function_json_contains.sql',
+    path.join(__dirname, 'function_json_contains.sql'),
+    { verify_field_types: true }
+  );
+  runTests(
+    'function_json_overlaps.sql',
+    path.join(__dirname, 'function_json_overlaps.sql'),
+    { verify_field_types: true }
+  );
   runTests('function_inet.sql', path.join(__dirname, 'function_inet.sql'), {
     verify_field_types: true,
   });

@@ -169,19 +169,19 @@ and geometry
 | JSON_ARRAY_APPEND()             |    ✅     | Append data to JSON document                                                                                                                            |
 | JSON_ARRAY_INSERT()             |    ✅     | Insert into JSON array                                                                                                                                  |
 | JSON_ARRAYAGG()                 |    ❌     | Return result set as a single JSON array                                                                                                                |
-| JSON_CONTAINS()                 |    ❌     | Whether JSON document contains specific object at path                                                                                                  |
+| JSON_CONTAINS()                 |    ✅     | Whether JSON document contains specific object at path                                                                                                  |
 | JSON_CONTAINS_PATH()            |    ✅     | Whether JSON document contains any data at path                                                                                                         |
 | JSON_DEPTH()                    |    ✅     | Maximum depth of JSON document                                                                                                                          |
 | JSON_EXTRACT()                  |    ✅     | Return data from JSON document                                                                                                                          |
 | JSON_INSERT()                   |    ✅     | Insert data into JSON document                                                                                                                          |
 | JSON_KEYS()                     |    ✅     | Array of keys from JSON document                                                                                                                        |
 | JSON_LENGTH()                   |    ✅     | Number of elements in JSON document                                                                                                                     |
-| JSON_MERGE()                    |    ❌     | Merge JSON documents, preserving duplicate keys. Deprecated synonym for JSON_MERGE_PRESERVE()                                                           |
-| JSON_MERGE_PATCH()              |    ❌     | Merge JSON documents, replacing values of duplicate keys                                                                                                |
+| JSON_MERGE()                    |    ✅     | Merge JSON documents, preserving duplicate keys. Deprecated synonym for JSON_MERGE_PRESERVE()                                                           |
+| JSON_MERGE_PATCH()              |    ✅     | Merge JSON documents, replacing values of duplicate keys                                                                                                |
 | JSON_MERGE_PRESERVE()           |    ✅     | Merge JSON documents, preserving duplicate keys                                                                                                         |
 | JSON_OBJECT()                   |    ✅     | Create JSON object                                                                                                                                      |
 | JSON_OBJECTAGG()                |    ❌     | Return result set as a single JSON object                                                                                                               |
-| JSON_OVERLAPS()                 |    ❌     | Compares two JSON documents, returns TRUE (1) if these have any key-value pairs or array elements in common, otherwise FALSE (0)                        |
+| JSON_OVERLAPS()                 |    ✅     | Compares two JSON documents, returns TRUE (1) if these have any key-value pairs or array elements in common, otherwise FALSE (0)                        |
 | JSON_PRETTY()                   |    ❌     | Print a JSON document in human-readable format                                                                                                          |
 | JSON_QUOTE()                    |    ✅     | Quote JSON document                                                                                                                                     |
 | JSON_REMOVE()                   |    ✅     | Remove data from JSON document                                                                                                                          |

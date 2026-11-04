@@ -6,7 +6,7 @@ const mysql = require('mysql');
 const { createSession } = require('../src/session');
 
 const { Types } = require('../src/types');
-const { deepEqual } = require('../src/tools/deep_equal');
+const { isDeepStrictEqual } = require('node:util');
 
 const SECONDS_REGEX = /:[0-9]{2}(\.[0-9]*)?$/g;
 
@@ -218,7 +218,7 @@ function _checkEqual(name, i, left, right) {
     }
   } else if (name === 'json_value') {
     expect(
-      deepEqual(JSON.parse(left), JSON.parse(right)),
+      isDeepStrictEqual(JSON.parse(left), JSON.parse(right)),
       `results[${i}].${name} json equal: ${left} vs ${right}`
     ).to.be.true;
   } else if (name === 'json_unsorted_array') {
@@ -229,7 +229,7 @@ function _checkEqual(name, i, left, right) {
     expect(Array.isArray(right_array), `results[${i}].${name} right is array`)
       .to.be.true;
     expect(
-      deepEqual(left_array.sort(), right_array.sort()),
+      isDeepStrictEqual(left_array.sort(), right_array.sort()),
       `results[${i}].${name} unsorted json equal: ${left} vs ${right}`
     ).to.be.true;
   } else if (left instanceof Date) {

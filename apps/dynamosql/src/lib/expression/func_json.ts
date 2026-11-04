@@ -1,3 +1,5 @@
+import { isDeepStrictEqual } from 'node:util';
+
 import { SQLError } from '../../error';
 import { assertArgCount } from '../helpers/arg_count';
 import { SQLJson } from '../types/sql_json';
@@ -229,6 +231,26 @@ export function json_merge_preserve(
   return { err: null, value: new SQLJson(node), type: 'json' };
 }
 
+export function json_merge_patch(
+  expr: Function,
+  state: EvaluationState
+): EvaluationResult {
+  assertArgCount(expr, 2, Infinity);
+  const doc_list = expr.args.value.map((arg) => getValue(arg, state));
+  const failed = doc_list.find((result) => result.err);
+  if (failed) {
+    return failed;
+  }
+  if (doc_list.some(({ value }) => value === null)) {
+    return { err: null, value: null, type: 'json' };
+  }
+
+  const node = doc_list
+    .map((doc, index) => _parseDocument(doc, 'json_merge_patch', index + 1))
+    .reduce(_mergePatch);
+  return { err: null, value: new SQLJson(node), type: 'json' };
+}
+
 export function json_contains_path(
   expr: Function,
   state: EvaluationState
@@ -270,6 +292,78 @@ export function json_contains_path(
   }
   const result = mode_name === 'one' ? 0 : 1;
   return { err: null, value: result, type: 'longlong' };
+}
+
+export function json_contains(
+  expr: Function,
+  state: EvaluationState
+): EvaluationResult {
+  assertArgCount(expr, 2, 3);
+  const arg_list = expr.args.value;
+  const doc = getValue(arg_list[0], state);
+  const candidate = getValue(arg_list[1], state);
+  const path = arg_list.length === 3 ? getValue(arg_list[2], state) : undefined;
+  if (doc.err) {
+    return doc;
+  }
+  if (candidate.err) {
+    return candidate;
+  }
+  if (path?.err) {
+    return path;
+  }
+  if (doc.value === null || candidate.value === null || path?.value === null) {
+    return { err: null, value: null, type: 'longlong' };
+  }
+
+  const root = SQLJson.parseText(doc, 'json_contains', 1);
+  const candidate_node = SQLJson.parseText(candidate, 'json_contains', 2);
+  const target = path ? _lookup(root, _parsePath(String(path.value))) : root;
+  if (target === NOT_FOUND) {
+    return { err: null, value: null, type: 'longlong' };
+  }
+  return {
+    err: null,
+    value: _contains(target, candidate_node) ? 1 : 0,
+    type: 'longlong',
+  };
+}
+
+export function json_overlaps(
+  expr: Function,
+  state: EvaluationState
+): EvaluationResult {
+  assertArgCount(expr, 2, 2);
+  const arg_list = expr.args.value;
+  const left = getValue(arg_list[0], state);
+  const right = getValue(arg_list[1], state);
+  if (left.err) {
+    return left;
+  }
+  if (right.err) {
+    return right;
+  }
+  if (left.value === null || right.value === null) {
+    return { err: null, value: null, type: 'longlong' };
+  }
+
+  const left_node = SQLJson.parseText(left, 'json_overlaps', 1);
+  const right_node = SQLJson.parseText(right, 'json_overlaps', 2);
+  let overlap = false;
+  if (_isRecord(left_node) && _isRecord(right_node)) {
+    overlap = Object.keys(left_node).some(
+      (key) =>
+        Object.hasOwn(right_node, key) &&
+        isDeepStrictEqual(left_node[key], right_node[key])
+    );
+  } else {
+    const left_list = Array.isArray(left_node) ? left_node : [left_node];
+    const right_list = Array.isArray(right_node) ? right_node : [right_node];
+    overlap = left_list.some((item) =>
+      right_list.some((other) => isDeepStrictEqual(item, other))
+    );
+  }
+  return { err: null, value: overlap ? 1 : 0, type: 'longlong' };
 }
 
 export function json_extract(
@@ -572,6 +666,51 @@ function _parseDocument(
     });
   }
   return SQLJson.parseText(doc, fn_name, position);
+}
+
+function _isRecord(node: unknown): node is Record<string, unknown> {
+  return typeof node === 'object' && node !== null && !Array.isArray(node);
+}
+
+function _contains(target: unknown, candidate: unknown): boolean {
+  if (Array.isArray(candidate)) {
+    return (
+      Array.isArray(target) &&
+      candidate.every((item) =>
+        target.some((element) => _contains(element, item))
+      )
+    );
+  }
+  if (Array.isArray(target)) {
+    return target.some((element) => _contains(element, candidate));
+  }
+  if (_isRecord(candidate)) {
+    return (
+      _isRecord(target) &&
+      Object.entries(candidate).every(
+        ([key, value]) =>
+          Object.hasOwn(target, key) && _contains(target[key], value)
+      )
+    );
+  }
+  return isDeepStrictEqual(target, candidate);
+}
+
+function _mergePatch(target: unknown, patch: unknown): unknown {
+  if (!_isRecord(patch)) {
+    return patch;
+  }
+  const merged: Record<string, unknown> = _isRecord(target)
+    ? { ...target }
+    : {};
+  for (const [key, value] of Object.entries(patch)) {
+    if (value === null) {
+      Reflect.deleteProperty(merged, key);
+    } else {
+      merged[key] = _mergePatch(merged[key], value);
+    }
+  }
+  return merged;
 }
 
 function _mergePreserve(left: unknown, right: unknown): unknown {
