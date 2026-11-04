@@ -117,6 +117,7 @@ Development:
 
 ## Notes
 
+- The agent ALWAYS has DynamoDB access. Use the settings in `.env` (including `AWS_REGION`) for all development, testing, and investigation. Do not assume DynamoDB is unavailable, and do not report it as unavailable without checking `.env` first.
 - AWS credentials come from the SDK default chain (`AWS_REGION`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, or `~/.aws/credentials`).
 - DynamoDB tables are created in the `_dynamodb` database namespace on the MySQL side.
 - Build output in `dist/` is generated. Do not edit it by hand.
