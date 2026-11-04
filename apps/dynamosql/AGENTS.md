@@ -92,6 +92,15 @@ After any code change, run `npm run ts:check && npm run lint`, then `npm test`. 
 - Match the Prettier style: single quotes, 2-space indent, ES5 trailing commas. Run `npm run pretty` before finishing.
 - ESLint enforces Unix line endings.
 
+### Comments
+
+- No file-level comments.
+- No function or method comments, except on the true external interface (exports of `src/index.ts` and other public API).
+- Do not add comments that restate what the code clearly does.
+- If the code is non-obvious, rename variables or functions to make it clear before adding a comment.
+- If a comment is still needed, keep it to one concise line.
+- Never write comments about the history of the code or tell stories about past changes.
+
 ## Dependencies
 
 Production:

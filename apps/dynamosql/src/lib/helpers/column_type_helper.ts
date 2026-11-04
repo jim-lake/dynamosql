@@ -101,6 +101,11 @@ export function convertType(def: Partial<ColumnDef>): FieldInfo {
         length = 66;
         flags |= FIELD_FLAGS.BINARY;
         break;
+      case 'year':
+        type = Types.YEAR;
+        length = 4;
+        flags |= FIELD_FLAGS.BINARY;
+        break;
       case 'null':
         type = Types.NULL;
         flags |= FIELD_FLAGS.BINARY;

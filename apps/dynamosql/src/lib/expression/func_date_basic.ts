@@ -137,7 +137,7 @@ export function year(expr: Function, state: EvaluationState): EvaluationResult {
   assertArgCountParse(expr, 1);
   const result = getValue(expr.args.value[0], state);
   result.name = `YEAR(${result.name})`;
-  result.type = 'longlong';
+  result.type = 'year';
   if (!result.err && result.value !== null) {
     const dt = convertDateTime({
       value: result.value,

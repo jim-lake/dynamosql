@@ -262,10 +262,13 @@ function _numBothSides(
   return { err, name, value, left_num, right_num, interval, datetime, type };
 }
 function _unionNumberType(
-  type1: ValueType,
-  type2: ValueType,
+  raw_type1: ValueType,
+  raw_type2: ValueType,
   default_type: ValueType
 ): ValueType {
+  // YEAR values are integers in arithmetic, so they behave like longlong.
+  const type1 = raw_type1 === 'year' ? 'longlong' : raw_type1;
+  const type2 = raw_type2 === 'year' ? 'longlong' : raw_type2;
   if (type1 === 'string' || type2 === 'string') {
     return 'double';
   } else if (type1 === type2) {

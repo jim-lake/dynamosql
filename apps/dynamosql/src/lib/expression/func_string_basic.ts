@@ -189,11 +189,15 @@ export function repeat(
     type = 'string';
   } else if (!err) {
     const count = convertNum(arg2.value);
-    value =
-      count !== null && count > 0
-        ? String(arg1.value).repeat(Math.round(count))
-        : '';
-    type = 'string';
+    const str = String(arg1.value);
+    const rounded = count === null ? 0 : Math.round(count);
+    value = rounded > 0 ? str.repeat(rounded) : '';
+    // MySQL types results over 65535 bytes (or a negative count) as BLOB.
+    let max_bytes = 3 * str.length * Math.max(rounded, 0);
+    if (rounded < 0 && str.length > 0) {
+      max_bytes = Infinity;
+    }
+    type = max_bytes > 65535 ? 'text' : 'string';
   } else {
     type = 'text';
   }

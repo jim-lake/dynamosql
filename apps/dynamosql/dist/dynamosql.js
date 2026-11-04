@@ -4934,6 +4934,7 @@ function _valueToDynamoKeyType(type) {
         case 'bool':
         case 'long':
         case 'longlong':
+        case 'year':
         case 'number':
         case 'double':
             return 'N';
@@ -6718,7 +6719,10 @@ function _numBothSides(expr, state, op, allow_interval) {
     }
     return { err, name, value, left_num, right_num, interval, datetime, type };
 }
-function _unionNumberType(type1, type2, default_type) {
+function _unionNumberType(raw_type1, raw_type2, default_type) {
+    // YEAR values are integers in arithmetic, so they behave like longlong.
+    const type1 = raw_type1 === 'year' ? 'longlong' : raw_type1;
+    const type2 = raw_type2 === 'year' ? 'longlong' : raw_type2;
     if (type1 === 'string' || type2 === 'string') {
         return 'double';
     }
@@ -7295,7 +7299,11 @@ function _unionType$1(list) {
     else if (types.includes('number')) {
         compare_type = 'number';
     }
-    else if (types.includes('longlong')) {
+    else if (types.includes('year') &&
+        types.every((t) => t === 'year' || t === 'null')) {
+        compare_type = 'year';
+    }
+    else if (types.includes('longlong') || types.includes('year')) {
         compare_type = 'longlong';
     }
     else if (types.every((t) => t === 'null')) {
@@ -7359,6 +7367,7 @@ function _compare(expr, state, functionName, dateCompare, nativeCompare) {
                 }
                 break;
             case 'longlong':
+            case 'year':
                 {
                     let val = undefined;
                     for (const sub of values) {
@@ -7569,7 +7578,7 @@ function year(expr, state) {
     assertArgCountParse(expr, 1);
     const result = getValue(expr.args.value[0], state);
     result.name = `YEAR(${result.name})`;
-    result.type = 'longlong';
+    result.type = 'year';
     if (!result.err && result.value !== null) {
         const dt = convertDateTime({
             value: result.value,
@@ -8866,7 +8875,7 @@ function user(expr, _state) {
 }
 function version(expr, _state) {
     assertArgCountParse(expr, 0);
-    return { err: null, value: '8.0.0-dynamosql', type: 'string' };
+    return { err: null, value: '8.4.0-dynamosql', type: 'string' };
 }
 function connection_id(expr, state) {
     assertArgCountParse(expr, 0);
@@ -9204,11 +9213,15 @@ function repeat(expr, state) {
     }
     else if (!err) {
         const count = convertNum(arg2.value);
-        value =
-            count !== null && count > 0
-                ? String(arg1.value).repeat(Math.round(count))
-                : '';
-        type = 'string';
+        const str = String(arg1.value);
+        const rounded = count === null ? 0 : Math.round(count);
+        value = rounded > 0 ? str.repeat(rounded) : '';
+        // MySQL types results over 65535 bytes (or a negative count) as BLOB.
+        let max_bytes = 3 * str.length * Math.max(rounded, 0);
+        if (rounded < 0 && str.length > 0) {
+            max_bytes = Infinity;
+        }
+        type = max_bytes > 65535 ? 'text' : 'string';
     }
     else {
         type = 'text';
@@ -12662,6 +12675,11 @@ function convertType(def) {
             case 'longlong':
                 type = exports.Types.LONGLONG;
                 length = 66;
+                flags |= FIELD_FLAGS.BINARY;
+                break;
+            case 'year':
+                type = exports.Types.YEAR;
+                length = 4;
                 flags |= FIELD_FLAGS.BINARY;
                 break;
             case 'null':

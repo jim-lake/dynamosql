@@ -206,7 +206,12 @@ function _unionType(list: EvaluationResult[]): UnionTypeResult {
     compare_type = 'double';
   } else if (types.includes('number')) {
     compare_type = 'number';
-  } else if (types.includes('longlong')) {
+  } else if (
+    types.includes('year') &&
+    types.every((t) => t === 'year' || t === 'null')
+  ) {
+    compare_type = 'year';
+  } else if (types.includes('longlong') || types.includes('year')) {
     compare_type = 'longlong';
   } else if (types.every((t) => t === 'null')) {
     compare_type = 'null';
@@ -300,6 +305,7 @@ export function _compare(
         }
         break;
       case 'longlong':
+      case 'year':
         {
           let val: bigint | number | undefined = undefined;
           for (const sub of values) {

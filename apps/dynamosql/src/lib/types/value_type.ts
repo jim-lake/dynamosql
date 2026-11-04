@@ -12,6 +12,7 @@ export type ValueType =
   | 'char'
   | 'long'
   | 'longlong'
+  | 'year'
   | 'number'
   | 'double'
   | 'text'
@@ -39,6 +40,8 @@ export function valueTypeToMysqlType(s: ValueType): MysqlType {
       return 'INT' as const;
     case 'longlong':
       return 'BIGINT' as const;
+    case 'year':
+      return 'YEAR' as const;
     case 'number':
       return 'DECIMAL' as const;
     case 'double':

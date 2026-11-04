@@ -216,6 +216,7 @@ function _valueToDynamoKeyType(type: ValueType): 'N' | 'B' | 'S' {
     case 'bool':
     case 'long':
     case 'longlong':
+    case 'year':
     case 'number':
     case 'double':
       return 'N';
