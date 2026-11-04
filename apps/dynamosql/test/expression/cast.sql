@@ -39,3 +39,49 @@ SELECT CAST(NULL AS TIME) AS result;
 SELECT CAST("10" AS SIGNED) + CAST("20" AS SIGNED) AS result;
 SELECT CAST("100" AS SIGNED) * 2 AS result;
 SELECT CONCAT("Value: ", CAST(123 AS CHAR)) AS result;
+
+-- CAST AS JSON: strings are parsed as JSON text
+SELECT CAST('[1, 2]' AS JSON) AS json_value;
+SELECT CAST('{"a": 1, "b": [true, null]}' AS JSON) AS json_value;
+SELECT CAST('"text"' AS JSON) AS json_value;
+SELECT CAST('null' AS JSON) AS json_value;
+SELECT CAST('true' AS JSON) AS json_value;
+SELECT CAST('1' AS JSON) AS json_value;
+SELECT CAST('-1.5' AS JSON) AS json_value;
+SELECT CAST(' [1,2] ' AS JSON) AS json_value;
+SELECT CAST('{"a": 1, "a": 2}' AS JSON) AS json_value;
+SELECT CAST('{"k": "é"}' AS JSON) AS json_value;
+SELECT CAST('{"a":[1,{"b":null}]}' AS JSON) AS json_value;
+SELECT CAST('abc' AS JSON) AS json_value;
+SELECT CAST('' AS JSON) AS json_value;
+SELECT CAST('   ' AS JSON) AS json_value;
+SELECT CAST('[1,]' AS JSON) AS json_value;
+SELECT CAST('1 2' AS JSON) AS json_value;
+SELECT CAST('NaN' AS JSON) AS json_value;
+SELECT CAST("{'a':1}" AS JSON) AS json_value;
+
+-- CAST AS JSON: non-string scalars become JSON scalars
+SELECT CAST(NULL AS JSON) AS json_value;
+SELECT CAST(1 AS JSON) AS json_value;
+SELECT CAST(-7 AS JSON) AS json_value;
+SELECT CAST(0 AS JSON) AS json_value;
+SELECT CAST(1.50 AS JSON) AS json_value;
+SELECT CAST(1.5E0 AS JSON) AS json_value;
+SELECT CAST(1e20 AS JSON) AS json_value;
+SELECT CAST(9.5 + 1 AS JSON) AS json_value;
+SELECT CAST(1 = 1 AS JSON) AS json_value;
+SELECT CAST(1 = 2 AS JSON) AS json_value;
+SELECT CAST(CAST('2020-01-02' AS DATE) AS JSON) AS json_value;
+SELECT CAST(CAST('2020-01-02 03:04:05' AS DATETIME) AS JSON) AS json_value;
+SELECT CAST(CAST('2020-01-02 03:04:05.5' AS DATETIME(1)) AS JSON) AS json_value;
+SELECT CAST(CAST('03:04:05' AS TIME) AS JSON) AS json_value;
+SELECT CAST(x'41' AS JSON) AS json_value;
+SELECT CAST(x'5b315d' AS JSON) AS json_value;
+
+-- CAST AS JSON: JSON input passes through
+SELECT CAST(JSON_ARRAY(1, 2) AS JSON) AS json_value;
+SELECT CAST(JSON_ARRAY(1, 'a', NULL) AS JSON) AS json_value;
+SELECT CAST(CAST('[1, 2]' AS JSON) AS JSON) AS json_value;
+SELECT JSON_ARRAY(CAST('[1, 2]' AS JSON), 3) AS json_value;
+SELECT JSON_ARRAY_APPEND(CAST('[1]' AS JSON), '$', 2) AS json_value;
+SELECT JSON_ARRAY_APPEND('[1]', '$', CAST('{"a": 1}' AS JSON)) AS json_value;

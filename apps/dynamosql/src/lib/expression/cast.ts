@@ -4,6 +4,7 @@ import {
   convertTime,
   convertBigInt,
 } from '../helpers/sql_conversion';
+import { SQLJson } from '../types/sql_json';
 
 import { getValue } from './evaluate';
 
@@ -114,7 +115,24 @@ function double(expr: Cast, state: EvaluationState): EvaluationResult {
   return result;
 }
 
+function json(expr: Cast, state: EvaluationState): EvaluationResult {
+  const result = getValue(expr.expr, state);
+  result.name = `CAST(${result.name} AS JSON)`;
+  if (!result.err && result.value !== null) {
+    const is_text =
+      result.type === 'string' ||
+      result.type === 'char' ||
+      result.type === 'text';
+    const node = is_text
+      ? SQLJson.parseText(result, 'cast_as_json', 1)
+      : SQLJson.toNode(result, state.session.timeZone, 'cast_as_json', 1);
+    result.value = new SQLJson(node);
+  }
+  result.type = 'json';
+  return result;
+}
+
 export const methods: Record<
   string,
   undefined | ((expr: Cast, state: EvaluationState) => EvaluationResult)
-> = { datetime, date, time, signed, char, decimal, double };
+> = { datetime, date, time, signed, char, decimal, double, json };
