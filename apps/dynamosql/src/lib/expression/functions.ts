@@ -38,7 +38,11 @@ import {
   json_array_append,
   json_depth,
   json_extract,
+  json_keys,
   json_length,
+  json_quote,
+  json_type,
+  json_unquote,
   json_valid,
 } from './func_json';
 import {
@@ -312,6 +316,10 @@ export const methods: Record<
   json_depth,
   json_extract,
   json_length,
+  json_keys,
+  json_quote,
+  json_type,
+  json_unquote,
   json_valid,
   user,
   current_user: user,

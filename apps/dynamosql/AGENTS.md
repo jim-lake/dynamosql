@@ -92,6 +92,7 @@ After any code change, run `npm run ts:check && npm run lint`, then `npm test`. 
 
 - NEVER write one-line functions. A one-line function never reduces code lines, so the ideal code uses as few lines as possible. A one-line function with no logic is a complete waste in all cases.
 - Inline any function that has only one caller. Extract a helper only when at least two call sites exist now or the function is recursive. Do not design shared code for possible future use. Extract it when a change adds a second caller.
+- After the code is written, verified, and finished, re-read the changed code for every function invoked in only one place. Decide for each one whether it should be inlined. A single-caller helper that adds no reuse or recursion is wrong and must be inlined before the work is reported as complete.
 - Round float arguments used as counts, positions, or lengths with `Math.round()`.
 - Import directly from the defining module. Do not add unnecessary re-export chains.
 - Match the Prettier style: single quotes, 2-space indent, ES5 trailing commas. Run `npm run pretty` before finishing.

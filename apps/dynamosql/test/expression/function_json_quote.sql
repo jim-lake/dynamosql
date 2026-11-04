@@ -1,0 +1,20 @@
+-- JSON_QUOTE tests
+SELECT JSON_QUOTE('abc') AS string_value;
+SELECT JSON_QUOTE('') AS string_value;
+SELECT JSON_QUOTE('say "hi"') AS string_value;
+SELECT JSON_QUOTE('back\\slash') AS string_value;
+SELECT JSON_QUOTE('tab\there') AS string_value;
+SELECT JSON_QUOTE('new\nline') AS string_value;
+SELECT JSON_QUOTE('a/b') AS string_value;
+SELECT JSON_QUOTE('é') AS string_value;
+SELECT JSON_QUOTE('"') AS string_value;
+SELECT JSON_QUOTE(NULL) AS string_value;
+SELECT JSON_QUOTE(CAST('x' AS CHAR)) AS string_value;
+SELECT JSON_QUOTE(JSON_QUOTE('a')) AS string_value;
+SELECT JSON_QUOTE(5) AS string_value;
+SELECT JSON_QUOTE(1.5) AS string_value;
+SELECT JSON_QUOTE(TRUE) AS string_value;
+SELECT JSON_QUOTE(JSON_ARRAY(1)) AS string_value;
+SELECT JSON_QUOTE(CURDATE()) AS string_value;
+SELECT JSON_QUOTE('a', 'b') AS string_value;
+SELECT JSON_QUOTE() AS string_value;

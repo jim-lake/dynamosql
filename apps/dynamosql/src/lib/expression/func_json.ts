@@ -188,6 +188,130 @@ export function json_valid(
   return { err: null, value: valid, type: 'longlong' };
 }
 
+export function json_keys(
+  expr: Function,
+  state: EvaluationState
+): EvaluationResult {
+  assertArgCount(expr, 1, 2);
+  const arg_list = expr.args.value;
+  const doc = getValue(arg_list[0], state);
+  const path = arg_list.length === 2 ? getValue(arg_list[1], state) : undefined;
+  if (doc.err) {
+    return doc;
+  }
+  if (path?.err) {
+    return path;
+  }
+  if (doc.value === null || path?.value === null) {
+    return { err: null, value: null, type: 'json' };
+  }
+
+  const root = _parseDocument(doc, 'json_keys');
+  const node = path
+    ? _lookup(root, _parsePath(String(path.value)), false)
+    : root;
+  if (typeof node !== 'object' || node === null || Array.isArray(node)) {
+    return { err: null, value: null, type: 'json' };
+  }
+  const key_list = Object.keys(node).sort(
+    (a, b) =>
+      Buffer.byteLength(a) - Buffer.byteLength(b) ||
+      Buffer.compare(Buffer.from(a), Buffer.from(b))
+  );
+  return { err: null, value: new SQLJson(key_list), type: 'json' };
+}
+
+export function json_quote(
+  expr: Function,
+  state: EvaluationState
+): EvaluationResult {
+  assertArgCount(expr, 1, 1);
+  const str = getValue(expr.args.value[0], state);
+  if (str.err) {
+    return str;
+  }
+  if (str.value === null) {
+    return { err: null, value: null, type: 'string' };
+  }
+  if (!TEXT_TYPES.includes(str.type)) {
+    throw new SQLError({ err: 'ER_INCORRECT_TYPE', args: [1, 'json_quote'] });
+  }
+  return {
+    err: null,
+    value: JSON.stringify(String(str.value)),
+    type: 'string',
+  };
+}
+
+export function json_type(
+  expr: Function,
+  state: EvaluationState
+): EvaluationResult {
+  assertArgCount(expr, 1, 1);
+  const doc = getValue(expr.args.value[0], state);
+  if (doc.err) {
+    return doc;
+  }
+  if (doc.value === null) {
+    return { err: null, value: null, type: 'string' };
+  }
+  const node = _parseDocument(doc, 'json_type');
+  let type_name = 'DOUBLE';
+  if (node === null) {
+    type_name = 'NULL';
+  } else if (Array.isArray(node)) {
+    type_name = 'ARRAY';
+  } else if (typeof node === 'object') {
+    type_name = 'OBJECT';
+  } else if (typeof node === 'string') {
+    type_name = 'STRING';
+  } else if (typeof node === 'boolean') {
+    type_name = 'BOOLEAN';
+  } else if (/^-?\d+$/.test(String(doc.value).trim())) {
+    type_name = 'INTEGER';
+  }
+  return { err: null, value: type_name, type: 'string' };
+}
+
+export function json_unquote(
+  expr: Function,
+  state: EvaluationState
+): EvaluationResult {
+  assertArgCount(expr, 1, 1);
+  const str = getValue(expr.args.value[0], state);
+  if (str.err) {
+    return str;
+  }
+  if (str.value === null) {
+    return { err: null, value: null, type: 'string' };
+  }
+  if (str.type === 'json') {
+    const node = SQLJson.parseText(str, 'json_unquote', 1);
+    if (typeof node === 'string') {
+      return { err: null, value: node, type: 'text' };
+    }
+    return { err: null, value: String(str.value), type: 'text' };
+  }
+  if (!TEXT_TYPES.includes(str.type)) {
+    throw new SQLError({ err: 'ER_INCORRECT_TYPE', args: [1, 'json_unquote'] });
+  }
+  const text = String(str.value);
+  const is_quoted =
+    text.length >= 2 && text.startsWith('"') && text.endsWith('"');
+  return {
+    err: null,
+    value: is_quoted ? SQLJson.parseText(str, 'json_unquote', 1) : text,
+    type: 'string',
+  };
+}
+
+function _parseDocument(doc: EvaluationResult, fn_name: string): unknown {
+  if (doc.type !== 'json' && !TEXT_TYPES.includes(doc.type)) {
+    throw new SQLError({ err: 'ER_INVALID_TYPE_FOR_JSON', args: [1, fn_name] });
+  }
+  return SQLJson.parseText(doc, fn_name, 1);
+}
+
 function _depth(node: unknown): number {
   if (typeof node !== 'object' || node === null) {
     return 1;
@@ -263,7 +387,11 @@ function _arrayIndex(
   return segment.from_last ? length - 1 - segment.index : segment.index;
 }
 
-function _lookup(node: unknown, path: PathSegment[]): unknown {
+function _lookup(
+  node: unknown,
+  path: PathSegment[],
+  auto_wrap = true
+): unknown {
   const [segment, ...rest] = path;
   if (segment === undefined) {
     return node;
@@ -276,15 +404,21 @@ function _lookup(node: unknown, path: PathSegment[]): unknown {
     ) {
       return NOT_FOUND;
     }
-    return _lookup((node as Record<string, unknown>)[segment.key], rest);
+    return _lookup(
+      (node as Record<string, unknown>)[segment.key],
+      rest,
+      auto_wrap
+    );
   } else if (Array.isArray(node)) {
     const index = _arrayIndex(segment, node.length);
     return index >= 0 && index < node.length
-      ? _lookup(node[index], rest)
+      ? _lookup(node[index], rest, auto_wrap)
       : NOT_FOUND;
+  } else if (!auto_wrap) {
+    return NOT_FOUND;
   }
   // A non-array value behaves as a one-element array, so only index 0 reaches it.
-  return segment.index === 0 ? _lookup(node, rest) : NOT_FOUND;
+  return segment.index === 0 ? _lookup(node, rest, auto_wrap) : NOT_FOUND;
 }
 
 function _appendAt(

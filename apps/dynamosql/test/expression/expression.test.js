@@ -173,6 +173,26 @@ describe('Expression', function () {
     path.join(__dirname, 'function_json_depth.sql'),
     { verify_field_types: true }
   );
+  runTests(
+    'function_json_keys.sql',
+    path.join(__dirname, 'function_json_keys.sql'),
+    { verify_field_types: true }
+  );
+  runTests(
+    'function_json_quote.sql',
+    path.join(__dirname, 'function_json_quote.sql'),
+    { verify_field_types: true }
+  );
+  runTests(
+    'function_json_type.sql',
+    path.join(__dirname, 'function_json_type.sql'),
+    { verify_field_types: true }
+  );
+  runTests(
+    'function_json_unquote.sql',
+    path.join(__dirname, 'function_json_unquote.sql'),
+    { verify_field_types: true }
+  );
   runTests('function_inet.sql', path.join(__dirname, 'function_inet.sql'), {
     verify_field_types: true,
   });

@@ -192,6 +192,10 @@ const ERROR_MAP: Record<string, ErrorMapEntry> = {
     sqlMessage:
       'In this situation, path expressions may not contain the * and ** tokens or an array range.',
   },
+  ER_INCORRECT_TYPE: {
+    code: 'ER_INCORRECT_TYPE',
+    sqlMessage: errStr`Incorrect type for argument ${0} in function ${1}.`,
+  },
 };
 
 export class SQLError extends Error {
