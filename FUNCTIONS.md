@@ -173,23 +173,23 @@ and geometry
 | JSON_CONTAINS_PATH()            |    ✅     | Whether JSON document contains any data at path                                                                                                         |
 | JSON_DEPTH()                    |    ✅     | Maximum depth of JSON document                                                                                                                          |
 | JSON_EXTRACT()                  |    ✅     | Return data from JSON document                                                                                                                          |
-| JSON_INSERT()                   |    ❌     | Insert data into JSON document                                                                                                                          |
+| JSON_INSERT()                   |    ✅     | Insert data into JSON document                                                                                                                          |
 | JSON_KEYS()                     |    ✅     | Array of keys from JSON document                                                                                                                        |
 | JSON_LENGTH()                   |    ✅     | Number of elements in JSON document                                                                                                                     |
 | JSON_MERGE()                    |    ❌     | Merge JSON documents, preserving duplicate keys. Deprecated synonym for JSON_MERGE_PRESERVE()                                                           |
 | JSON_MERGE_PATCH()              |    ❌     | Merge JSON documents, replacing values of duplicate keys                                                                                                |
-| JSON_MERGE_PRESERVE()           |    ❌     | Merge JSON documents, preserving duplicate keys                                                                                                         |
+| JSON_MERGE_PRESERVE()           |    ✅     | Merge JSON documents, preserving duplicate keys                                                                                                         |
 | JSON_OBJECT()                   |    ✅     | Create JSON object                                                                                                                                      |
 | JSON_OBJECTAGG()                |    ❌     | Return result set as a single JSON object                                                                                                               |
 | JSON_OVERLAPS()                 |    ❌     | Compares two JSON documents, returns TRUE (1) if these have any key-value pairs or array elements in common, otherwise FALSE (0)                        |
 | JSON_PRETTY()                   |    ❌     | Print a JSON document in human-readable format                                                                                                          |
 | JSON_QUOTE()                    |    ✅     | Quote JSON document                                                                                                                                     |
 | JSON_REMOVE()                   |    ✅     | Remove data from JSON document                                                                                                                          |
-| JSON_REPLACE()                  |    ❌     | Replace values in JSON document                                                                                                                         |
+| JSON_REPLACE()                  |    ✅     | Replace values in JSON document                                                                                                                         |
 | JSON_SCHEMA_VALID()             |    ❌     | Validate JSON document against JSON schema; returns TRUE/1 if document validates against schema, or FALSE/0 if it does not                              |
 | JSON_SCHEMA_VALIDATION_REPORT() |    ❌     | Validate JSON document against JSON schema; returns report in JSON format on outcome on validation including success or failure and reasons for failure |
 | JSON_SEARCH()                   |    ❌     | Path to value within JSON document                                                                                                                      |
-| JSON_SET()                      |    ❌     | Insert data into JSON document                                                                                                                          |
+| JSON_SET()                      |    ✅     | Insert data into JSON document                                                                                                                          |
 | JSON_STORAGE_FREE()             |    ❌     | Freed space within binary representation of JSON column value following partial update                                                                  |
 | JSON_STORAGE_SIZE()             |    ❌     | Space used for storage of binary representation of a JSON document                                                                                      |
 | JSON_TABLE()                    |    ❌     | Return data from a JSON expression as a relational table                                                                                                |
