@@ -1,0 +1,24 @@
+-- JSON_MERGE_PRESERVE tests
+SELECT JSON_MERGE_PRESERVE('{"a":1}', '{"a":2,"b":3}') AS json_value;
+SELECT JSON_MERGE_PRESERVE('{"a":1}', '{"b":{"c":1}}', '{"b":{"d":2}}') AS json_value;
+SELECT JSON_MERGE_PRESERVE('{"a":{"x":1}}', '{"a":{"y":2}}') AS json_value;
+SELECT JSON_MERGE_PRESERVE('{"a":{"x":1}}', '{"a":[2]}') AS json_value;
+SELECT JSON_MERGE_PRESERVE('{"a":[1]}', '{"a":2}') AS json_value;
+SELECT JSON_MERGE_PRESERVE('{"a":1}', '{"b":2}') AS json_value;
+SELECT JSON_MERGE_PRESERVE('[1,2]', '[3]') AS json_value;
+SELECT JSON_MERGE_PRESERVE('[1,2]', '[3]', '{"a":1}') AS json_value;
+SELECT JSON_MERGE_PRESERVE('{"a":1}', '[1]') AS json_value;
+SELECT JSON_MERGE_PRESERVE('[]', '{}') AS json_value;
+SELECT JSON_MERGE_PRESERVE('1', '2') AS json_value;
+SELECT JSON_MERGE_PRESERVE('null', '1') AS json_value;
+SELECT JSON_MERGE_PRESERVE('"s"', '[1]') AS json_value;
+SELECT JSON_MERGE_PRESERVE('{"a":1}') AS json_value;
+SELECT JSON_MERGE_PRESERVE('{"a":1}', '{"a":2}', '{"a":3}') AS json_value;
+SELECT JSON_MERGE_PRESERVE('{"a":1}', NULL) AS json_value;
+SELECT JSON_MERGE_PRESERVE(NULL, '[1]') AS json_value;
+SELECT JSON_MERGE_PRESERVE('1', NULL, '2') AS json_value;
+SELECT JSON_MERGE_PRESERVE(JSON_ARRAY(1), '[2]') AS json_value;
+SELECT JSON_MERGE_PRESERVE(CAST('[1]' AS JSON), '[2]') AS json_value;
+SELECT JSON_MERGE_PRESERVE('{"a":1}', 'not json') AS json_value;
+SELECT JSON_MERGE_PRESERVE('{"a":1}', '{"a":2}', 'x') AS json_value;
+SELECT JSON_MERGE_PRESERVE('1', 2) AS json_value;

@@ -1,0 +1,27 @@
+-- JSON_REPLACE tests
+SELECT JSON_REPLACE('{"a":1,"b":2}', '$.a', 5, '$.c', 3) AS json_value;
+SELECT JSON_REPLACE('{"a":1}', '$.a', 2, '$.a', 3) AS json_value;
+SELECT JSON_REPLACE('{"a":1}', '$.b', 2) AS json_value;
+SELECT JSON_REPLACE('{"a":1}', '$.a', NULL) AS json_value;
+SELECT JSON_REPLACE('{"a":{"b":1}}', '$.a', 'x') AS json_value;
+SELECT JSON_REPLACE('{"a":{"b":1}}', '$.a.b', 'x') AS json_value;
+SELECT JSON_REPLACE('{"a":{"b":1}}', '$.a.c', 'x') AS json_value;
+SELECT JSON_REPLACE('{"a":1}', '$.a.b', 2) AS json_value;
+SELECT JSON_REPLACE('{"a":[1,2]}', '$.a[1]', 'x') AS json_value;
+SELECT JSON_REPLACE('{"a":[1,2]}', '$.a[5]', 'x') AS json_value;
+SELECT JSON_REPLACE('{"a":1}', '$', 'x') AS json_value;
+SELECT JSON_REPLACE('[1,2]', '$[0]', 9, '$[5]', 8) AS json_value;
+SELECT JSON_REPLACE('[1,2]', '$[last]', 'x') AS json_value;
+SELECT JSON_REPLACE('[1,2]', '$[9]', 'x') AS json_value;
+SELECT JSON_REPLACE('[]', '$[0]', 'x') AS json_value;
+SELECT JSON_REPLACE('5', '$[0]', 'x') AS json_value;
+SELECT JSON_REPLACE('5', '$[1]', 'x') AS json_value;
+SELECT JSON_REPLACE('{"a":1}', '$.a', JSON_ARRAY(1, 2)) AS json_value;
+SELECT JSON_REPLACE(NULL, '$.a', 1) AS json_value;
+SELECT JSON_REPLACE('{"a":1}', NULL, 2) AS json_value;
+SELECT JSON_REPLACE(CAST('{"a":1}' AS JSON), '$.a', 2) AS json_value;
+SELECT JSON_REPLACE('{"a":1}', '$.a') AS json_value;
+SELECT JSON_REPLACE('{"a":1}') AS json_value;
+SELECT JSON_REPLACE('{"a":1}', 'a', 2) AS json_value;
+SELECT JSON_REPLACE('{"a":1}', '$.*', 2) AS json_value;
+SELECT JSON_REPLACE('not json', '$.a', 1) AS json_value;
