@@ -1,7 +1,7 @@
 import { SQLError } from '../../error';
 import { assertArgCount } from '../helpers/arg_count';
 import { convertBooleanValue, convertString } from '../helpers/sql_conversion';
-import { JsonRaw, SQLJson } from '../types/sql_json';
+import { SQLJson } from '../types/sql_json';
 
 import { getValue } from './evaluate';
 
@@ -19,12 +19,12 @@ export function json_array(
   assertArgCount(expr, 0, Infinity);
   const { timeZone } = state.session;
   const node_list: unknown[] = [];
-  for (const sub of expr.args.value) {
+  for (const [index, sub] of expr.args.value.entries()) {
     const result = getValue(sub, state);
     if (result.err) {
       return result;
     }
-    node_list.push(_toJsonNode(result, timeZone));
+    node_list.push(_toJsonNode(result, timeZone, 'json_array', index + 1));
   }
   return { err: null, value: new SQLJson(node_list), type: 'json' };
 }
@@ -44,11 +44,16 @@ export function json_array_append(
   const { timeZone } = state.session;
 
   const doc = getValue(arg_list[0], state);
-  const pair_list: { path: EvaluationResult; value: EvaluationResult }[] = [];
+  const pair_list: {
+    path: EvaluationResult;
+    value: EvaluationResult;
+    position: number;
+  }[] = [];
   for (let i = 1; i < arg_list.length; i += 2) {
     pair_list.push({
       path: getValue(arg_list[i], state),
       value: getValue(arg_list[i + 1], state),
+      position: i + 2,
     });
   }
   const failed = [
@@ -62,37 +67,38 @@ export function json_array_append(
     return { err: null, value: null, type: 'json' };
   }
 
-  let node = _parseDoc(doc);
-  for (const { path, value } of pair_list) {
+  let node = _parseJsonValue(doc, 'json_array_append', 1);
+  for (const { path, value, position } of pair_list) {
     node = _appendAt(
       node,
       _parsePath(String(path.value)),
-      _toJsonNode(value, timeZone)
+      _toJsonNode(value, timeZone, 'json_array_append', position)
     );
   }
   return { err: null, value: new SQLJson(node), type: 'json' };
 }
 
-function _toJsonNode(result: EvaluationResult, timeZone: string): unknown {
+function _toJsonNode(
+  result: EvaluationResult,
+  timeZone: string,
+  fn_name: string,
+  position: number
+): unknown {
   const { type, value } = result;
   if (value === null || value === undefined) {
     return null;
   }
   switch (type) {
     case 'json':
-      if (value instanceof SQLJson) {
-        return value.node;
-      }
-      return typeof value === 'string' ? new JsonRaw(value) : value;
+      return _parseJsonValue(result, fn_name, position);
     case 'bool':
-      return new JsonRaw(convertBooleanValue(value) === 1 ? 'true' : 'false');
+      return convertBooleanValue(value) === 1;
     case 'long':
     case 'longlong':
     case 'year':
-      return new JsonRaw(String(value));
     case 'number':
     case 'double':
-      return new JsonRaw(String(value));
+      return Number(value);
     case 'date':
       return convertString({ value, timeZone }) ?? '';
     case 'datetime':
@@ -109,19 +115,23 @@ function _toJsonNode(result: EvaluationResult, timeZone: string): unknown {
   }
 }
 
-function _parseDoc(doc: EvaluationResult): unknown {
-  if (doc.value instanceof SQLJson) {
-    return doc.value.node;
+function _parseJsonValue(
+  result: EvaluationResult,
+  fn_name: string,
+  position: number
+): unknown {
+  if (result.value instanceof SQLJson) {
+    return result.value.node;
   }
-  const text = Buffer.isBuffer(doc.value)
-    ? doc.value.toString('utf8')
-    : String(doc.value);
+  const text = Buffer.isBuffer(result.value)
+    ? result.value.toString('utf8')
+    : String(result.value);
   try {
     return JSON.parse(text);
   } catch {
     throw new SQLError({
       err: 'ER_INVALID_JSON_TEXT_IN_PARAM',
-      args: [1, 'json_array_append'],
+      args: [position, fn_name],
     });
   }
 }

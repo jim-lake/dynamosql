@@ -55,6 +55,7 @@ After any code change, run `npm run ts:check && npm run lint`, then `npm test`. 
 
 - Test runs always write the complete output to a `/tmp` log file. The terminal shows only the log path and `SUCCESS`/`FAIL`. Use `grep` or `sed` on the log file to find details. Do not pipe the test command itself through a filter.
 - Tests run each query against MySQL and DynamoDB and compare the results. A MySQL server must be running and configured in the .env.
+- JSON results are compared by parsing both sides with `JSON.parse` and comparing the parsed values with deep equality. Never compare the raw JSON text from MySQL with DynamoSQL output. MySQL point releases can change JSON text formatting (spacing, key order, number rendering), and tests that depend on that text would break without any real behavior change.
 - Tests need AWS credentials with DynamoDB access, read from the environment or `.env`.
 - When asked to write tests, read the implementation first. Cover the full behavior of implemented functionality, and skip anything not implemented. Tests must fail when the implemented behavior differs from MySQL. Pass and fail results are both acceptable; coverage is the goal.
 - Mocha timeout is 15 seconds per test.
