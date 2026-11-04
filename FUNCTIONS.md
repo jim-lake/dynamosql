@@ -171,7 +171,7 @@ and geometry
 | JSON_ARRAYAGG()                 |    ❌     | Return result set as a single JSON array                                                                                                                |
 | JSON_CONTAINS()                 |    ❌     | Whether JSON document contains specific object at path                                                                                                  |
 | JSON_CONTAINS_PATH()            |    ❌     | Whether JSON document contains any data at path                                                                                                         |
-| JSON_DEPTH()                    |    ❌     | Maximum depth of JSON document                                                                                                                          |
+| JSON_DEPTH()                    |    ✅     | Maximum depth of JSON document                                                                                                                          |
 | JSON_EXTRACT()                  |    ✅     | Return data from JSON document                                                                                                                          |
 | JSON_INSERT()                   |    ❌     | Insert data into JSON document                                                                                                                          |
 | JSON_KEYS()                     |    ❌     | Array of keys from JSON document                                                                                                                        |
@@ -195,7 +195,7 @@ and geometry
 | JSON_TABLE()                    |    ❌     | Return data from a JSON expression as a relational table                                                                                                |
 | JSON_TYPE()                     |    ❌     | Type of JSON value                                                                                                                                      |
 | JSON_UNQUOTE()                  |    ❌     | Unquote JSON value                                                                                                                                      |
-| JSON_VALID()                    |    ❌     | Whether JSON value is valid                                                                                                                             |
+| JSON_VALID()                    |    ✅     | Whether JSON value is valid                                                                                                                             |
 | JSON_VALUE()                    |    ❌     | Extract value from JSON document at location pointed to by path provided; return this value as VARCHAR(512) or specified type                           |
 | LAG()                           |    ❌     | Value of argument from row lagging current row within partition                                                                                         |
 | LAST_INSERT_ID()                |    ❌     | Value of the AUTOINCREMENT column for the last INSERT                                                                                                   |

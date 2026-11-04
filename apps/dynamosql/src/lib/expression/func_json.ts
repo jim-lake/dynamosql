@@ -12,6 +12,7 @@ type PathSegment =
   | { kind: 'index'; index: number; from_last: boolean };
 
 const NOT_FOUND = Symbol('not_found');
+const TEXT_TYPES: string[] = ['string', 'char', 'text'];
 
 export function json_array(
   expr: Function,
@@ -136,6 +137,69 @@ export function json_length(
     length = Object.keys(node).length;
   }
   return { err: null, value: length, type: 'longlong' };
+}
+
+export function json_depth(
+  expr: Function,
+  state: EvaluationState
+): EvaluationResult {
+  assertArgCount(expr, 1, 1);
+  const doc = getValue(expr.args.value[0], state);
+  if (doc.err) {
+    return doc;
+  }
+  if (doc.value === null) {
+    return { err: null, value: null, type: 'longlong' };
+  }
+  if (doc.type !== 'json' && !TEXT_TYPES.includes(doc.type)) {
+    throw new SQLError({
+      err: 'ER_INVALID_TYPE_FOR_JSON',
+      args: [1, 'json_depth'],
+    });
+  }
+  const root = SQLJson.parseText(doc, 'json_depth', 1);
+  return { err: null, value: _depth(root), type: 'longlong' };
+}
+
+export function json_valid(
+  expr: Function,
+  state: EvaluationState
+): EvaluationResult {
+  assertArgCount(expr, 1, 1);
+  const doc = getValue(expr.args.value[0], state);
+  if (doc.err) {
+    return doc;
+  }
+  if (doc.value === null) {
+    return { err: null, value: null, type: 'longlong' };
+  }
+  if (doc.type === 'json') {
+    return { err: null, value: 1, type: 'longlong' };
+  }
+  if (!TEXT_TYPES.includes(doc.type)) {
+    return { err: null, value: 0, type: 'longlong' };
+  }
+  let valid = 1;
+  try {
+    JSON.parse(String(doc.value));
+  } catch {
+    valid = 0;
+  }
+  return { err: null, value: valid, type: 'longlong' };
+}
+
+function _depth(node: unknown): number {
+  if (typeof node !== 'object' || node === null) {
+    return 1;
+  }
+  const child_list: unknown[] = Array.isArray(node)
+    ? node
+    : Object.values(node as Record<string, unknown>);
+  let max_child_depth = 0;
+  for (const child of child_list) {
+    max_child_depth = Math.max(max_child_depth, _depth(child));
+  }
+  return 1 + max_child_depth;
 }
 
 function _parsePath(path: string): PathSegment[] {

@@ -163,6 +163,16 @@ describe('Expression', function () {
     path.join(__dirname, 'function_json_length.sql'),
     { verify_field_types: true }
   );
+  runTests(
+    'function_json_valid.sql',
+    path.join(__dirname, 'function_json_valid.sql'),
+    { verify_field_types: true }
+  );
+  runTests(
+    'function_json_depth.sql',
+    path.join(__dirname, 'function_json_depth.sql'),
+    { verify_field_types: true }
+  );
   runTests('function_inet.sql', path.join(__dirname, 'function_inet.sql'), {
     verify_field_types: true,
   });

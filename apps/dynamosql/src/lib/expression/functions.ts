@@ -36,8 +36,10 @@ import {
 import {
   json_array,
   json_array_append,
+  json_depth,
   json_extract,
   json_length,
+  json_valid,
 } from './func_json';
 import {
   ln,
@@ -307,8 +309,10 @@ export const methods: Record<
   maketime,
   json_array,
   json_array_append,
+  json_depth,
   json_extract,
   json_length,
+  json_valid,
   user,
   current_user: user,
   session_user: user,

@@ -179,6 +179,10 @@ const ERROR_MAP: Record<string, ErrorMapEntry> = {
     code: 'ER_INVALID_JSON_TEXT_IN_PARAM',
     sqlMessage: errStr`Invalid JSON text in argument ${0} to function ${1}.`,
   },
+  ER_INVALID_TYPE_FOR_JSON: {
+    code: 'ER_INVALID_TYPE_FOR_JSON',
+    sqlMessage: errStr`Invalid data type for JSON data in argument ${0} to function ${1}; a JSON string or JSON type is required.`,
+  },
   ER_INVALID_JSON_PATH: {
     code: 'ER_INVALID_JSON_PATH',
     sqlMessage: errStr`Invalid JSON path expression. The error is around character position ${0}.`,
