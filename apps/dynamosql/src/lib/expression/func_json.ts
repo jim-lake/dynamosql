@@ -11,6 +11,8 @@ type PathSegment =
   | { kind: 'key'; key: string }
   | { kind: 'index'; index: number; from_last: boolean };
 
+const NOT_FOUND = Symbol('not_found');
+
 export function json_array(
   expr: Function,
   state: EvaluationState
@@ -77,6 +79,65 @@ export function json_array_append(
   return { err: null, value: new SQLJson(node), type: 'json' };
 }
 
+export function json_extract(
+  expr: Function,
+  state: EvaluationState
+): EvaluationResult {
+  assertArgCount(expr, 2, Infinity);
+  const arg_list = expr.args.value;
+  const doc = getValue(arg_list[0], state);
+  const path_list = arg_list.slice(1).map((arg) => getValue(arg, state));
+  const failed = [doc, ...path_list].find((result) => result.err);
+  if (failed) {
+    return failed;
+  }
+  if (doc.value === null || path_list.some(({ value }) => value === null)) {
+    return { err: null, value: null, type: 'json' };
+  }
+
+  const root = SQLJson.parseText(doc, 'json_extract', 1);
+  const match_list = path_list
+    .map(({ value }) => _lookup(root, _parsePath(String(value))))
+    .filter((node) => node !== NOT_FOUND);
+  if (match_list.length === 0) {
+    return { err: null, value: null, type: 'json' };
+  }
+  const result = path_list.length === 1 ? match_list[0] : match_list;
+  return { err: null, value: new SQLJson(result), type: 'json' };
+}
+
+export function json_length(
+  expr: Function,
+  state: EvaluationState
+): EvaluationResult {
+  assertArgCount(expr, 1, 2);
+  const arg_list = expr.args.value;
+  const doc = getValue(arg_list[0], state);
+  const path = arg_list.length === 2 ? getValue(arg_list[1], state) : undefined;
+  if (doc.err) {
+    return doc;
+  }
+  if (path?.err) {
+    return path;
+  }
+  if (doc.value === null || path?.value === null) {
+    return { err: null, value: null, type: 'longlong' };
+  }
+
+  const root = SQLJson.parseText(doc, 'json_length', 1);
+  const node = path ? _lookup(root, _parsePath(String(path.value))) : root;
+  if (node === NOT_FOUND) {
+    return { err: null, value: null, type: 'longlong' };
+  }
+  let length = 1;
+  if (Array.isArray(node)) {
+    length = node.length;
+  } else if (typeof node === 'object' && node !== null) {
+    length = Object.keys(node).length;
+  }
+  return { err: null, value: length, type: 'longlong' };
+}
+
 function _parsePath(path: string): PathSegment[] {
   if (!path.startsWith('$')) {
     throw new SQLError({ err: 'ER_INVALID_JSON_PATH', args: [1] });
@@ -131,6 +192,37 @@ function _parsePath(path: string): PathSegment[] {
   return segment_list;
 }
 
+function _arrayIndex(
+  segment: Extract<PathSegment, { kind: 'index' }>,
+  length: number
+): number {
+  return segment.from_last ? length - 1 - segment.index : segment.index;
+}
+
+function _lookup(node: unknown, path: PathSegment[]): unknown {
+  const [segment, ...rest] = path;
+  if (segment === undefined) {
+    return node;
+  } else if (segment.kind === 'key') {
+    if (
+      typeof node !== 'object' ||
+      node === null ||
+      Array.isArray(node) ||
+      !Object.hasOwn(node, segment.key)
+    ) {
+      return NOT_FOUND;
+    }
+    return _lookup((node as Record<string, unknown>)[segment.key], rest);
+  } else if (Array.isArray(node)) {
+    const index = _arrayIndex(segment, node.length);
+    return index >= 0 && index < node.length
+      ? _lookup(node[index], rest)
+      : NOT_FOUND;
+  }
+  // A non-array value behaves as a one-element array, so only index 0 reaches it.
+  return segment.index === 0 ? _lookup(node, rest) : NOT_FOUND;
+}
+
 function _appendAt(
   node: unknown,
   path: PathSegment[],
@@ -154,9 +246,7 @@ function _appendAt(
       [segment.key]: _appendAt(record[segment.key], rest, value),
     };
   } else if (Array.isArray(node)) {
-    const index = segment.from_last
-      ? node.length - 1 - segment.index
-      : segment.index;
+    const index = _arrayIndex(segment, node.length);
     if (index < 0 || index >= node.length) {
       return node;
     }

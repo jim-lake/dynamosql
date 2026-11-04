@@ -33,7 +33,12 @@ import {
   yearweek,
   makedate,
 } from './func_date_calc';
-import { json_array, json_array_append } from './func_json';
+import {
+  json_array,
+  json_array_append,
+  json_extract,
+  json_length,
+} from './func_json';
 import {
   ln,
   log,
@@ -302,6 +307,8 @@ export const methods: Record<
   maketime,
   json_array,
   json_array_append,
+  json_extract,
+  json_length,
   user,
   current_user: user,
   session_user: user,

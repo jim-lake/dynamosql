@@ -172,10 +172,10 @@ and geometry
 | JSON_CONTAINS()                 |    ❌     | Whether JSON document contains specific object at path                                                                                                  |
 | JSON_CONTAINS_PATH()            |    ❌     | Whether JSON document contains any data at path                                                                                                         |
 | JSON_DEPTH()                    |    ❌     | Maximum depth of JSON document                                                                                                                          |
-| JSON_EXTRACT()                  |    ❌     | Return data from JSON document                                                                                                                          |
+| JSON_EXTRACT()                  |    ✅     | Return data from JSON document                                                                                                                          |
 | JSON_INSERT()                   |    ❌     | Insert data into JSON document                                                                                                                          |
 | JSON_KEYS()                     |    ❌     | Array of keys from JSON document                                                                                                                        |
-| JSON_LENGTH()                   |    ❌     | Number of elements in JSON document                                                                                                                     |
+| JSON_LENGTH()                   |    ✅     | Number of elements in JSON document                                                                                                                     |
 | JSON_MERGE()                    |    ❌     | Merge JSON documents, preserving duplicate keys. Deprecated synonym for JSON_MERGE_PRESERVE()                                                           |
 | JSON_MERGE_PATCH()              |    ❌     | Merge JSON documents, replacing values of duplicate keys                                                                                                |
 | JSON_MERGE_PRESERVE()           |    ❌     | Merge JSON documents, preserving duplicate keys                                                                                                         |
