@@ -15,7 +15,11 @@ export function abs(expr: Function, state: EvaluationState): EvaluationResult {
   if (!result.err && result.value !== null) {
     const num = convertNum(result.value);
     result.value = num !== null ? Math.abs(num) : null;
-    result.type = result.type === 'string' ? 'double' : result.type;
+    if (result.type === 'string') {
+      result.type = 'double';
+    } else if (result.type === 'bool') {
+      result.type = 'longlong';
+    }
   } else {
     result.type = 'double';
   }
@@ -87,6 +91,9 @@ export function round(
     const factor = Math.pow(10, -decimals);
     result.value = _mysqlRound(value / factor) * factor;
   }
+  if (result.type === 'bool') {
+    result.type = 'longlong';
+  }
   if (result.type === 'string') {
     result.type = 'double';
   }
@@ -105,6 +112,8 @@ function _resolveTypeForRounding(result: EvaluationResult): ValueType {
   if (result.value === null || result.type === 'string') {
     return 'double';
   } else if (result.type === 'number') {
+    return 'longlong';
+  } else if (result.type === 'bool') {
     return 'longlong';
   }
   return result.type;

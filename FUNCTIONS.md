@@ -165,8 +165,8 @@ and geometry
 | IS_USED_LOCK()                  |    ❌     | Whether the named lock is in use; return connection identifier if true                                                                                  |
 | IS_UUID()                       |    ❌     | Whether argument is a valid UUID                                                                                                                        |
 | ISNULL()                        |    ✅     | Test whether the argument is NULL                                                                                                                       |
-| JSON_ARRAY()                    |    ❌     | Create JSON array                                                                                                                                       |
-| JSON_ARRAY_APPEND()             |    ❌     | Append data to JSON document                                                                                                                            |
+| JSON_ARRAY()                    |    ✅     | Create JSON array                                                                                                                                       |
+| JSON_ARRAY_APPEND()             |    ✅     | Append data to JSON document                                                                                                                            |
 | JSON_ARRAY_INSERT()             |    ❌     | Insert into JSON array                                                                                                                                  |
 | JSON_ARRAYAGG()                 |    ❌     | Return result set as a single JSON array                                                                                                                |
 | JSON_CONTAINS()                 |    ❌     | Whether JSON document contains specific object at path                                                                                                  |

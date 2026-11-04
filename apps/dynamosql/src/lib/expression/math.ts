@@ -266,9 +266,11 @@ function _unionNumberType(
   raw_type2: ValueType,
   default_type: ValueType
 ): ValueType {
-  // YEAR values are integers in arithmetic, so they behave like longlong.
-  const type1 = raw_type1 === 'year' ? 'longlong' : raw_type1;
-  const type2 = raw_type2 === 'year' ? 'longlong' : raw_type2;
+  // YEAR and BOOL values are integers in arithmetic, so they behave like longlong.
+  const type1 =
+    raw_type1 === 'year' || raw_type1 === 'bool' ? 'longlong' : raw_type1;
+  const type2 =
+    raw_type2 === 'year' || raw_type2 === 'bool' ? 'longlong' : raw_type2;
   if (type1 === 'string' || type2 === 'string') {
     return 'double';
   } else if (type1 === type2) {

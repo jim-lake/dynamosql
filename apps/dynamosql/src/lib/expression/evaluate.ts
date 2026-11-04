@@ -230,7 +230,7 @@ export function getValue(
     } else if (type === 'bool') {
       result.value = expr.value ? 1 : 0;
       result.name = expr.value ? 'TRUE' : 'FALSE';
-      result.type = 'longlong';
+      result.type = 'bool';
     } else if (type === 'hex_string' || type === 'full_hex_string') {
       const value = expr.value;
       if (typeof value === 'string') {

@@ -36,18 +36,18 @@ Module-level notes:
 
 Run these from `apps/dynamosql/`:
 
-| Task                          | Command                                                           |
-| ----------------------------- | ----------------------------------------------------------------- |
-| Create DynamoDB/MySQL tables  | `npm run test:setup`                                              |
-| Full test run                 | `npm test`                                                        |
-| Single test file              | `npm run test:single -- test/select/<file>.test.js`               |
-| Include slow tests            | `npm run test:quiet:slow` or `npm run test:single:slow -- <file>` |
-| Type check                    | `npm run ts:check`                                                |
-| Lint                          | `npm run lint` (runs `eslint src test examples --fix`)            |
-| Format                        | `npm run pretty`                                                  |
-| Build                         | `npm run build`                                                   |
-| Export check                  | `npm run test:export:check`                                       |
-| Manual query (MySQL / Dynamo) | `npm run query:mysql` / `npm run query:session`                   |
+| Task                          | Command                                                     |
+| ----------------------------- | ----------------------------------------------------------- |
+| Create DynamoDB/MySQL tables  | `npm run test:setup`                                        |
+| Full test run                 | `npm test`                                                  |
+| Single test file              | `npm run test:single -- test/select/<file>.test.js`         |
+| Include slow tests            | `npm run test:slow` or `npm run test:single:slow -- <file>` |
+| Type check                    | `npm run ts:check`                                          |
+| Lint                          | `npm run lint` (runs `eslint src test examples --fix`)      |
+| Format                        | `npm run pretty`                                            |
+| Build                         | `npm run build`                                             |
+| Export check                  | `npm run test:export:check`                                 |
+| Manual query (MySQL / Dynamo) | `npm run query:mysql` / `npm run query:session`             |
 
 After any code change, run `npm run ts:check && npm run lint`, then `npm test`. Run `npm run test:setup` first if table definitions changed.
 
@@ -56,9 +56,12 @@ After any code change, run `npm run ts:check && npm run lint`, then `npm test`. 
 - Test runs always write the complete output to a `/tmp` log file. The terminal shows only the log path and `SUCCESS`/`FAIL`. Use `grep` or `sed` on the log file to find details. Do not pipe the test command itself through a filter.
 - Tests run each query against MySQL and DynamoDB and compare the results. A MySQL server must be running and configured in the .env.
 - Tests need AWS credentials with DynamoDB access, read from the environment or `.env`.
+- When asked to write tests, read the implementation first. Cover the full behavior of implemented functionality, and skip anything not implemented. Tests must fail when the implemented behavior differs from MySQL. Pass and fail results are both acceptable; coverage is the goal.
 - Mocha timeout is 15 seconds per test.
 - Test directories: `select/`, `insert/`, `update/`, `delete/`, `replace/`, `join/`, `expression/`, `ddl/`, `memory/`, `client_opts/`, `unit_misc/`, `setup/`.
 - Each feature directory holds `.sql` query files and `.test.js` or `.test.ts` files that compare results. Follow the pattern of the neighboring tests.
+- Run a subset of tests by name with `npm run test -- --grep 'pattern'`. The pattern matches against the full test title, which is the SQL statement text for `.sql` tests.
+- To run one query manually through the DynamoSQL engine, use `npm run query:session`. To run it through MySQL, use `npm run query:mysql`. Use these to compare the two outputs before writing a test.
 
 ## Code Conventions
 
@@ -86,6 +89,7 @@ After any code change, run `npm run ts:check && npm run lint`, then `npm test`. 
 
 ### General patterns
 
+- NEVER write one-line functions. A one-line function never reduces code lines, so the ideal code uses as few lines as possible. A one-line function with no logic is a complete waste in all cases.
 - Round float arguments used as counts, positions, or lengths with `Math.round()`.
 - Import directly from the defining module. Do not add unnecessary re-export chains.
 - Match the Prettier style: single quotes, 2-space indent, ES5 trailing commas. Run `npm run pretty` before finishing.

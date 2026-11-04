@@ -186,7 +186,7 @@ interface UnionTypeResult {
 }
 function _unionType(list: EvaluationResult[]): UnionTypeResult {
   let compare_type: ValueType;
-  const types = list.map((e) => e.type);
+  const types = list.map((e) => (e.type === 'bool' ? 'longlong' : e.type));
   if (types.includes('datetime')) {
     compare_type = 'datetime';
   } else if (types.includes('date')) {

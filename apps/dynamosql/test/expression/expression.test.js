@@ -148,6 +148,11 @@ describe('Expression', function () {
   runTests('function_uuid.sql', path.join(__dirname, 'function_uuid.sql'), {
     verify_field_types: true,
   });
+  runTests(
+    'function_json_array.sql',
+    path.join(__dirname, 'function_json_array.sql'),
+    { verify_field_types: true }
+  );
   runTests('function_inet.sql', path.join(__dirname, 'function_inet.sql'), {
     verify_field_types: true,
   });

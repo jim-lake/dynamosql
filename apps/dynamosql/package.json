@@ -16,9 +16,9 @@
     "test:setup": "bash scripts/run-tests.sh setup test/setup/setup.js",
     "test:single": "bash scripts/run-tests.sh single",
     "test:single:slow": "TEST_RUN_SLOW=1 bash scripts/run-tests.sh single-slow",
+    "test:slow": "TEST_RUN_SLOW=1 bash scripts/run-tests.sh slow 'test/**/*.test.js' 'test/**/*.test.ts'",
     "test": "bash scripts/run-tests.sh test 'test/**/*.test.js' 'test/**/*.test.ts'",
     "test:coverage": "TEST_RUN_SLOW=1 TEST_COVER=1 bash scripts/run-tests.sh coverage 'test/**/*.test.js'",
-    "test:quiet:slow": "TEST_RUN_SLOW=1 bash scripts/run-tests.sh quiet-slow 'test/**/*.test.js' 'test/**/*.test.ts'",
     "query:mysql": "dotenv -- npx tsx test/test_client.js",
     "query:session": "dotenv -- npx tsx test/test_session.js",
     "example:query": "dotenv -- node examples/query.js"

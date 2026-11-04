@@ -167,6 +167,19 @@ const ERROR_MAP: Record<string, ErrorMapEntry> = {
     code: 'ER_CANT_AGGREGATE_2COLLATIONS',
     sqlMessage: errStr`Illegal mix of collations (${0}) and (${1}) for operation`,
   },
+  ER_INVALID_JSON_TEXT_IN_PARAM: {
+    code: 'ER_INVALID_JSON_TEXT_IN_PARAM',
+    sqlMessage: errStr`Invalid JSON text in argument ${0} to function ${1}.`,
+  },
+  ER_INVALID_JSON_PATH: {
+    code: 'ER_INVALID_JSON_PATH',
+    sqlMessage: errStr`Invalid JSON path expression. The error is around character position ${0}.`,
+  },
+  ER_INVALID_JSON_PATH_WILDCARD: {
+    code: 'ER_INVALID_JSON_PATH_WILDCARD',
+    sqlMessage:
+      'In this situation, path expressions may not contain the * and ** tokens or an array range.',
+  },
 };
 
 export class SQLError extends Error {

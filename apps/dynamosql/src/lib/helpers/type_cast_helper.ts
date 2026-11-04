@@ -3,6 +3,7 @@ import { toBigInt } from '../../tools/safe_convert';
 import { Types } from '../../types';
 import { SQLDate } from '../types/sql_date';
 import { SQLDateTime } from '../types/sql_datetime';
+import { SQLJson } from '../types/sql_json';
 import { SQLTime } from '../types/sql_time';
 
 import type { TypeCastOptions } from '../../session';
@@ -88,12 +89,12 @@ export function typeCast(
         }
         break;
       case Types.JSON:
-        if (typeof value === 'object') {
-          return value;
-        } else if (typeof value === 'string') {
-          return _jsonParse(value);
+        if (value instanceof SQLJson) {
+          return value.toString();
+        } else if (typeof value === 'object') {
+          return JSON.stringify(value);
         } else {
-          return value;
+          return String(value);
         }
         break;
       case Types.TINY_BLOB:
@@ -118,12 +119,5 @@ function _toNumber(value: unknown): number {
     return parseFloat(value);
   } else {
     return parseFloat(String(value));
-  }
-}
-function _jsonParse(obj: string): unknown {
-  try {
-    return JSON.parse(obj);
-  } catch {
-    return null;
   }
 }

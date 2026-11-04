@@ -1,3 +1,5 @@
+import { SQLJson } from '../lib/types/sql_json';
+
 import type {
   AttributeValue,
   ScalarAttributeType,
@@ -131,6 +133,8 @@ export function escapeValue(value: unknown, type?: string): string {
     s = escapeNumber(value);
   } else if (value === null) {
     s = 'NULL';
+  } else if (value instanceof SQLJson) {
+    s = "'" + escapeString(value.toString()) + "'";
   } else if (Array.isArray(value)) {
     s = '[ ';
     s += value.map((v) => escapeValue(v)).join(', ');
