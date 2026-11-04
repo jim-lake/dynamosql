@@ -54,12 +54,11 @@ After any code change, run `npm run ts:check && npm run lint`, then `npm test`. 
 ## Testing Rules
 
 - Test runs always write the complete output to a `/tmp` log file. The terminal shows only the log path and `SUCCESS`/`FAIL`. Use `grep` or `sed` on the log file to find details. Do not pipe the test command itself through a filter.
-- Tests run each query against MySQL and DynamoDB and compare the results. A MySQL server must be running and configured in the root `config.json`.
+- Tests run each query against MySQL and DynamoDB and compare the results. A MySQL server must be running and configured in the .env.
 - Tests need AWS credentials with DynamoDB access, read from the environment or `.env`.
 - Mocha timeout is 15 seconds per test.
 - Test directories: `select/`, `insert/`, `update/`, `delete/`, `replace/`, `join/`, `expression/`, `ddl/`, `memory/`, `client_opts/`, `unit_misc/`, `setup/`.
 - Each feature directory holds `.sql` query files and `.test.js` or `.test.ts` files that compare results. Follow the pattern of the neighboring tests.
-- Do not add new tests unless the user asks for them.
 
 ## Code Conventions
 

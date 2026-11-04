@@ -14,7 +14,6 @@ dynamosql/
 ├── apps/
 │   ├── dynamosql/          # Core query engine library (see apps/dynamosql/AGENTS.md)
 │   └── server/             # MySQL protocol server
-├── config.json             # MySQL connection config for tests
 ├── package.json            # Root workspace configuration
 └── node_modules/           # Shared dependencies
 ```
@@ -31,21 +30,6 @@ npm install
 ```
 
 This installs dependencies for the whole workspace and both packages.
-
-## Test Configuration (`config.json`)
-
-```json
-{
-  "db": {
-    "host": "localhost",
-    "database": "dynamodb_test",
-    "user": "root",
-    "password": ""
-  }
-}
-```
-
-Tests use this MySQL connection to run each query against MySQL and DynamoDB and compare the results.
 
 ## Common Commands
 
