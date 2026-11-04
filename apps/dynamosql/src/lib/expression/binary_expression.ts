@@ -39,7 +39,7 @@ function and(expr: Binary, state: EvaluationState): EvaluationResult {
       name = left.name + ' AND ' + right.name;
     }
   }
-  return { err, value, name, type: 'longlong' };
+  return { err, value, name, type: 'bool' };
 }
 function or(expr: Binary, state: EvaluationState): EvaluationResult {
   const left = getValue(expr.left, state);
@@ -60,7 +60,7 @@ function or(expr: Binary, state: EvaluationState): EvaluationResult {
       name = left.name + ' OR ' + right.name;
     }
   }
-  return { err, value, name, type: 'longlong' };
+  return { err, value, name, type: 'bool' };
 }
 function xor(expr: Binary, state: EvaluationState): EvaluationResult {
   const left = getValue(expr.left, state);
@@ -77,7 +77,7 @@ function xor(expr: Binary, state: EvaluationState): EvaluationResult {
       value = right_bool ^ left_bool;
     }
   }
-  return { err, value, name, type: 'longlong' };
+  return { err, value, name, type: 'bool' };
 }
 
 function is(expr: Binary, state: EvaluationState): EvaluationResult {
@@ -137,7 +137,7 @@ function _is(
       result.value = 0;
     }
   }
-  result.type = 'longlong';
+  result.type = 'bool';
   return result;
 }
 function like(expr: Binary, state: EvaluationState): EvaluationResult {
@@ -159,7 +159,7 @@ function like(expr: Binary, state: EvaluationState): EvaluationResult {
       value = regex.test(str) ? 1 : 0;
     }
   }
-  return { err, value, name, type: 'longlong' };
+  return { err, value, name, type: 'bool' };
 }
 function notLike(expr: Binary, state: EvaluationState): EvaluationResult {
   const result = like(expr, state);
@@ -186,7 +186,7 @@ function between(expr: Binary, state: EvaluationState): EvaluationResult {
       err: { err: 'syntax_err', args: ['BETWEEN'] },
       value: null,
       name: '',
-      type: 'longlong',
+      type: 'bool',
     };
   }
 
@@ -204,7 +204,7 @@ function between(expr: Binary, state: EvaluationState): EvaluationResult {
       err: { err: 'syntax_err', args: ['BETWEEN'] },
       value: null,
       name: '',
-      type: 'longlong',
+      type: 'bool',
     };
   }
 
@@ -225,7 +225,7 @@ function between(expr: Binary, state: EvaluationState): EvaluationResult {
     min_result.value === null ||
     max_result.value === null
   ) {
-    return { err: null, value: null, name, type: 'longlong' };
+    return { err: null, value: null, name, type: 'bool' };
   }
 
   // Use >= and <= comparison logic
@@ -234,7 +234,7 @@ function between(expr: Binary, state: EvaluationState): EvaluationResult {
     state
   );
   if (gte_result.err || gte_result.value === null) {
-    return { err: gte_result.err, value: null, name, type: 'longlong' };
+    return { err: gte_result.err, value: null, name, type: 'bool' };
   }
 
   const lte_result = lte(
@@ -242,11 +242,11 @@ function between(expr: Binary, state: EvaluationState): EvaluationResult {
     state
   );
   if (lte_result.err || lte_result.value === null) {
-    return { err: lte_result.err, value: null, name, type: 'longlong' };
+    return { err: lte_result.err, value: null, name, type: 'bool' };
   }
 
   const value = gte_result.value && lte_result.value ? 1 : 0;
-  return { err: null, value, name, type: 'longlong' };
+  return { err: null, value, name, type: 'bool' };
 }
 
 function notBetween(expr: Binary, state: EvaluationState): EvaluationResult {

@@ -6,6 +6,7 @@ const mysql = require('mysql');
 const { createSession } = require('../src/session');
 
 const { Types } = require('../src/types');
+const { deepEqual } = require('../src/tools/deep_equal');
 
 const SECONDS_REGEX = /:[0-9]{2}(\.[0-9]*)?$/g;
 
@@ -215,6 +216,11 @@ function _checkEqual(name, i, left, right) {
       right = String(right).replace(SECONDS_REGEX, '');
       expect(left, `results[${i}].${name} equal`).to.equal(right);
     }
+  } else if (name === 'json_value') {
+    expect(
+      deepEqual(JSON.parse(left), JSON.parse(right)),
+      `results[${i}].${name} json equal: ${left} vs ${right}`
+    ).to.be.true;
   } else if (left instanceof Date) {
     assert(right instanceof Date, 'both are dates');
     expect(left.getTime(), `results[${i}].${name} typeof equal`).to.equal(

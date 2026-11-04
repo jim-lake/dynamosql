@@ -74,7 +74,7 @@ export function json_array_append(
 }
 
 function _toJsonNode(result: EvaluationResult, timeZone: string): unknown {
-  const { type, value, decimals } = result;
+  const { type, value } = result;
   if (value === null || value === undefined) {
     return null;
   }
@@ -91,13 +91,8 @@ function _toJsonNode(result: EvaluationResult, timeZone: string): unknown {
     case 'year':
       return new JsonRaw(String(value));
     case 'number':
-      return new JsonRaw(
-        typeof value === 'number' && decimals !== undefined
-          ? value.toFixed(decimals)
-          : String(value)
-      );
     case 'double':
-      return new JsonRaw(_formatDouble(Number(value)));
+      return new JsonRaw(String(value));
     case 'date':
       return convertString({ value, timeZone }) ?? '';
     case 'datetime':
@@ -112,11 +107,6 @@ function _toJsonNode(result: EvaluationResult, timeZone: string): unknown {
     default:
       return String(value);
   }
-}
-
-function _formatDouble(num: number): string {
-  const text = String(num);
-  return Number.isInteger(num) && !text.includes('e') ? `${text}.0` : text;
 }
 
 function _parseDoc(doc: EvaluationResult): unknown {

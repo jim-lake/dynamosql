@@ -220,11 +220,11 @@ export function getValue(
         result.type = 'longlong';
       }
     } else if (type === 'double_quote_string') {
-      result.value = expr.value;
-      result.name = `"${result.value}"`;
+      result.name = `"${expr.value}"`;
+      result.value = _unescapeLiteral(String(expr.value), '"');
     } else if (type === 'single_quote_string') {
-      result.value = expr.value;
-      result.name = `'${result.value}'`;
+      result.name = `'${expr.value}'`;
+      result.value = _unescapeLiteral(String(expr.value), "'");
     } else if (type === 'null') {
       result.value = null;
     } else if (type === 'bool') {
@@ -442,6 +442,26 @@ export function getValue(
     result.name = String(result.value);
   }
   return result;
+}
+const LITERAL_ESCAPES: Record<string, string> = {
+  '0': '\0',
+  b: '\b',
+  n: '\n',
+  r: '\r',
+  t: '\t',
+  Z: '\x1a',
+};
+function _unescapeLiteral(raw: string, quote: string): string {
+  const pattern = new RegExp(`${quote}${quote}|\\\\(.)`, 'gs');
+  return raw.replace(pattern, (match: string, char?: string) => {
+    if (char === undefined) {
+      return quote;
+    } else if (char === '%' || char === '_') {
+      return match;
+    } else {
+      return LITERAL_ESCAPES[char] ?? char;
+    }
+  });
 }
 function _decodeCell(cell: EngineValue | null | undefined): {
   type: ValueType;

@@ -151,6 +151,11 @@ async function _createTable(
       }
     }
   }
+  for (const name of primary_key) {
+    if (column_list.find((col) => col.name === name)?.mysqlType === 'JSON') {
+      throw new SQLError({ err: 'ER_JSON_USED_AS_KEY', args: [name] });
+    }
+  }
 
   let list: EvaluationResultRow[] | undefined;
   if (ast.as && ast.query_expr) {

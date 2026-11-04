@@ -76,6 +76,8 @@ export function mysqlStringToValueType(s: string): ValueType {
       return 'number';
     case 'BOOL':
       return 'bool';
+    case 'JSON':
+      return 'json';
     default:
       return 'string';
   }

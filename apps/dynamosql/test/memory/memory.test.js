@@ -10,4 +10,8 @@ describe('Temp', function () {
     path.join(__dirname, 'memory_edge_cases.sql'),
     { checkChanged: true }
   );
+  runTests('memory_json.sql', path.join(__dirname, 'memory_json.sql'), {
+    checkChanged: true,
+    verify_field_types: true,
+  });
 });

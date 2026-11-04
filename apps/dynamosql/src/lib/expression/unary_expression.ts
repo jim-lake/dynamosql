@@ -11,7 +11,7 @@ function plus(expr: Unary, state: EvaluationState): EvaluationResult {
 function not(expr: Unary, state: EvaluationState): EvaluationResult {
   const result = getValue(expr.expr, state);
   result.name = 'NOT ' + result.name;
-  result.type = 'longlong';
+  result.type = 'bool';
   if (!result.err && result.value !== null) {
     result.value = convertNum(result.value) ? 0 : 1;
   }

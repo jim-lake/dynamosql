@@ -167,6 +167,14 @@ const ERROR_MAP: Record<string, ErrorMapEntry> = {
     code: 'ER_CANT_AGGREGATE_2COLLATIONS',
     sqlMessage: errStr`Illegal mix of collations (${0}) and (${1}) for operation`,
   },
+  ER_INVALID_JSON_TEXT: {
+    code: 'ER_INVALID_JSON_TEXT',
+    sqlMessage: 'Invalid JSON text',
+  },
+  ER_JSON_USED_AS_KEY: {
+    code: 'ER_JSON_USED_AS_KEY',
+    sqlMessage: errStr`JSON column '${0}' cannot be used in key specification.`,
+  },
   ER_INVALID_JSON_TEXT_IN_PARAM: {
     code: 'ER_INVALID_JSON_TEXT_IN_PARAM',
     sqlMessage: errStr`Invalid JSON text in argument ${0} to function ${1}.`,

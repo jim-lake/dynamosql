@@ -64,6 +64,7 @@ function _transformRow(
   for (const column of column_list) {
     const cell = row[column.name_lc];
     if (cell !== undefined) {
+      _checkJsonText(column, cell.value);
       result[column.name_lc] = { type: cell.type, value: cell.value };
     } else if (column.defaultValue === undefined) {
       throw new SQLError({
@@ -75,6 +76,16 @@ function _transformRow(
     }
   }
   return result;
+}
+function _checkJsonText(column: MemoryColumnDef, value: unknown) {
+  if (column.type !== 'json' || typeof value !== 'string') {
+    return;
+  }
+  try {
+    JSON.parse(value);
+  } catch {
+    throw new SQLError({ err: 'ER_INVALID_JSON_TEXT' });
+  }
 }
 function _rowEqual(a: CellRow, b: CellRow): boolean {
   const keys_a = Object.keys(a);

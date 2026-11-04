@@ -70,7 +70,7 @@ export function inOp(expr: Binary, state: EvaluationState): EvaluationResult {
     err: null,
     value,
     name: `${left.name} IN (${names.join(', ')})`,
-    type: 'longlong',
+    type: 'bool',
   };
 }
 export function notIn(expr: Binary, state: EvaluationState): EvaluationResult {
@@ -223,7 +223,7 @@ function _equal(
       value = stringCompare(left_val, right_val, collation) === 0 ? 1 : 0;
     }
   }
-  return { err, value, name, type: 'longlong' };
+  return { err, value, name, type: 'bool' };
 }
 function _gt(
   expr_left: ExpressionValue | ExprList | ExtractFunc,
@@ -256,7 +256,7 @@ function _gt(
       value = stringCompare(left_val, right_val, collation) > 0 ? 1 : 0;
     }
   }
-  return { err, value, name, type: 'longlong' };
+  return { err, value, name, type: 'bool' };
 }
 function _gte(
   expr_left: ExpressionValue | ExprList | ExtractFunc,
@@ -292,7 +292,7 @@ function _gte(
       value = stringCompare(left_val, right_val, collation) >= 0 ? 1 : 0;
     }
   }
-  return { err, value, type: 'longlong', name };
+  return { err, value, type: 'bool', name };
 }
 function _isDateLike(value: unknown): value is SQLDate | SQLDateTime {
   return value instanceof SQLDate || value instanceof SQLDateTime;

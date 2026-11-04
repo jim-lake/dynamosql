@@ -79,6 +79,11 @@ export function convertType(def: Partial<ColumnDef>): FieldInfo {
         length = 4294967295;
         flags |= FIELD_FLAGS.BINARY | FIELD_FLAGS.BLOB;
         break;
+      case 'JSON':
+        type = Types.JSON;
+        charsetNr = COLLATIONS.UTF8MB4_GENERAL_CI;
+        length = 4294967295;
+        break;
       default:
         type = Types.VAR_STRING;
         break;
@@ -99,6 +104,11 @@ export function convertType(def: Partial<ColumnDef>): FieldInfo {
       case 'longlong':
         type = Types.LONGLONG;
         length = 66;
+        flags |= FIELD_FLAGS.BINARY;
+        break;
+      case 'bool':
+        type = Types.LONGLONG;
+        length = 1;
         flags |= FIELD_FLAGS.BINARY;
         break;
       case 'year':
