@@ -1,7 +1,7 @@
 import { arrayIndexToSQL, columnOffsetToSQL } from './column'
 import { collateToSQL } from './collate'
 import { exprToSQL, orderOrPartitionByToSQL } from './expr'
-import { arrayStructTypeToSQL, hasVal, identifierToSql, literalToSQL, toUpper } from './util'
+import { arrayStructTypeToSQL, dataTypeToSQL, hasVal, identifierToSql, literalToSQL, toUpper } from './util'
 import { overToSQL } from './over'
 
 function anyValueFuncToSQL(stmt) {
@@ -115,6 +115,19 @@ function withinGroupToSQL(stmt) {
   return [toUpper(type), toUpper(keyword), `(${orderOrPartitionByToSQL(orderby, 'order by')})`].filter(hasVal).join(' ')
 }
 
+function jsonOnClauseToSQL(clause) {
+  if (!clause) return
+  const { type, behavior, value } = clause
+  const behaviorSQL = behavior === 'DEFAULT' ? `DEFAULT ${exprToSQL(value)}` : behavior
+  return `${behaviorSQL} ${toUpper(type)}`
+}
+
+function jsonValueClausesToSQL(expr) {
+  const { returning, on_empty: onEmpty, on_error: onError } = expr
+  const returningSQL = returning && `RETURNING ${dataTypeToSQL(returning)}`
+  return [returningSQL, jsonOnClauseToSQL(onEmpty), jsonOnClauseToSQL(onError)].filter(hasVal).join(' ')
+}
+
 function funcToSQL(expr) {
   const { args, array_index, collate, name, args_parentheses, parentheses, within_group: withinGroup, over, suffix } = expr
   const overStr = overToSQL(over)
@@ -146,7 +159,7 @@ function funcToSQL(expr) {
   } else if (toUpper(funcName) === 'TRIM' && fromPosition > 0) {
     str.push([argsList.slice(0, fromPosition + 1).join(' '), argsList.slice(fromPosition + 1).join(', ')].join(' '))
   } else {
-    str.push(argsList.join(separator))
+    str.push([argsList.join(separator), jsonValueClausesToSQL(expr)].filter(hasVal).join(' '))
   }
   if (args_parentheses !== false) str.push(')')
   str.push(arrayIndexToSQL(array_index))
@@ -177,6 +190,7 @@ export {
   funcArgToSQL,
   funcToSQL,
   jsonObjectArgToSQL,
+  jsonOnClauseToSQL,
   lambdaToSQL,
   tablefuncFunToSQL,
 }

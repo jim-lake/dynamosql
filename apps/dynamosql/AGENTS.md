@@ -125,6 +125,10 @@ Development:
 - `@types/sqlstring`
 - Test tooling (`mocha`, `tsx`, `dotenv`) comes from the workspace root.
 
+## Parser Gaps
+
+- Whenever you find a legitimate mismatch between real MySQL 8.4 syntax and the node-sql-parser MySQL grammar, add a single concise line for it to `docs/PARSER_TODO.md`.
+
 ## Notes
 
 - The agent ALWAYS has DynamoDB access. Use the settings in `.env` (including `AWS_REGION`) for all development, testing, and investigation. Do not assume DynamoDB is unavailable, and do not report it as unavailable without checking `.env` first.

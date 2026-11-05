@@ -2,7 +2,7 @@
  * Generated type guards for "mysql.d.ts".
  * WARNING: Do not manually change this file.
  */
-import { With, Location, LocationRange, ParseOptions, Option, TableColumnAst, BaseFrom, Join, Values, TableExpr, Dual, From, LimitValue, Limit, OrderBy, ValueExpr, StringValue, OriginValue, DefaultValue, NumberValue, IntervalExprValue, SeparatorValue, SortDirection, ColumnRefItem, ColumnRef, SetList, InsertReplaceValue, Star, Case, Cast, AggrFunc, FunctionNameValue, FunctionName, Function, FulltextSearch, Column, Interval, Param, Var, Assign, Binary, Unary, Expr, ExtractFunc, ExpressionValue, ExprList, PartitionBy, WindowSpec, WindowFrameClause, AsWindowSpec, NamedWindowExpr, WindowExpr, Select, Insert_Replace, Update, Delete, Alter, AlterExpr, AlterColumnPosition, AlterAddColumn, AlterDropColumn, AlterModifyColumn, AlterChangeColumn, AlterRenameTable, AlterRenameColumn, AlterAddIndex, AlterDropIndex, AlterDropKey, AlterAddConstraint, AlterDropConstraint, AlterEnableConstraint, AlterDisableConstraint, AlterAddPartition, AlterDropPartition, AlterOperatePartition, AlterAlgorithm, AlterLock, AlterTableOption, Use, KeywordComment, CollateExpr, MysqlType, ConvertDataType, DataType, OnUpdateCurrentTimestamp, LiteralNotNull, LiteralNull, ColumnConstraint, ColumnDefinitionOptList, ReferenceDefinition, OnReference, CreateColumnDefinition, IndexType, IndexOption, CreateIndexDefinition, CreateFulltextSpatialIndexDefinition, ConstraintName, CreateConstraintPrimary, CreateConstraintUnique, CreateConstraintForeign, CreateConstraintCheck, CreateConstraintDefinition, CreateDefinition, CreateTable, DatabaseOption, CreateDatabase, CreateSchema, CreateIndex, CreateView, CreateTrigger, CreateUser, Create, TriggerEvent, UserAuthOption, RequireOption, ResourceOption, PasswordOption, TableOption, DropTable, DropDatabase, DropView, DropIndex, DropTrigger, Drop, ShowLogs, ShowTables, ShowSimple, ShowProcedureFunctionStatus, ShowBinlogEvents, ShowCharacterSet, ShowCollationDatabases, ShowColumnsIndexes, ShowCreateTable, ShowCreateView, ShowCreateEvent, ShowCreateTrigger, ShowCreateProcedure, ShowGrants, Show, Desc, Explain, Call, SetAssign, SetStatement, Lock, LockTable, Unlock, Grant, LoadData, LoadDataField, LoadDataLine, Truncate, Rename, Transaction, AST } from "./mysql";
+import { With, Location, LocationRange, ParseOptions, Option, TableColumnAst, BaseFrom, Join, Values, TableExpr, Dual, From, LimitValue, Limit, OrderBy, ValueExpr, StringValue, OriginValue, DefaultValue, NumberValue, IntervalExprValue, SeparatorValue, SortDirection, ColumnRefItem, ColumnRef, SetList, InsertReplaceValue, Star, Case, Cast, AggrFunc, FunctionNameValue, FunctionName, Function, JsonOnClause, JsonTable, JsonTableColumn, FulltextSearch, Column, Interval, Param, Var, Assign, Binary, Unary, Expr, ExtractFunc, ExpressionValue, ExprList, PartitionBy, WindowSpec, WindowFrameClause, AsWindowSpec, NamedWindowExpr, WindowExpr, Select, Insert_Replace, Update, Delete, Alter, AlterExpr, AlterColumnPosition, AlterAddColumn, AlterDropColumn, AlterModifyColumn, AlterChangeColumn, AlterRenameTable, AlterRenameColumn, AlterAddIndex, AlterDropIndex, AlterDropKey, AlterAddConstraint, AlterDropConstraint, AlterEnableConstraint, AlterDisableConstraint, AlterAddPartition, AlterDropPartition, AlterOperatePartition, AlterAlgorithm, AlterLock, AlterTableOption, Use, KeywordComment, CollateExpr, MysqlType, ConvertDataType, DataType, OnUpdateCurrentTimestamp, LiteralNotNull, LiteralNull, ColumnConstraint, ColumnDefinitionOptList, ReferenceDefinition, OnReference, CreateColumnDefinition, IndexType, IndexOption, CreateIndexDefinition, CreateFulltextSpatialIndexDefinition, ConstraintName, CreateConstraintPrimary, CreateConstraintUnique, CreateConstraintForeign, CreateConstraintCheck, CreateConstraintDefinition, CreateDefinition, CreateTable, DatabaseOption, CreateDatabase, CreateSchema, CreateIndex, CreateView, CreateTrigger, CreateUser, Create, TriggerEvent, UserAuthOption, RequireOption, ResourceOption, PasswordOption, TableOption, DropTable, DropDatabase, DropView, DropIndex, DropTrigger, Drop, ShowLogs, ShowTables, ShowSimple, ShowProcedureFunctionStatus, ShowBinlogEvents, ShowCharacterSet, ShowCollationDatabases, ShowColumnsIndexes, ShowCreateTable, ShowCreateView, ShowCreateEvent, ShowCreateTrigger, ShowCreateProcedure, ShowGrants, Show, Desc, Explain, Call, SetAssign, SetStatement, Lock, LockTable, Unlock, Grant, LoadData, LoadDataField, LoadDataLine, Truncate, Rename, Transaction, AST } from "./mysql";
 
 export function isWith(obj: unknown): obj is With {
     const typedObj = obj as With
@@ -229,6 +229,7 @@ export function isTableExpr(obj: unknown): obj is TableExpr {
             typeof typedObj === "object" ||
             typeof typedObj === "function") &&
         (isValues(typedObj["expr"]) as boolean ||
+            isJsonTable(typedObj["expr"]) as boolean ||
             (typedObj["expr"] !== null &&
                 typeof typedObj["expr"] === "object" ||
                 typeof typedObj["expr"] === "function") &&
@@ -693,7 +694,8 @@ export function isAggrFunc(obj: unknown): obj is AggrFunc {
             isParam(typedObj["args"]["expr"]) as boolean ||
             isVar(typedObj["args"]["expr"]) as boolean ||
             isBinary(typedObj["args"]["expr"]) as boolean ||
-            isUnary(typedObj["args"]["expr"]) as boolean) &&
+            isUnary(typedObj["args"]["expr"]) as boolean ||
+            isExprList(typedObj["args"]["expr"]) as boolean) &&
         (typeof typedObj["args"]["distinct"] === "undefined" ||
             typedObj["args"]["distinct"] === null ||
             typedObj["args"]["distinct"] === "DISTINCT") &&
@@ -779,8 +781,92 @@ export function isFunction(obj: unknown): obj is Function {
         (typeof typedObj["collate"] === "undefined" ||
             typedObj["collate"] === null ||
             isCollateExpr(typedObj["collate"]) as boolean) &&
+        (typeof typedObj["returning"] === "undefined" ||
+            typedObj["returning"] === null ||
+            isConvertDataType(typedObj["returning"]) as boolean) &&
+        (typeof typedObj["on_empty"] === "undefined" ||
+            typedObj["on_empty"] === null ||
+            isJsonOnClause(typedObj["on_empty"]) as boolean) &&
+        (typeof typedObj["on_error"] === "undefined" ||
+            typedObj["on_error"] === null ||
+            isJsonOnClause(typedObj["on_error"]) as boolean) &&
         (typeof typedObj["loc"] === "undefined" ||
             isLocationRange(typedObj["loc"]) as boolean)
+    )
+}
+
+export function isJsonOnClause(obj: unknown): obj is JsonOnClause {
+    const typedObj = obj as JsonOnClause
+    return (
+        (typedObj !== null &&
+            typeof typedObj === "object" ||
+            typeof typedObj === "function") &&
+        (typedObj["type"] === "on empty" ||
+            typedObj["type"] === "on error") &&
+        (typedObj["behavior"] === "ERROR" ||
+            typedObj["behavior"] === "NULL" ||
+            typedObj["behavior"] === "DEFAULT") &&
+        (typedObj["value"] === null ||
+            isTableColumnAst(typedObj["value"]) as boolean ||
+            isValueExpr(typedObj["value"]) as boolean ||
+            isColumnRefItem(typedObj["value"]) as boolean ||
+            isCase(typedObj["value"]) as boolean ||
+            isCast(typedObj["value"]) as boolean ||
+            isAggrFunc(typedObj["value"]) as boolean ||
+            isFunction(typedObj["value"]) as boolean ||
+            isInterval(typedObj["value"]) as boolean ||
+            isParam(typedObj["value"]) as boolean ||
+            isVar(typedObj["value"]) as boolean ||
+            isBinary(typedObj["value"]) as boolean ||
+            isUnary(typedObj["value"]) as boolean)
+    )
+}
+
+export function isJsonTable(obj: unknown): obj is JsonTable {
+    const typedObj = obj as JsonTable
+    return (
+        (typedObj !== null &&
+            typeof typedObj === "object" ||
+            typeof typedObj === "function") &&
+        typedObj["type"] === "json_table" &&
+        isExpressionValue(typedObj["json"]) as boolean &&
+        isStringValue(typedObj["path"]) as boolean &&
+        Array.isArray(typedObj["columns"]) &&
+        typedObj["columns"].every((e: any) =>
+            isJsonTableColumn(e) as boolean
+        )
+    )
+}
+
+export function isJsonTableColumn(obj: unknown): obj is JsonTableColumn {
+    const typedObj = obj as JsonTableColumn
+    return (
+        ((typedObj !== null &&
+            typeof typedObj === "object" ||
+            typeof typedObj === "function") &&
+            typedObj["type"] === "ordinality" &&
+            typeof typedObj["name"] === "string" ||
+            (typedObj !== null &&
+                typeof typedObj === "object" ||
+                typeof typedObj === "function") &&
+            typedObj["type"] === "nested" &&
+            isStringValue(typedObj["path"]) as boolean &&
+            Array.isArray(typedObj["columns"]) &&
+            typedObj["columns"].every((e: any) =>
+                isJsonTableColumn(e) as boolean
+            ) ||
+            (typedObj !== null &&
+                typeof typedObj === "object" ||
+                typeof typedObj === "function") &&
+            typedObj["type"] === "column" &&
+            typeof typedObj["name"] === "string" &&
+            isDataType(typedObj["datatype"]) as boolean &&
+            typeof typedObj["exists"] === "boolean" &&
+            isStringValue(typedObj["path"]) as boolean &&
+            (typedObj["on_empty"] === null ||
+                isJsonOnClause(typedObj["on_empty"]) as boolean) &&
+            (typedObj["on_error"] === null ||
+                isJsonOnClause(typedObj["on_error"]) as boolean))
     )
 }
 
@@ -2618,7 +2704,9 @@ export function isConvertDataType(obj: unknown): obj is ConvertDataType {
             typedObj["dataType"] === "GEOMETRYCOLLECTION" ||
             typedObj["dataType"] === "VECTOR" ||
             typedObj["dataType"] === "SIGNED" ||
-            typedObj["dataType"] === "UNSIGNED") &&
+            typedObj["dataType"] === "UNSIGNED" ||
+            typedObj["dataType"] === "SIGNED INTEGER" ||
+            typedObj["dataType"] === "UNSIGNED INTEGER") &&
         (typeof typedObj["length"] === "undefined" ||
             typedObj["length"] === null ||
             typeof typedObj["length"] === "number") &&

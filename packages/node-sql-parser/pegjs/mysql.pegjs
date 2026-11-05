@@ -286,6 +286,8 @@
     sum: true,
     count: true,
     convert: true,
+    json_arrayagg: true,
+    json_objectagg: true,
     max: true,
     min: true,
     group_concat: true,
@@ -2546,6 +2548,12 @@ table_base
         type: 'dual'
       };
   }
+  / t:json_table_func __ alias:alias_clause {
+      return {
+        expr: t,
+        as: alias,
+      };
+    }
   / t:table_name __ alias:alias_clause? {
       if (t.type === 'var') {
         t.as = alias;
@@ -3066,6 +3074,12 @@ comparison_op_right
   / is_op_right
   / like_op_right
   / regexp_op_right
+  / member_of_op_right
+
+member_of_op_right
+  = 'MEMBER'i !ident_part __ 'OF'i !ident_part __ LPAREN __ e:expr __ RPAREN {
+    return { op: 'MEMBER OF', right: { type: 'expr_list', value: [e], parentheses: true } };
+  }
 
 arithmetic_op_right
   = l:(__ arithmetic_comparison_operator __ additive_expr)+ __ i:in_op_right? {
@@ -3351,12 +3365,24 @@ param
 aggr_func
   = aggr_fun_count
   / aggr_fun_smma
+  / aggr_fun_json
 
 aggr_fun_smma
-  = name:KW_SUM_MAX_MIN_AVG  __ LPAREN __ e:or_and_expr __ RPAREN __ bc:over_partition? {
+  = name:KW_SUM_MAX_MIN_AVG  __ LPAREN __ d:KW_DISTINCT? __ e:or_and_expr __ RPAREN __ bc:over_partition? {
       return {
         type: 'aggr_func',
         name: name,
+        args: d ? { distinct: d, expr: e } : { expr: e },
+        over: bc,
+        ...getLocationObject(),
+      };
+    }
+
+aggr_fun_json
+  = name:'JSON_ARRAYAGG'i !ident_part __ LPAREN __ e:json_agg_arg __ RPAREN __ bc:over_partition? {
+      return {
+        type: 'aggr_func',
+        name: 'JSON_ARRAYAGG',
         args: {
           expr: e
         },
@@ -3364,6 +3390,20 @@ aggr_fun_smma
         ...getLocationObject(),
       };
     }
+  / name:'JSON_OBJECTAGG'i !ident_part __ LPAREN __ k:json_agg_arg __ COMMA __ v:json_agg_arg __ RPAREN __ bc:over_partition? {
+      return {
+        type: 'aggr_func',
+        name: 'JSON_OBJECTAGG',
+        args: {
+          expr: { type: 'expr_list', value: [k, v] }
+        },
+        over: bc,
+        ...getLocationObject(),
+      };
+    }
+
+json_agg_arg
+  = e:or_and_expr &{ return !(e.expr && e.expr.column === '*') } { return e; }
 
 KW_SUM_MAX_MIN_AVG
   = KW_SUM / KW_MAX / KW_MIN / KW_AVG
@@ -3640,6 +3680,7 @@ func_call
         ...getLocationObject(),
     };
   }
+  / json_value_func
   / name:scalar_func __ LPAREN __ l:expr_list? __ RPAREN __ bc:over_partition? {
       return {
         type: 'function',
@@ -3668,6 +3709,80 @@ func_call
         ...getLocationObject(),
       };
     }
+json_value_func
+  = n:'JSON_VALUE'i !ident_part __ LPAREN __ json:expr __ COMMA __ path:expr __ returning:json_returning? __ clauses:json_value_on_clauses __ RPAREN {
+    return {
+      type: 'function',
+      name: { name: [{ type: 'default', value: n }] },
+      args: { type: 'expr_list', value: [json, path] },
+      returning,
+      on_empty: clauses.on_empty,
+      on_error: clauses.on_error,
+      over: null,
+      ...getLocationObject(),
+    };
+  }
+
+json_returning
+  = 'RETURNING'i !ident_part __ s:signedness t:(__ KW_INTEGER)? {
+    return { type: 'datatype', dataType: s + (t ? ' INTEGER' : '') };
+  }
+  / 'RETURNING'i !ident_part __ d:data_type {
+    return { type: 'datatype', ...d };
+  }
+
+json_value_on_clauses
+  = empty:(c:json_on_clause &{ return c.type === 'on empty' } { return c })? __ err:(c:json_on_clause &{ return c.type === 'on error' } { return c })? {
+    return { on_empty: empty, on_error: err };
+  }
+
+json_table_on_clauses
+  = a:json_on_clause b:(__ json_on_clause)? &{ return !b || b[1].type !== a.type } {
+    const clauses = b ? [a, b[1]] : [a];
+    return {
+      on_empty: clauses.find(c => c.type === 'on empty') || null,
+      on_error: clauses.find(c => c.type === 'on error') || null,
+    };
+  }
+  / "" { return { on_empty: null, on_error: null }; }
+
+json_on_clause
+  = b:json_on_behavior __ KW_ON __ k:('EMPTY'i / 'ERROR'i) !ident_part {
+    return { type: 'on ' + k.toLowerCase(), behavior: b.behavior, value: b.value };
+  }
+
+json_on_behavior
+  = 'ERROR'i !ident_part { return { behavior: 'ERROR', value: null }; }
+  / 'NULL'i !ident_part { return { behavior: 'NULL', value: null }; }
+  / 'DEFAULT'i !ident_part __ v:json_default_value { return { behavior: 'DEFAULT', value: v }; }
+
+json_default_value
+  = literal_string
+  / literal_bool
+  / literal_numeric
+  / sign:'-' __ n:literal_numeric { return createUnaryExpr(sign, n); }
+
+json_table_func
+  = 'JSON_TABLE'i !ident_part __ LPAREN __ json:expr __ COMMA __ path:literal_string __ 'COLUMNS'i !ident_part __ LPAREN __ columns:json_table_column_list __ RPAREN __ RPAREN {
+    return { type: 'json_table', json, path, columns };
+  }
+
+json_table_column_list
+  = head:json_table_column tail:(__ COMMA __ json_table_column)* {
+    return createList(head, tail);
+  }
+
+json_table_column
+  = name:column __ 'FOR'i !ident_part __ 'ORDINALITY'i !ident_part {
+    return { type: 'ordinality', name };
+  }
+  / 'NESTED'i !ident_part __ ('PATH'i !ident_part __)? path:literal_string __ 'COLUMNS'i !ident_part __ LPAREN __ columns:json_table_column_list __ RPAREN {
+    return { type: 'nested', path, columns };
+  }
+  / name:column __ datatype:data_type __ exists:('EXISTS'i !ident_part __)? 'PATH'i !ident_part __ path:literal_string __ clauses:json_table_on_clauses {
+    return { type: 'column', name, datatype, exists: exists !== null, path, on_empty: clauses.on_empty, on_error: clauses.on_error };
+  }
+
 scalar_time_func
   = KW_CURRENT_DATE
   / KW_CURRENT_TIME

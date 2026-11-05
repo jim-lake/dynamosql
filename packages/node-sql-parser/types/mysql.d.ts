@@ -76,7 +76,7 @@ export interface TableExpr {
     columnList: string[];
     ast: Select;
     parentheses: boolean;
-  } | Values;
+  } | Values | JsonTable;
   as: string | null;
   prefix?: string;
 }
@@ -217,7 +217,7 @@ export interface AggrFunc {
   type: "aggr_func";
   name: string;
   args: {
-    expr: ExpressionValue | Star;
+    expr: ExpressionValue | Star | ExprList;
     distinct?: "DISTINCT" | null;
     orderby?: OrderBy[] | null;
     parentheses?: boolean;
@@ -242,8 +242,44 @@ export interface Function {
   args?: ExprList | null;
   over?: { type: 'window'; as_window_specification: AsWindowSpec } | OnUpdateCurrentTimestamp | null;
   collate?: CollateExpr | null;
+  /** JSON_VALUE only: the RETURNING type. */
+  returning?: ConvertDataType | null;
+  /** JSON_VALUE only: the ON EMPTY behavior. */
+  on_empty?: JsonOnClause | null;
+  /** JSON_VALUE only: the ON ERROR behavior. */
+  on_error?: JsonOnClause | null;
   loc?: LocationRange;
 }
+
+/** ON EMPTY or ON ERROR behavior of JSON_VALUE and JSON_TABLE columns. */
+export type JsonOnClause = {
+  type: "on empty" | "on error";
+  behavior: "ERROR" | "NULL" | "DEFAULT";
+  /** Literal or negated number after DEFAULT. Null for ERROR and NULL. */
+  value: ExpressionValue | null;
+};
+
+/** JSON_TABLE(json, path COLUMNS (...)) in a FROM clause. */
+export interface JsonTable {
+  type: "json_table";
+  json: ExpressionValue;
+  path: StringValue;
+  columns: JsonTableColumn[];
+}
+
+export type JsonTableColumn =
+  | { type: "ordinality"; name: string }
+  | { type: "nested"; path: StringValue; columns: JsonTableColumn[] }
+  | {
+      type: "column";
+      name: string;
+      datatype: DataType;
+      /** True for `name type EXISTS PATH path`. */
+      exists: boolean;
+      path: StringValue;
+      on_empty: JsonOnClause | null;
+      on_error: JsonOnClause | null;
+    };
 export interface FulltextSearch {
   type: "fulltext_search";
   match: "match";
@@ -679,7 +715,7 @@ export type MysqlType =
 
 export type ConvertDataType = {
   type: "datatype";
-  dataType: MysqlType | "SIGNED" | "UNSIGNED";
+  dataType: MysqlType | "SIGNED" | "UNSIGNED" | "SIGNED INTEGER" | "UNSIGNED INTEGER";
   length?: number | null;
   parentheses?: true;
   scale?: number | null;

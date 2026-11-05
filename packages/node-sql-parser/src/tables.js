@@ -1,9 +1,10 @@
 import { binaryToSQL } from './binary'
 import { columnRefToSQL } from './column'
 import { exprToSQL } from './expr'
+import { jsonOnClauseToSQL } from './func'
 import { valuesToSQL } from './insert'
 import { intervalToSQL } from './interval'
-import { commonOptionConnector, commonTypeValue, hasVal, identifierToSql, literalToSQL, toUpper } from './util'
+import { commonOptionConnector, commonTypeValue, dataTypeToSQL, hasVal, identifierToSql, literalToSQL, toUpper } from './util'
 
 function unnestToSQL(unnestExpr) {
   const { type, as, expr, with_offset: withOffset } = unnestExpr
@@ -112,6 +113,18 @@ function generateVirtualTable(stmt) {
   return `${toUpper(keyword)}(${toUpper(type)}(${generatorSQL}))`
 }
 
+function jsonTableColumnToSQL(column) {
+  const { type, name, path, columns, datatype, exists, on_empty: onEmpty, on_error: onError } = column
+  if (type === 'ordinality') return `${identifierToSql(name)} FOR ORDINALITY`
+  if (type === 'nested') return `NESTED PATH ${literalToSQL(path)} COLUMNS (${columns.map(jsonTableColumnToSQL).join(', ')})`
+  return [identifierToSql(name), dataTypeToSQL(datatype), exists && 'EXISTS', 'PATH', literalToSQL(path), jsonOnClauseToSQL(onEmpty), jsonOnClauseToSQL(onError)].filter(hasVal).join(' ')
+}
+
+function jsonTableToSQL(jsonTable) {
+  const { json, path, columns } = jsonTable
+  return `JSON_TABLE(${exprToSQL(json)}, ${literalToSQL(path)} COLUMNS (${columns.map(jsonTableColumnToSQL).join(', ')}))`
+}
+
 function tableToSQL(tableInfo) {
   if (toUpper(tableInfo.type) === 'UNNEST') return unnestToSQL(tableInfo)
   const { table, db, as, expr, operator, prefix: prefixStr, schema, server, suffix, tablesample, temporal_table, table_hint, surround = {} } = tableInfo
@@ -135,6 +148,9 @@ function tableToSQL(tableInfo) {
         break
       case 'generator':
         tableName = generateVirtualTable(expr)
+        break
+      case 'json_table':
+        tableName = jsonTableToSQL(expr)
         break
       default:
         tableName = exprToSQL(expr)

@@ -64,6 +64,7 @@ tsx --test test/types/**.spec.ts
 - `delete.spec.ts` - Tests for DELETE statement types
 - `expressions.spec.ts` - Tests for expression types (functions, aggregates, CASE, CAST)
 - `joins.spec.ts` - Tests for JOIN types
+- `json-table-and-aggregates.spec.ts` - Tests for JSON_VALUE RETURNING and ON EMPTY/ON ERROR, MEMBER OF, DISTINCT in SUM/AVG/MIN/MAX, JSON_ARRAYAGG/JSON_OBJECTAGG, and JSON_TABLE
 
 ## How It Works
 
