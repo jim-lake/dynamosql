@@ -12,6 +12,9 @@
     "lint": "npm run lint --workspaces",
     "test": "npm run test --workspace=apps/dynamosql"
   },
+  "allowScripts": {
+    "esbuild@0.28.2": true
+  },
   "repository": {
     "type": "git",
     "url": "git+ssh://git@github.com/jim-lake/dynamosql.git"

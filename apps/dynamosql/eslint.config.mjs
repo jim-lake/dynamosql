@@ -29,6 +29,7 @@ export default tseslint.config(
     plugins: { local: localPlugin, import: importPlugin },
     rules: {
       'no-console': 'error',
+      'local/no-bare-node-sql-parser': 'error',
       'local/local-snake-case': [
         0,
         { exclude: [/^affectedRows$/, /^changedRows$/] },
