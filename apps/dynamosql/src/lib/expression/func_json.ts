@@ -835,7 +835,7 @@ export function json_storage_size(
   const node = _parseDocument(doc, 'json_storage_size');
   return {
     err: null,
-    value: Buffer.byteLength(JSON.stringify(node)),
+    value: JSON.stringify(node).length,
     type: 'longlong',
   };
 }
