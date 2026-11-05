@@ -1,0 +1,49 @@
+import { columnsToSQL } from './column'
+import { exprToSQL, orderOrPartitionByToSQL } from './expr'
+import { limitToSQL } from './limit'
+import { arrayStructTypeToSQL, hasVal, toUpper } from './util'
+
+function arrayExprListToSQL(expr) {
+  const {
+    array_path: arrayPath,
+    brackets,
+    expr_list: exprList,
+    parentheses,
+  } = expr
+  if (!exprList) return `[${columnsToSQL(arrayPath)}]`
+  const result = Array.isArray(exprList) ? exprList.map(col => `(${columnsToSQL(col)})`).filter(hasVal).join(', ') : exprToSQL(exprList)
+  if (brackets) return `[${result}]`
+  return parentheses ? `(${result})` : result
+}
+
+function arrayStructValueToSQL(expr) {
+  const {
+    expr_list: exprList,
+    type,
+  } = expr
+  switch (toUpper(type)) {
+    case 'STRUCT':
+    case 'ROW':
+      return `(${columnsToSQL(exprList)})`
+    case 'ARRAY':
+      return arrayExprListToSQL(expr)
+    default:
+      return ''
+  }
+}
+
+function arrayStructExprToSQL(expr) {
+  const { definition, keyword, orderby, limit } = expr
+  const result = [toUpper(keyword)]
+  if (definition && typeof definition === 'object') {
+    result.length = 0
+    result.push(arrayStructTypeToSQL(definition))
+  }
+  result.push(arrayStructValueToSQL(expr), orderOrPartitionByToSQL(orderby, 'order by'), limitToSQL(limit))
+  return result.filter(hasVal).join('')
+}
+
+export {
+  arrayStructExprToSQL,
+  arrayStructValueToSQL,
+}

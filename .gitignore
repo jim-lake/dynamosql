@@ -1,0 +1,10 @@
+node_modules/
+build/
+coverage/
+.nyc_output/
+.coveralls.yml
+bower_components/
+umd/
+output/
+.DS_Store
+AGENTS.md
