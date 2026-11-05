@@ -24,13 +24,13 @@ SELECT id, LEFT(name, 3) AS name_prefix FROM _dynamodb.users ORDER BY id LIMIT 3
 SELECT id, LOWER(name) AS lowercase_name FROM _dynamodb.users ORDER BY id LIMIT 3;
 
 -- Test SELECT with NOW()
-SELECT NOW() AS current_timestamp;
+SELECT NOW() AS `current_timestamp`;
 
 -- Test SELECT with CURDATE()
-SELECT CURDATE() AS current_date;
+SELECT CURDATE() AS `current_date`;
 
 -- Test SELECT with CURTIME()
-SELECT CURTIME() AS current_time;
+SELECT CURTIME() AS `current_time`;
 
 -- Test SELECT with DATE()
 SELECT DATE(NOW()) AS today;

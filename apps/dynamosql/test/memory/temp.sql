@@ -1,19 +1,20 @@
 CREATE DATABASE IF NOT EXISTS mem_test;
 CREATE TEMPORARY TABLE mem_test.bar (id INT PRIMARY KEY, comment VARCHAR(256));
-LIST TABLES;
+USE mem_test;
+SHOW TABLES;
 
 INSERT INTO mem_test.bar SET id = 4, comment = "foobar";
 SELECT id, comment FROM mem_test.bar ORDER BY id;
 INSERT INTO mem_test.bar SET id = 3, comment = "3 foobar";
 SELECT id, comment FROM mem_test.bar ORDER BY id;
-UPDATE FROM mem_test.bar SET comment = "barbar" WHERE id = 4;
+UPDATE mem_test.bar SET comment = "barbar" WHERE id = 4;
 SELECT id, comment FROM mem_test.bar ORDER BY id;
 DELETE FROM mem_test.bar WHERE id = 3;
 SELECT id, comment FROM mem_test.bar ORDER BY id;
 
 USE mem_test;
 CREATE TEMPORARY TABLE foo (id INT PRIMARY KEY, comment VARCHAR(256));
-LIST TABLES;
+SHOW TABLES;
 INSERT INTO foo (id, comment) VALUES (1, "1 comment"), (2, "2 comment");
 SELECT id, comment FROM foo ORDER BY id;
 SELECT id, comment FROM mem_test.foo ORDER BY id;

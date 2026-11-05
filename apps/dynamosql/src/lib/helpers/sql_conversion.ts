@@ -229,7 +229,7 @@ export function convertTime(params: ConvertTimeParams): SQLTime | null {
     if (time === undefined) {
       return null;
     } else {
-      return createSQLTime({ time, decimals });
+      return createSQLTime({ time, decimals: decimals ?? getDecimals(value) });
     }
   } else if (typeof value === 'number') {
     const time = _numToTime(value);
