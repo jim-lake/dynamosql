@@ -3,7 +3,7 @@ import { createSQLInterval } from '../types/sql_interval';
 import { getValue } from './evaluate';
 
 import type { EvaluationState, EvaluationResult } from './evaluate';
-import type { Interval } from 'node-sql-parser';
+import type { Interval } from 'node-sql-parser/build/mysql';
 
 function interval(expr: Interval, state: EvaluationState): EvaluationResult {
   const result = getValue(expr.expr, state);

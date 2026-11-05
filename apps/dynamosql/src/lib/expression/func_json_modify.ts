@@ -7,7 +7,7 @@ import { _arrayIndex, _parsePath } from './func_json_common';
 
 import type { EvaluationState, EvaluationResult } from './evaluate';
 import type { PathSegment } from './func_json_common';
-import type { Function } from 'node-sql-parser';
+import type { Function } from 'node-sql-parser/build/mysql';
 
 type AssignMode = 'set' | 'insert' | 'replace';
 

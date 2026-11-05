@@ -13,7 +13,7 @@ import type {
   Star,
   Assign,
   OriginValue,
-} from 'node-sql-parser';
+} from 'node-sql-parser/build/mysql';
 
 function isExpressionValue(
   expr: ExpressionValue | ExtractFunc | Star | FulltextSearch | Assign

@@ -3,7 +3,7 @@ import { convertNum } from '../helpers/sql_conversion';
 import { getValue } from './evaluate';
 
 import type { EvaluationState, EvaluationResult } from './evaluate';
-import type { AggrFunc } from 'node-sql-parser';
+import type { AggrFunc } from 'node-sql-parser/build/mysql';
 
 function sum(expr: AggrFunc, state: EvaluationState): EvaluationResult {
   const { row, ...other } = state;

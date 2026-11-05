@@ -25,7 +25,7 @@ import type {
   RowListResult,
   QueryTableInfo,
 } from '../index';
-import type { BaseFrom } from 'node-sql-parser';
+import type { BaseFrom } from 'node-sql-parser/build/mysql';
 
 export async function getRowList(
   params: RowListParams

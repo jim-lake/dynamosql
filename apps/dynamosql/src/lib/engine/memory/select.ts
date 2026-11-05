@@ -3,7 +3,7 @@ import { SQLError } from '../../../error';
 import * as Storage from './storage';
 
 import type { QueryTableInfo, RowListParams, Row, RowListResult } from '..';
-import type { BaseFrom } from 'node-sql-parser';
+import type { BaseFrom } from 'node-sql-parser/build/mysql';
 
 export async function getRowList(
   params: RowListParams

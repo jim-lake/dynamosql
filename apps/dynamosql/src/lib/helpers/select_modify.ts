@@ -7,7 +7,7 @@ import { internalQuery } from '../select_handler';
 import type { EngineValue } from '../engine';
 import type { RequestInfo } from './column_ref_helper';
 import type { HandlerParams, SourceRowResult } from '../handler_types';
-import type { Select, Delete, From, Update } from 'node-sql-parser';
+import type { Select, Delete, From, Update } from 'node-sql-parser/build/mysql';
 
 export interface KeyRowResult {
   key: EngineValue[];

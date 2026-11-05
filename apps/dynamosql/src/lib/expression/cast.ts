@@ -9,7 +9,7 @@ import { SQLJson } from '../types/sql_json';
 import { getValue } from './evaluate';
 
 import type { EvaluationState, EvaluationResult } from './evaluate';
-import type { Cast } from 'node-sql-parser';
+import type { Cast } from 'node-sql-parser/build/mysql';
 
 interface CastTarget {
   dataType: string;

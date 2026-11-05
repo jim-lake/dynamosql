@@ -9,7 +9,7 @@ import * as TransactionManager from './transaction_manager';
 
 import type { Engine, EvaluationResultRow } from './engine';
 import type { HandlerParams, AffectedResult } from './handler_types';
-import type { Insert_Replace, SetList } from 'node-sql-parser';
+import type { Insert_Replace, SetList } from 'node-sql-parser/build/mysql';
 
 interface ErrorWithDetails {
   message?: string;

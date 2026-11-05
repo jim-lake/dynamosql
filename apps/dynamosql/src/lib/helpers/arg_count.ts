@@ -2,7 +2,7 @@ import { SQLError } from '../../error';
 
 import { getFunctionName } from './ast_helper';
 
-import type { Function } from 'node-sql-parser';
+import type { Function } from 'node-sql-parser/build/mysql';
 
 export function assertArgCount(
   expr: Function,

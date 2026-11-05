@@ -20,7 +20,11 @@ import type { HandlerParams, AffectedResult } from './handler_types';
 import type { FieldInfo } from '../types';
 import type { EvaluationResult } from './expression';
 import type { CHARSETS } from '../constants/mysql';
-import type { Create, CreateTable, CreateDatabase } from 'node-sql-parser';
+import type {
+  Create,
+  CreateTable,
+  CreateDatabase,
+} from 'node-sql-parser/build/mysql';
 
 function isCreateDatabase(ast: Create): ast is CreateDatabase {
   return ast.keyword === 'database';

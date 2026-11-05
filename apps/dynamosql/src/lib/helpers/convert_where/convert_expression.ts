@@ -3,7 +3,7 @@ import { getValue } from '../../expression';
 import { convertWhere } from './convert_where';
 
 import type { ConvertWhereState, ConvertResult } from './convert_where';
-import type { ExpressionValue, Binary } from 'node-sql-parser';
+import type { ExpressionValue, Binary } from 'node-sql-parser/build/mysql';
 
 type ConvertFunc = (
   expr: ExpressionValue,

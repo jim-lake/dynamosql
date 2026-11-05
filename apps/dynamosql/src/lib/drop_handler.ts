@@ -5,7 +5,7 @@ import { SQLError } from '../error';
 import * as SchemaManager from './schema_manager';
 
 import type { HandlerParams } from './handler_types';
-import type { Drop } from 'node-sql-parser';
+import type { Drop } from 'node-sql-parser/build/mysql';
 
 export async function query(params: HandlerParams<Drop>): Promise<void> {
   const { ast, session, dynamodb } = params;

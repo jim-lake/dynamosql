@@ -11,7 +11,7 @@ import { SQLDateTime, createSQLDateTime } from '../types/sql_datetime';
 import { getValue } from './evaluate';
 
 import type { EvaluationState, EvaluationResult } from './evaluate';
-import type { Function } from 'node-sql-parser';
+import type { Function } from 'node-sql-parser/build/mysql';
 
 export function now(expr: Function, state: EvaluationState): EvaluationResult {
   assertArgCount(expr, 0, 1);

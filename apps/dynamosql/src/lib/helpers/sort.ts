@@ -9,7 +9,7 @@ import type { FieldInfo } from '../../types';
 import type { EvaluationState } from '../expression';
 import type { SourceRowResult } from '../handler_types';
 import type { QueryColumn } from '../helpers/query_columns';
-import type { OrderBy } from 'node-sql-parser';
+import type { OrderBy } from 'node-sql-parser/build/mysql';
 
 export interface SortParams {
   iter: AsyncIterableIterator<SourceRowResult[]>;

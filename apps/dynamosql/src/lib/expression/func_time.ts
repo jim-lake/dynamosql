@@ -5,7 +5,7 @@ import { createSQLTime } from '../types/sql_time';
 import { getValue } from './evaluate';
 
 import type { EvaluationState, EvaluationResult } from './evaluate';
-import type { Function } from 'node-sql-parser';
+import type { Function } from 'node-sql-parser/build/mysql';
 
 const DAY = 24 * 60 * 60;
 

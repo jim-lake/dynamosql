@@ -41,7 +41,7 @@ import type {
   ValueExpr,
   Interval as IntervalType,
   ColumnRef,
-} from 'node-sql-parser';
+} from 'node-sql-parser/build/mysql';
 
 export interface EvaluationState {
   session: Session;

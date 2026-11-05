@@ -17,7 +17,7 @@ import type {
   ConvertDataType,
   ColumnRef,
   From,
-} from 'node-sql-parser';
+} from 'node-sql-parser/build/mysql';
 
 export interface ConvertWhereState {
   session: Session;

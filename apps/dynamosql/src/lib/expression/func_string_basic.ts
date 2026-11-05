@@ -4,7 +4,7 @@ import { convertNum, convertString } from '../helpers/sql_conversion';
 import { getValue } from './evaluate';
 
 import type { EvaluationState, EvaluationResult } from './evaluate';
-import type { Function } from 'node-sql-parser';
+import type { Function } from 'node-sql-parser/build/mysql';
 
 export function length(
   expr: Function,

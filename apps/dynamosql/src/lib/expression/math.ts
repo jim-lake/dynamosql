@@ -12,7 +12,7 @@ import { getValue } from './evaluate';
 
 import type { EvaluationState, EvaluationResult } from './evaluate';
 import type { ValueType } from '../types/value_type';
-import type { Binary } from 'node-sql-parser';
+import type { Binary } from 'node-sql-parser/build/mysql';
 
 function isSQLInterval(value: unknown): value is SQLInterval {
   return value instanceof SQLInterval;

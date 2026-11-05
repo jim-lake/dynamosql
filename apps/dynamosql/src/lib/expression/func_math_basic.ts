@@ -6,7 +6,7 @@ import { modHelper } from './math';
 
 import type { EvaluationState, EvaluationResult } from './evaluate';
 import type { ValueType } from '../types/value_type';
-import type { Function } from 'node-sql-parser';
+import type { Function } from 'node-sql-parser/build/mysql';
 
 export function abs(expr: Function, state: EvaluationState): EvaluationResult {
   assertArgCount(expr, 1);

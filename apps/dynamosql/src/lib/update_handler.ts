@@ -12,7 +12,7 @@ import type { UpdateChange, EngineValue } from './engine';
 import type { EvaluationResult } from './expression';
 import type { HandlerParams, ChangedResult } from './handler_types';
 import type { RequestInfo } from './helpers/column_ref_helper';
-import type { From, BaseFrom, Update } from 'node-sql-parser';
+import type { From, BaseFrom, Update } from 'node-sql-parser/build/mysql';
 
 export interface SetListWithValue {
   column: string;

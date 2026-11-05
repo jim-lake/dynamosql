@@ -12,7 +12,7 @@ import type {
   ExprList,
   ExtractFunc,
   FulltextSearch,
-} from 'node-sql-parser';
+} from 'node-sql-parser/build/mysql';
 
 export enum COERCIBILITY {
   EXPLICIT = 0,

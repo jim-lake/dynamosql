@@ -1,5 +1,5 @@
-import type { MysqlType } from 'node-sql-parser';
-export type { MysqlType } from 'node-sql-parser';
+import type { MysqlType } from 'node-sql-parser/build/mysql';
+export type { MysqlType } from 'node-sql-parser/build/mysql';
 
 export type ValueType =
   | 'null'

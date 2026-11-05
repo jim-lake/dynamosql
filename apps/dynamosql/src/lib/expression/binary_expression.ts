@@ -11,7 +11,7 @@ import type {
   ExpressionValue,
   ExprList,
   ExtractFunc,
-} from 'node-sql-parser';
+} from 'node-sql-parser/build/mysql';
 
 function isExprList(
   value: ExpressionValue | ExprList | ExtractFunc

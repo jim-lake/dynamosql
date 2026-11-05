@@ -20,7 +20,7 @@ import { Types } from './types';
 import type { AffectedResult, ChangedResult } from './lib/handler_types';
 import type { Session, QueryParams } from './session';
 import type { FieldInfo, OkPacket, TypeCast, QueryListResult } from './types';
-import type { AST, Use } from 'node-sql-parser';
+import type { AST, Use } from 'node-sql-parser/build/mysql';
 import type { Readable, ReadableOptions } from 'node:stream';
 
 const g_parser = new Parser();
@@ -300,7 +300,7 @@ interface PegError {
 function _astify(sql: string): AST[] {
   let list: AST[] = [];
   try {
-    const result = g_parser.astify(sql, { database: 'MySQL' }) as AST[] | AST;
+    const result = g_parser.astify(sql, { database: 'MySQL' });
     if (Array.isArray(result)) {
       list = result;
     } else {

@@ -181,7 +181,7 @@ import {
 } from './func_time';
 
 import type { EvaluationState, EvaluationResult } from './evaluate';
-import type { Function } from 'node-sql-parser';
+import type { Function } from 'node-sql-parser/build/mysql';
 
 export const methods: Record<
   string,

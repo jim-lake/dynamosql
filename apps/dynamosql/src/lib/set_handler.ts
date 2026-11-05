@@ -15,7 +15,7 @@ import type {
   ExpressionValue,
   ExtractFunc,
   FulltextSearch,
-} from 'node-sql-parser';
+} from 'node-sql-parser/build/mysql';
 
 interface SelectSubquery {
   ast: Select;

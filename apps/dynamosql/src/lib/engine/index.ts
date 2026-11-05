@@ -26,7 +26,7 @@ import type {
   BaseFrom,
   From,
   SetList,
-} from 'node-sql-parser';
+} from 'node-sql-parser/build/mysql';
 
 export type {
   DynamoDBClient,

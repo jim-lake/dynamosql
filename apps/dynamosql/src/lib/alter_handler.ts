@@ -7,7 +7,7 @@ import { mysqlStringToValueType } from './types/value_type';
 
 import type { Engine, ColumnDefParam } from './engine';
 import type { HandlerParams } from './handler_types';
-import type { Alter } from 'node-sql-parser';
+import type { Alter } from 'node-sql-parser/build/mysql';
 
 export async function query(params: HandlerParams<Alter>): Promise<void> {
   const { ast, dynamodb, session } = params;

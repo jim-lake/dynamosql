@@ -13,7 +13,7 @@ import type {
   Function,
   ExprList,
   ExtractFunc,
-} from 'node-sql-parser';
+} from 'node-sql-parser/build/mysql';
 
 export function equal(expr: Binary, state: EvaluationState): EvaluationResult {
   return _equal(expr, state, ' = ');

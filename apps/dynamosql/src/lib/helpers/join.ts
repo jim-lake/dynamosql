@@ -13,7 +13,7 @@ import type {
   ColumnRef,
   Unary,
   FulltextSearch,
-} from 'node-sql-parser';
+} from 'node-sql-parser/build/mysql';
 
 export interface FormJoinParams {
   sourceMap: SourceMap;

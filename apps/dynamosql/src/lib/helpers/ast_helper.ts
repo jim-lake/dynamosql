@@ -4,7 +4,7 @@ import type {
   FunctionName,
   BaseFrom,
   From,
-} from 'node-sql-parser';
+} from 'node-sql-parser/build/mysql';
 
 function isBaseFrom(from: From): from is BaseFrom {
   return 'table' in from && typeof from.table === 'string';

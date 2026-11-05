@@ -6,7 +6,7 @@ import { convertNum } from '../helpers/sql_conversion';
 import { getValue } from './evaluate';
 
 import type { EvaluationState, EvaluationResult } from './evaluate';
-import type { Function } from 'node-sql-parser';
+import type { Function } from 'node-sql-parser/build/mysql';
 
 export function hex(expr: Function, state: EvaluationState): EvaluationResult {
   assertArgCount(expr, 1);

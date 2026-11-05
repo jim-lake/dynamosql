@@ -5,7 +5,7 @@ import * as SchemaManager from './schema_manager';
 
 import type { HandlerParams } from './handler_types';
 import type { FieldInfo } from '../types';
-import type { Show } from 'node-sql-parser';
+import type { Show } from 'node-sql-parser/build/mysql';
 
 export interface ShowResult {
   rows: string[][];

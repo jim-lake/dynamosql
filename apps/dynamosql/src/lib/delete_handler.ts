@@ -9,7 +9,7 @@ import * as TransactionManager from './transaction_manager';
 import type { EngineValue } from './engine';
 import type { HandlerParams, AffectedResult } from './handler_types';
 import type { RequestInfo } from './helpers/column_ref_helper';
-import type { BaseFrom, Delete, From } from 'node-sql-parser';
+import type { BaseFrom, Delete, From } from 'node-sql-parser/build/mysql';
 
 // The actual runtime structure has a 'from' property, but the types say it's From & { addition?: boolean }
 // The types are incomplete/wrong, so we define the actual structure
