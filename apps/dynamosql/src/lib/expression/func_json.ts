@@ -7,7 +7,7 @@ import { SQLJson } from '../types/sql_json';
 import { getValue } from './evaluate';
 
 import type { EvaluationState, EvaluationResult } from './evaluate';
-import type { Function } from 'node-sql-parser';
+import type { Binary, Function } from 'node-sql-parser';
 
 type PathSegment =
   | { kind: 'key'; key: string }
@@ -383,6 +383,27 @@ export function json_extract(
   const arg_list = expr.args.value;
   const doc = getValue(arg_list[0], state);
   const path_list = arg_list.slice(1).map((arg) => getValue(arg, state));
+  return _extract(doc, path_list);
+}
+
+export function json_arrow(
+  expr: Binary,
+  state: EvaluationState
+): EvaluationResult {
+  return _extract(getValue(expr.left, state), [getValue(expr.right, state)]);
+}
+
+export function json_arrow_unquote(
+  expr: Binary,
+  state: EvaluationState
+): EvaluationResult {
+  return { ..._unquote(json_arrow(expr, state)), type: 'text' };
+}
+
+function _extract(
+  doc: EvaluationResult,
+  path_list: EvaluationResult[]
+): EvaluationResult {
   const failed = [doc, ...path_list].find((result) => result.err);
   if (failed) {
     return failed;
@@ -636,7 +657,10 @@ export function json_unquote(
   state: EvaluationState
 ): EvaluationResult {
   assertArgCount(expr, 1, 1);
-  const str = getValue(expr.args.value[0], state);
+  return _unquote(getValue(expr.args.value[0], state));
+}
+
+function _unquote(str: EvaluationResult): EvaluationResult {
   if (str.err) {
     return str;
   }
@@ -794,6 +818,26 @@ export function json_value(
   }
   const text = typeof node === 'object' ? JSON.stringify(node) : String(node);
   return { err: null, value: text, type: 'string' };
+}
+
+export function json_storage_size(
+  expr: Function,
+  state: EvaluationState
+): EvaluationResult {
+  assertArgCount(expr, 1, 1);
+  const doc = getValue(expr.args.value[0], state);
+  if (doc.err) {
+    return doc;
+  }
+  if (doc.value === null) {
+    return { err: null, value: null, type: 'longlong' };
+  }
+  const node = _parseDocument(doc, 'json_storage_size');
+  return {
+    err: null,
+    value: Buffer.byteLength(JSON.stringify(node)),
+    type: 'longlong',
+  };
 }
 
 export function json_storage_free(

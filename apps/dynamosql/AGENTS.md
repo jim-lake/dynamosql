@@ -59,6 +59,7 @@ After any code change, run `npm run ts:check && npm run lint`, then `npm test`. 
 - We are EXPLICITLY NOT trying to match MySQL behavior for JSON key ordering or JSON stringification. MySQL states these are NOT STABLE across versions. Do NOT investigate the exact parameters of key sorting or stringification, EVER.
 - Tests need AWS credentials with DynamoDB access, read from the environment or `.env`.
 - When asked to write tests, read the implementation first. Cover the full behavior of implemented functionality, and skip anything not implemented. Tests must fail when the implemented behavior differs from MySQL. Pass and fail results are both acceptable; coverage is the goal.
+- When doing generic work implementing SQL Functions, DO NOT TEST SQL parse failure edge cases where MySQL returns ER_PARSE_ERROR. That error is not behavior end users depend on, so skip it in most cases.
 - Mocha timeout is 15 seconds per test.
 - Test directories: `select/`, `insert/`, `update/`, `delete/`, `replace/`, `join/`, `expression/`, `ddl/`, `memory/`, `client_opts/`, `unit_misc/`, `setup/`.
 - Each feature directory holds `.sql` query files and `.test.js` or `.test.ts` files that compare results. Follow the pattern of the neighboring tests.

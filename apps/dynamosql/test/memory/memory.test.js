@@ -14,4 +14,9 @@ describe('Temp', function () {
     checkChanged: true,
     verify_field_types: true,
   });
+  runTests(
+    'memory_json_arrow.sql',
+    path.join(__dirname, 'memory_json_arrow.sql'),
+    { checkChanged: true, verify_field_types: true }
+  );
 });

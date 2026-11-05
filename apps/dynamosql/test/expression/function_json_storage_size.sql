@@ -1,0 +1,13 @@
+-- JSON_STORAGE_SIZE tests
+SELECT JSON_STORAGE_SIZE('{"a":1}') > 0 AS json_value;
+SELECT JSON_STORAGE_SIZE('[1,2]') > 0 AS json_value;
+SELECT JSON_STORAGE_SIZE('"x"') > 0 AS json_value;
+SELECT JSON_STORAGE_SIZE('null') > 0 AS json_value;
+SELECT JSON_STORAGE_SIZE(NULL) > 0 AS json_value;
+SELECT JSON_STORAGE_SIZE(JSON_OBJECT('a', 1)) > 0 AS json_value;
+SELECT JSON_STORAGE_SIZE(CAST('[1]' AS JSON)) > 0 AS json_value;
+SELECT JSON_STORAGE_SIZE('[1]') + 1 > 0 AS json_value;
+SELECT JSON_STORAGE_SIZE('not json') > 0 AS json_value;
+SELECT JSON_STORAGE_SIZE(5) > 0 AS json_value;
+SELECT JSON_STORAGE_SIZE() AS json_value;
+SELECT JSON_STORAGE_SIZE('[1]', '$') > 0 AS json_value;

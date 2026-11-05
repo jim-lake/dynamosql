@@ -218,7 +218,7 @@ function _checkEqual(name, i, left, right) {
     }
   } else if (name === 'json_value') {
     expect(
-      isDeepStrictEqual(JSON.parse(left), JSON.parse(right)),
+      left === right || isDeepStrictEqual(JSON.parse(left), JSON.parse(right)),
       `results[${i}].${name} json equal: ${left} vs ${right}`
     ).to.be.true;
   } else if (name === 'json_unsorted_array') {
