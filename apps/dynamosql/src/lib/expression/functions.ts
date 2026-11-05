@@ -37,30 +37,38 @@ import {
   json_array,
   json_array_append,
   json_array_insert,
-  json_contains,
-  json_contains_path,
-  json_depth,
-  json_extract,
-  json_keys,
-  json_insert,
-  json_length,
+} from './func_json_array';
+import {
   json_merge_patch,
   json_merge_preserve,
   json_object,
-  json_overlaps,
   json_pretty,
   json_quote,
-  json_remove,
-  json_replace,
-  json_search,
-  json_set,
+  json_unquote,
+} from './func_json_build';
+import {
+  json_depth,
+  json_keys,
+  json_length,
   json_storage_free,
   json_storage_size,
   json_type,
-  json_unquote,
   json_valid,
+} from './func_json_inspect';
+import {
+  json_insert,
+  json_remove,
+  json_replace,
+  json_set,
+} from './func_json_modify';
+import {
+  json_contains,
+  json_contains_path,
+  json_extract,
+  json_overlaps,
   json_value,
-} from './func_json';
+} from './func_json_query';
+import { json_search } from './func_json_search';
 import {
   ln,
   log,
