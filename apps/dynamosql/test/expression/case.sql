@@ -20,6 +20,7 @@ SELECT CASE WHEN TRUE THEN 'truthy' ELSE 'falsy' END AS result;
 SELECT CASE WHEN FALSE THEN 'truthy' ELSE 'falsy' END AS result;
 SELECT CASE WHEN 1 > 0 AND 2 > 1 THEN 'both' ELSE 'not' END AS result;
 SELECT CASE WHEN NULL IS NULL THEN 'null' ELSE 'not null' END AS result;
+SELECT CASE WHEN NULL <=> NULL THEN 'null safe' ELSE 'diff' END AS result;
 SELECT CASE WHEN 'a' = 'A' THEN 'ci' ELSE 'cs' END AS result;
 
 -- Simple CASE (operand form)

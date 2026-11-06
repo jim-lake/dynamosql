@@ -19,5 +19,4 @@ These queries were removed from `test/expression/case.sql` because DynamoSQL doe
 
 Parser output checked with `npm run query:parse`. The parser accepts both queries, so the gaps are in the engine.
 
-- `SELECT CASE WHEN NULL <=> NULL THEN 'null safe' ELSE 'diff' END AS result;`: the parser returns `binary_expr` with operator `<=>`. The engine has no `<=>` entry in the operator map in `src/lib/expression/binary_expression.ts`, so it fails with `ER_SP_DOES_NOT_EXIST`.
 - `SELECT CASE WHEN 1 THEN 1 ELSE 2 END AS result FROM DUAL;`: the parser returns `from: [{ type: 'dual' }]`. `src/lib/select_handler.ts` accepts only base tables in `FROM`, so it throws `Invalid from clause`.

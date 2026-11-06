@@ -14,7 +14,7 @@ and geometry
 | !=                              |    ✅     | Not equal operator                                                                                                                                      |
 | <<                              |    ❌     | Left shift                                                                                                                                              |
 | <=                              |    ✅     | Less than or equal operator                                                                                                                             |
-| <=>                             |    ❌     | NULL-safe equal to operator                                                                                                                             |
+| <=>                             |    ✅     | NULL-safe equal to operator                                                                                                                             |
 | %                               |    ❌     | Modulo operator                                                                                                                                         |
 | MOD                             |    ✅     | Modulo operator                                                                                                                                         |
 | \*                              |    ✅     | Multiplication operator                                                                                                                                 |

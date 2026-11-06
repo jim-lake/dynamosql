@@ -42141,6 +42141,9 @@ const methods$5 = {
 function equal$1(expr, state) {
     return _equal$1(expr, state, ' = ');
 }
+function nullSafeEqual$1(expr, state) {
+    return _equal$1(expr, state, ' <=> ', true);
+}
 function notEqual$1(expr, state) {
     const ret = _equal$1(expr, state, ' != ');
     if (ret.value !== null) {
@@ -42168,7 +42171,7 @@ function inOp(expr, state) {
                 if (right.err) {
                     return right;
                 }
-                const [left_val, right_val] = _convertCompare(left, right, state.session.timeZone);
+                const [left_val, right_val] = convertCompare(left, right, state.session.timeZone);
                 if (right.value === null) {
                     value = null;
                 }
@@ -42222,7 +42225,7 @@ function nullif(expr, state) {
     const name = `NULLIF(${arg1.name}, ${arg2.name})`;
     if (!err) {
         const origValue = arg1.value;
-        const [left_val, right_val] = _convertCompare(arg1, arg2, state.session.timeZone);
+        const [left_val, right_val] = convertCompare(arg1, arg2, state.session.timeZone);
         const isEqual = left_val !== null && left_val === right_val;
         value = isEqual ? null : origValue;
         if (origValue instanceof SQLDate ||
@@ -42233,7 +42236,7 @@ function nullif(expr, state) {
     }
     return { err, name, value, type };
 }
-function _convertCompare(left, right, timeZone) {
+function convertCompare(left, right, timeZone) {
     let left_val = left.value;
     let right_val = right.value;
     if (left_val === null || right_val === null) {
@@ -42292,15 +42295,18 @@ function _convertCompare(left, right, timeZone) {
     }
     return [left_str, right_str];
 }
-function _equal$1(expr, state, op) {
+function _equal$1(expr, state, op, nullSafe = false) {
     const left = getValue(expr.left, state);
     const right = getValue(expr.right, state);
     const err = left.err ?? right.err;
     const name = (left.name ?? '') + op + (right.name ?? '');
     let value = 0;
     if (!err) {
-        const [left_val, right_val] = _convertCompare(left, right, state.session.timeZone);
-        if (left_val === null) {
+        const [left_val, right_val] = convertCompare(left, right, state.session.timeZone);
+        if (nullSafe && (left.value === null || right.value === null)) {
+            value = left.value === right.value ? 1 : 0;
+        }
+        else if (left_val === null) {
             value = null;
         }
         else if (left_val === right_val) {
@@ -42322,7 +42328,7 @@ function _gt$1(expr_left, expr_right, state, op, flip) {
         : (left.name ?? '') + op + (right.name ?? '');
     let value = 0;
     if (!err) {
-        const [left_val, right_val] = _convertCompare(left, right, state.session.timeZone);
+        const [left_val, right_val] = convertCompare(left, right, state.session.timeZone);
         if (left_val === null) {
             value = null;
         }
@@ -42348,7 +42354,7 @@ function _gte$1(expr_left, expr_right, state, op, flip) {
         : (left.name ?? '') + op + (right.name ?? '');
     let value = 0;
     if (!err) {
-        const [left_val, right_val] = _convertCompare(left, right, state.session.timeZone);
+        const [left_val, right_val] = convertCompare(left, right, state.session.timeZone);
         if (left_val === null) {
             value = null;
         }
@@ -43488,6 +43494,7 @@ const methods$4 = {
     '%': mod$1,
     div: intDiv,
     '=': equal$1,
+    '<=>': nullSafeEqual$1,
     '!=': notEqual$1,
     '<>': notEqual$1,
     '>': gt$1,
@@ -43512,114 +43519,6 @@ const methods$4 = {
     'member of': member_of,
 };
 
-function datetime(expr, state) {
-    const result = getValue(expr.expr, state);
-    result.name = `CAST(${result.name} AS DATETIME)`;
-    result.type = 'datetime';
-    if (!result.err && result.value !== null) {
-        const target = Array.isArray(expr.target)
-            ? expr.target[0]
-            : expr.target;
-        const decimals = target?.length ?? 0;
-        if (decimals > 6) {
-            result.err = 'ER_TOO_BIG_PRECISION';
-        }
-        result.value = convertDateTime({
-            value: result.value,
-            decimals,
-            timeZone: state.session.timeZone,
-        });
-    }
-    return result;
-}
-function date$2(expr, state) {
-    const result = getValue(expr.expr, state);
-    result.name = `CAST(${result.name} AS DATE)`;
-    result.type = 'date';
-    if (!result.err && result.value !== null) {
-        result.value = convertDate({
-            value: result.value,
-            timeZone: state.session.timeZone,
-        });
-    }
-    return result;
-}
-function time$2(expr, state) {
-    const result = getValue(expr.expr, state);
-    result.name = `CAST(${result.name} AS TIME)`;
-    result.type = 'time';
-    if (!result.err && result.value !== null) {
-        const target = Array.isArray(expr.target)
-            ? expr.target[0]
-            : expr.target;
-        const decimals = target?.length ?? 0;
-        if (decimals > 6) {
-            result.err = 'ER_TOO_BIG_PRECISION';
-        }
-        result.value = convertTime({ value: result.value, decimals });
-    }
-    return result;
-}
-function signed(expr, state) {
-    const result = getValue(expr.expr, state);
-    result.name = `CAST(${result.name} AS SIGNED)`;
-    result.type = 'longlong';
-    if (!result.err && result.value !== null) {
-        result.value = convertBigInt(result.value);
-    }
-    return result;
-}
-function char(expr, state) {
-    const result = getValue(expr.expr, state);
-    result.name = `CAST(${result.name} AS CHAR)`;
-    result.type = 'string';
-    if (!result.err &&
-        result.value !== null &&
-        typeof result.value !== 'string') {
-        result.value = String(result.value);
-    }
-    return result;
-}
-function decimal(expr, state) {
-    const result = getValue(expr.expr, state);
-    result.name = `CAST(${result.name} AS DECIMAL)`;
-    result.type = 'number';
-    if (!result.err &&
-        result.value !== null &&
-        typeof result.value !== 'number') {
-        result.value = Number(result.value);
-    }
-    return result;
-}
-function double(expr, state) {
-    const result = getValue(expr.expr, state);
-    result.name = `CAST(${result.name} AS DOUBLE)`;
-    result.type = 'double';
-    result.decimals = 31;
-    if (!result.err &&
-        result.value !== null &&
-        typeof result.value !== 'number') {
-        result.value = Number(result.value);
-    }
-    return result;
-}
-function json(expr, state) {
-    const result = getValue(expr.expr, state);
-    result.name = `CAST(${result.name} AS JSON)`;
-    if (!result.err && result.value !== null) {
-        const is_text = result.type === 'string' ||
-            result.type === 'char' ||
-            result.type === 'text';
-        const node = is_text
-            ? SQLJson.parseText(result, 'cast_as_json', 1)
-            : SQLJson.toNode(result, state.session.timeZone, 'cast_as_json', 1);
-        result.value = new SQLJson(node);
-    }
-    result.type = 'json';
-    return result;
-}
-const methods$3 = { datetime, date: date$2, time: time$2, signed, char, decimal, double, json };
-
 function coalesce(expr, state) {
     assertArgCountParse(expr, 1, Infinity);
     let err = null;
@@ -43638,7 +43537,7 @@ function coalesce(expr, state) {
             value = result.value;
         }
     }
-    const { type } = _unionType$1(values);
+    const { type } = unionType(values);
     return { err, name: `COALESCE(${names.join(', ')}`, value, type };
 }
 function ifnull(expr, state) {
@@ -43652,7 +43551,7 @@ function ifnull(expr, state) {
         return arg2;
     }
     const value = arg1.value !== null ? arg1.value : arg2.value;
-    const { type } = _unionType$1([arg1, arg2]);
+    const { type } = unionType([arg1, arg2]);
     return { err: null, name: `IFNULL(${arg1.name}, ${arg2.name})`, value, type };
 }
 function ifFunc(expr, state) {
@@ -43664,7 +43563,7 @@ function ifFunc(expr, state) {
     let value;
     let type = 'longlong';
     if (!err) {
-        type = _unionType$1([trueValue, falseValue]).type;
+        type = unionType([trueValue, falseValue]).type;
         const condResult = convertNum(condition.value);
         let result_type;
         if (condResult === null || condResult === 0) {
@@ -43756,7 +43655,7 @@ function _ltList(list, timeZone, convert) {
     }
     return { value: value ?? null, decimals };
 }
-function _unionType$1(list) {
+function unionType(list) {
     let compare_type;
     const types = list.map((e) => (e.type === 'bool' ? 'longlong' : e.type));
     if (types.includes('datetime')) {
@@ -43825,7 +43724,7 @@ function _compare(expr, state, functionName, dateCompare, nativeCompare) {
             value = null;
         }
     }
-    const { compare_type, type } = _unionType$1(values);
+    const { compare_type, type } = unionType(values);
     let decimals = 0;
     if (value !== null) {
         switch (compare_type) {
@@ -43943,6 +43842,169 @@ function _dateCompareList(values, type, state, dateCompare, convertFunc) {
     }
     return { value, decimals };
 }
+
+function caseExpr(expr, state) {
+    const operand = expr.expr ? getValue(expr.expr, state) : null;
+    if (operand?.err) {
+        return operand;
+    }
+    const whenConds = expr.args.flatMap((arg) => arg.type === 'when' ? [arg.cond] : []);
+    const collation = operand
+        ? getExprCollation([expr.expr ?? undefined, ...whenConds], state)
+        : null;
+    const results = [];
+    let matched;
+    let elseResult;
+    for (const arg of expr.args) {
+        const result = getValue(arg.result, state);
+        if (result.err) {
+            return result;
+        }
+        results.push(result);
+        if (arg.type === 'else') {
+            elseResult = result;
+        }
+        else if (matched === undefined) {
+            const cond = getValue(arg.cond, state);
+            if (cond.err) {
+                return cond;
+            }
+            let isMatch = convertBooleanValue(cond.value) === 1;
+            if (operand) {
+                const [left_val, right_val] = convertCompare(operand, cond, state.session.timeZone);
+                isMatch =
+                    left_val !== null &&
+                        (left_val === right_val ||
+                            (typeof left_val === 'string' &&
+                                typeof right_val === 'string' &&
+                                stringCompare(left_val, right_val, collation) === 0));
+            }
+            if (isMatch) {
+                matched = result;
+            }
+        }
+    }
+    if (!elseResult) {
+        results.push({ err: null, type: 'null', value: null });
+    }
+    const chosen = matched ?? elseResult;
+    const { type } = unionType(results);
+    const value = chosen && chosen.type !== type && type === 'datetime'
+        ? convertDateTime({
+            value: chosen.value,
+            timeZone: state.session.timeZone,
+        })
+        : (chosen?.value ?? null);
+    return { err: null, name: 'CASE', value, type };
+}
+
+function datetime(expr, state) {
+    const result = getValue(expr.expr, state);
+    result.name = `CAST(${result.name} AS DATETIME)`;
+    result.type = 'datetime';
+    if (!result.err && result.value !== null) {
+        const target = Array.isArray(expr.target)
+            ? expr.target[0]
+            : expr.target;
+        const decimals = target?.length ?? 0;
+        if (decimals > 6) {
+            result.err = 'ER_TOO_BIG_PRECISION';
+        }
+        result.value = convertDateTime({
+            value: result.value,
+            decimals,
+            timeZone: state.session.timeZone,
+        });
+    }
+    return result;
+}
+function date$2(expr, state) {
+    const result = getValue(expr.expr, state);
+    result.name = `CAST(${result.name} AS DATE)`;
+    result.type = 'date';
+    if (!result.err && result.value !== null) {
+        result.value = convertDate({
+            value: result.value,
+            timeZone: state.session.timeZone,
+        });
+    }
+    return result;
+}
+function time$2(expr, state) {
+    const result = getValue(expr.expr, state);
+    result.name = `CAST(${result.name} AS TIME)`;
+    result.type = 'time';
+    if (!result.err && result.value !== null) {
+        const target = Array.isArray(expr.target)
+            ? expr.target[0]
+            : expr.target;
+        const decimals = target?.length ?? 0;
+        if (decimals > 6) {
+            result.err = 'ER_TOO_BIG_PRECISION';
+        }
+        result.value = convertTime({ value: result.value, decimals });
+    }
+    return result;
+}
+function signed(expr, state) {
+    const result = getValue(expr.expr, state);
+    result.name = `CAST(${result.name} AS SIGNED)`;
+    result.type = 'longlong';
+    if (!result.err && result.value !== null) {
+        result.value = convertBigInt(result.value);
+    }
+    return result;
+}
+function char(expr, state) {
+    const result = getValue(expr.expr, state);
+    result.name = `CAST(${result.name} AS CHAR)`;
+    result.type = 'string';
+    if (!result.err &&
+        result.value !== null &&
+        typeof result.value !== 'string') {
+        result.value = String(result.value);
+    }
+    return result;
+}
+function decimal(expr, state) {
+    const result = getValue(expr.expr, state);
+    result.name = `CAST(${result.name} AS DECIMAL)`;
+    result.type = 'number';
+    if (!result.err &&
+        result.value !== null &&
+        typeof result.value !== 'number') {
+        result.value = Number(result.value);
+    }
+    return result;
+}
+function double(expr, state) {
+    const result = getValue(expr.expr, state);
+    result.name = `CAST(${result.name} AS DOUBLE)`;
+    result.type = 'double';
+    result.decimals = 31;
+    if (!result.err &&
+        result.value !== null &&
+        typeof result.value !== 'number') {
+        result.value = Number(result.value);
+    }
+    return result;
+}
+function json(expr, state) {
+    const result = getValue(expr.expr, state);
+    result.name = `CAST(${result.name} AS JSON)`;
+    if (!result.err && result.value !== null) {
+        const is_text = result.type === 'string' ||
+            result.type === 'char' ||
+            result.type === 'text';
+        const node = is_text
+            ? SQLJson.parseText(result, 'cast_as_json', 1)
+            : SQLJson.toNode(result, state.session.timeZone, 'cast_as_json', 1);
+        result.value = new SQLJson(node);
+    }
+    result.type = 'json';
+    return result;
+}
+const methods$3 = { datetime, date: date$2, time: time$2, signed, char, decimal, double, json };
 
 function now(expr, state) {
     assertArgCount(expr, 0, 1);
@@ -48913,6 +48975,9 @@ function getValue(expr, state) {
         // FulltextSearch - MATCH(...) AGAINST(...) - not yet implemented
         result.err = { err: 'ER_NOT_SUPPORTED_YET' };
     }
+    else if ('type' in expr && expr.type === 'case') {
+        result = caseExpr(expr, state);
+    }
     else if (isValueExpr(expr)) {
         const type = expr.type;
         if (type === 'number') {
@@ -49362,6 +49427,29 @@ function _comparator(expr, state, op) {
     const value = `${left.value} ${op} ${right.value}`;
     return { err, value };
 }
+function nullSafeEqual(expr, state) {
+    const left = convertWhere(expr.left, state);
+    const right = convertWhere(expr.right, state);
+    const err = left.err ?? right.err;
+    let value = null;
+    if (!err) {
+        const leftIsConstant = !getValue(expr.left, state).err;
+        const rightIsConstant = !getValue(expr.right, state).err;
+        if (left.value === null) {
+            value = `(${right.value} IS NULL OR ${right.value} IS MISSING)`;
+        }
+        else if (right.value === null) {
+            value = `(${left.value} IS NULL OR ${left.value} IS MISSING)`;
+        }
+        else if (leftIsConstant || rightIsConstant) {
+            value = `(${left.value} = ${right.value})`;
+        }
+        else {
+            value = `((${left.value} = ${right.value}) OR ((${left.value} IS NULL OR ${left.value} IS MISSING) AND (${right.value} IS NULL OR ${right.value} IS MISSING)))`;
+        }
+    }
+    return { err, value };
+}
 function equal(expr, state) {
     return _comparator(expr, state, '=');
 }
@@ -49411,7 +49499,9 @@ function _is(expr, state, op) {
             err = 'syntax_err';
         }
     }
-    const value = `${left.value} ${op} ${right}`;
+    const value = op === 'IS' && right === 'NULL'
+        ? `(${left.value} IS NULL OR ${left.value} IS MISSING)`
+        : `${left.value} ${op} ${right}`;
     return { err, value };
 }
 function not(expr, state) {
@@ -49439,6 +49529,7 @@ function unsupported() {
 }
 const _equal = constantFixup(equal);
 const _notEqual = constantFixup(notEqual);
+const _nullSafeEqual = constantFixup(nullSafeEqual);
 const _gt = constantFixup(gt);
 const _lt = constantFixup(lt);
 const _gte = constantFixup(gte);
@@ -49453,6 +49544,7 @@ const _not = constantFixup(not);
 const _minus = constantFixup(minus);
 var ConvertExpression = {
     '=': _equal,
+    '<=>': _nullSafeEqual,
     '!=': _notEqual,
     '<>': _notEqual,
     '>': _gt,

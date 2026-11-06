@@ -7,6 +7,14 @@ SELECT NULL > NULL AS result;
 SELECT NULL <= NULL AS result;
 SELECT NULL >= NULL AS result;
 
+-- NULL-safe equal
+SELECT NULL <=> NULL AS result;
+SELECT NULL <=> 5 AS result;
+SELECT 5 <=> NULL AS result;
+SELECT 5 <=> 5 AS result;
+SELECT 5 <=> 6 AS result;
+SELECT NULL <=> "" AS result;
+
 -- NULL with values
 SELECT 5 = NULL AS result;
 SELECT NULL = 5 AS result;

@@ -18,6 +18,12 @@ import type {
 export function equal(expr: Binary, state: EvaluationState): EvaluationResult {
   return _equal(expr, state, ' = ');
 }
+export function nullSafeEqual(
+  expr: Binary,
+  state: EvaluationState
+): EvaluationResult {
+  return _equal(expr, state, ' <=> ', true);
+}
 export function notEqual(
   expr: Binary,
   state: EvaluationState
@@ -201,7 +207,8 @@ export function convertCompare(
 function _equal(
   expr: Binary,
   state: EvaluationState,
-  op: string
+  op: string,
+  nullSafe = false
 ): EvaluationResult {
   const left = getValue(expr.left, state);
   const right = getValue(expr.right, state);
@@ -214,7 +221,9 @@ function _equal(
       right,
       state.session.timeZone
     );
-    if (left_val === null) {
+    if (nullSafe && (left.value === null || right.value === null)) {
+      value = left.value === right.value ? 1 : 0;
+    } else if (left_val === null) {
       value = null;
     } else if (left_val === right_val) {
       value = 1;

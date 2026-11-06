@@ -1,6 +1,16 @@
 import { convertBooleanValue } from '../helpers/sql_conversion';
 
-import { equal, notEqual, gt, lt, gte, lte, inOp, notIn } from './compare';
+import {
+  equal,
+  nullSafeEqual,
+  notEqual,
+  gt,
+  lt,
+  gte,
+  lte,
+  inOp,
+  notIn,
+} from './compare';
 import { getValue } from './evaluate';
 import { json_arrow, json_arrow_unquote, member_of } from './func_json_query';
 import { plus, minus, div, mul, mod, intDiv } from './math';
@@ -269,6 +279,7 @@ export const methods: Record<
   '%': mod,
   div: intDiv,
   '=': equal,
+  '<=>': nullSafeEqual,
   '!=': notEqual,
   '<>': notEqual,
   '>': gt,

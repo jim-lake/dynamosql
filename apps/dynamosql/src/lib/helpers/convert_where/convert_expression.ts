@@ -130,6 +130,27 @@ function _comparator(
   return { err, value };
 }
 
+function nullSafeEqual(expr: Binary, state: ConvertWhereState): ConvertResult {
+  const left = convertWhere(expr.left, state);
+  const right = convertWhere(expr.right, state);
+  const err = left.err ?? right.err;
+  let value: string | null = null;
+  if (!err) {
+    const leftIsConstant = !getValue(expr.left, state).err;
+    const rightIsConstant = !getValue(expr.right, state).err;
+    if (left.value === null) {
+      value = `(${right.value} IS NULL OR ${right.value} IS MISSING)`;
+    } else if (right.value === null) {
+      value = `(${left.value} IS NULL OR ${left.value} IS MISSING)`;
+    } else if (leftIsConstant || rightIsConstant) {
+      value = `(${left.value} = ${right.value})`;
+    } else {
+      value = `((${left.value} = ${right.value}) OR ((${left.value} IS NULL OR ${left.value} IS MISSING) AND (${right.value} IS NULL OR ${right.value} IS MISSING)))`;
+    }
+  }
+  return { err, value };
+}
+
 function equal(expr: Binary, state: ConvertWhereState): ConvertResult {
   return _comparator(expr, state, '=');
 }
@@ -192,7 +213,10 @@ function _is(
       err = 'syntax_err';
     }
   }
-  const value = `${left.value} ${op} ${right}`;
+  const value =
+    op === 'IS' && right === 'NULL'
+      ? `(${left.value} IS NULL OR ${left.value} IS MISSING)`
+      : `${left.value} ${op} ${right}`;
   return { err, value };
 }
 
@@ -224,6 +248,7 @@ function unsupported(): ConvertResult {
 
 const _equal = constantFixup(equal as ConvertFunc);
 const _notEqual = constantFixup(notEqual as ConvertFunc);
+const _nullSafeEqual = constantFixup(nullSafeEqual as ConvertFunc);
 const _gt = constantFixup(gt as ConvertFunc);
 const _lt = constantFixup(lt as ConvertFunc);
 const _gte = constantFixup(gte as ConvertFunc);
@@ -239,6 +264,7 @@ const _minus = constantFixup(minus);
 
 export default {
   '=': _equal,
+  '<=>': _nullSafeEqual,
   '!=': _notEqual,
   '<>': _notEqual,
   '>': _gt,
