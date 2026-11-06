@@ -1,0 +1,15 @@
+UPDATE IGNORE t SET a = 1;
+update ignore t set a = 1;
+UPDATE IGNORE t SET a = 1, b = 'x';
+UPDATE IGNORE t SET a = 1 WHERE id = 2;
+UPDATE IGNORE t SET a = 1 WHERE id = 2 ORDER BY id LIMIT 5;
+UPDATE IGNORE t SET a = 1 LIMIT 1;
+UPDATE IGNORE db.t SET a = 1;
+UPDATE IGNORE t AS x SET x.a = 1;
+UPDATE IGNORE t1 INNER JOIN t2 ON t1.id = t2.id SET t1.a = t2.b;
+UPDATE IGNORE t SET a = .5;
+UPDATE IGNORE t SET a = a + 1 WHERE b IS NULL;
+UPDATE IGNORE t SET a = 1 WHERE EXISTS (SELECT 1 FROM s WHERE s.id = t.id);
+UPDATE IGNORE ignore_tbl SET a = 1;
+UPDATE IGNORE t SET ignore_col = 1;
+WITH c AS (SELECT 1 AS v) UPDATE IGNORE t JOIN c ON t.id = c.v SET t.a = c.v;

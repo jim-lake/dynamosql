@@ -2712,6 +2712,7 @@ limit_clause
 
 update_stmt
   = __ cte:with_clause? __ KW_UPDATE    __
+    ig:KW_IGNORE? __
     t:table_ref_list __
     KW_SET       __
     l:set_list   __
@@ -2740,6 +2741,7 @@ update_stmt
         ast: {
           with: cte,
           type: 'update',
+          ignore: ig && ig[0].toLowerCase(),
           table: t,
           set: l,
           where: w,
@@ -3924,7 +3926,18 @@ escape_char
 
 // MySQL specific: number rules with bigint support
 number
-  = int_:int frac:frac exp:exp {
+  = "." digits:digits exp:exp {
+    // leading-dot literal such as .5E0; same value and text form as 0.5E0
+    return '0.' + digits + exp;
+  }
+  / "." digits:digits {
+    // leading-dot literal such as .5; same value as 0.5
+    const numStr = '0.' + digits;
+    const num = parseFloat(numStr);
+    if (num.toString() === numStr) return num;
+    return numStr;
+  }
+  / int_:int frac:frac exp:exp {
     return int_ + frac + exp;
   }
   / int_:int frac:frac {

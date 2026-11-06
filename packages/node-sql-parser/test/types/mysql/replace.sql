@@ -14,3 +14,5 @@ REPLACE INTO mydb.users (id) VALUES (1);
 REPLACE mydb.users SET id = 1;
 REPLACE IGNORE INTO users (id) VALUES (1);
 REPLACE INTO users (id, name) VALUES (1, 'John') ON DUPLICATE KEY UPDATE name = 'Updated';
+REPLACE INTO t (x) VALUES (.5);
+REPLACE INTO t (x, y) VALUES (-.5, .25);

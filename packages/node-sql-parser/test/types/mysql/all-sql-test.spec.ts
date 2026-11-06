@@ -67,6 +67,14 @@ test('create.sql statements', () => {
   }
 });
 
+test('decimal-literal.sql statements', () => {
+  const statements = readSqlFile('decimal-literal.sql');
+  for (const sql of statements) {
+    const ast = astify(sql);
+    assertType(isSelect, ast, `isSelect: ${sql}`);
+  }
+});
+
 test('delete.sql statements', () => {
   const statements = readSqlFile('delete.sql');
   for (const sql of statements) {
@@ -240,6 +248,14 @@ test('unlock.sql statements', () => {
   for (const sql of statements) {
     const ast = astify(sql);
     assertType(isUnlock, ast, `isUnlock: ${sql}`);
+  }
+});
+
+test('update-ignore.sql statements', () => {
+  const statements = readSqlFile('update-ignore.sql');
+  for (const sql of statements) {
+    const ast = astify(sql);
+    assertType(isUpdate, ast, `isUpdate: ${sql}`);
   }
 });
 

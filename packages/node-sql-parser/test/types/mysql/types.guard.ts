@@ -1424,6 +1424,9 @@ export function isUpdate(obj: unknown): obj is Update {
                 isWith(e) as boolean
             )) &&
         typedObj["type"] === "update" &&
+        (typeof typedObj["ignore"] === "undefined" ||
+            typedObj["ignore"] === null ||
+            typedObj["ignore"] === "ignore") &&
         (typedObj["table"] === null ||
             Array.isArray(typedObj["table"]) &&
             typedObj["table"].every((e: any) =>

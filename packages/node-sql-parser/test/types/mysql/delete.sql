@@ -147,3 +147,5 @@ DELETE FROM users WHERE FROM_UNIXTIME(1577836800) = created_at;
 DELETE FROM _dynamodb.foo WHERE id IN ("tx1", "tx5", "tx6");
 DELETE FROM _dynamodb.foo WHERE id = "4" AND comment = "missing";
 DELETE FROM type_test WHERE str_col IS NULL AND int_col IS NOT NULL;
+DELETE FROM t WHERE x = .5;
+DELETE FROM t WHERE x IN (.5, -.5) LIMIT 2;

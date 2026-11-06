@@ -200,3 +200,6 @@ UPDATE t1 AS a, t2 AS b SET a.col = b.col WHERE a.id = b.id;
 UPDATE t1 a, t2 b SET a.col = b.col WHERE a.id = b.id;
 UPDATE _dynamodb.foo SET comment = CONCAT(comment, " updated") WHERE id = "edge1";
 UPDATE _dynamodb.foo SET comment = LEFT(comment, LENGTH(comment) - 7) WHERE id = "111";
+UPDATE t SET x = .5 WHERE id = 1;
+UPDATE t SET x = .5, y = -.25 WHERE id = 1;
+UPDATE t SET x = .5 WHERE y BETWEEN .1 AND .9 LIMIT 3;

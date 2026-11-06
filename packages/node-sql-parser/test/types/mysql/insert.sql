@@ -53,3 +53,6 @@ INSERT INTO json_mixed (id, doc, label) VALUES (6, JSON_ARRAY(JSON_ARRAY(1, 2), 
 INSERT INTO json_mixed (id, doc, label) VALUES (9, JSON_ARRAY(9007199254740993), 'bigint');
 INSERT INTO json_mixed (id, doc, label) VALUES (10, JSON_ARRAY(1 = 1, 1 = 2), 'comparisons');
 INSERT INTO json_mixed (id, doc, label) SELECT 13, JSON_ARRAY('from', 'select'), 'insert select';
+INSERT INTO t (x) VALUES (.5);
+INSERT INTO t (x, y) VALUES (.5, .25), (-.5, 1.);
+INSERT INTO t (x) VALUES (+.5), (.0);

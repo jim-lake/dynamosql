@@ -32,10 +32,11 @@ function setToSQL(sets) {
 }
 
 function updateToSQL(stmt) {
-  const { from, table, set, where, orderby, with: withInfo, limit, returning } = stmt
+  const { from, table, set, where, orderby, with: withInfo, limit, returning, ignore } = stmt
   const clauses = [
     withToSQL(withInfo),
     'UPDATE',
+    ignore ? 'IGNORE' : '',
     tablesToSQL(table),
     commonOptionConnector('SET', setToSQL, set),
     commonOptionConnector('FROM', tablesToSQL, from),

@@ -438,6 +438,8 @@ export interface Insert_Replace {
 export interface Update {
   with: With[] | null;
   type: "update";
+  /** Set when the statement is `UPDATE IGNORE`. */
+  ignore?: "ignore" | null;
   table: Array<From | Dual> | null;
   set: SetList[];
   where: Binary | Unary | Function | FulltextSearch | null;
