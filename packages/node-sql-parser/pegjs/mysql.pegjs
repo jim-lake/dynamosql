@@ -3045,14 +3045,20 @@ not_expr
     }
 
 comparison_expr
-  = left:additive_expr __ rh:comparison_op_right? {
+  = left:additive_expr __ rh:comparison_op_right? tail:(__ comparison_op_right)* {
+      // comparison operators share one precedence level in MySQL and associate left to right,
+      // so `1 MEMBER OF('[1]') = 1` and `1 = 1 MEMBER OF('[1]')` fold into nested binary exprs
+      const apply = (l, r) => {
+        if (r.type === 'arithmetic') {
+          const chained = createBinaryExprChain(l, r.tail);
+          return r.in ? createBinaryExpr(r.in.op, chained, r.in.right) : chained;
+        }
+        return createBinaryExpr(r.op, l, r.right);
+      };
       if (rh === null) return left;
-      else if (rh.type === 'arithmetic') {
-        if (!rh.in) return createBinaryExprChain(left, rh.tail);
-        const leftExpr = createBinaryExprChain(left, rh.tail);
-        return createBinaryExpr(rh.in.op, leftExpr, rh.in.right);
-      }
-      else return createBinaryExpr(rh.op, left, rh.right);
+      let result = apply(left, rh);
+      for (const t of tail) result = apply(result, t[1]);
+      return result;
     }
   / literal_string
   / column_ref

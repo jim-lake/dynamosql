@@ -163,6 +163,14 @@ test('lock.sql statements', () => {
   }
 });
 
+test('member-of.sql statements', () => {
+  const statements = readSqlFile('member-of.sql');
+  for (const sql of statements) {
+    const ast = astify(sql);
+    assertType(isSelect, ast, `isSelect: ${sql}`);
+  }
+});
+
 test('rename.sql statements', () => {
   const statements = readSqlFile('rename.sql');
   for (const sql of statements) {

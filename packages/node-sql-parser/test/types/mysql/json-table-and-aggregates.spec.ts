@@ -113,6 +113,23 @@ test('MEMBER OF requires parentheses', () => {
   assertRejected('SELECT 1 MEMBER OF j FROM t');
 });
 
+test('MEMBER OF and comparison operators fold left to right', () => {
+  const expr = parseColumnExpr(`SELECT 1 MEMBER OF('[1]') = 1 IS TRUE AS v`);
+  assertType(isBinary, expr);
+  assert.strictEqual(expr.operator, 'IS');
+  assertType(isBinary, expr.left);
+  assert.strictEqual(expr.left.operator, '=');
+  assert.strictEqual(expr.left.left.operator, 'MEMBER OF');
+  assert.strictEqual(expr.left.left.right.type, 'expr_list');
+});
+
+test('MEMBER OF chains sqlify back to the same shape', () => {
+  const sql = `SELECT 1 MEMBER OF('[1]') = 1 IS TRUE FROM t`;
+  const out = parser.sqlify(parser.astify(sql));
+  assert.ok(out.includes(`MEMBER OF ('[1]') = 1 IS TRUE`), out);
+  assertType(isSelect, parser.astify(out));
+});
+
 test('SUM, AVG, MIN, and MAX accept DISTINCT', () => {
   for (const fn of ['SUM', 'AVG', 'MIN', 'MAX']) {
     const expr = parseColumnExpr(`SELECT ${fn}(DISTINCT a) AS v FROM t`);
