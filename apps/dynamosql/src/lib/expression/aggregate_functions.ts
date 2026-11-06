@@ -1,6 +1,7 @@
 import { convertNum } from '../helpers/sql_conversion';
 
 import { getValue } from './evaluate';
+import { json_arrayagg, json_objectagg } from './func_json_agg';
 
 import type { EvaluationState, EvaluationResult } from './evaluate';
 import type { AggrFunc } from 'node-sql-parser/build/mysql';
@@ -409,4 +410,6 @@ export const methods: Record<
   bit_and,
   bit_or,
   bit_xor,
+  json_arrayagg,
+  json_objectagg,
 };

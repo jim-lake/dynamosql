@@ -307,6 +307,11 @@ describe('Expression', function () {
     { verify_field_types: true }
   );
   runTests(
+    'function_json_agg.sql',
+    path.join(__dirname, 'function_json_agg.sql'),
+    { verify_field_types: true }
+  );
+  runTests(
     'operator_control_flow.sql',
     path.join(__dirname, 'operator_control_flow.sql'),
     { verify_field_types: true }
