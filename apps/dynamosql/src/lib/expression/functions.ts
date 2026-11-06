@@ -70,6 +70,10 @@ import {
 } from './func_json_query';
 import { json_search } from './func_json_search';
 import {
+  json_schema_valid,
+  json_schema_validation_report,
+} from './func_json_validation';
+import {
   ln,
   log,
   log2,
@@ -354,6 +358,8 @@ export const methods: Record<
   json_type,
   json_unquote,
   json_valid,
+  json_schema_valid,
+  json_schema_validation_report,
   json_insert,
   json_replace,
   json_set,

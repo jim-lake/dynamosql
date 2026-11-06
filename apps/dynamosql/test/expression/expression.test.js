@@ -169,6 +169,16 @@ describe('Expression', function () {
     { verify_field_types: true }
   );
   runTests(
+    'function_json_schema_valid.sql',
+    path.join(__dirname, 'function_json_schema_valid.sql'),
+    { verify_field_types: true }
+  );
+  runTests(
+    'function_json_schema_validation_report.sql',
+    path.join(__dirname, 'function_json_schema_validation_report.sql'),
+    { verify_field_types: true }
+  );
+  runTests(
     'function_json_depth.sql',
     path.join(__dirname, 'function_json_depth.sql'),
     { verify_field_types: true }

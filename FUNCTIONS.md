@@ -21,8 +21,8 @@ and geometry
 | \+                              |    ✅     | Addition operator                                                                                                                                       |
 | \-                              |    ✅     | Minus operator                                                                                                                                          |
 | \-                              |    ✅     | Change the sign of the argument                                                                                                                         |
-| \-\>                            |    ❌     | Return value from JSON column after evaluating path; equivalent to JSON_EXTRACT().                                                                      |
-| \-\>\>                          |    ❌     | Return value from JSON column after evaluating path and unquoting the result; equivalent to JSON_UNQUOTE(JSON_EXTRACT()).                               |
+| \-\>                            |    ✅     | Return value from JSON column after evaluating path; equivalent to JSON_EXTRACT().                                                                      |
+| \-\>\>                          |    ✅     | Return value from JSON column after evaluating path and unquoting the result; equivalent to JSON_UNQUOTE(JSON_EXTRACT()).                               |
 | \/                              |    ✅     | Division operator                                                                                                                                       |
 | \:\=                            |    ❌     | Assign a value                                                                                                                                          |
 | \=                              |    ❌     | Assign a value (as part of a SET statement, or as part of the SET clause in an UPDATE statement)                                                        |
@@ -186,12 +186,12 @@ and geometry
 | JSON_QUOTE()                    |    ✅     | Quote JSON document                                                                                                                                     |
 | JSON_REMOVE()                   |    ✅     | Remove data from JSON document                                                                                                                          |
 | JSON_REPLACE()                  |    ✅     | Replace values in JSON document                                                                                                                         |
-| JSON_SCHEMA_VALID()             |    ❌     | Validate JSON document against JSON schema; returns TRUE/1 if document validates against schema, or FALSE/0 if it does not                              |
-| JSON_SCHEMA_VALIDATION_REPORT() |    ❌     | Validate JSON document against JSON schema; returns report in JSON format on outcome on validation including success or failure and reasons for failure |
+| JSON_SCHEMA_VALID()             |    ✅     | Validate JSON document against JSON schema; returns TRUE/1 if document validates against schema, or FALSE/0 if it does not                              |
+| JSON_SCHEMA_VALIDATION_REPORT() |    ✅     | Validate JSON document against JSON schema; returns report in JSON format on outcome on validation including success or failure and reasons for failure |
 | JSON_SEARCH()                   |    ✅     | Path to value within JSON document                                                                                                                      |
 | JSON_SET()                      |    ✅     | Insert data into JSON document                                                                                                                          |
 | JSON_STORAGE_FREE()             |    ✅     | Freed space within binary representation of JSON column value following partial update                                                                  |
-| JSON_STORAGE_SIZE()             |    ❌     | Space used for storage of binary representation of a JSON document                                                                                      |
+| JSON_STORAGE_SIZE()             |    ✅     | Space used for storage of binary representation of a JSON document                                                                                      |
 | JSON_TABLE()                    |    ❌     | Return data from a JSON expression as a relational table                                                                                                |
 | JSON_TYPE()                     |    ✅     | Type of JSON value                                                                                                                                      |
 | JSON_UNQUOTE()                  |    ✅     | Unquote JSON value                                                                                                                                      |

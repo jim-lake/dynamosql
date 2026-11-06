@@ -25,6 +25,7 @@
   },
   "dependencies": {
     "@aws-sdk/client-dynamodb": "^3.922.0",
+    "@cfworker/json-schema": "^4.1.6",
     "sqlstring": "2.3.3"
   },
   "devDependencies": {
