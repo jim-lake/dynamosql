@@ -47,7 +47,7 @@ export function inOp(expr: Binary, state: EvaluationState): EvaluationResult {
         if (right.err) {
           return right;
         }
-        const [left_val, right_val] = _convertCompare(
+        const [left_val, right_val] = convertCompare(
           left,
           right,
           state.session.timeZone
@@ -107,7 +107,7 @@ export function nullif(
 
   if (!err) {
     const origValue = arg1.value;
-    const [left_val, right_val] = _convertCompare(
+    const [left_val, right_val] = convertCompare(
       arg1,
       arg2,
       state.session.timeZone
@@ -126,7 +126,7 @@ export function nullif(
   }
   return { err, name, value, type };
 }
-function _convertCompare(
+export function convertCompare(
   left: EvaluationResult,
   right: EvaluationResult,
   timeZone: string
@@ -209,7 +209,7 @@ function _equal(
   const name = (left.name ?? '') + op + (right.name ?? '');
   let value: unknown = 0;
   if (!err) {
-    const [left_val, right_val] = _convertCompare(
+    const [left_val, right_val] = convertCompare(
       left,
       right,
       state.session.timeZone
@@ -240,7 +240,7 @@ function _gt(
     : (left.name ?? '') + op + (right.name ?? '');
   let value: unknown = 0;
   if (!err) {
-    const [left_val, right_val] = _convertCompare(
+    const [left_val, right_val] = convertCompare(
       left,
       right,
       state.session.timeZone
@@ -273,7 +273,7 @@ function _gte(
     : (left.name ?? '') + op + (right.name ?? '');
   let value: unknown = 0;
   if (!err) {
-    const [left_val, right_val] = _convertCompare(
+    const [left_val, right_val] = convertCompare(
       left,
       right,
       state.session.timeZone

@@ -324,4 +324,7 @@ describe('Expression', function () {
   runTests('collation.sql', path.join(__dirname, 'collation.sql'), {
     verify_field_types: true,
   });
+  runTests('case.sql', path.join(__dirname, 'case.sql'), {
+    verify_field_types: true,
+  });
 });

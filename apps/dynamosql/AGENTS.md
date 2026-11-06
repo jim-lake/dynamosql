@@ -36,18 +36,18 @@ Module-level notes:
 
 Run these from `apps/dynamosql/`:
 
-| Task                          | Command                                                     |
-| ----------------------------- | ----------------------------------------------------------- |
-| Create DynamoDB/MySQL tables  | `npm run test:setup`                                        |
-| Full test run                 | `npm test`                                                  |
-| Single test file              | `npm run test:single -- test/select/<file>.test.js`         |
-| Include slow tests            | `npm run test:slow` or `npm run test:single:slow -- <file>` |
-| Type check                    | `npm run ts:check`                                          |
-| Lint                          | `npm run lint` (runs `eslint src test examples --fix`)      |
-| Format                        | `npm run pretty`                                            |
-| Build                         | `npm run build`                                             |
-| Export check                  | `npm run test:export:check`                                 |
-| Manual query (MySQL / Dynamo) | `npm run query:mysql` / `npm run query:session`             |
+| Task                                       | Command                                                                 |
+| ------------------------------------------ | ----------------------------------------------------------------------- |
+| Create DynamoDB/MySQL tables               | `npm run test:setup`                                                    |
+| Full test run                              | `npm test`                                                              |
+| Single test file                           | `npm run test:single -- test/select/<file>.test.js`                     |
+| Include slow tests                         | `npm run test:slow` or `npm run test:single:slow -- <file>`             |
+| Type check                                 | `npm run ts:check`                                                      |
+| Lint                                       | `npm run lint` (runs `eslint src test examples --fix`)                  |
+| Format                                     | `npm run pretty`                                                        |
+| Build                                      | `npm run build`                                                         |
+| Export check                               | `npm run test:export:check`                                             |
+| Manual query (MySQL / Dynamo / parse tree) | `npm run query:mysql` / `npm run query:session` / `npm run query:parse` |
 
 After any code change, run `npm run ts:check && npm run lint`, then `npm test`. Run `npm run test:setup` first if table definitions changed.
 
@@ -66,7 +66,7 @@ After any code change, run `npm run ts:check && npm run lint`, then `npm test`. 
 - Test directories: `select/`, `insert/`, `update/`, `delete/`, `replace/`, `join/`, `expression/`, `ddl/`, `memory/`, `client_opts/`, `unit_misc/`, `setup/`.
 - Each feature directory holds `.sql` query files and `.test.js` or `.test.ts` files that compare results. Follow the pattern of the neighboring tests.
 - Run a subset of tests by name with `npm test -- --grep 'pattern'`. Most tests come from `.sql` files: each statement in a `.sql` file becomes a test case titled with the statement text. Do not guess test file names for these. Search by a fragment of the SQL text instead, for example `npm test -- --grep 'JSON_ARRAY'`. Avoid `npm run test:single`. Very few `.test.js` files exist, so only use it when you have confirmed a specific `.test.js` or `.test.ts` file exists.
-- To run one query manually through the DynamoSQL engine, use `npm run query:session`. To run it through MySQL, use `npm run query:mysql`. Use these to compare the two outputs before writing a test.
+- For development, use all three manual query commands on the same SQL. Use `npm run query:mysql` for the MySQL result, `npm run query:session` for the DynamoSQL engine result, and `npm run query:parse` for the parse tree that the engine receives. When a query fails, run `npm run query:parse` first. If the tree is correct, the gap is in the engine. If the parser rejects the SQL or returns a wrong tree, the gap is in the parser. Use these to compare the outputs before writing a test.
 
 ## Code Conventions
 

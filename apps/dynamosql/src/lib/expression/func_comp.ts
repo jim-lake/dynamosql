@@ -35,7 +35,7 @@ export function coalesce(
       value = result.value;
     }
   }
-  const { type } = _unionType(values);
+  const { type } = unionType(values);
   return { err, name: `COALESCE(${names.join(', ')}`, value, type };
 }
 export function ifnull(
@@ -52,7 +52,7 @@ export function ifnull(
     return arg2;
   }
   const value = arg1.value !== null ? arg1.value : arg2.value;
-  const { type } = _unionType([arg1, arg2]);
+  const { type } = unionType([arg1, arg2]);
   return { err: null, name: `IFNULL(${arg1.name}, ${arg2.name})`, value, type };
 }
 export function ifFunc(
@@ -68,7 +68,7 @@ export function ifFunc(
   let value;
   let type: EvaluationResult['type'] = 'longlong';
   if (!err) {
-    type = _unionType([trueValue, falseValue]).type;
+    type = unionType([trueValue, falseValue]).type;
     const condResult = convertNum(condition.value);
     let result_type: ValueType;
     if (condResult === null || condResult === 0) {
@@ -184,7 +184,7 @@ interface UnionTypeResult {
   compare_type: ValueType;
   type: ValueType;
 }
-function _unionType(list: EvaluationResult[]): UnionTypeResult {
+export function unionType(list: EvaluationResult[]): UnionTypeResult {
   let compare_type: ValueType;
   const types = list.map((e) => (e.type === 'bool' ? 'longlong' : e.type));
   if (types.includes('datetime')) {
@@ -260,7 +260,7 @@ export function _compare(
       value = null;
     }
   }
-  const { compare_type, type } = _unionType(values);
+  const { compare_type, type } = unionType(values);
 
   let decimals = 0;
   if (value !== null) {

@@ -9,6 +9,7 @@ import { getDecimalsForString } from '../helpers/decimals';
 
 import { methods as AggregateFunctions } from './aggregate_functions';
 import { methods as BinaryExpression } from './binary_expression';
+import { caseExpr } from './case';
 import { methods as Cast } from './cast';
 import { methods as Functions } from './functions';
 import { methods as Interval } from './interval';
@@ -191,6 +192,8 @@ export function getValue(
   } else if ('type' in expr && expr.type === 'fulltext_search') {
     // FulltextSearch - MATCH(...) AGAINST(...) - not yet implemented
     result.err = { err: 'ER_NOT_SUPPORTED_YET' };
+  } else if ('type' in expr && expr.type === 'case') {
+    result = caseExpr(expr, state);
   } else if (isValueExpr(expr)) {
     const type = expr.type;
     if (type === 'number') {

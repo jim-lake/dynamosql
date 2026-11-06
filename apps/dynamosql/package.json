@@ -21,6 +21,7 @@
     "test:coverage": "TEST_RUN_SLOW=1 TEST_COVER=1 bash scripts/run-tests.sh coverage 'test/**/*.test.js'",
     "query:mysql": "dotenv -- npx tsx test/test_client.js",
     "query:session": "dotenv -- npx tsx test/test_session.js",
+    "query:parse": "npx tsx test/test_parse.ts",
     "example:query": "dotenv -- node examples/query.js"
   },
   "dependencies": {
