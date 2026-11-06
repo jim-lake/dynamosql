@@ -3,7 +3,10 @@ import { SQLJson } from '../types/sql_json';
 
 import type { EvaluationResult } from './evaluate';
 
-export interface IndexBound { index: number; from_last: boolean }
+export interface IndexBound {
+  index: number;
+  from_last: boolean;
+}
 
 export type SinglePathSegment =
   { kind: 'key'; key: string } | ({ kind: 'index' } & IndexBound);

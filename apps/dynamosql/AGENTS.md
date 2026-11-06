@@ -51,6 +51,8 @@ Run these from `apps/dynamosql/`:
 
 After any code change, run `npm run ts:check && npm run lint`, then `npm test`. Run `npm run test:setup` first if table definitions changed.
 
+`npm run lint` must always be run before you finish a task. It runs `eslint --fix`, so it may reformat files you did not edit. Never revert those files with git or by hand. Leave every change lint makes, even in files outside your task.
+
 ## Testing Rules
 
 - Test runs always write the complete output to a `/tmp` log file. The terminal shows only the log path and `SUCCESS`/`FAIL`. Use `grep` or `sed` on the log file to find details. Do not pipe the test command itself through a filter.

@@ -9,6 +9,7 @@ import type {
   From,
   SetList,
   BaseFrom,
+  Binary,
   ColumnRef,
   Column,
 } from 'node-sql-parser/build/mysql';
@@ -87,6 +88,33 @@ export function resolveReferences(
       }
     }
   });
+  from?.forEach((joined: From, index: number, list: From[]) => {
+    if (!isBaseFrom(joined) || index === 0 || !('using' in joined)) {
+      return;
+    }
+    const left = list.slice(0, index).filter(isBaseFrom).pop();
+    if (!left || !joined.using) {
+      return;
+    }
+    const columns = (joined.using as unknown as { value: string }[]).map(
+      (item) => item.value
+    );
+    joined.on = columns
+      .map((column): Binary => ({
+        type: 'binary_expr',
+        operator: '=',
+        left: { type: 'column_ref', table: left.as ?? left.table, column },
+        right: { type: 'column_ref', table: joined.as ?? joined.table, column },
+      }))
+      .reduce((acc, condition) => ({
+        type: 'binary_expr',
+        operator: 'AND',
+        left: acc,
+        right: condition,
+      }));
+    delete joined.using;
+  });
+
   const tableRaw = ast.type === 'delete' ? ast.table : null;
   const table = Array.isArray(tableRaw) ? tableRaw : null;
   table?.forEach((object: From & { from?: TableMapEntry }) => {
