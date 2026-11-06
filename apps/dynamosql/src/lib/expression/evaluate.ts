@@ -204,7 +204,7 @@ export function getValue(
       } else if (value !== null) {
         result.value = Number(value);
         if (typeof value === 'string') {
-          if (value.includes('e')) {
+          if (value.toLowerCase().includes('e')) {
             result.type = 'double';
             result.decimals = 31;
           } else if (value.includes('.')) {

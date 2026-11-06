@@ -1,0 +1,20 @@
+-- Exponent notation literals are DOUBLE, whatever the case of the exponent marker
+SELECT 2.5E0 AS result;
+SELECT 2.5e0 AS result;
+SELECT 1.5E0 AS result;
+SELECT 1.0E0 AS result;
+SELECT 0.5E0 AS result;
+SELECT 2E0 AS result;
+SELECT 1E3 AS result;
+SELECT 2.5E-1 AS result;
+SELECT 2.5E+1 AS result;
+SELECT -2.5E0 AS result;
+SELECT 2.5E0 + 1 AS result;
+SELECT 2.5E0 * 2 AS result;
+SELECT 2.5E0 / 2 AS result;
+SELECT 2.5E0 % 2 AS result;
+SELECT CASE WHEN 1 THEN 1 ELSE 2.5E0 END AS result;
+SELECT CASE WHEN 1 THEN 1.5E0 ELSE 2 END AS result;
+SELECT CASE WHEN 0 THEN 1.5E0 ELSE 2.25 END AS result;
+SELECT CASE WHEN 1 THEN 1.5E0 ELSE 2.25 END AS result;
+SELECT CASE WHEN 1 THEN 10 END + 1.5E0 AS result;

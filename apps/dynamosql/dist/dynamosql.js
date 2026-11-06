@@ -43128,11 +43128,7 @@ function modHelper(left, right, name) {
     const err = left.err ?? right.err;
     let value;
     let type;
-    if (!err && (left.value === null || right.value === null)) {
-        value = null;
-        type = 'double';
-    }
-    else if (!err) {
+    if (!err) {
         const num1 = convertNum(left.value);
         const num2 = convertNum(right.value);
         if (num2 === 0 || num2 === null) {
@@ -43141,10 +43137,16 @@ function modHelper(left, right, name) {
         else {
             value = num1 !== null ? num1 % num2 : null;
         }
-        if (left.type === 'double' || right.type === 'double') {
+        if (left.type === 'double' ||
+            right.type === 'double' ||
+            left.type === 'null' ||
+            right.type === 'null') {
             type = 'double';
         }
-        else if (left.type === 'string' || right.type === 'string') {
+        else if (left.type === 'string' ||
+            right.type === 'string' ||
+            left.type === 'text' ||
+            right.type === 'text') {
             type = 'double';
         }
         else if (left.type === 'number' || right.type === 'number') {
@@ -43173,7 +43175,12 @@ function _numBothSides(expr, state, op, allow_interval) {
     if (!err) {
         if (left.value === null || right.value === null) {
             value = null;
-            type = 'double';
+            if (left.type === 'null' ||
+                right.type === 'null' ||
+                left.type === 'interval' ||
+                right.type === 'interval') {
+                type = 'double';
+            }
         }
         else if (allow_interval &&
             left.type === 'interval' &&
@@ -43255,7 +43262,10 @@ function _unionNumberType(raw_type1, raw_type2, default_type) {
     // YEAR and BOOL values are integers in arithmetic, so they behave like longlong.
     const type1 = raw_type1 === 'year' || raw_type1 === 'bool' ? 'longlong' : raw_type1;
     const type2 = raw_type2 === 'year' || raw_type2 === 'bool' ? 'longlong' : raw_type2;
-    if (type1 === 'string' || type2 === 'string') {
+    if (type1 === 'string' ||
+        type2 === 'string' ||
+        type1 === 'text' ||
+        type2 === 'text') {
         return 'double';
     }
     else if (type1 === type2) {
@@ -48989,7 +48999,7 @@ function getValue(expr, state) {
             else if (value !== null) {
                 result.value = Number(value);
                 if (typeof value === 'string') {
-                    if (value.includes('e')) {
+                    if (value.toLowerCase().includes('e')) {
                         result.type = 'double';
                         result.decimals = 31;
                     }

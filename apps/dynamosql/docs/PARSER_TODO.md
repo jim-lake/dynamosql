@@ -2,7 +2,9 @@
 
 Mismatches between node-sql-parser (MySQL grammar) and MySQL 8.4. Each form was checked against MySQL 8.4.11.
 
-No open items.
+## Open
+
+- Decimal literals with no leading digit (`SELECT .5`, `SELECT .5E0`) fail to parse. MySQL 8.4 accepts them.
 
 ## Resolved
 

@@ -133,10 +133,7 @@ export function modHelper(
   let value;
   let type: EvaluationResult['type'];
 
-  if (!err && (left.value === null || right.value === null)) {
-    value = null;
-    type = 'double';
-  } else if (!err) {
+  if (!err) {
     const num1 = convertNum(left.value);
     const num2 = convertNum(right.value);
     if (num2 === 0 || num2 === null) {
@@ -145,9 +142,19 @@ export function modHelper(
       value = num1 !== null ? num1 % num2 : null;
     }
 
-    if (left.type === 'double' || right.type === 'double') {
+    if (
+      left.type === 'double' ||
+      right.type === 'double' ||
+      left.type === 'null' ||
+      right.type === 'null'
+    ) {
       type = 'double';
-    } else if (left.type === 'string' || right.type === 'string') {
+    } else if (
+      left.type === 'string' ||
+      right.type === 'string' ||
+      left.type === 'text' ||
+      right.type === 'text'
+    ) {
       type = 'double';
     } else if (left.type === 'number' || right.type === 'number') {
       type = 'number';
@@ -184,7 +191,14 @@ function _numBothSides(
   if (!err) {
     if (left.value === null || right.value === null) {
       value = null;
-      type = 'double';
+      if (
+        left.type === 'null' ||
+        right.type === 'null' ||
+        left.type === 'interval' ||
+        right.type === 'interval'
+      ) {
+        type = 'double';
+      }
     } else if (
       allow_interval &&
       left.type === 'interval' &&
@@ -271,7 +285,12 @@ function _unionNumberType(
     raw_type1 === 'year' || raw_type1 === 'bool' ? 'longlong' : raw_type1;
   const type2 =
     raw_type2 === 'year' || raw_type2 === 'bool' ? 'longlong' : raw_type2;
-  if (type1 === 'string' || type2 === 'string') {
+  if (
+    type1 === 'string' ||
+    type2 === 'string' ||
+    type1 === 'text' ||
+    type2 === 'text'
+  ) {
     return 'double';
   } else if (type1 === type2) {
     return type1;

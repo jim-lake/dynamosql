@@ -327,4 +327,14 @@ describe('Expression', function () {
   runTests('case.sql', path.join(__dirname, 'case.sql'), {
     verify_field_types: true,
   });
+  runTests(
+    'exponent_literal_types.sql',
+    path.join(__dirname, 'exponent_literal_types.sql'),
+    { verify_field_types: true }
+  );
+  runTests(
+    'null_and_text_arithmetic.sql',
+    path.join(__dirname, 'null_and_text_arithmetic.sql'),
+    { verify_field_types: true }
+  );
 });
