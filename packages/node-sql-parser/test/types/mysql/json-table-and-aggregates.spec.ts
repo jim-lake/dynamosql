@@ -130,6 +130,16 @@ test('MEMBER OF chains sqlify back to the same shape', () => {
   assertType(isSelect, parser.astify(out));
 });
 
+test('MEMBER OF on the right of = folds left to right', () => {
+  const expr = parseColumnExpr(`SELECT 2 = 1 MEMBER OF(t.j) AS v FROM t`);
+  assertType(isBinary, expr);
+  assert.strictEqual(expr.operator, 'MEMBER OF');
+  assertType(isBinary, expr.left);
+  assert.strictEqual(expr.left.operator, '=');
+  assert.strictEqual(expr.left.right.value, 1);
+  assert.strictEqual(expr.right.type, 'expr_list');
+});
+
 test('SUM, AVG, MIN, and MAX accept DISTINCT', () => {
   for (const fn of ['SUM', 'AVG', 'MIN', 'MAX']) {
     const expr = parseColumnExpr(`SELECT ${fn}(DISTINCT a) AS v FROM t`);

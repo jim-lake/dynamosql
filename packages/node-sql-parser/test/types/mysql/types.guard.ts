@@ -195,13 +195,19 @@ export function isJoin(obj: unknown): obj is Join {
         isBaseFrom(typedObj) as boolean &&
         (typedObj["join"] === "INNER JOIN" ||
             typedObj["join"] === "LEFT JOIN" ||
-            typedObj["join"] === "RIGHT JOIN") &&
+            typedObj["join"] === "RIGHT JOIN" ||
+            typedObj["join"] === "CROSS JOIN" ||
+            typedObj["join"] === "STRAIGHT_JOIN" ||
+            typedObj["join"] === "NATURAL JOIN" ||
+            typedObj["join"] === "NATURAL LEFT JOIN" ||
+            typedObj["join"] === "NATURAL RIGHT JOIN") &&
         (typeof typedObj["using"] === "undefined" ||
             Array.isArray(typedObj["using"]) &&
             typedObj["using"].every((e: any) =>
                 typeof e === "string"
             )) &&
         (typeof typedObj["on"] === "undefined" ||
+            typedObj["on"] === null ||
             isBinary(typedObj["on"]) as boolean)
     )
 }

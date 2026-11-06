@@ -147,6 +147,14 @@ test('insert.sql statements', () => {
   }
 });
 
+test('join-operators.sql statements', () => {
+  const statements = readSqlFile('join-operators.sql');
+  for (const sql of statements) {
+    const ast = astify(sql);
+    assertType(isSelect, ast, `isSelect: ${sql}`);
+  }
+});
+
 test('load.sql statements', () => {
   const statements = readSqlFile('load.sql');
   for (const sql of statements) {
@@ -165,6 +173,14 @@ test('lock.sql statements', () => {
 
 test('member-of.sql statements', () => {
   const statements = readSqlFile('member-of.sql');
+  for (const sql of statements) {
+    const ast = astify(sql);
+    assertType(isSelect, ast, `isSelect: ${sql}`);
+  }
+});
+
+test('natural-join.sql statements', () => {
+  const statements = readSqlFile('natural-join.sql');
   for (const sql of statements) {
     const ast = astify(sql);
     assertType(isSelect, ast, `isSelect: ${sql}`);

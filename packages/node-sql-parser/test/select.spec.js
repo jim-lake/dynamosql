@@ -468,7 +468,7 @@ describe('select', () => {
         ]);
       });
 
-      ['left', 'right', 'full'].forEach((join) => {
+      ['left', 'right'].forEach((join) => {
         [' ', ' outer '].forEach((outer) => {
           it(`should parse ${join}${outer}joins`, () => {
             const ast = parser.astify(`SELECT * FROM t ${join} ${outer} join d on d.d = d.a`);

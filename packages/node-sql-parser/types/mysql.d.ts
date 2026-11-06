@@ -60,9 +60,9 @@ export interface BaseFrom {
   loc?: LocationRange;
 }
 export interface Join extends BaseFrom {
-  join: "INNER JOIN" | "LEFT JOIN" | "RIGHT JOIN";
+  join: "INNER JOIN" | "LEFT JOIN" | "RIGHT JOIN" | "CROSS JOIN" | "STRAIGHT_JOIN" | "NATURAL JOIN" | "NATURAL LEFT JOIN" | "NATURAL RIGHT JOIN";
   using?: string[];
-  on?: Binary;
+  on?: Binary | null;
 }
 export interface Values {
   type: "values";

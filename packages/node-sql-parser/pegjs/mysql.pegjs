@@ -69,7 +69,6 @@
     'EXPLAIN': true,
 
     'FALSE': true,
-    'FULL': true,
     'FROM': true,
     'FETCH': true,
     'FLOAT': true,
@@ -2521,8 +2520,13 @@ table_ref
   / __ t:table_join { return t; }
 
 
+// NATURAL joins take no ON or USING clause, so the join ends after the table
 table_join
-  = op:join_op __ t:(table_base / table_ref_list) __ KW_USING __ LPAREN __ head:ident_without_kw_type tail:(__ COMMA __ ident_without_kw_type)* __ RPAREN {
+  = op:natural_join_op __ t:(table_base / table_ref_list) {
+      t.join = op;
+      return t;
+    }
+  / op:join_op __ t:(table_base / table_ref_list) __ KW_USING __ LPAREN __ head:ident_without_kw_type tail:(__ COMMA __ ident_without_kw_type)* __ RPAREN {
       t.join = op;
       t.using = createList(head, tail);
       return t;
@@ -2600,10 +2604,14 @@ table_base
 join_op
   = KW_LEFT __ KW_OUTER? __ KW_JOIN { return 'LEFT JOIN'; }
   / KW_RIGHT __ KW_OUTER? __ KW_JOIN { return 'RIGHT JOIN'; }
-  / KW_FULL __ KW_OUTER? __ KW_JOIN { return 'FULL JOIN'; }
   / KW_CROSS __ KW_JOIN { return 'CROSS JOIN'; }
   / KW_STRAIGHT_JOIN { return 'STRAIGHT_JOIN'; }
   / (KW_INNER __)? KW_JOIN { return 'INNER JOIN'; }
+
+natural_join_op
+  = KW_NATURAL __ KW_LEFT __ KW_OUTER? __ KW_JOIN { return 'NATURAL LEFT JOIN'; }
+  / KW_NATURAL __ KW_RIGHT __ KW_OUTER? __ KW_JOIN { return 'NATURAL RIGHT JOIN'; }
+  / KW_NATURAL __ (KW_INNER __)? KW_JOIN { return 'NATURAL JOIN'; }
 
 table_name
   = prefix:[_0-9]+ part:ident_without_kw tail:(__ DOT __ ident_without_kw)? {
