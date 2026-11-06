@@ -5,6 +5,7 @@ Mismatches between node-sql-parser (MySQL grammar) and MySQL 8.4. Each form was 
 ## Open
 
 - Decimal literals with no leading digit (`SELECT .5`, `SELECT .5E0`) fail to parse. MySQL 8.4 accepts them.
+- `UPDATE IGNORE t SET ...` fails to parse (`Expected [A-Za-z0-9_$\x80-\u{FFFF}] but " " found`). MySQL 8.4 accepts it.
 
 ## Resolved
 
