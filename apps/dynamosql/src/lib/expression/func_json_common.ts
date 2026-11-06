@@ -3,9 +3,13 @@ import { SQLJson } from '../types/sql_json';
 
 import type { EvaluationResult } from './evaluate';
 
+export interface IndexBound { index: number; from_last: boolean }
+
+export type SinglePathSegment =
+  { kind: 'key'; key: string } | ({ kind: 'index' } & IndexBound);
+
 export type PathSegment =
-  | { kind: 'key'; key: string }
-  | { kind: 'index'; index: number; from_last: boolean };
+  SinglePathSegment | { kind: 'range'; from: IndexBound; to: IndexBound };
 
 export const NOT_FOUND = Symbol('not_found');
 
@@ -29,7 +33,20 @@ export function _isRecord(node: unknown): node is Record<string, unknown> {
   return typeof node === 'object' && node !== null && !Array.isArray(node);
 }
 
-export function _parsePath(path: string): PathSegment[] {
+function _parseIndexBound(text: string): IndexBound | null {
+  const last_match = /^last\s*(?:-\s*(\d+))?$/.exec(text);
+  if (last_match) {
+    return { index: Number(last_match[1] ?? 0), from_last: true };
+  }
+  return /^\d+$/.test(text) ? { index: Number(text), from_last: false } : null;
+}
+
+export function _parsePath(
+  path: string,
+  allow_range?: false
+): SinglePathSegment[];
+export function _parsePath(path: string, allow_range: true): PathSegment[];
+export function _parsePath(path: string, allow_range = false): PathSegment[] {
   if (!path.startsWith('$')) {
     throw new SQLError({ err: 'ER_INVALID_JSON_PATH', args: [1] });
   }
@@ -56,24 +73,33 @@ export function _parsePath(path: string): PathSegment[] {
         throw new SQLError({ err: 'ER_INVALID_JSON_PATH', args: [pos + 1] });
       }
       const inner = path.slice(pos + 1, end).trim();
-      if (inner === '*' || /\sto\s/.test(inner)) {
+      if (inner === '*') {
         throw new SQLError({ err: 'ER_INVALID_JSON_PATH_WILDCARD' });
       }
-      const last_match = /^last\s*(?:-\s*(\d+))?$/.exec(inner);
-      if (last_match) {
-        segment_list.push({
-          kind: 'index',
-          index: Number(last_match[1] ?? 0),
-          from_last: true,
-        });
-      } else if (/^\d+$/.test(inner)) {
-        segment_list.push({
-          kind: 'index',
-          index: Number(inner),
-          from_last: false,
-        });
+      const range_match = /^(.+?)\s+to\s+(.+)$/.exec(inner);
+      if (range_match === null) {
+        const bound = _parseIndexBound(inner);
+        if (bound === null) {
+          throw new SQLError({ err: 'ER_INVALID_JSON_PATH', args: [pos + 1] });
+        }
+        segment_list.push({ kind: 'index', ...bound });
       } else {
-        throw new SQLError({ err: 'ER_INVALID_JSON_PATH', args: [pos + 1] });
+        if (!allow_range) {
+          throw new SQLError({ err: 'ER_INVALID_JSON_PATH_WILDCARD' });
+        }
+        const [, from_text = '', to_text = ''] = range_match;
+        const from = _parseIndexBound(from_text);
+        const to = _parseIndexBound(to_text);
+        const is_reversed =
+          from !== null &&
+          to !== null &&
+          !from.from_last &&
+          !to.from_last &&
+          from.index > to.index;
+        if (from === null || to === null || is_reversed) {
+          throw new SQLError({ err: 'ER_INVALID_JSON_PATH', args: [pos + 1] });
+        }
+        segment_list.push({ kind: 'range', from, to });
       }
       pos = end + 1;
     } else {
@@ -83,11 +109,38 @@ export function _parsePath(path: string): PathSegment[] {
   return segment_list;
 }
 
-export function _arrayIndex(
-  segment: Extract<PathSegment, { kind: 'index' }>,
-  length: number
-): number {
-  return segment.from_last ? length - 1 - segment.index : segment.index;
+export function _arrayIndex(bound: IndexBound, length: number): number {
+  return bound.from_last ? length - 1 - bound.index : bound.index;
+}
+
+export function _select(
+  node: unknown,
+  path: PathSegment[],
+  auto_wrap = true
+): unknown[] {
+  const [segment, ...rest] = path;
+  if (segment === undefined) {
+    return [node];
+  } else if (segment.kind === 'key') {
+    if (!_isRecord(node) || !Object.hasOwn(node, segment.key)) {
+      return [];
+    }
+    return _select(node[segment.key], rest, auto_wrap);
+  }
+  // A non-array value behaves as a one-element array, so only index 0 reaches it.
+  const item_list = Array.isArray(node) ? node : auto_wrap ? [node] : [];
+  const length = item_list.length;
+  const first = segment.kind === 'index' ? segment : segment.from;
+  const last = segment.kind === 'index' ? segment : segment.to;
+  const start = Math.max(0, _arrayIndex(first, length));
+  const end = Math.min(length - 1, _arrayIndex(last, length));
+  const index_list = Array.from(
+    { length: Math.max(0, end - start + 1) },
+    (_, offset) => start + offset
+  );
+  return index_list.flatMap((index) =>
+    _select(item_list[index], rest, auto_wrap)
+  );
 }
 
 export function _lookup(
@@ -95,33 +148,8 @@ export function _lookup(
   path: PathSegment[],
   auto_wrap = true
 ): unknown {
-  const [segment, ...rest] = path;
-  if (segment === undefined) {
-    return node;
-  } else if (segment.kind === 'key') {
-    if (
-      typeof node !== 'object' ||
-      node === null ||
-      Array.isArray(node) ||
-      !Object.hasOwn(node, segment.key)
-    ) {
-      return NOT_FOUND;
-    }
-    return _lookup(
-      (node as Record<string, unknown>)[segment.key],
-      rest,
-      auto_wrap
-    );
-  } else if (Array.isArray(node)) {
-    const index = _arrayIndex(segment, node.length);
-    return index >= 0 && index < node.length
-      ? _lookup(node[index], rest, auto_wrap)
-      : NOT_FOUND;
-  } else if (!auto_wrap) {
-    return NOT_FOUND;
-  }
-  // A non-array value behaves as a one-element array, so only index 0 reaches it.
-  return segment.index === 0 ? _lookup(node, rest, auto_wrap) : NOT_FOUND;
+  const match_list = _select(node, path, auto_wrap);
+  return match_list.length === 0 ? NOT_FOUND : match_list[0];
 }
 
 export function _unquote(str: EvaluationResult): EvaluationResult {

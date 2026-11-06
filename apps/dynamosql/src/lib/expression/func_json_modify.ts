@@ -6,7 +6,7 @@ import { getValue } from './evaluate';
 import { _arrayIndex, _parsePath } from './func_json_common';
 
 import type { EvaluationState, EvaluationResult } from './evaluate';
-import type { PathSegment } from './func_json_common';
+import type { SinglePathSegment } from './func_json_common';
 import type { Function } from 'node-sql-parser/build/mysql';
 
 type AssignMode = 'set' | 'insert' | 'replace';
@@ -116,7 +116,7 @@ export function json_remove(
   return { err: null, value: new SQLJson(node), type: 'json' };
 }
 
-function _removeAt(node: unknown, path: PathSegment[]): unknown {
+function _removeAt(node: unknown, path: SinglePathSegment[]): unknown {
   const [segment, ...rest] = path;
   if (segment === undefined) {
     return node;
@@ -160,7 +160,7 @@ function _removeAt(node: unknown, path: PathSegment[]): unknown {
 
 function _assignAt(
   node: unknown,
-  path: PathSegment[],
+  path: SinglePathSegment[],
   value: unknown,
   mode: AssignMode
 ): unknown {

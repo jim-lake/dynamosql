@@ -12,6 +12,7 @@ import {
   _lookup,
   _parseDocument,
   _parsePath,
+  _select,
   _unquote,
 } from './func_json_common';
 
@@ -213,13 +214,20 @@ function _extract(
   }
 
   const root = SQLJson.parseText(doc, 'json_extract', 1);
-  const match_list = path_list
-    .map(({ value }) => _lookup(root, _parsePath(String(value))))
-    .filter((node) => node !== NOT_FOUND);
+  const segment_lists = path_list.map(({ value }) =>
+    _parsePath(String(value), true)
+  );
+  const match_list = segment_lists.flatMap((segment_list) =>
+    _select(root, segment_list)
+  );
   if (match_list.length === 0) {
     return { err: null, value: null, type: 'json' };
   }
-  const result = path_list.length === 1 ? match_list[0] : match_list;
+  const has_range = segment_lists.some((segment_list) =>
+    segment_list.some(({ kind }) => kind === 'range')
+  );
+  const result =
+    path_list.length === 1 && !has_range ? match_list[0] : match_list;
   return { err: null, value: new SQLJson(result), type: 'json' };
 }
 

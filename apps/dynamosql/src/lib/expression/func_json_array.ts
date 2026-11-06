@@ -6,7 +6,7 @@ import { getValue } from './evaluate';
 import { _arrayIndex, _parsePath } from './func_json_common';
 
 import type { EvaluationState, EvaluationResult } from './evaluate';
-import type { PathSegment } from './func_json_common';
+import type { SinglePathSegment } from './func_json_common';
 import type { Function } from 'node-sql-parser/build/mysql';
 
 export function json_array(
@@ -130,7 +130,7 @@ export function json_array_insert(
 
 function _appendAt(
   node: unknown,
-  path: PathSegment[],
+  path: SinglePathSegment[],
   value: unknown
 ): unknown {
   const [segment, ...rest] = path;
@@ -165,7 +165,7 @@ function _appendAt(
 
 function _insertAt(
   node: unknown,
-  path: PathSegment[],
+  path: SinglePathSegment[],
   value: unknown
 ): unknown {
   const [segment, ...rest] = path;

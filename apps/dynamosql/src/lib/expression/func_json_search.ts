@@ -12,7 +12,7 @@ import {
 } from './func_json_common';
 
 import type { EvaluationState, EvaluationResult } from './evaluate';
-import type { PathSegment } from './func_json_common';
+import type { SinglePathSegment } from './func_json_common';
 import type { Function } from 'node-sql-parser/build/mysql';
 
 interface LocatedNode {
@@ -106,7 +106,7 @@ function _pathKey(key: string): string {
 
 function _locate(
   node: unknown,
-  path: PathSegment[],
+  path: SinglePathSegment[],
   prefix: string
 ): LocatedNode | typeof NOT_FOUND {
   const [segment, ...rest] = path;
