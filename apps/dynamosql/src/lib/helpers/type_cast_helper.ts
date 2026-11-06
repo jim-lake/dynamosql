@@ -1,5 +1,6 @@
+import { toBigInt } from '@/tools/safe_convert';
+
 import { FIELD_FLAGS } from '../../constants/mysql';
-import { toBigInt } from '../../tools/safe_convert';
 import { Types } from '../../types';
 import { SQLDate } from '../types/sql_date';
 import { SQLDateTime } from '../types/sql_datetime';

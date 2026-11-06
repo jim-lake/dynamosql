@@ -1,6 +1,7 @@
+import { deepClone } from '@/tools/clone';
+
 import { COLLATIONS, CHARSETS } from '../../../constants/mysql';
 import { SQLError } from '../../../error';
-import { deepClone } from '../../../tools/clone';
 import { COLLATION_CHARSET_MAP, CHARSET_BYTE_MAP } from '../../helpers/charset';
 import {
   getEngine,

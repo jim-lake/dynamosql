@@ -1,12 +1,13 @@
-import { SQLError } from '../../../error';
+import type { NativeType } from '@/tools/dynamodb';
 import {
   escapeValue,
   escapeIdentifier,
   convertError,
-} from '../../../tools/dynamodb_helper';
-import { trackFirstSeen } from '../../../tools/util';
+} from '@/tools/dynamodb_helper';
+import { trackFirstSeen } from '@/tools/util';
 
-import type { NativeType } from '../../../tools/dynamodb';
+import { SQLError } from '../../../error';
+
 import type {
   EvaluationResultRow,
   InsertParams,

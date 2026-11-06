@@ -1,5 +1,6 @@
+import { jsonStringify } from '@/tools/util';
+
 import { CODE_ERRNO } from './constants/mysql';
-import { jsonStringify } from './tools/util';
 
 const DEFAULT_CODE = 'ER_NO';
 

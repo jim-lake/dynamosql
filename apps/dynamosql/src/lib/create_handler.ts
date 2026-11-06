@@ -1,8 +1,9 @@
 import { logger } from '@dynamosql/shared';
 
+import { trackFirstSeen } from '@/tools/util';
+
 import { COLLATIONS } from '../constants/mysql';
 import { SQLError } from '../error';
-import { trackFirstSeen } from '../tools/util';
 
 import {
   getDatabaseName,

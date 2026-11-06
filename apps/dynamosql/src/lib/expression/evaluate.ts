@@ -1,8 +1,9 @@
 import { logger } from '@dynamosql/shared';
 
+import { mapToObject } from '@/tools/dynamodb_helper';
+import { toBigInt } from '@/tools/safe_convert';
+
 import GlobalSettings from '../../global_settings';
-import { mapToObject } from '../../tools/dynamodb_helper';
-import { toBigInt } from '../../tools/safe_convert';
 import { getFunctionName } from '../helpers/ast_helper';
 import { getDecimalsForString } from '../helpers/decimals';
 

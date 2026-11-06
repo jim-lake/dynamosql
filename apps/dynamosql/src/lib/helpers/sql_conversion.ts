@@ -1,4 +1,5 @@
-import { toBigInt } from '../../tools/safe_convert';
+import { toBigInt } from '@/tools/safe_convert';
+
 import { SQLDate } from '../types/sql_date';
 import { SQLDateTime } from '../types/sql_datetime';
 import { createSQLTime, SQLTime } from '../types/sql_time';

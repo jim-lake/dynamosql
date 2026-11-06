@@ -117,6 +117,7 @@ export default tseslint.config(
           ],
           'newlines-between': 'always',
           alphabetize: { order: 'asc', caseInsensitive: true },
+          pathGroups: [{ pattern: '@/**', group: 'internal' }],
         },
       ],
       'import/consistent-type-specifier-style': ['error', 'prefer-top-level'],

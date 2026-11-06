@@ -1,7 +1,9 @@
 import { logger } from '@dynamosql/shared';
 
+import type { ItemRecord } from '@/tools/dynamodb';
+import { escapeIdentifier } from '@/tools/dynamodb_helper';
+
 import { SQLError } from '../../../error';
-import { escapeIdentifier } from '../../../tools/dynamodb_helper';
 import { convertWhere } from '../../helpers/convert_where';
 
 import type {
@@ -11,7 +13,6 @@ import type {
   QueryTableInfo,
   QueryColumnInfo,
 } from '..';
-import type { ItemRecord } from '../../../tools/dynamodb';
 
 export async function getRowList(
   params: RowListParams

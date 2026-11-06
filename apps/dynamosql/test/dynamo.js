@@ -1,4 +1,4 @@
-const dynamodb = require('../src/tools/dynamodb');
+const dynamodb = require('@/tools/dynamodb');
 const util = require('node:util');
 
 dynamodb.init({});

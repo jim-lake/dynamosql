@@ -1,6 +1,6 @@
 import { expect } from 'chai';
-import { toBigInt } from '../../src/tools/safe_convert';
-import { jsonStringify, hex, trackFirstSeen } from '../../src/tools/util';
+import { toBigInt } from '@/tools/safe_convert';
+import { jsonStringify, hex, trackFirstSeen } from '@/tools/util';
 
 describe('Utility Functions', () => {
   describe('safe_convert', () => {

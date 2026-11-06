@@ -1,14 +1,15 @@
 import { logger } from '@dynamosql/shared';
 
-import { NoSingleOperationError } from '../../../error';
+import type { SetRowByKeys, ItemRecord } from '@/tools/dynamodb';
 import {
   escapeIdentifier,
   escapeValue,
   valueToNative,
-} from '../../../tools/dynamodb_helper';
+} from '@/tools/dynamodb_helper';
+
+import { NoSingleOperationError } from '../../../error';
 import { convertWhere } from '../../helpers/convert_where';
 
-import type { SetRowByKeys, ItemRecord } from '../../../tools/dynamodb';
 import type {
   MultiUpdateParams,
   UpdateParams,

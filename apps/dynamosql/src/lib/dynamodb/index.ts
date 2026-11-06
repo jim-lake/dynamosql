@@ -1,10 +1,9 @@
-import { DynamoDB } from '../../tools/dynamodb';
-
+import { DynamoDB } from '@/tools/dynamodb';
 import type {
   DynamoDBConstructorParams,
   DescribeTableCommandOutput,
   CreateTableParams,
-} from '../../tools/dynamodb';
+} from '@/tools/dynamodb';
 
 interface TableCacheEntry {
   last_updated: number;

@@ -1,3 +1,5 @@
+import type { AttributeValue, ItemRecord } from '@/tools/dynamodb';
+
 import { SQLError } from '../../error';
 
 import * as InformationSchemaEngine from './information_schema';
@@ -6,7 +8,6 @@ import * as RawEngine from './raw';
 
 import type { COLLATIONS } from '../../constants/mysql';
 import type { Session } from '../../session';
-import type { AttributeValue, ItemRecord } from '../../tools/dynamodb';
 import type { EvaluationResult } from '../expression';
 import type {
   DynamoDBClient,
@@ -33,7 +34,7 @@ export type {
   ChangedResult,
   AffectedResult,
 } from '../handler_types';
-export type { AttributeValue } from '../../tools/dynamodb';
+export type { AttributeValue } from '@/tools/dynamodb';
 
 export interface ColumnDef {
   name: string;

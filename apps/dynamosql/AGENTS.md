@@ -137,4 +137,4 @@ Development:
 - The agent ALWAYS has MySQL access too, using the `DB_*` settings in `.env`. Never complain about a missing environment or say tests cannot be run because of it.
 - AWS credentials come from the SDK default chain (`AWS_REGION`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, or `~/.aws/credentials`).
 - DynamoDB tables are created in the `_dynamodb` database namespace on the MySQL side.
-- Build output in `dist/` is generated. Do not edit it by hand.
+- Build output in `dist/` is generated. Do not edit it by hand. Do not revert `dist/` changes with git just because you ran `npm run build`; keep the regenerated output so it matches the source.

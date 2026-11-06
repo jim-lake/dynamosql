@@ -1,6 +1,7 @@
+import { drainBoth } from '@/tools/drain_both';
+import { filterInPlace } from '@/tools/filter_in_place';
+
 import { SQLError } from '../../error';
-import { drainBoth } from '../../tools/drain_both';
-import { filterInPlace } from '../../tools/filter_in_place';
 import { getValue } from '../expression';
 
 import type { Row, SourceMap } from '../engine';
