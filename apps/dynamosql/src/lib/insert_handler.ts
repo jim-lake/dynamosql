@@ -1,15 +1,36 @@
 import { logger } from '@dynamosql/shared';
 
-import { SQLError } from '../error';
+import type { ItemRecord } from '@/tools/dynamodb';
+
+import { NoSingleOperationError, SQLError } from '../error';
 
 import * as Expression from './expression';
+import { walkColumnRefs } from './helpers/ast_helper';
+import {
+  evaluateDuplicateUpdate,
+  findKey,
+  isSameCell,
+  toCell,
+} from './helpers/duplicate_update';
 import * as SchemaManager from './schema_manager';
 import * as SelectHandler from './select_handler';
 import * as TransactionManager from './transaction_manager';
 
-import type { Engine, EvaluationResultRow } from './engine';
-import type { HandlerParams, AffectedResult } from './handler_types';
-import type { Insert_Replace, SetList } from 'node-sql-parser/build/mysql';
+import type { Engine, EngineValue, EvaluationResultRow } from './engine';
+import type {
+  HandlerParams,
+  AffectedResult,
+  ChangedResult,
+} from './handler_types';
+import type { ColumnRefInfo } from './helpers/column_ref_helper';
+import type {
+  BaseFrom,
+  ColumnRef,
+  From,
+  Binary,
+  Insert_Replace,
+  SetList,
+} from 'node-sql-parser/build/mysql';
 
 interface ErrorWithDetails {
   message?: string;
@@ -27,7 +48,7 @@ interface InsertReplaceExtended extends Omit<Insert_Replace, 'values'> {
   values?: Insert_Replace['values'];
 }
 
-type DuplicateMode = 'replace' | 'ignore' | null;
+type DuplicateMode = 'replace' | 'ignore' | 'update' | null;
 
 export async function query(
   params: HandlerParams<InsertReplaceExtended>
@@ -36,9 +57,11 @@ export async function query(
   const duplicate_mode: DuplicateMode =
     ast.type === 'replace'
       ? 'replace'
-      : ast.prefix === 'ignore into'
-        ? 'ignore'
-        : null;
+      : ast.on_duplicate_update
+        ? 'update'
+        : ast.prefix === 'ignore into'
+          ? 'ignore'
+          : null;
 
   const tableArray = Array.isArray(ast.table) ? ast.table : [ast.table];
   const firstTable = tableArray[0];
@@ -137,9 +160,165 @@ async function _runInsert(
       table,
       list,
       duplicate_mode: duplicate_mode ?? undefined,
+      on_duplicate_update: ast.on_duplicate_update?.set,
     };
     try {
-      return await engine.insertRowList(opts);
+      let result: ChangedResult;
+      try {
+        result = await engine.insertRowList(opts);
+      } catch (err: unknown) {
+        const upsert_set = ast.on_duplicate_update?.set;
+        if (!(err instanceof NoSingleOperationError) || !upsert_set) {
+          throw err;
+        }
+        const database = params.database;
+        const set = upsert_set;
+        const { primary_key } = await engine.getTableInfo({
+          dynamodb,
+          database,
+          table,
+          session,
+        });
+        const from = { db: database, table, as: null } as unknown as BaseFrom;
+        const unique_rows = [
+          ...new Map(
+            list.map((row) => [_keyOf(row, primary_key), row])
+          ).values(),
+        ];
+        const [first_key] = primary_key;
+        const where = (
+          first_key !== undefined && primary_key.length === 1
+            ? {
+                type: 'binary_expr',
+                operator: 'IN',
+                left: _columnRef(first_key),
+                right: {
+                  type: 'expr_list',
+                  value: unique_rows.map((row) => _literalFor(row, first_key)),
+                },
+              }
+            : _chain(
+                'OR',
+                unique_rows.map((row) =>
+                  _chain(
+                    'AND',
+                    primary_key.map((key) => ({
+                      type: 'binary_expr',
+                      operator: '=',
+                      left: _columnRef(key),
+                      right: _literalFor(row, key),
+                    }))
+                  )
+                )
+              )
+        ) as Binary;
+        const columnRefMap = new Map<ColumnRef, ColumnRefInfo>();
+        walkColumnRefs(where, (ref) => {
+          columnRefMap.set(ref as ColumnRef, { from });
+        });
+
+        const { sourceMap } = await engine.getRowList({
+          dynamodb,
+          session,
+          list: [from],
+          where,
+          requestSets: new Map<From, Set<string>>([[from, new Set<string>()]]),
+          requestAll: new Map<From, boolean>([[from, true]]),
+          columnRefMap,
+        });
+        const state = new Map<
+          string,
+          {
+            cur: EvaluationResultRow;
+            changed: EvaluationResultRow;
+            key: EngineValue[] | null;
+          }
+        >();
+        for await (const batch of sourceMap.get(from) ?? []) {
+          for (const item of batch as ItemRecord[]) {
+            const cur = Object.fromEntries(
+              Object.entries(item).map(([name, attr]) => [name, toCell(attr)])
+            );
+            state.set(_keyOf(cur, primary_key), {
+              cur,
+              changed: {},
+              key: primary_key.map(
+                (key) => item[findKey(item, key)] ?? { NULL: true }
+              ),
+            });
+          }
+        }
+
+        let affectedRows = 0;
+        let changedRows = 0;
+        for (const row of list) {
+          const entry = state.get(_keyOf(row, primary_key));
+          if (!entry) {
+            state.set(_keyOf(row, primary_key), {
+              cur: { ...row },
+              changed: {},
+              key: null,
+            });
+            affectedRows += 1;
+            continue;
+          }
+          let changed = false;
+          const values = evaluateDuplicateUpdate({
+            session,
+            set,
+            existing: entry.cur,
+            inserted: row,
+          });
+          for (const { column: name, value } of values) {
+            const attr = findKey(entry.cur, name);
+            if (!isSameCell(entry.cur[attr], value)) {
+              changed = true;
+              entry.changed[attr] = value;
+            }
+            entry.cur[attr] = value;
+          }
+          affectedRows += changed ? 2 : 1;
+          changedRows += 1;
+        }
+
+        const update_list = [...state.values()]
+          .filter(
+            (entry) =>
+              entry.key !== null && Object.keys(entry.changed).length > 0
+          )
+          .map((entry) => ({
+            key: entry.key ?? [],
+            set_list: Object.entries(entry.changed).map(([column, value]) => ({
+              column,
+              value,
+            })),
+          }));
+        if (update_list.length > 0) {
+          await engine.multipleUpdate({
+            dynamodb,
+            session,
+            list: [
+              { database, table, key_list: [...primary_key], update_list },
+            ],
+          });
+        }
+        const insert_list = [...state.values()]
+          .filter((entry) => entry.key === null)
+          .map((entry) => entry.cur);
+        if (insert_list.length > 0) {
+          await engine.insertRowList({
+            dynamodb,
+            session,
+            database,
+            table,
+            list: insert_list,
+          });
+        }
+        result = { affectedRows, changedRows };
+      }
+      // The driver reads changedRows from MySQL's row-count info, which MySQL sends for multi-row VALUES and INSERT ... SELECT.
+      const has_row_info = list.length > 1 || ast.values?.type === 'select';
+      return has_row_info ? result : { affectedRows: result.affectedRows };
     } catch (err: unknown) {
       if (!isErrorWithDetails(err)) {
         throw err;
@@ -168,4 +347,33 @@ function _checkAst(ast: InsertReplaceExtended) {
       throw new SQLError({ err: 'ER_WRONG_VALUE_COUNT_ON_ROW', args: [1] });
     }
   }
+}
+
+function _columnRef(name: string) {
+  return { type: 'column_ref', table: null, column: name };
+}
+
+function _literalFor(row: EvaluationResultRow, name: string) {
+  const cell = row[findKey(row, name)];
+  return cell?.type === 'number'
+    ? { type: 'number', value: Number(cell.value) }
+    : {
+        type: 'single_quote_string',
+        value: String(cell?.value).replaceAll("'", "''"),
+      };
+}
+
+function _chain(operator: string, items: unknown[]) {
+  return items.reduce((left, right) => ({
+    type: 'binary_expr',
+    operator,
+    left,
+    right,
+  }));
+}
+
+function _keyOf(record: EvaluationResultRow, primary_key: readonly string[]) {
+  return primary_key
+    .map((key) => String(record[findKey(record, key)]?.value))
+    .join('|');
 }

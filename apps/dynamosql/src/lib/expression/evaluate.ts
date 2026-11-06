@@ -17,7 +17,12 @@ import { methods as UnaryExpression } from './unary_expression';
 
 import type { SQLError } from '../../error';
 import type { Session } from '../../session';
-import type { EngineValue, CellValue, TableInfoMap } from '../engine';
+import type {
+  EngineValue,
+  CellValue,
+  EvaluationResultRow,
+  TableInfoMap,
+} from '../engine';
 import type {
   SourceRow,
   SourceRowResult,
@@ -50,6 +55,7 @@ export interface EvaluationState {
   row?: SourceRow | SourceRowResult | SourceRowGroup | SourceRowResultGroup;
   columnRefMap?: Map<ColumnRef, ColumnRefInfo>;
   tableInfoMap?: TableInfoMap;
+  insertRow?: EvaluationResultRow;
 }
 export interface EvaluationValue {
   type: ValueType;

@@ -115,6 +115,7 @@ import {
   user,
   version,
   connection_id,
+  values,
 } from './func_misc';
 import {
   elt,
@@ -195,6 +196,7 @@ export const methods: Record<
   schema: database,
   isnull,
   sleep,
+  values,
   length,
   octet_length: length,
   char_length,

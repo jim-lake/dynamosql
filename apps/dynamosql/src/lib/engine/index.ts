@@ -207,7 +207,8 @@ export interface InsertParams {
   table: string;
   session: Session;
   list: EvaluationResultRow[];
-  duplicate_mode?: 'ignore' | 'replace';
+  duplicate_mode?: 'ignore' | 'replace' | 'update';
+  on_duplicate_update?: SetList[];
 }
 
 export interface Engine {
@@ -225,7 +226,7 @@ export interface Engine {
   multipleDelete(params: MultiDeleteParams): Promise<AffectedResult>;
   singleUpdate(params: UpdateParams): Promise<ChangedResult>;
   multipleUpdate(params: MultiUpdateParams): Promise<ChangedResult>;
-  insertRowList(params: InsertParams): Promise<AffectedResult>;
+  insertRowList(params: InsertParams): Promise<ChangedResult>;
 }
 
 const NullEngine: Engine = {

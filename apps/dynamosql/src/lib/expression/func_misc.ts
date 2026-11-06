@@ -78,3 +78,17 @@ export function connection_id(
   assertArgCountParse(expr, 0);
   return { err: null, value: state.session.threadId, type: 'longlong' };
 }
+export function values(
+  expr: Function,
+  state: EvaluationState
+): EvaluationResult {
+  assertArgCount(expr, 1);
+  const column = String((expr.args.value[0] as { column: string }).column);
+  const cell = state.insertRow?.[column.toLowerCase()];
+  return {
+    err: null,
+    name: `VALUES(${column})`,
+    type: cell?.type ?? 'null',
+    value: cell?.value ?? null,
+  };
+}

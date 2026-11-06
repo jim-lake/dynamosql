@@ -1,4 +1,5 @@
 import { SQLError } from '../../../error';
+import { evaluateDuplicateUpdate } from '../../helpers/duplicate_update';
 
 import * as Storage from './storage';
 
@@ -6,18 +7,25 @@ import type { MemoryColumnDef } from './storage';
 import type {
   EvaluationResultRow,
   InsertParams,
-  AffectedResult,
+  ChangedResult,
   CellRow,
 } from '../index';
 
 export async function insertRowList(
   params: InsertParams
-): Promise<AffectedResult> {
-  const { session, database, table, list, duplicate_mode } = params;
+): Promise<ChangedResult> {
+  const {
+    session,
+    database,
+    table,
+    list,
+    duplicate_mode,
+    on_duplicate_update,
+  } = params;
   const data = Storage.getTable(database, table, session);
 
   if (list.length === 0) {
-    return { affectedRows: 0 };
+    return { affectedRows: 0, changedRows: 0 };
   }
 
   if (!data) {
@@ -28,6 +36,7 @@ export async function insertRowList(
   const row_list = data.row_list.slice();
   const primary_map = new Map(data.primary_map);
   let affectedRows = 0;
+  let duplicateRows = 0;
 
   for (const row of list) {
     const cellRow = _transformRow(row, data.column_list);
@@ -38,6 +47,45 @@ export async function insertRowList(
     if (index === undefined) {
       primary_map.set(key, row_list.push(cellRow) - 1);
       affectedRows++;
+    } else if (duplicate_mode === 'update' && on_duplicate_update) {
+      const old_row = row_list[index];
+      if (!old_row) {
+        continue;
+      }
+      const sets = evaluateDuplicateUpdate({
+        session,
+        set: on_duplicate_update,
+        existing: old_row,
+        inserted: row,
+      });
+      const new_row: CellRow = { ...old_row };
+      let changed = false;
+      for (const { column, value } of sets) {
+        const name = column.toLowerCase();
+        if (!data.column_list.some((col) => col.name_lc === name)) {
+          throw new SQLError({ err: 'column_not_found', args: [column] });
+        }
+        new_row[name] = { type: value.type, value: value.value };
+        if (old_row[name]?.value !== value.value) {
+          changed = true;
+        }
+      }
+      const new_key = JSON.stringify(
+        primary_key.map((name) => new_row[name]?.value)
+      );
+      if (new_key !== key) {
+        if (primary_map.has(new_key)) {
+          throw new SQLError({
+            err: 'dup_primary_key_entry',
+            args: [primary_key, new_key],
+          });
+        }
+        primary_map.delete(key);
+        primary_map.set(new_key, index);
+      }
+      row_list[index] = new_row;
+      affectedRows += changed ? 2 : 1;
+      duplicateRows++;
     } else if (duplicate_mode === 'replace') {
       const existingRow = row_list[index];
       if (existingRow && !_rowEqual(existingRow, cellRow)) {
@@ -54,7 +102,7 @@ export async function insertRowList(
   }
 
   Storage.txSaveData(database, table, session, { row_list, primary_map });
-  return { affectedRows };
+  return { affectedRows, changedRows: duplicateRows };
 }
 function _transformRow(
   row: EvaluationResultRow,

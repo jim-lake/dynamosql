@@ -13,6 +13,7 @@ import {
   KeyType,
   BillingMode,
   ReturnValuesOnConditionCheckFailure,
+  UpdateItemCommand,
 } from '@aws-sdk/client-dynamodb';
 
 import {
@@ -108,6 +109,13 @@ export interface CreateIndexParams {
 export interface DeleteIndexParams {
   table: string;
   index_name: string;
+}
+export interface UpdateItemParams {
+  table: string;
+  key: ItemRecord;
+  expression: string;
+  names: Record<string, string>;
+  values: ItemRecord;
 }
 
 export class DynamoDB {
@@ -323,6 +331,22 @@ export class DynamoDB {
       });
     } catch {
       throw err_list;
+    }
+  }
+  async updateItem(params: UpdateItemParams): Promise<ItemRecord | undefined> {
+    const command = new UpdateItemCommand({
+      TableName: `${this.namespace}${params.table}`,
+      Key: params.key,
+      UpdateExpression: params.expression,
+      ExpressionAttributeNames: params.names,
+      ExpressionAttributeValues: params.values,
+      ReturnValues: 'ALL_OLD',
+    });
+    try {
+      const result = await this.client.send(command);
+      return result.Attributes;
+    } catch (err) {
+      throw safeConvertError(err);
     }
   }
   async getTableList(): Promise<string[]> {
