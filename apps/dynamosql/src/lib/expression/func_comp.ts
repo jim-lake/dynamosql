@@ -36,7 +36,12 @@ export function coalesce(
     }
   }
   const { type } = unionType(values);
-  return { err, name: `COALESCE(${names.join(', ')}`, value, type };
+  return {
+    err,
+    name: `COALESCE(${names.join(', ')}`,
+    value: unionValue(value, type),
+    type,
+  };
 }
 export function ifnull(
   expr: Function,
@@ -53,7 +58,12 @@ export function ifnull(
   }
   const value = arg1.value !== null ? arg1.value : arg2.value;
   const { type } = unionType([arg1, arg2]);
-  return { err: null, name: `IFNULL(${arg1.name}, ${arg2.name})`, value, type };
+  return {
+    err: null,
+    name: `IFNULL(${arg1.name}, ${arg2.name})`,
+    value: unionValue(value, type),
+    type,
+  };
 }
 export function ifFunc(
   expr: Function,
@@ -85,7 +95,7 @@ export function ifFunc(
   return {
     err,
     name: `IF(${condition.name}, ${trueValue.name}, ${falseValue.name})`,
-    value,
+    value: unionValue(value, type),
     type,
   };
 }
@@ -180,13 +190,32 @@ function _ltList<T extends Comparable<T>>(
   }
   return { value: value ?? null, decimals };
 }
+const INT64_MAX = 9223372036854775807n;
 interface UnionTypeResult {
   compare_type: ValueType;
   type: ValueType;
 }
+function isUnsignedBigInt(e: EvaluationResult): boolean {
+  return (
+    e.type === 'longlong' && typeof e.value === 'bigint' && e.value > INT64_MAX
+  );
+}
+export function unionValue(
+  value: EvaluationResult['value'],
+  type: ValueType
+): EvaluationResult['value'] {
+  return type === 'number' && typeof value === 'bigint' ? Number(value) : value;
+}
 export function unionType(list: EvaluationResult[]): UnionTypeResult {
   let compare_type: ValueType;
   const types = list.map((e) => (e.type === 'bool' ? 'longlong' : e.type));
+  const hasUnsigned = list.some(isUnsignedBigInt);
+  const hasSigned = list.some(
+    (e) =>
+      e.value !== null &&
+      ['longlong', 'bool', 'year'].includes(e.type) &&
+      !isUnsignedBigInt(e)
+  );
   if (types.includes('datetime')) {
     compare_type = 'datetime';
   } else if (types.includes('date')) {
@@ -211,6 +240,8 @@ export function unionType(list: EvaluationResult[]): UnionTypeResult {
     types.every((t) => t === 'year' || t === 'null')
   ) {
     compare_type = 'year';
+  } else if (hasUnsigned && hasSigned) {
+    compare_type = 'number';
   } else if (types.includes('longlong') || types.includes('year')) {
     compare_type = 'longlong';
   } else if (types.every((t) => t === 'null')) {

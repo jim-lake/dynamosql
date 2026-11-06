@@ -6,7 +6,7 @@ import {
 
 import { convertCompare } from './compare';
 import { getValue } from './evaluate';
-import { unionType } from './func_comp';
+import { unionType, unionValue } from './func_comp';
 
 import type { EvaluationState, EvaluationResult } from './evaluate';
 import type { Case } from 'node-sql-parser/build/mysql';
@@ -70,6 +70,6 @@ export function caseExpr(expr: Case, state: EvaluationState): EvaluationResult {
           value: chosen.value,
           timeZone: state.session.timeZone,
         })
-      : (chosen?.value ?? null);
+      : unionValue(chosen?.value ?? null, type);
   return { err: null, name: 'CASE', value, type };
 }
