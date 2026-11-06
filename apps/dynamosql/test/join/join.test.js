@@ -10,4 +10,8 @@ describe('Join', function () {
     session: { resultObjects: true },
     nestTables: true,
   });
+  runTests('join_using.sql', path.join(__dirname, 'join_using.sql'), {
+    session: { resultObjects: true },
+    nestTables: true,
+  });
 });

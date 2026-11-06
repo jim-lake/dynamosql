@@ -1,3 +1,5 @@
+import { setTimeout } from 'node:timers/promises';
+
 import { logger } from '@dynamosql/shared';
 
 import { COLLATIONS } from '../../../constants/mysql';
@@ -22,8 +24,6 @@ const COLLATION_MAP = {
   N: undefined,
   B: undefined,
 } as const;
-
-const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 export async function getTableInfo(
   params: TableInfoParams
@@ -177,7 +177,7 @@ async function _waitForTable(params: WaitForTableParams): Promise<void> {
     const result = await dynamodb.getTable(table);
     const tableData = result.Table;
     if (!tableData) {
-      await sleep(LOOP_MS);
+      await setTimeout(LOOP_MS);
       continue;
     }
     const status = tableData.TableStatus;
@@ -186,7 +186,7 @@ async function _waitForTable(params: WaitForTableParams): Promise<void> {
       status === 'UPDATING' ||
       status === 'DELETING'
     ) {
-      await sleep(LOOP_MS);
+      await setTimeout(LOOP_MS);
       continue;
     }
     if (index_name !== undefined) {
@@ -194,7 +194,7 @@ async function _waitForTable(params: WaitForTableParams): Promise<void> {
         (item) => item.IndexName === index_name
       );
       if (!index || index.IndexStatus !== 'ACTIVE') {
-        await sleep(LOOP_MS);
+        await setTimeout(LOOP_MS);
         continue;
       }
     }

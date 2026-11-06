@@ -30,6 +30,7 @@ export default tseslint.config(
     rules: {
       'no-console': 'error',
       'local/no-bare-node-sql-parser': 'error',
+      'func-style': ['error', 'declaration'],
       'local/local-snake-case': [
         0,
         { exclude: [/^affectedRows$/, /^changedRows$/] },

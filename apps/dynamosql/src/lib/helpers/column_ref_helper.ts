@@ -48,6 +48,46 @@ export interface RequestInfo {
   setListMap: Map<SetList, From>;
 }
 
+export function buildUsingCondition(
+  lefts: BaseFrom[],
+  right: BaseFrom,
+  columns: string[]
+): Binary {
+  return columns
+    .map((column): Binary => {
+      const leftRefs = lefts.map((left) => ({
+        type: 'column_ref' as const,
+        table: left.as ?? left.table,
+        column,
+      }));
+      const left =
+        leftRefs.length === 1
+          ? leftRefs[0]
+          : {
+              type: 'function' as const,
+              name: 'COALESCE',
+              args: { type: 'expr_list' as const, value: leftRefs },
+            };
+      const condition = {
+        type: 'binary_expr',
+        operator: '=',
+        left,
+        right: {
+          type: 'column_ref' as const,
+          table: right.as ?? right.table,
+          column,
+        },
+      };
+      return condition as unknown as Binary;
+    })
+    .reduce((acc, condition) => ({
+      type: 'binary_expr',
+      operator: 'AND',
+      left: acc,
+      right: condition,
+    }));
+}
+
 export function resolveReferences(
   ast: SelectWithOptionalGroupBy | Update | Delete,
   current_database?: string
@@ -58,9 +98,14 @@ export function resolveReferences(
   const setListMap = new Map<SetList, From>();
   const table_map: TableMap = {};
   const db_map: DbMap = {};
+  const using_owners: TableMap = {};
   const fromRaw =
     ast.type === 'select' || ast.type === 'delete' ? ast.from : ast.table;
   const from = Array.isArray(fromRaw) ? fromRaw : null;
+  const natural =
+    from?.some(
+      (item) => 'join' in item && String(item.join).includes('NATURAL')
+    ) ?? false;
   from?.forEach((fromEntry: From) => {
     if ('table' in fromEntry) {
       if (!fromEntry.db) {
@@ -71,7 +116,7 @@ export function resolveReferences(
         }
       }
       requestSets.set(fromEntry, new Set());
-      requestAll.set(fromEntry, false);
+      requestAll.set(fromEntry, natural);
       if (fromEntry.as) {
         table_map[fromEntry.as] = fromEntry;
       } else {
@@ -92,27 +137,19 @@ export function resolveReferences(
     if (!isBaseFrom(joined) || index === 0 || !('using' in joined)) {
       return;
     }
-    const left = list.slice(0, index).filter(isBaseFrom).pop();
-    if (!left || !joined.using) {
+    const lefts = list.slice(0, index).filter(isBaseFrom);
+    const owner = lefts[0];
+    if (!owner || !joined.using) {
       return;
     }
     const columns = (joined.using as unknown as { value: string }[]).map(
       (item) => item.value
     );
-    joined.on = columns
-      .map((column): Binary => ({
-        type: 'binary_expr',
-        operator: '=',
-        left: { type: 'column_ref', table: left.as ?? left.table, column },
-        right: { type: 'column_ref', table: joined.as ?? joined.table, column },
-      }))
-      .reduce((acc, condition) => ({
-        type: 'binary_expr',
-        operator: 'AND',
-        left: acc,
-        right: condition,
-      }));
-    delete joined.using;
+    columns.forEach((column) => {
+      using_owners[column] ??= owner;
+    });
+    joined.on = buildUsingCondition(lefts, joined, columns);
+    joined.using = columns;
   });
 
   const tableRaw = ast.type === 'delete' ? ast.table : null;
@@ -135,47 +172,28 @@ export function resolveReferences(
   const columns = ast.type === 'select' ? ast.columns : undefined;
   const set = ast.type === 'update' ? ast.set : undefined;
   const where = ast.where;
-  [from, columns, where].forEach((item: unknown) => {
-    walkColumnRefs(item, (object: unknown) => {
-      _resolveObject(
-        object,
-        ast,
-        db_map,
-        table_map,
-        name_cache,
-        requestSets,
-        requestAll,
-        columnRefMap,
-        setListMap
-      );
-    });
-  });
-
-  set?.forEach((item) => {
-    walkColumnRefs(item, (object: unknown) => {
-      _resolveObject(
-        object,
-        ast,
-        db_map,
-        table_map,
-        name_cache,
-        requestSets,
-        requestAll,
-        columnRefMap,
-        setListMap
-      );
-    });
+  function resolveObject(object: unknown, result_map?: ResultMap) {
     _resolveObject(
-      item,
+      object,
       ast,
       db_map,
       table_map,
       name_cache,
+      using_owners,
       requestSets,
       requestAll,
       columnRefMap,
-      setListMap
+      setListMap,
+      result_map
     );
+  }
+  [from, columns, where].forEach((item: unknown) => {
+    walkColumnRefs(item, resolveObject);
+  });
+
+  set?.forEach((item) => {
+    walkColumnRefs(item, resolveObject);
+    resolveObject(item);
   });
 
   const result_map: ResultMap = {};
@@ -209,37 +227,14 @@ export function resolveReferences(
   if (ast.type === 'select') {
     const groupby = ast.groupby ? ast.groupby.columns : undefined;
     if (groupby !== undefined) {
-      walkColumnRefs(groupby, (object: unknown) => {
-        _resolveObject(
-          object,
-          ast,
-          db_map,
-          table_map,
-          name_cache,
-          requestSets,
-          requestAll,
-          columnRefMap,
-          setListMap
-        );
-      });
+      walkColumnRefs(groupby, resolveObject);
     }
   }
   const orderby = ast.orderby;
   const having = ast.type === 'select' ? ast.having : undefined;
   [orderby, having].forEach((item: unknown) => {
     walkColumnRefs(item, (object: unknown) => {
-      _resolveObject(
-        object,
-        ast,
-        db_map,
-        table_map,
-        name_cache,
-        requestSets,
-        requestAll,
-        columnRefMap,
-        setListMap,
-        result_map
-      );
+      resolveObject(object, result_map);
     });
   });
   if (columns) {
@@ -258,6 +253,7 @@ function _resolveObject(
   db_map: DbMap,
   table_map: TableMap,
   name_cache: TableMap,
+  using_owners: TableMap,
   requestSets: Map<From, Set<string>>,
   requestAll: Map<From, boolean>,
   columnRefMap: Map<ColumnRef, ColumnRefInfo>,
@@ -335,7 +331,8 @@ function _resolveObject(
       if (index !== undefined && index >= 0) {
         columnRefMap.set(object as ColumnRef, { resultIndex: index });
       } else {
-        const cached = name_cache[obj.column ?? ''];
+        const cached =
+          using_owners[obj.column ?? ''] ?? name_cache[obj.column ?? ''];
         const astFrom = ast.type === 'update' ? ast.table : ast.from;
         const firstFrom = Array.isArray(astFrom) ? astFrom[0] : undefined;
         from =

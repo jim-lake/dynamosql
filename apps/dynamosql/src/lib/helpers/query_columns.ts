@@ -65,7 +65,11 @@ export function expandStarColumns(
             from.as === table
           ) {
             const info = tableInfoMap.get(from);
+            const usingColumns = !table && 'using' in from ? from.using : [];
             info?.columns.forEach((c) => {
+              if (usingColumns?.includes(c.name)) {
+                return;
+              }
               const colRef = {
                 type: 'column_ref' as const,
                 db: from.as ? null : from.db,

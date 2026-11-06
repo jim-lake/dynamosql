@@ -3,7 +3,11 @@ import { setTimeout } from 'node:timers/promises';
 import { SQLError } from '../error';
 
 import * as Expression from './expression';
-import { resolveReferences } from './helpers/column_ref_helper';
+import { walkColumnRefs } from './helpers/ast_helper';
+import {
+  resolveReferences,
+  buildUsingCondition,
+} from './helpers/column_ref_helper';
 import { makeEngineGroups } from './helpers/engine_groups';
 import { formGroup, formImplicitGroup, hasAggregate } from './helpers/group';
 import { formJoin } from './helpers/join';
@@ -32,6 +36,7 @@ import type {
   ColumnRef,
   From,
   BaseFrom,
+  Join,
   Limit,
   ExpressionValue,
   ExtractFunc,
@@ -174,6 +179,36 @@ async function _iterQuery(
       }
     });
     await Promise.all(tasks);
+    from.forEach((item, index) => {
+      const joined = item as Join;
+      if (index === 0 || !String(joined.join).includes('NATURAL')) {
+        return;
+      }
+      const lefts = from.slice(0, index);
+      const leftNames = new Set(
+        lefts.flatMap(
+          (left) => tableInfoMap.get(left)?.columns.map((c) => c.name) ?? []
+        )
+      );
+      const rightNames = new Set(
+        tableInfoMap.get(joined)?.columns.map((c) => c.name)
+      );
+      const columns = [...leftNames].filter((name) => rightNames.has(name));
+      if (columns.length === 0) {
+        return;
+      }
+      joined.using = columns;
+      joined.on = buildUsingCondition(lefts, joined, columns);
+      walkColumnRefs(joined.on, (ref) => {
+        const column_ref = ref as ColumnRef;
+        const owner = [...lefts, joined].find(
+          (table) => (table.as ?? table.table) === column_ref.table
+        );
+        if (owner) {
+          columnRefMap.set(column_ref, { from: owner });
+        }
+      });
+    });
   }
   return _evaluateReturn({
     ...params,

@@ -1,5 +1,3 @@
-/* eslint-disable @typescript-eslint/no-unused-vars */
-
 import type * as mysql from 'mysql';
 import * as dynamosql from '../src';
 
@@ -67,7 +65,7 @@ const _queryOptionsCheck: _QueryOptionsProps = {
 };
 
 // Connection method validation
-const _testConnection = (conn: ReturnType<typeof dynamosql.createSession>) => {
+function _testConnection(conn: ReturnType<typeof dynamosql.createSession>) {
   conn.query;
   conn.end;
   conn.destroy;
@@ -81,10 +79,10 @@ const _testConnection = (conn: ReturnType<typeof dynamosql.createSession>) => {
   conn.emit;
   conn.threadId;
   conn.state;
-};
+}
 
 // Test Pool compatibility
-const _testPool = (pool: ReturnType<typeof dynamosql.createPool>) => {
+function _testPool(pool: ReturnType<typeof dynamosql.createPool>) {
   pool.query;
   pool.end;
   pool.getConnection;
@@ -92,14 +90,15 @@ const _testPool = (pool: ReturnType<typeof dynamosql.createPool>) => {
   pool.escapeId;
   pool.format;
   pool.config;
-};
+}
 
 // Callback signature validation
-const _testCallback: dynamosql.queryCallback = (
-  err: dynamosql.MysqlError | null,
-  results?: any,
-  fields?: dynamosql.FieldInfo[]
-) => {};
+function _testCallback(
+  _err: dynamosql.MysqlError | null,
+  _results?: any,
+  _fields?: dynamosql.FieldInfo[]
+) {}
+const _checkCallback: dynamosql.queryCallback = _testCallback;
 
 // Function signature validation
 const _testEscape: typeof mysql.escape = dynamosql.escape;
