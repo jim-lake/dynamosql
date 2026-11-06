@@ -50,7 +50,7 @@ and geometry
 | LIKE                            |    ✅     | Simple pattern matching                                                                                                                                 |
 | LOCALTIME                       |    ✅     | Synonym for NOW()                                                                                                                                       |
 | LOCALTIMESTAMP                  |    ✅     | Synonym for NOW()                                                                                                                                       |
-| MEMBER OF()                     |    ❌     | Returns true (1) if first operand matches any element of JSON array passed as second operand, otherwise returns false (0)                               |
+| MEMBER OF()                     |    ✅     | Returns true (1) if first operand matches any element of JSON array passed as second operand, otherwise returns false (0)                               |
 | NOT                             |    ✅     | Negates value                                                                                                                                           |
 | NOT BETWEEN                     |    ❌     | ... AND ... Whether a value is not within a range of values                                                                                             |
 | NOT EXISTS()                    |    ❌     | Whether the result of a query contains no rows                                                                                                          |

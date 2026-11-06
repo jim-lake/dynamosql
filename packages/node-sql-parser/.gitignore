@@ -8,3 +8,4 @@ umd/
 output/
 .DS_Store
 AGENTS.md
+.kiro/

@@ -2,7 +2,7 @@ import { convertBooleanValue } from '../helpers/sql_conversion';
 
 import { equal, notEqual, gt, lt, gte, lte, inOp, notIn } from './compare';
 import { getValue } from './evaluate';
-import { json_arrow, json_arrow_unquote } from './func_json_query';
+import { json_arrow, json_arrow_unquote, member_of } from './func_json_query';
 import { plus, minus, div, mul, mod, intDiv } from './math';
 
 import type { EvaluationState, EvaluationResult } from './evaluate';
@@ -290,4 +290,5 @@ export const methods: Record<
   'not in': notIn,
   '->': json_arrow,
   '->>': json_arrow_unquote,
+  'member of': member_of,
 };

@@ -259,6 +259,11 @@ describe('Expression', function () {
     { verify_field_types: true }
   );
   runTests(
+    'function_json_member_of.sql',
+    path.join(__dirname, 'function_json_member_of.sql'),
+    { verify_field_types: true }
+  );
+  runTests(
     'function_json_overlaps.sql',
     path.join(__dirname, 'function_json_overlaps.sql'),
     { verify_field_types: true }

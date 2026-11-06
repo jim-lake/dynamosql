@@ -10,6 +10,7 @@ import {
   TEXT_TYPES,
   _isRecord,
   _lookup,
+  _parseDocument,
   _parsePath,
   _unquote,
 } from './func_json_common';
@@ -133,6 +134,45 @@ export function json_overlaps(
     );
   }
   return { err: null, value: overlap ? 1 : 0, type: 'longlong' };
+}
+
+export function member_of(
+  expr: Binary,
+  state: EvaluationState
+): EvaluationResult {
+  const right_items =
+    'type' in expr.right && expr.right.type === 'expr_list'
+      ? expr.right.value
+      : null;
+  if (!right_items || right_items.length !== 1) {
+    return {
+      err: { err: 'syntax_err', args: ['MEMBER OF'] },
+      value: null,
+      type: 'longlong',
+    };
+  }
+  const left = getValue(expr.left, state);
+  const right = getValue(right_items[0], state);
+  if (left.err) {
+    return left;
+  }
+  if (right.err) {
+    return right;
+  }
+  if (left.value === null || right.value === null) {
+    return { err: null, value: null, type: 'longlong' };
+  }
+
+  const candidate = SQLJson.toNode(
+    left,
+    state.session.timeZone,
+    'member of',
+    1
+  );
+  const array = _parseDocument(right, 'member of', 2);
+  const elements = Array.isArray(array) ? array : [array];
+  const found = elements.some((item) => isDeepStrictEqual(item, candidate));
+  return { err: null, value: found ? 1 : 0, type: 'longlong' };
 }
 
 export function json_extract(
