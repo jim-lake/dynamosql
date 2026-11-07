@@ -48,7 +48,3 @@ Only non-correlated scalar subqueries in `WHERE` are supported (`src/lib/select_
 ## Writes on derived tables
 
 - `UPDATE (SELECT id FROM u) s SET s.c = 1;`: MySQL returns `ER_NON_UPDATABLE_TABLE`. DynamoSQL returns `ER_NO_DB_ERROR`, because `getDatabaseFromUpdate` finds no base table before the check runs.
-
-## Parser
-
-- `UPDATE t JOIN u ON u.id = t.id SET t.c = 0;` works. `UPDATE db.t JOIN u ON u.id = db.t.id SET db.t.c = 0;` fails with `ER_PARSE_ERROR`, because node-sql-parser rejects a database-qualified column in `SET`. MySQL 8.4 accepts it. This is also listed in `docs/PARSER_TODO.md`.

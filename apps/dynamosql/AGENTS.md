@@ -131,9 +131,10 @@ Development:
 - `@types/sqlstring`
 - Test tooling (`mocha`, `tsx`, `dotenv`) comes from the workspace root.
 
-## Parser Gaps
+## Gap Documents
 
-- Whenever you find a legitimate mismatch between real MySQL 8.4 syntax and the node-sql-parser MySQL grammar, add a single concise line for it to `docs/PARSER_TODO.md`.
+- `docs/PARSER_TODO.md` holds only parser-grammar mismatches: real MySQL 8.4 syntax that node-sql-parser's MySQL grammar rejects or misparses. Add one concise line per mismatch. Do not put parser issues in `docs/MYSQL_GAPS.md`.
+- `docs/MYSQL_GAPS.md` holds behavior gaps: valid queries that DynamoSQL rejects or returns differently from MySQL 8.4, where the parser accepts the SQL and the gap is in the engine. Record the query, the MySQL result, and the DynamoSQL result.
 
 ## Notes
 
