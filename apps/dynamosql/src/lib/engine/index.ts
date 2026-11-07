@@ -8,7 +8,7 @@ import * as RawEngine from './raw';
 
 import type { COLLATIONS } from '../../constants/mysql';
 import type { Session } from '../../session';
-import type { EvaluationResult } from '../expression';
+import type { EvaluationResult, SubqueryValues } from '../expression';
 import type {
   DynamoDBClient,
   ChangedResult,
@@ -76,6 +76,7 @@ export interface RowListParams {
   requestSets: Map<From, Set<string>>;
   requestAll: Map<From, boolean>;
   columnRefMap: Map<ColumnRef, ColumnRefInfo>;
+  subqueryValues?: SubqueryValues;
 }
 export type EvaluationResultRow = Record<string, EvaluationResult>;
 export interface CellValue {

@@ -24,7 +24,11 @@ import type {
   SourceRowResultGroup,
 } from './handler_types';
 import type { FieldInfo } from '../types';
-import type { EvaluationResult, EvaluationState } from './expression';
+import type {
+  EvaluationResult,
+  EvaluationState,
+  SubqueryValues,
+} from './expression';
 import type { Session } from '../session';
 import type { ColumnRefInfo } from './helpers/column_ref_helper';
 import type { QueryColumn } from './helpers/query_columns';
@@ -126,6 +130,49 @@ export async function internalQuery(
   const rows = row_list.map((row) => row.result);
   return { rows, columns, row_list };
 }
+type PlainNode = Record<string, unknown>;
+function _isPlainNode(value: unknown): value is PlainNode {
+  return typeof value === 'object' && value !== null;
+}
+async function _collectScalarSubqueries(
+  expr: unknown,
+  params: InternalQueryParams,
+  values: SubqueryValues
+): Promise<void> {
+  if (!_isPlainNode(expr) || expr.type !== 'binary_expr') {
+    return;
+  }
+  for (const side of ['left', 'right']) {
+    const operand = expr[side];
+    if (Expression.isSelectSubquery(operand)) {
+      const { rows, columns } = await internalQuery({
+        dynamodb: params.dynamodb,
+        session: params.session,
+        ast: operand.ast,
+      });
+      if (columns.length !== 1) {
+        throw new SQLError({
+          code: 'ER_OPERAND_COLUMNS',
+          sqlMessage: 'Operand should contain 1 column(s)',
+        });
+      }
+      if (rows.length > 1) {
+        throw new SQLError({
+          code: 'ER_SUBQUERY_NO_1_ROW',
+          sqlMessage: 'Subquery returns more than 1 row',
+        });
+      }
+      const cell = rows[0]?.[0];
+      values.set(operand, {
+        type: cell?.type ?? 'null',
+        value: cell?.value ?? null,
+      });
+    } else {
+      await _collectScalarSubqueries(operand, params, values);
+    }
+  }
+}
+
 interface IterQueryResults {
   resultIter: AsyncIterableIterator<SourceRowResult[]>;
   queryColumns: QueryColumn[];
@@ -135,6 +182,8 @@ async function _iterQuery(
   params: InternalQueryParams
 ): Promise<IterQueryResults> {
   const { ast, session, dynamodb } = params;
+  const subqueryValues: SubqueryValues = new Map();
+  await _collectScalarSubqueries(ast.where, params, subqueryValues);
 
   const current_database = session.getCurrentDatabase();
   let requestSets = new Map<From, Set<string>>();
@@ -169,6 +218,7 @@ async function _iterQuery(
         requestSets,
         requestAll,
         columnRefMap,
+        subqueryValues,
       };
       const result = await group.engine.getRowList(opts);
       for (const [f, item] of result.sourceMap) {
@@ -216,6 +266,7 @@ async function _iterQuery(
     tableInfoMap,
     requestSets,
     columnRefMap,
+    subqueryValues,
   });
 }
 interface EvaluateReturnParams {
@@ -226,11 +277,19 @@ interface EvaluateReturnParams {
   tableInfoMap: TableInfoMap;
   requestSets: Map<From, Set<string>>;
   columnRefMap: Map<ColumnRef, ColumnRefInfo>;
+  subqueryValues: SubqueryValues;
 }
 async function _evaluateReturn(
   params: EvaluateReturnParams
 ): Promise<IterQueryResults> {
-  const { ast, session, sourceMap, columnRefMap, tableInfoMap } = params;
+  const {
+    ast,
+    session,
+    sourceMap,
+    columnRefMap,
+    tableInfoMap,
+    subqueryValues,
+  } = params;
   const queryColumns = _isSelect(ast)
     ? expandStarColumns({ ...params, ast })
     : [];
@@ -239,7 +298,7 @@ async function _evaluateReturn(
   const groupby = ast.type === 'select' ? ast.groupby : undefined;
   const from = ast.type === 'update' ? ast.table : ast.from;
 
-  const state = { session, columnRefMap, tableInfoMap };
+  const state = { session, columnRefMap, tableInfoMap, subqueryValues };
   const rowIter =
     from && Array.isArray(from)
       ? formJoin({ sourceMap, from, where, state })

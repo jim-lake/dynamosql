@@ -1,10 +1,11 @@
-import { getValue } from '../../expression';
+import { getValue, isSelectSubquery } from '../../expression';
 import { getFunctionName } from '../ast_helper';
 
 import ConvertExpression from './convert_expression';
 import Functions from './functions';
 
 import type { Session } from '../../../session';
+import type { SubqueryValues } from '../../expression';
 import type { ColumnRefInfo } from '../column_ref_helper';
 import type {
   ExpressionValue,
@@ -24,6 +25,7 @@ export interface ConvertWhereState {
   from?: From;
   default_true?: boolean;
   columnRefMap?: Map<ColumnRef, ColumnRefInfo>;
+  subqueryValues?: SubqueryValues;
 }
 
 export interface ConvertResult {
@@ -48,7 +50,18 @@ export function convertWhere(
   let err: string | null = null;
   let value: string | number | boolean | null = null;
 
-  if (expr && 'type' in expr) {
+  const subquery = isSelectSubquery(expr)
+    ? state.subqueryValues?.get(expr)
+    : undefined;
+  if (subquery) {
+    if (typeof subquery.value === 'number' || subquery.value === null) {
+      value = subquery.value;
+    } else {
+      err = 'unsupported';
+    }
+  } else if (isSelectSubquery(expr)) {
+    err = 'unsupported';
+  } else if (expr && 'type' in expr) {
     const { type } = expr;
     if (type === 'number' && 'value' in expr) {
       value = expr.value;

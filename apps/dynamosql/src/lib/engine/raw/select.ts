@@ -45,6 +45,7 @@ async function _getFromTable(
     requestSets,
     requestAll,
     columnRefMap,
+    subqueryValues,
   } = params;
   const { table } = from;
   const requestSet = requestSets.get(from) ?? new Set<string>();
@@ -60,7 +61,13 @@ async function _getFromTable(
   const is_left_join = from.join ? from.join.indexOf('LEFT') >= 0 : false;
   const where_result =
     where && !is_left_join
-      ? convertWhere(where, { session, from, default_true: true, columnRefMap })
+      ? convertWhere(where, {
+          session,
+          from,
+          default_true: true,
+          columnRefMap,
+          subqueryValues,
+        })
       : null;
   if (!where_result?.err && where_result?.value && where_result.value !== 1) {
     sql += ' WHERE ' + where_result.value;

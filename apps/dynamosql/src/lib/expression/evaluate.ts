@@ -48,6 +48,7 @@ import type {
   ValueExpr,
   Interval as IntervalType,
   ColumnRef,
+  Select,
 } from 'node-sql-parser/build/mysql';
 
 export interface EvaluationState {
@@ -56,6 +57,7 @@ export interface EvaluationState {
   columnRefMap?: Map<ColumnRef, ColumnRefInfo>;
   tableInfoMap?: TableInfoMap;
   insertRow?: EvaluationResultRow;
+  subqueryValues?: SubqueryValues;
 }
 export interface EvaluationValue {
   type: ValueType;
@@ -67,6 +69,13 @@ export interface EvaluationResult extends EvaluationValue {
   decimals?: number;
   sleep_ms?: number;
 }
+export interface SelectSubquery {
+  ast: Select;
+}
+export function isSelectSubquery(expr: unknown): expr is SelectSubquery {
+  return typeof expr === 'object' && expr !== null && 'ast' in expr;
+}
+export type SubqueryValues = Map<SelectSubquery, EvaluationValue>;
 
 // Type guards
 function isValueExpr(expr: unknown): expr is ValueExpr {
@@ -200,6 +209,10 @@ export function getValue(
     result.err = { err: 'ER_NOT_SUPPORTED_YET' };
   } else if ('type' in expr && expr.type === 'case') {
     result = caseExpr(expr, state);
+  } else if (isSelectSubquery(expr) && state.subqueryValues?.has(expr)) {
+    const resolved = state.subqueryValues.get(expr);
+    result.type = resolved?.type ?? 'null';
+    result.value = resolved?.value ?? null;
   } else if (isValueExpr(expr)) {
     const type = expr.type;
     if (type === 'number') {
