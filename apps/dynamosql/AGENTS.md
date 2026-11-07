@@ -62,6 +62,10 @@ After any code change, run `npm run ts:check && npm run lint`, then `npm test`. 
 - Tests need AWS credentials with DynamoDB access, read from the environment or `.env`.
 - When asked to write tests, read the implementation first. Cover the full behavior of implemented functionality, and skip anything not implemented. Tests must fail when the implemented behavior differs from MySQL. Pass and fail results are both acceptable; coverage is the goal.
 - When doing generic work implementing SQL Functions, DO NOT TEST SQL parse failure edge cases where MySQL returns ER_PARSE_ERROR. That error is not behavior end users depend on, so skip it in most cases.
+- Matching MySQL's behavior for illegal statements is not a goal. Parse errors (ER_PARSE_ERROR) are not a hard requirement, and neither are other errors for invalid statements, such as ER_CANT_REOPEN_TABLE. Treat these as the same kind of case as parse errors: skip them unless there is a specific reason to test them.
+- Error messages do not need to match MySQL's text exactly. Error codes should match MySQL exactly for valid statements, except where the difference is a design choice.
+- Raw engine design choices are documented in `../../RAW_ENGINE.md`.
+- The memory engine should not have design gaps in general.
 - Mocha timeout is 15 seconds per test.
 - Test directories: `select/`, `insert/`, `update/`, `delete/`, `replace/`, `join/`, `expression/`, `ddl/`, `memory/`, `client_opts/`, `unit_misc/`, `setup/`.
 - Each feature directory holds `.sql` query files and `.test.js` or `.test.ts` files that compare results. Follow the pattern of the neighboring tests.

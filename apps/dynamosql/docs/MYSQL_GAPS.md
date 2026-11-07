@@ -2,6 +2,8 @@
 
 Scenarios where DynamoSQL does not match MySQL 8.4. Each entry gives the query, the MySQL result, and the DynamoSQL result. Entries from the CASE tests are listed first, because those queries were removed from `test/expression/case.sql`.
 
+Matching MySQL is not a goal for illegal statements. Parse errors (`ER_PARSE_ERROR`) and other errors for invalid statements, such as `ER_CANT_REOPEN_TABLE`, are not hard requirements. Entries about those errors are kept only as reference and are not targets to fix. Valid MySQL syntax that DynamoSQL rejects, and valid queries that return different results, are gaps.
+
 ## CASE tests
 
 ### Unsupported syntax
@@ -50,11 +52,3 @@ Only non-correlated scalar subqueries in `WHERE` are supported (`src/lib/select_
 ## Parser
 
 - `UPDATE t JOIN u ON u.id = t.id SET t.c = 0;` works. `UPDATE db.t JOIN u ON u.id = db.t.id SET db.t.c = 0;` fails with `ER_PARSE_ERROR`, because node-sql-parser rejects a database-qualified column in `SET`. MySQL 8.4 accepts it. This is also listed in `docs/PARSER_TODO.md`.
-
-## Errors that differ in message or code
-
-- `SELECT id FROM db.zzz;`, where the table does not exist: MySQL reports `Table 'db.zzz' doesn't exist`. DynamoSQL reports `Table 'zzz' doesn't exist`. The code is the same, `ER_NO_SUCH_TABLE`.
-
-## Accepted by DynamoSQL, rejected by MySQL
-
-- `SELECT t.id FROM t JOIN t t2 ON t2.id = t.id;` on a temporary table: MySQL returns `ER_CANT_REOPEN_TABLE`. DynamoSQL returns the rows. This is a MySQL restriction on temporary tables, and DynamoSQL does not enforce it.
