@@ -19,4 +19,7 @@ describe('Temp', function () {
     path.join(__dirname, 'memory_json_arrow.sql'),
     { checkChanged: true, verify_field_types: true }
   );
+  runTests('collation.sql', path.join(__dirname, 'collation.sql'), {
+    checkChanged: true,
+  });
 });

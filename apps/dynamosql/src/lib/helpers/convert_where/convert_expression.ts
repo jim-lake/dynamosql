@@ -1,8 +1,15 @@
 import { getValue } from '../../expression';
+import {
+  COERCIBILITY,
+  getExprCoercibility,
+  getExprCollation,
+  isCaseInsensitive,
+} from '../collation';
 
 import { convertWhere } from './convert_where';
 
 import type { ConvertWhereState, ConvertResult } from './convert_where';
+import type { ExprArgument } from '../collation';
 import type { ExpressionValue, Binary } from 'node-sql-parser/build/mysql';
 
 type ConvertFunc = (
@@ -92,6 +99,10 @@ function _in(expr: Binary, state: ConvertWhereState): ConvertResult {
     const rightValue = rightExpr.value;
     if (!rightValue) {
       err = 'unsupported';
+    } else if (
+      hasExplicitCaseInsensitiveCollation([expr.left, ...rightValue], state)
+    ) {
+      err = 'unsupported';
     } else {
       const count = rightValue.length;
       const list: (string | number | boolean | null)[] = [];
@@ -122,6 +133,9 @@ function _comparator(
   state: ConvertWhereState,
   op: string
 ): ConvertResult {
+  if (hasExplicitCaseInsensitiveCollation([expr.left, expr.right], state)) {
+    return unsupported();
+  }
   const left = convertWhere(expr.left, state);
   const right = convertWhere(expr.right, state);
 
@@ -131,6 +145,9 @@ function _comparator(
 }
 
 function nullSafeEqual(expr: Binary, state: ConvertWhereState): ConvertResult {
+  if (hasExplicitCaseInsensitiveCollation([expr.left, expr.right], state)) {
+    return unsupported();
+  }
   const left = convertWhere(expr.left, state);
   const right = convertWhere(expr.right, state);
   const err = left.err ?? right.err;
@@ -149,6 +166,16 @@ function nullSafeEqual(expr: Binary, state: ConvertWhereState): ConvertResult {
     }
   }
   return { err, value };
+}
+
+function hasExplicitCaseInsensitiveCollation(
+  operands: ExprArgument[],
+  state: ConvertWhereState
+): boolean {
+  return (
+    getExprCoercibility(operands, state) === COERCIBILITY.EXPLICIT &&
+    isCaseInsensitive(getExprCollation(operands, state))
+  );
 }
 
 function equal(expr: Binary, state: ConvertWhereState): ConvertResult {

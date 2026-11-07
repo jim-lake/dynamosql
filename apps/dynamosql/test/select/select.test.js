@@ -20,4 +20,5 @@ describe('Select', function () {
   runTests('null_handling.sql', path.join(__dirname, 'null_handling.sql'));
   runTests('operators.sql', path.join(__dirname, 'operators.sql'));
   runTests('string_funcs.sql', path.join(__dirname, 'string_funcs.sql'));
+  runTests('collation_raw.sql', path.join(__dirname, 'collation_raw.sql'));
 });

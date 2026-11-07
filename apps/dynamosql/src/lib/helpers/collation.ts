@@ -62,6 +62,12 @@ export function getCollation(s: string): COLLATIONS {
   }
   return found;
 }
+export function isCaseInsensitive(collation: COLLATIONS | null): boolean {
+  if (collation === null) {
+    return false;
+  }
+  return COLLATIONS[collation].endsWith('_CI');
+}
 export function stringCompare(
   s1: string,
   s2: string,
@@ -70,16 +76,16 @@ export function stringCompare(
   if (s1 === s2) {
     return 0;
   }
+  if (isCaseInsensitive(collation)) {
+    return s1.localeCompare(s2, 'und', {
+      sensitivity: 'base',
+      ignorePunctuation: false,
+      numeric: false,
+      caseFirst: 'false',
+      usage: 'sort',
+    });
+  }
   switch (collation) {
-    case COLLATIONS.UTF8MB4_GENERAL_CI:
-    case COLLATIONS.UTF8MB4_0900_AI_CI:
-      return s1.localeCompare(s2, 'und', {
-        sensitivity: 'base',
-        ignorePunctuation: false,
-        numeric: false,
-        caseFirst: 'false',
-        usage: 'sort',
-      });
     case COLLATIONS.UTF8MB4_0900_AS_CS:
       return s1.localeCompare(s2, 'und', {
         sensitivity: 'variant',
@@ -95,7 +101,7 @@ export function stringCompare(
       return s1 > s2 ? 1 : -1;
   }
 }
-type ExprArgument =
+export type ExprArgument =
   | Assign
   | ExpressionValue
   | ConvertDataType

@@ -3,6 +3,7 @@ import { logger } from '@dynamosql/shared';
 import type { ItemRecord } from '@/tools/dynamodb';
 import { escapeIdentifier } from '@/tools/dynamodb_helper';
 
+import { COLLATIONS } from '../../../constants/mysql';
 import { SQLError } from '../../../error';
 import { convertWhere } from '../../helpers/convert_where';
 
@@ -13,6 +14,8 @@ import type {
   QueryTableInfo,
   QueryColumnInfo,
 } from '..';
+
+const RAW_COLLATION = COLLATIONS.UTF8MB4_0900_BIN;
 
 export async function getRowList(
   params: RowListParams
@@ -76,7 +79,11 @@ async function _getFromTable(
           for (const name in result) {
             const old = response_map.get(name);
             if (!old) {
-              response_map.set(name, { name, name_lc: name.toLowerCase() });
+              response_map.set(name, {
+                name,
+                name_lc: name.toLowerCase(),
+                collation: RAW_COLLATION,
+              });
             }
           }
         }
@@ -86,6 +93,7 @@ async function _getFromTable(
       columns = request_columns.map((name) => ({
         name,
         name_lc: name.toLowerCase(),
+        collation: RAW_COLLATION,
       }));
     }
     async function* _makeIter(): AsyncIterable<ItemRecord[]> {

@@ -1,3 +1,4 @@
+import { getExprCollation, isCaseInsensitive } from '../helpers/collation';
 import { convertBooleanValue } from '../helpers/sql_conversion';
 
 import {
@@ -166,7 +167,9 @@ function like(expr: Binary, state: EvaluationState): EvaluationResult {
         .replace(/[.+^${}()|[\]\\]/g, '\\$&')
         .replace(/%/g, '.*')
         .replace(/_/g, '.');
-      const regex = new RegExp('^' + pattern + '$', 'i');
+      const collation = getExprCollation([expr.left, expr.right], state);
+      const flags = isCaseInsensitive(collation) ? 'i' : '';
+      const regex = new RegExp('^' + pattern + '$', flags);
       value = regex.test(str) ? 1 : 0;
     }
   }

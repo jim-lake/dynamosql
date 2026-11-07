@@ -4,8 +4,8 @@ var SqlString = require('sqlstring');
 var node_events = require('node:events');
 var clientDynamodb = require('@aws-sdk/client-dynamodb');
 var require$$0 = require('node:util');
-var promises = require('node:timers/promises');
 var crypto = require('node:crypto');
+var promises = require('node:timers/promises');
 
 function _interopNamespaceDefault(e) {
     var n = Object.create(null);
@@ -2460,20 +2460,26 @@ function getCollation(s) {
     }
     return found;
 }
+function isCaseInsensitive(collation) {
+    if (collation === null) {
+        return false;
+    }
+    return COLLATIONS[collation].endsWith('_CI');
+}
 function stringCompare(s1, s2, collation) {
     if (s1 === s2) {
         return 0;
     }
+    if (isCaseInsensitive(collation)) {
+        return s1.localeCompare(s2, 'und', {
+            sensitivity: 'base',
+            ignorePunctuation: false,
+            numeric: false,
+            caseFirst: 'false',
+            usage: 'sort',
+        });
+    }
     switch (collation) {
-        case COLLATIONS.UTF8MB4_GENERAL_CI:
-        case COLLATIONS.UTF8MB4_0900_AI_CI:
-            return s1.localeCompare(s2, 'und', {
-                sensitivity: 'base',
-                ignorePunctuation: false,
-                numeric: false,
-                caseFirst: 'false',
-                usage: 'sort',
-            });
         case COLLATIONS.UTF8MB4_0900_AS_CS:
             return s1.localeCompare(s2, 'und', {
                 sensitivity: 'variant',
@@ -2491,6 +2497,9 @@ function stringCompare(s1, s2, collation) {
 }
 function getExprCollation(expr, state) {
     return _getExprCollation(expr, state)[0];
+}
+function getExprCoercibility(expr, state) {
+    return _getExprCollation(expr, state)[1];
 }
 function _getExprCollation(expr, state) {
     if (!expr) {
@@ -3969,6 +3978,23 @@ class DynamoDB {
             throw err_list;
         }
     }
+    async updateItem(params) {
+        const command = new clientDynamodb.UpdateItemCommand({
+            TableName: `${this.namespace}${params.table}`,
+            Key: params.key,
+            UpdateExpression: params.expression,
+            ExpressionAttributeNames: params.names,
+            ExpressionAttributeValues: params.values,
+            ReturnValues: 'ALL_OLD',
+        });
+        try {
+            const result = await this.client.send(command);
+            return result.Attributes;
+        }
+        catch (err) {
+            throw safeConvertError(err);
+        }
+    }
     async getTableList() {
         const namespace_len = this.namespace.length;
         const command = new clientDynamodb.ListTablesCommand({ Limit: 100 });
@@ -5233,10 +5259,11 @@ function setToSQL(sets) {
   return clauses.join(", ");
 }
 function updateToSQL(stmt) {
-  const { from, table, set, where, orderby, with: withInfo, limit, returning } = stmt;
+  const { from, table, set, where, orderby, with: withInfo, limit, returning, ignore } = stmt;
   const clauses = [
     withToSQL(withInfo),
     "UPDATE",
+    ignore ? "IGNORE" : "",
     tablesToSQL(table),
     commonOptionConnector("SET", setToSQL, set),
     commonOptionConnector("FROM", tablesToSQL, from),
@@ -10170,7 +10197,7 @@ function peg$parse(input, options) {
       ...getLocationObject(),
     };
   }
-  function peg$f263(cte, t, l, w, or, lc) {
+  function peg$f263(cte, ig, t, l, w, or, lc) {
     const dbObj = {};
     if (t) t.forEach(tableInfo => {
       const { db, as, table, join } = tableInfo;
@@ -10193,6 +10220,7 @@ function peg$parse(input, options) {
       ast: {
         with: cte,
         type: 'update',
+        ignore: ig && ig[0].toLowerCase(),
         table: t,
         set: l,
         where: w,
@@ -11110,191 +11138,202 @@ function peg$parse(input, options) {
   function peg$f431() {    return "''"  }
   function peg$f432() {    return '""'  }
   function peg$f433() {    return '``'  }
-  function peg$f434(int_, frac, exp) {
+  function peg$f434(digits, exp) {
+    // leading-dot literal such as .5E0; same value and text form as 0.5E0
+    return '0.' + digits + exp;
+  }
+  function peg$f435(digits) {
+    // leading-dot literal such as .5; same value as 0.5
+    const numStr = '0.' + digits;
+    const num = parseFloat(numStr);
+    if (num.toString() === numStr) return num;
+    return numStr;
+  }
+  function peg$f436(int_, frac, exp) {
     return int_ + frac + exp;
   }
-  function peg$f435(int_, frac) {
+  function peg$f437(int_, frac) {
     const numStr = int_ + frac;
     const num = parseFloat(numStr);
     if (num.toString() === numStr) return num;
     return numStr;
   }
-  function peg$f436(int_, exp) {
+  function peg$f438(int_, exp) {
     return int_ + exp;
   }
-  function peg$f437(int_) {
+  function peg$f439(int_) {
     if (isBigInt(int_)) return {
       type: 'bigint',
       value: int_
     }
     return parseFloat(int_);
   }
-  function peg$f438(op, digits) {    return op + digits;  }
-  function peg$f439(op, digit) {    return op + digit;  }
-  function peg$f440(digits) {
+  function peg$f440(op, digits) {    return op + digits;  }
+  function peg$f441(op, digit) {    return op + digit;  }
+  function peg$f442(digits) {
     if (!digits) return ''
     return "." + digits;
   }
-  function peg$f441(e, digits) {    return e + digits;  }
-  function peg$f442(digits) {    return digits.join("");  }
-  function peg$f443(e, sign) {    return e + (sign !== null ? sign: '');  }
-  function peg$f444() {    return 'DROP';  }
-  function peg$f445() {    return 'ALTER';  }
-  function peg$f446() {    return 'RECURSIVE';  }
-  function peg$f447() {    return 'RETURN';  }
-  function peg$f448() {    return 'DESCRIBE';  }
-  function peg$f449() {    return 'PARTITION';  }
-  function peg$f450() {    return 'SET';  }
-  function peg$f451() {    return 'TABLE';  }
-  function peg$f452() {    return 'TABLES';  }
-  function peg$f453() {    return 'DATABASE';  }
-  function peg$f454() {    return 'SCHEMA';  }
-  function peg$f455() {    return 'COLLATE';  }
-  function peg$f456() {    return 'TRIGGER';  }
-  function peg$f457() {    return 'VIEW';  }
-  function peg$f458() {    return 'LEFT';  }
-  function peg$f459() {    return 'RIGHT';  }
-  function peg$f460() {    return 'INNER';  }
-  function peg$f461() {    return 'CROSS';  }
-  function peg$f462() {    return 'JOIN';  }
-  function peg$f463() {    return 'OUTER';  }
-  function peg$f464() {    return 'NATURAL';  }
-  function peg$f465() {    return 'STRAIGHT_JOIN';  }
-  function peg$f466() {    return 'UNION';  }
-  function peg$f467() {    return 'MINUS';  }
-  function peg$f468() {    return 'INTERSECT';  }
-  function peg$f469() {    return 'EXCEPT';  }
-  function peg$f470() {    return 'GO';  }
-  function peg$f471() {    return 'OFFSET';  }
-  function peg$f472() {    return 'ASC';  }
-  function peg$f473() {    return 'DESC';  }
-  function peg$f474() {    return 'ALL';  }
-  function peg$f475() {    return 'DISTINCT';  }
-  function peg$f476() {    return 'BETWEEN';  }
-  function peg$f477() {    return 'IN';  }
-  function peg$f478() {    return 'IS';  }
-  function peg$f479() {    return 'LIKE';  }
-  function peg$f480() {    return 'RLIKE';  }
-  function peg$f481() {    return 'REGEXP';  }
-  function peg$f482() {    return 'EXISTS';  }
-  function peg$f483() {    return 'NOT';  }
-  function peg$f484() {    return 'AND';  }
-  function peg$f485() {    return 'OR';  }
-  function peg$f486() {    return 'COUNT';  }
-  function peg$f487() {    return 'MAX';  }
-  function peg$f488() {    return 'MIN';  }
-  function peg$f489() {    return 'SUM';  }
-  function peg$f490() {    return 'AVG';  }
-  function peg$f491() {    return 'GROUP_CONCAT';  }
-  function peg$f492() {    return 'CALL';  }
-  function peg$f493() {    return 'EXTRACT';  }
-  function peg$f494() {    return 'CAST';  }
-  function peg$f495() {    return 'BOOL';  }
-  function peg$f496() {    return 'BOOLEAN';  }
-  function peg$f497() {    return 'CHAR';  }
-  function peg$f498() {    return 'CHARACTER';  }
-  function peg$f499() {    return 'VARCHAR';  }
-  function peg$f500() {    return 'STRING';  }
-  function peg$f501() {    return 'TEXT';  }
-  function peg$f502() {    return 'TINYTEXT';  }
-  function peg$f503() {    return 'MEDIUMTEXT';  }
-  function peg$f504() {    return 'LONGTEXT';  }
-  function peg$f505() {    return 'NUMERIC';  }
-  function peg$f506() {    return 'DECIMAL';  }
-  function peg$f507() {    return 'NUMBER';  }
-  function peg$f508() {    return 'SIGNED';  }
-  function peg$f509() {    return 'UNSIGNED';  }
-  function peg$f510() {    return 'INT';  }
-  function peg$f511() {    return 'INT64';  }
-  function peg$f512() {    return 'INTEGER';  }
-  function peg$f513() {    return 'SMALLINT';  }
-  function peg$f514() {    return 'MEDIUMINT';  }
-  function peg$f515() {    return 'TINYINT';  }
-  function peg$f516() {    return 'BYTEINT';  }
-  function peg$f517() {    return 'BIGINT';  }
-  function peg$f518() {    return 'FLOAT';  }
-  function peg$f519() {    return 'FLOAT4';  }
-  function peg$f520() {    return 'FLOAT8';  }
-  function peg$f521() {    return 'FLOAT64';  }
-  function peg$f522() {    return 'DOUBLE';  }
-  function peg$f523() {    return 'REAL';  }
-  function peg$f524() {    return 'PRECISION';  }
-  function peg$f525() {    return 'ZEROFILL';  }
-  function peg$f526() {    return 'SERIAL';  }
-  function peg$f527() {    return 'BIGSERIAL';  }
-  function peg$f528() {    return 'BINARY';  }
-  function peg$f529() {    return 'VARBINARY';  }
-  function peg$f530() {    return 'BIT';  }
-  function peg$f531() {    return 'JSON';  }
-  function peg$f532() {    return 'JSONB';  }
-  function peg$f533() {    return 'ENUM';  }
-  function peg$f534() {    return 'ROWS';  }
-  function peg$f535() {    return 'DATE';  }
-  function peg$f536() {    return 'DATETIME';  }
-  function peg$f537() {    return 'TIME';  }
-  function peg$f538() {    return 'TIMESTAMP';  }
-  function peg$f539() {    return 'TIMESTAMPTZ';  }
-  function peg$f540() {    return 'TIMESTAMP_TZ';  }
-  function peg$f541() {    return 'TIMESTAMP_NTZ';  }
-  function peg$f542() {    return 'TIMESTAMP_LTZ';  }
-  function peg$f543() {    return 'YEAR';  }
-  function peg$f544() {    return 'GEOMETRY';  }
-  function peg$f545() {    return 'GEOGRAPHY';  }
-  function peg$f546() {    return 'POINT';  }
-  function peg$f547() {    return 'LINESTRING';  }
-  function peg$f548() {    return 'POLYGON';  }
-  function peg$f549() {    return 'MULTIPOINT';  }
-  function peg$f550() {    return 'MULTILINESTRING';  }
-  function peg$f551() {    return 'MULTIPOLYGON';  }
-  function peg$f552() {    return 'GEOMETRYCOLLECTION';  }
-  function peg$f553() {    return 'VECTOR';  }
-  function peg$f554() {    return 'TRUNCATE';  }
-  function peg$f555() {    return 'USER';  }
-  function peg$f556() {    return 'CURRENT_DATE';  }
-  function peg$f557() {    return 'INTERVAL';  }
-  function peg$f558() {    return 'CURRENT_TIME';  }
-  function peg$f559() {    return 'CURRENT_TIMESTAMP';  }
-  function peg$f560() {    return 'CURRENT_USER';  }
-  function peg$f561() {    return 'SESSION_USER';  }
-  function peg$f562() {    return 'SYSTEM_USER';  }
-  function peg$f563() {    return 'YEAR';  }
-  function peg$f564() {    return 'QUARTER';  }
-  function peg$f565() {    return 'MONTH';  }
-  function peg$f566() {    return 'WEEK';  }
-  function peg$f567() {    return 'DAY';  }
-  function peg$f568() {    return 'HOUR';  }
-  function peg$f569() {    return 'MINUTE';  }
-  function peg$f570() {    return 'SECOND';  }
-  function peg$f571() {    return 'MICROSECOND';  }
-  function peg$f572() {    return 'SECOND_MICROSECOND';  }
-  function peg$f573() {    return 'MINUTE_MICROSECOND';  }
-  function peg$f574() {    return 'MINUTE_SECOND';  }
-  function peg$f575() {    return 'HOUR_MICROSECOND';  }
-  function peg$f576() {    return 'HOUR_SECOND';  }
-  function peg$f577() {    return 'HOUR_MINUTE';  }
-  function peg$f578() {    return 'DAY_MICROSECOND';  }
-  function peg$f579() {    return 'DAY_SECOND';  }
-  function peg$f580() {    return 'DAY_MINUTE';  }
-  function peg$f581() {    return 'DAY_HOUR';  }
-  function peg$f582() {    return 'YEAR_MONTH';  }
-  function peg$f583() {    return 'GLOBAL';  }
-  function peg$f584() {    return 'SESSION';  }
-  function peg$f585() {    return 'LOCAL';  }
-  function peg$f586() {    return 'PERSIST';  }
-  function peg$f587() {    return 'PERSIST_ONLY';  }
-  function peg$f588() {    return 'ADD';  }
-  function peg$f589() {    return 'COLUMN';  }
-  function peg$f590() {    return 'MODIFY';  }
-  function peg$f591() {    return 'INDEX';  }
-  function peg$f592() {    return 'KEY';  }
-  function peg$f593() {    return 'FULLTEXT';  }
-  function peg$f594() {    return 'SPATIAL';  }
-  function peg$f595() {    return 'UNIQUE';  }
-  function peg$f596() {    return 'KEY_BLOCK_SIZE';  }
-  function peg$f597() {    return 'COMMENT';  }
-  function peg$f598() {    return 'CONSTRAINT';  }
-  function peg$f599() {    return 'REFERENCES';  }
-  function peg$f600(k, s, c) {
+  function peg$f443(e, digits) {    return e + digits;  }
+  function peg$f444(digits) {    return digits.join("");  }
+  function peg$f445(e, sign) {    return e + (sign !== null ? sign: '');  }
+  function peg$f446() {    return 'DROP';  }
+  function peg$f447() {    return 'ALTER';  }
+  function peg$f448() {    return 'RECURSIVE';  }
+  function peg$f449() {    return 'RETURN';  }
+  function peg$f450() {    return 'DESCRIBE';  }
+  function peg$f451() {    return 'PARTITION';  }
+  function peg$f452() {    return 'SET';  }
+  function peg$f453() {    return 'TABLE';  }
+  function peg$f454() {    return 'TABLES';  }
+  function peg$f455() {    return 'DATABASE';  }
+  function peg$f456() {    return 'SCHEMA';  }
+  function peg$f457() {    return 'COLLATE';  }
+  function peg$f458() {    return 'TRIGGER';  }
+  function peg$f459() {    return 'VIEW';  }
+  function peg$f460() {    return 'LEFT';  }
+  function peg$f461() {    return 'RIGHT';  }
+  function peg$f462() {    return 'INNER';  }
+  function peg$f463() {    return 'CROSS';  }
+  function peg$f464() {    return 'JOIN';  }
+  function peg$f465() {    return 'OUTER';  }
+  function peg$f466() {    return 'NATURAL';  }
+  function peg$f467() {    return 'STRAIGHT_JOIN';  }
+  function peg$f468() {    return 'UNION';  }
+  function peg$f469() {    return 'MINUS';  }
+  function peg$f470() {    return 'INTERSECT';  }
+  function peg$f471() {    return 'EXCEPT';  }
+  function peg$f472() {    return 'GO';  }
+  function peg$f473() {    return 'OFFSET';  }
+  function peg$f474() {    return 'ASC';  }
+  function peg$f475() {    return 'DESC';  }
+  function peg$f476() {    return 'ALL';  }
+  function peg$f477() {    return 'DISTINCT';  }
+  function peg$f478() {    return 'BETWEEN';  }
+  function peg$f479() {    return 'IN';  }
+  function peg$f480() {    return 'IS';  }
+  function peg$f481() {    return 'LIKE';  }
+  function peg$f482() {    return 'RLIKE';  }
+  function peg$f483() {    return 'REGEXP';  }
+  function peg$f484() {    return 'EXISTS';  }
+  function peg$f485() {    return 'NOT';  }
+  function peg$f486() {    return 'AND';  }
+  function peg$f487() {    return 'OR';  }
+  function peg$f488() {    return 'COUNT';  }
+  function peg$f489() {    return 'MAX';  }
+  function peg$f490() {    return 'MIN';  }
+  function peg$f491() {    return 'SUM';  }
+  function peg$f492() {    return 'AVG';  }
+  function peg$f493() {    return 'GROUP_CONCAT';  }
+  function peg$f494() {    return 'CALL';  }
+  function peg$f495() {    return 'EXTRACT';  }
+  function peg$f496() {    return 'CAST';  }
+  function peg$f497() {    return 'BOOL';  }
+  function peg$f498() {    return 'BOOLEAN';  }
+  function peg$f499() {    return 'CHAR';  }
+  function peg$f500() {    return 'CHARACTER';  }
+  function peg$f501() {    return 'VARCHAR';  }
+  function peg$f502() {    return 'STRING';  }
+  function peg$f503() {    return 'TEXT';  }
+  function peg$f504() {    return 'TINYTEXT';  }
+  function peg$f505() {    return 'MEDIUMTEXT';  }
+  function peg$f506() {    return 'LONGTEXT';  }
+  function peg$f507() {    return 'NUMERIC';  }
+  function peg$f508() {    return 'DECIMAL';  }
+  function peg$f509() {    return 'NUMBER';  }
+  function peg$f510() {    return 'SIGNED';  }
+  function peg$f511() {    return 'UNSIGNED';  }
+  function peg$f512() {    return 'INT';  }
+  function peg$f513() {    return 'INT64';  }
+  function peg$f514() {    return 'INTEGER';  }
+  function peg$f515() {    return 'SMALLINT';  }
+  function peg$f516() {    return 'MEDIUMINT';  }
+  function peg$f517() {    return 'TINYINT';  }
+  function peg$f518() {    return 'BYTEINT';  }
+  function peg$f519() {    return 'BIGINT';  }
+  function peg$f520() {    return 'FLOAT';  }
+  function peg$f521() {    return 'FLOAT4';  }
+  function peg$f522() {    return 'FLOAT8';  }
+  function peg$f523() {    return 'FLOAT64';  }
+  function peg$f524() {    return 'DOUBLE';  }
+  function peg$f525() {    return 'REAL';  }
+  function peg$f526() {    return 'PRECISION';  }
+  function peg$f527() {    return 'ZEROFILL';  }
+  function peg$f528() {    return 'SERIAL';  }
+  function peg$f529() {    return 'BIGSERIAL';  }
+  function peg$f530() {    return 'BINARY';  }
+  function peg$f531() {    return 'VARBINARY';  }
+  function peg$f532() {    return 'BIT';  }
+  function peg$f533() {    return 'JSON';  }
+  function peg$f534() {    return 'JSONB';  }
+  function peg$f535() {    return 'ENUM';  }
+  function peg$f536() {    return 'ROWS';  }
+  function peg$f537() {    return 'DATE';  }
+  function peg$f538() {    return 'DATETIME';  }
+  function peg$f539() {    return 'TIME';  }
+  function peg$f540() {    return 'TIMESTAMP';  }
+  function peg$f541() {    return 'TIMESTAMPTZ';  }
+  function peg$f542() {    return 'TIMESTAMP_TZ';  }
+  function peg$f543() {    return 'TIMESTAMP_NTZ';  }
+  function peg$f544() {    return 'TIMESTAMP_LTZ';  }
+  function peg$f545() {    return 'YEAR';  }
+  function peg$f546() {    return 'GEOMETRY';  }
+  function peg$f547() {    return 'GEOGRAPHY';  }
+  function peg$f548() {    return 'POINT';  }
+  function peg$f549() {    return 'LINESTRING';  }
+  function peg$f550() {    return 'POLYGON';  }
+  function peg$f551() {    return 'MULTIPOINT';  }
+  function peg$f552() {    return 'MULTILINESTRING';  }
+  function peg$f553() {    return 'MULTIPOLYGON';  }
+  function peg$f554() {    return 'GEOMETRYCOLLECTION';  }
+  function peg$f555() {    return 'VECTOR';  }
+  function peg$f556() {    return 'TRUNCATE';  }
+  function peg$f557() {    return 'USER';  }
+  function peg$f558() {    return 'CURRENT_DATE';  }
+  function peg$f559() {    return 'INTERVAL';  }
+  function peg$f560() {    return 'CURRENT_TIME';  }
+  function peg$f561() {    return 'CURRENT_TIMESTAMP';  }
+  function peg$f562() {    return 'CURRENT_USER';  }
+  function peg$f563() {    return 'SESSION_USER';  }
+  function peg$f564() {    return 'SYSTEM_USER';  }
+  function peg$f565() {    return 'YEAR';  }
+  function peg$f566() {    return 'QUARTER';  }
+  function peg$f567() {    return 'MONTH';  }
+  function peg$f568() {    return 'WEEK';  }
+  function peg$f569() {    return 'DAY';  }
+  function peg$f570() {    return 'HOUR';  }
+  function peg$f571() {    return 'MINUTE';  }
+  function peg$f572() {    return 'SECOND';  }
+  function peg$f573() {    return 'MICROSECOND';  }
+  function peg$f574() {    return 'SECOND_MICROSECOND';  }
+  function peg$f575() {    return 'MINUTE_MICROSECOND';  }
+  function peg$f576() {    return 'MINUTE_SECOND';  }
+  function peg$f577() {    return 'HOUR_MICROSECOND';  }
+  function peg$f578() {    return 'HOUR_SECOND';  }
+  function peg$f579() {    return 'HOUR_MINUTE';  }
+  function peg$f580() {    return 'DAY_MICROSECOND';  }
+  function peg$f581() {    return 'DAY_SECOND';  }
+  function peg$f582() {    return 'DAY_MINUTE';  }
+  function peg$f583() {    return 'DAY_HOUR';  }
+  function peg$f584() {    return 'YEAR_MONTH';  }
+  function peg$f585() {    return 'GLOBAL';  }
+  function peg$f586() {    return 'SESSION';  }
+  function peg$f587() {    return 'LOCAL';  }
+  function peg$f588() {    return 'PERSIST';  }
+  function peg$f589() {    return 'PERSIST_ONLY';  }
+  function peg$f590() {    return 'ADD';  }
+  function peg$f591() {    return 'COLUMN';  }
+  function peg$f592() {    return 'MODIFY';  }
+  function peg$f593() {    return 'INDEX';  }
+  function peg$f594() {    return 'KEY';  }
+  function peg$f595() {    return 'FULLTEXT';  }
+  function peg$f596() {    return 'SPATIAL';  }
+  function peg$f597() {    return 'UNIQUE';  }
+  function peg$f598() {    return 'KEY_BLOCK_SIZE';  }
+  function peg$f599() {    return 'COMMENT';  }
+  function peg$f600() {    return 'CONSTRAINT';  }
+  function peg$f601() {    return 'REFERENCES';  }
+  function peg$f602(k, s, c) {
     // => { type: 'comment'; keyword: 'comment'; symbol: '='; value: literal_string; }
     return {
       type: k.toLowerCase(),
@@ -11303,7 +11342,7 @@ function peg$parse(input, options) {
       value: c,
     }
   }
-  function peg$f601(condition_list, otherwise) {
+  function peg$f603(condition_list, otherwise) {
     if (otherwise) condition_list.push(otherwise);
     return {
       type: 'case',
@@ -11311,7 +11350,7 @@ function peg$parse(input, options) {
       args: condition_list
     };
   }
-  function peg$f602(expr, condition_list, otherwise) {
+  function peg$f604(expr, condition_list, otherwise) {
     if (otherwise) condition_list.push(otherwise);
     return {
       type: 'case',
@@ -11319,28 +11358,28 @@ function peg$parse(input, options) {
       args: condition_list
     };
   }
-  function peg$f603(head, tail) {
+  function peg$f605(head, tail) {
     return createList(head, tail, 1)
   }
-  function peg$f604(condition, result) {
+  function peg$f606(condition, result) {
     return {
       type: 'when',
       cond: condition,
       result: result
     };
   }
-  function peg$f605(result) {
+  function peg$f607(result) {
     return { type: 'else', result: result };
   }
-  function peg$f606() {    return 'XOR'  }
-  function peg$f607() {    varList = []; return true;  }
-  function peg$f608(s) {
+  function peg$f608() {    return 'XOR'  }
+  function peg$f609() {    varList = []; return true;  }
+  function peg$f610(s) {
     return { stmt: s, vars: varList };
   }
-  function peg$f609(head, tail) {
+  function peg$f611(head, tail) {
     return createList(head, tail);
   }
-  function peg$f610(va, s, e) {
+  function peg$f612(va, s, e) {
     return {
       type: 'assign',
       left: va,
@@ -11348,7 +11387,7 @@ function peg$parse(input, options) {
       right: e
     };
   }
-  function peg$f611(va, s, e) {
+  function peg$f613(va, s, e) {
     return {
       type: 'assign',
       left: va,
@@ -11356,16 +11395,16 @@ function peg$parse(input, options) {
       right: e
     };
   }
-  function peg$f612(e) {
+  function peg$f614(e) {
     return { type: 'return', expr: e };
   }
-  function peg$f613(head, tail) {
+  function peg$f615(head, tail) {
     return createBinaryExprChain(head, tail);
   }
-  function peg$f614(head, tail) {
+  function peg$f616(head, tail) {
     return createBinaryExprChain(head, tail);
   }
-  function peg$f615(lt, op, rt, expr) {
+  function peg$f617(lt, op, rt, expr) {
     return {
       type: 'join',
       ltable: lt,
@@ -11374,11 +11413,11 @@ function peg$parse(input, options) {
       on: expr
     };
   }
-  function peg$f616(e) {
+  function peg$f618(e) {
     e.parentheses = true;
     return e;
   }
-  function peg$f617(dt, tail) {
+  function peg$f619(dt, tail) {
     const result = { name: [dt] };
     if (tail !== null) {
       result.schema = dt;
@@ -11386,7 +11425,7 @@ function peg$parse(input, options) {
     }
     return result
   }
-  function peg$f618(name, l) {
+  function peg$f620(name, l) {
     //compatible with original func_call
     return {
       type: 'function',
@@ -11398,7 +11437,7 @@ function peg$parse(input, options) {
       ...getLocationObject(),
     };
   }
-  function peg$f619(name) {
+  function peg$f621(name) {
     return {
         type: 'function',
         name: name,
@@ -11406,23 +11445,23 @@ function peg$parse(input, options) {
         ...getLocationObject(),
       };
   }
-  function peg$f620(head, tail) {
+  function peg$f622(head, tail) {
     return createList(head, tail);
   }
-  function peg$f621(l) {
+  function peg$f623(l) {
     return { type: 'array', value: l };
   }
-  function peg$f622(head, tail) {
+  function peg$f624(head, tail) {
     return createList(head, tail)
   }
-  function peg$f623(p, d) {
+  function peg$f625(p, d) {
     return {
       type: 'var',
       ...d,
       prefix: p
     };
   }
-  function peg$f624(name, m) {
+  function peg$f626(name, m) {
     //push for analysis
     varList.push(name);
     return {
@@ -11432,7 +11471,7 @@ function peg$parse(input, options) {
       prefix: null,
     };
   }
-  function peg$f625(n) {
+  function peg$f627(n) {
     return {
       type: 'var',
       name: n.value,
@@ -11441,31 +11480,31 @@ function peg$parse(input, options) {
       prefix: null,
     }
   }
-  function peg$f626(l) {
+  function peg$f628(l) {
     const s = [];
     for (let i = 0; i < l.length; i++) {
       s.push(l[i][1]);
     }
     return s;
   }
-  function peg$f627(l, s) {
+  function peg$f629(l, s) {
     return {
       length: parseInt(l.join(''), 10),
       parentheses: true,
       suffix: s,
     };
   }
-  function peg$f628(t) {
+  function peg$f630(t) {
     return { dataType: t }
   }
-  function peg$f629(b) {    return { dataType: b.toUpperCase() };  }
-  function peg$f630(t, num) {
+  function peg$f631(b) {    return { dataType: b.toUpperCase() };  }
+  function peg$f632(t, num) {
     return { dataType: t, ...(num || {}) }
   }
-  function peg$f631() {
+  function peg$f633() {
     return 'CHARACTER VARYING'
   }
-  function peg$f632(t, num) {
+  function peg$f634(t, num) {
     const result = { dataType: t };
     if (num) {
       result.length = parseInt(num[3].join(''), 10);
@@ -11474,18 +11513,18 @@ function peg$parse(input, options) {
     }
     return result
   }
-  function peg$f633(t, s) {
+  function peg$f635(t, s) {
     const result = { dataType: t };
     if (!s || s.length === 0) return result
     return { ...result, length: parseInt(s[3].join(''), 10), parentheses: true  };
   }
-  function peg$f634(w) {
+  function peg$f636(w) {
     // => string[];
     return [w.toUpperCase(), 'TIME', 'ZONE']
   }
-  function peg$f635(t, l, tz) {    return { dataType: t, length: parseInt(l.join(''), 10), parentheses: true, suffix: tz };  }
-  function peg$f636(t, tz) {    return { dataType: t, suffix: tz };  }
-  function peg$f637(t, num) {
+  function peg$f637(t, l, tz) {    return { dataType: t, length: parseInt(l.join(''), 10), parentheses: true, suffix: tz };  }
+  function peg$f638(t, tz) {    return { dataType: t, suffix: tz };  }
+  function peg$f639(t, num) {
     const result = { dataType: t };
     if (num) {
       result.length = parseInt(num[3], 10);
@@ -11494,49 +11533,49 @@ function peg$parse(input, options) {
     }
     return result
   }
-  function peg$f638(t, l, s) {    return s.length > 0  }
-  function peg$f639(t, l, s) {
+  function peg$f640(t, l, s) {    return s.length > 0  }
+  function peg$f641(t, l, s) {
     return { dataType: t, length: parseInt(l, 10), parentheses: true, suffix: s }
   }
-  function peg$f640(un, ze) {
+  function peg$f642(un, ze) {
     const result = [];
     if (un) result.push(un);
     if (ze) result.push(ze);
     return result
   }
-  function peg$f641(p) {
+  function peg$f643(p) {
     if (p) {
       return 'DOUBLE PRECISION'
     }
     return 'DOUBLE'
   }
-  function peg$f642(t, l, r, s) {
+  function peg$f644(t, l, r, s) {
     return { dataType: t, length: parseInt(l.join(''), 10), scale: r && parseInt(r[2].join(''), 10), parentheses: true, suffix: s };
-  }
-  function peg$f643(t, s) {
-    return { dataType: t, suffix: s };
-  }
-  function peg$f644(t, l, s) {
-    return { dataType: t, length: parseInt(l.join(''), 10), suffix: s };
   }
   function peg$f645(t, s) {
     return { dataType: t, suffix: s };
   }
-  function peg$f646(t, e) {
+  function peg$f646(t, l, s) {
+    return { dataType: t, length: parseInt(l.join(''), 10), suffix: s };
+  }
+  function peg$f647(t, s) {
+    return { dataType: t, suffix: s };
+  }
+  function peg$f648(t, e) {
     e.parentheses = true;
     return {
       dataType: t,
       expr: e
     }
   }
-  function peg$f647(t) {
+  function peg$f649(t) {
     return { dataType: t };
   }
-  function peg$f648(t, num) {
+  function peg$f650(t, num) {
     return { dataType: t, ...(num || {}) }
   }
-  function peg$f649(t) {    return { dataType: t }  }
-  function peg$f650(t, num) {
+  function peg$f651(t) {    return { dataType: t }  }
+  function peg$f652(t, num) {
     return {
       dataType: t,
     ...(num || {})
@@ -22426,7 +22465,7 @@ function peg$parse(input, options) {
   }
 
   function peg$parseupdate_stmt() {
-    let s0, s2, s4, s6, s8, s10, s12, s14, s16;
+    let s0, s2, s4, s6, s8, s10, s12, s14, s16, s18;
 
     s0 = peg$currPos;
     peg$parse__();
@@ -22438,31 +22477,36 @@ function peg$parse(input, options) {
     s4 = peg$parseKW_UPDATE();
     if (s4 !== peg$FAILED) {
       peg$parse__();
-      s6 = peg$parsetable_ref_list();
-      if (s6 !== peg$FAILED) {
+      s6 = peg$parseKW_IGNORE();
+      if (s6 === peg$FAILED) {
+        s6 = null;
+      }
+      peg$parse__();
+      s8 = peg$parsetable_ref_list();
+      if (s8 !== peg$FAILED) {
         peg$parse__();
-        s8 = peg$parseKW_SET();
-        if (s8 !== peg$FAILED) {
+        s10 = peg$parseKW_SET();
+        if (s10 !== peg$FAILED) {
           peg$parse__();
-          s10 = peg$parseset_list();
-          if (s10 !== peg$FAILED) {
+          s12 = peg$parseset_list();
+          if (s12 !== peg$FAILED) {
             peg$parse__();
-            s12 = peg$parsewhere_clause();
-            if (s12 === peg$FAILED) {
-              s12 = null;
-            }
-            peg$parse__();
-            s14 = peg$parseorder_by_clause();
+            s14 = peg$parsewhere_clause();
             if (s14 === peg$FAILED) {
               s14 = null;
             }
             peg$parse__();
-            s16 = peg$parselimit_clause();
+            s16 = peg$parseorder_by_clause();
             if (s16 === peg$FAILED) {
               s16 = null;
             }
+            peg$parse__();
+            s18 = peg$parselimit_clause();
+            if (s18 === peg$FAILED) {
+              s18 = null;
+            }
             peg$savedPos = s0;
-            s0 = peg$f263(s2, s6, s10, s12, s14, s16);
+            s0 = peg$f263(s2, s6, s8, s12, s14, s16, s18);
           } else {
             peg$currPos = s0;
             s0 = peg$FAILED;
@@ -29531,14 +29575,20 @@ function peg$parse(input, options) {
     let s0, s1, s2, s3;
 
     s0 = peg$currPos;
-    s1 = peg$parseint();
+    if (input.charCodeAt(peg$currPos) === 46) {
+      s1 = peg$c315;
+      peg$currPos++;
+    } else {
+      s1 = peg$FAILED;
+      if (peg$silentFails === 0) { peg$fail(peg$e336); }
+    }
     if (s1 !== peg$FAILED) {
-      s2 = peg$parsefrac();
+      s2 = peg$parsedigits();
       if (s2 !== peg$FAILED) {
         s3 = peg$parseexp();
         if (s3 !== peg$FAILED) {
           peg$savedPos = s0;
-          s0 = peg$f434(s1, s2, s3);
+          s0 = peg$f434(s2, s3);
         } else {
           peg$currPos = s0;
           s0 = peg$FAILED;
@@ -29553,12 +29603,18 @@ function peg$parse(input, options) {
     }
     if (s0 === peg$FAILED) {
       s0 = peg$currPos;
-      s1 = peg$parseint();
+      if (input.charCodeAt(peg$currPos) === 46) {
+        s1 = peg$c315;
+        peg$currPos++;
+      } else {
+        s1 = peg$FAILED;
+        if (peg$silentFails === 0) { peg$fail(peg$e336); }
+      }
       if (s1 !== peg$FAILED) {
-        s2 = peg$parsefrac();
+        s2 = peg$parsedigits();
         if (s2 !== peg$FAILED) {
           peg$savedPos = s0;
-          s0 = peg$f435(s1, s2);
+          s0 = peg$f435(s2);
         } else {
           peg$currPos = s0;
           s0 = peg$FAILED;
@@ -29571,10 +29627,16 @@ function peg$parse(input, options) {
         s0 = peg$currPos;
         s1 = peg$parseint();
         if (s1 !== peg$FAILED) {
-          s2 = peg$parseexp();
+          s2 = peg$parsefrac();
           if (s2 !== peg$FAILED) {
-            peg$savedPos = s0;
-            s0 = peg$f436(s1, s2);
+            s3 = peg$parseexp();
+            if (s3 !== peg$FAILED) {
+              peg$savedPos = s0;
+              s0 = peg$f436(s1, s2, s3);
+            } else {
+              peg$currPos = s0;
+              s0 = peg$FAILED;
+            }
           } else {
             peg$currPos = s0;
             s0 = peg$FAILED;
@@ -29587,10 +29649,44 @@ function peg$parse(input, options) {
           s0 = peg$currPos;
           s1 = peg$parseint();
           if (s1 !== peg$FAILED) {
-            peg$savedPos = s0;
-            s1 = peg$f437(s1);
+            s2 = peg$parsefrac();
+            if (s2 !== peg$FAILED) {
+              peg$savedPos = s0;
+              s0 = peg$f437(s1, s2);
+            } else {
+              peg$currPos = s0;
+              s0 = peg$FAILED;
+            }
+          } else {
+            peg$currPos = s0;
+            s0 = peg$FAILED;
           }
-          s0 = s1;
+          if (s0 === peg$FAILED) {
+            s0 = peg$currPos;
+            s1 = peg$parseint();
+            if (s1 !== peg$FAILED) {
+              s2 = peg$parseexp();
+              if (s2 !== peg$FAILED) {
+                peg$savedPos = s0;
+                s0 = peg$f438(s1, s2);
+              } else {
+                peg$currPos = s0;
+                s0 = peg$FAILED;
+              }
+            } else {
+              peg$currPos = s0;
+              s0 = peg$FAILED;
+            }
+            if (s0 === peg$FAILED) {
+              s0 = peg$currPos;
+              s1 = peg$parseint();
+              if (s1 !== peg$FAILED) {
+                peg$savedPos = s0;
+                s1 = peg$f439(s1);
+              }
+              s0 = s1;
+            }
+          }
         }
       }
     }
@@ -29617,7 +29713,7 @@ function peg$parse(input, options) {
           s2 = peg$parsedigits();
           if (s2 !== peg$FAILED) {
             peg$savedPos = s0;
-            s0 = peg$f438(s1, s2);
+            s0 = peg$f440(s1, s2);
           } else {
             peg$currPos = s0;
             s0 = peg$FAILED;
@@ -29639,7 +29735,7 @@ function peg$parse(input, options) {
             s2 = peg$parsedigit();
             if (s2 !== peg$FAILED) {
               peg$savedPos = s0;
-              s0 = peg$f439(s1, s2);
+              s0 = peg$f441(s1, s2);
             } else {
               peg$currPos = s0;
               s0 = peg$FAILED;
@@ -29672,7 +29768,7 @@ function peg$parse(input, options) {
         s2 = null;
       }
       peg$savedPos = s0;
-      s0 = peg$f440(s2);
+      s0 = peg$f442(s2);
     } else {
       peg$currPos = s0;
       s0 = peg$FAILED;
@@ -29690,7 +29786,7 @@ function peg$parse(input, options) {
       s2 = peg$parsedigits();
       if (s2 !== peg$FAILED) {
         peg$savedPos = s0;
-        s0 = peg$f441(s1, s2);
+        s0 = peg$f443(s1, s2);
       } else {
         peg$currPos = s0;
         s0 = peg$FAILED;
@@ -29718,7 +29814,7 @@ function peg$parse(input, options) {
     }
     if (s1 !== peg$FAILED) {
       peg$savedPos = s0;
-      s1 = peg$f442(s1);
+      s1 = peg$f444(s1);
     }
     s0 = s1;
 
@@ -29776,7 +29872,7 @@ function peg$parse(input, options) {
         s2 = null;
       }
       peg$savedPos = s0;
-      s0 = peg$f443(s1, s2);
+      s0 = peg$f445(s1, s2);
     } else {
       peg$currPos = s0;
       s0 = peg$FAILED;
@@ -30068,7 +30164,7 @@ function peg$parse(input, options) {
       }
       if (s2 !== peg$FAILED) {
         peg$savedPos = s0;
-        s0 = peg$f444();
+        s0 = peg$f446();
       } else {
         peg$currPos = s0;
         s0 = peg$FAILED;
@@ -30142,7 +30238,7 @@ function peg$parse(input, options) {
       }
       if (s2 !== peg$FAILED) {
         peg$savedPos = s0;
-        s0 = peg$f445();
+        s0 = peg$f447();
       } else {
         peg$currPos = s0;
         s0 = peg$FAILED;
@@ -30401,7 +30497,7 @@ function peg$parse(input, options) {
       }
       if (s2 !== peg$FAILED) {
         peg$savedPos = s0;
-        s0 = peg$f446();
+        s0 = peg$f448();
       } else {
         peg$currPos = s0;
         s0 = peg$FAILED;
@@ -30475,7 +30571,7 @@ function peg$parse(input, options) {
       }
       if (s2 !== peg$FAILED) {
         peg$savedPos = s0;
-        s0 = peg$f447();
+        s0 = peg$f449();
       } else {
         peg$currPos = s0;
         s0 = peg$FAILED;
@@ -30623,7 +30719,7 @@ function peg$parse(input, options) {
       }
       if (s2 !== peg$FAILED) {
         peg$savedPos = s0;
-        s0 = peg$f448();
+        s0 = peg$f450();
       } else {
         peg$currPos = s0;
         s0 = peg$FAILED;
@@ -30660,7 +30756,7 @@ function peg$parse(input, options) {
       }
       if (s2 !== peg$FAILED) {
         peg$savedPos = s0;
-        s0 = peg$f449();
+        s0 = peg$f451();
       } else {
         peg$currPos = s0;
         s0 = peg$FAILED;
@@ -30771,7 +30867,7 @@ function peg$parse(input, options) {
       }
       if (s2 !== peg$FAILED) {
         peg$savedPos = s0;
-        s0 = peg$f450();
+        s0 = peg$f452();
       } else {
         peg$currPos = s0;
         s0 = peg$FAILED;
@@ -30919,7 +31015,7 @@ function peg$parse(input, options) {
       }
       if (s2 !== peg$FAILED) {
         peg$savedPos = s0;
-        s0 = peg$f451();
+        s0 = peg$f453();
       } else {
         peg$currPos = s0;
         s0 = peg$FAILED;
@@ -30956,7 +31052,7 @@ function peg$parse(input, options) {
       }
       if (s2 !== peg$FAILED) {
         peg$savedPos = s0;
-        s0 = peg$f452();
+        s0 = peg$f454();
       } else {
         peg$currPos = s0;
         s0 = peg$FAILED;
@@ -30993,7 +31089,7 @@ function peg$parse(input, options) {
       }
       if (s2 !== peg$FAILED) {
         peg$savedPos = s0;
-        s0 = peg$f453();
+        s0 = peg$f455();
       } else {
         peg$currPos = s0;
         s0 = peg$FAILED;
@@ -31030,7 +31126,7 @@ function peg$parse(input, options) {
       }
       if (s2 !== peg$FAILED) {
         peg$savedPos = s0;
-        s0 = peg$f454();
+        s0 = peg$f456();
       } else {
         peg$currPos = s0;
         s0 = peg$FAILED;
@@ -31067,7 +31163,7 @@ function peg$parse(input, options) {
       }
       if (s2 !== peg$FAILED) {
         peg$savedPos = s0;
-        s0 = peg$f455();
+        s0 = peg$f457();
       } else {
         peg$currPos = s0;
         s0 = peg$FAILED;
@@ -31104,7 +31200,7 @@ function peg$parse(input, options) {
       }
       if (s2 !== peg$FAILED) {
         peg$savedPos = s0;
-        s0 = peg$f456();
+        s0 = peg$f458();
       } else {
         peg$currPos = s0;
         s0 = peg$FAILED;
@@ -31141,7 +31237,7 @@ function peg$parse(input, options) {
       }
       if (s2 !== peg$FAILED) {
         peg$savedPos = s0;
-        s0 = peg$f457();
+        s0 = peg$f459();
       } else {
         peg$currPos = s0;
         s0 = peg$FAILED;
@@ -31215,7 +31311,7 @@ function peg$parse(input, options) {
       }
       if (s2 !== peg$FAILED) {
         peg$savedPos = s0;
-        s0 = peg$f458();
+        s0 = peg$f460();
       } else {
         peg$currPos = s0;
         s0 = peg$FAILED;
@@ -31252,7 +31348,7 @@ function peg$parse(input, options) {
       }
       if (s2 !== peg$FAILED) {
         peg$savedPos = s0;
-        s0 = peg$f459();
+        s0 = peg$f461();
       } else {
         peg$currPos = s0;
         s0 = peg$FAILED;
@@ -31289,7 +31385,7 @@ function peg$parse(input, options) {
       }
       if (s2 !== peg$FAILED) {
         peg$savedPos = s0;
-        s0 = peg$f460();
+        s0 = peg$f462();
       } else {
         peg$currPos = s0;
         s0 = peg$FAILED;
@@ -31326,7 +31422,7 @@ function peg$parse(input, options) {
       }
       if (s2 !== peg$FAILED) {
         peg$savedPos = s0;
-        s0 = peg$f461();
+        s0 = peg$f463();
       } else {
         peg$currPos = s0;
         s0 = peg$FAILED;
@@ -31363,7 +31459,7 @@ function peg$parse(input, options) {
       }
       if (s2 !== peg$FAILED) {
         peg$savedPos = s0;
-        s0 = peg$f462();
+        s0 = peg$f464();
       } else {
         peg$currPos = s0;
         s0 = peg$FAILED;
@@ -31400,7 +31496,7 @@ function peg$parse(input, options) {
       }
       if (s2 !== peg$FAILED) {
         peg$savedPos = s0;
-        s0 = peg$f463();
+        s0 = peg$f465();
       } else {
         peg$currPos = s0;
         s0 = peg$FAILED;
@@ -31437,7 +31533,7 @@ function peg$parse(input, options) {
       }
       if (s2 !== peg$FAILED) {
         peg$savedPos = s0;
-        s0 = peg$f464();
+        s0 = peg$f466();
       } else {
         peg$currPos = s0;
         s0 = peg$FAILED;
@@ -31474,7 +31570,7 @@ function peg$parse(input, options) {
       }
       if (s2 !== peg$FAILED) {
         peg$savedPos = s0;
-        s0 = peg$f465();
+        s0 = peg$f467();
       } else {
         peg$currPos = s0;
         s0 = peg$FAILED;
@@ -31511,7 +31607,7 @@ function peg$parse(input, options) {
       }
       if (s2 !== peg$FAILED) {
         peg$savedPos = s0;
-        s0 = peg$f466();
+        s0 = peg$f468();
       } else {
         peg$currPos = s0;
         s0 = peg$FAILED;
@@ -31548,7 +31644,7 @@ function peg$parse(input, options) {
       }
       if (s2 !== peg$FAILED) {
         peg$savedPos = s0;
-        s0 = peg$f467();
+        s0 = peg$f469();
       } else {
         peg$currPos = s0;
         s0 = peg$FAILED;
@@ -31585,7 +31681,7 @@ function peg$parse(input, options) {
       }
       if (s2 !== peg$FAILED) {
         peg$savedPos = s0;
-        s0 = peg$f468();
+        s0 = peg$f470();
       } else {
         peg$currPos = s0;
         s0 = peg$FAILED;
@@ -31622,7 +31718,7 @@ function peg$parse(input, options) {
       }
       if (s2 !== peg$FAILED) {
         peg$savedPos = s0;
-        s0 = peg$f469();
+        s0 = peg$f471();
       } else {
         peg$currPos = s0;
         s0 = peg$FAILED;
@@ -31807,7 +31903,7 @@ function peg$parse(input, options) {
       }
       if (s2 !== peg$FAILED) {
         peg$savedPos = s0;
-        s0 = peg$f470();
+        s0 = peg$f472();
       } else {
         peg$currPos = s0;
         s0 = peg$FAILED;
@@ -32029,7 +32125,7 @@ function peg$parse(input, options) {
       }
       if (s2 !== peg$FAILED) {
         peg$savedPos = s0;
-        s0 = peg$f471();
+        s0 = peg$f473();
       } else {
         peg$currPos = s0;
         s0 = peg$FAILED;
@@ -32066,7 +32162,7 @@ function peg$parse(input, options) {
       }
       if (s2 !== peg$FAILED) {
         peg$savedPos = s0;
-        s0 = peg$f472();
+        s0 = peg$f474();
       } else {
         peg$currPos = s0;
         s0 = peg$FAILED;
@@ -32103,7 +32199,7 @@ function peg$parse(input, options) {
       }
       if (s2 !== peg$FAILED) {
         peg$savedPos = s0;
-        s0 = peg$f473();
+        s0 = peg$f475();
       } else {
         peg$currPos = s0;
         s0 = peg$FAILED;
@@ -32140,7 +32236,7 @@ function peg$parse(input, options) {
       }
       if (s2 !== peg$FAILED) {
         peg$savedPos = s0;
-        s0 = peg$f474();
+        s0 = peg$f476();
       } else {
         peg$currPos = s0;
         s0 = peg$FAILED;
@@ -32177,7 +32273,7 @@ function peg$parse(input, options) {
       }
       if (s2 !== peg$FAILED) {
         peg$savedPos = s0;
-        s0 = peg$f475();
+        s0 = peg$f477();
       } else {
         peg$currPos = s0;
         s0 = peg$FAILED;
@@ -32214,7 +32310,7 @@ function peg$parse(input, options) {
       }
       if (s2 !== peg$FAILED) {
         peg$savedPos = s0;
-        s0 = peg$f476();
+        s0 = peg$f478();
       } else {
         peg$currPos = s0;
         s0 = peg$FAILED;
@@ -32251,7 +32347,7 @@ function peg$parse(input, options) {
       }
       if (s2 !== peg$FAILED) {
         peg$savedPos = s0;
-        s0 = peg$f477();
+        s0 = peg$f479();
       } else {
         peg$currPos = s0;
         s0 = peg$FAILED;
@@ -32288,7 +32384,7 @@ function peg$parse(input, options) {
       }
       if (s2 !== peg$FAILED) {
         peg$savedPos = s0;
-        s0 = peg$f478();
+        s0 = peg$f480();
       } else {
         peg$currPos = s0;
         s0 = peg$FAILED;
@@ -32325,7 +32421,7 @@ function peg$parse(input, options) {
       }
       if (s2 !== peg$FAILED) {
         peg$savedPos = s0;
-        s0 = peg$f479();
+        s0 = peg$f481();
       } else {
         peg$currPos = s0;
         s0 = peg$FAILED;
@@ -32362,7 +32458,7 @@ function peg$parse(input, options) {
       }
       if (s2 !== peg$FAILED) {
         peg$savedPos = s0;
-        s0 = peg$f480();
+        s0 = peg$f482();
       } else {
         peg$currPos = s0;
         s0 = peg$FAILED;
@@ -32399,7 +32495,7 @@ function peg$parse(input, options) {
       }
       if (s2 !== peg$FAILED) {
         peg$savedPos = s0;
-        s0 = peg$f481();
+        s0 = peg$f483();
       } else {
         peg$currPos = s0;
         s0 = peg$FAILED;
@@ -32436,7 +32532,7 @@ function peg$parse(input, options) {
       }
       if (s2 !== peg$FAILED) {
         peg$savedPos = s0;
-        s0 = peg$f482();
+        s0 = peg$f484();
       } else {
         peg$currPos = s0;
         s0 = peg$FAILED;
@@ -32473,7 +32569,7 @@ function peg$parse(input, options) {
       }
       if (s2 !== peg$FAILED) {
         peg$savedPos = s0;
-        s0 = peg$f483();
+        s0 = peg$f485();
       } else {
         peg$currPos = s0;
         s0 = peg$FAILED;
@@ -32510,7 +32606,7 @@ function peg$parse(input, options) {
       }
       if (s2 !== peg$FAILED) {
         peg$savedPos = s0;
-        s0 = peg$f484();
+        s0 = peg$f486();
       } else {
         peg$currPos = s0;
         s0 = peg$FAILED;
@@ -32547,7 +32643,7 @@ function peg$parse(input, options) {
       }
       if (s2 !== peg$FAILED) {
         peg$savedPos = s0;
-        s0 = peg$f485();
+        s0 = peg$f487();
       } else {
         peg$currPos = s0;
         s0 = peg$FAILED;
@@ -32584,7 +32680,7 @@ function peg$parse(input, options) {
       }
       if (s2 !== peg$FAILED) {
         peg$savedPos = s0;
-        s0 = peg$f486();
+        s0 = peg$f488();
       } else {
         peg$currPos = s0;
         s0 = peg$FAILED;
@@ -32621,7 +32717,7 @@ function peg$parse(input, options) {
       }
       if (s2 !== peg$FAILED) {
         peg$savedPos = s0;
-        s0 = peg$f487();
+        s0 = peg$f489();
       } else {
         peg$currPos = s0;
         s0 = peg$FAILED;
@@ -32658,7 +32754,7 @@ function peg$parse(input, options) {
       }
       if (s2 !== peg$FAILED) {
         peg$savedPos = s0;
-        s0 = peg$f488();
+        s0 = peg$f490();
       } else {
         peg$currPos = s0;
         s0 = peg$FAILED;
@@ -32695,7 +32791,7 @@ function peg$parse(input, options) {
       }
       if (s2 !== peg$FAILED) {
         peg$savedPos = s0;
-        s0 = peg$f489();
+        s0 = peg$f491();
       } else {
         peg$currPos = s0;
         s0 = peg$FAILED;
@@ -32732,7 +32828,7 @@ function peg$parse(input, options) {
       }
       if (s2 !== peg$FAILED) {
         peg$savedPos = s0;
-        s0 = peg$f490();
+        s0 = peg$f492();
       } else {
         peg$currPos = s0;
         s0 = peg$FAILED;
@@ -32769,7 +32865,7 @@ function peg$parse(input, options) {
       }
       if (s2 !== peg$FAILED) {
         peg$savedPos = s0;
-        s0 = peg$f491();
+        s0 = peg$f493();
       } else {
         peg$currPos = s0;
         s0 = peg$FAILED;
@@ -32806,7 +32902,7 @@ function peg$parse(input, options) {
       }
       if (s2 !== peg$FAILED) {
         peg$savedPos = s0;
-        s0 = peg$f492();
+        s0 = peg$f494();
       } else {
         peg$currPos = s0;
         s0 = peg$FAILED;
@@ -32843,7 +32939,7 @@ function peg$parse(input, options) {
       }
       if (s2 !== peg$FAILED) {
         peg$savedPos = s0;
-        s0 = peg$f493();
+        s0 = peg$f495();
       } else {
         peg$currPos = s0;
         s0 = peg$FAILED;
@@ -33065,7 +33161,7 @@ function peg$parse(input, options) {
       }
       if (s2 !== peg$FAILED) {
         peg$savedPos = s0;
-        s0 = peg$f494();
+        s0 = peg$f496();
       } else {
         peg$currPos = s0;
         s0 = peg$FAILED;
@@ -33102,7 +33198,7 @@ function peg$parse(input, options) {
       }
       if (s2 !== peg$FAILED) {
         peg$savedPos = s0;
-        s0 = peg$f495();
+        s0 = peg$f497();
       } else {
         peg$currPos = s0;
         s0 = peg$FAILED;
@@ -33139,7 +33235,7 @@ function peg$parse(input, options) {
       }
       if (s2 !== peg$FAILED) {
         peg$savedPos = s0;
-        s0 = peg$f496();
+        s0 = peg$f498();
       } else {
         peg$currPos = s0;
         s0 = peg$FAILED;
@@ -33176,7 +33272,7 @@ function peg$parse(input, options) {
       }
       if (s2 !== peg$FAILED) {
         peg$savedPos = s0;
-        s0 = peg$f497();
+        s0 = peg$f499();
       } else {
         peg$currPos = s0;
         s0 = peg$FAILED;
@@ -33213,7 +33309,7 @@ function peg$parse(input, options) {
       }
       if (s2 !== peg$FAILED) {
         peg$savedPos = s0;
-        s0 = peg$f498();
+        s0 = peg$f500();
       } else {
         peg$currPos = s0;
         s0 = peg$FAILED;
@@ -33250,7 +33346,7 @@ function peg$parse(input, options) {
       }
       if (s2 !== peg$FAILED) {
         peg$savedPos = s0;
-        s0 = peg$f499();
+        s0 = peg$f501();
       } else {
         peg$currPos = s0;
         s0 = peg$FAILED;
@@ -33287,7 +33383,7 @@ function peg$parse(input, options) {
       }
       if (s2 !== peg$FAILED) {
         peg$savedPos = s0;
-        s0 = peg$f500();
+        s0 = peg$f502();
       } else {
         peg$currPos = s0;
         s0 = peg$FAILED;
@@ -33324,7 +33420,7 @@ function peg$parse(input, options) {
       }
       if (s2 !== peg$FAILED) {
         peg$savedPos = s0;
-        s0 = peg$f501();
+        s0 = peg$f503();
       } else {
         peg$currPos = s0;
         s0 = peg$FAILED;
@@ -33361,7 +33457,7 @@ function peg$parse(input, options) {
       }
       if (s2 !== peg$FAILED) {
         peg$savedPos = s0;
-        s0 = peg$f502();
+        s0 = peg$f504();
       } else {
         peg$currPos = s0;
         s0 = peg$FAILED;
@@ -33398,7 +33494,7 @@ function peg$parse(input, options) {
       }
       if (s2 !== peg$FAILED) {
         peg$savedPos = s0;
-        s0 = peg$f503();
+        s0 = peg$f505();
       } else {
         peg$currPos = s0;
         s0 = peg$FAILED;
@@ -33435,7 +33531,7 @@ function peg$parse(input, options) {
       }
       if (s2 !== peg$FAILED) {
         peg$savedPos = s0;
-        s0 = peg$f504();
+        s0 = peg$f506();
       } else {
         peg$currPos = s0;
         s0 = peg$FAILED;
@@ -33472,7 +33568,7 @@ function peg$parse(input, options) {
       }
       if (s2 !== peg$FAILED) {
         peg$savedPos = s0;
-        s0 = peg$f505();
+        s0 = peg$f507();
       } else {
         peg$currPos = s0;
         s0 = peg$FAILED;
@@ -33509,7 +33605,7 @@ function peg$parse(input, options) {
       }
       if (s2 !== peg$FAILED) {
         peg$savedPos = s0;
-        s0 = peg$f506();
+        s0 = peg$f508();
       } else {
         peg$currPos = s0;
         s0 = peg$FAILED;
@@ -33546,7 +33642,7 @@ function peg$parse(input, options) {
       }
       if (s2 !== peg$FAILED) {
         peg$savedPos = s0;
-        s0 = peg$f507();
+        s0 = peg$f509();
       } else {
         peg$currPos = s0;
         s0 = peg$FAILED;
@@ -33583,7 +33679,7 @@ function peg$parse(input, options) {
       }
       if (s2 !== peg$FAILED) {
         peg$savedPos = s0;
-        s0 = peg$f508();
+        s0 = peg$f510();
       } else {
         peg$currPos = s0;
         s0 = peg$FAILED;
@@ -33620,7 +33716,7 @@ function peg$parse(input, options) {
       }
       if (s2 !== peg$FAILED) {
         peg$savedPos = s0;
-        s0 = peg$f509();
+        s0 = peg$f511();
       } else {
         peg$currPos = s0;
         s0 = peg$FAILED;
@@ -33657,7 +33753,7 @@ function peg$parse(input, options) {
       }
       if (s2 !== peg$FAILED) {
         peg$savedPos = s0;
-        s0 = peg$f510();
+        s0 = peg$f512();
       } else {
         peg$currPos = s0;
         s0 = peg$FAILED;
@@ -33694,7 +33790,7 @@ function peg$parse(input, options) {
       }
       if (s2 !== peg$FAILED) {
         peg$savedPos = s0;
-        s0 = peg$f511();
+        s0 = peg$f513();
       } else {
         peg$currPos = s0;
         s0 = peg$FAILED;
@@ -33731,7 +33827,7 @@ function peg$parse(input, options) {
       }
       if (s2 !== peg$FAILED) {
         peg$savedPos = s0;
-        s0 = peg$f512();
+        s0 = peg$f514();
       } else {
         peg$currPos = s0;
         s0 = peg$FAILED;
@@ -33768,7 +33864,7 @@ function peg$parse(input, options) {
       }
       if (s2 !== peg$FAILED) {
         peg$savedPos = s0;
-        s0 = peg$f513();
+        s0 = peg$f515();
       } else {
         peg$currPos = s0;
         s0 = peg$FAILED;
@@ -33805,7 +33901,7 @@ function peg$parse(input, options) {
       }
       if (s2 !== peg$FAILED) {
         peg$savedPos = s0;
-        s0 = peg$f514();
+        s0 = peg$f516();
       } else {
         peg$currPos = s0;
         s0 = peg$FAILED;
@@ -33842,7 +33938,7 @@ function peg$parse(input, options) {
       }
       if (s2 !== peg$FAILED) {
         peg$savedPos = s0;
-        s0 = peg$f515();
+        s0 = peg$f517();
       } else {
         peg$currPos = s0;
         s0 = peg$FAILED;
@@ -33879,7 +33975,7 @@ function peg$parse(input, options) {
       }
       if (s2 !== peg$FAILED) {
         peg$savedPos = s0;
-        s0 = peg$f516();
+        s0 = peg$f518();
       } else {
         peg$currPos = s0;
         s0 = peg$FAILED;
@@ -33916,7 +34012,7 @@ function peg$parse(input, options) {
       }
       if (s2 !== peg$FAILED) {
         peg$savedPos = s0;
-        s0 = peg$f517();
+        s0 = peg$f519();
       } else {
         peg$currPos = s0;
         s0 = peg$FAILED;
@@ -33953,7 +34049,7 @@ function peg$parse(input, options) {
       }
       if (s2 !== peg$FAILED) {
         peg$savedPos = s0;
-        s0 = peg$f518();
+        s0 = peg$f520();
       } else {
         peg$currPos = s0;
         s0 = peg$FAILED;
@@ -33990,7 +34086,7 @@ function peg$parse(input, options) {
       }
       if (s2 !== peg$FAILED) {
         peg$savedPos = s0;
-        s0 = peg$f519();
+        s0 = peg$f521();
       } else {
         peg$currPos = s0;
         s0 = peg$FAILED;
@@ -34027,7 +34123,7 @@ function peg$parse(input, options) {
       }
       if (s2 !== peg$FAILED) {
         peg$savedPos = s0;
-        s0 = peg$f520();
+        s0 = peg$f522();
       } else {
         peg$currPos = s0;
         s0 = peg$FAILED;
@@ -34064,7 +34160,7 @@ function peg$parse(input, options) {
       }
       if (s2 !== peg$FAILED) {
         peg$savedPos = s0;
-        s0 = peg$f521();
+        s0 = peg$f523();
       } else {
         peg$currPos = s0;
         s0 = peg$FAILED;
@@ -34101,7 +34197,7 @@ function peg$parse(input, options) {
       }
       if (s2 !== peg$FAILED) {
         peg$savedPos = s0;
-        s0 = peg$f522();
+        s0 = peg$f524();
       } else {
         peg$currPos = s0;
         s0 = peg$FAILED;
@@ -34138,7 +34234,7 @@ function peg$parse(input, options) {
       }
       if (s2 !== peg$FAILED) {
         peg$savedPos = s0;
-        s0 = peg$f523();
+        s0 = peg$f525();
       } else {
         peg$currPos = s0;
         s0 = peg$FAILED;
@@ -34175,7 +34271,7 @@ function peg$parse(input, options) {
       }
       if (s2 !== peg$FAILED) {
         peg$savedPos = s0;
-        s0 = peg$f524();
+        s0 = peg$f526();
       } else {
         peg$currPos = s0;
         s0 = peg$FAILED;
@@ -34212,7 +34308,7 @@ function peg$parse(input, options) {
       }
       if (s2 !== peg$FAILED) {
         peg$savedPos = s0;
-        s0 = peg$f525();
+        s0 = peg$f527();
       } else {
         peg$currPos = s0;
         s0 = peg$FAILED;
@@ -34249,7 +34345,7 @@ function peg$parse(input, options) {
       }
       if (s2 !== peg$FAILED) {
         peg$savedPos = s0;
-        s0 = peg$f526();
+        s0 = peg$f528();
       } else {
         peg$currPos = s0;
         s0 = peg$FAILED;
@@ -34286,7 +34382,7 @@ function peg$parse(input, options) {
       }
       if (s2 !== peg$FAILED) {
         peg$savedPos = s0;
-        s0 = peg$f527();
+        s0 = peg$f529();
       } else {
         peg$currPos = s0;
         s0 = peg$FAILED;
@@ -34323,7 +34419,7 @@ function peg$parse(input, options) {
       }
       if (s2 !== peg$FAILED) {
         peg$savedPos = s0;
-        s0 = peg$f528();
+        s0 = peg$f530();
       } else {
         peg$currPos = s0;
         s0 = peg$FAILED;
@@ -34360,7 +34456,7 @@ function peg$parse(input, options) {
       }
       if (s2 !== peg$FAILED) {
         peg$savedPos = s0;
-        s0 = peg$f529();
+        s0 = peg$f531();
       } else {
         peg$currPos = s0;
         s0 = peg$FAILED;
@@ -34397,7 +34493,7 @@ function peg$parse(input, options) {
       }
       if (s2 !== peg$FAILED) {
         peg$savedPos = s0;
-        s0 = peg$f530();
+        s0 = peg$f532();
       } else {
         peg$currPos = s0;
         s0 = peg$FAILED;
@@ -34434,7 +34530,7 @@ function peg$parse(input, options) {
       }
       if (s2 !== peg$FAILED) {
         peg$savedPos = s0;
-        s0 = peg$f531();
+        s0 = peg$f533();
       } else {
         peg$currPos = s0;
         s0 = peg$FAILED;
@@ -34471,7 +34567,7 @@ function peg$parse(input, options) {
       }
       if (s2 !== peg$FAILED) {
         peg$savedPos = s0;
-        s0 = peg$f532();
+        s0 = peg$f534();
       } else {
         peg$currPos = s0;
         s0 = peg$FAILED;
@@ -34508,7 +34604,7 @@ function peg$parse(input, options) {
       }
       if (s2 !== peg$FAILED) {
         peg$savedPos = s0;
-        s0 = peg$f533();
+        s0 = peg$f535();
       } else {
         peg$currPos = s0;
         s0 = peg$FAILED;
@@ -34545,7 +34641,7 @@ function peg$parse(input, options) {
       }
       if (s2 !== peg$FAILED) {
         peg$savedPos = s0;
-        s0 = peg$f534();
+        s0 = peg$f536();
       } else {
         peg$currPos = s0;
         s0 = peg$FAILED;
@@ -34582,7 +34678,7 @@ function peg$parse(input, options) {
       }
       if (s2 !== peg$FAILED) {
         peg$savedPos = s0;
-        s0 = peg$f535();
+        s0 = peg$f537();
       } else {
         peg$currPos = s0;
         s0 = peg$FAILED;
@@ -34619,7 +34715,7 @@ function peg$parse(input, options) {
       }
       if (s2 !== peg$FAILED) {
         peg$savedPos = s0;
-        s0 = peg$f536();
+        s0 = peg$f538();
       } else {
         peg$currPos = s0;
         s0 = peg$FAILED;
@@ -34656,7 +34752,7 @@ function peg$parse(input, options) {
       }
       if (s2 !== peg$FAILED) {
         peg$savedPos = s0;
-        s0 = peg$f537();
+        s0 = peg$f539();
       } else {
         peg$currPos = s0;
         s0 = peg$FAILED;
@@ -34693,7 +34789,7 @@ function peg$parse(input, options) {
       }
       if (s2 !== peg$FAILED) {
         peg$savedPos = s0;
-        s0 = peg$f538();
+        s0 = peg$f540();
       } else {
         peg$currPos = s0;
         s0 = peg$FAILED;
@@ -34730,7 +34826,7 @@ function peg$parse(input, options) {
       }
       if (s2 !== peg$FAILED) {
         peg$savedPos = s0;
-        s0 = peg$f539();
+        s0 = peg$f541();
       } else {
         peg$currPos = s0;
         s0 = peg$FAILED;
@@ -34767,7 +34863,7 @@ function peg$parse(input, options) {
       }
       if (s2 !== peg$FAILED) {
         peg$savedPos = s0;
-        s0 = peg$f540();
+        s0 = peg$f542();
       } else {
         peg$currPos = s0;
         s0 = peg$FAILED;
@@ -34804,7 +34900,7 @@ function peg$parse(input, options) {
       }
       if (s2 !== peg$FAILED) {
         peg$savedPos = s0;
-        s0 = peg$f541();
+        s0 = peg$f543();
       } else {
         peg$currPos = s0;
         s0 = peg$FAILED;
@@ -34841,7 +34937,7 @@ function peg$parse(input, options) {
       }
       if (s2 !== peg$FAILED) {
         peg$savedPos = s0;
-        s0 = peg$f542();
+        s0 = peg$f544();
       } else {
         peg$currPos = s0;
         s0 = peg$FAILED;
@@ -34878,7 +34974,7 @@ function peg$parse(input, options) {
       }
       if (s2 !== peg$FAILED) {
         peg$savedPos = s0;
-        s0 = peg$f543();
+        s0 = peg$f545();
       } else {
         peg$currPos = s0;
         s0 = peg$FAILED;
@@ -34915,7 +35011,7 @@ function peg$parse(input, options) {
       }
       if (s2 !== peg$FAILED) {
         peg$savedPos = s0;
-        s0 = peg$f544();
+        s0 = peg$f546();
       } else {
         peg$currPos = s0;
         s0 = peg$FAILED;
@@ -34952,7 +35048,7 @@ function peg$parse(input, options) {
       }
       if (s2 !== peg$FAILED) {
         peg$savedPos = s0;
-        s0 = peg$f545();
+        s0 = peg$f547();
       } else {
         peg$currPos = s0;
         s0 = peg$FAILED;
@@ -34989,7 +35085,7 @@ function peg$parse(input, options) {
       }
       if (s2 !== peg$FAILED) {
         peg$savedPos = s0;
-        s0 = peg$f546();
+        s0 = peg$f548();
       } else {
         peg$currPos = s0;
         s0 = peg$FAILED;
@@ -35026,7 +35122,7 @@ function peg$parse(input, options) {
       }
       if (s2 !== peg$FAILED) {
         peg$savedPos = s0;
-        s0 = peg$f547();
+        s0 = peg$f549();
       } else {
         peg$currPos = s0;
         s0 = peg$FAILED;
@@ -35063,7 +35159,7 @@ function peg$parse(input, options) {
       }
       if (s2 !== peg$FAILED) {
         peg$savedPos = s0;
-        s0 = peg$f548();
+        s0 = peg$f550();
       } else {
         peg$currPos = s0;
         s0 = peg$FAILED;
@@ -35100,7 +35196,7 @@ function peg$parse(input, options) {
       }
       if (s2 !== peg$FAILED) {
         peg$savedPos = s0;
-        s0 = peg$f549();
+        s0 = peg$f551();
       } else {
         peg$currPos = s0;
         s0 = peg$FAILED;
@@ -35137,7 +35233,7 @@ function peg$parse(input, options) {
       }
       if (s2 !== peg$FAILED) {
         peg$savedPos = s0;
-        s0 = peg$f550();
+        s0 = peg$f552();
       } else {
         peg$currPos = s0;
         s0 = peg$FAILED;
@@ -35174,7 +35270,7 @@ function peg$parse(input, options) {
       }
       if (s2 !== peg$FAILED) {
         peg$savedPos = s0;
-        s0 = peg$f551();
+        s0 = peg$f553();
       } else {
         peg$currPos = s0;
         s0 = peg$FAILED;
@@ -35211,7 +35307,7 @@ function peg$parse(input, options) {
       }
       if (s2 !== peg$FAILED) {
         peg$savedPos = s0;
-        s0 = peg$f552();
+        s0 = peg$f554();
       } else {
         peg$currPos = s0;
         s0 = peg$FAILED;
@@ -35248,7 +35344,7 @@ function peg$parse(input, options) {
       }
       if (s2 !== peg$FAILED) {
         peg$savedPos = s0;
-        s0 = peg$f553();
+        s0 = peg$f555();
       } else {
         peg$currPos = s0;
         s0 = peg$FAILED;
@@ -35285,7 +35381,7 @@ function peg$parse(input, options) {
       }
       if (s2 !== peg$FAILED) {
         peg$savedPos = s0;
-        s0 = peg$f554();
+        s0 = peg$f556();
       } else {
         peg$currPos = s0;
         s0 = peg$FAILED;
@@ -35322,7 +35418,7 @@ function peg$parse(input, options) {
       }
       if (s2 !== peg$FAILED) {
         peg$savedPos = s0;
-        s0 = peg$f555();
+        s0 = peg$f557();
       } else {
         peg$currPos = s0;
         s0 = peg$FAILED;
@@ -35359,7 +35455,7 @@ function peg$parse(input, options) {
       }
       if (s2 !== peg$FAILED) {
         peg$savedPos = s0;
-        s0 = peg$f556();
+        s0 = peg$f558();
       } else {
         peg$currPos = s0;
         s0 = peg$FAILED;
@@ -35396,7 +35492,7 @@ function peg$parse(input, options) {
       }
       if (s2 !== peg$FAILED) {
         peg$savedPos = s0;
-        s0 = peg$f557();
+        s0 = peg$f559();
       } else {
         peg$currPos = s0;
         s0 = peg$FAILED;
@@ -35433,7 +35529,7 @@ function peg$parse(input, options) {
       }
       if (s2 !== peg$FAILED) {
         peg$savedPos = s0;
-        s0 = peg$f558();
+        s0 = peg$f560();
       } else {
         peg$currPos = s0;
         s0 = peg$FAILED;
@@ -35470,7 +35566,7 @@ function peg$parse(input, options) {
       }
       if (s2 !== peg$FAILED) {
         peg$savedPos = s0;
-        s0 = peg$f559();
+        s0 = peg$f561();
       } else {
         peg$currPos = s0;
         s0 = peg$FAILED;
@@ -35507,7 +35603,7 @@ function peg$parse(input, options) {
       }
       if (s2 !== peg$FAILED) {
         peg$savedPos = s0;
-        s0 = peg$f560();
+        s0 = peg$f562();
       } else {
         peg$currPos = s0;
         s0 = peg$FAILED;
@@ -35544,7 +35640,7 @@ function peg$parse(input, options) {
       }
       if (s2 !== peg$FAILED) {
         peg$savedPos = s0;
-        s0 = peg$f561();
+        s0 = peg$f563();
       } else {
         peg$currPos = s0;
         s0 = peg$FAILED;
@@ -35581,7 +35677,7 @@ function peg$parse(input, options) {
       }
       if (s2 !== peg$FAILED) {
         peg$savedPos = s0;
-        s0 = peg$f562();
+        s0 = peg$f564();
       } else {
         peg$currPos = s0;
         s0 = peg$FAILED;
@@ -35618,7 +35714,7 @@ function peg$parse(input, options) {
       }
       if (s2 !== peg$FAILED) {
         peg$savedPos = s0;
-        s0 = peg$f563();
+        s0 = peg$f565();
       } else {
         peg$currPos = s0;
         s0 = peg$FAILED;
@@ -35655,7 +35751,7 @@ function peg$parse(input, options) {
       }
       if (s2 !== peg$FAILED) {
         peg$savedPos = s0;
-        s0 = peg$f564();
+        s0 = peg$f566();
       } else {
         peg$currPos = s0;
         s0 = peg$FAILED;
@@ -35692,7 +35788,7 @@ function peg$parse(input, options) {
       }
       if (s2 !== peg$FAILED) {
         peg$savedPos = s0;
-        s0 = peg$f565();
+        s0 = peg$f567();
       } else {
         peg$currPos = s0;
         s0 = peg$FAILED;
@@ -35783,7 +35879,7 @@ function peg$parse(input, options) {
       }
       if (s2 !== peg$FAILED) {
         peg$savedPos = s0;
-        s0 = peg$f566();
+        s0 = peg$f568();
       } else {
         peg$currPos = s0;
         s0 = peg$FAILED;
@@ -35820,7 +35916,7 @@ function peg$parse(input, options) {
       }
       if (s2 !== peg$FAILED) {
         peg$savedPos = s0;
-        s0 = peg$f567();
+        s0 = peg$f569();
       } else {
         peg$currPos = s0;
         s0 = peg$FAILED;
@@ -35857,7 +35953,7 @@ function peg$parse(input, options) {
       }
       if (s2 !== peg$FAILED) {
         peg$savedPos = s0;
-        s0 = peg$f568();
+        s0 = peg$f570();
       } else {
         peg$currPos = s0;
         s0 = peg$FAILED;
@@ -35894,7 +35990,7 @@ function peg$parse(input, options) {
       }
       if (s2 !== peg$FAILED) {
         peg$savedPos = s0;
-        s0 = peg$f569();
+        s0 = peg$f571();
       } else {
         peg$currPos = s0;
         s0 = peg$FAILED;
@@ -35931,7 +36027,7 @@ function peg$parse(input, options) {
       }
       if (s2 !== peg$FAILED) {
         peg$savedPos = s0;
-        s0 = peg$f570();
+        s0 = peg$f572();
       } else {
         peg$currPos = s0;
         s0 = peg$FAILED;
@@ -35968,7 +36064,7 @@ function peg$parse(input, options) {
       }
       if (s2 !== peg$FAILED) {
         peg$savedPos = s0;
-        s0 = peg$f571();
+        s0 = peg$f573();
       } else {
         peg$currPos = s0;
         s0 = peg$FAILED;
@@ -36005,7 +36101,7 @@ function peg$parse(input, options) {
       }
       if (s2 !== peg$FAILED) {
         peg$savedPos = s0;
-        s0 = peg$f572();
+        s0 = peg$f574();
       } else {
         peg$currPos = s0;
         s0 = peg$FAILED;
@@ -36042,7 +36138,7 @@ function peg$parse(input, options) {
       }
       if (s2 !== peg$FAILED) {
         peg$savedPos = s0;
-        s0 = peg$f573();
+        s0 = peg$f575();
       } else {
         peg$currPos = s0;
         s0 = peg$FAILED;
@@ -36079,7 +36175,7 @@ function peg$parse(input, options) {
       }
       if (s2 !== peg$FAILED) {
         peg$savedPos = s0;
-        s0 = peg$f574();
+        s0 = peg$f576();
       } else {
         peg$currPos = s0;
         s0 = peg$FAILED;
@@ -36116,7 +36212,7 @@ function peg$parse(input, options) {
       }
       if (s2 !== peg$FAILED) {
         peg$savedPos = s0;
-        s0 = peg$f575();
+        s0 = peg$f577();
       } else {
         peg$currPos = s0;
         s0 = peg$FAILED;
@@ -36153,7 +36249,7 @@ function peg$parse(input, options) {
       }
       if (s2 !== peg$FAILED) {
         peg$savedPos = s0;
-        s0 = peg$f576();
+        s0 = peg$f578();
       } else {
         peg$currPos = s0;
         s0 = peg$FAILED;
@@ -36190,7 +36286,7 @@ function peg$parse(input, options) {
       }
       if (s2 !== peg$FAILED) {
         peg$savedPos = s0;
-        s0 = peg$f577();
+        s0 = peg$f579();
       } else {
         peg$currPos = s0;
         s0 = peg$FAILED;
@@ -36227,7 +36323,7 @@ function peg$parse(input, options) {
       }
       if (s2 !== peg$FAILED) {
         peg$savedPos = s0;
-        s0 = peg$f578();
+        s0 = peg$f580();
       } else {
         peg$currPos = s0;
         s0 = peg$FAILED;
@@ -36264,7 +36360,7 @@ function peg$parse(input, options) {
       }
       if (s2 !== peg$FAILED) {
         peg$savedPos = s0;
-        s0 = peg$f579();
+        s0 = peg$f581();
       } else {
         peg$currPos = s0;
         s0 = peg$FAILED;
@@ -36301,7 +36397,7 @@ function peg$parse(input, options) {
       }
       if (s2 !== peg$FAILED) {
         peg$savedPos = s0;
-        s0 = peg$f580();
+        s0 = peg$f582();
       } else {
         peg$currPos = s0;
         s0 = peg$FAILED;
@@ -36338,7 +36434,7 @@ function peg$parse(input, options) {
       }
       if (s2 !== peg$FAILED) {
         peg$savedPos = s0;
-        s0 = peg$f581();
+        s0 = peg$f583();
       } else {
         peg$currPos = s0;
         s0 = peg$FAILED;
@@ -36375,7 +36471,7 @@ function peg$parse(input, options) {
       }
       if (s2 !== peg$FAILED) {
         peg$savedPos = s0;
-        s0 = peg$f582();
+        s0 = peg$f584();
       } else {
         peg$currPos = s0;
         s0 = peg$FAILED;
@@ -36412,7 +36508,7 @@ function peg$parse(input, options) {
       }
       if (s2 !== peg$FAILED) {
         peg$savedPos = s0;
-        s0 = peg$f583();
+        s0 = peg$f585();
       } else {
         peg$currPos = s0;
         s0 = peg$FAILED;
@@ -36449,7 +36545,7 @@ function peg$parse(input, options) {
       }
       if (s2 !== peg$FAILED) {
         peg$savedPos = s0;
-        s0 = peg$f584();
+        s0 = peg$f586();
       } else {
         peg$currPos = s0;
         s0 = peg$FAILED;
@@ -36486,7 +36582,7 @@ function peg$parse(input, options) {
       }
       if (s2 !== peg$FAILED) {
         peg$savedPos = s0;
-        s0 = peg$f585();
+        s0 = peg$f587();
       } else {
         peg$currPos = s0;
         s0 = peg$FAILED;
@@ -36523,7 +36619,7 @@ function peg$parse(input, options) {
       }
       if (s2 !== peg$FAILED) {
         peg$savedPos = s0;
-        s0 = peg$f586();
+        s0 = peg$f588();
       } else {
         peg$currPos = s0;
         s0 = peg$FAILED;
@@ -36560,7 +36656,7 @@ function peg$parse(input, options) {
       }
       if (s2 !== peg$FAILED) {
         peg$savedPos = s0;
-        s0 = peg$f587();
+        s0 = peg$f589();
       } else {
         peg$currPos = s0;
         s0 = peg$FAILED;
@@ -36712,7 +36808,7 @@ function peg$parse(input, options) {
       }
       if (s2 !== peg$FAILED) {
         peg$savedPos = s0;
-        s0 = peg$f588();
+        s0 = peg$f590();
       } else {
         peg$currPos = s0;
         s0 = peg$FAILED;
@@ -36749,7 +36845,7 @@ function peg$parse(input, options) {
       }
       if (s2 !== peg$FAILED) {
         peg$savedPos = s0;
-        s0 = peg$f589();
+        s0 = peg$f591();
       } else {
         peg$currPos = s0;
         s0 = peg$FAILED;
@@ -36786,7 +36882,7 @@ function peg$parse(input, options) {
       }
       if (s2 !== peg$FAILED) {
         peg$savedPos = s0;
-        s0 = peg$f590();
+        s0 = peg$f592();
       } else {
         peg$currPos = s0;
         s0 = peg$FAILED;
@@ -36823,7 +36919,7 @@ function peg$parse(input, options) {
       }
       if (s2 !== peg$FAILED) {
         peg$savedPos = s0;
-        s0 = peg$f591();
+        s0 = peg$f593();
       } else {
         peg$currPos = s0;
         s0 = peg$FAILED;
@@ -36860,7 +36956,7 @@ function peg$parse(input, options) {
       }
       if (s2 !== peg$FAILED) {
         peg$savedPos = s0;
-        s0 = peg$f592();
+        s0 = peg$f594();
       } else {
         peg$currPos = s0;
         s0 = peg$FAILED;
@@ -36897,7 +36993,7 @@ function peg$parse(input, options) {
       }
       if (s2 !== peg$FAILED) {
         peg$savedPos = s0;
-        s0 = peg$f593();
+        s0 = peg$f595();
       } else {
         peg$currPos = s0;
         s0 = peg$FAILED;
@@ -36934,7 +37030,7 @@ function peg$parse(input, options) {
       }
       if (s2 !== peg$FAILED) {
         peg$savedPos = s0;
-        s0 = peg$f594();
+        s0 = peg$f596();
       } else {
         peg$currPos = s0;
         s0 = peg$FAILED;
@@ -36971,7 +37067,7 @@ function peg$parse(input, options) {
       }
       if (s2 !== peg$FAILED) {
         peg$savedPos = s0;
-        s0 = peg$f595();
+        s0 = peg$f597();
       } else {
         peg$currPos = s0;
         s0 = peg$FAILED;
@@ -37008,7 +37104,7 @@ function peg$parse(input, options) {
       }
       if (s2 !== peg$FAILED) {
         peg$savedPos = s0;
-        s0 = peg$f596();
+        s0 = peg$f598();
       } else {
         peg$currPos = s0;
         s0 = peg$FAILED;
@@ -37045,7 +37141,7 @@ function peg$parse(input, options) {
       }
       if (s2 !== peg$FAILED) {
         peg$savedPos = s0;
-        s0 = peg$f597();
+        s0 = peg$f599();
       } else {
         peg$currPos = s0;
         s0 = peg$FAILED;
@@ -37082,7 +37178,7 @@ function peg$parse(input, options) {
       }
       if (s2 !== peg$FAILED) {
         peg$savedPos = s0;
-        s0 = peg$f598();
+        s0 = peg$f600();
       } else {
         peg$currPos = s0;
         s0 = peg$FAILED;
@@ -37119,7 +37215,7 @@ function peg$parse(input, options) {
       }
       if (s2 !== peg$FAILED) {
         peg$savedPos = s0;
-        s0 = peg$f599();
+        s0 = peg$f601();
       } else {
         peg$currPos = s0;
         s0 = peg$FAILED;
@@ -37695,7 +37791,7 @@ function peg$parse(input, options) {
       s5 = peg$parseliteral_string();
       if (s5 !== peg$FAILED) {
         peg$savedPos = s0;
-        s0 = peg$f600(s1, s3, s5);
+        s0 = peg$f602(s1, s3, s5);
       } else {
         peg$currPos = s0;
         s0 = peg$FAILED;
@@ -37731,7 +37827,7 @@ function peg$parse(input, options) {
             s9 = null;
           }
           peg$savedPos = s0;
-          s0 = peg$f601(s3, s5);
+          s0 = peg$f603(s3, s5);
         } else {
           peg$currPos = s0;
           s0 = peg$FAILED;
@@ -37765,7 +37861,7 @@ function peg$parse(input, options) {
               peg$parse__();
               peg$parseKW_CASE();
               peg$savedPos = s0;
-              s0 = peg$f602(s3, s5, s7);
+              s0 = peg$f604(s3, s5, s7);
             } else {
               peg$currPos = s0;
               s0 = peg$FAILED;
@@ -37810,7 +37906,7 @@ function peg$parse(input, options) {
         s3.push(s4);
       }
       peg$savedPos = s0;
-      s0 = peg$f603(s1, s3);
+      s0 = peg$f605(s1, s3);
     } else {
       peg$currPos = s0;
       s0 = peg$FAILED;
@@ -37835,7 +37931,7 @@ function peg$parse(input, options) {
           s7 = peg$parseexpr();
           if (s7 !== peg$FAILED) {
             peg$savedPos = s0;
-            s0 = peg$f604(s3, s7);
+            s0 = peg$f606(s3, s7);
           } else {
             peg$currPos = s0;
             s0 = peg$FAILED;
@@ -37866,7 +37962,7 @@ function peg$parse(input, options) {
       s3 = peg$parseexpr();
       if (s3 !== peg$FAILED) {
         peg$savedPos = s0;
-        s0 = peg$f605(s3);
+        s0 = peg$f607(s3);
       } else {
         peg$currPos = s0;
         s0 = peg$FAILED;
@@ -37903,7 +37999,7 @@ function peg$parse(input, options) {
       }
       if (s2 !== peg$FAILED) {
         peg$savedPos = s0;
-        s0 = peg$f606();
+        s0 = peg$f608();
       } else {
         peg$currPos = s0;
         s0 = peg$FAILED;
@@ -38055,7 +38151,7 @@ function peg$parse(input, options) {
 
     s0 = peg$currPos;
     peg$savedPos = peg$currPos;
-    s1 = peg$f607();
+    s1 = peg$f609();
     if (s1) {
       s1 = undefined;
     } else {
@@ -38069,7 +38165,7 @@ function peg$parse(input, options) {
       }
       if (s3 !== peg$FAILED) {
         peg$savedPos = s0;
-        s0 = peg$f608(s3);
+        s0 = peg$f610(s3);
       } else {
         peg$currPos = s0;
         s0 = peg$FAILED;
@@ -38111,7 +38207,7 @@ function peg$parse(input, options) {
         s2.push(s3);
       }
       peg$savedPos = s0;
-      s0 = peg$f609(s1, s2);
+      s0 = peg$f611(s1, s2);
     } else {
       peg$currPos = s0;
       s0 = peg$FAILED;
@@ -38139,7 +38235,7 @@ function peg$parse(input, options) {
         s5 = peg$parseexpr();
         if (s5 !== peg$FAILED) {
           peg$savedPos = s0;
-          s0 = peg$f610(s1, s3, s5);
+          s0 = peg$f612(s1, s3, s5);
         } else {
           peg$currPos = s0;
           s0 = peg$FAILED;
@@ -38172,7 +38268,7 @@ function peg$parse(input, options) {
         s5 = peg$parseexpr();
         if (s5 !== peg$FAILED) {
           peg$savedPos = s0;
-          s0 = peg$f611(s1, s3, s5);
+          s0 = peg$f613(s1, s3, s5);
         } else {
           peg$currPos = s0;
           s0 = peg$FAILED;
@@ -38199,7 +38295,7 @@ function peg$parse(input, options) {
       s3 = peg$parseproc_expr();
       if (s3 !== peg$FAILED) {
         peg$savedPos = s0;
-        s0 = peg$f612(s3);
+        s0 = peg$f614(s3);
       } else {
         peg$currPos = s0;
         s0 = peg$FAILED;
@@ -38258,7 +38354,7 @@ function peg$parse(input, options) {
         s2.push(s3);
       }
       peg$savedPos = s0;
-      s0 = peg$f613(s1, s2);
+      s0 = peg$f615(s1, s2);
     } else {
       peg$currPos = s0;
       s0 = peg$FAILED;
@@ -38296,7 +38392,7 @@ function peg$parse(input, options) {
         s2.push(s3);
       }
       peg$savedPos = s0;
-      s0 = peg$f614(s1, s2);
+      s0 = peg$f616(s1, s2);
     } else {
       peg$currPos = s0;
       s0 = peg$FAILED;
@@ -38321,7 +38417,7 @@ function peg$parse(input, options) {
           s7 = peg$parseon_clause();
           if (s7 !== peg$FAILED) {
             peg$savedPos = s0;
-            s0 = peg$f615(s1, s3, s5, s7);
+            s0 = peg$f617(s1, s3, s5, s7);
           } else {
             peg$currPos = s0;
             s0 = peg$FAILED;
@@ -38367,7 +38463,7 @@ function peg$parse(input, options) {
                     s5 = peg$parseRPAREN();
                     if (s5 !== peg$FAILED) {
                       peg$savedPos = s0;
-                      s0 = peg$f616(s3);
+                      s0 = peg$f618(s3);
                     } else {
                       peg$currPos = s0;
                       s0 = peg$FAILED;
@@ -38423,7 +38519,7 @@ function peg$parse(input, options) {
         s2 = null;
       }
       peg$savedPos = s0;
-      s0 = peg$f617(s1, s2);
+      s0 = peg$f619(s1, s2);
     } else {
       peg$currPos = s0;
       s0 = peg$FAILED;
@@ -38450,7 +38546,7 @@ function peg$parse(input, options) {
         s7 = peg$parseRPAREN();
         if (s7 !== peg$FAILED) {
           peg$savedPos = s0;
-          s0 = peg$f618(s1, s5);
+          s0 = peg$f620(s1, s5);
         } else {
           peg$currPos = s0;
           s0 = peg$FAILED;
@@ -38474,7 +38570,7 @@ function peg$parse(input, options) {
     s1 = peg$parseproc_func_name();
     if (s1 !== peg$FAILED) {
       peg$savedPos = s0;
-      s1 = peg$f619(s1);
+      s1 = peg$f621(s1);
     }
     s0 = s1;
 
@@ -38521,7 +38617,7 @@ function peg$parse(input, options) {
         s2.push(s3);
       }
       peg$savedPos = s0;
-      s0 = peg$f620(s1, s2);
+      s0 = peg$f622(s1, s2);
     } else {
       peg$currPos = s0;
       s0 = peg$FAILED;
@@ -38543,7 +38639,7 @@ function peg$parse(input, options) {
         s5 = peg$parseRBRAKE();
         if (s5 !== peg$FAILED) {
           peg$savedPos = s0;
-          s0 = peg$f621(s3);
+          s0 = peg$f623(s3);
         } else {
           peg$currPos = s0;
           s0 = peg$FAILED;
@@ -38589,7 +38685,7 @@ function peg$parse(input, options) {
         s2.push(s3);
       }
       peg$savedPos = s0;
-      s0 = peg$f622(s1, s2);
+      s0 = peg$f624(s1, s2);
     } else {
       peg$currPos = s0;
       s0 = peg$FAILED;
@@ -38607,7 +38703,7 @@ function peg$parse(input, options) {
       s2 = peg$parsewithout_prefix_var_decl();
       if (s2 !== peg$FAILED) {
         peg$savedPos = s0;
-        s0 = peg$f623(s1, s2);
+        s0 = peg$f625(s1, s2);
       } else {
         peg$currPos = s0;
         s0 = peg$FAILED;
@@ -38628,7 +38724,7 @@ function peg$parse(input, options) {
     if (s1 !== peg$FAILED) {
       s2 = peg$parsemem_chain();
       peg$savedPos = s0;
-      s0 = peg$f624(s1, s2);
+      s0 = peg$f626(s1, s2);
     } else {
       peg$currPos = s0;
       s0 = peg$FAILED;
@@ -38638,7 +38734,7 @@ function peg$parse(input, options) {
       s1 = peg$parseliteral_numeric();
       if (s1 !== peg$FAILED) {
         peg$savedPos = s0;
-        s1 = peg$f625(s1);
+        s1 = peg$f627(s1);
       }
       s0 = s1;
     }
@@ -38677,7 +38773,7 @@ function peg$parse(input, options) {
       s1.push(s2);
     }
     peg$savedPos = s0;
-    s1 = peg$f626(s1);
+    s1 = peg$f628(s1);
     s0 = s1;
 
     return s0;
@@ -38764,7 +38860,7 @@ function peg$parse(input, options) {
           peg$parse__();
           s7 = peg$parsenumeric_type_suffix();
           peg$savedPos = s0;
-          s0 = peg$f627(s3, s7);
+          s0 = peg$f629(s3, s7);
         } else {
           peg$currPos = s0;
           s0 = peg$FAILED;
@@ -38791,7 +38887,7 @@ function peg$parse(input, options) {
     }
     if (s1 !== peg$FAILED) {
       peg$savedPos = s0;
-      s1 = peg$f628(s1);
+      s1 = peg$f630(s1);
     }
     s0 = s1;
 
@@ -38838,7 +38934,7 @@ function peg$parse(input, options) {
     }
     if (s1 !== peg$FAILED) {
       peg$savedPos = s0;
-      s1 = peg$f629(s1);
+      s1 = peg$f631(s1);
     }
     s0 = s1;
 
@@ -38860,7 +38956,7 @@ function peg$parse(input, options) {
         s3 = null;
       }
       peg$savedPos = s0;
-      s0 = peg$f630(s1, s3);
+      s0 = peg$f632(s1, s3);
     } else {
       peg$currPos = s0;
       s0 = peg$FAILED;
@@ -38887,7 +38983,7 @@ function peg$parse(input, options) {
         s3 = null;
       }
       peg$savedPos = s0;
-      s0 = peg$f631();
+      s0 = peg$f633();
     } else {
       peg$currPos = s0;
       s0 = peg$FAILED;
@@ -38961,7 +39057,7 @@ function peg$parse(input, options) {
         s2 = null;
       }
       peg$savedPos = s0;
-      s0 = peg$f632(s1, s2);
+      s0 = peg$f634(s1, s2);
     } else {
       peg$currPos = s0;
       s0 = peg$FAILED;
@@ -39014,7 +39110,7 @@ function peg$parse(input, options) {
           s2.push(s3);
         }
         peg$savedPos = s0;
-        s0 = peg$f633(s1, s2);
+        s0 = peg$f635(s1, s2);
       } else {
         peg$currPos = s0;
         s0 = peg$FAILED;
@@ -39058,7 +39154,7 @@ function peg$parse(input, options) {
         }
         if (s5 !== peg$FAILED) {
           peg$savedPos = s0;
-          s0 = peg$f634(s1);
+          s0 = peg$f636(s1);
         } else {
           peg$currPos = s0;
           s0 = peg$FAILED;
@@ -39125,7 +39221,7 @@ function peg$parse(input, options) {
               s9 = null;
             }
             peg$savedPos = s0;
-            s0 = peg$f635(s1, s5, s9);
+            s0 = peg$f637(s1, s5, s9);
           } else {
             peg$currPos = s0;
             s0 = peg$FAILED;
@@ -39167,7 +39263,7 @@ function peg$parse(input, options) {
           s3 = null;
         }
         peg$savedPos = s0;
-        s0 = peg$f636(s1, s3);
+        s0 = peg$f638(s1, s3);
       } else {
         peg$currPos = s0;
         s0 = peg$FAILED;
@@ -39225,7 +39321,7 @@ function peg$parse(input, options) {
         s2 = null;
       }
       peg$savedPos = s0;
-      s0 = peg$f637(s1, s2);
+      s0 = peg$f639(s1, s2);
     } else {
       peg$currPos = s0;
       s0 = peg$FAILED;
@@ -39273,7 +39369,7 @@ function peg$parse(input, options) {
             peg$parse__();
             s9 = peg$parsenumeric_type_suffix();
             peg$savedPos = peg$currPos;
-            s10 = peg$f638(s1, s5, s9);
+            s10 = peg$f640(s1, s5, s9);
             if (s10) {
               s10 = undefined;
             } else {
@@ -39281,7 +39377,7 @@ function peg$parse(input, options) {
             }
             if (s10 !== peg$FAILED) {
               peg$savedPos = s0;
-              s0 = peg$f639(s1, s5, s9);
+              s0 = peg$f641(s1, s5, s9);
             } else {
               peg$currPos = s0;
               s0 = peg$FAILED;
@@ -39320,7 +39416,7 @@ function peg$parse(input, options) {
       s3 = null;
     }
     peg$savedPos = s0;
-    s0 = peg$f640(s1, s3);
+    s0 = peg$f642(s1, s3);
 
     return s0;
   }
@@ -39345,7 +39441,7 @@ function peg$parse(input, options) {
         s2 = null;
       }
       peg$savedPos = s0;
-      s0 = peg$f641(s2);
+      s0 = peg$f643(s2);
     } else {
       peg$currPos = s0;
       s0 = peg$FAILED;
@@ -39471,7 +39567,7 @@ function peg$parse(input, options) {
             s10 = peg$parse__();
             s11 = peg$parsenumeric_type_suffix();
             peg$savedPos = s0;
-            s0 = peg$f642(s1, s5, s7, s11);
+            s0 = peg$f644(s1, s5, s7, s11);
           } else {
             peg$currPos = s0;
             s0 = peg$FAILED;
@@ -39496,7 +39592,7 @@ function peg$parse(input, options) {
         s3 = peg$parsenumeric_type_suffix();
         s4 = peg$parse__();
         peg$savedPos = s0;
-        s0 = peg$f643(s1, s3);
+        s0 = peg$f645(s1, s3);
       } else {
         peg$currPos = s0;
         s0 = peg$FAILED;
@@ -39575,7 +39671,7 @@ function peg$parse(input, options) {
             s3 = peg$parse__();
             s4 = peg$parsenumeric_type_suffix();
             peg$savedPos = s0;
-            s0 = peg$f644(s1, s2, s4);
+            s0 = peg$f646(s1, s2, s4);
           } else {
             peg$currPos = s0;
             s0 = peg$FAILED;
@@ -39646,7 +39742,7 @@ function peg$parse(input, options) {
             s3 = peg$parsenumeric_type_suffix();
             s4 = peg$parse__();
             peg$savedPos = s0;
-            s0 = peg$f645(s1, s3);
+            s0 = peg$f647(s1, s3);
           } else {
             peg$currPos = s0;
             s0 = peg$FAILED;
@@ -39671,7 +39767,7 @@ function peg$parse(input, options) {
       s3 = peg$parsevalue_item();
       if (s3 !== peg$FAILED) {
         peg$savedPos = s0;
-        s0 = peg$f646(s1, s3);
+        s0 = peg$f648(s1, s3);
       } else {
         peg$currPos = s0;
         s0 = peg$FAILED;
@@ -39694,7 +39790,7 @@ function peg$parse(input, options) {
     }
     if (s1 !== peg$FAILED) {
       peg$savedPos = s0;
-      s1 = peg$f647(s1);
+      s1 = peg$f649(s1);
     }
     s0 = s1;
 
@@ -39721,7 +39817,7 @@ function peg$parse(input, options) {
         s2 = null;
       }
       peg$savedPos = s0;
-      s0 = peg$f648(s1, s2);
+      s0 = peg$f650(s1, s2);
     } else {
       peg$currPos = s0;
       s0 = peg$FAILED;
@@ -39761,7 +39857,7 @@ function peg$parse(input, options) {
     }
     if (s1 !== peg$FAILED) {
       peg$savedPos = s0;
-      s1 = peg$f649(s1);
+      s1 = peg$f651(s1);
     }
     s0 = s1;
 
@@ -39780,7 +39876,7 @@ function peg$parse(input, options) {
         s3 = null;
       }
       peg$savedPos = s0;
-      s0 = peg$f650(s1, s3);
+      s0 = peg$f652(s1, s3);
     } else {
       peg$currPos = s0;
       s0 = peg$FAILED;
@@ -41193,398 +41289,6 @@ async function multipleDelete$1(params) {
         txSaveData(database, table, session, { row_list, primary_map });
     }
     return { affectedRows };
-}
-
-async function insertRowList$1(params) {
-    const { session, database, table, list, duplicate_mode } = params;
-    const data = getTable(database, table, session);
-    if (list.length === 0) {
-        return { affectedRows: 0 };
-    }
-    if (!data) {
-        throw new SQLError('table_not_found');
-    }
-    const { primary_key } = data;
-    const row_list = data.row_list.slice();
-    const primary_map = new Map(data.primary_map);
-    let affectedRows = 0;
-    for (const row of list) {
-        const cellRow = _transformRow(row, data.column_list);
-        const key_values = primary_key.map((name) => cellRow[name]?.value);
-        const key = JSON.stringify(key_values);
-        const index = primary_map.get(key);
-        if (index === undefined) {
-            primary_map.set(key, row_list.push(cellRow) - 1);
-            affectedRows++;
-        }
-        else if (duplicate_mode === 'replace') {
-            const existingRow = row_list[index];
-            if (existingRow && !_rowEqual(existingRow, cellRow)) {
-                affectedRows++;
-            }
-            row_list[index] = cellRow;
-            affectedRows++;
-        }
-        else if (!duplicate_mode) {
-            throw new SQLError({
-                err: 'dup_primary_key_entry',
-                args: [primary_key, key_values],
-            });
-        }
-    }
-    txSaveData(database, table, session, { row_list, primary_map });
-    return { affectedRows };
-}
-function _transformRow(row, column_list) {
-    const result = {};
-    for (const column of column_list) {
-        const cell = row[column.name_lc];
-        if (cell !== undefined) {
-            _checkJsonText(column, cell.value);
-            result[column.name_lc] = { type: cell.type, value: cell.value };
-        }
-        else if (column.defaultValue === undefined) {
-            throw new SQLError({
-                err: 'ER_NO_DEFAULT_FOR_FIELD',
-                args: [column.name],
-            });
-        }
-        else {
-            result[column.name_lc] = column.defaultValue;
-        }
-    }
-    return result;
-}
-function _checkJsonText(column, value) {
-    if (column.type !== 'json' || typeof value !== 'string') {
-        return;
-    }
-    try {
-        JSON.parse(value);
-    }
-    catch {
-        throw new SQLError({ err: 'ER_INVALID_JSON_TEXT' });
-    }
-}
-function _rowEqual(a, b) {
-    const keys_a = Object.keys(a);
-    return keys_a.every((key) => {
-        return a[key]?.value === b[key]?.value;
-    });
-}
-
-async function getRowList$1(params) {
-    const { list } = params;
-    const sourceMap = new Map();
-    const tableInfoMap = new Map();
-    for (const from of list) {
-        const { rowList, tableInfo } = _getFromTable$1({ ...params, from });
-        sourceMap.set(from, _listToItetator$1(rowList));
-        tableInfoMap.set(from, tableInfo);
-    }
-    return { sourceMap, tableInfoMap };
-}
-function _getFromTable$1(params) {
-    const { session, from } = params;
-    const { db, table } = from;
-    const data = getTable(db ?? '', table, session);
-    if (!data) {
-        throw new SQLError('table_not_found');
-    }
-    return {
-        rowList: data.row_list,
-        tableInfo: { isCaseSensitive: false, columns: data.column_list },
-    };
-}
-async function* _listToItetator$1(list) {
-    yield list;
-}
-
-function isCellValue(value) {
-    return 'value' in value && !('S' in value || 'N' in value || 'B' in value);
-}
-async function singleUpdate$1(_params) {
-    throw new NoSingleOperationError();
-}
-async function multipleUpdate$1(params) {
-    const { session, list } = params;
-    let affectedRows = 0;
-    let changedRows = 0;
-    for (const changes of list) {
-        const { database, table, update_list } = changes;
-        const data = getTable(database, table, session);
-        if (!data) {
-            throw new SQLError('table_not_found');
-        }
-        const row_list = data.row_list.slice();
-        const primary_map = new Map(data.primary_map);
-        for (const update of update_list) {
-            const { set_list } = update;
-            const key_list = update.key.map((key) => {
-                if (!isCellValue(key)) {
-                    throw new SQLError('invalid_key_type');
-                }
-                return key.value;
-            });
-            const update_key = JSON.stringify(key_list);
-            const index = primary_map.get(update_key);
-            if (index !== undefined && index >= 0) {
-                const old_row = row_list[index];
-                if (!old_row) {
-                    continue;
-                }
-                const new_row = Object.assign({}, old_row);
-                let changed = false;
-                for (const set of set_list) {
-                    new_row[set.column] = _transformCell(set.value);
-                    if (old_row[set.column]?.value !== new_row[set.column]?.value) {
-                        changed = true;
-                    }
-                }
-                const new_key = _makePrimaryKey(data.primary_key, new_row);
-                if (new_key !== update_key && primary_map.has(new_key)) {
-                    throw new SQLError({
-                        err: 'dup_primary_key_entry',
-                        args: [data.primary_key, new_key],
-                    });
-                }
-                else if (new_key !== update_key) {
-                    primary_map.delete(update_key);
-                    primary_map.set(new_key, index);
-                }
-                row_list[index] = new_row;
-                affectedRows++;
-                if (changed) {
-                    changedRows++;
-                }
-            }
-            else {
-                distExports.logger.error('memory.update: failed to find key:', key_list, 'for table:', table);
-            }
-        }
-        txSaveData(database, table, session, { row_list, primary_map });
-    }
-    return { affectedRows, changedRows };
-}
-function _transformCell(cell) {
-    return { value: cell.value, type: cell.type };
-}
-function _makePrimaryKey(primary_key, row) {
-    const key_values = primary_key.map((key) => row[key]?.value);
-    return JSON.stringify(key_values);
-}
-
-async function commit$2(params) {
-    const { session, data } = params;
-    for (const key in data) {
-        const entry = data[key];
-        if (entry) {
-            updateTableData(entry.database, entry.table, session, entry.data);
-        }
-    }
-}
-async function rollback$2(_params) { }
-
-var MemoryEngine = /*#__PURE__*/Object.freeze({
-    __proto__: null,
-    addColumn: addColumn$1,
-    commit: commit$2,
-    createIndex: createIndex$1,
-    createTable: createTable$2,
-    deleteIndex: deleteIndex$1,
-    dropTable: dropTable$2,
-    getRowList: getRowList$1,
-    getTableInfo: getTableInfo$1,
-    getTableList: getTableList$2,
-    insertRowList: insertRowList$1,
-    multipleDelete: multipleDelete$1,
-    multipleUpdate: multipleUpdate$1,
-    rollback: rollback$2,
-    singleDelete: singleDelete$1,
-    singleUpdate: singleUpdate$1
-});
-
-const TYPE_MAP = { S: 'string', N: 'number', B: 'buffer' };
-const MYSQL_TYPE_MAP = { S: 'VARCHAR', N: 'DECIMAL', B: 'BLOB' };
-const COLLATION_MAP = {
-    S: COLLATIONS.UTF8MB4_0900_BIN,
-    N: undefined,
-    B: undefined,
-};
-async function getTableInfo(params) {
-    const { dynamodb, table } = params;
-    try {
-        const data = await dynamodb.getTable(table);
-        if (!data.Table?.AttributeDefinitions || !data.Table.KeySchema) {
-            throw new Error('bad_data');
-        }
-        const column_list = data.Table.AttributeDefinitions.map((def) => {
-            if (!def.AttributeName || !def.AttributeType) {
-                throw new Error('bad_data');
-            }
-            const type = TYPE_MAP[def.AttributeType];
-            const mysqlType = MYSQL_TYPE_MAP[def.AttributeType];
-            const collation = COLLATION_MAP[def.AttributeType];
-            return { name: def.AttributeName, type, mysqlType, collation };
-        });
-        const primary_key = data.Table.KeySchema.map((key) => key.AttributeName ?? '');
-        return {
-            table,
-            collation: COLLATIONS.UTF8MB4_0900_BIN,
-            primary_key,
-            column_list,
-            is_open: true,
-            rowCount: BigInt(data.Table.ItemCount ?? 0),
-            tableSize: BigInt(data.Table.TableSizeBytes ?? 0),
-        };
-    }
-    catch (err) {
-        distExports.logger.error('getTableInfo: err:', err, table);
-        throw err;
-    }
-}
-async function getTableList$1(params) {
-    const { dynamodb } = params;
-    try {
-        return await dynamodb.getTableList();
-    }
-    catch (err) {
-        distExports.logger.error('raw_engine.getTableList: err:', err);
-        throw err;
-    }
-}
-async function createTable$1(params) {
-    const { dynamodb, table, ...other } = params;
-    const primary_key = params.primary_key.map((name) => {
-        const column = params.column_list.find((c) => c.name === name);
-        if (!column) {
-            throw new SQLError('bad_primary_key');
-        }
-        return { name: column.name, type: _valueToDynamoKeyType(column.type) };
-    });
-    const opts = { ...other, table, primary_key };
-    try {
-        await dynamodb.createTable(opts);
-        await _waitForTable({ dynamodb, table });
-    }
-    catch (err) {
-        if (err instanceof Error && err.message === 'resource_in_use') {
-            throw new SQLError('table_exists');
-        }
-        distExports.logger.error('raw_engine.createTable: err:', err);
-        throw err;
-    }
-}
-async function dropTable$1(params) {
-    const { dynamodb, table } = params;
-    try {
-        await dynamodb.deleteTable(table);
-    }
-    catch (delete_err) {
-        if (delete_err instanceof Error &&
-            delete_err.name === 'ResourceNotFoundException') {
-            throw new SQLError('table_not_found');
-        }
-        distExports.logger.error('raw_engine.dropTable: deleteTable err:', delete_err);
-        throw delete_err;
-    }
-    try {
-        await _waitForTable({ dynamodb, table });
-    }
-    catch (wait_err) {
-        if (wait_err instanceof Error &&
-            wait_err.message === 'resource_not_found') {
-            return;
-        }
-        distExports.logger.error('raw_engine.dropTable: waitForTable err:', wait_err);
-        throw wait_err;
-    }
-}
-async function addColumn(_params) { }
-async function createIndex(params) {
-    const { dynamodb, table, index_name } = params;
-    const key_list = params.key_list.map((key) => {
-        return { name: key.name, type: _valueToDynamoKeyType(key.type) };
-    });
-    const opts = { table, index_name, key_list };
-    try {
-        await dynamodb.createIndex(opts);
-        await _waitForTable({ dynamodb, table, index_name });
-    }
-    catch (err) {
-        if (err instanceof Error) {
-            if (err.message === 'resource_in_use' ||
-                err.message.indexOf('already exists') >= 0) {
-                throw new Error('index_exists');
-            }
-        }
-        distExports.logger.error('raw_engine.createIndex: err:', err);
-        throw err;
-    }
-}
-async function deleteIndex(params) {
-    const { dynamodb, table, index_name } = params;
-    try {
-        await dynamodb.deleteIndex({ table, index_name });
-        await _waitForTable({ dynamodb, table, index_name });
-    }
-    catch (err) {
-        if (err instanceof Error && err.message === 'resource_not_found') {
-            throw new Error('index_not_found');
-        }
-        distExports.logger.error('raw_engine.deleteIndex: err:', err);
-        throw err;
-    }
-}
-const LOOP_MS = 250;
-async function _waitForTable(params) {
-    const { dynamodb, table, index_name } = params;
-    for (;;) {
-        const result = await dynamodb.getTable(table);
-        const tableData = result.Table;
-        if (!tableData) {
-            await promises.setTimeout(LOOP_MS);
-            continue;
-        }
-        const status = tableData.TableStatus;
-        if (status === 'CREATING' ||
-            status === 'UPDATING' ||
-            status === 'DELETING') {
-            await promises.setTimeout(LOOP_MS);
-            continue;
-        }
-        if (index_name !== undefined) {
-            const index = tableData.GlobalSecondaryIndexes?.find((item) => item.IndexName === index_name);
-            if (!index || index.IndexStatus !== 'ACTIVE') {
-                await promises.setTimeout(LOOP_MS);
-                continue;
-            }
-        }
-        return;
-    }
-}
-function _valueToDynamoKeyType(type) {
-    switch (type) {
-        case 'null':
-        case 'interval':
-        case 'datetime':
-        case 'date':
-        case 'time':
-        case 'string':
-        case 'char':
-        case 'text':
-        case 'json':
-            return 'S';
-        case 'bool':
-        case 'long':
-        case 'longlong':
-        case 'year':
-        case 'number':
-        case 'double':
-            return 'N';
-        case 'buffer':
-            return 'B';
-    }
 }
 
 function isBaseFrom$3(from) {
@@ -43418,7 +43122,9 @@ function like(expr, state) {
                 .replace(/[.+^${}()|[\]\\]/g, '\\$&')
                 .replace(/%/g, '.*')
                 .replace(/_/g, '.');
-            const regex = new RegExp('^' + pattern + '$', 'i');
+            const collation = getExprCollation([expr.left, expr.right], state);
+            const flags = isCaseInsensitive(collation) ? 'i' : '';
+            const regex = new RegExp('^' + pattern + '$', flags);
             value = regex.test(str) ? 1 : 0;
         }
     }
@@ -43548,7 +43254,12 @@ function coalesce(expr, state) {
         }
     }
     const { type } = unionType(values);
-    return { err, name: `COALESCE(${names.join(', ')}`, value, type };
+    return {
+        err,
+        name: `COALESCE(${names.join(', ')}`,
+        value: unionValue(value, type),
+        type,
+    };
 }
 function ifnull(expr, state) {
     assertArgCount(expr, 2);
@@ -43562,7 +43273,12 @@ function ifnull(expr, state) {
     }
     const value = arg1.value !== null ? arg1.value : arg2.value;
     const { type } = unionType([arg1, arg2]);
-    return { err: null, name: `IFNULL(${arg1.name}, ${arg2.name})`, value, type };
+    return {
+        err: null,
+        name: `IFNULL(${arg1.name}, ${arg2.name})`,
+        value: unionValue(value, type),
+        type,
+    };
 }
 function ifFunc(expr, state) {
     assertArgCount(expr, 3);
@@ -43591,7 +43307,7 @@ function ifFunc(expr, state) {
     return {
         err,
         name: `IF(${condition.name}, ${trueValue.name}, ${falseValue.name})`,
-        value,
+        value: unionValue(value, type),
         type,
     };
 }
@@ -43665,9 +43381,20 @@ function _ltList(list, timeZone, convert) {
     }
     return { value: value ?? null, decimals };
 }
+const INT64_MAX = 9223372036854775807n;
+function isUnsignedBigInt(e) {
+    return (e.type === 'longlong' && typeof e.value === 'bigint' && e.value > INT64_MAX);
+}
+function unionValue(value, type) {
+    return type === 'number' && typeof value === 'bigint' ? Number(value) : value;
+}
 function unionType(list) {
     let compare_type;
     const types = list.map((e) => (e.type === 'bool' ? 'longlong' : e.type));
+    const hasUnsigned = list.some(isUnsignedBigInt);
+    const hasSigned = list.some((e) => e.value !== null &&
+        ['longlong', 'bool', 'year'].includes(e.type) &&
+        !isUnsignedBigInt(e));
     if (types.includes('datetime')) {
         compare_type = 'datetime';
     }
@@ -43695,6 +43422,9 @@ function unionType(list) {
     else if (types.includes('year') &&
         types.every((t) => t === 'year' || t === 'null')) {
         compare_type = 'year';
+    }
+    else if (hasUnsigned && hasSigned) {
+        compare_type = 'number';
     }
     else if (types.includes('longlong') || types.includes('year')) {
         compare_type = 'longlong';
@@ -43904,7 +43634,7 @@ function caseExpr(expr, state) {
             value: chosen.value,
             timeZone: state.session.timeZone,
         })
-        : (chosen?.value ?? null);
+        : unionValue(chosen?.value ?? null, type);
     return { err: null, name: 'CASE', value, type };
 }
 
@@ -47469,6 +47199,17 @@ function connection_id(expr, state) {
     assertArgCountParse(expr, 0);
     return { err: null, value: state.session.threadId, type: 'longlong' };
 }
+function values(expr, state) {
+    assertArgCount(expr, 1);
+    const column = String(expr.args.value[0].column);
+    const cell = state.insertRow?.[column.toLowerCase()];
+    return {
+        err: null,
+        name: `VALUES(${column})`,
+        type: cell?.type ?? 'null',
+        value: cell?.value ?? null,
+    };
+}
 
 function elt(expr, state) {
     assertArgCount(expr, 2, Infinity);
@@ -48669,6 +48410,7 @@ const methods$2 = {
     schema: database,
     isnull,
     sleep,
+    values,
     length,
     octet_length: length,
     char_length,
@@ -49315,6 +49057,530 @@ function _isCellValue(cell) {
     return (typeof cell === 'object' && 'value' in cell && cell.value !== undefined);
 }
 
+const NULL_CELL = { err: null, type: 'null', value: null };
+function lowerKeys(record) {
+    return Object.fromEntries(Object.entries(record).map(([key, value]) => [key.toLowerCase(), value]));
+}
+function buildSetReferences(set, from) {
+    const columnRefMap = new Map();
+    set.forEach((item) => {
+        walkColumnRefs(item.value, (ref) => {
+            columnRefMap.set(ref, { from });
+        });
+    });
+    return columnRefMap;
+}
+function evaluateDuplicateUpdate(params) {
+    const { session, set, existing, inserted } = params;
+    const from = { db: null, table: null, as: null };
+    const columnRefMap = buildSetReferences(set, from);
+    const row = {
+        source: new Map([
+            [from, lowerKeys(existing)],
+        ]),
+        group: null,
+        result: null,
+    };
+    const tableInfoMap = new Map([
+        [from, { isCaseSensitive: false, columns: [] }],
+    ]);
+    const insertRow = lowerKeys(inserted);
+    return set.map((item) => {
+        const value = getValue(item.value, {
+            session,
+            row,
+            columnRefMap,
+            tableInfoMap,
+            insertRow,
+        });
+        if (value.err) {
+            throw new SQLError(value.err);
+        }
+        return { column: item.column, value };
+    });
+}
+function orNull(cell) {
+    return cell ?? NULL_CELL;
+}
+function toCell(attr) {
+    if (attr === undefined || attr.NULL) {
+        return NULL_CELL;
+    }
+    else if (attr.N !== undefined) {
+        return { err: null, type: 'number', value: Number(attr.N) };
+    }
+    else if (attr.BOOL !== undefined) {
+        return { err: null, type: 'bool', value: attr.BOOL ? 1 : 0 };
+    }
+    else if (attr.B !== undefined) {
+        return { err: null, type: 'buffer', value: Buffer.from(attr.B) };
+    }
+    else if (attr.S !== undefined) {
+        return { err: null, type: 'string', value: attr.S };
+    }
+    return { err: null, type: 'string', value: valueToNative(attr) };
+}
+function toAttribute(cell) {
+    const { type, value } = cell;
+    if (value === null || value === undefined) {
+        return { NULL: true };
+    }
+    else if (Buffer.isBuffer(value)) {
+        return { B: value };
+    }
+    else if (type === 'bool') {
+        return { BOOL: Boolean(value) };
+    }
+    else if (type === 'number' || typeof value === 'number') {
+        return { N: String(value) };
+    }
+    else if (typeof value === 'object') {
+        return nativeToValue(value);
+    }
+    return { S: String(value) };
+}
+function normalizeCell(cell) {
+    return cell.type === 'number' ? Number(cell.value) : (cell.value ?? null);
+}
+function isSameCell(left, right) {
+    return (JSON.stringify(normalizeCell(left ?? NULL_CELL)) ===
+        JSON.stringify(normalizeCell(right)));
+}
+function findKey(record, name) {
+    return (Object.keys(record).find((key) => key.toLowerCase() === name.toLowerCase()) ?? name);
+}
+
+async function insertRowList$1(params) {
+    const { session, database, table, list, duplicate_mode, on_duplicate_update, } = params;
+    const data = getTable(database, table, session);
+    if (list.length === 0) {
+        return { affectedRows: 0, changedRows: 0 };
+    }
+    if (!data) {
+        throw new SQLError('table_not_found');
+    }
+    const { primary_key } = data;
+    const row_list = data.row_list.slice();
+    const primary_map = new Map(data.primary_map);
+    let affectedRows = 0;
+    let duplicateRows = 0;
+    for (const row of list) {
+        const cellRow = _transformRow(row, data.column_list);
+        const key_values = primary_key.map((name) => cellRow[name]?.value);
+        const key = JSON.stringify(key_values);
+        const index = primary_map.get(key);
+        if (index === undefined) {
+            primary_map.set(key, row_list.push(cellRow) - 1);
+            affectedRows++;
+        }
+        else if (duplicate_mode === 'update' && on_duplicate_update) {
+            const old_row = row_list[index];
+            if (!old_row) {
+                continue;
+            }
+            const sets = evaluateDuplicateUpdate({
+                session,
+                set: on_duplicate_update,
+                existing: old_row,
+                inserted: row,
+            });
+            const new_row = { ...old_row };
+            let changed = false;
+            for (const { column, value } of sets) {
+                const name = column.toLowerCase();
+                if (!data.column_list.some((col) => col.name_lc === name)) {
+                    throw new SQLError({ err: 'column_not_found', args: [column] });
+                }
+                new_row[name] = { type: value.type, value: value.value };
+                if (old_row[name]?.value !== value.value) {
+                    changed = true;
+                }
+            }
+            const new_key = JSON.stringify(primary_key.map((name) => new_row[name]?.value));
+            if (new_key !== key) {
+                if (primary_map.has(new_key)) {
+                    throw new SQLError({
+                        err: 'dup_primary_key_entry',
+                        args: [primary_key, new_key],
+                    });
+                }
+                primary_map.delete(key);
+                primary_map.set(new_key, index);
+            }
+            row_list[index] = new_row;
+            affectedRows += changed ? 2 : 1;
+            duplicateRows++;
+        }
+        else if (duplicate_mode === 'replace') {
+            const existingRow = row_list[index];
+            if (existingRow && !_rowEqual(existingRow, cellRow)) {
+                affectedRows++;
+            }
+            row_list[index] = cellRow;
+            affectedRows++;
+        }
+        else if (!duplicate_mode) {
+            throw new SQLError({
+                err: 'dup_primary_key_entry',
+                args: [primary_key, key_values],
+            });
+        }
+    }
+    txSaveData(database, table, session, { row_list, primary_map });
+    return { affectedRows, changedRows: duplicateRows };
+}
+function _transformRow(row, column_list) {
+    const result = {};
+    for (const column of column_list) {
+        const cell = row[column.name_lc];
+        if (cell !== undefined) {
+            _checkJsonText(column, cell.value);
+            result[column.name_lc] = { type: cell.type, value: cell.value };
+        }
+        else if (column.defaultValue === undefined) {
+            throw new SQLError({
+                err: 'ER_NO_DEFAULT_FOR_FIELD',
+                args: [column.name],
+            });
+        }
+        else {
+            result[column.name_lc] = column.defaultValue;
+        }
+    }
+    return result;
+}
+function _checkJsonText(column, value) {
+    if (column.type !== 'json' || typeof value !== 'string') {
+        return;
+    }
+    try {
+        JSON.parse(value);
+    }
+    catch {
+        throw new SQLError({ err: 'ER_INVALID_JSON_TEXT' });
+    }
+}
+function _rowEqual(a, b) {
+    const keys_a = Object.keys(a);
+    return keys_a.every((key) => {
+        return a[key]?.value === b[key]?.value;
+    });
+}
+
+async function getRowList$1(params) {
+    const { list } = params;
+    const sourceMap = new Map();
+    const tableInfoMap = new Map();
+    for (const from of list) {
+        const { rowList, tableInfo } = _getFromTable$1({ ...params, from });
+        sourceMap.set(from, _listToItetator$1(rowList));
+        tableInfoMap.set(from, tableInfo);
+    }
+    return { sourceMap, tableInfoMap };
+}
+function _getFromTable$1(params) {
+    const { session, from } = params;
+    const { db, table } = from;
+    const data = getTable(db ?? '', table, session);
+    if (!data) {
+        throw new SQLError('table_not_found');
+    }
+    return {
+        rowList: data.row_list,
+        tableInfo: { isCaseSensitive: false, columns: data.column_list },
+    };
+}
+async function* _listToItetator$1(list) {
+    yield list;
+}
+
+function isCellValue(value) {
+    return 'value' in value && !('S' in value || 'N' in value || 'B' in value);
+}
+async function singleUpdate$1(_params) {
+    throw new NoSingleOperationError();
+}
+async function multipleUpdate$1(params) {
+    const { session, list } = params;
+    let affectedRows = 0;
+    let changedRows = 0;
+    for (const changes of list) {
+        const { database, table, update_list } = changes;
+        const data = getTable(database, table, session);
+        if (!data) {
+            throw new SQLError('table_not_found');
+        }
+        const row_list = data.row_list.slice();
+        const primary_map = new Map(data.primary_map);
+        for (const update of update_list) {
+            const { set_list } = update;
+            const key_list = update.key.map((key) => {
+                if (!isCellValue(key)) {
+                    throw new SQLError('invalid_key_type');
+                }
+                return key.value;
+            });
+            const update_key = JSON.stringify(key_list);
+            const index = primary_map.get(update_key);
+            if (index !== undefined && index >= 0) {
+                const old_row = row_list[index];
+                if (!old_row) {
+                    continue;
+                }
+                const new_row = Object.assign({}, old_row);
+                let changed = false;
+                for (const set of set_list) {
+                    new_row[set.column] = _transformCell(set.value);
+                    if (old_row[set.column]?.value !== new_row[set.column]?.value) {
+                        changed = true;
+                    }
+                }
+                const new_key = _makePrimaryKey(data.primary_key, new_row);
+                if (new_key !== update_key && primary_map.has(new_key)) {
+                    throw new SQLError({
+                        err: 'dup_primary_key_entry',
+                        args: [data.primary_key, new_key],
+                    });
+                }
+                else if (new_key !== update_key) {
+                    primary_map.delete(update_key);
+                    primary_map.set(new_key, index);
+                }
+                row_list[index] = new_row;
+                affectedRows++;
+                if (changed) {
+                    changedRows++;
+                }
+            }
+            else {
+                distExports.logger.error('memory.update: failed to find key:', key_list, 'for table:', table);
+            }
+        }
+        txSaveData(database, table, session, { row_list, primary_map });
+    }
+    return { affectedRows, changedRows };
+}
+function _transformCell(cell) {
+    return { value: cell.value, type: cell.type };
+}
+function _makePrimaryKey(primary_key, row) {
+    const key_values = primary_key.map((key) => row[key]?.value);
+    return JSON.stringify(key_values);
+}
+
+async function commit$2(params) {
+    const { session, data } = params;
+    for (const key in data) {
+        const entry = data[key];
+        if (entry) {
+            updateTableData(entry.database, entry.table, session, entry.data);
+        }
+    }
+}
+async function rollback$2(_params) { }
+
+var MemoryEngine = /*#__PURE__*/Object.freeze({
+    __proto__: null,
+    addColumn: addColumn$1,
+    commit: commit$2,
+    createIndex: createIndex$1,
+    createTable: createTable$2,
+    deleteIndex: deleteIndex$1,
+    dropTable: dropTable$2,
+    getRowList: getRowList$1,
+    getTableInfo: getTableInfo$1,
+    getTableList: getTableList$2,
+    insertRowList: insertRowList$1,
+    multipleDelete: multipleDelete$1,
+    multipleUpdate: multipleUpdate$1,
+    rollback: rollback$2,
+    singleDelete: singleDelete$1,
+    singleUpdate: singleUpdate$1
+});
+
+const TYPE_MAP = { S: 'string', N: 'number', B: 'buffer' };
+const MYSQL_TYPE_MAP = { S: 'VARCHAR', N: 'DECIMAL', B: 'BLOB' };
+const COLLATION_MAP = {
+    S: COLLATIONS.UTF8MB4_0900_BIN,
+    N: undefined,
+    B: undefined,
+};
+async function getTableInfo(params) {
+    const { dynamodb, table } = params;
+    try {
+        const data = await dynamodb.getTable(table);
+        if (!data.Table?.AttributeDefinitions || !data.Table.KeySchema) {
+            throw new Error('bad_data');
+        }
+        const column_list = data.Table.AttributeDefinitions.map((def) => {
+            if (!def.AttributeName || !def.AttributeType) {
+                throw new Error('bad_data');
+            }
+            const type = TYPE_MAP[def.AttributeType];
+            const mysqlType = MYSQL_TYPE_MAP[def.AttributeType];
+            const collation = COLLATION_MAP[def.AttributeType];
+            return { name: def.AttributeName, type, mysqlType, collation };
+        });
+        const primary_key = data.Table.KeySchema.map((key) => key.AttributeName ?? '');
+        return {
+            table,
+            collation: COLLATIONS.UTF8MB4_0900_BIN,
+            primary_key,
+            column_list,
+            is_open: true,
+            rowCount: BigInt(data.Table.ItemCount ?? 0),
+            tableSize: BigInt(data.Table.TableSizeBytes ?? 0),
+        };
+    }
+    catch (err) {
+        distExports.logger.error('getTableInfo: err:', err, table);
+        throw err;
+    }
+}
+async function getTableList$1(params) {
+    const { dynamodb } = params;
+    try {
+        return await dynamodb.getTableList();
+    }
+    catch (err) {
+        distExports.logger.error('raw_engine.getTableList: err:', err);
+        throw err;
+    }
+}
+async function createTable$1(params) {
+    const { dynamodb, table, ...other } = params;
+    const primary_key = params.primary_key.map((name) => {
+        const column = params.column_list.find((c) => c.name === name);
+        if (!column) {
+            throw new SQLError('bad_primary_key');
+        }
+        return { name: column.name, type: _valueToDynamoKeyType(column.type) };
+    });
+    const opts = { ...other, table, primary_key };
+    try {
+        await dynamodb.createTable(opts);
+        await _waitForTable({ dynamodb, table });
+    }
+    catch (err) {
+        if (err instanceof Error && err.message === 'resource_in_use') {
+            throw new SQLError('table_exists');
+        }
+        distExports.logger.error('raw_engine.createTable: err:', err);
+        throw err;
+    }
+}
+async function dropTable$1(params) {
+    const { dynamodb, table } = params;
+    try {
+        await dynamodb.deleteTable(table);
+    }
+    catch (delete_err) {
+        if (delete_err instanceof Error &&
+            delete_err.name === 'ResourceNotFoundException') {
+            throw new SQLError('table_not_found');
+        }
+        distExports.logger.error('raw_engine.dropTable: deleteTable err:', delete_err);
+        throw delete_err;
+    }
+    try {
+        await _waitForTable({ dynamodb, table });
+    }
+    catch (wait_err) {
+        if (wait_err instanceof Error &&
+            wait_err.message === 'resource_not_found') {
+            return;
+        }
+        distExports.logger.error('raw_engine.dropTable: waitForTable err:', wait_err);
+        throw wait_err;
+    }
+}
+async function addColumn(_params) { }
+async function createIndex(params) {
+    const { dynamodb, table, index_name } = params;
+    const key_list = params.key_list.map((key) => {
+        return { name: key.name, type: _valueToDynamoKeyType(key.type) };
+    });
+    const opts = { table, index_name, key_list };
+    try {
+        await dynamodb.createIndex(opts);
+        await _waitForTable({ dynamodb, table, index_name });
+    }
+    catch (err) {
+        if (err instanceof Error) {
+            if (err.message === 'resource_in_use' ||
+                err.message.indexOf('already exists') >= 0) {
+                throw new Error('index_exists');
+            }
+        }
+        distExports.logger.error('raw_engine.createIndex: err:', err);
+        throw err;
+    }
+}
+async function deleteIndex(params) {
+    const { dynamodb, table, index_name } = params;
+    try {
+        await dynamodb.deleteIndex({ table, index_name });
+        await _waitForTable({ dynamodb, table, index_name });
+    }
+    catch (err) {
+        if (err instanceof Error && err.message === 'resource_not_found') {
+            throw new Error('index_not_found');
+        }
+        distExports.logger.error('raw_engine.deleteIndex: err:', err);
+        throw err;
+    }
+}
+const LOOP_MS = 250;
+async function _waitForTable(params) {
+    const { dynamodb, table, index_name } = params;
+    for (;;) {
+        const result = await dynamodb.getTable(table);
+        const tableData = result.Table;
+        if (!tableData) {
+            await promises.setTimeout(LOOP_MS);
+            continue;
+        }
+        const status = tableData.TableStatus;
+        if (status === 'CREATING' ||
+            status === 'UPDATING' ||
+            status === 'DELETING') {
+            await promises.setTimeout(LOOP_MS);
+            continue;
+        }
+        if (index_name !== undefined) {
+            const index = tableData.GlobalSecondaryIndexes?.find((item) => item.IndexName === index_name);
+            if (!index || index.IndexStatus !== 'ACTIVE') {
+                await promises.setTimeout(LOOP_MS);
+                continue;
+            }
+        }
+        return;
+    }
+}
+function _valueToDynamoKeyType(type) {
+    switch (type) {
+        case 'null':
+        case 'interval':
+        case 'datetime':
+        case 'date':
+        case 'time':
+        case 'string':
+        case 'char':
+        case 'text':
+        case 'json':
+            return 'S';
+        case 'bool':
+        case 'long':
+        case 'longlong':
+        case 'year':
+        case 'number':
+        case 'double':
+            return 'N';
+        case 'buffer':
+            return 'B';
+    }
+}
+
 function constantFixup(func) {
     return (expr, state) => {
         const result = getValue(expr, state);
@@ -49404,6 +49670,9 @@ function _in(expr, state) {
         if (!rightValue) {
             err = 'unsupported';
         }
+        else if (hasExplicitCaseInsensitiveCollation([expr.left, ...rightValue], state)) {
+            err = 'unsupported';
+        }
         else {
             const count = rightValue.length;
             const list = [];
@@ -49431,6 +49700,9 @@ function _in(expr, state) {
     return { err, value };
 }
 function _comparator(expr, state, op) {
+    if (hasExplicitCaseInsensitiveCollation([expr.left, expr.right], state)) {
+        return unsupported();
+    }
     const left = convertWhere(expr.left, state);
     const right = convertWhere(expr.right, state);
     const err = left.err ?? right.err;
@@ -49438,6 +49710,9 @@ function _comparator(expr, state, op) {
     return { err, value };
 }
 function nullSafeEqual(expr, state) {
+    if (hasExplicitCaseInsensitiveCollation([expr.left, expr.right], state)) {
+        return unsupported();
+    }
     const left = convertWhere(expr.left, state);
     const right = convertWhere(expr.right, state);
     const err = left.err ?? right.err;
@@ -49459,6 +49734,10 @@ function nullSafeEqual(expr, state) {
         }
     }
     return { err, value };
+}
+function hasExplicitCaseInsensitiveCollation(operands, state) {
+    return (getExprCoercibility(operands, state) === COERCIBILITY.EXPLICIT &&
+        isCaseInsensitive(getExprCollation(operands, state)));
 }
 function equal(expr, state) {
     return _comparator(expr, state, '=');
@@ -49710,7 +49989,169 @@ async function multipleDelete(params) {
 
 async function insertRowList(params) {
     if (params.list.length === 0) {
-        return { affectedRows: 0 };
+        return { affectedRows: 0, changedRows: 0 };
+    }
+    else if (params.duplicate_mode === 'update' && params.on_duplicate_update) {
+        const { dynamodb, session, database, table, list } = params;
+        const set = params.on_duplicate_update;
+        const table_info = await dynamodb.getTableCached(table);
+        const key_list = (table_info.Table?.KeySchema ?? []).map((key) => key.AttributeName ?? '');
+        for (const item of set) {
+            if (key_list.some((key) => key.toLowerCase() === item.column.toLowerCase())) {
+                throw new SQLError('unsupported');
+            }
+        }
+        const from = { db: database, table, as: null };
+        const columnRefMap = buildSetReferences(set, from);
+        let affectedRows = 0;
+        let changedRows = 0;
+        const plans = list.map((row) => {
+            const insert_row = lowerKeys(row);
+            return set.map((item) => {
+                const inserted = orNull(row[findKey(row, item.column)]);
+                if (!hasExistingRef(item.value)) {
+                    const value = getValue(item.value, {
+                        session,
+                        insertRow: insert_row,
+                    });
+                    if (value.err) {
+                        throw new SQLError(value.err);
+                    }
+                    return isSameCell(inserted, value)
+                        ? { column: item.column, set: value }
+                        : undefined;
+                }
+                const expr = item.value;
+                const is_increment = (expr.operator === '+' || expr.operator === '-') &&
+                    'type' in expr.left &&
+                    expr.left.type === 'column_ref' &&
+                    String(expr.left.column).toLowerCase() ===
+                        item.column.toLowerCase() &&
+                    !hasExistingRef(expr.right);
+                if (!is_increment) {
+                    return undefined;
+                }
+                const amount = getValue(expr.right, { session, insertRow: insert_row });
+                if (amount.err || amount.type === 'null') {
+                    return undefined;
+                }
+                const delta = expr.operator === '+' ? Number(amount.value) : -Number(amount.value);
+                return inserted.value !== null && delta === Number(inserted.value)
+                    ? { column: item.column, add: delta }
+                    : undefined;
+            });
+        });
+        if (plans.every((plan) => plan.every((item) => item !== undefined))) {
+            for (let i = 0; i < list.length; i++) {
+                const row = list[i] ?? {};
+                const plan = plans[i] ?? [];
+                const key = {};
+                for (const name of key_list) {
+                    key[name] = toAttribute(orNull(row[findKey(row, name)]));
+                }
+                const attr_names = {};
+                const attr_values = {};
+                const sets = [];
+                const adds = [];
+                let index = 0;
+                for (const item of plan) {
+                    const name = `#n${index}`;
+                    const value = `:v${index}`;
+                    index++;
+                    attr_names[name] = item.column;
+                    if (item.add !== undefined) {
+                        attr_values[value] = { N: String(item.add) };
+                        adds.push(`${name} ${value}`);
+                    }
+                    else if (item.set) {
+                        attr_values[value] = toAttribute(item.set);
+                        sets.push(`${name} = ${value}`);
+                    }
+                }
+                for (const name of Object.keys(row)) {
+                    const is_set = plan.some((item) => item.column.toLowerCase() === name.toLowerCase());
+                    if (is_set || key_list.includes(name)) {
+                        continue;
+                    }
+                    const attr_name = `#n${index}`;
+                    const value = `:v${index}`;
+                    index++;
+                    attr_names[attr_name] = name;
+                    attr_values[value] = toAttribute(orNull(row[name]));
+                    sets.push(`${attr_name} = if_not_exists(${attr_name}, ${value})`);
+                }
+                const clauses = [
+                    sets.length > 0 ? `SET ${sets.join(', ')}` : '',
+                    adds.length > 0 ? `ADD ${adds.join(', ')}` : '',
+                ];
+                const old = await dynamodb.updateItem({
+                    table,
+                    key,
+                    expression: clauses.filter(Boolean).join(' '),
+                    names: attr_names,
+                    values: attr_values,
+                });
+                if (!old) {
+                    affectedRows += 1;
+                    continue;
+                }
+                const changed = plan.some((item) => item.add !== undefined
+                    ? item.add !== 0
+                    : item.set !== undefined &&
+                        !isSameCell(toCell(old[findKey(old, item.column)]), item.set));
+                affectedRows += changed ? 2 : 1;
+                changedRows += 1;
+            }
+            return { affectedRows, changedRows };
+        }
+        const keys = list.map((row) => key_list
+            .map((key) => String(orNull(row[findKey(row, key)]).value))
+            .join('|'));
+        if (new Set(keys).size !== keys.length) {
+            throw new NoSingleOperationError();
+        }
+        const update_sql = list.map((row) => {
+            const sets = set.map((item) => {
+                const result = convertWhere(item.value, {
+                    session,
+                    from,
+                    columnRefMap,
+                });
+                if (result.err) {
+                    throw new NoSingleOperationError();
+                }
+                return `${escapeIdentifier(item.column)} = ${result.value ?? 'NULL'}`;
+            });
+            const key_cond = key_list
+                .map((key) => `${escapeIdentifier(key)} = ${escapeValue(orNull(row[findKey(row, key)]).value)}`)
+                .join(' AND ');
+            return `UPDATE ${escapeIdentifier(table)} SET ${sets.join(', ')} WHERE ${key_cond}`;
+        });
+        const missing_rows = [];
+        try {
+            await dynamodb.batchQL(update_sql);
+        }
+        catch (err) {
+            if (!Array.isArray(err)) {
+                throw err;
+            }
+            err.forEach((item_err, i) => {
+                if (item_err?.message !== 'cond_fail') {
+                    throw item_err;
+                }
+                const row = list[i];
+                if (row) {
+                    missing_rows.push(row);
+                }
+            });
+        }
+        if (missing_rows.length > 0) {
+            await dynamodb.batchQL(missing_rows.map((row) => `INSERT INTO ${escapeIdentifier(table)} VALUE ${_escapeItem(row)}`));
+        }
+        const updated = list.length - missing_rows.length;
+        affectedRows = updated * 2 + missing_rows.length;
+        changedRows = updated;
+        return { affectedRows, changedRows };
     }
     else if (params.duplicate_mode) {
         return _insertIgnoreReplace(params);
@@ -49718,6 +50159,21 @@ async function insertRowList(params) {
     else {
         return _insertNoIgnore(params);
     }
+}
+function hasExistingRef(node) {
+    if (typeof node !== 'object' || node === null) {
+        return false;
+    }
+    if ('type' in node && node.type === 'column_ref') {
+        return true;
+    }
+    if ('type' in node && node.type === 'function' && 'name' in node) {
+        const name = getFunctionName(node.name);
+        if (name.toLowerCase() === 'values') {
+            return false;
+        }
+    }
+    return Object.values(node).some(hasExistingRef);
 }
 async function _insertIgnoreReplace(params) {
     const { dynamodb, duplicate_mode, table } = params;
@@ -49804,7 +50260,7 @@ async function _insertIgnoreReplace(params) {
         await dynamodb.putItems(opts);
         affectedRows = list.length;
     }
-    return { affectedRows };
+    return { affectedRows, changedRows: 0 };
 }
 function hasCancellationReasons(err) {
     return ('CancellationReasons' in err &&
@@ -49815,7 +50271,7 @@ async function _insertNoIgnore(params) {
     const sql_list = list.map((item) => `INSERT INTO ${escapeIdentifier(table)} VALUE ${_escapeItem(item)}`);
     try {
         await dynamodb.transactionQL(sql_list);
-        return { affectedRows: list.length };
+        return { affectedRows: list.length, changedRows: 0 };
     }
     catch (err) {
         if (err instanceof Error) {
@@ -49881,6 +50337,7 @@ function _escapeItem(item) {
     return s;
 }
 
+const RAW_COLLATION = COLLATIONS.UTF8MB4_0900_BIN;
 async function getRowList(params) {
     const sourceMap = new Map();
     const tableInfoMap = new Map();
@@ -49924,7 +50381,11 @@ async function _getFromTable(params) {
                     for (const name in result) {
                         const old = response_map.get(name);
                         if (!old) {
-                            response_map.set(name, { name, name_lc: name.toLowerCase() });
+                            response_map.set(name, {
+                                name,
+                                name_lc: name.toLowerCase(),
+                                collation: RAW_COLLATION,
+                            });
                         }
                     }
                 }
@@ -49935,6 +50396,7 @@ async function _getFromTable(params) {
             columns = request_columns.map((name) => ({
                 name,
                 name_lc: name.toLowerCase(),
+                collation: RAW_COLLATION,
             }));
         }
         async function* _makeIter() {
@@ -52510,9 +52972,11 @@ async function query$3(params) {
     const { ast, session } = params;
     const duplicate_mode = ast.type === 'replace'
         ? 'replace'
-        : ast.prefix === 'ignore into'
-            ? 'ignore'
-            : null;
+        : ast.on_duplicate_update
+            ? 'update'
+            : ast.prefix === 'ignore into'
+                ? 'ignore'
+                : null;
     const tableArray = Array.isArray(ast.table) ? ast.table : [ast.table];
     const firstTable = tableArray[0];
     const database = (firstTable && 'db' in firstTable ? firstTable.db : null) ??
@@ -52599,9 +53063,137 @@ async function _runInsert(params) {
             table,
             list,
             duplicate_mode: duplicate_mode ?? undefined,
+            on_duplicate_update: ast.on_duplicate_update?.set,
         };
         try {
-            return await engine.insertRowList(opts);
+            let result;
+            try {
+                result = await engine.insertRowList(opts);
+            }
+            catch (err) {
+                const upsert_set = ast.on_duplicate_update?.set;
+                if (!(err instanceof NoSingleOperationError) || !upsert_set) {
+                    throw err;
+                }
+                const database = params.database;
+                const set = upsert_set;
+                const { primary_key } = await engine.getTableInfo({
+                    dynamodb,
+                    database,
+                    table,
+                    session,
+                });
+                const from = { db: database, table, as: null };
+                const unique_rows = [
+                    ...new Map(list.map((row) => [_keyOf(row, primary_key), row])).values(),
+                ];
+                const [first_key] = primary_key;
+                const where = (first_key !== undefined && primary_key.length === 1
+                    ? {
+                        type: 'binary_expr',
+                        operator: 'IN',
+                        left: _columnRef(first_key),
+                        right: {
+                            type: 'expr_list',
+                            value: unique_rows.map((row) => _literalFor(row, first_key)),
+                        },
+                    }
+                    : _chain('OR', unique_rows.map((row) => _chain('AND', primary_key.map((key) => ({
+                        type: 'binary_expr',
+                        operator: '=',
+                        left: _columnRef(key),
+                        right: _literalFor(row, key),
+                    }))))));
+                const columnRefMap = new Map();
+                walkColumnRefs(where, (ref) => {
+                    columnRefMap.set(ref, { from });
+                });
+                const { sourceMap } = await engine.getRowList({
+                    dynamodb,
+                    session,
+                    list: [from],
+                    where,
+                    requestSets: new Map([[from, new Set()]]),
+                    requestAll: new Map([[from, true]]),
+                    columnRefMap,
+                });
+                const state = new Map();
+                for await (const batch of sourceMap.get(from) ?? []) {
+                    for (const item of batch) {
+                        const cur = Object.fromEntries(Object.entries(item).map(([name, attr]) => [name, toCell(attr)]));
+                        state.set(_keyOf(cur, primary_key), {
+                            cur,
+                            changed: {},
+                            key: primary_key.map((key) => item[findKey(item, key)] ?? { NULL: true }),
+                        });
+                    }
+                }
+                let affectedRows = 0;
+                let changedRows = 0;
+                for (const row of list) {
+                    const entry = state.get(_keyOf(row, primary_key));
+                    if (!entry) {
+                        state.set(_keyOf(row, primary_key), {
+                            cur: { ...row },
+                            changed: {},
+                            key: null,
+                        });
+                        affectedRows += 1;
+                        continue;
+                    }
+                    let changed = false;
+                    const values = evaluateDuplicateUpdate({
+                        session,
+                        set,
+                        existing: entry.cur,
+                        inserted: row,
+                    });
+                    for (const { column: name, value } of values) {
+                        const attr = findKey(entry.cur, name);
+                        if (!isSameCell(entry.cur[attr], value)) {
+                            changed = true;
+                            entry.changed[attr] = value;
+                        }
+                        entry.cur[attr] = value;
+                    }
+                    affectedRows += changed ? 2 : 1;
+                    changedRows += 1;
+                }
+                const update_list = [...state.values()]
+                    .filter((entry) => entry.key !== null && Object.keys(entry.changed).length > 0)
+                    .map((entry) => ({
+                    key: entry.key ?? [],
+                    set_list: Object.entries(entry.changed).map(([column, value]) => ({
+                        column,
+                        value,
+                    })),
+                }));
+                if (update_list.length > 0) {
+                    await engine.multipleUpdate({
+                        dynamodb,
+                        session,
+                        list: [
+                            { database, table, key_list: [...primary_key], update_list },
+                        ],
+                    });
+                }
+                const insert_list = [...state.values()]
+                    .filter((entry) => entry.key === null)
+                    .map((entry) => entry.cur);
+                if (insert_list.length > 0) {
+                    await engine.insertRowList({
+                        dynamodb,
+                        session,
+                        database,
+                        table,
+                        list: insert_list,
+                    });
+                }
+                result = { affectedRows, changedRows };
+            }
+            // The driver reads changedRows from MySQL's row-count info, which MySQL sends for multi-row VALUES and INSERT ... SELECT.
+            const has_row_info = list.length > 1 || ast.values?.type === 'select';
+            return has_row_info ? result : { affectedRows: result.affectedRows };
         }
         catch (err) {
             if (!isErrorWithDetails(err)) {
@@ -52630,6 +53222,31 @@ function _checkAst(ast) {
             throw new SQLError({ err: 'ER_WRONG_VALUE_COUNT_ON_ROW', args: [1] });
         }
     }
+}
+function _columnRef(name) {
+    return { type: 'column_ref', table: null, column: name };
+}
+function _literalFor(row, name) {
+    const cell = row[findKey(row, name)];
+    return cell?.type === 'number'
+        ? { type: 'number', value: Number(cell.value) }
+        : {
+            type: 'single_quote_string',
+            value: String(cell?.value).replaceAll("'", "''"),
+        };
+}
+function _chain(operator, items) {
+    return items.reduce((left, right) => ({
+        type: 'binary_expr',
+        operator,
+        left,
+        right,
+    }));
+}
+function _keyOf(record, primary_key) {
+    return primary_key
+        .map((key) => String(record[findKey(record, key)]?.value))
+        .join('|');
 }
 
 function isSelectSubquery(value) {
