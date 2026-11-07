@@ -86,7 +86,7 @@ export interface CellValue {
 export type CellRow = Record<string, CellValue>;
 export type Row = CellRow | ItemRecord;
 export type EngineValue = CellValue | AttributeValue;
-export type SourceMap = Map<BaseFrom, AsyncIterable<Row[]>>;
+export type SourceMap = Map<From, AsyncIterable<Row[]>>;
 export type QueryColumnInfo = Omit<Partial<ColumnDef>, 'name'> & {
   name: string;
   name_lc: string;

@@ -1,6 +1,11 @@
 import { SQLError } from '../../error';
 
-import { walkColumnRefs } from './ast_helper';
+import {
+  getSourceName,
+  isBaseFrom,
+  isDerivedFrom,
+  walkColumnRefs,
+} from './ast_helper';
 
 import type {
   Select,
@@ -21,7 +26,7 @@ interface TableMapEntry {
   key?: string;
 }
 
-type TableMap = Record<string, BaseFrom>;
+type TableMap = Record<string, From>;
 
 type DbMap = Record<string, Record<string, BaseFrom>>;
 
@@ -30,10 +35,6 @@ type ResultMap = Record<string, number>;
 type SelectWithOptionalGroupBy = Omit<Select, 'groupby'> & {
   groupby?: { columns?: unknown } | null;
 };
-
-function isBaseFrom(from: From): from is BaseFrom {
-  return 'table' in from && typeof from.table === 'string';
-}
 
 export interface ColumnRefInfo {
   resultIndex?: number;
@@ -49,15 +50,15 @@ export interface RequestInfo {
 }
 
 export function buildUsingCondition(
-  lefts: BaseFrom[],
-  right: BaseFrom,
+  lefts: From[],
+  right: From,
   columns: string[]
 ): Binary {
   return columns
     .map((column): Binary => {
       const leftRefs = lefts.map((left) => ({
         type: 'column_ref' as const,
-        table: left.as ?? left.table,
+        table: getSourceName(left),
         column,
       }));
       const left =
@@ -74,7 +75,7 @@ export function buildUsingCondition(
         left,
         right: {
           type: 'column_ref' as const,
-          table: right.as ?? right.table,
+          table: getSourceName(right),
           column,
         },
       };
@@ -107,7 +108,15 @@ export function resolveReferences(
       (item) => 'join' in item && String(item.join).includes('NATURAL')
     ) ?? false;
   from?.forEach((fromEntry: From) => {
-    if ('table' in fromEntry) {
+    if (isDerivedFrom(fromEntry)) {
+      if (!fromEntry.as) {
+        throw new SQLError({
+          code: 'ER_DERIVED_MUST_HAVE_ALIAS',
+          sqlMessage: 'Every derived table must have its own alias',
+        });
+      }
+      table_map[fromEntry.as] = fromEntry;
+    } else if ('table' in fromEntry) {
       if (!fromEntry.db) {
         if (!current_database) {
           throw new SQLError('no_current_database');
@@ -134,10 +143,10 @@ export function resolveReferences(
     }
   });
   from?.forEach((joined: From, index: number, list: From[]) => {
-    if (!isBaseFrom(joined) || index === 0 || !('using' in joined)) {
+    if (index === 0 || !('using' in joined)) {
       return;
     }
-    const lefts = list.slice(0, index).filter(isBaseFrom);
+    const lefts = list.slice(0, index);
     const owner = lefts[0];
     if (!owner || !joined.using) {
       return;
@@ -154,7 +163,7 @@ export function resolveReferences(
 
   const tableRaw = ast.type === 'delete' ? ast.table : null;
   const table = Array.isArray(tableRaw) ? tableRaw : null;
-  table?.forEach((object: From & { from?: TableMapEntry }) => {
+  table?.forEach((object: From & { from?: From }) => {
     if (!isBaseFrom(object)) {
       return;
     }
@@ -187,7 +196,8 @@ export function resolveReferences(
       result_map
     );
   }
-  [from, columns, where].forEach((item: unknown) => {
+  const joinConditions = from?.map((item) => ('on' in item ? item.on : null));
+  [joinConditions, columns, where].forEach((item: unknown) => {
     walkColumnRefs(item, resolveObject);
   });
 
@@ -296,11 +306,9 @@ function _resolveObject(
       const astFrom = ast.type === 'update' ? ast.table : ast.from;
       const matchingFrom = Array.isArray(astFrom)
         ? astFrom.find((from: From) => {
-            if (!isBaseFrom(from)) {
-              return false;
-            }
             return (
-              from.as === obj.table || (!from.as && from.table === obj.table)
+              (isBaseFrom(from) || isDerivedFrom(from)) &&
+              getSourceName(from) === obj.table
             );
           })
         : undefined;
@@ -319,7 +327,7 @@ function _resolveObject(
     }
   } else {
     let add_cache = false;
-    let from: BaseFrom | undefined;
+    let from: From | undefined;
     if (obj.db) {
       from = db_map[obj.db]?.[obj.table ?? ''];
       add_cache = true;
@@ -335,8 +343,9 @@ function _resolveObject(
           using_owners[obj.column ?? ''] ?? name_cache[obj.column ?? ''];
         const astFrom = ast.type === 'update' ? ast.table : ast.from;
         const firstFrom = Array.isArray(astFrom) ? astFrom[0] : undefined;
-        from =
-          cached ?? (firstFrom && 'table' in firstFrom ? firstFrom : undefined);
+        const isSource =
+          firstFrom && (isBaseFrom(firstFrom) || isDerivedFrom(firstFrom));
+        from = cached ?? (isSource ? firstFrom : undefined);
       }
     }
     if (from) {

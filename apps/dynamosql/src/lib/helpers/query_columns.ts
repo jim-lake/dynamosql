@@ -1,3 +1,4 @@
+import { getSourceName, isBaseFrom, isDerivedFrom } from './ast_helper';
 import { getCollation } from './collation';
 import { convertType } from './column_type_helper';
 
@@ -10,7 +11,7 @@ import type {
   Select,
   ColumnRef,
   From,
-  BaseFrom,
+  Join,
   ExpressionValue,
   ExtractFunc,
   FulltextSearch,
@@ -55,25 +56,21 @@ export function expandStarColumns(
         const table = column.expr.table;
         const from_list = Array.isArray(ast.from) ? ast.from : [];
         for (const from of from_list) {
-          if (!_isBaseFrom(from)) {
+          if (!isBaseFrom(from) && !isDerivedFrom(from)) {
             continue;
           }
-          // Match if no table specified, or table matches from.table or from.as
-          if (
-            !table ||
-            (from.table === table && !from.as) ||
-            from.as === table
-          ) {
+          if (!table || getSourceName(from) === table) {
             const info = tableInfoMap.get(from);
-            const usingColumns = !table && 'using' in from ? from.using : [];
+            const usingColumns =
+              !table && 'using' in from ? (from as Join).using : [];
             info?.columns.forEach((c) => {
               if (usingColumns?.includes(c.name)) {
                 return;
               }
               const colRef = {
                 type: 'column_ref' as const,
-                db: from.as ? null : from.db,
-                table: from.as ?? from.table,
+                db: isBaseFrom(from) && !from.as ? from.db : null,
+                table: getSourceName(from),
                 column: c.name,
               };
               // Add to columnRefMap so it can be looked up later
@@ -89,7 +86,7 @@ export function expandStarColumns(
       } else {
         const column_ref = columnRefMap.get(column.expr);
         let result: QueryColumn['result'] = {};
-        if (column_ref?.from && _isBaseFrom(column_ref.from)) {
+        if (column_ref?.from) {
           const info = tableInfoMap.get(column_ref.from);
           if (info) {
             const col_name = info.isCaseSensitive
@@ -122,26 +119,19 @@ export function calcColumns(
   for (const column of queryColumns) {
     const column_type = convertType(column.result);
 
-    // Get table info from columnRefMap if this is a column_ref
-    let fromInfo: BaseFrom | null = null;
-    if (_isColumnRef(column.expr)) {
-      const refInfo = columnRefMap.get(column.expr);
-      if (refInfo?.from && _isBaseFrom(refInfo.from)) {
-        fromInfo = refInfo.from;
-      }
-    }
+    const source = _isColumnRef(column.expr)
+      ? columnRefMap.get(column.expr)?.from
+      : undefined;
+    const base = source && isBaseFrom(source) ? source : null;
 
-    column_type.db = fromInfo?.db ?? column.expr.db ?? column.db ?? '';
+    column_type.db = base?.db ?? column.expr.db ?? column.db ?? '';
     column_type.orgName = column.result.orgName ?? column.result.name ?? '';
     column_type.name = column.as ?? column.result.name ?? column_type.orgName;
-    column_type.orgTable = fromInfo?.table ?? '';
-    column_type.table = fromInfo?.as ?? column_type.orgTable;
+    column_type.orgTable = base?.table ?? '';
+    column_type.table = source ? getSourceName(source) : '';
     ret.push(column_type);
   }
   return ret;
-}
-function _isBaseFrom(from: From): from is BaseFrom {
-  return 'table' in from && typeof from.table === 'string';
 }
 function _isColumnRef(
   expr: ExpressionValue | ExtractFunc | FulltextSearch

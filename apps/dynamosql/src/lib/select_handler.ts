@@ -3,7 +3,12 @@ import { setTimeout } from 'node:timers/promises';
 import { SQLError } from '../error';
 
 import * as Expression from './expression';
-import { walkColumnRefs } from './helpers/ast_helper';
+import {
+  getSourceName,
+  isBaseFrom,
+  isDerivedFrom,
+  walkColumnRefs,
+} from './helpers/ast_helper';
 import {
   resolveReferences,
   buildUsingCondition,
@@ -14,7 +19,7 @@ import { formJoin } from './helpers/join';
 import { expandStarColumns, calcColumns } from './helpers/query_columns';
 import { sort } from './helpers/sort';
 
-import type { TableInfoMap, SourceMap } from './engine';
+import type { TableInfoMap, SourceMap, CellRow } from './engine';
 import type {
   HandlerParams,
   DynamoDBClient,
@@ -39,25 +44,12 @@ import type {
   Select,
   ColumnRef,
   From,
-  BaseFrom,
   Join,
   Limit,
   ExpressionValue,
   ExtractFunc,
   FulltextSearch,
 } from 'node-sql-parser/build/mysql';
-
-function _isBaseFrom(from: From): from is BaseFrom {
-  return 'table' in from && typeof from.table === 'string';
-}
-function _isBaseFromList(list: From[]): list is BaseFrom[] {
-  for (const from of list) {
-    if (!_isBaseFrom(from)) {
-      return false;
-    }
-  }
-  return true;
-}
 
 function _isColumnRef(
   expr: ExpressionValue | ExtractFunc | FulltextSearch
@@ -111,6 +103,7 @@ export interface InternalQueryParams {
 export interface InternalQueryResult {
   rows: EvaluationResult[][];
   columns: FieldInfo[];
+  queryColumns: QueryColumn[];
   row_list: SourceRowResult[] | SourceRowResultGroup[];
 }
 export async function internalQuery(
@@ -128,7 +121,7 @@ export async function internalQuery(
   }
   const columns = calcColumns(queryColumns, columnRefMap);
   const rows = row_list.map((row) => row.result);
-  return { rows, columns, row_list };
+  return { rows, columns, queryColumns, row_list };
 }
 type PlainNode = Record<string, unknown>;
 function _isPlainNode(value: unknown): value is PlainNode {
@@ -199,14 +192,12 @@ async function _iterQuery(
   const sourceMap: SourceMap = new Map();
   const tableInfoMap: TableInfoMap = new Map();
   if (Array.isArray(from) && from[0]) {
-    if (!_isBaseFromList(from)) {
+    if (!from.every((item) => isBaseFrom(item) || isDerivedFrom(item))) {
       throw new SQLError('Invalid from clause');
     }
-    const list = from.map((item) => ({
-      database: item.db,
-      table: item.table,
-      item,
-    }));
+    const list = from
+      .filter(isBaseFrom)
+      .map((item) => ({ database: item.db, table: item.table, item }));
     const groups = makeEngineGroups(session, list);
 
     const tasks = groups.map(async (group) => {
@@ -228,6 +219,56 @@ async function _iterQuery(
         tableInfoMap.set(f, item);
       }
     });
+    for (const item of from.filter(isDerivedFrom)) {
+      tasks.push(
+        internalQuery({ ast: item.expr.ast, session, dynamodb }).then(
+          ({ row_list, columns, queryColumns }) => {
+            const specs = columns.map((column, index) => {
+              const result: QueryColumn['result'] =
+                queryColumns[index]?.result ?? {};
+              return {
+                name: column.name,
+                name_lc: column.name.toLowerCase(),
+                type: result.type,
+                mysqlType: result.mysqlType,
+                length: result.length,
+                decimals: result.decimals,
+                collation: result.collation,
+                nullable: result.nullable,
+              };
+            });
+            const duplicate = specs.find(
+              (spec, index) =>
+                specs.findIndex((other) => other.name_lc === spec.name_lc) !==
+                index
+            );
+            if (duplicate) {
+              throw new SQLError({
+                code: 'ER_DUP_FIELDNAME',
+                sqlMessage: `Duplicate column name '${duplicate.name}'`,
+              });
+            }
+            const rowList = row_list.map((row) => {
+              const cells: CellRow = {};
+              row.result.forEach((cell, index) => {
+                const spec = specs[index];
+                if (spec) {
+                  cells[spec.name_lc] = { type: cell.type, value: cell.value };
+                }
+              });
+              return cells;
+            });
+            sourceMap.set(
+              item,
+              (async function* () {
+                yield rowList;
+              })()
+            );
+            tableInfoMap.set(item, { isCaseSensitive: false, columns: specs });
+          }
+        )
+      );
+    }
     await Promise.all(tasks);
     from.forEach((item, index) => {
       const joined = item as Join;
@@ -252,7 +293,7 @@ async function _iterQuery(
       walkColumnRefs(joined.on, (ref) => {
         const column_ref = ref as ColumnRef;
         const owner = [...lefts, joined].find(
-          (table) => (table.as ?? table.table) === column_ref.table
+          (table) => getSourceName(table) === column_ref.table
         );
         if (owner) {
           columnRefMap.set(column_ref, { from: owner });

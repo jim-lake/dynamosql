@@ -41291,8 +41291,15 @@ async function multipleDelete$1(params) {
     return { affectedRows };
 }
 
-function isBaseFrom$3(from) {
+function isBaseFrom$2(from) {
     return 'table' in from && typeof from.table === 'string';
+}
+function isDerivedFrom(from) {
+    return 'expr' in from && 'ast' in from.expr;
+}
+function getSourceName(from) {
+    const alias = 'as' in from ? from.as : null;
+    return alias ?? ('table' in from ? from.table : '');
 }
 function isCreateTable$1(ast) {
     return ast.type === 'create' && 'table' in ast;
@@ -41311,7 +41318,7 @@ function getTableFromTable(ast) {
 }
 function getDatabaseFromUpdate(ast) {
     if (ast.type === 'update') {
-        if (Array.isArray(ast.table) && ast.table[0] && isBaseFrom$3(ast.table[0])) {
+        if (Array.isArray(ast.table) && ast.table[0] && isBaseFrom$2(ast.table[0])) {
             return ast.table[0].db ?? '';
         }
     }
@@ -48634,6 +48641,9 @@ function minus$1(expr, state) {
 }
 const methods = { '+': plus, '!': not$1, not: not$1, '-': minus$1 };
 
+function isSelectSubquery$1(expr) {
+    return typeof expr === 'object' && expr !== null && 'ast' in expr;
+}
 // Type guards
 function isValueExpr(expr) {
     return (typeof expr === 'object' &&
@@ -48729,6 +48739,11 @@ function getValue(expr, state) {
     }
     else if ('type' in expr && expr.type === 'case') {
         result = caseExpr(expr, state);
+    }
+    else if (isSelectSubquery$1(expr) && state.subqueryValues?.has(expr)) {
+        const resolved = state.subqueryValues.get(expr);
+        result.type = resolved?.type ?? 'null';
+        result.value = resolved?.value ?? null;
     }
     else if (isValueExpr(expr)) {
         const type = expr.type;
@@ -49301,7 +49316,7 @@ async function singleUpdate$1(_params) {
     throw new NoSingleOperationError();
 }
 async function multipleUpdate$1(params) {
-    const { session, list } = params;
+    const { session, list, ignore } = params;
     let affectedRows = 0;
     let changedRows = 0;
     for (const changes of list) {
@@ -49337,10 +49352,14 @@ async function multipleUpdate$1(params) {
                 }
                 const new_key = _makePrimaryKey(data.primary_key, new_row);
                 if (new_key !== update_key && primary_map.has(new_key)) {
-                    throw new SQLError({
-                        err: 'dup_primary_key_entry',
-                        args: [data.primary_key, new_key],
-                    });
+                    if (!ignore) {
+                        throw new SQLError({
+                            err: 'dup_primary_key_entry',
+                            args: [data.primary_key, new_key],
+                        });
+                    }
+                    affectedRows++;
+                    continue;
                 }
                 else if (new_key !== update_key) {
                     primary_map.delete(update_key);
@@ -49860,7 +49879,21 @@ function convertWhere(expr, state) {
     const { from } = state;
     let err = null;
     let value = null;
-    if (expr && 'type' in expr) {
+    const subquery = isSelectSubquery$1(expr)
+        ? state.subqueryValues?.get(expr)
+        : undefined;
+    if (subquery) {
+        if (typeof subquery.value === 'number' || subquery.value === null) {
+            value = subquery.value;
+        }
+        else {
+            err = 'unsupported';
+        }
+    }
+    else if (isSelectSubquery$1(expr)) {
+        err = 'unsupported';
+    }
+    else if (expr && 'type' in expr) {
         const { type } = expr;
         if (type === 'number' && 'value' in expr) {
             value = expr.value;
@@ -50350,7 +50383,7 @@ async function getRowList(params) {
     return { sourceMap, tableInfoMap };
 }
 async function _getFromTable(params) {
-    const { dynamodb, session, from, where, requestSets, requestAll, columnRefMap, } = params;
+    const { dynamodb, session, from, where, requestSets, requestAll, columnRefMap, subqueryValues, } = params;
     const { table } = from;
     const requestSet = requestSets.get(from) ?? new Set();
     const isRequestAll = requestAll.get(from) ?? false;
@@ -50363,7 +50396,13 @@ async function _getFromTable(params) {
     // The WHERE clause must be applied after the join
     const is_left_join = from.join ? from.join.indexOf('LEFT') >= 0 : false;
     const where_result = where && !is_left_join
-        ? convertWhere(where, { session, from, default_true: true, columnRefMap })
+        ? convertWhere(where, {
+            session,
+            from,
+            default_true: true,
+            columnRefMap,
+            subqueryValues,
+        })
         : null;
     if (!where_result?.err && where_result?.value && where_result.value !== 1) {
         sql += ' WHERE ' + where_result.value;
@@ -51094,15 +51133,12 @@ async function _runAlterTable(params) {
     }
 }
 
-function isBaseFrom$2(from) {
-    return 'table' in from && typeof from.table === 'string';
-}
 function buildUsingCondition(lefts, right, columns) {
     return columns
         .map((column) => {
         const leftRefs = lefts.map((left) => ({
             type: 'column_ref',
-            table: left.as ?? left.table,
+            table: getSourceName(left),
             column,
         }));
         const left = leftRefs.length === 1
@@ -51118,7 +51154,7 @@ function buildUsingCondition(lefts, right, columns) {
             left,
             right: {
                 type: 'column_ref',
-                table: right.as ?? right.table,
+                table: getSourceName(right),
                 column,
             },
         };
@@ -51143,7 +51179,16 @@ function resolveReferences(ast, current_database) {
     const from = Array.isArray(fromRaw) ? fromRaw : null;
     const natural = from?.some((item) => 'join' in item && String(item.join).includes('NATURAL')) ?? false;
     from?.forEach((fromEntry) => {
-        if ('table' in fromEntry) {
+        if (isDerivedFrom(fromEntry)) {
+            if (!fromEntry.as) {
+                throw new SQLError({
+                    code: 'ER_DERIVED_MUST_HAVE_ALIAS',
+                    sqlMessage: 'Every derived table must have its own alias',
+                });
+            }
+            table_map[fromEntry.as] = fromEntry;
+        }
+        else if ('table' in fromEntry) {
             if (!fromEntry.db) {
                 if (!current_database) {
                     throw new SQLError('no_current_database');
@@ -51172,10 +51217,10 @@ function resolveReferences(ast, current_database) {
         }
     });
     from?.forEach((joined, index, list) => {
-        if (!isBaseFrom$2(joined) || index === 0 || !('using' in joined)) {
+        if (index === 0 || !('using' in joined)) {
             return;
         }
-        const lefts = list.slice(0, index).filter(isBaseFrom$2);
+        const lefts = list.slice(0, index);
         const owner = lefts[0];
         if (!owner || !joined.using) {
             return;
@@ -51210,7 +51255,8 @@ function resolveReferences(ast, current_database) {
     function resolveObject(object, result_map) {
         _resolveObject(object, ast, db_map, table_map, name_cache, using_owners, requestSets, requestAll, columnRefMap, setListMap, result_map);
     }
-    [from, columns, where].forEach((item) => {
+    const joinConditions = from?.map((item) => ('on' in item ? item.on : null));
+    [joinConditions, columns, where].forEach((item) => {
         walkColumnRefs(item, resolveObject);
     });
     set?.forEach((item) => {
@@ -51292,10 +51338,8 @@ function _resolveObject(object, ast, db_map, table_map, name_cache, using_owners
             const astFrom = ast.type === 'update' ? ast.table : ast.from;
             const matchingFrom = Array.isArray(astFrom)
                 ? astFrom.find((from) => {
-                    if (!isBaseFrom$2(from)) {
-                        return false;
-                    }
-                    return (from.as === obj.table || (!from.as && from.table === obj.table));
+                    return ((isBaseFrom$2(from) || isDerivedFrom(from)) &&
+                        getSourceName(from) === obj.table);
                 })
                 : undefined;
             if (matchingFrom) {
@@ -51334,8 +51378,8 @@ function _resolveObject(object, ast, db_map, table_map, name_cache, using_owners
                 const cached = using_owners[obj.column ?? ''] ?? name_cache[obj.column ?? ''];
                 const astFrom = ast.type === 'update' ? ast.table : ast.from;
                 const firstFrom = Array.isArray(astFrom) ? astFrom[0] : undefined;
-                from =
-                    cached ?? (firstFrom && 'table' in firstFrom ? firstFrom : undefined);
+                const isSource = firstFrom && (isBaseFrom$2(firstFrom) || isDerivedFrom(firstFrom));
+                from = cached ?? (isSource ? firstFrom : undefined);
             }
         }
         if (from) {
@@ -51957,13 +52001,10 @@ function expandStarColumns(params) {
                 const table = column.expr.table;
                 const from_list = Array.isArray(ast.from) ? ast.from : [];
                 for (const from of from_list) {
-                    if (!_isBaseFrom$1(from)) {
+                    if (!isBaseFrom$2(from) && !isDerivedFrom(from)) {
                         continue;
                     }
-                    // Match if no table specified, or table matches from.table or from.as
-                    if (!table ||
-                        (from.table === table && !from.as) ||
-                        from.as === table) {
+                    if (!table || getSourceName(from) === table) {
                         const info = tableInfoMap.get(from);
                         const usingColumns = !table && 'using' in from ? from.using : [];
                         info?.columns.forEach((c) => {
@@ -51972,8 +52013,8 @@ function expandStarColumns(params) {
                             }
                             const colRef = {
                                 type: 'column_ref',
-                                db: from.as ? null : from.db,
-                                table: from.as ?? from.table,
+                                db: isBaseFrom$2(from) && !from.as ? from.db : null,
+                                table: getSourceName(from),
                                 column: c.name,
                             };
                             // Add to columnRefMap so it can be looked up later
@@ -51990,7 +52031,7 @@ function expandStarColumns(params) {
             else {
                 const column_ref = columnRefMap.get(column.expr);
                 let result = {};
-                if (column_ref?.from && _isBaseFrom$1(column_ref.from)) {
+                if (column_ref?.from) {
                     const info = tableInfoMap.get(column_ref.from);
                     if (info) {
                         const col_name = info.isCaseSensitive
@@ -52020,25 +52061,18 @@ function calcColumns(queryColumns, columnRefMap) {
     const ret = [];
     for (const column of queryColumns) {
         const column_type = convertType(column.result);
-        // Get table info from columnRefMap if this is a column_ref
-        let fromInfo = null;
-        if (_isColumnRef(column.expr)) {
-            const refInfo = columnRefMap.get(column.expr);
-            if (refInfo?.from && _isBaseFrom$1(refInfo.from)) {
-                fromInfo = refInfo.from;
-            }
-        }
-        column_type.db = fromInfo?.db ?? column.expr.db ?? column.db ?? '';
+        const source = _isColumnRef(column.expr)
+            ? columnRefMap.get(column.expr)?.from
+            : undefined;
+        const base = source && isBaseFrom$2(source) ? source : null;
+        column_type.db = base?.db ?? column.expr.db ?? column.db ?? '';
         column_type.orgName = column.result.orgName ?? column.result.name ?? '';
         column_type.name = column.as ?? column.result.name ?? column_type.orgName;
-        column_type.orgTable = fromInfo?.table ?? '';
-        column_type.table = fromInfo?.as ?? column_type.orgTable;
+        column_type.orgTable = base?.table ?? '';
+        column_type.table = source ? getSourceName(source) : '';
         ret.push(column_type);
     }
     return ret;
-}
-function _isBaseFrom$1(from) {
-    return 'table' in from && typeof from.table === 'string';
 }
 function _isColumnRef(expr) {
     return 'type' in expr && expr.type === 'column_ref';
@@ -52178,17 +52212,6 @@ function _getCollationForOrderBy(order, queryColumns, state) {
     }
 }
 
-function _isBaseFrom(from) {
-    return 'table' in from && typeof from.table === 'string';
-}
-function _isBaseFromList(list) {
-    for (const from of list) {
-        if (!_isBaseFrom(from)) {
-            return false;
-        }
-    }
-    return true;
-}
 function _isSelect(ast) {
     return ast.type === 'select';
 }
@@ -52232,10 +52255,50 @@ async function internalQuery(params) {
     }
     const columns = calcColumns(queryColumns, columnRefMap);
     const rows = row_list.map((row) => row.result);
-    return { rows, columns, row_list };
+    return { rows, columns, queryColumns, row_list };
+}
+function _isPlainNode(value) {
+    return typeof value === 'object' && value !== null;
+}
+async function _collectScalarSubqueries(expr, params, values) {
+    if (!_isPlainNode(expr) || expr.type !== 'binary_expr') {
+        return;
+    }
+    for (const side of ['left', 'right']) {
+        const operand = expr[side];
+        if (isSelectSubquery$1(operand)) {
+            const { rows, columns } = await internalQuery({
+                dynamodb: params.dynamodb,
+                session: params.session,
+                ast: operand.ast,
+            });
+            if (columns.length !== 1) {
+                throw new SQLError({
+                    code: 'ER_OPERAND_COLUMNS',
+                    sqlMessage: 'Operand should contain 1 column(s)',
+                });
+            }
+            if (rows.length > 1) {
+                throw new SQLError({
+                    code: 'ER_SUBQUERY_NO_1_ROW',
+                    sqlMessage: 'Subquery returns more than 1 row',
+                });
+            }
+            const cell = rows[0]?.[0];
+            values.set(operand, {
+                type: cell?.type ?? 'null',
+                value: cell?.value ?? null,
+            });
+        }
+        else {
+            await _collectScalarSubqueries(operand, params, values);
+        }
+    }
 }
 async function _iterQuery(params) {
     const { ast, session, dynamodb } = params;
+    const subqueryValues = new Map();
+    await _collectScalarSubqueries(ast.where, params, subqueryValues);
     const current_database = session.getCurrentDatabase();
     let requestSets = new Map();
     let requestAll = new Map();
@@ -52250,14 +52313,12 @@ async function _iterQuery(params) {
     const sourceMap = new Map();
     const tableInfoMap = new Map();
     if (Array.isArray(from) && from[0]) {
-        if (!_isBaseFromList(from)) {
+        if (!from.every((item) => isBaseFrom$2(item) || isDerivedFrom(item))) {
             throw new SQLError('Invalid from clause');
         }
-        const list = from.map((item) => ({
-            database: item.db,
-            table: item.table,
-            item,
-        }));
+        const list = from
+            .filter(isBaseFrom$2)
+            .map((item) => ({ database: item.db, table: item.table, item }));
         const groups = makeEngineGroups(session, list);
         const tasks = groups.map(async (group) => {
             const opts = {
@@ -52268,6 +52329,7 @@ async function _iterQuery(params) {
                 requestSets,
                 requestAll,
                 columnRefMap,
+                subqueryValues,
             };
             const result = await group.engine.getRowList(opts);
             for (const [f, item] of result.sourceMap) {
@@ -52277,6 +52339,45 @@ async function _iterQuery(params) {
                 tableInfoMap.set(f, item);
             }
         });
+        for (const item of from.filter(isDerivedFrom)) {
+            tasks.push(internalQuery({ ast: item.expr.ast, session, dynamodb }).then(({ row_list, columns, queryColumns }) => {
+                const specs = columns.map((column, index) => {
+                    const result = queryColumns[index]?.result ?? {};
+                    return {
+                        name: column.name,
+                        name_lc: column.name.toLowerCase(),
+                        type: result.type,
+                        mysqlType: result.mysqlType,
+                        length: result.length,
+                        decimals: result.decimals,
+                        collation: result.collation,
+                        nullable: result.nullable,
+                    };
+                });
+                const duplicate = specs.find((spec, index) => specs.findIndex((other) => other.name_lc === spec.name_lc) !==
+                    index);
+                if (duplicate) {
+                    throw new SQLError({
+                        code: 'ER_DUP_FIELDNAME',
+                        sqlMessage: `Duplicate column name '${duplicate.name}'`,
+                    });
+                }
+                const rowList = row_list.map((row) => {
+                    const cells = {};
+                    row.result.forEach((cell, index) => {
+                        const spec = specs[index];
+                        if (spec) {
+                            cells[spec.name_lc] = { type: cell.type, value: cell.value };
+                        }
+                    });
+                    return cells;
+                });
+                sourceMap.set(item, (async function* () {
+                    yield rowList;
+                })());
+                tableInfoMap.set(item, { isCaseSensitive: false, columns: specs });
+            }));
+        }
         await Promise.all(tasks);
         from.forEach((item, index) => {
             const joined = item;
@@ -52294,7 +52395,7 @@ async function _iterQuery(params) {
             joined.on = buildUsingCondition(lefts, joined, columns);
             walkColumnRefs(joined.on, (ref) => {
                 const column_ref = ref;
-                const owner = [...lefts, joined].find((table) => (table.as ?? table.table) === column_ref.table);
+                const owner = [...lefts, joined].find((table) => getSourceName(table) === column_ref.table);
                 if (owner) {
                     columnRefMap.set(column_ref, { from: owner });
                 }
@@ -52307,17 +52408,18 @@ async function _iterQuery(params) {
         tableInfoMap,
         requestSets,
         columnRefMap,
+        subqueryValues,
     });
 }
 async function _evaluateReturn(params) {
-    const { ast, session, sourceMap, columnRefMap, tableInfoMap } = params;
+    const { ast, session, sourceMap, columnRefMap, tableInfoMap, subqueryValues, } = params;
     const queryColumns = _isSelect(ast)
         ? expandStarColumns({ ...params, ast })
         : [];
     const where = ast.where;
     const groupby = ast.type === 'select' ? ast.groupby : undefined;
     const from = ast.type === 'update' ? ast.table : ast.from;
-    const state = { session, columnRefMap, tableInfoMap };
+    const state = { session, columnRefMap, tableInfoMap, subqueryValues };
     const rowIter = from && Array.isArray(from)
         ? formJoin({ sourceMap, from, where, state })
         : _listToItetator([{ source: new Map(), result: null, group: null }]);
@@ -53438,7 +53540,7 @@ async function _multipleUpdate(params) {
         const groups = makeEngineGroups(session, from_list);
         for (const group of groups) {
             const { engine, list } = group;
-            const opts = { dynamodb, session, list };
+            const opts = { dynamodb, session, list, ignore: Boolean(ast.ignore) };
             const result = await engine.multipleUpdate(opts);
             affectedRows += result.affectedRows;
             changedRows += result.changedRows;

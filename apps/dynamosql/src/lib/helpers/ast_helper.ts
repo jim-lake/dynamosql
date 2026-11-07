@@ -4,10 +4,23 @@ import type {
   FunctionName,
   BaseFrom,
   From,
+  Select,
+  TableExpr,
 } from 'node-sql-parser/build/mysql';
 
-function isBaseFrom(from: From): from is BaseFrom {
+export function isBaseFrom(from: From): from is BaseFrom {
   return 'table' in from && typeof from.table === 'string';
+}
+
+export function isDerivedFrom(
+  from: From
+): from is TableExpr & { expr: { ast: Select } } {
+  return 'expr' in from && 'ast' in from.expr;
+}
+
+export function getSourceName(from: From): string {
+  const alias = 'as' in from ? from.as : null;
+  return alias ?? ('table' in from ? from.table : '');
 }
 
 function isCreateTable(ast: AST): ast is CreateTable {
