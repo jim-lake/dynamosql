@@ -5,4 +5,5 @@ describe('Update', function () {
   runTests('update.sql', path.join(__dirname, 'update.sql'));
   runTests('multi_table.sql', path.join(__dirname, 'multi_table.sql'));
   runTests('edge_cases.sql', path.join(__dirname, 'edge_cases.sql'));
+  runTests('update_ignore.sql', path.join(__dirname, 'update_ignore.sql'));
 });
