@@ -27,7 +27,7 @@ export async function singleUpdate(
 export async function multipleUpdate(
   params: MultiUpdateParams
 ): Promise<ChangedResult> {
-  const { session, list } = params;
+  const { session, list, ignore } = params;
 
   let affectedRows = 0;
   let changedRows = 0;
@@ -70,10 +70,14 @@ export async function multipleUpdate(
 
         const new_key = _makePrimaryKey(data.primary_key, new_row);
         if (new_key !== update_key && primary_map.has(new_key)) {
-          throw new SQLError({
-            err: 'dup_primary_key_entry',
-            args: [data.primary_key, new_key],
-          });
+          if (!ignore) {
+            throw new SQLError({
+              err: 'dup_primary_key_entry',
+              args: [data.primary_key, new_key],
+            });
+          }
+          affectedRows++;
+          continue;
         } else if (new_key !== update_key) {
           primary_map.delete(update_key);
           primary_map.set(new_key, index);

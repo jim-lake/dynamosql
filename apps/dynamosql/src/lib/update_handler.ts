@@ -132,7 +132,7 @@ async function _multipleUpdate(
     const groups = makeEngineGroups<UpdateChange>(session, from_list);
     for (const group of groups) {
       const { engine, list } = group;
-      const opts = { dynamodb, session, list };
+      const opts = { dynamodb, session, list, ignore: Boolean(ast.ignore) };
       const result = await engine.multipleUpdate(opts);
       affectedRows += result.affectedRows;
       changedRows += result.changedRows;

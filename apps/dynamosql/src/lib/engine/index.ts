@@ -200,6 +200,7 @@ export interface MultiUpdateParams {
   dynamodb: DynamoDBClient;
   session: Session;
   list: UpdateChange[];
+  ignore?: boolean;
 }
 export interface InsertParams {
   dynamodb: DynamoDBClient;
