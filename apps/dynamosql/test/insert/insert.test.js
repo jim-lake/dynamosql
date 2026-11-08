@@ -33,4 +33,5 @@ describe('Insert', function () {
     path.join(__dirname, 'on_duplicate_key_raw.sql'),
     { checkChanged: true, skipAffected: true }
   );
+  runTests('syntax.sql', path.join(__dirname, 'syntax.sql'));
 });

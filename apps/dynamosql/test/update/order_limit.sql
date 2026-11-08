@@ -1,0 +1,14 @@
+CREATE DATABASE IF NOT EXISTS mem_gap_update_order;
+USE mem_gap_update_order;
+CREATE TEMPORARY TABLE u (id INT PRIMARY KEY, v INT);
+INSERT INTO u (id, v) VALUES (1, 10), (2, 20), (3, 30), (4, 40);
+SELECT id, v FROM u ORDER BY id;
+
+UPDATE u SET v = v + 1 ORDER BY id LIMIT 2;
+SELECT id, v FROM u ORDER BY id;
+
+UPDATE u SET v = 0 WHERE v > 15 ORDER BY v DESC LIMIT 1;
+SELECT id, v FROM u ORDER BY id;
+
+UPDATE u SET v = 99 ORDER BY id DESC LIMIT 0;
+SELECT id, v FROM u ORDER BY id;

@@ -43,4 +43,5 @@ describe('Select', function () {
   runTests('operators.sql', path.join(__dirname, 'operators.sql'));
   runTests('string_funcs.sql', path.join(__dirname, 'string_funcs.sql'));
   runTests('collation_raw.sql', path.join(__dirname, 'collation_raw.sql'));
+  runTests('syntax.sql', path.join(__dirname, 'syntax.sql'));
 });

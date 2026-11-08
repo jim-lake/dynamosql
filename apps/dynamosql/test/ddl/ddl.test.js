@@ -62,4 +62,21 @@ describe('DDL', function () {
     { allowedErrors: 'SAME_CODE', skipAffected: true, timeout: 30000 },
     true
   );
+  runTests(
+    'create_temporary.sql',
+    path.join(__dirname, 'create_temporary.sql'),
+    { skipAffected: true }
+  );
+  runTests('create_types.sql', path.join(__dirname, 'create_types.sql'), {
+    skipAffected: true,
+    verify_field_types: true,
+  });
+  runTests('drop_multi.sql', path.join(__dirname, 'drop_multi.sql'), {
+    skipAffected: true,
+  });
+  runTests(
+    'transaction_modes.sql',
+    path.join(__dirname, 'transaction_modes.sql'),
+    { skipAffected: true }
+  );
 });

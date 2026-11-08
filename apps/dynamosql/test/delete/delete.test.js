@@ -8,4 +8,5 @@ describe('Delete', function () {
     'delete_edge_cases.sql',
     path.join(__dirname, 'delete_edge_cases.sql')
   );
+  runTests('order_limit.sql', path.join(__dirname, 'order_limit.sql'));
 });

@@ -22,11 +22,11 @@ Source: MySQL 8.4 Reference Manual, chapter 15 (SQL statements), chapter 11 (lan
 | `SELECT DISTINCTROW`                                      |    ❌     |                                                                             |
 | `HIGH_PRIORITY` modifier                                  |    ❌     |                                                                             |
 | `STRAIGHT_JOIN` modifier                                  |    ❌     |                                                                             |
-| `SQL_SMALL_RESULT`, `SQL_BIG_RESULT`, `SQL_BUFFER_RESULT` |    ❌     |                                                                             |
-| `SQL_NO_CACHE` (deprecated, no effect)                    |    ❌     |                                                                             |
-| `SQL_CALC_FOUND_ROWS` (deprecated)                        |    ❌     |                                                                             |
-| Several modifiers in one `SELECT`                         |    ❌     |                                                                             |
-| Optimizer hints `SELECT /*+ ... */`                       |    ❌     | See Optimizer hints below.                                                  |
+| `SQL_SMALL_RESULT`, `SQL_BIG_RESULT`, `SQL_BUFFER_RESULT` |    ❌     | Accepted and ignored. |
+| `SQL_NO_CACHE` (deprecated, no effect)                    |    ❌     | Accepted and ignored. |
+| `SQL_CALC_FOUND_ROWS` (deprecated)                        |    ❌     | Accepted and ignored. `FOUND_ROWS()` is not implemented. |
+| Several modifiers in one `SELECT`                         |    ❌     | Depends on modifiers that are accepted and ignored. |
+| Optimizer hints `SELECT /*+ ... */`                       |    ❌     | Accepted and ignored. Not tested. |
 | `EXPLAIN SELECT`                                          |    ❌     | See DESCRIBE and EXPLAIN.                                                   |
 
 ### Select list and aliases
@@ -71,7 +71,7 @@ Source: MySQL 8.4 Reference Manual, chapter 15 (SQL statements), chapter 11 (lan
 | Index hint `IGNORE INDEX`, `IGNORE KEY`                                        |    ❌     |                       |
 | Index hint `FORCE INDEX`, `FORCE KEY`                                          |    ❌     |                       |
 | Several index hints on one table                                               |    ❌     |                       |
-| Parenthesized table reference group `( table_references )`                     |    ❌     |                       |
+| Parenthesized table reference group `( table_references )`                     |    ❌     | `join/syntax.sql` covers `(t alias)` alone and before a `JOIN`. |
 | ODBC escape `{ OJ table_reference join_type ... }`                             |    ❌     |                       |
 
 ### Joins
@@ -87,7 +87,7 @@ Source: MySQL 8.4 Reference Manual, chapter 15 (SQL statements), chapter 11 (lan
 | `LEFT [OUTER] JOIN ... USING (...)`                            |    ✅     | `join/join_using.sql`                                                               |
 | `RIGHT [OUTER] JOIN ... ON`                                    |    ❌     | Silently wrong. A probe returned fewer rows than MySQL.                             |
 | `RIGHT [OUTER] JOIN ... USING (...)`                           |    ❌     |                                                                                     |
-| `CROSS JOIN ... ON` or `... USING` (with `CROSS JOIN` keyword) |    ❌     | A probe of `CROSS JOIN` without a condition returned the expected rows. Not tested. |
+| `CROSS JOIN ... ON` or `... USING` (with `CROSS JOIN` keyword) |    ❌     | `join/syntax.sql` covers the `ON` form. `USING` is not tested. |
 | `NATURAL [INNER] JOIN`                                         |    ✅     | `join/join_using.sql`                                                               |
 | `NATURAL LEFT [OUTER] JOIN`                                    |    ✅     | `join/join_using.sql`                                                               |
 | `NATURAL RIGHT [OUTER] JOIN`                                   |    ❌     |                                                                                     |
@@ -174,19 +174,19 @@ Source: MySQL 8.4 Reference Manual, chapter 15 (SQL statements), chapter 11 (lan
 | `ORDER BY ... WITH ROLLUP`              |    ❌     |                                                                 |
 | `LIMIT row_count`                       |    ✅     | `select/limit.sql`                                              |
 | `LIMIT row_count OFFSET offset`         |    ✅     | `select/limit.sql`                                              |
-| `LIMIT offset, row_count`               |    ❌     | Not tested. A probe of `LIMIT 1, 2` returned the expected rows. |
+| `LIMIT offset, row_count`               |    ✅     | `select/syntax.sql` |
 | Placeholders in `LIMIT ?`               |    ❌     |                                                                 |
 
 ### Locking reads
 
 | Feature                            | Supported | Notes                                                 |
 | :--------------------------------- | :-------: | ----------------------------------------------------- |
-| `FOR UPDATE`                       |    ❌     | Silently ignored. A probe returned rows with no lock. |
+| `FOR UPDATE`                       |    ❌     | Accepted and ignored. No lock is taken. Not tested. |
 | `FOR UPDATE OF tbl`                |    ❌     |                                                       |
 | `FOR SHARE` and `FOR SHARE OF tbl` |    ❌     |                                                       |
-| `LOCK IN SHARE MODE`               |    ❌     |                                                       |
+| `LOCK IN SHARE MODE`               |    ❌     | Accepted and ignored. No lock is taken. Not tested. |
 | `NOWAIT`                           |    ❌     |                                                       |
-| `SKIP LOCKED`                      |    ❌     |                                                       |
+| `SKIP LOCKED`                      |    ❌     | Accepted and ignored. No lock is taken. Not tested. |
 
 ### Set operators
 
@@ -265,11 +265,11 @@ Subqueries are independent (no reference to the outer query) or dependent (corre
 | `UPDATE IGNORE`                                             |    ✅     | `update/update_ignore.sql`                                                                      |
 | `UPDATE LOW_PRIORITY`                                       |    ❌     |                                                                                                 |
 | `UPDATE ... ORDER BY`                                       |    ❌     | A probe ran without error. Not tested.                                                          |
-| `UPDATE ... LIMIT`                                          |    ❌     | A probe ran without error. Not tested.                                                          |
+| `UPDATE ... ORDER BY ... LIMIT n` |    ✅     | `update/order_limit.sql` |
 | Multi-table update with `JOIN ... USING (...)`              |    ✅     | `update/multi_table.sql`                                                                        |
 | Multi-table update with `JOIN ... ON`                       |    ✅     | `update/multi_table.sql`                                                                        |
 | Multi-table update with a derived table as a join source    |    ✅     | `select/derived_table.sql`                                                                      |
-| Comma multi-table update, `UPDATE a, b SET ...`             |    ❌     |                                                                                                 |
+| Comma multi-table update, `UPDATE a, b SET ...`             |    ✅     | `update/multi_table_comma.sql` |
 | Derived table as the update target, `UPDATE (SELECT ...) s` |    ❌     | `ER_NO_DB_ERROR`. See `MYSQL_GAPS.md`.                                                          |
 | `WITH cte UPDATE ...`                                       |    ❌     |                                                                                                 |
 | Subquery in `WHERE`                                         |    ✅     | Scalar form only. See Subqueries under SELECT.                                                  |
@@ -285,7 +285,7 @@ Subqueries are independent (no reference to the outer query) or dependent (corre
 | Partial column list (other columns take their default)                |    ✅     | `insert/edge_cases.sql`                                                                |
 | `VALUES` without a column list                                        |    ❌     | `ER_NO: Unsupport sql feature.` `insert_handler.ts` rejects it before the engine runs. |
 | `DEFAULT` as a value                                                  |    ❌     |                                                                                        |
-| `VALUES ROW(...)` row constructor form                                |    ❌     |                                                                                        |
+| `VALUES ROW(...)` row constructor form                                |    ✅     | `insert/syntax.sql` |
 | `INSERT ... TABLE tbl_name`                                           |    ❌     |                                                                                        |
 | `INSERT INTO t SET col = value, ...`                                  |    ✅     | `insert/insert.sql`                                                                    |
 | `INSERT ... SELECT`                                                   |    ✅     | `insert/insert_select.sql`                                                             |
@@ -308,9 +308,9 @@ Subqueries are independent (no reference to the outer query) or dependent (corre
 | :----------------------------------------------------- | :-------: | -------------------------------------------------------- |
 | `REPLACE INTO t (cols) VALUES (...)`                   |    ✅     | `replace/replace.sql`                                    |
 | `REPLACE INTO t SET col = value, ...`                  |    ✅     | `replace/replace.sql`                                    |
-| `REPLACE ... SELECT`                                   |    ❌     | A probe on a memory table ran without error. Not tested. |
+| `REPLACE ... SELECT`                                   |    ✅     | `replace/syntax.sql` |
 | `REPLACE ... TABLE tbl_name`                           |    ❌     |                                                          |
-| `REPLACE ... VALUES ROW(...)`                          |    ❌     |                                                          |
+| `REPLACE ... VALUES ROW(...)`                          |    ✅     | `replace/syntax.sql` |
 | `REPLACE LOW_PRIORITY`, `REPLACE DELAYED` (deprecated) |    ❌     |                                                          |
 | `REPLACE ... PARTITION (p1, ...)`                      |    ❌     |                                                          |
 
@@ -325,10 +325,10 @@ Subqueries are independent (no reference to the outer query) or dependent (corre
 | `DELETE FROM t AS alias`                                         |    ❌     |                                                                                     |
 | `DELETE ... PARTITION (p1, ...)`                                 |    ❌     |                                                                                     |
 | `DELETE ... ORDER BY`                                            |    ❌     | A probe ran without error. Not tested.                                              |
-| `DELETE ... LIMIT`                                               |    ❌     | A probe ran without error. Not tested.                                              |
+| `DELETE ... ORDER BY ... LIMIT n` |    ✅     | `delete/order_limit.sql` |
 | `DELETE IGNORE`                                                  |    ❌     |                                                                                     |
 | `DELETE LOW_PRIORITY`, `DELETE QUICK`                            |    ❌     |                                                                                     |
-| Multi-table `DELETE t1[.*] [, t2[.*]] FROM table_references ...` |    ❌     | `delete/multi_table.sql` is a placeholder. A probe of `DELETE t FROM t JOIN u` ran. |
+| Multi-table `DELETE t1[.*] [, t2[.*]] FROM table_references ...` |    ❌     | `delete/multi_table.sql` covers one target table. |
 | Multi-table `DELETE ... USING table_references ...`              |    ❌     |                                                                                     |
 | `WITH cte DELETE ...`                                            |    ❌     |                                                                                     |
 
@@ -348,7 +348,7 @@ Subqueries are independent (no reference to the outer query) or dependent (corre
 | `CREATE DATABASE db_name`                     |    ✅     | `ddl/create.sql`       |
 | `CREATE DATABASE IF NOT EXISTS db_name`       |    ✅     | `ddl/create.sql`       |
 | `CREATE DATABASE ... COLLATE`                 |    ✅     | `test/setup/setup.sql` |
-| `CREATE DATABASE ... [DEFAULT] CHARACTER SET` |    ❌     |                        |
+| `CREATE DATABASE ... [DEFAULT] CHARACTER SET` |    ✅     | `ddl/create_temporary.sql` |
 | `CREATE DATABASE ... [DEFAULT] ENCRYPTION`    |    ❌     |                        |
 | `CREATE SCHEMA` (synonym of `DATABASE`)       |    ❌     |                        |
 
@@ -361,7 +361,7 @@ Subqueries are independent (no reference to the outer query) or dependent (corre
 | `CREATE TEMPORARY TABLE`                                                                                                                                                                                                                                                                                                                               |    ✅     | `select/having.sql`, `memory/memory_edge_cases.sql`                     |
 | Inline `PRIMARY KEY` on a column                                                                                                                                                                                                                                                                                                                       |    ✅     | `ddl/create.sql`                                                        |
 | Table constraint `PRIMARY KEY (a, b)`                                                                                                                                                                                                                                                                                                                  |    ✅     | `ddl/create.sql`                                                        |
-| `UNIQUE [KEY]` column attribute                                                                                                                                                                                                                                                                                                                        |    ❌     |                                                                         |
+| `UNIQUE [KEY]` column attribute                                                                                                                                                                                                                                                                                                                        |    ❌     | Accepted and not enforced. |
 | `UNIQUE KEY` / `UNIQUE INDEX` table constraint                                                                                                                                                                                                                                                                                                         |    ❌     |                                                                         |
 | `INDEX` / `KEY` table constraint (`[index_name] [index_type] (key_part, ...)`)                                                                                                                                                                                                                                                                         |    ❌     |                                                                         |
 | `FULLTEXT` / `SPATIAL` index table constraint                                                                                                                                                                                                                                                                                                          |    ❌     |                                                                         |
@@ -370,9 +370,9 @@ Subqueries are independent (no reference to the outer query) or dependent (corre
 | `REFERENCES tbl (cols)` inline column reference                                                                                                                                                                                                                                                                                                        |    ❌     |                                                                         |
 | `MATCH FULL` / `MATCH PARTIAL` / `MATCH SIMPLE` in a reference                                                                                                                                                                                                                                                                                         |    ❌     |                                                                         |
 | `ON DELETE` / `ON UPDATE` reference option (`RESTRICT`, `CASCADE`, `SET NULL`, `NO ACTION`, `SET DEFAULT`)                                                                                                                                                                                                                                             |    ❌     |                                                                         |
-| `[CONSTRAINT [symbol]] CHECK (expr) [[NOT] ENFORCED]`                                                                                                                                                                                                                                                                                                  |    ❌     |                                                                         |
+| `[CONSTRAINT [symbol]] CHECK (expr) [[NOT] ENFORCED]`                                                                                                                                                                                                                                                                                                  |    ❌     | Accepted and not enforced. |
 | `COLLATE` column attribute                                                                                                                                                                                                                                                                                                                             |    ✅     | `select/sort.sql`                                                       |
-| `CHARACTER SET` column attribute                                                                                                                                                                                                                                                                                                                       |    ❌     |                                                                         |
+| `CHARACTER SET` column attribute                                                                                                                                                                                                                                                                                                                       |    ✅     | `ddl/create_temporary.sql` |
 | `CHARSET` column attribute (synonym)                                                                                                                                                                                                                                                                                                                   |    ❌     |                                                                         |
 | `COLUMN_FORMAT {FIXED \| DYNAMIC \| DEFAULT}`                                                                                                                                                                                                                                                                                                          |    ❌     |                                                                         |
 | `ENGINE_ATTRIBUTE` and `SECONDARY_ENGINE_ATTRIBUTE` column attributes                                                                                                                                                                                                                                                                                  |    ❌     |                                                                         |
@@ -381,7 +381,7 @@ Subqueries are independent (no reference to the outer query) or dependent (corre
 | `DEFAULT literal` / `DEFAULT (expr)` column attribute                                                                                                                                                                                                                                                                                                  |    ❌     |                                                                         |
 | `VISIBLE` / `INVISIBLE` column attribute                                                                                                                                                                                                                                                                                                               |    ❌     |                                                                         |
 | `AUTO_INCREMENT` column attribute                                                                                                                                                                                                                                                                                                                      |    ❌     |                                                                         |
-| `COMMENT 'string'` column attribute                                                                                                                                                                                                                                                                                                                    |    ❌     |                                                                         |
+| `COMMENT 'string'` column attribute                                                                                                                                                                                                                                                                                                                    |    ❌     | Accepted. Not reported by `information_schema`. |
 | `SRID n` column attribute                                                                                                                                                                                                                                                                                                                              |    ❌     |                                                                         |
 | `ON UPDATE CURRENT_TIMESTAMP` column attribute                                                                                                                                                                                                                                                                                                         |    ❌     |                                                                         |
 | Generated column `[GENERATED ALWAYS] AS (expr) [VIRTUAL \| STORED]`                                                                                                                                                                                                                                                                                    |    ❌     |                                                                         |
@@ -390,9 +390,9 @@ Subqueries are independent (no reference to the outer query) or dependent (corre
 | Table option `ENGINE = other_engine`                                                                                                                                                                                                                                                                                                                   |    ❌     |                                                                         |
 | Table option `AUTO_INCREMENT = n`                                                                                                                                                                                                                                                                                                                      |    ❌     |                                                                         |
 | Table option `AUTOEXTEND_SIZE`, `AVG_ROW_LENGTH`, `CHECKSUM`, `COMPRESSION`, `CONNECTION`, `DELAY_KEY_WRITE`, `ENCRYPTION`, `ENGINE_ATTRIBUTE`, `INSERT_METHOD`, `KEY_BLOCK_SIZE`, `MAX_ROWS`, `MIN_ROWS`, `PACK_KEYS`, `PASSWORD`, `ROW_FORMAT`, `SECONDARY_ENGINE_ATTRIBUTE`, `STATS_AUTO_RECALC`, `STATS_PERSISTENT`, `STATS_SAMPLE_PAGES`, `UNION` |    ❌     |                                                                         |
-| Table option `[DEFAULT] CHARACTER SET`                                                                                                                                                                                                                                                                                                                 |    ❌     |                                                                         |
-| Table option `[DEFAULT] COLLATE`                                                                                                                                                                                                                                                                                                                       |    ❌     |                                                                         |
-| Table option `COMMENT 'string'`                                                                                                                                                                                                                                                                                                                        |    ❌     |                                                                         |
+| Table option `[DEFAULT] CHARACTER SET`                                                                                                                                                                                                                                                                                                                 |    ✅     | `ddl/create_temporary.sql` |
+| Table option `[DEFAULT] COLLATE`                                                                                                                                                                                                                                                                                                                       |    ✅     | `ddl/create_temporary.sql` |
+| Table option `COMMENT 'string'`                                                                                                                                                                                                                                                                                                                        |    ❌     | Accepted and ignored. |
 | Table option `TABLESPACE name [STORAGE {DISK \| MEMORY}]`                                                                                                                                                                                                                                                                                              |    ❌     |                                                                         |
 | Table option `DATA DIRECTORY` / `INDEX DIRECTORY`                                                                                                                                                                                                                                                                                                      |    ❌     |                                                                         |
 | Table option `START TRANSACTION`                                                                                                                                                                                                                                                                                                                       |    ❌     |                                                                         |
@@ -412,20 +412,20 @@ Subqueries are independent (no reference to the outer query) or dependent (corre
 | `BOOLEAN`                                                                                                           |    ✅     | `memory/memory_edge_cases.sql` |
 | `BOOL`                                                                                                              |    ❌     |                                |
 | `JSON`                                                                                                              |    ✅     | `memory/memory_json.sql`       |
-| `TINYINT`, `SMALLINT`, `MEDIUMINT`, `BIGINT` (with `UNSIGNED`, `ZEROFILL`)                                          |    ❌     |                                |
+| `TINYINT`, `SMALLINT`, `MEDIUMINT`, `BIGINT` (with `UNSIGNED`, `ZEROFILL`)                                          |    ❌     | Only `BIGINT UNSIGNED` matches MySQL (`ddl/create_types.sql`). The other sizes report `VAR_STRING` field types. |
 | `SERIAL` and `SERIAL DEFAULT VALUE`                                                                                 |    ❌     |                                |
 | `DECIMAL(M,D)`, `DEC`, `NUMERIC`, `FIXED`                                                                           |    ❌     |                                |
 | `FLOAT[(p)]`, `FLOAT(M,D)` (deprecated), `DOUBLE`, `DOUBLE PRECISION`, `REAL`                                       |    ❌     |                                |
 | `BIT(M)`                                                                                                            |    ❌     |                                |
-| `DATE`, `TIME[(fsp)]`, `DATETIME[(fsp)]`, `TIMESTAMP[(fsp)]`, `YEAR`                                                |    ❌     |                                |
+| `DATE`, `TIME[(fsp)]`, `DATETIME[(fsp)]`, `TIMESTAMP[(fsp)]`, `YEAR`                                                |    ❌     | `DATE`, `TIME(3)`, `DATETIME(6)`: `ddl/create_types.sql`. `YEAR` reports `VAR_STRING`. |
 | `DEFAULT CURRENT_TIMESTAMP`, `ON UPDATE CURRENT_TIMESTAMP`                                                          |    ❌     |                                |
-| `CHAR(M)`, `CHARACTER(M)`, `NCHAR(M)`, `NATIONAL CHAR(M)`                                                           |    ❌     |                                |
+| `CHAR(M)`, `CHARACTER(M)`, `NCHAR(M)`, `NATIONAL CHAR(M)`                                                           |    ❌     | `CHAR(3)`: `ddl/create_types.sql`. Other spellings are not tested. |
 | `CHAR BYTE`                                                                                                         |    ❌     |                                |
 | `CHARACTER VARYING(M)`, `NVARCHAR(M)`, `NATIONAL VARCHAR(M)`                                                        |    ❌     |                                |
-| `BINARY(M)`, `VARBINARY(M)`                                                                                         |    ❌     |                                |
-| `TINYBLOB`, `BLOB[(M)]`, `MEDIUMBLOB`, `LONGBLOB`                                                                   |    ❌     |                                |
-| `TINYTEXT`, `TEXT[(M)]`, `MEDIUMTEXT`, `LONGTEXT`, `LONG [VARCHAR]`                                                 |    ❌     |                                |
-| `ENUM('v', ...)`, `SET('v', ...)`                                                                                   |    ❌     |                                |
+| `BINARY(M)`, `VARBINARY(M)`                                                                                         |    ❌     | `VARBINARY(8)`: `ddl/create_types.sql`. `BINARY(M)` does not match MySQL. |
+| `TINYBLOB`, `BLOB[(M)]`, `MEDIUMBLOB`, `LONGBLOB`                                                                   |    ❌     | `TINYBLOB`, `BLOB`, `MEDIUMBLOB`, `LONGBLOB` without a size: `ddl/create_types.sql`. |
+| `TINYTEXT`, `TEXT[(M)]`, `MEDIUMTEXT`, `LONGTEXT`, `LONG [VARCHAR]`                                                 |    ❌     | `TINYTEXT`, `TEXT`, `MEDIUMTEXT`, `LONGTEXT`: `ddl/create_types.sql`. |
+| `ENUM('v', ...)`, `SET('v', ...)`                                                                                   |    ❌     | Does not match MySQL. `ENUM` and `SET` report `VAR_STRING` field types. |
 | `GEOMETRY`, `POINT`, `LINESTRING`, `POLYGON`, `MULTIPOINT`, `MULTILINESTRING`, `MULTIPOLYGON`, `GEOMETRYCOLLECTION` |    ❌     |                                |
 | Deprecated column attributes `BINARY`, `ASCII`, `UNICODE`                                                           |    ❌     |                                |
 
@@ -524,11 +524,11 @@ Subqueries are independent (no reference to the outer query) or dependent (corre
 | :-------------------------------------------------------- | :-------: | ---------------------------------------- |
 | `DROP DATABASE db_name`                                   |    ✅     | `ddl/create.sql`                         |
 | `DROP DATABASE IF EXISTS db_name`                         |    ✅     | `test/setup/setup.sql`                   |
-| `DROP SCHEMA db_name` (synonym)                           |    ❌     |                                          |
+| `DROP SCHEMA db_name` (synonym)                           |    ✅     | `ddl/drop_multi.sql` |
 | `DROP TABLE t`                                            |    ✅     | `ddl/create.sql`                         |
 | `DROP TABLE IF EXISTS t`                                  |    ✅     | `ddl/drop.sql`                           |
 | `DROP TEMPORARY TABLE t`                                  |    ❌     |                                          |
-| `DROP TABLE t1, t2, ...` (several tables)                 |    ❌     |                                          |
+| `DROP TABLE t1, t2, ...` (several tables)                 |    ❌     | Drops only the first table in the list. The other tables are not dropped. |
 | `DROP TABLE ... RESTRICT \| CASCADE`                      |    ❌     | Parsed and ignored in MySQL. Not tested. |
 | `DROP INDEX name ON tbl [ALGORITHM ...] [LOCK ...]`       |    ❌     |                                          |
 | `DROP INDEX PRIMARY ON tbl`                               |    ❌     |                                          |
@@ -551,20 +551,20 @@ Subqueries are independent (no reference to the outer query) or dependent (corre
 
 | Feature                                                                                                                                                                                                                                                                                                   | Supported | Notes                                  |
 | :-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | :-------: | -------------------------------------- |
-| `ALTER TABLE t ADD [COLUMN] col definition`                                                                                                                                                                                                                                                               |    ✅     | `ddl/alter.sql`                        |
-| `ADD COLUMN` with `FIRST` or `AFTER col`                                                                                                                                                                                                                                                                  |    ❌     |                                        |
+| `ALTER TABLE t ADD [COLUMN] col definition`                                                                                                                                                                                                                                                               |    ❌     | Not green. On temporary tables, `SELECT *` omits the added column. |
+| `ADD COLUMN` with `FIRST` or `AFTER col`                                                                                                                                                                                                                                                                  |    ❌     | Column position is ignored, and the column is missing from `SELECT *`. |
 | `ADD [COLUMN] (col def, ...)` several columns in one list                                                                                                                                                                                                                                                 |    ❌     |                                        |
-| Several alter operations in one `ALTER TABLE`                                                                                                                                                                                                                                                             |    ❌     |                                        |
+| Several alter operations in one `ALTER TABLE`                                                                                                                                                                                                                                                             |    ❌     | Not tested. See `MYSQL_GAPS.md` for `ADD COLUMN` on temporary tables. |
 | `ADD {INDEX \| KEY}`, `ADD {FULLTEXT \| SPATIAL}`, `ADD [CONSTRAINT] PRIMARY KEY`, `ADD [CONSTRAINT] UNIQUE`, `ADD [CONSTRAINT] FOREIGN KEY`, `ADD [CONSTRAINT] CHECK (expr) [[NOT] ENFORCED]`                                                                                                            |    ❌     |                                        |
-| `DROP [COLUMN] col`                                                                                                                                                                                                                                                                                       |    ❌     | A probe ran without error. Not tested. |
+| `DROP [COLUMN] col`                                                                                                                                                                                                                                                                                       |    ❌     | Not implemented. |
 | `DROP {INDEX \| KEY} name`, `DROP PRIMARY KEY`, `DROP FOREIGN KEY fk`, `DROP CHECK name`, `DROP CONSTRAINT name`                                                                                                                                                                                          |    ❌     |                                        |
 | `ALTER [COLUMN] col SET DEFAULT {literal \| (expr)}`, `ALTER [COLUMN] col DROP DEFAULT`                                                                                                                                                                                                                   |    ❌     |                                        |
 | `ALTER [COLUMN] col SET {VISIBLE \| INVISIBLE}`                                                                                                                                                                                                                                                           |    ❌     |                                        |
 | `ALTER INDEX name {VISIBLE \| INVISIBLE}`                                                                                                                                                                                                                                                                 |    ❌     |                                        |
 | `ALTER {CHECK \| CONSTRAINT} name [NOT] ENFORCED`                                                                                                                                                                                                                                                         |    ❌     |                                        |
-| `CHANGE [COLUMN] old new definition [FIRST \| AFTER col]`                                                                                                                                                                                                                                                 |    ❌     |                                        |
-| `MODIFY [COLUMN] col definition [FIRST \| AFTER col]`                                                                                                                                                                                                                                                     |    ❌     |                                        |
-| `RENAME COLUMN old TO new`                                                                                                                                                                                                                                                                                |    ❌     |                                        |
+| `CHANGE [COLUMN] old new definition [FIRST \| AFTER col]`                                                                                                                                                                                                                                                 |    ❌     | Not implemented. |
+| `MODIFY [COLUMN] col definition [FIRST \| AFTER col]`                                                                                                                                                                                                                                                     |    ❌     | Not implemented. |
+| `RENAME COLUMN old TO new`                                                                                                                                                                                                                                                                                |    ❌     | Not implemented. |
 | `RENAME {INDEX \| KEY} old TO new`                                                                                                                                                                                                                                                                        |    ❌     |                                        |
 | `RENAME [TO \| AS] new_tbl_name`                                                                                                                                                                                                                                                                          |    ❌     |                                        |
 | `ALGORITHM [=] {DEFAULT \| INSTANT \| INPLACE \| COPY}`                                                                                                                                                                                                                                                   |    ❌     |                                        |
@@ -677,13 +677,13 @@ Subqueries are independent (no reference to the outer query) or dependent (corre
 | Feature                                                                              | Supported | Notes                                     |
 | :----------------------------------------------------------------------------------- | :-------: | ----------------------------------------- |
 | `SET @var = expr`                                                                    |    ✅     | `expression/variables.sql`                |
-| `SET @var := expr`                                                                   |    ❌     |                                           |
+| `SET @var := expr`                                                                   |    ✅     | `expression/set_statements.sql` |
 | Several assignments in one `SET`                                                     |    ✅     | `expression/variables.sql`                |
 | `SET @var = (SELECT ...)`                                                            |    ✅     | `expression/variables.sql`                |
 | `SET @@var = expr` (no scope keyword)                                                |    ✅     | `expression/variables.sql`                |
 | `SET @@SESSION.var = expr`                                                           |    ✅     | `expression/variables.sql`                |
-| `SET var = expr` with no scope keyword                                               |    ❌     |                                           |
-| `SET SESSION var = expr` and `SET LOCAL var = expr`                                  |    ❌     |                                           |
+| `SET time_zone = expr` with no scope keyword |    ✅     | `expression/set_statements.sql` |
+| `SET SESSION time_zone = expr` and `SET LOCAL time_zone = expr` |    ✅     | `expression/set_statements.sql` |
 | `SET @@LOCAL.var = expr`                                                             |    ❌     |                                           |
 | `SET GLOBAL var = expr`, `SET @@GLOBAL.var = expr`                                   |    ❌     |                                           |
 | `SET PERSIST var = expr`, `SET @@PERSIST.var = expr`                                 |    ❌     |                                           |
@@ -710,9 +710,9 @@ Subqueries are independent (no reference to the outer query) or dependent (corre
 | Feature                                                                 | Supported | Notes                                                                                 |
 | :---------------------------------------------------------------------- | :-------: | ------------------------------------------------------------------------------------- |
 | `BEGIN`                                                                 |    ✅     | `ddl/transactions.sql`                                                                |
-| `BEGIN WORK`                                                            |    ❌     |                                                                                       |
+| `BEGIN WORK`                                                            |    ✅     | `ddl/transaction_modes.sql` |
 | `START TRANSACTION`                                                     |    ✅     | `insert/on_duplicate_key.sql`                                                         |
-| `START TRANSACTION READ ONLY`, `READ WRITE`                             |    ❌     |                                                                                       |
+| `START TRANSACTION READ ONLY`, `READ WRITE`                             |    ❌     | Accepted and not enforced. `UPDATE` succeeds in a read-only transaction. |
 | `START TRANSACTION WITH CONSISTENT SNAPSHOT`                            |    ❌     |                                                                                       |
 | `COMMIT`                                                                |    ✅     | `ddl/transactions.sql`                                                                |
 | `COMMIT [WORK] [AND [NO] CHAIN] [[NO] RELEASE]`                         |    ❌     |                                                                                       |
@@ -831,7 +831,7 @@ Subqueries are independent (no reference to the outer query) or dependent (corre
 | :-------------------------------------------------------------------------------------------------------------------------------------- | :-------: | -------------------------------------------------------------------------------- |
 | Double-quoted string literal `"text"`                                                                                                   |    ✅     | Used throughout `test/`. MySQL treats it as a string unless `ANSI_QUOTES` is on. |
 | Single-quoted string literal `'text'`                                                                                                   |    ✅     | Used throughout `test/`.                                                         |
-| Doubled quote inside a string `'it''s'`, `"say ""hi"""`                                                                                 |    ❌     |                                                                                  |
+| Doubled quote inside a string `'it''s'`, `"say ""hi"""`                                                                                 |    ✅     | `select/syntax.sql` |
 | Backslash escapes `\'`, `\"`, `\\`, `\n`, `\t`, `\0`, `\b`, `\r`, `\Z`, `\%`, `\_`                                                      |    ❌     | `\\` appears in `memory/memory_json.sql`. Others untested.                       |
 | Adjacent string literals concatenate `'a' 'b'`                                                                                          |    ❌     |                                                                                  |
 | Character set introducer `_charset'string'` and `_binary'string'`                                                                       |    ❌     |                                                                                  |
@@ -839,7 +839,7 @@ Subqueries are independent (no reference to the outer query) or dependent (corre
 | Integer literal, signed or unsigned                                                                                                     |    ✅     | Used throughout `test/`.                                                         |
 | Decimal literal `1.5`, `.5`                                                                                                             |    ✅     | `expression/variables.sql` (`SET @myvar = 2.5`)                                  |
 | Exponent literal `1e20`, `2.5E-3`                                                                                                       |    ✅     | `expression/exponent_literal_types.sql`                                          |
-| Hexadecimal `X'hex'` and `0xhex`                                                                                                        |    ❌     |                                                                                  |
+| Hexadecimal `X'hex'` and `0xhex`                                                                                                        |    ✅     | `select/syntax.sql` |
 | Bit value `b'01'` and `0b01`                                                                                                            |    ❌     |                                                                                  |
 | `TRUE` and `FALSE` literals                                                                                                             |    ✅     | `expression/operators.sql`                                                       |
 | `NULL` literal                                                                                                                          |    ✅     | `select/null_handling.sql`                                                       |
@@ -873,7 +873,7 @@ Subqueries are independent (no reference to the outer query) or dependent (corre
 | :------------------------------------------------------ | :-------: | ------------------------------------------------- |
 | User variable `@name`                                   |    ✅     | `expression/variables.sql`                        |
 | User variable `` @`name` ``, `@'name'`, `@"name"`       |    ❌     |                                                   |
-| `@name := expr` assignment inside an expression         |    ❌     |                                                   |
+| `@name := expr` assignment inside an expression         |    ✅     | `select/syntax.sql` |
 | System variable read `@@name`                           |    ✅     | `expression/variables.sql` (`SELECT @@time_zone`) |
 | System variable `@@SESSION.name`                        |    ✅     | `expression/variables.sql`                        |
 | System variable `@@GLOBAL.name`, `@@LOCAL.name`         |    ❌     |                                                   |
@@ -886,7 +886,7 @@ Subqueries are independent (no reference to the outer query) or dependent (corre
 | :---------------------------------------------------------------------------------------------------------------- | :-------: | ----------------------------------------------------------------------------------------------------------- |
 | `-- comment` (dash-dash with a space)                                                                             |    ❌     | The test runner strips `--` comments before sending SQL (`test/test_sql_helper.ts`). A probe accepted them. |
 | `# comment`                                                                                                       |    ❌     | A probe accepted it. Not tested.                                                                            |
-| `/* comment */`                                                                                                   |    ❌     | A probe accepted it. Not tested.                                                                            |
+| `/* comment */`                                                                                                   |    ✅     | `select/syntax.sql` |
 | Executable comment `/*! code */` and `/*!NNNNN code */` (versioned)                                               |    ❌     |                                                                                                             |
 | Optimizer hint `/*+ hint */` after `SELECT`, `INSERT`, `REPLACE`, `UPDATE`, `DELETE`, `EXPLAIN SELECT`            |    ❌     |                                                                                                             |
 | Hint `MAX_EXECUTION_TIME(n)`, `SET_VAR(...)`, `RESOURCE_GROUP(...)`, `QB_NAME(...)`                               |    ❌     |                                                                                                             |
@@ -911,12 +911,12 @@ Operator semantics and function behavior are in `FUNCTIONS.md`. The rows below c
 | Arithmetic `+`, `-`, `*`, `/`                           |    ✅     | `select/operators.sql`                                           |
 | Unary `+expr`, `-expr`                                  |    ✅     | `expression/unary_expression.sql`                                |
 | Integer division `DIV`                                  |    ✅     | `expression/operator_control_flow.sql`                           |
-| Modulo `MOD` and `%`                                    |    ✅     | `MOD` is tested. `%` is listed as unsupported in `FUNCTIONS.md`. |
+| Modulo `MOD` and `%`                                    |    ✅     | `MOD` and `%` are tested in `select/syntax.sql`. |
 | Bitwise `&`, `\|`, `^`, `~`, `<<`, `>>`                 |    ❌     | See `FUNCTIONS.md`.                                              |
 | Logical `AND`, `OR`, `XOR`, `NOT`                       |    ✅     | `select/where.sql`                                               |
 | Symbolic `&&`, `\|\|`, `!`                              |    ❌     | `!` is tested. `&&` and `\|\|` are listed in `FUNCTIONS.md`.     |
 | Comparison `=`, `<>`, `!=`, `<`, `<=`, `>`, `>=`, `<=>` |    ✅     | `select/operators.sql`                                           |
-| Assignment `:=` (outside `SET`)                         |    ❌     |                                                                  |
+| Assignment `:=` (outside `SET`)                         |    ✅     | `select/syntax.sql` |
 | `                                                       |           | `as string concatenation under`PIPES_AS_CONCAT`                  | ❌  |     |
 | `BINARY expr` prefix (cast to binary string)            |    ❌     |                                                                  |
 | JSON path operators `column -> path`, `column ->> path` |    ✅     | `memory/memory_json_arrow.sql`                                   |
@@ -962,9 +962,9 @@ Operator semantics and function behavior are in `FUNCTIONS.md`. The rows below c
 | :-------------------------------------------- | :-------: | -------------------------------------- |
 | Path scope `$`                                |    ✅     | `expression/function_json_extract.sql` |
 | Object member `.key`                          |    ✅     | `expression/function_json_extract.sql` |
-| Quoted object member `."key name"`            |    ❌     |                                        |
+| Quoted object member `."key name"`            |    ✅     | `select/syntax.sql` |
 | Array element `[N]`                           |    ✅     | `expression/function_json_extract.sql` |
-| Last element `[last]`, relative `[last-N]`    |    ❌     |                                        |
+| Last element `[last]`, relative `[last-N]`    |    ❌     | `[last]` matches MySQL: `select/syntax.sql`. `[last-N]` is not tested. |
 | Array range `[M to N]`, `[M to last-N]`       |    ❌     |                                        |
 | Wildcard `.*`, `[*]`                          |    ❌     |                                        |
 | Any depth `**`, `$**.key`, `[prefix]**suffix` |    ❌     |                                        |

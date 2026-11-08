@@ -15,7 +15,7 @@ and geometry
 | <<                              |    ❌     | Left shift                                                                                                                                              |
 | <=                              |    ✅     | Less than or equal operator                                                                                                                             |
 | <=>                             |    ✅     | NULL-safe equal to operator                                                                                                                             |
-| %                               |    ❌     | Modulo operator                                                                                                                                         |
+| %                               |    ✅     | Modulo operator. Tested in `select/syntax.sql`.                                                                                                         |
 | MOD                             |    ✅     | Modulo operator                                                                                                                                         |
 | \*                              |    ✅     | Multiplication operator                                                                                                                                 |
 | \+                              |    ✅     | Addition operator                                                                                                                                       |

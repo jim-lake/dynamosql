@@ -8,4 +8,5 @@ describe('Replace', function () {
   runTests('edge_cases.sql', path.join(__dirname, 'edge_cases.sql'), {
     skipAffected: true,
   });
+  runTests('syntax.sql', path.join(__dirname, 'syntax.sql'));
 });

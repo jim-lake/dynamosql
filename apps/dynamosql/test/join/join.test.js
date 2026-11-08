@@ -14,4 +14,5 @@ describe('Join', function () {
     session: { resultObjects: true },
     nestTables: true,
   });
+  runTests('syntax.sql', path.join(__dirname, 'syntax.sql'));
 });

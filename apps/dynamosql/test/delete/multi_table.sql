@@ -1,2 +1,10 @@
--- Multi-table DELETE is not yet fully supported with JOIN conditions
--- These tests are placeholders for future implementation
+CREATE DATABASE IF NOT EXISTS mem_multi_delete;
+USE mem_multi_delete;
+CREATE TEMPORARY TABLE a (id INT PRIMARY KEY, v INT);
+CREATE TEMPORARY TABLE b (id INT PRIMARY KEY, w INT);
+INSERT INTO a (id, v) VALUES (1, 10), (2, 20), (3, 30);
+INSERT INTO b (id, w) VALUES (2, 0), (3, 1);
+
+DELETE a FROM a JOIN b ON a.id = b.id;
+SELECT id, v FROM a ORDER BY id;
+SELECT id, w FROM b ORDER BY id;

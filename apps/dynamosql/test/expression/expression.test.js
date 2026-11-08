@@ -59,6 +59,9 @@ describe('Expression', function () {
     allowedErrors: 'SAME_CODE',
     verify_field_types: true,
   });
+  runTests('set_statements.sql', path.join(__dirname, 'set_statements.sql'), {
+    verify_field_types: true,
+  });
   runTests('operators.sql', path.join(__dirname, 'operators.sql'), {
     verify_field_types: true,
   });
