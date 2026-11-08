@@ -13,8 +13,8 @@ SELECT other, SUM(CAST(id AS SIGNED)) AS sum_id FROM _dynamodb.foo WHERE id LIKE
 -- GROUP BY with multiple aggregates
 SELECT other, SUM(CAST(id AS SIGNED)) AS sum_id, COUNT(*) AS cnt FROM _dynamodb.foo WHERE id LIKE "grp%" GROUP BY other ORDER BY other;
 
--- GROUP BY with HAVING (if supported, otherwise will error)
--- SELECT other, SUM(CAST(id AS SIGNED)) AS sum_id FROM _dynamodb.foo WHERE id LIKE "grp%" GROUP BY other HAVING sum_id > 0 ORDER BY other;
+-- GROUP BY with HAVING
+SELECT other, SUM(CAST(id AS SIGNED)) AS sum_id FROM _dynamodb.foo WHERE id LIKE "grp%" GROUP BY other HAVING sum_id > 0 ORDER BY other;
 
 -- GROUP BY string column
 SELECT comment, COUNT(*) AS cnt FROM _dynamodb.foo WHERE id LIKE "grp%" GROUP BY comment ORDER BY comment;

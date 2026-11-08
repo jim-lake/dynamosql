@@ -1,4 +1,5 @@
 import { SQLError } from '../../error';
+import { isAggregateNode } from '../expression/aggregate_functions';
 
 import {
   getSourceName,
@@ -17,6 +18,7 @@ import type {
   Binary,
   ColumnRef,
   Column,
+  ExpressionValue,
 } from 'node-sql-parser/build/mysql';
 
 interface TableMapEntry {
@@ -241,12 +243,39 @@ export function resolveReferences(
     }
   }
   const orderby = ast.orderby;
-  const having = ast.type === 'select' ? ast.having : undefined;
-  [orderby, having].forEach((item: unknown) => {
-    walkColumnRefs(item, (object: unknown) => {
-      resolveObject(object, result_map);
-    });
+  walkColumnRefs(orderby, (object: unknown) => {
+    resolveObject(object, result_map);
   });
+  if (ast.type === 'select' && ast.having) {
+    const groupColumns = (ast.groupby?.columns ?? []) as ExpressionValue[];
+    const groupNames = new Set(
+      groupColumns.flatMap((column) =>
+        'type' in column && column.type === 'column_ref'
+          ? [_columnName(column)]
+          : []
+      )
+    );
+    const hasStar =
+      Array.isArray(ast.columns) &&
+      ast.columns.some(
+        (column) =>
+          'type' in column.expr &&
+          column.expr.type === 'column_ref' &&
+          column.expr.column === '*'
+      );
+    walkHavingColumnRefs(ast.having, (object, inAggregate) => {
+      const name = _columnName(object);
+      if (inAggregate || object.table || groupNames.has(name)) {
+        resolveObject(object);
+      } else if (Object.hasOwn(result_map, name)) {
+        resolveObject(object, result_map);
+      } else if (hasStar) {
+        resolveObject(object);
+      } else {
+        throw new SQLError({ err: 'column_not_found', args: [name] });
+      }
+    });
+  }
   if (columns) {
     columnRefMap.forEach((ref) => {
       if (ref.resultIndex !== undefined) {
@@ -255,6 +284,33 @@ export function resolveReferences(
     });
   }
   return { requestSets, requestAll, columnRefMap, setListMap };
+}
+
+function _columnName(ref: ColumnRef): string {
+  return typeof ref.column === 'string'
+    ? ref.column
+    : (ref.column as { expr: { value: string } }).expr.value;
+}
+
+function walkHavingColumnRefs(
+  node: unknown,
+  cb: (ref: ColumnRef, inAggregate: boolean) => void,
+  inAggregate = false
+): void {
+  if (typeof node !== 'object' || node === null) {
+    return;
+  }
+  if ('type' in node && node.type === 'select') {
+    return;
+  }
+  if ('type' in node && node.type === 'column_ref') {
+    cb(node as ColumnRef, inAggregate);
+    return;
+  }
+  const nested = inAggregate || isAggregateNode(node);
+  for (const child of Object.values(node)) {
+    walkHavingColumnRefs(child, cb, nested);
+  }
 }
 
 function _resolveObject(

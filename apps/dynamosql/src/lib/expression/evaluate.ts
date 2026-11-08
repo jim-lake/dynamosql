@@ -7,7 +7,11 @@ import GlobalSettings from '../../global_settings';
 import { getFunctionName } from '../helpers/ast_helper';
 import { getDecimalsForString } from '../helpers/decimals';
 
-import { methods as AggregateFunctions } from './aggregate_functions';
+import {
+  methods as AggregateFunctions,
+  functionAsAggregate,
+  isAggregateNode,
+} from './aggregate_functions';
 import { methods as BinaryExpression } from './binary_expression';
 import { caseExpr } from './case';
 import { methods as Cast } from './cast';
@@ -271,8 +275,12 @@ export function getValue(
     }
   } else if (isFunction(expr)) {
     const funcName = getFunctionName(expr.name);
+    const aggregate = AggregateFunctions[funcName.toLowerCase()];
     const func = Functions[funcName.toLowerCase()];
-    if (typeof func === 'function') {
+    if (isAggregateNode(expr) && aggregate) {
+      result = aggregate(functionAsAggregate(expr), state);
+      result.name ??= funcName + '()';
+    } else if (typeof func === 'function') {
       result = func(expr, state);
       result.name ??= funcName + '()';
     } else {

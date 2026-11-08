@@ -28,7 +28,7 @@ MySQL allows `UPDATE` to change a primary key value. The raw engine (DynamoDB ta
 
 ## Subqueries
 
-Only non-correlated scalar subqueries in `WHERE` are supported (`src/lib/select_handler.ts`, `collectScalarSubqueries`). The queries below were run on temporary tables.
+Only non-correlated scalar subqueries in `WHERE` and `HAVING` are supported (`src/lib/select_handler.ts`, `_collectScalarSubqueries`). The queries below were run on temporary tables.
 
 - `SELECT id FROM t WHERE c IN (SELECT c FROM u) ORDER BY id;`: MySQL returns `[{id: 1}]`. DynamoSQL returns `ER_NO: Unsupport sql feature.`
 - `SELECT id, (SELECT MAX(c) FROM u) AS m FROM t ORDER BY id;`: a scalar subquery in the SELECT list. MySQL returns `m = 70` on each row. DynamoSQL returns `ER_NO: Unsupport sql feature.`
@@ -37,8 +37,16 @@ Only non-correlated scalar subqueries in `WHERE` are supported (`src/lib/select_
 
 ## Aggregates and HAVING
 
-- `SELECT COUNT(*) FROM t WHERE id > 100;`: an aggregate over zero rows. MySQL returns one row, `COUNT(*) = 0`. DynamoSQL returns no rows. `formImplicitGroup` in `src/lib/helpers/group.ts` yields nothing when the input is empty. Derived tables inherit this.
-- `SELECT c, COUNT(*) AS cnt FROM t GROUP BY c HAVING COUNT(*) > 1 ORDER BY c;`: MySQL returns `[{c: 7, cnt: 2}]` on the sample data. DynamoSQL returns every group. HAVING is resolved in `column_ref_helper.ts`, but no code applies it as a filter.
+- `SELECT id % 2 AS grp, COUNT(*) AS n FROM t GROUP BY grp ORDER BY grp;`, with ids 1 to 4: MySQL groups by the alias's expression and returns `[{grp: 0, n: 2}, {grp: 1, n: 2}]`. DynamoSQL returns one group, `[[1, 4]]`, because `grp` is resolved as a column of the table. GROUP BY on the expression itself, `GROUP BY id % 2`, matches MySQL.
+
+## Truthiness in WHERE
+
+- `SELECT id FROM t WHERE label ORDER BY id;`, with labels `'1'`, `'0'`, `'x'`, and `'2x'` on ids 1 to 4: MySQL returns ids 1 and 4, because it converts strings to numbers. DynamoSQL returns all four rows, because `formJoin` in `src/lib/helpers/join.ts` tests the raw value. HAVING uses the MySQL conversion (`convertNum` in `src/lib/helpers/sql_conversion.ts`).
+
+## Temporary tables
+
+- `CREATE TEMPORARY TABLE t (val INT);`: MySQL succeeds. DynamoSQL returns `ER_NO: Unsupport sql feature.` on the memory engine. The same statement with `id INT PRIMARY KEY` works, so the memory engine appears to require a primary key.
+- `INSERT INTO t VALUES (1, 1), (2, 3);` on `t (id INT PRIMARY KEY, val INT)` without a column list: MySQL inserts both rows. DynamoSQL returns `ER_NO: Unsupport sql feature.`. `INSERT INTO t (id, val) VALUES ...` works.
 
 ## Column resolution
 

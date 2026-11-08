@@ -41408,15 +41408,20 @@ function _scaleNumberString(s) {
     return i === -1 ? 0 : s.length - i - 1;
 }
 
+const EMPTY_ROW = { source: new Map(), result: null, group: null };
+function aggregateName(fn, args, state) {
+    const names = args.map((arg) => getValue(arg, { ...state, row: EMPTY_ROW }).name);
+    return `${fn}(${names.join(', ')})`;
+}
+
 function json_arrayagg(expr, state) {
     const { row, ...other } = state;
     const group = row?.group ?? [];
     const { timeZone } = state.session;
     const node_list = [];
-    let name;
+    const name = aggregateName('JSON_ARRAYAGG', [expr.args.expr], other);
     for (const group_row of group) {
         const result = getValue(expr.args.expr, { ...other, row: group_row });
-        name ??= `JSON_ARRAYAGG(${result.name})`;
         if (result.err) {
             return result;
         }
@@ -41437,12 +41442,11 @@ function json_objectagg(expr, state) {
     const group = row?.group ?? [];
     const { timeZone } = state.session;
     const entry_list = [];
-    let name;
+    const name = aggregateName('JSON_OBJECTAGG', [key_expr, value_expr], other);
     for (const group_row of group) {
         const group_state = { ...other, row: group_row };
         const key = getValue(key_expr, group_state);
         const value = getValue(value_expr, group_state);
-        name ??= `JSON_OBJECTAGG(${key.name}, ${value.name})`;
         if (key.err) {
             return key;
         }
@@ -41461,42 +41465,53 @@ function json_objectagg(expr, state) {
     return { err: null, value: json_value, type: 'json', name };
 }
 
+const FUNCTION_NODE_AGGREGATES = new Set([
+    'stddev',
+    'stddev_pop',
+    'stddev_samp',
+    'var_pop',
+    'var_samp',
+    'bit_and',
+    'bit_or',
+    'bit_xor',
+]);
+function isAggregateNode(node) {
+    if (typeof node !== 'object' || node === null || !('type' in node)) {
+        return false;
+    }
+    if (node.type === 'aggr_func') {
+        return true;
+    }
+    return (node.type === 'function' &&
+        'name' in node &&
+        FUNCTION_NODE_AGGREGATES.has(getFunctionName(node.name).toLowerCase()));
+}
+function functionAsAggregate(expr) {
+    return {
+        ...expr,
+        type: 'aggr_func',
+        args: { expr: expr.args?.value?.[0] },
+    };
+}
 function sum(expr, state) {
     const { row, ...other } = state;
     const group = row && row.group ? row.group : [];
+    const name = aggregateName('SUM', [expr.args.expr], other);
     let err = null;
-    let value = 0;
-    let name = '';
+    let value = null;
     let type = 'number';
     for (const group_row of group) {
-        const group_state = { ...other, row: group_row };
-        const result = getValue(expr.args.expr, group_state);
-        if (!name) {
-            name = `SUM(${result.name})`;
-        }
+        const result = getValue(expr.args.expr, { ...other, row: group_row });
         if (result.err) {
             err = result.err;
             break;
         }
-        else if (result.type === 'null') {
+        if (result.type === 'null' || result.type === 'string') {
             type = 'double';
-            value = null;
-            break;
         }
-        else if (result.value === null) {
-            value = null;
-            break;
-        }
-        else {
-            if (result.type === 'string') {
-                type = 'double';
-            }
-            const num = convertNum(result.value);
-            if (num === null) {
-                value = null;
-                break;
-            }
-            value += num;
+        const num = convertNum(result.value);
+        if (num !== null) {
+            value = (value ?? 0) + num;
         }
     }
     return { err, value, type, name };
@@ -41506,18 +41521,14 @@ function count(expr, state) {
     const group = row && row.group ? row.group : [];
     let err = null;
     let value = 0;
-    let name = '';
+    let name = 'COUNT(*)';
     if ('type' in expr.args.expr && expr.args.expr.type === 'star') {
         value = group.length;
-        name = 'COUNT(*)';
     }
     else {
+        name = aggregateName('COUNT', [expr.args.expr], other);
         for (const group_row of group) {
-            const group_state = { ...other, row: group_row };
-            const result = getValue(expr.args.expr, group_state);
-            if (!name) {
-                name = `COUNT(${result.name})`;
-            }
+            const result = getValue(expr.args.expr, { ...other, row: group_row });
             if (result.err) {
                 err = result.err;
                 break;
@@ -41532,17 +41543,13 @@ function count(expr, state) {
 function avg(expr, state) {
     const { row, ...other } = state;
     const group = row && row.group ? row.group : [];
+    const name = aggregateName('AVG', [expr.args.expr], other);
     let err = null;
     let total = 0;
     let cnt = 0;
-    let name = '';
     let hasString = false;
     for (const group_row of group) {
-        const group_state = { ...other, row: group_row };
-        const result = getValue(expr.args.expr, group_state);
-        if (!name) {
-            name = `AVG(${result.name})`;
-        }
+        const result = getValue(expr.args.expr, { ...other, row: group_row });
         if (result.err) {
             err = result.err;
             break;
@@ -41565,16 +41572,12 @@ function avg(expr, state) {
 function min(expr, state) {
     const { row, ...other } = state;
     const group = row && row.group ? row.group : [];
+    const name = aggregateName('MIN', [expr.args.expr], other);
     let err = null;
     let value = null;
     let type = 'null';
-    let name = '';
     for (const group_row of group) {
-        const group_state = { ...other, row: group_row };
-        const result = getValue(expr.args.expr, group_state);
-        if (!name) {
-            name = `MIN(${result.name})`;
-        }
+        const result = getValue(expr.args.expr, { ...other, row: group_row });
         if (result.err) {
             err = result.err;
             break;
@@ -41591,16 +41594,12 @@ function min(expr, state) {
 function max(expr, state) {
     const { row, ...other } = state;
     const group = row && row.group ? row.group : [];
+    const name = aggregateName('MAX', [expr.args.expr], other);
     let err = null;
     let value = null;
     let type = 'null';
-    let name = '';
     for (const group_row of group) {
-        const group_state = { ...other, row: group_row };
-        const result = getValue(expr.args.expr, group_state);
-        if (!name) {
-            name = `MAX(${result.name})`;
-        }
+        const result = getValue(expr.args.expr, { ...other, row: group_row });
         if (result.err) {
             err = result.err;
             break;
@@ -41617,15 +41616,11 @@ function max(expr, state) {
 function stddev_pop(expr, state) {
     const { row, ...other } = state;
     const group = row && row.group ? row.group : [];
+    const name = aggregateName('STDDEV_POP', [expr.args.expr], other);
     let err = null;
-    let name = '';
     const values = [];
     for (const group_row of group) {
-        const group_state = { ...other, row: group_row };
-        const result = getValue(expr.args.expr, group_state);
-        if (!name) {
-            name = `STDDEV_POP(${result.name})`;
-        }
+        const result = getValue(expr.args.expr, { ...other, row: group_row });
         if (result.err) {
             err = result.err;
             break;
@@ -41649,15 +41644,11 @@ function stddev_pop(expr, state) {
 function stddev_samp(expr, state) {
     const { row, ...other } = state;
     const group = row && row.group ? row.group : [];
+    const name = aggregateName('STDDEV_SAMP', [expr.args.expr], other);
     let err = null;
-    let name = '';
     const values = [];
     for (const group_row of group) {
-        const group_state = { ...other, row: group_row };
-        const result = getValue(expr.args.expr, group_state);
-        if (!name) {
-            name = `STDDEV_SAMP(${result.name})`;
-        }
+        const result = getValue(expr.args.expr, { ...other, row: group_row });
         if (result.err) {
             err = result.err;
             break;
@@ -41681,15 +41672,11 @@ function stddev_samp(expr, state) {
 function var_pop(expr, state) {
     const { row, ...other } = state;
     const group = row && row.group ? row.group : [];
+    const name = aggregateName('VAR_POP', [expr.args.expr], other);
     let err = null;
-    let name = '';
     const values = [];
     for (const group_row of group) {
-        const group_state = { ...other, row: group_row };
-        const result = getValue(expr.args.expr, group_state);
-        if (!name) {
-            name = `VAR_POP(${result.name})`;
-        }
+        const result = getValue(expr.args.expr, { ...other, row: group_row });
         if (result.err) {
             err = result.err;
             break;
@@ -41713,15 +41700,11 @@ function var_pop(expr, state) {
 function var_samp(expr, state) {
     const { row, ...other } = state;
     const group = row && row.group ? row.group : [];
+    const name = aggregateName('VAR_SAMP', [expr.args.expr], other);
     let err = null;
-    let name = '';
     const values = [];
     for (const group_row of group) {
-        const group_state = { ...other, row: group_row };
-        const result = getValue(expr.args.expr, group_state);
-        if (!name) {
-            name = `VAR_SAMP(${result.name})`;
-        }
+        const result = getValue(expr.args.expr, { ...other, row: group_row });
         if (result.err) {
             err = result.err;
             break;
@@ -41745,15 +41728,11 @@ function var_samp(expr, state) {
 function bit_and(expr, state) {
     const { row, ...other } = state;
     const group = row && row.group ? row.group : [];
+    const name = aggregateName('BIT_AND', [expr.args.expr], other);
     let err = null;
     let value = (1n << 64n) - 1n;
-    let name = '';
     for (const group_row of group) {
-        const group_state = { ...other, row: group_row };
-        const result = getValue(expr.args.expr, group_state);
-        if (!name) {
-            name = `BIT_AND(${result.name})`;
-        }
+        const result = getValue(expr.args.expr, { ...other, row: group_row });
         if (result.err) {
             err = result.err;
             break;
@@ -41774,15 +41753,11 @@ function bit_and(expr, state) {
 function bit_or(expr, state) {
     const { row, ...other } = state;
     const group = row && row.group ? row.group : [];
+    const name = aggregateName('BIT_OR', [expr.args.expr], other);
     let err = null;
     let value = 0n;
-    let name = '';
     for (const group_row of group) {
-        const group_state = { ...other, row: group_row };
-        const result = getValue(expr.args.expr, group_state);
-        if (!name) {
-            name = `BIT_OR(${result.name})`;
-        }
+        const result = getValue(expr.args.expr, { ...other, row: group_row });
         if (result.err) {
             err = result.err;
             break;
@@ -41803,15 +41778,11 @@ function bit_or(expr, state) {
 function bit_xor(expr, state) {
     const { row, ...other } = state;
     const group = row && row.group ? row.group : [];
+    const name = aggregateName('BIT_XOR', [expr.args.expr], other);
     let err = null;
     let value = 0n;
-    let name = '';
     for (const group_row of group) {
-        const group_state = { ...other, row: group_row };
-        const result = getValue(expr.args.expr, group_state);
-        if (!name) {
-            name = `BIT_XOR(${result.name})`;
-        }
+        const result = getValue(expr.args.expr, { ...other, row: group_row });
         if (result.err) {
             err = result.err;
             break;
@@ -48813,8 +48784,13 @@ function getValue(expr, state) {
     }
     else if (isFunction(expr)) {
         const funcName = getFunctionName(expr.name);
+        const aggregate = methods$5[funcName.toLowerCase()];
         const func = methods$2[funcName.toLowerCase()];
-        if (typeof func === 'function') {
+        if (isAggregateNode(expr) && aggregate) {
+            result = aggregate(functionAsAggregate(expr), state);
+            result.name ??= funcName + '()';
+        }
+        else if (typeof func === 'function') {
             result = func(expr, state);
             result.name ??= funcName + '()';
         }
@@ -51296,12 +51272,34 @@ function resolveReferences(ast, current_database) {
         }
     }
     const orderby = ast.orderby;
-    const having = ast.type === 'select' ? ast.having : undefined;
-    [orderby, having].forEach((item) => {
-        walkColumnRefs(item, (object) => {
-            resolveObject(object, result_map);
-        });
+    walkColumnRefs(orderby, (object) => {
+        resolveObject(object, result_map);
     });
+    if (ast.type === 'select' && ast.having) {
+        const groupColumns = (ast.groupby?.columns ?? []);
+        const groupNames = new Set(groupColumns.flatMap((column) => 'type' in column && column.type === 'column_ref'
+            ? [_columnName(column)]
+            : []));
+        const hasStar = Array.isArray(ast.columns) &&
+            ast.columns.some((column) => 'type' in column.expr &&
+                column.expr.type === 'column_ref' &&
+                column.expr.column === '*');
+        walkHavingColumnRefs(ast.having, (object, inAggregate) => {
+            const name = _columnName(object);
+            if (inAggregate || object.table || groupNames.has(name)) {
+                resolveObject(object);
+            }
+            else if (Object.hasOwn(result_map, name)) {
+                resolveObject(object, result_map);
+            }
+            else if (hasStar) {
+                resolveObject(object);
+            }
+            else {
+                throw new SQLError({ err: 'column_not_found', args: [name] });
+            }
+        });
+    }
     if (columns) {
         columnRefMap.forEach((ref) => {
             if (ref.resultIndex !== undefined) {
@@ -51310,6 +51308,27 @@ function resolveReferences(ast, current_database) {
         });
     }
     return { requestSets, requestAll, columnRefMap, setListMap };
+}
+function _columnName(ref) {
+    return typeof ref.column === 'string'
+        ? ref.column
+        : ref.column.expr.value;
+}
+function walkHavingColumnRefs(node, cb, inAggregate = false) {
+    if (typeof node !== 'object' || node === null) {
+        return;
+    }
+    if ('type' in node && node.type === 'select') {
+        return;
+    }
+    if ('type' in node && node.type === 'column_ref') {
+        cb(node, inAggregate);
+        return;
+    }
+    const nested = inAggregate || isAggregateNode(node);
+    for (const child of Object.values(node)) {
+        walkHavingColumnRefs(child, cb, nested);
+    }
 }
 function _resolveObject(object, ast, db_map, table_map, name_cache, using_owners, requestSets, requestAll, columnRefMap, setListMap, result_map) {
     const fixup_object = object;
@@ -51434,14 +51453,7 @@ function isExpressionValue(expr) {
     return false;
 }
 function hasAggregate(ast) {
-    if (Array.isArray(ast.columns)) {
-        for (const column of ast.columns) {
-            if (_hasAgg(column.expr)) {
-                return true;
-            }
-        }
-    }
-    return false;
+    return _hasAgg(ast.columns) || _hasAgg(ast.having);
 }
 async function* formImplicitGroup(params) {
     const { rowIter } = params;
@@ -51454,17 +51466,12 @@ async function* formImplicitGroup(params) {
             row_list = row_list.concat(batch);
         }
     }
-    if (row_list[0]) {
-        const group_row = {
-            source: row_list[0].source,
-            result: null,
-            group: row_list,
-        };
-        yield [group_row];
-    }
-    else {
-        yield [];
-    }
+    const group_row = {
+        source: row_list[0]?.source ?? new Map(),
+        result: null,
+        group: row_list,
+    };
+    yield [group_row];
 }
 async function* formGroup(params) {
     const { groupby, ast, rowIter, state } = params;
@@ -51538,26 +51545,20 @@ function _unroll(list, obj) {
         }
     }
 }
-function _hasAgg(expr) {
-    if (('type' in expr && expr.type === 'aggr_func') ||
-        ('expr' in expr &&
-            expr.expr &&
-            'type' in expr.expr &&
-            expr.expr.type === 'aggr_func')) {
+function _hasAgg(node) {
+    if (typeof node !== 'object' || node === null) {
+        return false;
+    }
+    if (Array.isArray(node)) {
+        return node.some(_hasAgg);
+    }
+    if (isAggregateNode(node)) {
         return true;
     }
-    if ('args' in expr &&
-        expr.args &&
-        'value' in expr.args &&
-        Array.isArray(expr.args.value)) {
-        for (const sub of expr.args.value) {
-            // sub can be ExpressionValue | DataType | ExprList, all of which are in our union type
-            if (_hasAgg(sub)) {
-                return true;
-            }
-        }
+    if ('type' in node && node.type === 'select') {
+        return false;
     }
-    return false;
+    return Object.values(node).some(_hasAgg);
 }
 
 async function* drainBoth(sourceA, sourceB, callback) {
@@ -52299,6 +52300,9 @@ async function _iterQuery(params) {
     const { ast, session, dynamodb } = params;
     const subqueryValues = new Map();
     await _collectScalarSubqueries(ast.where, params, subqueryValues);
+    if (ast.type === 'select') {
+        await _collectScalarSubqueries(ast.having, params, subqueryValues);
+    }
     const current_database = session.getCurrentDatabase();
     let requestSets = new Map();
     let requestAll = new Map();
@@ -52418,6 +52422,7 @@ async function _evaluateReturn(params) {
         : [];
     const where = ast.where;
     const groupby = ast.type === 'select' ? ast.groupby : undefined;
+    const having = ast.type === 'select' ? ast.having : null;
     const from = ast.type === 'update' ? ast.table : ast.from;
     const state = { session, columnRefMap, tableInfoMap, subqueryValues };
     const rowIter = from && Array.isArray(from)
@@ -52433,7 +52438,12 @@ async function _evaluateReturn(params) {
     else {
         group_iter = rowIter;
     }
-    let resultIter = _makeResults({ iter: group_iter, queryColumns, state });
+    let resultIter = _makeResults({
+        iter: group_iter,
+        queryColumns,
+        state,
+        having,
+    });
     if (ast.orderby) {
         resultIter = sort({
             iter: resultIter,
@@ -52451,7 +52461,7 @@ async function* _listToItetator(list) {
     yield list;
 }
 async function* _makeResults(params) {
-    const { iter, queryColumns, state, signal } = params;
+    const { iter, queryColumns, state, having, signal } = params;
     for await (const batch of iter) {
         const result_list = [];
         for (const row of batch) {
@@ -52462,6 +52472,25 @@ async function* _makeResults(params) {
                     throw new SQLError(result.err);
                 }
                 output_row.push(result);
+                if (result.sleep_ms) {
+                    await promises.setTimeout(result.sleep_ms, undefined, { signal });
+                }
+            }
+            _makeResult(row, output_row);
+            if (having) {
+                const having_result = getValue(having, { ...state, row });
+                if (having_result.err) {
+                    throw new SQLError(having_result.err);
+                }
+                if (!convertNum(having_result.value)) {
+                    continue;
+                }
+            }
+            for (const [index, column] of queryColumns.entries()) {
+                const result = output_row[index];
+                if (!result) {
+                    continue;
+                }
                 if (result.type !== column.result.type) {
                     column.result.type = _unionType(column.result.type, result.type);
                 }
@@ -52469,11 +52498,7 @@ async function* _makeResults(params) {
                 if (result.value === null) {
                     column.result.nullable = true;
                 }
-                if (result.sleep_ms) {
-                    await promises.setTimeout(result.sleep_ms, undefined, { signal });
-                }
             }
-            _makeResult(row, output_row);
             result_list.push(row);
         }
         yield result_list;

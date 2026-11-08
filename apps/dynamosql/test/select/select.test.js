@@ -12,6 +12,7 @@ describe('Select', function () {
     'group_edge_cases.sql',
     path.join(__dirname, 'group_edge_cases.sql')
   );
+  runTests('having.sql', path.join(__dirname, 'having.sql'));
   runTests('subquery.sql', path.join(__dirname, 'subquery.sql'));
   runTests('derived_table.sql', path.join(__dirname, 'derived_table.sql'));
   runTests('advanced.sql', path.join(__dirname, 'advanced.sql'));

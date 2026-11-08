@@ -1,13 +1,12 @@
 import { SQLError } from '../../error';
 import { getValue } from '../expression';
+import { isAggregateNode } from '../expression/aggregate_functions';
 
 import type { EvaluationState } from '../expression';
 import type { SourceRow, SourceRowGroup } from '../handler_types';
 import type {
   ExpressionValue,
   Select,
-  ConvertDataType,
-  ExprList,
   ExtractFunc,
   FulltextSearch,
   Star,
@@ -40,14 +39,7 @@ export interface FormGroupParams {
   state: EvaluationState;
 }
 export function hasAggregate(ast: Select): boolean {
-  if (Array.isArray(ast.columns)) {
-    for (const column of ast.columns) {
-      if (_hasAgg(column.expr)) {
-        return true;
-      }
-    }
-  }
-  return false;
+  return _hasAgg(ast.columns) || _hasAgg(ast.having);
 }
 export async function* formImplicitGroup(
   params: Omit<FormGroupParams, 'groupby'>
@@ -61,16 +53,12 @@ export async function* formImplicitGroup(
       row_list = row_list.concat(batch);
     }
   }
-  if (row_list[0]) {
-    const group_row = {
-      source: row_list[0].source,
-      result: null,
-      group: row_list,
-    };
-    yield [group_row];
-  } else {
-    yield [];
-  }
+  const group_row = {
+    source: row_list[0]?.source ?? new Map(),
+    result: null,
+    group: row_list,
+  };
+  yield [group_row];
 }
 export async function* formGroup(
   params: FormGroupParams
@@ -149,37 +137,18 @@ function _unroll(list: SourceRowGroup[], obj: unknown): void {
     }
   }
 }
-function _hasAgg(
-  expr:
-    | ExpressionValue
-    | ConvertDataType
-    | ExprList
-    | ExtractFunc
-    | FulltextSearch
-    | Star
-    | Assign
-): boolean {
-  if (
-    ('type' in expr && expr.type === 'aggr_func') ||
-    ('expr' in expr &&
-      expr.expr &&
-      'type' in expr.expr &&
-      expr.expr.type === 'aggr_func')
-  ) {
+function _hasAgg(node: unknown): boolean {
+  if (typeof node !== 'object' || node === null) {
+    return false;
+  }
+  if (Array.isArray(node)) {
+    return node.some(_hasAgg);
+  }
+  if (isAggregateNode(node)) {
     return true;
   }
-  if (
-    'args' in expr &&
-    expr.args &&
-    'value' in expr.args &&
-    Array.isArray(expr.args.value)
-  ) {
-    for (const sub of expr.args.value) {
-      // sub can be ExpressionValue | DataType | ExprList, all of which are in our union type
-      if (_hasAgg(sub)) {
-        return true;
-      }
-    }
+  if ('type' in node && node.type === 'select') {
+    return false;
   }
-  return false;
+  return Object.values(node).some(_hasAgg);
 }

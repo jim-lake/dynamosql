@@ -18,6 +18,7 @@ import { formGroup, formImplicitGroup, hasAggregate } from './helpers/group';
 import { formJoin } from './helpers/join';
 import { expandStarColumns, calcColumns } from './helpers/query_columns';
 import { sort } from './helpers/sort';
+import { convertNum } from './helpers/sql_conversion';
 
 import type { TableInfoMap, SourceMap, CellRow } from './engine';
 import type {
@@ -177,6 +178,9 @@ async function _iterQuery(
   const { ast, session, dynamodb } = params;
   const subqueryValues: SubqueryValues = new Map();
   await _collectScalarSubqueries(ast.where, params, subqueryValues);
+  if (ast.type === 'select') {
+    await _collectScalarSubqueries(ast.having, params, subqueryValues);
+  }
 
   const current_database = session.getCurrentDatabase();
   let requestSets = new Map<From, Set<string>>();
@@ -337,6 +341,7 @@ async function _evaluateReturn(
 
   const where = ast.where;
   const groupby = ast.type === 'select' ? ast.groupby : undefined;
+  const having = ast.type === 'select' ? ast.having : null;
   const from = ast.type === 'update' ? ast.table : ast.from;
 
   const state = { session, columnRefMap, tableInfoMap, subqueryValues };
@@ -355,7 +360,12 @@ async function _evaluateReturn(
     group_iter = rowIter;
   }
 
-  let resultIter = _makeResults({ iter: group_iter, queryColumns, state });
+  let resultIter = _makeResults({
+    iter: group_iter,
+    queryColumns,
+    state,
+    having,
+  });
   if (ast.orderby) {
     resultIter = sort({
       iter: resultIter,
@@ -377,12 +387,13 @@ interface MakeResultsParams {
   iter: AsyncIterable<SourceRow[]>;
   queryColumns: QueryColumn[];
   state: EvaluationState;
+  having: Select['having'];
   signal?: AbortSignal;
 }
 async function* _makeResults(
   params: MakeResultsParams
 ): AsyncIterableIterator<SourceRowResult[]> {
-  const { iter, queryColumns, state, signal } = params;
+  const { iter, queryColumns, state, having, signal } = params;
   for await (const batch of iter) {
     const result_list: SourceRowResult[] = [];
     for (const row of batch) {
@@ -393,6 +404,25 @@ async function* _makeResults(
           throw new SQLError(result.err);
         }
         output_row.push(result);
+        if (result.sleep_ms) {
+          await setTimeout(result.sleep_ms, undefined, { signal });
+        }
+      }
+      _makeResult(row, output_row);
+      if (having) {
+        const having_result = Expression.getValue(having, { ...state, row });
+        if (having_result.err) {
+          throw new SQLError(having_result.err);
+        }
+        if (!convertNum(having_result.value)) {
+          continue;
+        }
+      }
+      for (const [index, column] of queryColumns.entries()) {
+        const result = output_row[index];
+        if (!result) {
+          continue;
+        }
         if (result.type !== column.result.type) {
           column.result.type = _unionType(column.result.type, result.type);
         }
@@ -400,11 +430,7 @@ async function* _makeResults(
         if (result.value === null) {
           column.result.nullable = true;
         }
-        if (result.sleep_ms) {
-          await setTimeout(result.sleep_ms, undefined, { signal });
-        }
       }
-      _makeResult(row, output_row);
       result_list.push(row);
     }
     yield result_list;

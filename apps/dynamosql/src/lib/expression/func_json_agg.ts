@@ -1,6 +1,7 @@
 import { SQLError } from '../../error';
 import { SQLJson } from '../types/sql_json';
 
+import { aggregateName } from './aggregate_name';
 import { getValue } from './evaluate';
 
 import type { EvaluationState, EvaluationResult } from './evaluate';
@@ -14,10 +15,9 @@ export function json_arrayagg(
   const group = row?.group ?? [];
   const { timeZone } = state.session;
   const node_list: unknown[] = [];
-  let name: string | undefined;
+  const name = aggregateName('JSON_ARRAYAGG', [expr.args.expr], other);
   for (const group_row of group) {
     const result = getValue(expr.args.expr, { ...other, row: group_row });
-    name ??= `JSON_ARRAYAGG(${result.name})`;
     if (result.err) {
       return result;
     }
@@ -44,12 +44,11 @@ export function json_objectagg(
   const group = row?.group ?? [];
   const { timeZone } = state.session;
   const entry_list: [string, unknown][] = [];
-  let name: string | undefined;
+  const name = aggregateName('JSON_OBJECTAGG', [key_expr, value_expr], other);
   for (const group_row of group) {
     const group_state = { ...other, row: group_row };
     const key = getValue(key_expr, group_state);
     const value = getValue(value_expr, group_state);
-    name ??= `JSON_OBJECTAGG(${key.name}, ${value.name})`;
     if (key.err) {
       return key;
     }
