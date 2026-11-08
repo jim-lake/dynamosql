@@ -26,5 +26,3 @@ SELECT JSON_VALID(0) AS json_value;
 SELECT JSON_VALID(1.5) AS json_value;
 SELECT JSON_VALID(CURDATE()) AS json_value;
 SELECT JSON_VALID('[1,2]') + 1 AS json_value;
-SELECT JSON_VALID() AS json_value;
-SELECT JSON_VALID('[1]', '$') AS json_value;

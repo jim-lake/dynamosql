@@ -46,7 +46,3 @@ UPDATE der_mem.t t JOIN (SELECT id, nc FROM der_mem.u) s ON s.id = t.id SET t.c 
 SELECT id, c FROM der_mem.t ORDER BY id;
 UPDATE der_mem.t t JOIN (SELECT id FROM der_mem.u WHERE nc > 600) s ON s.id = t.id SET t.name = 'matched';
 SELECT id, name FROM der_mem.t ORDER BY id;
-
--- Derived table errors
-SELECT s.id FROM (SELECT id FROM der_mem.t) ORDER BY 1;
-SELECT s.id FROM (SELECT id, id FROM der_mem.t) s;

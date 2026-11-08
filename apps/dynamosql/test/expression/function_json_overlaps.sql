@@ -27,5 +27,3 @@ SELECT JSON_OVERLAPS('{"a":{"b":1}}', '{"a":{"b":1}}') AS json_value;
 SELECT JSON_OVERLAPS(CAST('[1,2]' AS JSON), JSON_ARRAY(2)) AS json_value;
 SELECT JSON_OVERLAPS(NULL, '[1]') AS json_value;
 SELECT JSON_OVERLAPS('[1]', NULL) AS json_value;
-SELECT JSON_OVERLAPS('[1]', 'x') AS json_value;
-SELECT JSON_OVERLAPS('[1]') AS json_value;

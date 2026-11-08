@@ -33,6 +33,12 @@ describe('DDL', function () {
     true
   );
   runTests(
+    'create_variations_error.sql',
+    path.join(__dirname, 'create_variations_error.sql'),
+    { allowedErrors: 'SAME_CODE', skipAffected: true, timeout: 30000 },
+    true
+  );
+  runTests(
     'drop.sql',
     path.join(__dirname, 'drop.sql'),
     { skipAffected: true, timeout: 30000 },
@@ -48,6 +54,12 @@ describe('DDL', function () {
     'error_cases.sql',
     path.join(__dirname, 'error_cases.sql'),
     { skipAffected: true, timeout: 30000 },
+    true
+  );
+  runTests(
+    'error_cases_error.sql',
+    path.join(__dirname, 'error_cases_error.sql'),
+    { allowedErrors: 'SAME_CODE', skipAffected: true, timeout: 30000 },
     true
   );
 });

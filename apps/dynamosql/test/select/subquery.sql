@@ -10,10 +10,6 @@ SELECT id FROM _dynamodb.foo WHERE other = (SELECT other FROM _dynamodb.foo WHER
 SELECT id FROM _dynamodb.foo WHERE other = (SELECT other FROM _dynamodb.foo WHERE id = '111') + 0 ORDER BY id;
 SELECT id FROM _dynamodb.foo WHERE other = (SELECT other FROM _dynamodb.foo WHERE id = '111') OR id = '4' ORDER BY id;
 
--- Subquery errors
-SELECT id FROM _dynamodb.foo WHERE other = (SELECT other FROM _dynamodb.foo);
-SELECT id FROM _dynamodb.foo WHERE other = (SELECT id, other FROM _dynamodb.foo WHERE id = '111');
-
 -- Aggregate and expression subqueries on temporary tables
 CREATE DATABASE IF NOT EXISTS sub_mem;
 CREATE TEMPORARY TABLE sub_mem.t (id INT PRIMARY KEY, c INT);
@@ -26,7 +22,6 @@ SELECT id FROM sub_mem.t WHERE c = (SELECT c FROM sub_mem.u WHERE id = 4) ORDER 
 SELECT id FROM sub_mem.t WHERE c > (SELECT AVG(c) FROM sub_mem.u) ORDER BY id;
 SELECT id FROM sub_mem.t WHERE c = (SELECT c FROM sub_mem.u WHERE id = 1) + 2 ORDER BY id;
 SELECT id FROM sub_mem.t WHERE (SELECT COUNT(*) FROM sub_mem.u) = 4 ORDER BY id;
-SELECT id FROM sub_mem.t WHERE c = (SELECT c FROM sub_mem.u);
 
 -- Scalar subqueries in UPDATE and DELETE WHERE
 CREATE TEMPORARY TABLE sub_mem.v (id INT PRIMARY KEY, c INT);

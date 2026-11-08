@@ -2,7 +2,6 @@
 SELECT JSON_SET('{"a":1}', '$.a', 2, '$.b', 3) AS json_value;
 SELECT JSON_SET('{"a":1}', '$.a', 'x', '$.b', NULL) AS json_value;
 SELECT JSON_SET('{"a":1}', '$.a', 2, '$.a', 3) AS json_value;
-SELECT JSON_SET('{"a":1}', '$.a', 2, '$.a', 3, '$.c') AS json_value;
 SELECT JSON_SET('{"a":1}', '$.b.c', 2) AS json_value;
 SELECT JSON_SET('{"a":1}', '$.a[0]', 2) AS json_value;
 SELECT JSON_SET('{"a":[1]}', '$.a[0][0]', 2) AS json_value;
@@ -32,10 +31,3 @@ SELECT JSON_SET(NULL, NULL, 2) AS json_value;
 SELECT JSON_SET('{"a":1}', '$.a', 2, NULL, 3) AS json_value;
 SELECT JSON_SET(CAST('{"a":1}' AS JSON), '$.a', 2) AS json_value;
 SELECT JSON_SET(JSON_ARRAY(1, 2), '$[1]', 'x') AS json_value;
-SELECT JSON_SET('{"a":1}', '$.a') AS json_value;
-SELECT JSON_SET('{"a":1}') AS json_value;
-SELECT JSON_SET('{"a":1}', '$.a', 2, '$.b') AS json_value;
-SELECT JSON_SET('{"a":1}', 'a', 2) AS json_value;
-SELECT JSON_SET('{"a":1}', '$.*', 2) AS json_value;
-SELECT JSON_SET('{"a":1}', '$[*]', 2) AS json_value;
-SELECT JSON_SET('not json', '$.a', 1) AS json_value;

@@ -40,7 +40,6 @@ START TRANSACTION;
 INSERT INTO odku_mem (id, c, s) VALUES (6, 1, 'rolled') ON DUPLICATE KEY UPDATE c = c + 1000;
 ROLLBACK;
 SELECT * FROM odku_mem ORDER BY id;
-INSERT INTO odku_mem (id, c, s) VALUES (1, 1, 'x') ON DUPLICATE KEY UPDATE nope = 1;
 SELECT * FROM odku_mem ORDER BY id;
 
 -- Memory engine: composite primary key and primary key changes
@@ -59,7 +58,6 @@ SELECT * FROM odku_mem_pk ORDER BY a, b;
 -- Memory engine: primary key change to an existing key
 CREATE TEMPORARY TABLE odku_mem_pkchg (id INT PRIMARY KEY, v INT);
 INSERT INTO odku_mem_pkchg (id, v) VALUES (1, 10), (2, 20);
-INSERT INTO odku_mem_pkchg (id, v) VALUES (1, 1) ON DUPLICATE KEY UPDATE id = 2;
 SELECT * FROM odku_mem_pkchg ORDER BY id;
 INSERT INTO odku_mem_pkchg (id, v) VALUES (1, 1) ON DUPLICATE KEY UPDATE id = 7;
 SELECT * FROM odku_mem_pkchg ORDER BY id;

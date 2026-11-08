@@ -1,0 +1,14 @@
+CREATE DATABASE IF NOT EXISTS having_mem;
+CREATE TEMPORARY TABLE having_mem.t (id INT PRIMARY KEY, c INT, name VARCHAR(20), amount INT);
+CREATE TEMPORARY TABLE having_mem.u (id INT PRIMARY KEY, c INT);
+CREATE TEMPORARY TABLE having_mem.s (id INT PRIMARY KEY, label VARCHAR(10));
+INSERT INTO having_mem.t (id, c, name, amount) VALUES (1, 7, 'alpha', 10), (2, 7, 'beta', 20), (3, 8, 'gamma', 30), (4, 9, NULL, 40), (5, NULL, 'alpha', 50), (6, 8, 'delta', 60), (7, 8, 'epsilon', 70);
+INSERT INTO having_mem.u (id, c) VALUES (1, 5), (2, 7), (3, 7), (4, NULL);
+INSERT INTO having_mem.s (id, label) VALUES (1, '1'), (2, '0'), (3, 'x'), (4, '2x'), (5, ''), (6, NULL), (7, '0.5');
+SELECT id FROM having_mem.s HAVING label ORDER BY id;
+SELECT id FROM having_mem.s HAVING NOT label ORDER BY id;
+SELECT id FROM having_mem.s HAVING label + 0 ORDER BY id;
+SELECT id FROM having_mem.s HAVING label = '0' ORDER BY id;
+SELECT c FROM having_mem.t GROUP BY c HAVING nope > 1;
+SELECT c, COUNT(*) FROM having_mem.t GROUP BY c HAVING name = 'x';
+SELECT id FROM having_mem.t HAVING amount > 1;

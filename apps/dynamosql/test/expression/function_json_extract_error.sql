@@ -1,0 +1,12 @@
+SELECT JSON_EXTRACT('[1,2]', '$[last+1]') AS json_value;
+SELECT JSON_EXTRACT('[1,2]', '$[1]x') AS json_value;
+SELECT JSON_EXTRACT('[1,2]', '') AS json_value;
+SELECT JSON_EXTRACT('{"a":1}', '$.') AS json_value;
+SELECT JSON_EXTRACT('{"a":1}', '$[]') AS json_value;
+SELECT JSON_EXTRACT('{"a":1}', 1) AS json_value;
+SELECT JSON_EXTRACT('{"a":1}') AS json_value;
+SELECT JSON_EXTRACT('not json', '$') AS json_value;
+SELECT JSON_EXTRACT('[1,2]', 'a') AS json_value;
+SELECT JSON_EXTRACT('[1,2,3,4]', '$[2 to 1]') AS json_value;
+SELECT JSON_EXTRACT('[1,2,3]', '$[0 TO 1]') AS json_value;
+SELECT JSON_EXTRACT('[1,2,3]', '$[0 to x]') AS json_value;

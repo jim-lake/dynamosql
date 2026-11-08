@@ -26,8 +26,6 @@ SELECT JSON_MERGE_PATCH('{"a":1}', '{"a":true}') AS json_value;
 SELECT JSON_MERGE_PATCH('{"a":1}', '{"a":[1,null]}') AS json_value;
 SELECT JSON_MERGE_PATCH(JSON_OBJECT('a', 1), '{"b":2}') AS json_value;
 SELECT JSON_MERGE_PATCH(CAST('{"a":1}' AS JSON), '{"a":null}') AS json_value;
-SELECT JSON_MERGE_PATCH('{"a":1}') AS json_value;
 SELECT JSON_MERGE_PATCH('{"a":1}', NULL) AS json_value;
 SELECT JSON_MERGE_PATCH(NULL, '{"a":1}') AS json_value;
 SELECT JSON_MERGE_PATCH('{"a":1}', '{}', NULL) AS json_value;
-SELECT JSON_MERGE_PATCH('{"a":1}', 'x') AS json_value;

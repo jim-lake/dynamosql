@@ -6,10 +6,6 @@ SELECT GREATEST(-5, -2, -8) AS result;
 SELECT GREATEST(1.5, 2.3, 1.9) AS result;
 SELECT GREATEST("a", "b", "c", "d") AS result;
 SELECT GREATEST("z", "a", "m", "b") AS result;
-
--- GREATEST edge cases
-SELECT GREATEST() AS result;
-SELECT GREATEST(1) AS result;
 SELECT GREATEST(1, 2) AS result;
 SELECT GREATEST(1, 2, 3, 4, 5) AS result;
 SELECT GREATEST("", "a") AS result;

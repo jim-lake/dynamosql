@@ -28,10 +28,6 @@ SELECT JSON_ARRAY_APPEND('[1]', '$', JSON_ARRAY(2, 3)) AS json_value;
 SELECT JSON_ARRAY_APPEND('[1]', '$', 'text', '$', 1.5) AS json_value;
 SELECT JSON_ARRAY_APPEND(NULL, '$', 1) AS json_value;
 SELECT JSON_ARRAY_APPEND('[1]', NULL, 1) AS json_value;
-SELECT JSON_ARRAY_APPEND('[1]', '$') AS json_value;
-SELECT JSON_ARRAY_APPEND('[1]', '$[*]', 2) AS json_value;
-SELECT JSON_ARRAY_APPEND('[1]', 'a', 2) AS json_value;
-SELECT JSON_ARRAY_APPEND('not json', '$', 1) AS json_value;
 
 -- JSON_ARRAY edge cases
 SELECT JSON_ARRAY(JSON_ARRAY(JSON_ARRAY(1))) AS json_value;

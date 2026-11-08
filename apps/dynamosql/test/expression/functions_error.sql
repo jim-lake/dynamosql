@@ -1,0 +1,2 @@
+SELECT DATE_ADD(NULL, NULL) AS result;
+SELECT DATE_ADD(NOW(), NULL) AS ignore_seconds;

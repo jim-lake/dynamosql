@@ -84,6 +84,3 @@ SELECT @@global.div_precision_increment AS div_prec;
 SET @@global.sql_mode = "TRADITIONAL";
 
 SELECT @@global.system_time_zone IS NOT NULL AS has_system_tz;
-
--- Invalid SET syntax (should error)
-SET invalid_syntax;

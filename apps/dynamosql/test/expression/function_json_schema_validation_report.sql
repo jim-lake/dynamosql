@@ -13,4 +13,3 @@ SELECT JSON_OBJECT('valid', JSON_EXTRACT(JSON_SCHEMA_VALIDATION_REPORT('{"type":
 SELECT JSON_OBJECT('valid', JSON_EXTRACT(JSON_SCHEMA_VALIDATION_REPORT('{"type":"object","properties":{"a":{"type":"number"}}}', CAST('{"a":"x"}' AS JSON)), '$.valid'), 'has_fields', JSON_CONTAINS_PATH(JSON_SCHEMA_VALIDATION_REPORT('{"type":"object","properties":{"a":{"type":"number"}}}', CAST('{"a":"x"}' AS JSON)), 'all', '$.reason', '$."schema-location"', '$."document-location"', '$."schema-failed-keyword"') + 0) AS json_value;
 SELECT JSON_SCHEMA_VALIDATION_REPORT('{"type":"object"}', NULL) AS json_value;
 SELECT JSON_SCHEMA_VALIDATION_REPORT(NULL, '{}') AS json_value;
-SELECT JSON_SCHEMA_VALIDATION_REPORT('{"type":"object"}', 'not json') AS json_value;

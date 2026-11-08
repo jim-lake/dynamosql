@@ -97,6 +97,11 @@ export function runTests(test_name, file_path, extra, maybe_skip) {
         }),
       ]);
 
+      if ((extra?.allowedErrors ?? 'NONE') === 'NONE') {
+        expect(mysql_result.err?.code ?? null, 'mysql error').to.equal(null);
+        expect(ddb_result.err?.code ?? null, 'dynamodb error').to.equal(null);
+      }
+
       if (ddb_result.err && !mysql_result.err) {
         console.error('unexpected ddb_result.err:', ddb_result.err);
         expect(ddb_result.err, 'err equality').to.equal(mysql_result.err);

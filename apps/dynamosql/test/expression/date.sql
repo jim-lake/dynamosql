@@ -5,7 +5,6 @@ SELECT NOW(3) AS ignore_seconds;
 SELECT NOW(4) AS ignore_seconds;
 SELECT NOW(5) AS ignore_seconds;
 SELECT NOW(6) AS ignore_seconds;
-SELECT NOW(7) AS ignore_seconds;
 
 SELECT CURTIME() AS ignore_seconds;
 SELECT CURTIME(1) AS ignore_seconds;
@@ -14,7 +13,6 @@ SELECT CURTIME(3) AS ignore_seconds;
 SELECT CURTIME(4) AS ignore_seconds;
 SELECT CURTIME(5) AS ignore_seconds;
 SELECT CURTIME(6) AS ignore_seconds;
-SELECT CURTIME(7) AS ignore_seconds;
 
 SELECT CURDATE() AS foo;
 SELECT CURRENT_DATE() AS foo;

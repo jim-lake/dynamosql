@@ -109,23 +109,12 @@ SELECT c, COUNT(*) AS cnt FROM having_mem.t GROUP BY c HAVING 1 = 1 AND 0 < 1 OR
 SELECT COUNT(*) AS cnt FROM having_mem.t HAVING NOT FALSE;
 SELECT id FROM having_mem.s HAVING TRUE ORDER BY id;
 
--- HAVING truthiness follows MySQL numeric conversion
-SELECT id FROM having_mem.s HAVING label ORDER BY id;
-SELECT id FROM having_mem.s HAVING NOT label ORDER BY id;
-SELECT id FROM having_mem.s HAVING label + 0 ORDER BY id;
-SELECT id FROM having_mem.s HAVING label = '0' ORDER BY id;
-
 -- HAVING inside derived tables and joins
 SELECT s.c, s.cnt FROM (SELECT c, COUNT(*) AS cnt FROM having_mem.t GROUP BY c HAVING COUNT(*) > 1) s ORDER BY s.c;
 SELECT COUNT(*) AS n FROM (SELECT c FROM having_mem.t GROUP BY c HAVING COUNT(*) > 2) s;
 SELECT s.n FROM (SELECT COUNT(*) AS n FROM having_mem.t WHERE id > 100) s;
 SELECT t.c, COUNT(*) AS cnt FROM having_mem.t t JOIN having_mem.u u ON u.c = t.c GROUP BY t.c HAVING cnt > 1 ORDER BY t.c;
 SELECT t.c, COUNT(*) AS cnt FROM having_mem.t t LEFT JOIN having_mem.u u ON u.c = t.c GROUP BY t.c HAVING COUNT(u.id) = 0 ORDER BY t.c;
-
--- HAVING errors and name resolution
-SELECT c FROM having_mem.t GROUP BY c HAVING nope > 1;
-SELECT c, COUNT(*) FROM having_mem.t GROUP BY c HAVING name = 'x';
-SELECT id FROM having_mem.t HAVING amount > 1;
 SELECT c FROM having_mem.t GROUP BY c, name HAVING name = 'alpha' ORDER BY c;
 SELECT COUNT(id) AS c FROM having_mem.t GROUP BY c HAVING c = 3;
 SELECT COUNT(id) AS c FROM having_mem.t HAVING c = 7;

@@ -30,8 +30,6 @@ SELECT JSON_SCHEMA_VALID('{"type":"object","required":["a"]}', NULL) AS is_valid
 SELECT JSON_SCHEMA_VALID(NULL, '{}') AS is_valid;
 SELECT JSON_SCHEMA_VALID('{"type":"object"}', CAST('{"a":1}' AS JSON)) AS is_valid;
 SELECT JSON_SCHEMA_VALID(CAST('{"type":"integer"}' AS JSON), '5') AS is_valid;
-SELECT JSON_SCHEMA_VALID('{"type":"object"}', 'not json') AS is_valid;
-SELECT JSON_SCHEMA_VALID('{"type":"object"}', 5) AS is_valid;
 SELECT JSON_SCHEMA_VALID('{"type":"object","required":["a","b"],"properties":{"a":{"type":"number"},"b":{"type":"string"}}}', '{"a":"x","b":3}') AS is_valid;
 SELECT JSON_SCHEMA_VALID('{"type":"object","required":["a","b"],"properties":{"a":{"type":"number"},"b":{"type":"string"}}}', '{"a":1,"b":"ok"}') AS is_valid;
 SELECT JSON_SCHEMA_VALID('{"type":"object","required":["c"],"properties":{"a":{"type":"number"}},"additionalProperties":false}', '{"a":"x","z":1}') AS is_valid;

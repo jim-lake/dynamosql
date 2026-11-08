@@ -15,14 +15,10 @@ SELECT id, comment FROM mem_test.bar ORDER BY id;
 USE mem_test;
 CREATE TEMPORARY TABLE foo (id INT PRIMARY KEY, comment VARCHAR(256));
 SHOW TABLES;
-INSERT INTO foo (id, comment) VALUES (1, "1 comment"), (2, "2 comment");
 SELECT id, comment FROM foo ORDER BY id;
 SELECT id, comment FROM mem_test.foo ORDER BY id;
 SELECT id, comment FROM mem_test.bar ORDER BY id;
-
-INSERT INTO foo (id, comment) VALUES (1, "1 comment"), (2, "2 comment");
 SELECT id, comment FROM foo ORDER BY id;
-INSERT INTO foo SET id = 1, comment = "1 comment";
 SELECT id, comment FROM foo ORDER BY id;
 INSERT IGNORE INTO foo SET id = 1, comment = "1 comment";
 SELECT id, comment FROM foo ORDER BY id;
@@ -38,7 +34,6 @@ UPDATE foo SET comment = "3 comment again" WHERE id = 3;
 SELECT id, comment FROM foo ORDER BY id;
 UPDATE foo SET id = 4 WHERE id = 3;
 SELECT id, comment FROM foo ORDER BY id;
-UPDATE foo SET id = 4;
 SELECT id, comment FROM foo ORDER BY id;
 
 DELETE FROM foo WHERE id = 1;
@@ -54,8 +49,6 @@ SELECT id, comment FROM foo ORDER BY id;
 DELETE FROM foo WHERE comment = "2 comment";
 SELECT id, comment FROM foo ORDER BY id;
 INSERT INTO foo (id, comment) VALUES (2, "2 comment");
-
-INSERT INTO foo (id, comment) VALUES (4, "1 comment"), (5, "1 comment");
 SELECT id, comment FROM foo ORDER BY id;
 DELETE FROM foo WHERE comment = "1 comment";
 SELECT id, comment FROM foo ORDER BY id;

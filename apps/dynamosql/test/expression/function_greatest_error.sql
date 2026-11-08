@@ -1,0 +1,2 @@
+SELECT GREATEST() AS result;
+SELECT GREATEST(1) AS result;

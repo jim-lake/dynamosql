@@ -1,0 +1,13 @@
+CREATE DATABASE IF NOT EXISTS mem_arrow_test;
+USE mem_arrow_test;
+CREATE TEMPORARY TABLE arrow_doc (id INT PRIMARY KEY, doc JSON, txt VARCHAR(256));
+INSERT INTO arrow_doc (id, doc, txt) VALUES (1, '{"a":1}', '{"a":"x"}');
+INSERT INTO arrow_doc (id, doc, txt) VALUES (2, '{"a":null,"b":[1,"s"]}', NULL);
+INSERT INTO arrow_doc (id, doc, txt) VALUES (3, '[1,2,3]', '[1,2]');
+INSERT INTO arrow_doc (id, doc, txt) VALUES (4, '{"a":{"b":[1,2]}}', '"x"');
+INSERT INTO arrow_doc (id, doc, txt) VALUES (5, NULL, NULL);
+INSERT INTO arrow_doc (id, doc, txt) VALUES (6, '{"a":1.50,"c":true,"d":"é"}', '{"a":1}');
+SELECT doc -> 'a' AS json_value FROM arrow_doc WHERE id = 1;
+INSERT INTO arrow_doc (id, doc, txt) VALUES (7, NULL, '{"a":1');
+SELECT txt -> '$.a' AS json_value FROM arrow_doc WHERE id = 7;
+SELECT txt ->> '$.a' AS text_value FROM arrow_doc WHERE id = 7;

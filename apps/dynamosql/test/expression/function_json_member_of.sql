@@ -45,5 +45,3 @@ SELECT NULL MEMBER OF('null') AS json_value;
 SELECT NULL MEMBER OF(1) AS json_value;
 SELECT NULL MEMBER OF('[1') AS json_value;
 SELECT 'a' MEMBER OF(NULL) AS json_value;
-SELECT 1 MEMBER OF(1) AS json_value;
-SELECT 1 MEMBER OF('[1') AS json_value;

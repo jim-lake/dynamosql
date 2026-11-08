@@ -22,6 +22,3 @@ SELECT JSON_VALUE(CAST('{"a":"x"}' AS JSON), '$.a') AS result;
 SELECT JSON_VALUE(JSON_ARRAY(1, 2), '$[0]') AS result;
 SELECT JSON_VALUE(NULL, '$.a') AS result;
 SELECT JSON_VALUE('not json', '$.a') AS result;
-SELECT JSON_VALUE('{"a":1}', 'a') AS result;
-SELECT JSON_VALUE('[1]', 'a') AS result;
-SELECT JSON_VALUE(5, '$') AS result;

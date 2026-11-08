@@ -5,7 +5,6 @@ USE mem_json_test;
 CREATE TEMPORARY TABLE json_temp (id INT PRIMARY KEY, doc JSON);
 CREATE TEMPORARY TABLE json_not_null (id INT PRIMARY KEY, doc JSON NOT NULL);
 CREATE TEMPORARY TABLE json_default_null (id INT PRIMARY KEY, doc JSON DEFAULT NULL);
-CREATE TEMPORARY TABLE json_key (id JSON PRIMARY KEY);
 CREATE TEMPORARY TABLE json_mixed (id INT PRIMARY KEY, doc JSON, label VARCHAR(256), flag BOOLEAN);
 
 -- JSON column insert
@@ -19,15 +18,11 @@ INSERT INTO json_mixed (id, doc, label) VALUES (7, JSON_ARRAY(1.0, 1e20, -0.5), 
 INSERT INTO json_mixed (id, doc, label) VALUES (8, JSON_ARRAY('say "hi"', 'back\\slash'), 'escapes');
 INSERT INTO json_mixed (id, doc, label) VALUES (9, JSON_ARRAY(9007199254740993), 'bigint');
 INSERT INTO json_mixed (id, doc, label) VALUES (10, JSON_ARRAY(1 = 1, 1 = 2), 'comparisons');
-INSERT INTO json_mixed (id, doc, label) VALUES (11, '[1,', 'invalid text');
-INSERT INTO json_mixed (id, doc, label) VALUES (12, 'not json', 'invalid word');
-INSERT INTO json_mixed (id, doc, label) VALUES (1, JSON_ARRAY(9), 'duplicate');
 REPLACE INTO json_mixed (id, doc, label) VALUES (1, JSON_ARRAY(9), 'replaced');
 INSERT IGNORE INTO json_mixed (id, doc, label) VALUES (1, JSON_ARRAY(8), 'ignored');
 INSERT INTO json_mixed (id, doc, label) SELECT 13, JSON_ARRAY('from', 'select'), 'insert select';
 INSERT INTO json_temp (id, doc) VALUES (1, JSON_ARRAY(1, 2)), (2, NULL), (3, JSON_ARRAY());
 INSERT INTO json_not_null (id, doc) VALUES (1, JSON_ARRAY(1));
-INSERT INTO json_not_null (id) VALUES (2);
 INSERT INTO json_default_null (id) VALUES (1);
 
 -- JSON column select

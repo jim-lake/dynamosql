@@ -1,0 +1,10 @@
+SELECT JSON_ARRAY_INSERT('[1,2]', '$[1]', 'x', '$[9]') AS json_value;
+SELECT JSON_ARRAY_INSERT('[1,2]', '$[0]') AS json_value;
+SELECT JSON_ARRAY_INSERT('[1,2]', '$.a', 'x') AS json_value;
+SELECT JSON_ARRAY_INSERT('{"a":{"b":1}}', '$.a.b', 'x') AS json_value;
+SELECT JSON_ARRAY_INSERT('[1,2]', '$', 'x') AS json_value;
+SELECT JSON_ARRAY_INSERT('[1,2]', '$[0]', 'x', '$.z', 'y') AS json_value;
+SELECT JSON_ARRAY_INSERT('[1,2]', '$[*]', 'x') AS json_value;
+SELECT JSON_ARRAY_INSERT('[1,2]', '$[1]x', 'x') AS json_value;
+SELECT JSON_ARRAY_INSERT('[1,2]', 'a', 'x') AS json_value;
+SELECT JSON_ARRAY_INSERT('not json', '$[0]', 'x') AS json_value;

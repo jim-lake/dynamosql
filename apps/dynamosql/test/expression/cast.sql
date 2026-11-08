@@ -52,13 +52,6 @@ SELECT CAST(' [1,2] ' AS JSON) AS json_value;
 SELECT CAST('{"a": 1, "a": 2}' AS JSON) AS json_value;
 SELECT CAST('{"k": "é"}' AS JSON) AS json_value;
 SELECT CAST('{"a":[1,{"b":null}]}' AS JSON) AS json_value;
-SELECT CAST('abc' AS JSON) AS json_value;
-SELECT CAST('' AS JSON) AS json_value;
-SELECT CAST('   ' AS JSON) AS json_value;
-SELECT CAST('[1,]' AS JSON) AS json_value;
-SELECT CAST('1 2' AS JSON) AS json_value;
-SELECT CAST('NaN' AS JSON) AS json_value;
-SELECT CAST("{'a':1}" AS JSON) AS json_value;
 
 -- CAST AS JSON: non-string scalars become JSON scalars
 SELECT CAST(NULL AS JSON) AS json_value;

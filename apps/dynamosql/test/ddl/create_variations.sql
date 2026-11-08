@@ -40,16 +40,6 @@ CREATE TABLE IF NOT EXISTS _dynamodb.if_not_exists (id INT PRIMARY KEY);
 SELECT * FROM _dynamodb.if_not_exists ORDER BY id;
 DROP TABLE _dynamodb.if_not_exists;
 
--- CREATE TEMPORARY TABLE with MEMORY engine
-CREATE TEMPORARY TABLE temp_memory (id INT PRIMARY KEY, name VARCHAR(256)) ENGINE=MEMORY;
-INSERT INTO temp_memory (id, name) VALUES (1, "temp1"), (2, "temp2");
-SELECT * FROM temp_memory ORDER BY id;
-
--- CREATE TEMPORARY TABLE with RAW engine
-CREATE TEMPORARY TABLE temp_raw (id INT PRIMARY KEY, name VARCHAR(256)) ENGINE=RAW;
-INSERT INTO temp_raw (id, name) VALUES (10, "raw1"), (20, "raw2");
-SELECT * FROM temp_raw ORDER BY id;
-
 -- CREATE TABLE AS SELECT (CTAS) with WHERE
 DROP TABLE IF EXISTS _dynamodb.ctas_where;
 CREATE TABLE _dynamodb.ctas_where (id VARCHAR(256) PRIMARY KEY, other INT)

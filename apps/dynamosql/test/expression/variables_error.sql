@@ -1,0 +1,1 @@
+SET invalid_syntax;

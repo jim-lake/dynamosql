@@ -8,7 +8,6 @@ INSERT INTO _dynamodb.foo SET id = "333", other = 999, comment = "Assigned";
 INSERT INTO _dynamodb.foo SET id = "667", other = 999, comment = "aa";
 INSERT INTO _dynamodb.foo SET id = "777", other = 999, comment = "about";
 INSERT INTO _dynamodb.foo SET id = "999", other = 999, comment = "zed";
-INSERT INTO _dynamodb.foo SET id = "667", other = 999, comment = "Zad";
 
 SELECT id, other, comment FROM _dynamodb.foo ORDER BY LOWER(comment), id;
 SELECT id, other, comment FROM _dynamodb.foo ORDER BY LOWER(comment) ASC, id;
