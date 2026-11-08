@@ -26,7 +26,7 @@ server.on('connection', (conn) => {
         connectionId: 1234,
         statusFlags: 2,
         characterSet: 8,
-        capabilityFlags: 2181036031,
+        capabilityFlags: 2181036031 - (1 << 24),
       });
     }
   });
@@ -45,12 +45,19 @@ server.on('connection', (conn) => {
     console.log('server: query:', sql);
     remote.query(sql, (err, result, columns) => {
       console.log('client: query:', err, result, columns);
-      if (Array.isArray(result)) {
-        console.log('rows', result);
-        console.log('columns', columns);
-        conn.writeTextResult(result, columns);
+      if (err) {
+        conn.writeError({
+          code: err.errno,
+          message: err.sqlMessage ?? err.message,
+        });
+      } else if (Array.isArray(result)) {
+        conn.writeColumns(columns);
+        conn.writeEof();
+        result.forEach((row) =>
+          conn.writeTextRow(columns.map((column) => row[column.name]))
+        );
+        conn.writeEof(undefined, undefined, true);
       } else {
-        console.log('result', result);
         conn.writeOk(result);
       }
     });
