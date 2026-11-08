@@ -49650,7 +49650,7 @@ function or(expr, state) {
     return { err, value };
 }
 function _in(expr, state) {
-    const left = convertWhere(expr.left, state);
+    const left = convertValueExpression(expr.left, state);
     let err = null;
     let value = null;
     if (left.err) {
@@ -49676,7 +49676,7 @@ function _in(expr, state) {
                 if (!item) {
                     continue;
                 }
-                const right = convertWhere(item, state);
+                const right = convertValueExpression(item, state);
                 if (right.err) {
                     err = right.err;
                     break;
@@ -49698,8 +49698,8 @@ function _comparator(expr, state, op) {
     if (hasExplicitCaseInsensitiveCollation([expr.left, expr.right], state)) {
         return unsupported();
     }
-    const left = convertWhere(expr.left, state);
-    const right = convertWhere(expr.right, state);
+    const left = convertValueExpression(expr.left, state);
+    const right = convertValueExpression(expr.right, state);
     const err = left.err ?? right.err;
     const value = `${left.value} ${op} ${right.value}`;
     return { err, value };
@@ -49708,8 +49708,8 @@ function nullSafeEqual(expr, state) {
     if (hasExplicitCaseInsensitiveCollation([expr.left, expr.right], state)) {
         return unsupported();
     }
-    const left = convertWhere(expr.left, state);
-    const right = convertWhere(expr.right, state);
+    const left = convertValueExpression(expr.left, state);
+    const right = convertValueExpression(expr.right, state);
     const err = left.err ?? right.err;
     let value = null;
     if (!err) {
@@ -49759,7 +49759,14 @@ function isNot(expr, state) {
     return _is(expr, state, 'IS NOT');
 }
 function _is(expr, state, op) {
-    const left = convertWhere(expr.left, state);
+    const isTruthTest = 'type' in expr.right && expr.right.type === 'bool';
+    const isBareColumn = 'type' in expr.left && expr.left.type === 'column_ref';
+    if (isTruthTest && isBareColumn) {
+        return { err: 'unsupported', value: null };
+    }
+    const left = isTruthTest
+        ? convertWhere(expr.left, { ...state, default_true: false })
+        : convertValueExpression(expr.left, state);
     let right;
     let err = left.err;
     if (!err) {
@@ -49792,7 +49799,7 @@ function not(expr, state) {
     if (!('type' in expr) || expr.type !== 'unary_expr') {
         return { err: 'syntax_err', value: null };
     }
-    const result = convertWhere(expr.expr, state);
+    const result = convertWhere(expr.expr, { ...state, default_true: false });
     if (!result.err) {
         result.value = 'NOT ' + result.value;
     }
@@ -49802,7 +49809,7 @@ function minus(expr, state) {
     if (!('type' in expr) || expr.type !== 'unary_expr') {
         return { err: 'syntax_err', value: null };
     }
-    const result = convertWhere(expr.expr, state);
+    const result = convertValueExpression(expr.expr, state);
     if (!result.err) {
         result.value = '-' + result.value;
     }
@@ -49852,6 +49859,16 @@ function foo(_expr, _state) {
 var Functions = { foo };
 
 function convertWhere(expr, state) {
+    if (expr && 'type' in expr && expr.type === 'column_ref') {
+        const col = String(expr.column);
+        return {
+            err: null,
+            value: `(${col} IS NOT NULL AND ${col} <> 0 AND ${col} <> '' AND ${col} <> false)`,
+        };
+    }
+    return convertValueExpression(expr, state);
+}
+function convertValueExpression(expr, state) {
     const { from } = state;
     let err = null;
     let value = null;
@@ -50121,7 +50138,7 @@ async function insertRowList(params) {
         }
         const update_sql = list.map((row) => {
             const sets = set.map((item) => {
-                const result = convertWhere(item.value, {
+                const result = convertValueExpression(item.value, {
                     session,
                     from,
                     columnRefMap,
@@ -50453,7 +50470,11 @@ async function singleUpdate(params) {
     const value_list = set.map((object) => {
         const { value } = object;
         let ret;
-        const result = convertWhere(value, { session, from, columnRefMap });
+        const result = convertValueExpression(value, {
+            session,
+            from,
+            columnRefMap,
+        });
         if (result.err) {
             throw new NoSingleOperationError();
         }
@@ -51649,7 +51670,7 @@ async function* formJoin(params) {
                     if (result.err) {
                         throw new SQLError(result.err);
                     }
-                    return result.value;
+                    return Boolean(convertNum(result.value));
                 });
             }
             if (batch.length > 0) {

@@ -5,7 +5,7 @@ import { escapeIdentifier } from '@/tools/dynamodb_helper';
 
 import { COLLATIONS } from '../../../constants/mysql';
 import { SQLError } from '../../../error';
-import { convertWhere } from '../../helpers/convert_where';
+import { convertWhere } from '../../helpers/convert_partiql/convert_where';
 
 import type {
   FromJoin,

@@ -46,6 +46,29 @@ export function convertWhere(
     | undefined,
   state: ConvertWhereState
 ): ConvertResult {
+  if (expr && 'type' in expr && expr.type === 'column_ref') {
+    const col = String(expr.column);
+    return {
+      err: null,
+      value: `(${col} IS NOT NULL AND ${col} <> 0 AND ${col} <> '' AND ${col} <> false)`,
+    };
+  }
+  return convertValueExpression(expr, state);
+}
+export function convertValueExpression(
+  expr:
+    | ExpressionValue
+    | Binary
+    | FunctionType
+    | Unary
+    | FulltextSearch
+    | ExtractFunc
+    | ExprList
+    | ConvertDataType
+    | null
+    | undefined,
+  state: ConvertWhereState
+): ConvertResult {
   const { from } = state;
   let err: string | null = null;
   let value: string | number | boolean | null = null;

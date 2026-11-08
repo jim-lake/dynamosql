@@ -9,7 +9,7 @@ import { trackFirstSeen } from '@/tools/util';
 import { NoSingleOperationError, SQLError } from '../../../error';
 import { getValue } from '../../expression/evaluate';
 import { getFunctionName } from '../../helpers/ast_helper';
-import { convertWhere } from '../../helpers/convert_where';
+import { convertValueExpression } from '../../helpers/convert_partiql/convert_where';
 import {
   buildSetReferences,
   findKey,
@@ -178,7 +178,7 @@ export async function insertRowList(
     }
     const update_sql = list.map((row) => {
       const sets = set.map((item) => {
-        const result = convertWhere(item.value, {
+        const result = convertValueExpression(item.value, {
           session,
           from,
           columnRefMap,

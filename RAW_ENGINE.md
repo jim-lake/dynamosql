@@ -61,3 +61,24 @@ The raw engine does not retry. A conflict is returned as an error. In path B, if
 ## Why these differences are accepted
 
 Exact counts would need a read of every row before each write, and a read cannot be made atomic with the write without retries. Path A and path B avoid that read on the common case. Path C reads only the rows the statement touches. The cost is a small mismatch in counts and a weaker transaction boundary for multi-row statements. These trade-offs are intentional.
+
+# Raw engine: WHERE conditions
+
+The raw engine sends WHERE conditions to DynamoDB as PartiQL. DynamoDB compares values by attribute type and does not convert strings to numbers the way MySQL does. The two differences below are design decisions.
+
+## Bare column as a condition
+
+`WHERE col` is sent as `(col IS NOT NULL AND col <> 0 AND col <> '' AND col <> false)`. The condition keeps every row that MySQL treats as true. For number and boolean columns it is exact, and it also drops NULL and empty strings correctly.
+
+For string columns it is not exact. MySQL converts a string to a number to decide truth, so `'0'`, `'0.0'`, and `'x'` are false in MySQL. The raw engine keeps those rows.
+
+- `SELECT`: the engine applies the full WHERE to every row in memory, so the extra rows are removed. The result matches MySQL.
+- `UPDATE` and `DELETE`: the condition is the filter. A bare string column can change or delete rows that MySQL would keep, for example rows where `col = 'x'`.
+
+`NOT col` is sent as `NOT (col IS NOT NULL AND col <> 0 AND col <> '' AND col <> false)`, so it has the same boolean behavior and the same string errata. `col IS TRUE` and `col IS FALSE` are not sent to DynamoDB. The bare column is unsupported there, so the statement uses the general path.
+
+## Comparisons do not convert types
+
+The raw engine sends a comparison as written. `WHERE id > 100` on a string attribute compares the string with the number, and DynamoDB matches no rows. MySQL converts `'111'` to 111 and matches rows `'111'` to `'115'`.
+
+The memory engine converts values the way MySQL does, so the same query works there. The raw engine does not add the conversion.

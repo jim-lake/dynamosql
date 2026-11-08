@@ -1,0 +1,17 @@
+SELECT id FROM _dynamodb.foo WHERE comment ORDER BY id;
+SELECT id FROM _dynamodb.foo WHERE NOT comment ORDER BY id;
+SELECT id FROM _dynamodb.foo WHERE comment AND comment ORDER BY id;
+SELECT id FROM _dynamodb.foo WHERE comment AND comment = '111 comment' ORDER BY id;
+SELECT id FROM _dynamodb.foo WHERE comment = '4 comment' OR comment ORDER BY id;
+SELECT id FROM _dynamodb.foo WHERE (comment) AND comment <> '4 comment' ORDER BY id;
+SELECT id FROM _dynamodb.foo WHERE NOT (comment AND comment = '111 comment') ORDER BY id;
+SELECT id FROM _dynamodb.foo WHERE NOT (comment OR comment = '111 comment') ORDER BY id;
+SELECT id FROM _dynamodb.foo WHERE NOT (comment AND id > 100) ORDER BY id;
+SELECT id FROM _dynamodb.foo WHERE comment IS TRUE ORDER BY id;
+SELECT id FROM _dynamodb.foo WHERE comment IS NOT FALSE ORDER BY id;
+SELECT id FROM _dynamodb.foo WHERE comment IS NULL ORDER BY id;
+SELECT id FROM _dynamodb.foo WHERE comment IS NOT NULL ORDER BY id;
+SELECT id FROM _dynamodb.foo WHERE other ORDER BY id;
+SELECT id FROM _dynamodb.foo WHERE other IS TRUE ORDER BY id;
+SELECT id FROM _dynamodb.foo WHERE other OR comment = 'x' ORDER BY id;
+SELECT id FROM _dynamodb.foo WHERE NOT other ORDER BY id;

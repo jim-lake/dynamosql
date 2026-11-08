@@ -6,7 +6,7 @@ import {
   isCaseInsensitive,
 } from '../collation';
 
-import { convertWhere } from './convert_where';
+import { convertValueExpression, convertWhere } from './convert_where';
 
 import type { ConvertWhereState, ConvertResult } from './convert_where';
 import type { ExprArgument } from '../collation';
@@ -87,7 +87,7 @@ function or(expr: Binary, state: ConvertWhereState): ConvertResult {
 }
 
 function _in(expr: Binary, state: ConvertWhereState): ConvertResult {
-  const left = convertWhere(expr.left, state);
+  const left = convertValueExpression(expr.left, state);
   let err: string | null = null;
   let value: string | number | boolean | null = null;
   if (left.err) {
@@ -111,7 +111,7 @@ function _in(expr: Binary, state: ConvertWhereState): ConvertResult {
         if (!item) {
           continue;
         }
-        const right = convertWhere(item, state);
+        const right = convertValueExpression(item, state);
         if (right.err) {
           err = right.err;
           break;
@@ -136,8 +136,8 @@ function _comparator(
   if (hasExplicitCaseInsensitiveCollation([expr.left, expr.right], state)) {
     return unsupported();
   }
-  const left = convertWhere(expr.left, state);
-  const right = convertWhere(expr.right, state);
+  const left = convertValueExpression(expr.left, state);
+  const right = convertValueExpression(expr.right, state);
 
   const err = left.err ?? right.err;
   const value = `${left.value} ${op} ${right.value}`;
@@ -148,8 +148,8 @@ function nullSafeEqual(expr: Binary, state: ConvertWhereState): ConvertResult {
   if (hasExplicitCaseInsensitiveCollation([expr.left, expr.right], state)) {
     return unsupported();
   }
-  const left = convertWhere(expr.left, state);
-  const right = convertWhere(expr.right, state);
+  const left = convertValueExpression(expr.left, state);
+  const right = convertValueExpression(expr.right, state);
   const err = left.err ?? right.err;
   let value: string | null = null;
   if (!err) {
@@ -215,7 +215,14 @@ function _is(
   state: ConvertWhereState,
   op: string
 ): ConvertResult {
-  const left = convertWhere(expr.left, state);
+  const isTruthTest = 'type' in expr.right && expr.right.type === 'bool';
+  const isBareColumn = 'type' in expr.left && expr.left.type === 'column_ref';
+  if (isTruthTest && isBareColumn) {
+    return { err: 'unsupported', value: null };
+  }
+  const left = isTruthTest
+    ? convertWhere(expr.left, { ...state, default_true: false })
+    : convertValueExpression(expr.left, state);
   let right: string | undefined;
   let err = left.err;
   if (!err) {
@@ -251,7 +258,7 @@ function not(expr: ExpressionValue, state: ConvertWhereState): ConvertResult {
   if (!('type' in expr) || expr.type !== 'unary_expr') {
     return { err: 'syntax_err', value: null };
   }
-  const result = convertWhere(expr.expr, state);
+  const result = convertWhere(expr.expr, { ...state, default_true: false });
   if (!result.err) {
     result.value = 'NOT ' + result.value;
   }
@@ -262,7 +269,7 @@ function minus(expr: ExpressionValue, state: ConvertWhereState): ConvertResult {
   if (!('type' in expr) || expr.type !== 'unary_expr') {
     return { err: 'syntax_err', value: null };
   }
-  const result = convertWhere(expr.expr, state);
+  const result = convertValueExpression(expr.expr, state);
   if (!result.err) {
     result.value = '-' + result.value;
   }

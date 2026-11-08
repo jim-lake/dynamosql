@@ -41,7 +41,7 @@ Only non-correlated scalar subqueries in `WHERE` and `HAVING` are supported (`sr
 
 ## Truthiness in WHERE
 
-- `SELECT id FROM t WHERE label ORDER BY id;`, with labels `'1'`, `'0'`, `'x'`, and `'2x'` on ids 1 to 4: MySQL returns ids 1 and 4, because it converts strings to numbers. DynamoSQL returns all four rows, because `formJoin` in `src/lib/helpers/join.ts` tests the raw value. HAVING uses the MySQL conversion (`convertNum` in `src/lib/helpers/sql_conversion.ts`).
+- `SELECT id FROM t WHERE label ORDER BY id;` on a memory table, with ids 1 to 4 holding `'1'`, `'0'`, `'x'`, and `'2x'`: MySQL returns ids 1 and 4. This now matches.
 
 ## Temporary tables
 

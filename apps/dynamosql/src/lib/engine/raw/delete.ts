@@ -4,7 +4,7 @@ import type { KeyValue } from '@/tools/dynamodb';
 import { escapeIdentifier } from '@/tools/dynamodb_helper';
 
 import { NoSingleOperationError } from '../../../error';
-import { convertWhere } from '../../helpers/convert_where';
+import { convertWhere } from '../../helpers/convert_partiql/convert_where';
 
 import type { DeleteParams, MultiDeleteParams, AffectedResult } from '../index';
 

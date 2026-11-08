@@ -10,6 +10,10 @@ describe('Select', function () {
   runTests('group.sql', path.join(__dirname, 'group.sql'));
   runTests('limit.sql', path.join(__dirname, 'limit.sql'));
   runTests('where.sql', path.join(__dirname, 'where.sql'));
+  runTests(
+    'where_truthiness.sql',
+    path.join(__dirname, 'where_truthiness.sql')
+  );
   runTests('alias.sql', path.join(__dirname, 'alias.sql'));
   runTests(
     'group_edge_cases.sql',

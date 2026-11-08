@@ -8,7 +8,10 @@ import {
 } from '@/tools/dynamodb_helper';
 
 import { NoSingleOperationError } from '../../../error';
-import { convertWhere } from '../../helpers/convert_where';
+import {
+  convertValueExpression,
+  convertWhere,
+} from '../../helpers/convert_partiql/convert_where';
 
 import type {
   MultiUpdateParams,
@@ -30,7 +33,11 @@ export async function singleUpdate(
   const value_list = set.map((object) => {
     const { value } = object;
     let ret: string | number | boolean | null | undefined;
-    const result = convertWhere(value, { session, from, columnRefMap });
+    const result = convertValueExpression(value, {
+      session,
+      from,
+      columnRefMap,
+    });
     if (result.err) {
       throw new NoSingleOperationError();
     } else {

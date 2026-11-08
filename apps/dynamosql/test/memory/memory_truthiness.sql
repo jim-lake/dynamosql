@@ -1,0 +1,11 @@
+CREATE DATABASE IF NOT EXISTS mem_truthiness;
+CREATE TEMPORARY TABLE mem_truthiness.t (id INT PRIMARY KEY, label VARCHAR(20), n INT);
+INSERT INTO mem_truthiness.t (id, label, n) VALUES (1, '1', 1), (2, '0', 0), (3, 'x', NULL), (4, '2x', 2), (5, '', 5), (6, NULL, 6), (7, '0.0', 7), (8, ' 3', 8);
+SELECT id FROM mem_truthiness.t WHERE label ORDER BY id;
+SELECT id FROM mem_truthiness.t WHERE NOT label ORDER BY id;
+SELECT id FROM mem_truthiness.t WHERE label AND id > 0 ORDER BY id;
+SELECT id FROM mem_truthiness.t WHERE label OR id = 2 ORDER BY id;
+SELECT id FROM mem_truthiness.t WHERE n ORDER BY id;
+SELECT id FROM mem_truthiness.t WHERE label IS TRUE ORDER BY id;
+SELECT id FROM mem_truthiness.t WHERE label IS FALSE ORDER BY id;
+SELECT id FROM mem_truthiness.t WHERE (label) = 1 ORDER BY id;

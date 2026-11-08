@@ -4,6 +4,8 @@ import { filterInPlace } from '@/tools/filter_in_place';
 import { SQLError } from '../../error';
 import { getValue } from '../expression';
 
+import { convertNum } from './sql_conversion';
+
 import type { Row, SourceMap } from '../engine';
 import type { EvaluationState } from '../expression';
 import type { SourceRow } from '../handler_types';
@@ -43,7 +45,7 @@ export async function* formJoin(
           if (result.err) {
             throw new SQLError(result.err);
           }
-          return result.value;
+          return Boolean(convertNum(result.value));
         });
       }
 
