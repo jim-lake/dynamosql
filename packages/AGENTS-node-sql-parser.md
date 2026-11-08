@@ -39,13 +39,13 @@ When you fix a grammar gap, add the statements from the report to a `.sql` file 
 
 Run these from `packages/node-sql-parser/`.
 
-| Task | Command |
-| --- | --- |
+| Task                                                 | Command                    |
+| ---------------------------------------------------- | -------------------------- |
 | Regenerate MySQL guards and run the MySQL type tests | `npm run test:types:mysql` |
-| Lint `src/` | `npm run lint` |
-| Rebuild all bundles after a grammar change | `npx rollup -c` |
-| Full unit suite (mocha, `test/**/*.spec.js`) | `npm run test:only` |
-| Lint plus full suite | `npm test` |
+| Lint `src/`                                          | `npm run lint`             |
+| Rebuild all bundles after a grammar change           | `npx rollup -c`            |
+| Full unit suite (mocha, `test/**/*.spec.js`)         | `npm run test:only`        |
+| Lint plus full suite                                 | `npm test`                 |
 
 Notes on these commands:
 

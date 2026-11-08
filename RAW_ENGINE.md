@@ -26,11 +26,11 @@ Statements that set a key column are rejected with `unsupported`. DynamoDB keys 
 
 ### affectedRows
 
-| Path | New row | Existing row, changed | Existing row, unchanged |
-|---|---|---|---|
-| A | 1 (exact) | 2 (exact) | 1 (exact) |
-| B | 1 (exact) | 2 (assumed changed) | 2 (assumed changed) |
-| C | 1 (exact) | 2 (exact) | 1 (exact) |
+| Path | New row   | Existing row, changed | Existing row, unchanged |
+| ---- | --------- | --------------------- | ----------------------- |
+| A    | 1 (exact) | 2 (exact)             | 1 (exact)               |
+| B    | 1 (exact) | 2 (assumed changed)   | 2 (assumed changed)     |
+| C    | 1 (exact) | 2 (exact)             | 1 (exact)               |
 
 Path B cannot see the previous row, because a batch `UPDATE` does not return it. It reports every matched row as changed. An update that leaves a row unchanged is counted as 2 instead of 1.
 
@@ -42,11 +42,11 @@ The raw engine follows that rule. Paths A and C report the duplicate count exact
 
 ### Atomicity
 
-| Path | Behavior |
-|---|---|
-| A | Each row is one atomic `UpdateItem`. A multi-row statement is not atomic: a later row can fail after an earlier row was written. |
-| B | Each batch statement succeeds or fails on its own. A multi-row statement can partly apply. |
-| C | The read and the writes are separate. A row changed by another writer between the read and the write has its changed columns overwritten with values computed from the stale read. A multi-row statement can partly apply. |
+| Path | Behavior                                                                                                                                                                                                                   |
+| ---- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| A    | Each row is one atomic `UpdateItem`. A multi-row statement is not atomic: a later row can fail after an earlier row was written.                                                                                           |
+| B    | Each batch statement succeeds or fails on its own. A multi-row statement can partly apply.                                                                                                                                 |
+| C    | The read and the writes are separate. A row changed by another writer between the read and the write has its changed columns overwritten with values computed from the stale read. A multi-row statement can partly apply. |
 
 The raw engine applies each write immediately. A `ROLLBACK` does not undo an ODKU statement. The memory engine applies the whole statement inside the session transaction, so `ROLLBACK` undoes it.
 
@@ -61,6 +61,10 @@ The raw engine does not retry. A conflict is returned as an error. In path B, if
 ## Why these differences are accepted
 
 Exact counts would need a read of every row before each write, and a read cannot be made atomic with the write without retries. Path A and path B avoid that read on the common case. Path C reads only the rows the statement touches. The cost is a small mismatch in counts and a weaker transaction boundary for multi-row statements. These trade-offs are intentional.
+
+# Raw engine: INSERT without a column list
+
+`INSERT INTO t VALUES (...)` without a column list is not supported on the raw engine. DynamoDB tables have no schema, so the engine cannot map positional values to columns. The statement fails with `ER_NO: Unsupport sql feature.` before it reaches DynamoDB. Use `INSERT INTO t (cols) VALUES (...)` instead.
 
 # Raw engine: WHERE conditions
 
