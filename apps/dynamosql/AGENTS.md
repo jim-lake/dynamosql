@@ -135,7 +135,9 @@ Development:
 ## Gap Documents
 
 - `docs/PARSER_TODO.md` holds only parser-grammar mismatches: real MySQL 8.4 syntax that node-sql-parser's MySQL grammar rejects or misparses. Add one concise line per mismatch. Do not put parser issues in `docs/MYSQL_GAPS.md`.
-- `docs/MYSQL_GAPS.md` holds behavior gaps: valid queries that DynamoSQL rejects or returns differently from MySQL 8.4, where the parser accepts the SQL and the gap is in the engine. Record the query, the MySQL result, and the DynamoSQL result.
+- `docs/MYSQL_GAPS.md` holds behavior gaps. A gap is a query that DynamoSQL rejects or returns differently from MySQL 8.4, when `../../SQL_GRAMMAR.md` or `../../FUNCTIONS.md` states the syntax or function is supported. Record the query, the MySQL result, and the DynamoSQL result.
+- Anything not stated as supported in `../../SQL_GRAMMAR.md` or `../../FUNCTIONS.md` is UNIMPLEMENTED, not a gap. Do not record it in `docs/MYSQL_GAPS.md`.
+- `docs/TEST_GAPS.md` holds statements that work (match MySQL 8.4) but have no test. When you find one, add it there instead of leaving it untested.
 
 ## Notes
 
