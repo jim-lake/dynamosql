@@ -13,7 +13,8 @@
     "test": "npm run test --workspace=apps/dynamosql"
   },
   "allowScripts": {
-    "esbuild@0.28.2": true
+    "esbuild@0.28.2": true,
+    "pre-commit": false
   },
   "repository": {
     "type": "git",
