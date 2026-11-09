@@ -290,6 +290,36 @@ async function _iterQuery(
       }
       joined.using = columns;
     });
+    from.forEach((item, index) => {
+      const joined = item as Join;
+      if (index === 0 || !('using' in joined) || !Array.isArray(joined.using)) {
+        return;
+      }
+      const leftInfos = from
+        .slice(0, index)
+        .map((left) => tableInfoMap.get(left));
+      const rightInfo = tableInfoMap.get(joined);
+      const closed = [rightInfo, ...leftInfos].every(
+        (info) => info?.is_open === false
+      );
+      if (!closed) {
+        return;
+      }
+      const leftNames = new Set(
+        leftInfos.flatMap(
+          (info) => info?.columns.map((c) => c.name.toLowerCase()) ?? []
+        )
+      );
+      const rightNames = new Set(
+        rightInfo?.columns.map((c) => c.name.toLowerCase())
+      );
+      for (const column of joined.using) {
+        const name_lc = column.toLowerCase();
+        if (!leftNames.has(name_lc) || !rightNames.has(name_lc)) {
+          throw new SQLError({ err: 'column_not_found', args: [column] });
+        }
+      }
+    });
   }
   return _evaluateReturn({
     ...params,

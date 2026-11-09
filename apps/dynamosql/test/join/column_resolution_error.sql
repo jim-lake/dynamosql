@@ -5,3 +5,6 @@ SELECT id FROM mem_join.t JOIN mem_join.u ON u.id = t.id;
 SELECT id, extra FROM mem_join.t JOIN mem_join.u ON u.id = t.id;
 SELECT t.id FROM mem_join.t JOIN mem_join.u ON u.id = t.id WHERE id = 1;
 SELECT t.id FROM mem_join.t JOIN mem_join.u ON u.id = t.id WHERE nope = 1;
+SELECT * FROM mem_join.t JOIN mem_join.u USING (extra);
+SELECT * FROM mem_join.t JOIN mem_join.u USING (nope);
+SELECT * FROM mem_join.t LEFT JOIN mem_join.u USING (extra);

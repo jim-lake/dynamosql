@@ -6,3 +6,5 @@ SELECT DB_ROW_ID FROM kl_err;
 SELECT no_such_col FROM kl_err;
 SELECT kl_err.DB_ROW_ID FROM kl_err;
 CREATE TEMPORARY TABLE kl_named_id (DB_ROW_ID int);
+CREATE TEMPORARY TABLE kl_named_lc (val INT, db_row_id INT);
+CREATE TEMPORARY TABLE kl_named_pk (id INT PRIMARY KEY, DB_ROW_ID INT);
