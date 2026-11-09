@@ -14,5 +14,20 @@ describe('Join', function () {
     session: { resultObjects: true },
     nestTables: true,
   });
+  runTests(
+    'column_resolution.sql',
+    path.join(__dirname, 'column_resolution.sql'),
+    { session: { resultObjects: true }, nestTables: true }
+  );
+  runTests(
+    'column_resolution_error.sql',
+    path.join(__dirname, 'column_resolution_error.sql'),
+    {
+      session: { resultObjects: true },
+      nestTables: true,
+      allowedErrors: 'SAME_CODE',
+      skipAffected: true,
+    }
+  );
   runTests('syntax.sql', path.join(__dirname, 'syntax.sql'));
 });

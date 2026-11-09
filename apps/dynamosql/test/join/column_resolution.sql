@@ -1,0 +1,14 @@
+CREATE DATABASE IF NOT EXISTS mem_join;
+CREATE TEMPORARY TABLE mem_join.t (id INT PRIMARY KEY, base INT);
+CREATE TEMPORARY TABLE mem_join.u (id INT PRIMARY KEY, extra VARCHAR(20));
+INSERT INTO mem_join.t (id, base) VALUES (1, 10), (2, 20), (3, 30);
+INSERT INTO mem_join.u (id, extra) VALUES (1, 'a'), (2, 'b');
+SELECT extra FROM mem_join.t JOIN mem_join.u ON u.id = t.id ORDER BY t.id;
+SELECT t.id, extra FROM mem_join.t JOIN mem_join.u ON u.id = t.id ORDER BY t.id;
+SELECT base, extra FROM mem_join.t JOIN mem_join.u ON u.id = t.id ORDER BY t.id;
+SELECT extra, base FROM mem_join.t, mem_join.u WHERE u.id = t.id ORDER BY t.id;
+SELECT extra FROM mem_join.t AS t JOIN mem_join.u AS u ON u.id = t.id ORDER BY t.id;
+SELECT t.id FROM mem_join.t JOIN mem_join.u ON u.id = t.id ORDER BY id;
+SELECT t.id FROM mem_join.t JOIN mem_join.u ON u.id = t.id WHERE extra = 'b' ORDER BY t.id;
+SELECT t.id FROM mem_join.t JOIN mem_join.u ON u.id = t.id WHERE u.id = 2 ORDER BY t.id;
+SELECT base FROM mem_join.t JOIN mem_join.u ON u.id = t.id ORDER BY extra DESC;
