@@ -27,6 +27,9 @@ export function isAggregateNode(node: unknown): boolean {
   if (typeof node !== 'object' || node === null || !('type' in node)) {
     return false;
   }
+  if (isWindowNode(node)) {
+    return false;
+  }
   if (node.type === 'aggr_func') {
     return true;
   }
@@ -36,6 +39,17 @@ export function isAggregateNode(node: unknown): boolean {
     FUNCTION_NODE_AGGREGATES.has(
       getFunctionName(node.name as FunctionName).toLowerCase()
     )
+  );
+}
+
+export function isWindowNode(node: unknown): node is FunctionExpr | AggrFunc {
+  return (
+    typeof node === 'object' &&
+    node !== null &&
+    'type' in node &&
+    (node.type === 'aggr_func' || node.type === 'function') &&
+    'over' in node &&
+    node.over != null
   );
 }
 

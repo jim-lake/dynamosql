@@ -41,6 +41,11 @@ describe('Select', function () {
     skipAffected: true,
   });
   runTests('aggregate.sql', path.join(__dirname, 'aggregate.sql'));
+  runTests('window.sql', path.join(__dirname, 'window.sql'));
+  runTests('window_error.sql', path.join(__dirname, 'window_error.sql'), {
+    allowedErrors: 'SAME_CODE',
+    skipAffected: true,
+  });
   runTests('cast.sql', path.join(__dirname, 'cast.sql'));
   runTests('functions.sql', path.join(__dirname, 'functions.sql'));
   runTests('null_handling.sql', path.join(__dirname, 'null_handling.sql'));

@@ -3,10 +3,24 @@ import { setTimeout } from 'node:timers/promises';
 import { SQLError } from '../error';
 
 import * as Expression from './expression';
-import { isBaseFrom, isDerivedFrom } from './helpers/ast_helper';
+import {
+  functionAsAggregate,
+  isWindowNode,
+  methods as AggregateFunctions,
+} from './expression/aggregate_functions';
+import {
+  getFunctionName,
+  isBaseFrom,
+  isDerivedFrom,
+} from './helpers/ast_helper';
 import { resolveReferences } from './helpers/column_ref_helper';
 import { makeEngineGroups } from './helpers/engine_groups';
-import { formGroup, formImplicitGroup, hasAggregate } from './helpers/group';
+import {
+  formGroup,
+  formImplicitGroup,
+  hasAggregate,
+  hasWindow,
+} from './helpers/group';
 import { formJoin } from './helpers/join';
 import { expandStarColumns, calcColumns } from './helpers/query_columns';
 import { sort } from './helpers/sort';
@@ -21,13 +35,14 @@ import type {
   SourceRowGroup,
   SourceRowResultGroup,
 } from './handler_types';
+import type { Session } from '../session';
 import type { FieldInfo } from '../types';
 import type {
   EvaluationResult,
   EvaluationState,
   SubqueryValues,
 } from './expression';
-import type { Session } from '../session';
+import type { WindowValues } from './expression/evaluate';
 import type { ColumnRefInfo } from './helpers/column_ref_helper';
 import type { QueryColumn } from './helpers/query_columns';
 import type { SelectModifyAST } from './helpers/select_modify';
@@ -418,6 +433,10 @@ async function _evaluateReturn(
     group_iter = rowIter;
   }
 
+  if (ast.type === 'select' && hasWindow(ast.columns)) {
+    group_iter = _applyWindows({ iter: group_iter, ast, queryColumns, state });
+  }
+
   let resultIter = _makeResults({
     iter: group_iter,
     queryColumns,
@@ -440,6 +459,87 @@ async function _evaluateReturn(
 
 async function* _listToItetator(list: SourceRow[]): AsyncIterable<SourceRow[]> {
   yield list;
+}
+async function* _applyWindows(params: {
+  iter: AsyncIterable<SourceRow[]>;
+  ast: Select;
+  queryColumns: QueryColumn[];
+  state: EvaluationState;
+}): AsyncIterable<SourceRow[]> {
+  const { iter, ast, queryColumns, state } = params;
+  let row_list: SourceRow[] = [];
+  for await (const batch of iter) {
+    row_list.push(...batch);
+  }
+  if (ast.having) {
+    const having = ast.having;
+    row_list = row_list.filter((row) => {
+      row.result = queryColumns.map((column) => {
+        if (hasWindow(column.expr)) {
+          return { err: null, type: 'null', value: null, name: undefined };
+        }
+        const result = Expression.getValue(column.expr, { ...state, row });
+        if (result.err) {
+          throw new SQLError(result.err);
+        }
+        return result;
+      });
+      const having_result = Expression.getValue(having, { ...state, row });
+      if (having_result.err) {
+        throw new SQLError(having_result.err);
+      }
+      return Boolean(convertNum(having_result.value));
+    });
+  }
+  const windowValues: WindowValues = new Map();
+  state.windowValues = windowValues;
+  for (const column of ast.columns) {
+    _collectWindows(column.expr, row_list, state, windowValues);
+  }
+  yield row_list;
+}
+function _collectWindows(
+  node: unknown,
+  rows: SourceRow[],
+  state: EvaluationState,
+  windowValues: WindowValues
+): void {
+  if (typeof node !== 'object' || node === null) {
+    return;
+  }
+  if (isWindowNode(node)) {
+    const name = getFunctionName(node.name).toLowerCase();
+    const aggregate = AggregateFunctions[name];
+    const over = node.over;
+    const spec =
+      over && over.type === 'window' ? over.as_window_specification : null;
+    const bare =
+      typeof spec === 'object' &&
+      spec !== null &&
+      !spec.window_specification.name &&
+      !spec.window_specification.partitionby &&
+      !spec.window_specification.orderby &&
+      !spec.window_specification.window_frame_clause &&
+      !(node as { args?: { distinct?: unknown } }).args?.distinct;
+    if (!aggregate || !bare) {
+      throw new SQLError({ err: 'ER_NOT_SUPPORTED_YET' });
+    }
+    const aggr = node.type === 'aggr_func' ? node : functionAsAggregate(node);
+    const group_row = { source: new Map(), result: null, group: rows };
+    const result = aggregate(aggr, { ...state, row: group_row });
+    if (result.err) {
+      throw new SQLError(result.err);
+    }
+    result.name = `${result.name ?? name + '()'} OVER ()`;
+    windowValues.set(node, result);
+    return;
+  }
+  if ('type' in node && node.type === 'select') {
+    return;
+  }
+  for (const child of Object.values(node)) {
+    _collectWindows(child, rows, state, windowValues);
+  }
 }
 interface MakeResultsParams {
   iter: AsyncIterable<SourceRow[]>;

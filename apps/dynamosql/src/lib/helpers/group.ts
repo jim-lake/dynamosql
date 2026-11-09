@@ -1,6 +1,9 @@
 import { SQLError } from '../../error';
 import { getValue } from '../expression';
-import { isAggregateNode } from '../expression/aggregate_functions';
+import {
+  isAggregateNode,
+  isWindowNode,
+} from '../expression/aggregate_functions';
 
 import type { EvaluationState } from '../expression';
 import type { SourceRow, SourceRowGroup } from '../handler_types';
@@ -40,6 +43,21 @@ export interface FormGroupParams {
 }
 export function hasAggregate(ast: Select): boolean {
   return _hasAgg(ast.columns) || _hasAgg(ast.having);
+}
+export function hasWindow(node: unknown): boolean {
+  if (typeof node !== 'object' || node === null) {
+    return false;
+  }
+  if (Array.isArray(node)) {
+    return node.some(hasWindow);
+  }
+  if (isWindowNode(node)) {
+    return true;
+  }
+  if ('type' in node && node.type === 'select') {
+    return false;
+  }
+  return Object.values(node).some(hasWindow);
 }
 export async function* formImplicitGroup(
   params: Omit<FormGroupParams, 'groupby'>

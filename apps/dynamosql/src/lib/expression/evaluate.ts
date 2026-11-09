@@ -11,6 +11,7 @@ import {
   methods as AggregateFunctions,
   functionAsAggregate,
   isAggregateNode,
+  isWindowNode,
 } from './aggregate_functions';
 import { methods as BinaryExpression } from './binary_expression';
 import { caseExpr } from './case';
@@ -62,6 +63,7 @@ export interface EvaluationState {
   tableInfoMap?: TableInfoMap;
   insertRow?: EvaluationResultRow;
   subqueryValues?: SubqueryValues;
+  windowValues?: WindowValues;
   isWrite?: boolean;
   isIgnore?: boolean;
 }
@@ -82,6 +84,7 @@ export function isSelectSubquery(expr: unknown): expr is SelectSubquery {
   return typeof expr === 'object' && expr !== null && 'ast' in expr;
 }
 export type SubqueryValues = Map<SelectSubquery, EvaluationValue>;
+export type WindowValues = Map<unknown, EvaluationResult>;
 
 // Type guards
 function isValueExpr(expr: unknown): expr is ValueExpr {
@@ -116,6 +119,19 @@ function isAggrFunc(expr: unknown): expr is AggrFunc {
     'type' in expr &&
     expr.type === 'aggr_func'
   );
+}
+
+function _windowValue(expr: unknown, state: EvaluationState): EvaluationResult {
+  const stored = state.windowValues?.get(expr);
+  if (!stored) {
+    return {
+      err: { err: 'ER_NOT_SUPPORTED_YET' },
+      type: 'null',
+      value: undefined,
+      name: undefined,
+    };
+  }
+  return { ...stored };
 }
 
 function isBinary(expr: unknown): expr is Binary {
@@ -279,7 +295,9 @@ export function getValue(
     const funcName = getFunctionName(expr.name);
     const aggregate = AggregateFunctions[funcName.toLowerCase()];
     const func = Functions[funcName.toLowerCase()];
-    if (isAggregateNode(expr) && aggregate) {
+    if (isWindowNode(expr)) {
+      result = _windowValue(expr, state);
+    } else if (isAggregateNode(expr) && aggregate) {
       result = aggregate(functionAsAggregate(expr), state);
       result.name ??= funcName + '()';
     } else if (typeof func === 'function') {
@@ -292,7 +310,9 @@ export function getValue(
   } else if (isAggrFunc(expr)) {
     const funcName = getFunctionName(expr.name);
     const func = AggregateFunctions[funcName.toLowerCase()];
-    if (func) {
+    if (isWindowNode(expr)) {
+      result = _windowValue(expr, state);
+    } else if (func) {
       result = func(expr, state);
       result.name ??= funcName + '()';
     } else {

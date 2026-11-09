@@ -153,13 +153,13 @@ Source: MySQL 8.4 Reference Manual, chapter 15 (SQL statements), chapter 11 (lan
 | `HAVING` with a scalar subquery                                                                        |    ✅     | `select/having.sql`                                                   |
 | Aggregate functions, `COUNT(DISTINCT ...)`                                                             |    ✅     | `select/aggregate.sql`, `select/having.sql`                           |
 | `WINDOW name AS (window_spec)` clause                                                                  |    ❌     |                                                                       |
-| `OVER (window_spec)` on a function                                                                     |    ❌     |                                                                       |
+| `OVER ()` on an aggregate function (`SUM`, `COUNT`, `AVG`, `MIN`, `MAX`)                                  |    ✅     | `select/window.sql`, `select/window_error.sql`. Only the empty spec; `PARTITION BY`, `ORDER BY`, and frames are rejected. |
 | `OVER window_name` on a function                                                                       |    ❌     |                                                                       |
 | `PARTITION BY` inside a window spec                                                                    |    ❌     |                                                                       |
 | `ORDER BY` inside a window spec                                                                        |    ❌     |                                                                       |
 | Frame clause `ROWS` / `RANGE` with `BETWEEN ... AND ...`                                               |    ❌     |                                                                       |
 | Frame bounds `UNBOUNDED PRECEDING`, `N PRECEDING`, `CURRENT ROW`, `N FOLLOWING`, `UNBOUNDED FOLLOWING` |    ❌     |                                                                       |
-| Window functions (`ROW_NUMBER`, `RANK`, `LAG`, and others)                                             |    ❌     | Listed in `FUNCTIONS.md`.                                             |
+| Window functions (`ROW_NUMBER`, `RANK`, `LAG`, and others)                                             |    ❌     | Listed in `FUNCTIONS.md`. `OVER ()` on `SUM`, `COUNT`, `MIN`, `MAX` is supported. |
 
 ### ORDER BY and LIMIT
 

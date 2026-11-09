@@ -52,6 +52,10 @@ const ERROR_MAP: Record<string, ErrorMapEntry> = {
       'Multiple statements are disabled.  See the "multipleStatements" session option.',
   },
   unsupported: { code: 'ER_NO', sqlMessage: 'Unsupport sql feature.' },
+  ER_NOT_SUPPORTED_YET: {
+    code: 'ER_NOT_SUPPORTED_YET',
+    sqlMessage: "This version of MySQL doesn't yet support this feature",
+  },
   unsupported_type: {
     code: 'ER_NO',
     sqlMessage: errStr`Unsupported query type: ${0}`,
