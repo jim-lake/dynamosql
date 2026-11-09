@@ -143,6 +143,11 @@ async function _createTable(
         collation: makeCollation(def, collation),
         nullable: def.nullable?.value !== 'not null',
       };
+      if (
+        column_list.some((c) => c.name.toLowerCase() === col.name.toLowerCase())
+      ) {
+        throw new SQLError({ err: 'ER_DUP_FIELDNAME', args: [col.name] });
+      }
       column_list.push(col);
       if (def.primary_key === 'primary key') {
         primary_key.push(col.name);

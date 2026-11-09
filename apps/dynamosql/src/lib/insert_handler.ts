@@ -16,7 +16,11 @@ import * as SchemaManager from './schema_manager';
 import * as SelectHandler from './select_handler';
 import * as TransactionManager from './transaction_manager';
 
-import type { Engine, EngineValue, EvaluationResultRow } from './engine';
+import type {
+  Engine as EngineType,
+  EngineValue,
+  EvaluationResultRow,
+} from './engine';
 import type {
   HandlerParams,
   AffectedResult,
@@ -83,11 +87,12 @@ export async function query(
 async function _runInsert(
   params: HandlerParams<InsertReplaceExtended> & {
     database: string;
-    engine: Engine;
+    engine: EngineType;
     duplicate_mode: DuplicateMode;
   }
 ): Promise<AffectedResult> {
   const { ast, session, engine, dynamodb, duplicate_mode } = params;
+  const is_ignore = ast.prefix === 'ignore into';
   const tableArray = Array.isArray(ast.table) ? ast.table : [ast.table];
   const firstTable = tableArray[0];
   const table =
@@ -98,7 +103,11 @@ async function _runInsert(
   if (ast.set && ast.set.length > 0) {
     const obj: EvaluationResultRow = {};
     for (const item of ast.set) {
-      const expr_result = Expression.getValue(item.value, { session });
+      const expr_result = Expression.getValue(item.value, {
+        session,
+        isWrite: true,
+        isIgnore: is_ignore,
+      });
       if (expr_result.err) {
         throw new SQLError(expr_result.err);
       }
@@ -131,7 +140,11 @@ async function _runInsert(
         const obj: EvaluationResultRow = {};
         if (ast.columns && row.value.length === ast.columns.length) {
           ast.columns.forEach((name: string, j: number) => {
-            const expr_result = Expression.getValue(row.value[j], { session });
+            const expr_result = Expression.getValue(row.value[j], {
+              session,
+              isWrite: true,
+              isIgnore: is_ignore,
+            });
             if (expr_result.err) {
               throw new SQLError(expr_result.err);
             }
@@ -144,8 +157,38 @@ async function _runInsert(
       });
     }
   } else {
-    logger.error('unsupported insert without column names');
-    throw new SQLError('unsupported');
+    const { column_list, is_open } = await engine.getTableInfo({
+      dynamodb,
+      database: params.database,
+      table: table ?? '',
+      session,
+    });
+    if (is_open) {
+      logger.error('unsupported insert without column names');
+      throw new SQLError('unsupported');
+    }
+    list = [];
+    const values = ast.values?.type === 'values' ? ast.values.values : [];
+    if (Array.isArray(values)) {
+      values.forEach((row, i: number) => {
+        if (row.value.length !== column_list.length) {
+          throw new SQLError({ err: 'ER_WRONG_VALUE_COUNT_ON_ROW', args: [i] });
+        }
+        const obj: EvaluationResultRow = {};
+        column_list.forEach((col, j: number) => {
+          const expr_result = Expression.getValue(row.value[j], {
+            session,
+            isWrite: true,
+            isIgnore: is_ignore,
+          });
+          if (expr_result.err) {
+            throw new SQLError(expr_result.err);
+          }
+          obj[col.name] = expr_result;
+        });
+        list.push(obj);
+      });
+    }
   }
 
   // Insert the rows
@@ -161,6 +204,7 @@ async function _runInsert(
       list,
       duplicate_mode: duplicate_mode ?? undefined,
       on_duplicate_update: ast.on_duplicate_update?.set,
+      is_ignore,
     };
     try {
       let result: ChangedResult;
@@ -268,6 +312,7 @@ async function _runInsert(
             set,
             existing: entry.cur,
             inserted: row,
+            isIgnore: is_ignore,
           });
           for (const { column: name, value } of values) {
             const attr = findKey(entry.cur, name);

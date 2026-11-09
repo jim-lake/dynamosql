@@ -1,0 +1,15 @@
+CREATE DATABASE IF NOT EXISTS ins_nocol_test;
+USE ins_nocol_test;
+CREATE TEMPORARY TABLE ins_nocol (id INT PRIMARY KEY, val INT);
+INSERT INTO ins_nocol VALUES (1, 1), (2, 3);
+SELECT * FROM ins_nocol ORDER BY id;
+INSERT INTO ins_nocol VALUES (4, NULL);
+INSERT INTO ins_nocol VALUES (5, 2 + 3);
+SELECT * FROM ins_nocol ORDER BY id;
+INSERT INTO ins_nocol VALUES (1, 7) ON DUPLICATE KEY UPDATE val = VALUES(val) + val;
+SELECT * FROM ins_nocol ORDER BY id;
+CREATE TEMPORARY TABLE ins_nocol_types (id INT PRIMARY KEY, name VARCHAR(10), amount DECIMAL(10, 2));
+INSERT INTO ins_nocol_types VALUES (1, 'a', 1.5), (2, 'b', 2.25);
+SELECT * FROM ins_nocol_types ORDER BY id;
+USE _dynamodb;
+DROP DATABASE ins_nocol_test;

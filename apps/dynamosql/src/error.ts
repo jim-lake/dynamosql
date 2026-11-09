@@ -113,8 +113,16 @@ const ERROR_MAP: Record<string, ErrorMapEntry> = {
     sqlMessage: errStr`Incorrect column name '${0}'`,
   },
   ER_BAD_NULL_ERROR: { code: 'ER_BAD_NULL_ERROR' },
+  ER_DIVISION_BY_ZERO: {
+    code: 'ER_DIVISION_BY_ZERO',
+    sqlMessage: 'Division by 0',
+  },
   ER_TRUNCATED_WRONG_VALUE_FOR_FIELD: {
     code: 'ER_TRUNCATED_WRONG_VALUE_FOR_FIELD',
+  },
+  ER_DUP_FIELDNAME: {
+    code: 'ER_DUP_FIELDNAME',
+    sqlMessage: errStr`Duplicate column name '${0}'`,
   },
   ER_KEY_COLUMN_DOES_NOT_EXITS: {
     code: 'ER_KEY_COLUMN_DOES_NOT_EXITS',

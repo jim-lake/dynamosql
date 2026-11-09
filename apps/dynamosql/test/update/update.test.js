@@ -11,4 +11,18 @@ describe('Update', function () {
     'multi_table_comma.sql',
     path.join(__dirname, 'multi_table_comma.sql')
   );
+  runTests(
+    'division_by_zero_raw.sql',
+    path.join(__dirname, 'division_by_zero_raw.sql'),
+    { allowedErrors: 'SAME_CODE', skipAffected: true, checkChanged: true }
+  );
+  runTests(
+    'division_by_zero_ignore.sql',
+    path.join(__dirname, 'division_by_zero_ignore.sql')
+  );
+  runTests(
+    'division_by_zero_error.sql',
+    path.join(__dirname, 'division_by_zero_error.sql'),
+    { allowedErrors: 'SAME_CODE', skipAffected: true, checkChanged: true }
+  );
 });

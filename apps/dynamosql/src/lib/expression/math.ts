@@ -80,8 +80,15 @@ export function div(expr: Binary, state: EvaluationState): EvaluationResult {
     left_num !== undefined &&
     right_num !== undefined
   ) {
-    // Division by zero returns NULL in MySQL
     if (right_num === 0 || right_num === 0n) {
+      if (state.isWrite && !state.isIgnore) {
+        return {
+          err: 'ER_DIVISION_BY_ZERO',
+          value: null,
+          name,
+          type: 'number',
+        };
+      }
       value = null;
     } else if (typeof left_num === 'bigint' || typeof right_num === 'bigint') {
       value = Number(left_num) / Number(right_num);

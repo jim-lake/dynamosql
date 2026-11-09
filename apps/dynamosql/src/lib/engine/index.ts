@@ -212,6 +212,7 @@ export interface InsertParams {
   list: EvaluationResultRow[];
   duplicate_mode?: 'ignore' | 'replace' | 'update';
   on_duplicate_update?: SetList[];
+  is_ignore?: boolean;
 }
 
 export interface Engine {

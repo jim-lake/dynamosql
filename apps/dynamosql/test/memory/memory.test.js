@@ -55,4 +55,12 @@ describe('Temp', function () {
     path.join(__dirname, 'temp_keyless_error.sql'),
     { allowedErrors: 'SAME_CODE', skipAffected: true, checkChanged: true }
   );
+  runTests('memory_intstr.sql', path.join(__dirname, 'memory_intstr.sql'), {
+    checkChanged: true,
+  });
+  runTests(
+    'memory_misuse_error.sql',
+    path.join(__dirname, 'memory_misuse_error.sql'),
+    { allowedErrors: 'SAME_CODE', skipAffected: true, checkChanged: true }
+  );
 });

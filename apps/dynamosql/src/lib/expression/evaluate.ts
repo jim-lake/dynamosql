@@ -62,6 +62,8 @@ export interface EvaluationState {
   tableInfoMap?: TableInfoMap;
   insertRow?: EvaluationResultRow;
   subqueryValues?: SubqueryValues;
+  isWrite?: boolean;
+  isIgnore?: boolean;
 }
 export interface EvaluationValue {
   type: ValueType;

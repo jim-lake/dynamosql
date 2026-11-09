@@ -1,0 +1,10 @@
+CREATE DATABASE IF NOT EXISTS mem_intstr_db;
+USE mem_intstr_db;
+CREATE TEMPORARY TABLE ints (id INT PRIMARY KEY, v INT);
+INSERT INTO ints (id, v) VALUES (1, '1.5'), (2, '1e3'), (3, '  7  '), (4, '-3');
+SELECT id, v FROM ints ORDER BY id;
+UPDATE ints SET v = '2.5' WHERE id = 1;
+UPDATE ints SET v = '1e2' WHERE id = 2;
+SELECT id, v FROM ints ORDER BY id;
+USE _dynamodb;
+DROP DATABASE mem_intstr_db;

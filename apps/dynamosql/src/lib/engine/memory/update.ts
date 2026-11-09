@@ -2,6 +2,7 @@ import { logger } from '@dynamosql/shared';
 
 import { SQLError, NoSingleOperationError } from '../../../error';
 
+import { roundInt, isInteger } from './insert';
 import * as Storage from './storage';
 
 import type { EvaluationResult } from '../../expression';
@@ -68,7 +69,16 @@ export async function multipleUpdate(
           ) {
             throw new SQLError({ err: 'column_not_found', args: [set.column] });
           }
-          new_row[set.column] = _transformCell(set.value);
+          const column = data.column_list.find(
+            (col) => col.name_lc === set.column.toLowerCase()
+          );
+          const zeroForNull =
+            ignore && !column?.nullable && set.value.value === null;
+          const value = zeroForNull ? 0 : set.value.value;
+          new_row[set.column] = _transformCell({
+            ...set.value,
+            value: isInteger(column?.type) ? roundInt(value) : value,
+          });
           if (old_row[set.column]?.value !== new_row[set.column]?.value) {
             changed = true;
           }

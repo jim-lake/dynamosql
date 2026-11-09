@@ -1,11 +1,13 @@
 import { SQLError } from '../../../error';
 import { evaluateDuplicateUpdate } from '../../helpers/duplicate_update';
+import { convertNum } from '../../helpers/sql_conversion';
 
 import * as Storage from './storage';
 import { ROW_ID_NAME } from './storage';
 
 import type { MemoryColumnDef } from './storage';
 import type {
+  CellValue,
   EvaluationResultRow,
   InsertParams,
   ChangedResult,
@@ -24,6 +26,7 @@ export async function insertRowList(
     list,
     duplicate_mode,
     on_duplicate_update,
+    is_ignore,
   } = params;
   const data = Storage.getTable(database, table, session);
 
@@ -47,7 +50,7 @@ export async function insertRowList(
         throw new SQLError({ err: 'column_not_found', args: [name] });
       }
     }
-    const cellRow = _transformRow(row, data.column_list);
+    const cellRow = _transformRow(row, data.column_list, is_ignore ?? false);
     if (primary_key[0] === ROW_ID_NAME) {
       cellRow[ROW_ID_NAME] = { type: 'longlong', value: ++g_last_row_id };
     }
@@ -68,6 +71,7 @@ export async function insertRowList(
         set: on_duplicate_update,
         existing: old_row,
         inserted: row,
+        isIgnore: is_ignore,
       });
       const new_row: CellRow = { ...old_row };
       let changed = false;
@@ -76,8 +80,13 @@ export async function insertRowList(
         if (!data.column_list.some((col) => col.name_lc === name)) {
           throw new SQLError({ err: 'column_not_found', args: [column] });
         }
-        new_row[name] = { type: value.type, value: value.value };
-        if (old_row[name]?.value !== value.value) {
+        const stored = _storedCell(
+          value,
+          data.column_list.find((col) => col.name_lc === name),
+          is_ignore ?? false
+        );
+        new_row[name] = { type: stored.type, value: stored.value };
+        if (old_row[name]?.value !== stored.value) {
           changed = true;
         }
       }
@@ -117,14 +126,15 @@ export async function insertRowList(
 }
 function _transformRow(
   row: EvaluationResultRow,
-  column_list: readonly MemoryColumnDef[]
+  column_list: readonly MemoryColumnDef[],
+  ignore: boolean
 ): CellRow {
   const result: CellRow = {};
   for (const column of column_list) {
     const cell = row[column.name_lc];
     if (cell !== undefined) {
       _checkJsonText(column, cell.value);
-      result[column.name_lc] = { type: cell.type, value: cell.value };
+      result[column.name_lc] = _storedCell(cell, column, ignore);
     } else if (column.defaultValue === undefined) {
       throw new SQLError({
         err: 'ER_NO_DEFAULT_FOR_FIELD',
@@ -135,6 +145,35 @@ function _transformRow(
     }
   }
   return result;
+}
+export function roundInt(value: unknown): unknown {
+  if (typeof value !== 'string' && typeof value !== 'number') {
+    return value;
+  }
+  if (
+    typeof value === 'string' &&
+    value.trim() !== '' &&
+    isNaN(Number(value))
+  ) {
+    throw new SQLError({ err: 'ER_TRUNCATED_WRONG_VALUE_FOR_FIELD' });
+  }
+  const num = convertNum(value) ?? 0;
+  return Math.sign(num) * Math.round(Math.abs(num));
+}
+export function isInteger(type: string | undefined): boolean {
+  return type === 'long' || type === 'longlong';
+}
+function _storedCell(
+  cell: { type: CellValue['type']; value: unknown },
+  column: MemoryColumnDef | undefined,
+  ignore: boolean
+): CellValue {
+  const zeroForNull = ignore && !column?.nullable && cell.value === null;
+  const value = zeroForNull ? 0 : cell.value;
+  return {
+    type: cell.type,
+    value: isInteger(column?.type) ? roundInt(value) : value,
+  } as CellValue;
 }
 function _checkJsonText(column: MemoryColumnDef, value: unknown) {
   if (column.type !== 'json' || typeof value !== 'string') {

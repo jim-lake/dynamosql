@@ -48,8 +48,9 @@ export function evaluateDuplicateUpdate(params: {
   set: SetList[];
   existing: Row;
   inserted: EvaluationResultRow;
+  isIgnore?: boolean;
 }): DuplicateSetValue[] {
-  const { session, set, existing, inserted } = params;
+  const { session, set, existing, inserted, isIgnore } = params;
   const from = { db: null, table: null, as: null } as unknown as BaseFrom;
   const columnRefMap = buildSetReferences(set, from);
   const row = {
@@ -70,6 +71,8 @@ export function evaluateDuplicateUpdate(params: {
       columnRefMap,
       tableInfoMap,
       insertRow,
+      isWrite: true,
+      isIgnore,
     });
     if (value.err) {
       throw new SQLError(value.err);

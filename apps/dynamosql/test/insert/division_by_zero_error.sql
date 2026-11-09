@@ -1,0 +1,10 @@
+CREATE DATABASE IF NOT EXISTS dz_ins_test;
+USE dz_ins_test;
+CREATE TEMPORARY TABLE dz_ins (id INT PRIMARY KEY, c INT);
+INSERT INTO dz_ins (id, c) VALUES (1, 1);
+INSERT INTO dz_ins (id, c) VALUES (2, 1 / 0);
+INSERT INTO dz_ins (id, c) VALUES (1, 1) ON DUPLICATE KEY UPDATE c = 1 / 0;
+INSERT INTO dz_ins (id, c) VALUES (1, 1) ON DUPLICATE KEY UPDATE c = c / 0;
+SELECT * FROM dz_ins ORDER BY id;
+USE _dynamodb;
+DROP DATABASE dz_ins_test;

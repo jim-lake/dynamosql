@@ -1,0 +1,10 @@
+CREATE DATABASE IF NOT EXISTS dz_upd_ign_test;
+USE dz_upd_ign_test;
+CREATE TEMPORARY TABLE dz_upd_ign (id INT PRIMARY KEY, c INT NOT NULL DEFAULT 7, n INT);
+INSERT INTO dz_upd_ign (id, c, n) VALUES (1, 1, 1);
+UPDATE IGNORE dz_upd_ign SET c = 1 / 0 WHERE id = 1;
+SELECT * FROM dz_upd_ign ORDER BY id;
+UPDATE IGNORE dz_upd_ign SET n = 1 / 0 WHERE id = 1;
+SELECT * FROM dz_upd_ign ORDER BY id;
+USE _dynamodb;
+DROP DATABASE dz_upd_ign_test;

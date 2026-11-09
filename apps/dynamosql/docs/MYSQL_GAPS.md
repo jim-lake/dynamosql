@@ -4,13 +4,6 @@ Scenarios where DynamoSQL does not match MySQL 8.4. Each entry gives the query, 
 
 Matching MySQL is not a goal for illegal statements. Parse errors (`ER_PARSE_ERROR`) and other errors for invalid statements, such as `ER_CANT_REOPEN_TABLE`, are not hard requirements. Entries about those errors are kept only as reference and are not targets to fix. Valid MySQL syntax that DynamoSQL rejects, and valid queries that return different results, are gaps. Only features marked as supported in `../../SQL_GRAMMAR.md` or `../../FUNCTIONS.md` are listed here.
 
-## Division by zero in writes
-
-MySQL 8.4 in strict mode raises an error when a write divides by zero. DynamoSQL stores NULL instead.
-
-- `INSERT INTO t (id, c) VALUES (1, 1) ON DUPLICATE KEY UPDATE c = 1 / 0;`: MySQL returns `ER_DIVISION_BY_ZERO`. DynamoSQL returns success and sets `c` to NULL.
-- `SELECT 1 / 0 AS r;` matches on both engines and returns NULL, so the gap is limited to writes.
-
 ## INSERT without a column list
 
 MySQL accepts `INSERT INTO t VALUES (...)` and maps the values to columns by position. The memory engine has a schema, so it should support this form. The raw engine cannot, because DynamoDB tables have no schema (see `RAW_ENGINE.md`).

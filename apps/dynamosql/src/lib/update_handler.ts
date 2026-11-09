@@ -101,6 +101,8 @@ async function _multipleUpdate(
             session,
             row,
             columnRefMap,
+            isWrite: true,
+            isIgnore: Boolean(ast.ignore),
           });
           if (expr_result.err) {
             throw new SQLError(expr_result.err);
