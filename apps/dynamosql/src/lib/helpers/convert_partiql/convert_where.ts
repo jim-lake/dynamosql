@@ -48,6 +48,10 @@ export function convertWhere(
 ): ConvertResult {
   if (expr && 'type' in expr && expr.type === 'column_ref') {
     const col = String(expr.column);
+    const refInfo = state.columnRefMap?.get(expr);
+    if (state.from && refInfo?.from !== state.from) {
+      return { err: 'unsupported', value: null };
+    }
     return {
       err: null,
       value: `(${col} IS NOT NULL AND ${col} <> 0 AND ${col} <> '' AND ${col} <> false)`,

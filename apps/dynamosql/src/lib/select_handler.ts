@@ -177,13 +177,11 @@ async function _iterQuery(
   const current_database = session.getCurrentDatabase();
   let requestSets = new Map<From, Set<string>>();
   let requestAll = new Map<From, boolean>();
-  let usingSets = new Map<From, Set<string>>();
   let columnRefMap = params.columnRefMap ?? new Map();
   if (!params.skip_resolve) {
     const requestInfo = resolveReferences(ast, current_database ?? undefined);
     requestSets = requestInfo.requestSets;
     requestAll = requestInfo.requestAll;
-    usingSets = requestInfo.usingSets;
     columnRefMap = requestInfo.columnRefMap;
   }
   const from = ast.type === 'update' ? ast.table : ast.from;
@@ -272,21 +270,6 @@ async function _iterQuery(
       );
     }
     await Promise.all(tasks);
-    for (const [object, names] of requestSets) {
-      const info = tableInfoMap.get(object);
-      if (!info || info.is_open) {
-        continue;
-      }
-      for (const name of names) {
-        if (usingSets.get(object)?.has(name)) {
-          continue;
-        }
-        const name_lc = name.toLowerCase();
-        if (!info.columns.some((col) => col.name.toLowerCase() === name_lc)) {
-          throw new SQLError({ err: 'column_not_found', args: [name] });
-        }
-      }
-    }
     from.forEach((item, index) => {
       const joined = item as Join;
       if (index === 0 || !String(joined.join).includes('NATURAL')) {
@@ -338,6 +321,48 @@ async function _evaluateReturn(
     tableInfoMap,
     subqueryValues,
   } = params;
+  for (const [ref, info] of columnRefMap) {
+    const bound = info.from ? tableInfoMap.get(info.from) : undefined;
+    if (bound && !bound.is_open && ref.column) {
+      const name_lc = String(ref.column).toLowerCase();
+      if (!bound.columns.some((col) => col.name.toLowerCase() === name_lc)) {
+        throw new SQLError({
+          err: 'column_not_found',
+          args: [String(ref.column)],
+        });
+      }
+    }
+  }
+  for (const [ref, info] of columnRefMap) {
+    if (info.from || info.resultIndex !== undefined || !ref.column) {
+      continue;
+    }
+    const name = String(ref.column);
+    const name_lc = name.toLowerCase();
+    const owners = [...tableInfoMap].filter(([, tableInfo]) =>
+      tableInfo.columns.some((col) => col.name.toLowerCase() === name_lc)
+    );
+    if (owners.length > 1) {
+      throw new SQLError({
+        code: 'ER_NON_UNIQ_ERROR',
+        sqlMessage: `Column '${name}' in field list is ambiguous`,
+      });
+    }
+    const owner = owners[0];
+    if (owner) {
+      columnRefMap.set(ref, { from: owner[0] });
+    } else if (
+      [...tableInfoMap.values()].every((tableInfo) => !tableInfo.is_open)
+    ) {
+      throw new SQLError({ err: 'column_not_found', args: [name] });
+    } else {
+      const fromList = ast.type === 'update' ? ast.table : ast.from;
+      const openFrom = Array.isArray(fromList)
+        ? fromList.find((item) => tableInfoMap.get(item)?.is_open)
+        : undefined;
+      columnRefMap.set(ref, { from: openFrom });
+    }
+  }
   const queryColumns = _isSelect(ast)
     ? expandStarColumns({ ...params, ast })
     : [];

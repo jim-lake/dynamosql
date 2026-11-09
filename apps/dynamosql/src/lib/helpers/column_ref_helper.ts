@@ -48,7 +48,6 @@ export interface RequestInfo {
   requestAll: Map<From, boolean>;
   columnRefMap: Map<ColumnRef, ColumnRefInfo>;
   setListMap: Map<SetList, From>;
-  usingSets: Map<From, Set<string>>;
 }
 
 export function resolveReferences(
@@ -59,7 +58,6 @@ export function resolveReferences(
   const requestAll = new Map<From, boolean>();
   const columnRefMap = new Map<ColumnRef, ColumnRefInfo>();
   const setListMap = new Map<SetList, From>();
-  const usingSets = new Map<From, Set<string>>();
   const table_map: TableMap = {};
   const db_map: DbMap = {};
   const fromRaw =
@@ -87,7 +85,6 @@ export function resolveReferences(
         }
       }
       requestSets.set(fromEntry, new Set());
-      usingSets.set(fromEntry, new Set());
       requestAll.set(fromEntry, natural);
       if (fromEntry.as) {
         table_map[fromEntry.as] = fromEntry;
@@ -116,7 +113,6 @@ export function resolveReferences(
     for (const table of from.slice(0, index + 1)) {
       for (const column of columns) {
         requestSets.get(table)?.add(column);
-        usingSets.get(table)?.add(column);
       }
     }
   });
@@ -240,7 +236,7 @@ export function resolveReferences(
       }
     });
   }
-  return { requestSets, requestAll, columnRefMap, setListMap, usingSets };
+  return { requestSets, requestAll, columnRefMap, setListMap };
 }
 
 function _columnName(ref: ColumnRef): string {
@@ -353,6 +349,24 @@ function _resolveObject(
       } else {
         const cached = name_cache[obj.column ?? ''];
         const astFrom = ast.type === 'update' ? ast.table : ast.from;
+        const baseFroms = Array.isArray(astFrom)
+          ? astFrom.filter(isBaseFrom)
+          : [];
+        const isUsingName = Array.isArray(astFrom)
+          ? astFrom.some(
+              (item) =>
+                'using' in item &&
+                Array.isArray(item.using) &&
+                item.using.includes(obj.column ?? '')
+            )
+          : false;
+        if (obj.column && baseFroms.length > 1 && !isUsingName) {
+          for (const base of baseFroms) {
+            requestSets.get(base)?.add(obj.column);
+          }
+          columnRefMap.set(object as ColumnRef, {});
+          return;
+        }
         const firstFrom = Array.isArray(astFrom) ? astFrom[0] : undefined;
         const isSource =
           firstFrom && (isBaseFrom(firstFrom) || isDerivedFrom(firstFrom));
