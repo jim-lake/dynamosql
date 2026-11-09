@@ -60,11 +60,12 @@ After any code change, run `npm run ts:check && npm run lint`, then `npm test`. 
 - JSON results are compared by parsing both sides with `JSON.parse` and comparing the parsed values with deep equality. Never compare the raw JSON text from MySQL with DynamoSQL output. MySQL point releases can change JSON text formatting (spacing, key order, number rendering), and tests that depend on that text would break without any real behavior change.
 - We are EXPLICITLY NOT trying to match MySQL behavior for JSON key ordering or JSON stringification. MySQL states these are NOT STABLE across versions. Do NOT investigate the exact parameters of key sorting or stringification, EVER.
 - Tests need AWS credentials with DynamoDB access, read from the environment or `.env`.
-- When asked to write tests, read the implementation first. Cover the full behavior of implemented functionality, and skip anything not implemented. Tests must fail when the implemented behavior differs from MySQL. Pass and fail results are both acceptable; coverage is the goal.
+- When asked to write tests, read the implementation first. Test only supported behavior, as defined in [Supported Behavior](#supported-behavior). Cover the full supported behavior of implemented functionality. Test what works and what is supported but broken. Do not add tests for unsupported behavior, even when DynamoSQL matches MySQL. Tests must fail when the implemented behavior differs from MySQL. Pass and fail results are both acceptable; coverage is the goal.
 - When doing generic work implementing SQL Functions, DO NOT TEST SQL parse failure edge cases where MySQL returns ER_PARSE_ERROR. That error is not behavior end users depend on, so skip it in most cases.
 - Matching MySQL's behavior for illegal statements is not a goal. Parse errors (ER_PARSE_ERROR) are not a hard requirement, and neither are other errors for invalid statements, such as ER_CANT_REOPEN_TABLE. Treat these as the same kind of case as parse errors: skip them unless there is a specific reason to test them.
 - Error messages do not need to match MySQL's text exactly. Error codes should match MySQL exactly for valid statements, except where the difference is a design choice.
 - Raw engine design choices are documented in `../../RAW_ENGINE.md`.
+- Memory engine design gaps are documented in `../../MEMORY_ENGINE.md`.
 - The memory engine should not have design gaps in general.
 - Mocha timeout is 15 seconds per test.
 - Test directories: `select/`, `insert/`, `update/`, `delete/`, `replace/`, `join/`, `expression/`, `ddl/`, `memory/`, `client_opts/`, `unit_misc/`, `setup/`.
@@ -133,12 +134,23 @@ Development:
 - `@types/sqlstring`
 - Test tooling (`mocha`, `tsx`, `dotenv`) comes from the workspace root.
 
+## Supported Behavior
+
+Supported behavior is the intersection of what these four docs state as supported:
+
+- `../../SQL_GRAMMAR.md`: SQL syntax.
+- `../../FUNCTIONS.md`: SQL functions.
+- `../../RAW_ENGINE.md`: raw (DynamoDB) engine behavior.
+- `../../MEMORY_ENGINE.md`: memory engine behavior.
+
+A behavior is supported only when all four docs cover it. If any one of them does not state it as supported, it is unimplemented or out of scope, not supported. Do not treat a behavior as supported because it exists in the code or matches MySQL.
+
 ## Gap Documents
 
 - `docs/PARSER_TODO.md` holds only parser-grammar mismatches: real MySQL 8.4 syntax that node-sql-parser's MySQL grammar rejects or misparses. Add one concise line per mismatch. Do not put parser issues in `docs/MYSQL_GAPS.md`.
-- `docs/MYSQL_GAPS.md` holds behavior gaps. A gap is a query that DynamoSQL rejects or returns differently from MySQL 8.4, when `../../SQL_GRAMMAR.md` or `../../FUNCTIONS.md` states the syntax or function is supported. Record the query, the MySQL result, and the DynamoSQL result.
-- Anything not stated as supported in `../../SQL_GRAMMAR.md` or `../../FUNCTIONS.md` is UNIMPLEMENTED, not a gap. Do not record it in `docs/MYSQL_GAPS.md`.
-- `docs/TEST_GAPS.md` holds statements that work (match MySQL 8.4) but have no test. When you find one, add it there instead of leaving it untested.
+- `docs/MYSQL_GAPS.md` holds behavior gaps. A gap is a query that DynamoSQL rejects or returns differently from MySQL 8.4, when the behavior is supported under [Supported Behavior](#supported-behavior). Record the query, the MySQL result, and the DynamoSQL result.
+- Anything not supported under [Supported Behavior](#supported-behavior) is UNIMPLEMENTED or out of scope, not a gap. Do not record it in `docs/MYSQL_GAPS.md`.
+- `docs/TEST_GAPS.md` holds supported statements that match MySQL 8.4 but have no test. When you find one, add it there instead of leaving it untested.
 
 ## Notes
 
