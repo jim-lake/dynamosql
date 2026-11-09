@@ -36,22 +36,22 @@ Module-level notes:
 
 Run these from `apps/dynamosql/`:
 
-| Task                                       | Command                                                                 |
-| ------------------------------------------ | ----------------------------------------------------------------------- |
-| Create DynamoDB/MySQL tables               | `npm run test:setup`                                                    |
-| Full test run                              | `npm test`                                                              |
-| Single test file                           | `npm run test:single -- test/select/<file>.test.js`                     |
-| Include slow tests                         | `npm run test:slow` or `npm run test:single:slow -- <file>`             |
-| Type check                                 | `npm run ts:check`                                                      |
-| Lint                                       | `npm run lint` (runs `eslint src test examples --fix`)                  |
-| Format                                     | `npm run pretty`                                                        |
-| Build                                      | `npm run build`                                                         |
-| Export check                               | `npm run test:export:check`                                             |
-| Manual query (MySQL / Dynamo / parse tree) | `npm run query:mysql` / `npm run query:session` / `npm run query:parse` |
+| Task                                            | Command                                                                 |
+| ----------------------------------------------- | ----------------------------------------------------------------------- |
+| Create DynamoDB/MySQL tables                    | `npm run test:setup`                                                    |
+| Full test run                                   | `npm test`                                                              |
+| Single test file                                | `npm run test:single -- test/select/<file>.test.js`                     |
+| Include slow tests                              | `npm run test:slow` or `npm run test:single:slow -- <file>`             |
+| Type check                                      | `npm run ts:check`                                                      |
+| Lint                                            | `npm run lint` (runs `eslint src test examples --fix`)                  |
+| Format (run only when the user explicitly asks) | `npm run pretty`                                                        |
+| Build                                           | `npm run build`                                                         |
+| Export check                                    | `npm run test:export:check`                                             |
+| Manual query (MySQL / Dynamo / parse tree)      | `npm run query:mysql` / `npm run query:session` / `npm run query:parse` |
 
 After any code change, run `npm run ts:check && npm run lint`, then `npm test`. Run `npm run test:setup` first if table definitions changed.
 
-`npm run lint` must always be run before you finish a task. It runs `eslint --fix`, so it may reformat files you did not edit. Never revert those files with git or by hand. Leave every change lint makes, even in files outside your task. The changes `eslint --fix` makes are correct by definition. Never review them, and never mention them in reports.
+`npm run lint` must always be run before you finish a task. It runs `eslint --fix`, which writes changes to files on disk, so it may reformat files you did not edit. Do not assume files stay unchanged after lint runs; re-read any file before editing it. Never revert those files with git or by hand. Leave every change lint makes, even in files outside your task. The changes `eslint --fix` makes are correct by definition. Never review them, and never mention them in reports.
 
 ## Testing Rules
 
@@ -115,7 +115,7 @@ The entire point of the query engine is its async iterator, end to end. Rows flo
 - After the code is written, verified, and finished, re-read the changed code for every function invoked in only one place. Decide for each one whether it should be inlined. A single-caller helper that adds no reuse or recursion is wrong and must be inlined before the work is reported as complete.
 - Round float arguments used as counts, positions, or lengths with `Math.round()`.
 - Import directly from the defining module. Do not add unnecessary re-export chains.
-- Match the Prettier style: single quotes, 2-space indent, ES5 trailing commas. Run `npm run pretty` before finishing. The changes `npm run pretty` makes are correct by definition. Never review them, and never mention them in reports.
+- Match the Prettier style: single quotes, 2-space indent, ES5 trailing commas. Do not run `npm run pretty` unless the user explicitly instructs you to. Never run it on your own initiative, including before finishing. When the user does ask for it, `npm run pretty` writes changes to files on disk, so do not assume files stay unchanged after it runs. Never revert those changes, and never mention them in reports.
 - ESLint enforces Unix line endings.
 
 ### Comments

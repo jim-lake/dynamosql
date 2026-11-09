@@ -29,7 +29,17 @@ export async function* sort(
       result_list = result_list.concat(batch);
     }
   }
-  const row = result_list[0];
+  sortRows(result_list, orderby, queryColumns, state);
+  yield result_list;
+}
+
+export function sortRows(
+  list: SourceRow[],
+  orderby: OrderBy[],
+  queryColumns: QueryColumn[],
+  state: EvaluationState
+): void {
+  const row = list[0];
   if (row) {
     const orders: OrderStep[] = [];
     for (const order of orderby) {
@@ -39,9 +49,8 @@ export async function* sort(
       });
       orders.push({ order, collation });
     }
-    result_list.sort(_sort.bind(null, orders, state));
+    list.sort(_sort.bind(null, orders, state));
   }
-  yield result_list;
 }
 interface OrderStep {
   order: OrderBy;

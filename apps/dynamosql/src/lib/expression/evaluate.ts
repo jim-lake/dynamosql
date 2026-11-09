@@ -64,6 +64,7 @@ export interface EvaluationState {
   insertRow?: EvaluationResultRow;
   subqueryValues?: SubqueryValues;
   windowValues?: WindowValues;
+  rowWindowValues?: RowWindowValues;
   isWrite?: boolean;
   isIgnore?: boolean;
 }
@@ -85,6 +86,7 @@ export function isSelectSubquery(expr: unknown): expr is SelectSubquery {
 }
 export type SubqueryValues = Map<SelectSubquery, EvaluationValue>;
 export type WindowValues = Map<unknown, EvaluationResult>;
+export type RowWindowValues = WeakMap<object, WindowValues>;
 
 // Type guards
 function isValueExpr(expr: unknown): expr is ValueExpr {
@@ -122,7 +124,9 @@ function isAggrFunc(expr: unknown): expr is AggrFunc {
 }
 
 function _windowValue(expr: unknown, state: EvaluationState): EvaluationResult {
-  const stored = state.windowValues?.get(expr);
+  const stored =
+    (state.row && state.rowWindowValues?.get(state.row)?.get(expr)) ??
+    state.windowValues?.get(expr);
   if (!stored) {
     return {
       err: { err: 'ER_NOT_SUPPORTED_YET' },

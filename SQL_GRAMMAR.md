@@ -159,7 +159,7 @@ Source: MySQL 8.4 Reference Manual, chapter 15 (SQL statements), chapter 11 (lan
 | `ORDER BY` inside a window spec                                                                        |    ❌     |                                                                       |
 | Frame clause `ROWS` / `RANGE` with `BETWEEN ... AND ...`                                               |    ❌     |                                                                       |
 | Frame bounds `UNBOUNDED PRECEDING`, `N PRECEDING`, `CURRENT ROW`, `N FOLLOWING`, `UNBOUNDED FOLLOWING` |    ❌     |                                                                       |
-| Window functions (`ROW_NUMBER`, `RANK`, `LAG`, and others)                                             |    ❌     | Listed in `FUNCTIONS.md`. `OVER ()` on `SUM`, `COUNT`, `MIN`, `MAX` is supported. |
+| Window functions (`ROW_NUMBER`, `LAG`, and others)                                             |    ✅     | `ROW_NUMBER` and `LAG` are listed in `FUNCTIONS.md`. `RANK` is not supported. `OVER ()` on `SUM`, `COUNT`, `MIN`, `MAX` is supported. |
 
 ### ORDER BY and LIMIT
 

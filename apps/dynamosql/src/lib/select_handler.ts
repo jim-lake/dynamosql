@@ -434,7 +434,7 @@ async function _evaluateReturn(
   }
 
   if (ast.type === 'select' && hasWindow(ast.columns)) {
-    group_iter = applyWindows({ iter: group_iter, ast, state });
+    group_iter = applyWindows({ iter: group_iter, ast, queryColumns, state });
   }
 
   let resultIter: AsyncIterable<SourceRow[]> = group_iter;

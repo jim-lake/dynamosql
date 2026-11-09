@@ -47,6 +47,7 @@ npm test --workspace=apps/server
 
 # Lint and format all workspaces
 npm run lint
+# Only when the user explicitly asks; this rewrites files on disk
 npm run pretty
 ```
 
@@ -55,7 +56,7 @@ Run package-specific commands from inside the package directory, as described in
 ## Development Workflow
 
 1. Make changes in `apps/dynamosql/src/` or `apps/server/src/`.
-2. Lint, format, and test the package you changed. The package `AGENTS.md` lists the exact commands.
+2. Lint and test the package you changed. Run `npm run pretty` only when the user explicitly asks for it. The package `AGENTS.md` lists the exact commands.
 
 ## Notes
 

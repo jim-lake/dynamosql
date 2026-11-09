@@ -197,7 +197,7 @@ and geometry
 | JSON_UNQUOTE()                  |    ✅     | Unquote JSON value                                                                                                                                      |
 | JSON_VALID()                    |    ✅     | Whether JSON value is valid                                                                                                                             |
 | JSON_VALUE()                    |    ✅     | Extract value from JSON document at location pointed to by path provided; return this value as VARCHAR(512) or specified type                           |
-| LAG()                           |    ❌     | Value of argument from row lagging current row within partition                                                                                         |
+| LAG()                           |    ✅     | `select/window_rank_lag.sql`. Offset must be a non-negative integer literal. Frames are rejected. `OVER ()` without ORDER BY streams per partition. |
 | LAST_INSERT_ID()                |    ❌     | Value of the AUTOINCREMENT column for the last INSERT                                                                                                   |
 | LAST_VALUE()                    |    ❌     | Value of argument from last row of window frame                                                                                                         |
 | LCASE()                         |    ✅     | Synonym for LOWER()                                                                                                                                     |
@@ -266,7 +266,7 @@ and geometry
 | ROLES_GRAPHML()                 |    ❌     | Return a GraphML document representing memory role subgraphs                                                                                            |
 | ROUND()                         |    ✅     | Round the argument                                                                                                                                      |
 | ROW_COUNT()                     |    ❌     | The number of rows updated                                                                                                                              |
-| ROW_NUMBER()                    |    ❌     | Number of current row within its partition                                                                                                              |
+| ROW_NUMBER()                    |    ✅     | `select/window_rank_lag.sql`. Numbering within each partition; row order is undefined without ORDER BY inside `OVER`, so tests use order-independent results. |
 | RPAD()                          |    ✅     | Append string the specified number of times                                                                                                             |
 | RTRIM()                         |    ✅     | Remove trailing spaces                                                                                                                                  |
 | SCHEMA()                        |    ✅     | Synonym for DATABASE()                                                                                                                                  |
