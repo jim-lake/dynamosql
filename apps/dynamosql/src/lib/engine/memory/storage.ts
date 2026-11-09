@@ -7,6 +7,8 @@ export interface MemoryColumnDef extends ColumnDef {
   defaultValue: CellValue | undefined;
 }
 
+export const ROW_ID_NAME = 'DB_ROW_ID';
+
 export interface TableData {
   table: string;
   collation: COLLATIONS;

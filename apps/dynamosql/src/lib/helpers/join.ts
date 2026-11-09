@@ -4,6 +4,7 @@ import { filterInPlace } from '@/tools/filter_in_place';
 import { SQLError } from '../../error';
 import { getValue } from '../expression';
 
+import { getSourceName } from './ast_helper';
 import { convertNum } from './sql_conversion';
 
 import type { Row, SourceMap } from '../engine';
@@ -34,7 +35,13 @@ export async function* formJoin(
   }
   let upstream = _firstRowIter(first, sourceMap);
   for (let i = 1; i < from.length; i++) {
-    upstream = _join(upstream, from[i] as From, sourceMap, state);
+    upstream = _join(
+      upstream,
+      from.slice(0, i),
+      from[i] as From,
+      sourceMap,
+      state
+    );
   }
 
   for await (const batch of upstream) {
@@ -76,12 +83,15 @@ async function* _firstRowIter(
 }
 function _join(
   upstream: AsyncIterable<SourceRow[]>,
+  lefts: From[],
   from: From,
   sourceMap: Map<From, AsyncIterable<Row[]>>,
   state: EvaluationState
 ): AsyncIterable<SourceRow[]> {
   const isLeft = 'join' in from && from.join.includes('LEFT');
-  const on = 'on' in from ? from.on : undefined;
+  const using_cols = 'using' in from ? from.using : undefined;
+  let on = 'on' in from ? from.on : undefined;
+  const columnRefMap = state.columnRefMap;
   const childIter =
     sourceMap.get(from) ??
     (async function* () {
@@ -96,6 +106,48 @@ function _join(
     childIter,
     (parentBatch, childBatch, parentDone, childDone) => {
       const outputs: SourceRow[] = [];
+
+      const first_parent = parentBatch?.[0];
+      if (using_cols && !on && first_parent && columnRefMap) {
+        const conditions = using_cols.map((column): Binary => {
+          const owner =
+            lefts.find((left) => {
+              const left_row = first_parent.source.get(left);
+              return (
+                Boolean(left_row) &&
+                (Object.hasOwn(left_row as object, column) ||
+                  Object.hasOwn(left_row as object, column.toLowerCase()))
+              );
+            }) ?? (lefts[lefts.length - 1] as From);
+          const left_ref = {
+            type: 'column_ref' as const,
+            table: getSourceName(owner),
+            column,
+          };
+          const right_ref = {
+            type: 'column_ref' as const,
+            table: getSourceName(from),
+            column,
+          };
+          columnRefMap.set(left_ref, { from: owner });
+          columnRefMap.set(right_ref, { from });
+          return {
+            type: 'binary_expr',
+            operator: '=',
+            left: left_ref,
+            right: right_ref,
+          } as unknown as Binary;
+        });
+        on = conditions.reduce(
+          (acc, condition) =>
+            ({
+              type: 'binary_expr',
+              operator: 'AND',
+              left: acc,
+              right: condition,
+            }) as unknown as Binary
+        );
+      }
 
       function _handleParentChild(parent: SourceRow, child: Row) {
         if (on) {

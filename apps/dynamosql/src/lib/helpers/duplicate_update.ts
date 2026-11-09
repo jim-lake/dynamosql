@@ -60,7 +60,7 @@ export function evaluateDuplicateUpdate(params: {
     result: null,
   };
   const tableInfoMap = new Map([
-    [from, { isCaseSensitive: false, columns: [] }],
+    [from, { isCaseSensitive: false, is_open: true, columns: [] }],
   ]);
   const insertRow = lowerKeys(inserted);
   return set.map((item) => {

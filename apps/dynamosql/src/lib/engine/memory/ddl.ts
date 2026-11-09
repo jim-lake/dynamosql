@@ -39,13 +39,14 @@ export async function getTableList(
   return [];
 }
 export async function createTable(params: CreateTableParams): Promise<void> {
-  const { session, database, table, primary_key, is_temp } = params;
-  if (primary_key.length === 0) {
-    throw new SQLError({
-      err: 'unsupported',
-      message: 'primary key is required',
-    });
+  const { session, database, table, is_temp } = params;
+  for (const col of params.column_list) {
+    if (col.name.toLowerCase() === Storage.ROW_ID_NAME.toLowerCase()) {
+      throw new SQLError({ err: 'ER_WRONG_COLUMN_NAME', args: [col.name] });
+    }
   }
+  const primary_key =
+    params.primary_key.length > 0 ? params.primary_key : [Storage.ROW_ID_NAME];
   const column_list = params.column_list.map((col) => {
     const ret: MemoryColumnDef = {
       name: col.name,

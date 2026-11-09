@@ -108,6 +108,10 @@ const ERROR_MAP: Record<string, ErrorMapEntry> = {
     code: 'ER_WRONG_VALUE_COUNT_ON_ROW',
     sqlMessage: errStr`Column count doesn't match value count at row ${0}`,
   },
+  ER_WRONG_COLUMN_NAME: {
+    code: 'ER_WRONG_COLUMN_NAME',
+    sqlMessage: errStr`Incorrect column name '${0}'`,
+  },
   ER_BAD_NULL_ERROR: { code: 'ER_BAD_NULL_ERROR' },
   ER_TRUNCATED_WRONG_VALUE_FOR_FIELD: {
     code: 'ER_TRUNCATED_WRONG_VALUE_FOR_FIELD',

@@ -15,7 +15,6 @@ import type {
   From,
   SetList,
   BaseFrom,
-  Binary,
   ColumnRef,
   Column,
   ExpressionValue,
@@ -49,46 +48,7 @@ export interface RequestInfo {
   requestAll: Map<From, boolean>;
   columnRefMap: Map<ColumnRef, ColumnRefInfo>;
   setListMap: Map<SetList, From>;
-}
-
-export function buildUsingCondition(
-  lefts: From[],
-  right: From,
-  columns: string[]
-): Binary {
-  return columns
-    .map((column): Binary => {
-      const leftRefs = lefts.map((left) => ({
-        type: 'column_ref' as const,
-        table: getSourceName(left),
-        column,
-      }));
-      const left =
-        leftRefs.length === 1
-          ? leftRefs[0]
-          : {
-              type: 'function' as const,
-              name: 'COALESCE',
-              args: { type: 'expr_list' as const, value: leftRefs },
-            };
-      const condition = {
-        type: 'binary_expr',
-        operator: '=',
-        left,
-        right: {
-          type: 'column_ref' as const,
-          table: getSourceName(right),
-          column,
-        },
-      };
-      return condition as unknown as Binary;
-    })
-    .reduce((acc, condition) => ({
-      type: 'binary_expr',
-      operator: 'AND',
-      left: acc,
-      right: condition,
-    }));
+  usingSets: Map<From, Set<string>>;
 }
 
 export function resolveReferences(
@@ -99,9 +59,9 @@ export function resolveReferences(
   const requestAll = new Map<From, boolean>();
   const columnRefMap = new Map<ColumnRef, ColumnRefInfo>();
   const setListMap = new Map<SetList, From>();
+  const usingSets = new Map<From, Set<string>>();
   const table_map: TableMap = {};
   const db_map: DbMap = {};
-  const using_owners: TableMap = {};
   const fromRaw =
     ast.type === 'select' || ast.type === 'delete' ? ast.from : ast.table;
   const from = Array.isArray(fromRaw) ? fromRaw : null;
@@ -127,6 +87,7 @@ export function resolveReferences(
         }
       }
       requestSets.set(fromEntry, new Set());
+      usingSets.set(fromEntry, new Set());
       requestAll.set(fromEntry, natural);
       if (fromEntry.as) {
         table_map[fromEntry.as] = fromEntry;
@@ -144,23 +105,20 @@ export function resolveReferences(
       }
     }
   });
-  from?.forEach((joined: From, index: number, list: From[]) => {
-    if (index === 0 || !('using' in joined)) {
-      return;
-    }
-    const lefts = list.slice(0, index);
-    const owner = lefts[0];
-    if (!owner || !joined.using) {
+  from?.forEach((joined: From, index: number) => {
+    if (index === 0 || !('using' in joined) || !joined.using) {
       return;
     }
     const columns = (joined.using as unknown as { value: string }[]).map(
       (item) => item.value
     );
-    columns.forEach((column) => {
-      using_owners[column] ??= owner;
-    });
-    joined.on = buildUsingCondition(lefts, joined, columns);
     joined.using = columns;
+    for (const table of from.slice(0, index + 1)) {
+      for (const column of columns) {
+        requestSets.get(table)?.add(column);
+        usingSets.get(table)?.add(column);
+      }
+    }
   });
 
   const tableRaw = ast.type === 'delete' ? ast.table : null;
@@ -190,7 +148,6 @@ export function resolveReferences(
       db_map,
       table_map,
       name_cache,
-      using_owners,
       requestSets,
       requestAll,
       columnRefMap,
@@ -283,7 +240,7 @@ export function resolveReferences(
       }
     });
   }
-  return { requestSets, requestAll, columnRefMap, setListMap };
+  return { requestSets, requestAll, columnRefMap, setListMap, usingSets };
 }
 
 function _columnName(ref: ColumnRef): string {
@@ -319,7 +276,6 @@ function _resolveObject(
   db_map: DbMap,
   table_map: TableMap,
   name_cache: TableMap,
-  using_owners: TableMap,
   requestSets: Map<From, Set<string>>,
   requestAll: Map<From, boolean>,
   columnRefMap: Map<ColumnRef, ColumnRefInfo>,
@@ -395,8 +351,7 @@ function _resolveObject(
       if (index !== undefined && index >= 0) {
         columnRefMap.set(object as ColumnRef, { resultIndex: index });
       } else {
-        const cached =
-          using_owners[obj.column ?? ''] ?? name_cache[obj.column ?? ''];
+        const cached = name_cache[obj.column ?? ''];
         const astFrom = ast.type === 'update' ? ast.table : ast.from;
         const firstFrom = Array.isArray(astFrom) ? astFrom[0] : undefined;
         const isSource =

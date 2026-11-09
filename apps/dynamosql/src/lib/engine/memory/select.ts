@@ -30,7 +30,11 @@ function _getFromTable(params: RowListParams & { from: BaseFrom }): {
   }
   return {
     rowList: data.row_list,
-    tableInfo: { isCaseSensitive: false, columns: data.column_list },
+    tableInfo: {
+      isCaseSensitive: false,
+      is_open: false,
+      columns: data.column_list,
+    },
   };
 }
 async function* _listToItetator<T>(list: T[]) {

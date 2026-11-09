@@ -7,6 +7,7 @@ export const CATALOGS_LIST = [
 ] as const;
 export const CATALOGS_INFO = {
   isCaseSensitive: false,
+  is_open: true,
   columns: [
     {
       name: 'CATALOG_NAME',
@@ -30,6 +31,7 @@ export const CATALOGS_INFO = {
 } as const;
 export const SCHEMATA_INFO = {
   isCaseSensitive: false,
+  is_open: true,
   columns: [
     {
       name: 'CATALOG_NAME',
@@ -76,6 +78,7 @@ export const SCHEMATA_INFO = {
 } as const;
 export const TABLES_INFO = {
   isCaseSensitive: false,
+  is_open: true,
   columns: [
     {
       name: 'TABLE_CATALOG',
@@ -201,6 +204,7 @@ export const TABLES_INFO = {
 } as const;
 export const COLUMNS_INFO = {
   isCaseSensitive: false,
+  is_open: true,
   columns: [
     {
       name: 'TABLE_CATALOG',

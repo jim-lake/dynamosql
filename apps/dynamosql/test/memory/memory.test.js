@@ -47,4 +47,12 @@ describe('Temp', function () {
   runTests('collation.sql', path.join(__dirname, 'collation.sql'), {
     checkChanged: true,
   });
+  runTests('temp_keyless.sql', path.join(__dirname, 'temp_keyless.sql'), {
+    checkChanged: true,
+  });
+  runTests(
+    'temp_keyless_error.sql',
+    path.join(__dirname, 'temp_keyless_error.sql'),
+    { allowedErrors: 'SAME_CODE', skipAffected: true, checkChanged: true }
+  );
 });

@@ -93,6 +93,7 @@ export type QueryColumnInfo = Omit<Partial<ColumnDef>, 'name'> & {
 };
 export interface QueryTableInfo {
   isCaseSensitive: boolean;
+  is_open: boolean;
   columns: readonly QueryColumnInfo[];
 }
 export type TableInfoMap = Map<From, QueryTableInfo>;

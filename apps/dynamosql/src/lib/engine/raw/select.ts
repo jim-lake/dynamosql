@@ -117,7 +117,7 @@ async function _getFromTable(
     }
     return {
       resultIter: _makeIter(),
-      tableInfo: { isCaseSensitive: true, columns },
+      tableInfo: { isCaseSensitive: true, is_open: true, columns },
     };
   } catch (err: unknown) {
     throw _fixErr(err, table, sql);

@@ -2,6 +2,7 @@ import { SQLError } from '../../../error';
 import { evaluateDuplicateUpdate } from '../../helpers/duplicate_update';
 
 import * as Storage from './storage';
+import { ROW_ID_NAME } from './storage';
 
 import type { MemoryColumnDef } from './storage';
 import type {
@@ -10,6 +11,8 @@ import type {
   ChangedResult,
   CellRow,
 } from '../index';
+
+let g_last_row_id = 0;
 
 export async function insertRowList(
   params: InsertParams
@@ -39,7 +42,15 @@ export async function insertRowList(
   let duplicateRows = 0;
 
   for (const row of list) {
+    for (const name of Object.keys(row)) {
+      if (!data.column_list.some((col) => col.name_lc === name.toLowerCase())) {
+        throw new SQLError({ err: 'column_not_found', args: [name] });
+      }
+    }
     const cellRow = _transformRow(row, data.column_list);
+    if (primary_key[0] === ROW_ID_NAME) {
+      cellRow[ROW_ID_NAME] = { type: 'longlong', value: ++g_last_row_id };
+    }
     const key_values = primary_key.map((name) => cellRow[name]?.value);
     const key = JSON.stringify(key_values);
     const index = primary_map.get(key);

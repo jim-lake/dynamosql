@@ -38,7 +38,6 @@ export async function multipleUpdate(
     if (!data) {
       throw new SQLError('table_not_found');
     }
-
     const row_list = data.row_list.slice();
     const primary_map = new Map(data.primary_map);
 
@@ -62,6 +61,13 @@ export async function multipleUpdate(
         let changed = false;
 
         for (const set of set_list) {
+          if (
+            !data.column_list.some(
+              (col) => col.name_lc === set.column.toLowerCase()
+            )
+          ) {
+            throw new SQLError({ err: 'column_not_found', args: [set.column] });
+          }
           new_row[set.column] = _transformCell(set.value);
           if (old_row[set.column]?.value !== new_row[set.column]?.value) {
             changed = true;

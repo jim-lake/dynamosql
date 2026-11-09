@@ -86,3 +86,7 @@ For string columns it is not exact. MySQL converts a string to a number to decid
 The raw engine sends a comparison as written. `WHERE id > 100` on a string attribute compares the string with the number, and DynamoDB matches no rows. MySQL converts `'111'` to 111 and matches rows `'111'` to `'115'`.
 
 The memory engine converts values the way MySQL does, so the same query works there. The raw engine does not add the conversion.
+
+# Raw engine: JOIN USING on sparse tables
+
+Raw tables have no schema, so `JOIN ... USING (col)` decides which table owns `col` from the first row of each table, in FROM order. The first table whose first row has `col` owns it. If no earlier table's first row has `col`, the join uses the previous table in FROM order. For a sparse table, where the first row lacks a column that later rows have, the join can match on the wrong table. This is accepted.

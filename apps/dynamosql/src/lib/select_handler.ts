@@ -3,16 +3,8 @@ import { setTimeout } from 'node:timers/promises';
 import { SQLError } from '../error';
 
 import * as Expression from './expression';
-import {
-  getSourceName,
-  isBaseFrom,
-  isDerivedFrom,
-  walkColumnRefs,
-} from './helpers/ast_helper';
-import {
-  resolveReferences,
-  buildUsingCondition,
-} from './helpers/column_ref_helper';
+import { isBaseFrom, isDerivedFrom } from './helpers/ast_helper';
+import { resolveReferences } from './helpers/column_ref_helper';
 import { makeEngineGroups } from './helpers/engine_groups';
 import { formGroup, formImplicitGroup, hasAggregate } from './helpers/group';
 import { formJoin } from './helpers/join';
@@ -185,11 +177,13 @@ async function _iterQuery(
   const current_database = session.getCurrentDatabase();
   let requestSets = new Map<From, Set<string>>();
   let requestAll = new Map<From, boolean>();
+  let usingSets = new Map<From, Set<string>>();
   let columnRefMap = params.columnRefMap ?? new Map();
   if (!params.skip_resolve) {
     const requestInfo = resolveReferences(ast, current_database ?? undefined);
     requestSets = requestInfo.requestSets;
     requestAll = requestInfo.requestAll;
+    usingSets = requestInfo.usingSets;
     columnRefMap = requestInfo.columnRefMap;
   }
   const from = ast.type === 'update' ? ast.table : ast.from;
@@ -268,12 +262,31 @@ async function _iterQuery(
                 yield rowList;
               })()
             );
-            tableInfoMap.set(item, { isCaseSensitive: false, columns: specs });
+            tableInfoMap.set(item, {
+              isCaseSensitive: false,
+              is_open: true,
+              columns: specs,
+            });
           }
         )
       );
     }
     await Promise.all(tasks);
+    for (const [object, names] of requestSets) {
+      const info = tableInfoMap.get(object);
+      if (!info || info.is_open) {
+        continue;
+      }
+      for (const name of names) {
+        if (usingSets.get(object)?.has(name)) {
+          continue;
+        }
+        const name_lc = name.toLowerCase();
+        if (!info.columns.some((col) => col.name.toLowerCase() === name_lc)) {
+          throw new SQLError({ err: 'column_not_found', args: [name] });
+        }
+      }
+    }
     from.forEach((item, index) => {
       const joined = item as Join;
       if (index === 0 || !String(joined.join).includes('NATURAL')) {
@@ -293,16 +306,6 @@ async function _iterQuery(
         return;
       }
       joined.using = columns;
-      joined.on = buildUsingCondition(lefts, joined, columns);
-      walkColumnRefs(joined.on, (ref) => {
-        const column_ref = ref as ColumnRef;
-        const owner = [...lefts, joined].find(
-          (table) => getSourceName(table) === column_ref.table
-        );
-        if (owner) {
-          columnRefMap.set(column_ref, { from: owner });
-        }
-      });
     });
   }
   return _evaluateReturn({
