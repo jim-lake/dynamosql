@@ -7,21 +7,21 @@ import { getExprCollation, stringCompare } from './collation';
 import type { COLLATIONS } from '../../constants/mysql';
 import type { FieldInfo } from '../../types';
 import type { EvaluationState } from '../expression';
-import type { SourceRowResult } from '../handler_types';
+import type { SourceRow } from '../handler_types';
 import type { QueryColumn } from '../helpers/query_columns';
 import type { OrderBy } from 'node-sql-parser/build/mysql';
 
 export interface SortParams {
-  iter: AsyncIterableIterator<SourceRowResult[]>;
+  iter: AsyncIterable<SourceRow[]>;
   orderby: OrderBy[];
   queryColumns: QueryColumn[];
   state: EvaluationState;
 }
 export async function* sort(
   params: SortParams
-): AsyncIterableIterator<SourceRowResult[]> {
+): AsyncIterableIterator<SourceRow[]> {
   const { iter, orderby, queryColumns, state } = params;
-  let result_list: SourceRowResult[] = [];
+  let result_list: SourceRow[] = [];
   for await (const batch of iter) {
     if (batch.length < 10_000) {
       result_list.push(...batch);
@@ -50,8 +50,8 @@ interface OrderStep {
 function _sort(
   orders: OrderStep[],
   state: EvaluationState,
-  a: SourceRowResult,
-  b: SourceRowResult
+  a: SourceRow,
+  b: SourceRow
 ): number {
   for (const step of orders) {
     const { order, collation } = step;
@@ -65,9 +65,9 @@ function _sort(
     ) {
       const index = expr.value - 1;
       const result = func(
-        a.result[index]?.value,
-        b.result[index]?.value,
-        a.result[index]?.type,
+        a.result?.[index]?.value,
+        b.result?.[index]?.value,
+        a.result?.[index]?.type,
         collation
       );
       if (result !== 0) {

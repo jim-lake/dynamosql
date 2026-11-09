@@ -3,28 +3,15 @@ import { setTimeout } from 'node:timers/promises';
 import { SQLError } from '../error';
 
 import * as Expression from './expression';
-import {
-  functionAsAggregate,
-  isWindowNode,
-  methods as AggregateFunctions,
-} from './expression/aggregate_functions';
-import {
-  getFunctionName,
-  isBaseFrom,
-  isDerivedFrom,
-} from './helpers/ast_helper';
+import { isBaseFrom, isDerivedFrom } from './helpers/ast_helper';
 import { resolveReferences } from './helpers/column_ref_helper';
 import { makeEngineGroups } from './helpers/engine_groups';
-import {
-  formGroup,
-  formImplicitGroup,
-  hasAggregate,
-  hasWindow,
-} from './helpers/group';
+import { formGroup, formImplicitGroup, hasAggregate } from './helpers/group';
 import { formJoin } from './helpers/join';
 import { expandStarColumns, calcColumns } from './helpers/query_columns';
 import { sort } from './helpers/sort';
 import { convertNum } from './helpers/sql_conversion';
+import { applyWindows, hasWindow } from './helpers/window';
 
 import type { TableInfoMap, SourceMap, CellRow } from './engine';
 import type {
@@ -32,7 +19,6 @@ import type {
   DynamoDBClient,
   SourceRow,
   SourceRowResult,
-  SourceRowGroup,
   SourceRowResultGroup,
 } from './handler_types';
 import type { Session } from '../session';
@@ -42,7 +28,6 @@ import type {
   EvaluationState,
   SubqueryValues,
 } from './expression';
-import type { WindowValues } from './expression/evaluate';
 import type { ColumnRefInfo } from './helpers/column_ref_helper';
 import type { QueryColumn } from './helpers/query_columns';
 import type { SelectModifyAST } from './helpers/select_modify';
@@ -433,17 +418,48 @@ async function _evaluateReturn(
     group_iter = rowIter;
   }
 
-  if (ast.type === 'select' && hasWindow(ast.columns)) {
-    group_iter = _applyWindows({ iter: group_iter, ast, queryColumns, state });
+  if (having) {
+    const indexes = _referencedResultIndexes(
+      having,
+      state.columnRefMap,
+      new Set()
+    );
+    group_iter = _projectColumns({
+      iter: group_iter,
+      queryColumns,
+      indexes,
+      state,
+    });
+    group_iter = _filterHaving({ iter: group_iter, having, state });
   }
 
-  let resultIter = _makeResults({
-    iter: group_iter,
-    queryColumns,
-    state,
-    having,
-  });
+  if (ast.type === 'select' && hasWindow(ast.columns)) {
+    group_iter = applyWindows({ iter: group_iter, ast, state });
+  }
+
+  let resultIter: AsyncIterable<SourceRow[]> = group_iter;
   if (ast.orderby) {
+    const indexes = _referencedResultIndexes(
+      ast.orderby,
+      state.columnRefMap,
+      new Set()
+    );
+    for (const order of ast.orderby) {
+      const expr = order.expr;
+      if (
+        'value' in expr &&
+        expr.type === 'number' &&
+        typeof expr.value === 'number'
+      ) {
+        indexes.add(expr.value - 1);
+      }
+    }
+    resultIter = _projectColumns({
+      iter: resultIter,
+      queryColumns,
+      indexes,
+      state,
+    });
     resultIter = sort({
       iter: resultIter,
       orderby: ast.orderby,
@@ -454,128 +470,121 @@ async function _evaluateReturn(
   if (ast.limit) {
     resultIter = _makeLimit(resultIter, ast.limit);
   }
-  return { resultIter, queryColumns, columnRefMap };
+
+  const finalIter = _makeResults({ iter: resultIter, queryColumns, state });
+  return { resultIter: finalIter, queryColumns, columnRefMap };
 }
 
 async function* _listToItetator(list: SourceRow[]): AsyncIterable<SourceRow[]> {
   yield list;
 }
-async function* _applyWindows(params: {
-  iter: AsyncIterable<SourceRow[]>;
-  ast: Select;
-  queryColumns: QueryColumn[];
-  state: EvaluationState;
-}): AsyncIterable<SourceRow[]> {
-  const { iter, ast, queryColumns, state } = params;
-  let row_list: SourceRow[] = [];
-  for await (const batch of iter) {
-    row_list.push(...batch);
+function _referencedResultIndexes(
+  node: unknown,
+  columnRefMap: EvaluationState['columnRefMap'],
+  found: Set<number>
+): Set<number> {
+  if (typeof node !== 'object' || node === null) {
+    return found;
   }
-  if (ast.having) {
-    const having = ast.having;
-    row_list = row_list.filter((row) => {
-      row.result = queryColumns.map((column) => {
-        if (hasWindow(column.expr)) {
-          return { err: null, type: 'null', value: null, name: undefined };
+  if (Array.isArray(node)) {
+    for (const child of node) {
+      _referencedResultIndexes(child, columnRefMap, found);
+    }
+    return found;
+  }
+  const index = columnRefMap?.get(node as ColumnRef)?.resultIndex;
+  if (index !== undefined && index >= 0) {
+    found.add(index);
+  }
+  if ('type' in node && node.type === 'select') {
+    return found;
+  }
+  for (const child of Object.values(node)) {
+    _referencedResultIndexes(child, columnRefMap, found);
+  }
+  return found;
+}
+interface ProjectColumnsParams {
+  iter: AsyncIterable<SourceRow[]>;
+  queryColumns: QueryColumn[];
+  indexes: Set<number>;
+  state: EvaluationState;
+}
+async function* _projectColumns(
+  params: ProjectColumnsParams
+): AsyncIterable<SourceRow[]> {
+  const { iter, queryColumns, indexes, state } = params;
+  for await (const batch of iter) {
+    for (const row of batch) {
+      const output_row: EvaluationResult[] = row.result ?? [];
+      for (const index of indexes) {
+        const column = queryColumns[index];
+        if (!column || output_row[index]) {
+          continue;
         }
         const result = Expression.getValue(column.expr, { ...state, row });
         if (result.err) {
           throw new SQLError(result.err);
         }
-        return result;
-      });
+        output_row[index] = result;
+        if (result.sleep_ms) {
+          await setTimeout(result.sleep_ms);
+        }
+      }
+      row.result = output_row;
+    }
+    yield batch;
+  }
+}
+interface FilterHavingParams {
+  iter: AsyncIterable<SourceRow[]>;
+  having: NonNullable<Select['having']>;
+  state: EvaluationState;
+}
+async function* _filterHaving(
+  params: FilterHavingParams
+): AsyncIterable<SourceRow[]> {
+  const { iter, having, state } = params;
+  for await (const batch of iter) {
+    const kept: SourceRow[] = [];
+    for (const row of batch) {
       const having_result = Expression.getValue(having, { ...state, row });
       if (having_result.err) {
         throw new SQLError(having_result.err);
       }
-      return Boolean(convertNum(having_result.value));
-    });
-  }
-  const windowValues: WindowValues = new Map();
-  state.windowValues = windowValues;
-  for (const column of ast.columns) {
-    _collectWindows(column.expr, row_list, state, windowValues);
-  }
-  yield row_list;
-}
-function _collectWindows(
-  node: unknown,
-  rows: SourceRow[],
-  state: EvaluationState,
-  windowValues: WindowValues
-): void {
-  if (typeof node !== 'object' || node === null) {
-    return;
-  }
-  if (isWindowNode(node)) {
-    const name = getFunctionName(node.name).toLowerCase();
-    const aggregate = AggregateFunctions[name];
-    const over = node.over;
-    const spec =
-      over && over.type === 'window' ? over.as_window_specification : null;
-    const bare =
-      typeof spec === 'object' &&
-      spec !== null &&
-      !spec.window_specification.name &&
-      !spec.window_specification.partitionby &&
-      !spec.window_specification.orderby &&
-      !spec.window_specification.window_frame_clause &&
-      !(node as { args?: { distinct?: unknown } }).args?.distinct;
-    if (!aggregate || !bare) {
-      throw new SQLError({ err: 'ER_NOT_SUPPORTED_YET' });
+      if (convertNum(having_result.value)) {
+        kept.push(row);
+      }
     }
-    const aggr = node.type === 'aggr_func' ? node : functionAsAggregate(node);
-    const group_row = { source: new Map(), result: null, group: rows };
-    const result = aggregate(aggr, { ...state, row: group_row });
-    if (result.err) {
-      throw new SQLError(result.err);
-    }
-    result.name = `${result.name ?? name + '()'} OVER ()`;
-    windowValues.set(node, result);
-    return;
-  }
-  if ('type' in node && node.type === 'select') {
-    return;
-  }
-  for (const child of Object.values(node)) {
-    _collectWindows(child, rows, state, windowValues);
+    yield kept;
   }
 }
 interface MakeResultsParams {
   iter: AsyncIterable<SourceRow[]>;
   queryColumns: QueryColumn[];
   state: EvaluationState;
-  having: Select['having'];
-  signal?: AbortSignal;
 }
 async function* _makeResults(
   params: MakeResultsParams
 ): AsyncIterableIterator<SourceRowResult[]> {
-  const { iter, queryColumns, state, having, signal } = params;
+  const { iter, queryColumns, state } = params;
   for await (const batch of iter) {
-    const result_list: SourceRowResult[] = [];
     for (const row of batch) {
-      const output_row: EvaluationResult[] = [];
-      for (const column of queryColumns) {
+      const output_row: EvaluationResult[] = row.result ?? [];
+      for (const [index, column] of queryColumns.entries()) {
+        if (output_row[index]) {
+          continue;
+        }
         const result = Expression.getValue(column.expr, { ...state, row });
         if (result.err) {
           throw new SQLError(result.err);
         }
-        output_row.push(result);
+        output_row[index] = result;
         if (result.sleep_ms) {
-          await setTimeout(result.sleep_ms, undefined, { signal });
+          await setTimeout(result.sleep_ms);
         }
       }
-      _makeResult(row, output_row);
-      if (having) {
-        const having_result = Expression.getValue(having, { ...state, row });
-        if (having_result.err) {
-          throw new SQLError(having_result.err);
-        }
-        if (!convertNum(having_result.value)) {
-          continue;
-        }
-      }
+      row.result = output_row;
       for (const [index, column] of queryColumns.entries()) {
         const result = output_row[index];
         if (!result) {
@@ -589,21 +598,14 @@ async function* _makeResults(
           column.result.nullable = true;
         }
       }
-      result_list.push(row);
     }
-    yield result_list;
+    yield batch as SourceRowResult[];
   }
 }
-function _makeResult(
-  row: SourceRow | SourceRowGroup,
-  result: EvaluationResult[]
-): asserts row is SourceRowResult {
-  row.result = result;
-}
 async function* _makeLimit(
-  iter: AsyncIterableIterator<SourceRowResult[]>,
+  iter: AsyncIterable<SourceRow[]>,
   limit: Limit
-): AsyncIterableIterator<SourceRowResult[]> {
+): AsyncIterableIterator<SourceRow[]> {
   let skip_count = 0;
   let send_count = 0;
   if (limit.seperator === 'offset') {

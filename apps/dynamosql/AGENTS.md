@@ -75,6 +75,14 @@ After any code change, run `npm run ts:check && npm run lint`, then `npm test`. 
 - To run a subset of queries from one `.sql` file, almost always use `npm test -- --grep <sql file name>`, for example `npm test -- --grep temp_keyless_error.sql`. The file name is part of the suite title, so this runs the whole file, including its setup and teardown statements, which is what you want. A statement fragment runs only the matching statements. It skips setup such as `CREATE DATABASE`, `USE`, and `CREATE TEMPORARY TABLE`, so later statements can fail or pass for reasons unrelated to the change.
 - For development, use all three manual query commands on the same SQL. Use `npm run query:mysql` for the MySQL result, `npm run query:session` for the DynamoSQL engine result, and `npm run query:parse` for the parse tree that the engine receives. When a query fails, run `npm run query:parse` first. If the tree is correct, the gap is in the engine. If the parser rejects the SQL or returns a wrong tree, the gap is in the parser. Use these to compare the outputs before writing a test.
 
+## Streaming Design
+
+The entire point of the query engine is its async iterator, end to end. Rows flow through the pipeline as `AsyncIterable` batches, and each stage consumes its input as it arrives.
+
+- A violation of the iterator is allowed only for correctness, and never as a shortcut that makes all queries slower (PESSIMAL).
+- When a stage must buffer rows, it buffers only the rows it needs. A window function collects only the particular window it needs (its partition and frame), never the whole result set, because many windows do not need the entire scope.
+- Without a window function, the select pipeline must not add any row collection of its own. Collection comes only from clauses that require it, such as GROUP BY, aggregates, and ORDER BY.
+
 ## Code Conventions
 
 ### Types
