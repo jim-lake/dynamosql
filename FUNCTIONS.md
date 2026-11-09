@@ -201,7 +201,7 @@ and geometry
 | LAST_INSERT_ID()                |    ❌     | Value of the AUTOINCREMENT column for the last INSERT                                                                                                   |
 | LAST_VALUE()                    |    ❌     | Value of argument from last row of window frame                                                                                                         |
 | LCASE()                         |    ✅     | Synonym for LOWER()                                                                                                                                     |
-| LEAD()                          |    ❌     | Value of argument from row leading current row within partition                                                                                         |
+| LEAD()                          |    ✅     | `select/window_lead.sql`. Offset must be a non-negative integer literal. Frames are rejected. `OVER ()` without ORDER BY streams per partition, holding back at most offset rows. |
 | LEAST()                         |    ✅     | Return the smallest argument                                                                                                                            |
 | LEFT()                          |    ✅     | Return the leftmost number of characters as specified                                                                                                   |
 | LENGTH()                        |    ✅     | Return the length of a string in bytes                                                                                                                  |

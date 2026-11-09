@@ -43,6 +43,7 @@ describe('Select', function () {
   runTests('aggregate.sql', path.join(__dirname, 'aggregate.sql'));
   runTests('window.sql', path.join(__dirname, 'window.sql'));
   runTests('window_rank_lag.sql', path.join(__dirname, 'window_rank_lag.sql'));
+  runTests('window_lead.sql', path.join(__dirname, 'window_lead.sql'));
   runTests('window_error.sql', path.join(__dirname, 'window_error.sql'), {
     allowedErrors: 'SAME_CODE',
     skipAffected: true,
