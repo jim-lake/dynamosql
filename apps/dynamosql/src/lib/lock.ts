@@ -146,7 +146,7 @@ async function release(
   const key = `${session.transactionDomain}_${name}`;
   const lease = session.heldLocks.get(key);
   if (!lease) {
-    return null;
+    return (await holder(session, name)) === null ? null : false;
   }
   lease.count--;
   if (lease.count > 0) {

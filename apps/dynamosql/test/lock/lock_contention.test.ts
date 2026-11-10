@@ -1,6 +1,7 @@
 import { assert } from 'chai';
 import type { Connection } from 'mysql';
 import * as DynamoSQL from '../../src';
+import { LOCK_TABLE } from '../../src/lib/lock';
 import { addUnitTest } from '../unit_helper';
 
 type Row = Record<string, unknown>;
@@ -143,6 +144,65 @@ describe('Lock contention between sessions', () => {
       }
     }
   );
+
+  addUnitTest(
+    'release by a session that does not hold a held lock returns 0',
+    async (mod, config) => {
+      const a = mod.createConnection(config);
+      const b = mod.createConnection(config);
+      try {
+        assert.equal(
+          await scalar(a, "SELECT GET_LOCK('ct_nonholder', 0) AS g", 'g'),
+          1
+        );
+        assert.equal(
+          await scalar(b, "SELECT RELEASE_LOCK('ct_nonholder') AS r", 'r'),
+          0
+        );
+        assert.equal(
+          await scalar(a, "SELECT RELEASE_LOCK('ct_nonholder') AS r", 'r'),
+          1
+        );
+      } finally {
+        a.destroy();
+        b.destroy();
+      }
+    }
+  );
+
+  it('a lock with an expired lease is acquired by another session', async () => {
+    const a = DynamoSQL.createConnection({
+      namespace: process.env.DYNAMO_NAMESPACE ?? 'dynamosql_test',
+    });
+    const b = DynamoSQL.createConnection({
+      namespace: process.env.DYNAMO_NAMESPACE ?? 'dynamosql_test',
+    });
+    try {
+      await scalar(a, "SELECT GET_LOCK('ct_warmup', 0) AS g", 'g');
+      await run(a, "SELECT RELEASE_LOCK('ct_warmup') AS r");
+      const stale = Date.now() - 1000;
+      await a.dynamodb.updateItem({
+        table: LOCK_TABLE,
+        key: { lock_key: { S: `${a.transactionDomain}_ct_expired` } },
+        expression: 'SET owner_id = :owner, expires_at = :expires',
+        values: {
+          ':owner': { S: 'stale-owner' },
+          ':expires': { N: String(stale) },
+        },
+      });
+      assert.equal(
+        await scalar(b, "SELECT GET_LOCK('ct_expired', 0) AS g", 'g'),
+        1
+      );
+      assert.equal(
+        await scalar(b, "SELECT RELEASE_LOCK('ct_expired') AS r", 'r'),
+        1
+      );
+    } finally {
+      a.destroy();
+      b.destroy();
+    }
+  });
 
   it('different transactionDomain values do not contend', async () => {
     const a = DynamoSQL.createConnection({
