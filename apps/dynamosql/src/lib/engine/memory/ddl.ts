@@ -1,3 +1,5 @@
+import BTree from 'sorted-btree';
+
 import { SQLError } from '../../../error';
 
 import * as Storage from './storage';
@@ -11,9 +13,11 @@ import type {
   CreateTableParams,
   DropTableParams,
   IndexParams,
+  DeleteIndexParams,
   AddColumnParams,
+  KeyDef,
 } from '../index';
-import type { MemoryColumnDef } from './storage';
+import type { MemoryColumnDef, TableData, UniqueIndex } from './storage';
 
 export async function getTableInfo(
   params: TableInfoParams
@@ -72,14 +76,20 @@ export async function createTable(params: CreateTableParams): Promise<void> {
     }
     return ret;
   });
-  const data = {
+  const data: TableData = {
     table,
     column_list,
     primary_key,
     collation: params.collation,
     row_list: [],
     primary_map: new Map(),
+    unique_list: [],
   };
+  for (const unique of params.unique_list) {
+    data.unique_list.push(
+      _buildUniqueIndex(data, unique.name, unique.key_list)
+    );
+  }
   if (is_temp) {
     session.saveTempTable(database, table, data);
   } else {
@@ -96,8 +106,64 @@ export async function dropTable(params: DropTableParams): Promise<void> {
 }
 
 export async function addColumn(_params: AddColumnParams): Promise<void> {}
-export async function createIndex(_params: IndexParams): Promise<void> {}
-export async function deleteIndex(_params: IndexParams): Promise<void> {}
+export async function createIndex(params: IndexParams): Promise<void> {
+  if (!params.is_unique) {
+    return;
+  }
+  const { session, database, table, index_name, key_list } = params;
+  const data = Storage.getTable(database, table, session);
+  if (!data) {
+    throw new SQLError({ err: 'table_not_found', args: [table] });
+  }
+  const index = _buildUniqueIndex(data, index_name, key_list);
+  Storage.updateTableData(database, table, session, {
+    unique_list: [...data.unique_list, index],
+  });
+}
+export async function deleteIndex(params: DeleteIndexParams): Promise<void> {
+  const { session, database, table, index_name } = params;
+  const data = Storage.getTable(database, table, session);
+  if (!data) {
+    throw new SQLError({ err: 'table_not_found', args: [table] });
+  }
+  const unique_list = data.unique_list.filter(
+    (index) => index.name !== index_name
+  );
+  if (unique_list.length === data.unique_list.length) {
+    throw new SQLError({ err: 'index_not_found', args: [index_name] });
+  }
+  Storage.updateTableData(database, table, session, { unique_list });
+}
+function _buildUniqueIndex(
+  data: TableData,
+  name: string,
+  key_list: readonly KeyDef[]
+): UniqueIndex {
+  if (data.unique_list.some((index) => index.name === name)) {
+    throw new SQLError({ err: 'ER_DUP_KEYNAME', args: [name] });
+  }
+  const column_list = key_list.map((key) => key.name.toLowerCase());
+  for (const column of column_list) {
+    if (!data.column_list.some((col) => col.name_lc === column)) {
+      throw new SQLError({
+        err: 'ER_KEY_COLUMN_DOES_NOT_EXITS',
+        args: [column],
+      });
+    }
+  }
+  const index: UniqueIndex = { name, column_list, map: new BTree() };
+  for (const row of data.row_list) {
+    const key = Storage.uniqueKeyOf(column_list, row);
+    if (key === null) {
+      continue;
+    }
+    if (index.map.has(key)) {
+      throw new SQLError({ err: 'dup_primary_key_entry', args: [name, key] });
+    }
+    index.map.set(key, Storage.primaryKeyOf(data.primary_key, row));
+  }
+  return index;
+}
 function _getDefault(column: ColumnDefParam): CellValue | undefined {
   if (column.default !== undefined) {
     return { type: column.type, value: column.default };

@@ -100,3 +100,7 @@ Lock names are case-insensitive, as in MySQL. Names are limited to 64 bytes. A N
 Lock calls are supported only in the select list of a SELECT. A lock call anywhere else, such as WHERE, HAVING, or ORDER BY, raises `ER_FEATURE_UNSUPPORTED`. Lock arguments may be column values, which are evaluated per row.
 
 `IS_USED_LOCK` returns the session's thread id, not the MySQL connection id. The owner string is `${threadId}_${uuid}`, so the thread id is the only part that matches a connection id here.
+
+# Raw engine limitation: UNIQUE indexes
+
+The raw engine does not support UNIQUE indexes, and it will not. `CREATE UNIQUE INDEX`, `UNIQUE` column and table constraints, and `ALTER TABLE ... ADD UNIQUE` are rejected with the `unsupported` error (`ER_NO`) on DynamoDB tables. DynamoDB global secondary indexes cannot enforce uniqueness, so this is a permanent limitation of the engine. Memory tables enforce UNIQUE; see `test/memory/memory_unique.sql`.

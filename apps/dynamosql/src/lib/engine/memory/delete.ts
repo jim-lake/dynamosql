@@ -37,8 +37,7 @@ export async function multipleDelete(
       throw new SQLError('table_not_found');
     }
 
-    const row_list = data.row_list.slice();
-    const primary_map = new Map<string, number>(data.primary_map);
+    const state = Storage.cloneState(data);
 
     for (const object of delete_list) {
       const key_list = object.map((key) => {
@@ -48,17 +47,10 @@ export async function multipleDelete(
         return key.value;
       });
       const delete_key = JSON.stringify(key_list);
-      const index = primary_map.get(delete_key);
+      const index = state.primary_map.get(delete_key);
 
       if (index !== undefined && index >= 0) {
-        primary_map.delete(delete_key);
-        row_list.splice(index, 1);
-        const deletedIndex = index;
-        primary_map.forEach((value, key) => {
-          if (value > deletedIndex) {
-            primary_map.set(key, value - 1);
-          }
-        });
+        Storage.removeRow(state, index, data.primary_key);
         affectedRows++;
       } else {
         logger.info(
@@ -70,7 +62,7 @@ export async function multipleDelete(
       }
     }
 
-    Storage.txSaveData(database, table, session, { row_list, primary_map });
+    Storage.txSaveData(database, table, session, state);
   }
 
   return { affectedRows };

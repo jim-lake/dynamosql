@@ -1,13 +1,14 @@
 import { SQLError } from '../error';
 
 import { makeCollation } from './helpers/collation';
+import { isUniqueConstraint, uniqueIndexName } from './helpers/unique_index';
 import * as SchemaManager from './schema_manager';
 import * as TransactionManager from './transaction_manager';
 import { mysqlStringToValueType } from './types/value_type';
 
-import type { Engine, ColumnDefParam } from './engine';
+import type { Engine, ColumnDefParam, IndexParams, KeyDef } from './engine';
 import type { HandlerParams } from './handler_types';
-import type { Alter } from 'node-sql-parser/build/mysql';
+import type { Alter, ColumnRef } from 'node-sql-parser/build/mysql';
 
 export async function query(params: HandlerParams<Alter>): Promise<void> {
   const { ast, dynamodb, session } = params;
@@ -68,61 +69,85 @@ async function _runAlterTable(
     }
   }
 
-  // Process index operations
+  const known_list = [...info.column_list, ...column_list];
   for (const def of ast.expr) {
-    if (def.resource === 'index' && 'action' in def) {
-      if (def.action === 'add') {
-        const addIndexDef = def;
-        const key_list = addIndexDef.definition.map((sub) => {
-          const column_def = column_list.find((col) => col.name === sub.column);
-          return {
-            name: sub.column,
-            order_by: sub.order_by,
-            type: column_def?.type ?? 'string',
-          };
+    if (
+      def.resource === 'constraint' &&
+      'action' in def &&
+      def.action === 'add'
+    ) {
+      const constraint = def.create_definitions;
+      if (isUniqueConstraint(constraint.constraint_type)) {
+        const columns = constraint.definition.map((sub) =>
+          String((sub as ColumnRef).column)
+        );
+        const index_name = uniqueIndexName(
+          ('index' in constraint ? constraint.index : null) ??
+            constraint.constraint,
+          columns,
+          []
+        );
+        await _addIndex(engine, {
+          dynamodb,
+          session,
+          database,
+          table,
+          index_name,
+          key_list: _keyList(columns, known_list),
+          is_unique: true,
         });
-
-        const opts = {
+      }
+    } else if (def.resource === 'index' && 'action' in def) {
+      if (def.action === 'add') {
+        const columns = def.definition.map((sub) => String(sub.column));
+        await _addIndex(engine, {
           dynamodb,
           session,
+          database,
           table,
-          index_name: addIndexDef.index,
-          key_list,
-        };
-
-        try {
-          await engine.createIndex(opts);
-        } catch (err) {
-          if (err instanceof Error && err.message === 'index_exists') {
-            throw new SQLError({
-              err: 'ER_DUP_KEYNAME',
-              args: [addIndexDef.index],
-            });
-          }
-          throw err;
-        }
+          index_name: def.index,
+          key_list: _keyList(columns, known_list),
+          is_unique: false,
+        });
       } else {
-        // action === 'drop'
-        const dropIndexDef = def;
-        const opts = {
-          dynamodb,
-          session,
-          table,
-          index_name: dropIndexDef.index,
-        };
-
         try {
-          await engine.deleteIndex(opts);
+          await engine.deleteIndex({
+            dynamodb,
+            session,
+            database,
+            table,
+            index_name: def.index,
+          });
         } catch (err) {
           if (err instanceof Error && err.message === 'index_not_found') {
             throw new SQLError({
               err: 'ER_CANT_DROP_FIELD_OR_KEY',
-              args: [dropIndexDef.index],
+              args: [def.index],
             });
           }
           throw err;
         }
       }
     }
+  }
+}
+
+function _keyList(
+  columns: string[],
+  known: readonly { name: string; type: KeyDef['type'] }[]
+): KeyDef[] {
+  return columns.map((name) => ({
+    name,
+    type: known.find((col) => col.name === name)?.type ?? 'string',
+  }));
+}
+async function _addIndex(engine: Engine, params: IndexParams): Promise<void> {
+  try {
+    await engine.createIndex(params);
+  } catch (err) {
+    if (err instanceof Error && err.message === 'index_exists') {
+      throw new SQLError({ err: 'ER_DUP_KEYNAME', args: [params.index_name] });
+    }
+    throw err;
   }
 }

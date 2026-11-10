@@ -11,7 +11,6 @@ import type {
   UpdateParams,
   ChangedResult,
   CellValue,
-  CellRow,
   EngineValue,
 } from '../index';
 
@@ -39,8 +38,7 @@ export async function multipleUpdate(
     if (!data) {
       throw new SQLError('table_not_found');
     }
-    const row_list = data.row_list.slice();
-    const primary_map = new Map(data.primary_map);
+    const state = Storage.cloneState(data);
 
     for (const update of update_list) {
       const { set_list } = update;
@@ -51,10 +49,10 @@ export async function multipleUpdate(
         return key.value;
       });
       const update_key = JSON.stringify(key_list);
-      const index = primary_map.get(update_key);
+      const index = state.primary_map.get(update_key);
 
       if (index !== undefined && index >= 0) {
-        const old_row = row_list[index];
+        const old_row = state.row_list[index];
         if (!old_row) {
           continue;
         }
@@ -84,22 +82,17 @@ export async function multipleUpdate(
           }
         }
 
-        const new_key = _makePrimaryKey(data.primary_key, new_row);
-        if (new_key !== update_key && primary_map.has(new_key)) {
+        if (
+          Storage.findConflicts(state, new_row, data.primary_key, index).length
+        ) {
           if (!ignore) {
-            throw new SQLError({
-              err: 'dup_primary_key_entry',
-              args: [data.primary_key, new_key],
-            });
+            throw Storage.duplicateEntryError(state, new_row, data.primary_key);
           }
           affectedRows++;
           continue;
-        } else if (new_key !== update_key) {
-          primary_map.delete(update_key);
-          primary_map.set(new_key, index);
         }
 
-        row_list[index] = new_row;
+        Storage.replaceRow(state, index, new_row, data.primary_key);
         affectedRows++;
         if (changed) {
           changedRows++;
@@ -114,15 +107,11 @@ export async function multipleUpdate(
       }
     }
 
-    Storage.txSaveData(database, table, session, { row_list, primary_map });
+    Storage.txSaveData(database, table, session, state);
   }
 
   return { affectedRows, changedRows };
 }
 function _transformCell(cell: EvaluationResult): CellValue {
   return { value: cell.value, type: cell.type };
-}
-function _makePrimaryKey(primary_key: string[], row: CellRow): string {
-  const key_values = primary_key.map((key) => row[key]?.value);
-  return JSON.stringify(key_values);
 }

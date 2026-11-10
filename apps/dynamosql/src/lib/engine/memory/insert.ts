@@ -39,8 +39,7 @@ export async function insertRowList(
   }
 
   const { primary_key } = data;
-  const row_list = data.row_list.slice();
-  const primary_map = new Map(data.primary_map);
+  const state = Storage.cloneState(data);
   let affectedRows = 0;
   let duplicateRows = 0;
 
@@ -54,15 +53,25 @@ export async function insertRowList(
     if (primary_key[0] === ROW_ID_NAME) {
       cellRow[ROW_ID_NAME] = { type: 'longlong', value: ++g_last_row_id };
     }
-    const key_values = primary_key.map((name) => cellRow[name]?.value);
-    const key = JSON.stringify(key_values);
-    const index = primary_map.get(key);
+    const conflicts = Storage.findConflicts(state, cellRow, primary_key);
+    const target = conflicts[0];
 
-    if (index === undefined) {
-      primary_map.set(key, row_list.push(cellRow) - 1);
+    if (target === undefined) {
+      Storage.appendRow(state, cellRow, primary_key);
       affectedRows++;
+    } else if (duplicate_mode === 'replace') {
+      const old_row = state.row_list[target];
+      if (!old_row) {
+        continue;
+      }
+      const same = _rowEqual(old_row, cellRow);
+      for (const position of conflicts.slice(1).reverse()) {
+        Storage.removeRow(state, position, primary_key);
+      }
+      Storage.replaceRow(state, target, cellRow, primary_key);
+      affectedRows += conflicts.length - 1 + (same ? 1 : 2);
     } else if (duplicate_mode === 'update' && on_duplicate_update) {
-      const old_row = row_list[index];
+      const old_row = state.row_list[target];
       if (!old_row) {
         continue;
       }
@@ -90,38 +99,20 @@ export async function insertRowList(
           changed = true;
         }
       }
-      const new_key = JSON.stringify(
-        primary_key.map((name) => new_row[name]?.value)
-      );
-      if (new_key !== key) {
-        if (primary_map.has(new_key)) {
-          throw new SQLError({
-            err: 'dup_primary_key_entry',
-            args: [primary_key, new_key],
-          });
-        }
-        primary_map.delete(key);
-        primary_map.set(new_key, index);
+      if (Storage.findConflicts(state, new_row, primary_key, target).length) {
+        throw Storage.duplicateEntryError(state, new_row, primary_key);
       }
-      row_list[index] = new_row;
+      Storage.replaceRow(state, target, new_row, primary_key);
       affectedRows += changed ? 2 : 1;
       duplicateRows++;
-    } else if (duplicate_mode === 'replace') {
-      const existingRow = row_list[index];
-      if (existingRow && !_rowEqual(existingRow, cellRow)) {
-        affectedRows++;
-      }
-      row_list[index] = cellRow;
-      affectedRows++;
-    } else if (!duplicate_mode) {
-      throw new SQLError({
-        err: 'dup_primary_key_entry',
-        args: [primary_key, key_values],
-      });
+    } else if (duplicate_mode === 'ignore') {
+      continue;
+    } else {
+      throw Storage.duplicateEntryError(state, cellRow, primary_key);
     }
   }
 
-  Storage.txSaveData(database, table, session, { row_list, primary_map });
+  Storage.txSaveData(database, table, session, state);
   return { affectedRows, changedRows: duplicateRows };
 }
 function _transformRow(

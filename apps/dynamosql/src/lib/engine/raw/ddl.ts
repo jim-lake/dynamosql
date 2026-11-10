@@ -127,6 +127,9 @@ export async function addColumn(_params: AddColumnParams): Promise<void> {}
 
 export async function createIndex(params: IndexParams): Promise<void> {
   const { dynamodb, table, index_name } = params;
+  if (params.is_unique) {
+    throw new SQLError({ err: 'unsupported' });
+  }
   const key_list = params.key_list.map((key) => {
     return { name: key.name, type: _valueToDynamoKeyType(key.type) };
   });

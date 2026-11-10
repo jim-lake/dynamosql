@@ -12,11 +12,16 @@ import {
 } from './helpers/ast_helper';
 import { CHARSET_DEFAULT_COLLATION_MAP, getCharset } from './helpers/charset';
 import { makeCollation, getCollation } from './helpers/collation';
+import { isUniqueConstraint, uniqueIndexName } from './helpers/unique_index';
 import * as SchemaManager from './schema_manager';
 import * as SelectHandler from './select_handler';
 import { mysqlStringToValueType } from './types/value_type';
 
-import type { ColumnDefParam, EvaluationResultRow } from './engine';
+import type {
+  ColumnDefParam,
+  EvaluationResultRow,
+  UniqueDefParam,
+} from './engine';
 import type { HandlerParams, AffectedResult } from './handler_types';
 import type { FieldInfo } from '../types';
 import type { EvaluationResult } from './expression';
@@ -25,7 +30,14 @@ import type {
   Create,
   CreateTable,
   CreateDatabase,
+  ColumnRef,
 } from 'node-sql-parser/build/mysql';
+
+type CreateUniqueIndex = Create & {
+  index: { schema: string | null; name: string };
+  index_columns: { column: string }[];
+  table: { db: string | null; table: string }[];
+};
 
 function isCreateDatabase(ast: Create): ast is CreateDatabase {
   return ast.keyword === 'database';
@@ -33,6 +45,10 @@ function isCreateDatabase(ast: Create): ast is CreateDatabase {
 
 function isCreateTable(ast: Create): ast is CreateTable {
   return ast.keyword === 'table';
+}
+
+function isCreateUniqueIndex(ast: Create): ast is CreateUniqueIndex {
+  return ast.keyword === 'index' && ast.index_type === 'unique';
 }
 
 export async function query(
@@ -43,10 +59,50 @@ export async function query(
     return await _createDatabase({ ...params, ast });
   } else if (isCreateTable(ast)) {
     return await _createTable({ ...params, ast });
+  } else if (isCreateUniqueIndex(ast)) {
+    return await _createUniqueIndex({ ...params, ast });
   } else {
     logger.error('unsupported create:', ast.keyword);
     throw new SQLError('unsupported');
   }
+}
+async function _createUniqueIndex(
+  params: HandlerParams<CreateUniqueIndex>
+): Promise<AffectedResult> {
+  const { ast, session, dynamodb } = params;
+  const tableRef = ast.table[0];
+  const database = tableRef?.db ?? session.getCurrentDatabase();
+  if (!database) {
+    throw new SQLError('no_current_database');
+  }
+  const table = tableRef?.table;
+  if (!table || !ast.index) {
+    throw new SQLError('bad_table_name');
+  }
+  const engine = SchemaManager.getEngine(database, table, session);
+  const info = await engine.getTableInfo({
+    dynamodb,
+    session,
+    database,
+    table,
+  });
+  const key_list = ast.index_columns.map((sub) => {
+    const name = sub.column;
+    return {
+      name,
+      type: info.column_list.find((col) => col.name === name)?.type ?? 'string',
+    };
+  });
+  await engine.createIndex({
+    dynamodb,
+    session,
+    database,
+    table,
+    index_name: ast.index.name,
+    key_list,
+    is_unique: true,
+  });
+  return { affectedRows: 0 };
 }
 async function _createDatabase(
   params: HandlerParams<CreateDatabase>
@@ -131,6 +187,7 @@ async function _createTable(
   const duplicate_mode = ast.ignore_replace ?? undefined;
   const column_list: ColumnDefParam[] = [];
   const primary_key: string[] = [];
+  const unique_list: UniqueDefParam[] = [];
 
   for (const def of ast.create_definitions ?? []) {
     if (def.resource === 'column') {
@@ -152,6 +209,17 @@ async function _createTable(
       if (def.primary_key === 'primary key') {
         primary_key.push(col.name);
       }
+      if (def.unique) {
+        const name = uniqueIndexName(
+          null,
+          [col.name],
+          unique_list.map((u) => u.name)
+        );
+        unique_list.push({
+          name,
+          key_list: [{ name: col.name, type: col.type }],
+        });
+      }
     } else if (
       def.resource === 'constraint' &&
       def.constraint_type === 'primary key'
@@ -159,6 +227,23 @@ async function _createTable(
       for (const sub of def.definition) {
         primary_key.push(sub.column);
       }
+    } else if (
+      def.resource === 'constraint' &&
+      isUniqueConstraint(def.constraint_type)
+    ) {
+      const columns = def.definition.map((sub) =>
+        String((sub as ColumnRef).column)
+      );
+      const name = uniqueIndexName(
+        ('index' in def ? def.index : null) ?? def.constraint,
+        columns,
+        unique_list.map((u) => u.name)
+      );
+      const key_list = columns.map((column) => ({
+        name: column,
+        type: column_list.find((col) => col.name === column)?.type ?? 'string',
+      }));
+      unique_list.push({ name, key_list });
     }
   }
   for (const name of primary_key) {
@@ -202,6 +287,7 @@ async function _createTable(
       table,
       collation,
       column_list,
+      unique_list,
       primary_key,
       is_temp,
       table_engine,

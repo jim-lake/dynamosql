@@ -58,6 +58,14 @@ describe('Temp', function () {
   runTests('memory_intstr.sql', path.join(__dirname, 'memory_intstr.sql'), {
     checkChanged: true,
   });
+  runTests('memory_unique.sql', path.join(__dirname, 'memory_unique.sql'), {
+    checkChanged: true,
+  });
+  runTests(
+    'memory_unique_error.sql',
+    path.join(__dirname, 'memory_unique_error.sql'),
+    { allowedErrors: 'SAME_CODE', skipAffected: true, checkChanged: true }
+  );
   runTests(
     'memory_misuse_error.sql',
     path.join(__dirname, 'memory_misuse_error.sql'),

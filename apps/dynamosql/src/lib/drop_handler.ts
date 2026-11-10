@@ -49,6 +49,31 @@ export async function query(params: HandlerParams<Drop>): Promise<void> {
       }
       throw err;
     }
+  } else if (ast.keyword === 'index') {
+    const indexAst = ast;
+    const database = indexAst.table.db ?? session.getCurrentDatabase();
+    if (!database) {
+      throw new SQLError('no_current_database');
+    }
+    const table = indexAst.table.table;
+    const index_name = String(indexAst.name.column);
+    try {
+      await SchemaManager.getEngine(database, table, session).deleteIndex({
+        dynamodb,
+        session,
+        database,
+        table,
+        index_name,
+      });
+    } catch (err) {
+      if (err instanceof Error && err.message === 'index_not_found') {
+        throw new SQLError({
+          err: 'ER_CANT_DROP_FIELD_OR_KEY',
+          args: [index_name],
+        });
+      }
+      throw err;
+    }
   } else {
     logger.error('unsupported:', ast);
     throw new SQLError('unsupported');

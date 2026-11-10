@@ -2,30 +2,176 @@
 
 var SqlString = require('sqlstring');
 var node_events = require('node:events');
-var clientDynamodb = require('@aws-sdk/client-dynamodb');
+var node_os = require('node:os');
 var require$$0 = require('node:util');
 var crypto = require('node:crypto');
+var clientDynamodb = require('@aws-sdk/client-dynamodb');
 var promises = require('node:timers/promises');
 
 function _interopNamespaceDefault(e) {
-    var n = Object.create(null);
-    if (e) {
-        Object.keys(e).forEach(function (k) {
-            if (k !== 'default') {
-                var d = Object.getOwnPropertyDescriptor(e, k);
-                Object.defineProperty(n, k, d.get ? d : {
-                    enumerable: true,
-                    get: function () { return e[k]; }
-                });
-            }
-        });
-    }
-    n.default = e;
-    return Object.freeze(n);
+	var n = Object.create(null);
+	if (e) {
+		Object.keys(e).forEach(function (k) {
+			if (k !== 'default') {
+				var d = Object.getOwnPropertyDescriptor(e, k);
+				Object.defineProperty(n, k, d.get ? d : {
+					enumerable: true,
+					get: function () { return e[k]; }
+				});
+			}
+		});
+	}
+	n.default = e;
+	return Object.freeze(n);
 }
 
 var SqlString__namespace = /*#__PURE__*/_interopNamespaceDefault(SqlString);
 var crypto__namespace = /*#__PURE__*/_interopNamespaceDefault(crypto);
+
+function getDefaultExportFromCjs (x) {
+	return x && x.__esModule && Object.prototype.hasOwnProperty.call(x, 'default') ? x['default'] : x;
+}
+
+var dist = {};
+
+var hasRequiredDist;
+
+function requireDist () {
+	if (hasRequiredDist) return dist;
+	hasRequiredDist = 1;
+
+	var util = require$$0;
+
+	function _interopNamespaceDefault(e) {
+	    var n = Object.create(null);
+	    if (e) {
+	        Object.keys(e).forEach(function (k) {
+	            if (k !== 'default') {
+	                var d = Object.getOwnPropertyDescriptor(e, k);
+	                Object.defineProperty(n, k, d.get ? d : {
+	                    enumerable: true,
+	                    get: function () { return e[k]; }
+	                });
+	            }
+	        });
+	    }
+	    n.default = e;
+	    return Object.freeze(n);
+	}
+
+	var util__namespace = /*#__PURE__*/_interopNamespaceDefault(util);
+
+	var LEVEL_NONE = 0;
+	var LEVEL_ERROR = 1;
+	var LEVEL_INFO = 2;
+	var LEVEL_TRACE = 3;
+	var LEVEL_MAP = {
+	    NONE: LEVEL_NONE,
+	    ERROR: LEVEL_ERROR,
+	    INFO: LEVEL_INFO,
+	    TRACE: LEVEL_TRACE,
+	};
+	var g_remoteLogFunc = null;
+	var g_logLevel = LEVEL_NONE;
+	if (process.env.LOG) {
+	    var level = LEVEL_MAP[process.env.LOG.toUpperCase()];
+	    if (level !== undefined) {
+	        g_logLevel = level;
+	        trace('log level:', level);
+	    }
+	}
+	function setRemoteLog(func) {
+	    g_remoteLogFunc = func;
+	}
+	function setLogLevel(level) {
+	    g_logLevel = level;
+	}
+	function error() {
+	    var args = [];
+	    for (var _i = 0; _i < arguments.length; _i++) {
+	        args[_i] = arguments[_i];
+	    }
+	    if (g_logLevel >= LEVEL_ERROR) {
+	        return _log.apply(void 0, args);
+	    }
+	}
+	function info() {
+	    var args = [];
+	    for (var _i = 0; _i < arguments.length; _i++) {
+	        args[_i] = arguments[_i];
+	    }
+	    if (g_logLevel >= LEVEL_INFO) {
+	        return _log.apply(void 0, args);
+	    }
+	}
+	function trace() {
+	    var args = [];
+	    for (var _i = 0; _i < arguments.length; _i++) {
+	        args[_i] = arguments[_i];
+	    }
+	    if (g_logLevel >= LEVEL_TRACE) {
+	        return _log.apply(void 0, args);
+	    }
+	}
+	function always() {
+	    var args = [];
+	    for (var _i = 0; _i < arguments.length; _i++) {
+	        args[_i] = arguments[_i];
+	    }
+	    return _log.apply(void 0, args);
+	}
+	function _log() {
+	    var args = [];
+	    for (var _i = 0; _i < arguments.length; _i++) {
+	        args[_i] = arguments[_i];
+	    }
+	    var s = util__namespace.format.apply(util__namespace, args);
+	    console.log('[' + new Date().toUTCString() + '] ' + s);
+	    g_remoteLogFunc === null || g_remoteLogFunc === void 0 ? void 0 : g_remoteLogFunc(s);
+	    return s;
+	}
+	function inspect() {
+	    var args = [];
+	    for (var _i = 0; _i < arguments.length; _i++) {
+	        args[_i] = arguments[_i];
+	    }
+	    var s = '';
+	    for (var index in args) {
+	        var a = args[index];
+	        if (Number(index) > 0) {
+	            s += ' ';
+	        }
+	        if (typeof a == 'object') {
+	            s += util__namespace.inspect(a, { depth: 99 });
+	        }
+	        else {
+	            s += a;
+	        }
+	    }
+	    console.log(s);
+	}
+
+	var logger = /*#__PURE__*/Object.freeze({
+	    __proto__: null,
+	    LEVEL_ERROR: LEVEL_ERROR,
+	    LEVEL_INFO: LEVEL_INFO,
+	    LEVEL_NONE: LEVEL_NONE,
+	    LEVEL_TRACE: LEVEL_TRACE,
+	    always: always,
+	    error: error,
+	    info: info,
+	    inspect: inspect,
+	    setLogLevel: setLogLevel,
+	    setRemoteLog: setRemoteLog,
+	    trace: trace
+	});
+
+	dist.logger = logger;
+	
+	return dist;
+}
+
+var distExports = requireDist();
 
 var CLIENT_FLAGS;
 (function (CLIENT_FLAGS) {
@@ -1689,6 +1835,7 @@ var CODE_ERRNO;
     CODE_ERRNO[CODE_ERRNO["ER_CANT_OPEN_ERROR_LOG"] = 3228] = "ER_CANT_OPEN_ERROR_LOG";
     CODE_ERRNO[CODE_ERRNO["ER_GROUPING_ON_TIMESTAMP_IN_DST"] = 3229] = "ER_GROUPING_ON_TIMESTAMP_IN_DST";
     CODE_ERRNO[CODE_ERRNO["ER_CANT_START_SERVER_NAMED_PIPE"] = 3230] = "ER_CANT_START_SERVER_NAMED_PIPE";
+    CODE_ERRNO[CODE_ERRNO["ER_FEATURE_UNSUPPORTED"] = 3658] = "ER_FEATURE_UNSUPPORTED";
 })(CODE_ERRNO || (CODE_ERRNO = {}));
 
 const SYSTEM_VARIABLE_TYPES = {
@@ -1764,6 +1911,14 @@ const ERROR_MAP = {
         sqlMessage: 'Multiple statements are disabled.  See the "multipleStatements" session option.',
     },
     unsupported: { code: 'ER_NO', sqlMessage: 'Unsupport sql feature.' },
+    ER_NOT_SUPPORTED_YET: {
+        code: 'ER_NOT_SUPPORTED_YET',
+        sqlMessage: "This version of MySQL doesn't yet support this feature",
+    },
+    LOCK_VALUE_REQUIRED: {
+        code: 'ER_FEATURE_UNSUPPORTED',
+        sqlMessage: errStr `${0} is only supported in the select list of a SELECT`,
+    },
     unsupported_type: {
         code: 'ER_NO',
         sqlMessage: errStr `Unsupported query type: ${0}`,
@@ -1820,9 +1975,21 @@ const ERROR_MAP = {
         code: 'ER_WRONG_VALUE_COUNT_ON_ROW',
         sqlMessage: errStr `Column count doesn't match value count at row ${0}`,
     },
+    ER_WRONG_COLUMN_NAME: {
+        code: 'ER_WRONG_COLUMN_NAME',
+        sqlMessage: errStr `Incorrect column name '${0}'`,
+    },
     ER_BAD_NULL_ERROR: { code: 'ER_BAD_NULL_ERROR' },
+    ER_DIVISION_BY_ZERO: {
+        code: 'ER_DIVISION_BY_ZERO',
+        sqlMessage: 'Division by 0',
+    },
     ER_TRUNCATED_WRONG_VALUE_FOR_FIELD: {
         code: 'ER_TRUNCATED_WRONG_VALUE_FOR_FIELD',
+    },
+    ER_DUP_FIELDNAME: {
+        code: 'ER_DUP_FIELDNAME',
+        sqlMessage: errStr `Duplicate column name '${0}'`,
     },
     ER_KEY_COLUMN_DOES_NOT_EXITS: {
         code: 'ER_KEY_COLUMN_DOES_NOT_EXITS',
@@ -2610,6 +2777,7 @@ function _sortCollate(a, b) {
 }
 
 const SYSTEM_TIME_ZONE = _getSystemTimezone();
+const SERVER_UUID = crypto.randomUUID();
 class GlobalSettings {
     _collationConnection = COLLATIONS.UTF8MB4_0900_AI_CI;
     _divPrecisionIncrement = 4;
@@ -2629,6 +2797,9 @@ class GlobalSettings {
     }
     get systemTimeZone() {
         return SYSTEM_TIME_ZONE;
+    }
+    get serverUUID() {
+        return SERVER_UUID;
     }
     getGlobalVariable(name) {
         const name_uc = name.toUpperCase();
@@ -3983,7 +4154,10 @@ class DynamoDB {
             TableName: `${this.namespace}${params.table}`,
             Key: params.key,
             UpdateExpression: params.expression,
-            ExpressionAttributeNames: params.names,
+            ConditionExpression: params.condition,
+            ExpressionAttributeNames: params.names && Object.keys(params.names).length > 0
+                ? params.names
+                : undefined,
             ExpressionAttributeValues: params.values,
             ReturnValues: 'ALL_OLD',
         });
@@ -4007,7 +4181,10 @@ class DynamoDB {
                         results.push(table);
                     }
                     else if (table.startsWith(this.namespace)) {
-                        results.push(table.substring(namespace_len));
+                        const name = table.substring(namespace_len);
+                        if (name !== '__dynamosql_locks') {
+                            results.push(name);
+                        }
                     }
                 }
             }
@@ -4061,6 +4238,18 @@ class DynamoDB {
     async deleteTable(raw_table) {
         const table = `${this.namespace}${raw_table}`;
         const command = new clientDynamodb.DeleteTableCommand({ TableName: table });
+        try {
+            await this.client.send(command);
+        }
+        catch (err) {
+            throw safeConvertError(err);
+        }
+    }
+    async enableTimeToLive(raw_table, attribute_name) {
+        const command = new clientDynamodb.UpdateTimeToLiveCommand({
+            TableName: `${this.namespace}${raw_table}`,
+            TimeToLiveSpecification: { AttributeName: attribute_name, Enabled: true },
+        });
         try {
             await this.client.send(command);
         }
@@ -4239,146 +4428,215 @@ class SQLMode extends node_events.EventEmitter {
     }
 }
 
-var dist = {};
-
-var hasRequiredDist;
-
-function requireDist () {
-	if (hasRequiredDist) return dist;
-	hasRequiredDist = 1;
-
-	var util = require$$0;
-
-	function _interopNamespaceDefault(e) {
-	    var n = Object.create(null);
-	    if (e) {
-	        Object.keys(e).forEach(function (k) {
-	            if (k !== 'default') {
-	                var d = Object.getOwnPropertyDescriptor(e, k);
-	                Object.defineProperty(n, k, d.get ? d : {
-	                    enumerable: true,
-	                    get: function () { return e[k]; }
-	                });
-	            }
-	        });
-	    }
-	    n.default = e;
-	    return Object.freeze(n);
-	}
-
-	var util__namespace = /*#__PURE__*/_interopNamespaceDefault(util);
-
-	var LEVEL_NONE = 0;
-	var LEVEL_ERROR = 1;
-	var LEVEL_INFO = 2;
-	var LEVEL_TRACE = 3;
-	var LEVEL_MAP = {
-	    NONE: LEVEL_NONE,
-	    ERROR: LEVEL_ERROR,
-	    INFO: LEVEL_INFO,
-	    TRACE: LEVEL_TRACE,
-	};
-	var g_remoteLogFunc = null;
-	var g_logLevel = LEVEL_NONE;
-	if (process.env.LOG) {
-	    var level = LEVEL_MAP[process.env.LOG.toUpperCase()];
-	    if (level !== undefined) {
-	        g_logLevel = level;
-	        trace('log level:', level);
-	    }
-	}
-	function setRemoteLog(func) {
-	    g_remoteLogFunc = func;
-	}
-	function setLogLevel(level) {
-	    g_logLevel = level;
-	}
-	function error() {
-	    var args = [];
-	    for (var _i = 0; _i < arguments.length; _i++) {
-	        args[_i] = arguments[_i];
-	    }
-	    if (g_logLevel >= LEVEL_ERROR) {
-	        return _log.apply(void 0, args);
-	    }
-	}
-	function info() {
-	    var args = [];
-	    for (var _i = 0; _i < arguments.length; _i++) {
-	        args[_i] = arguments[_i];
-	    }
-	    if (g_logLevel >= LEVEL_INFO) {
-	        return _log.apply(void 0, args);
-	    }
-	}
-	function trace() {
-	    var args = [];
-	    for (var _i = 0; _i < arguments.length; _i++) {
-	        args[_i] = arguments[_i];
-	    }
-	    if (g_logLevel >= LEVEL_TRACE) {
-	        return _log.apply(void 0, args);
-	    }
-	}
-	function always() {
-	    var args = [];
-	    for (var _i = 0; _i < arguments.length; _i++) {
-	        args[_i] = arguments[_i];
-	    }
-	    return _log.apply(void 0, args);
-	}
-	function _log() {
-	    var args = [];
-	    for (var _i = 0; _i < arguments.length; _i++) {
-	        args[_i] = arguments[_i];
-	    }
-	    var s = util__namespace.format.apply(util__namespace, args);
-	    console.log('[' + new Date().toUTCString() + '] ' + s);
-	    g_remoteLogFunc === null || g_remoteLogFunc === void 0 ? void 0 : g_remoteLogFunc(s);
-	    return s;
-	}
-	function inspect() {
-	    var args = [];
-	    for (var _i = 0; _i < arguments.length; _i++) {
-	        args[_i] = arguments[_i];
-	    }
-	    var s = '';
-	    for (var index in args) {
-	        var a = args[index];
-	        if (Number(index) > 0) {
-	            s += ' ';
-	        }
-	        if (typeof a == 'object') {
-	            s += util__namespace.inspect(a, { depth: 99 });
-	        }
-	        else {
-	            s += a;
-	        }
-	    }
-	    console.log(s);
-	}
-
-	var logger = /*#__PURE__*/Object.freeze({
-	    __proto__: null,
-	    LEVEL_ERROR: LEVEL_ERROR,
-	    LEVEL_INFO: LEVEL_INFO,
-	    LEVEL_NONE: LEVEL_NONE,
-	    LEVEL_TRACE: LEVEL_TRACE,
-	    always: always,
-	    error: error,
-	    info: info,
-	    inspect: inspect,
-	    setLogLevel: setLogLevel,
-	    setRemoteLog: setRemoteLog,
-	    trace: trace
-	});
-
-	dist.logger = logger;
-	
-	return dist;
+const LOCK_TABLE = '__dynamosql_locks';
+const LEASE_S = 10;
+const RENEW_MS = 1_000;
+const POLL_MS = 250;
+const MAX_NAME_LENGTH = 64;
+class LockValueRequiredError extends SQLError {
+    lock;
+    constructor(lock) {
+        super({ err: 'LOCK_VALUE_REQUIRED', args: [lock.fn] });
+        this.lock = lock;
+    }
 }
-
-var distExports = requireDist();
+function normalizeLockName(name) {
+    const lower = name.toLowerCase();
+    if (lower === '' || Buffer.byteLength(lower) > MAX_NAME_LENGTH) {
+        throw new SQLError({ code: 'ER_USER_LOCK_WRONG_NAME', args: [name] });
+    }
+    return lower;
+}
+async function ensureLockTable(dynamodb) {
+    try {
+        await dynamodb.getTable(LOCK_TABLE);
+        return;
+    }
+    catch (err) {
+        if (!(err instanceof Error) || err.message !== 'resource_not_found') {
+            throw err;
+        }
+    }
+    let created = false;
+    try {
+        await dynamodb.createTable({
+            table: LOCK_TABLE,
+            primary_key: [{ name: 'lock_key', type: 'S' }],
+        });
+        created = true;
+    }
+    catch (err) {
+        if (!(err instanceof Error) || err.message !== 'resource_in_use') {
+            throw err;
+        }
+    }
+    for (;;) {
+        const result = await dynamodb.getTable(LOCK_TABLE);
+        if (result.Table?.TableStatus === 'ACTIVE') {
+            break;
+        }
+        await promises.setTimeout(POLL_MS);
+    }
+    if (created) {
+        await dynamodb.enableTimeToLive(LOCK_TABLE, 'expires_at');
+    }
+}
+function isConditionFailure(err) {
+    return (err?.name ===
+        'ConditionalCheckFailedException');
+}
+// Returns false when another owner holds an unexpired lease.
+async function writeLease(session, key) {
+    const nowS = Math.floor(Date.now() / 1000);
+    try {
+        await session.dynamodb.updateItem({
+            table: LOCK_TABLE,
+            key: { lock_key: { S: key } },
+            expression: 'SET owner_id = :owner, expires_at = :expires',
+            condition: 'attribute_not_exists(owner_id) OR expires_at < :now OR owner_id = :owner',
+            values: {
+                ':owner': { S: session.lockOwner },
+                ':expires': { N: String(nowS + LEASE_S) },
+                ':now': { N: String(nowS) },
+            },
+        });
+        return true;
+    }
+    catch (err) {
+        if (isConditionFailure(err)) {
+            return false;
+        }
+        throw err;
+    }
+}
+async function acquire(session, name, timeout_s) {
+    await ensureLockTable(session.dynamodb);
+    const key = `${session.transactionDomain}_${name}`;
+    const deadline = Date.now() + timeout_s * 1000;
+    for (;;) {
+        if (await writeLease(session, key)) {
+            _addHeld(session, key);
+            return true;
+        }
+        if (Date.now() >= deadline) {
+            return false;
+        }
+        await promises.setTimeout(POLL_MS);
+    }
+}
+function _addHeld(session, key) {
+    const existing = session.heldLocks.get(key);
+    if (existing) {
+        existing.count++;
+        return;
+    }
+    const timer = setInterval(() => {
+        void _renew(session, key);
+    }, RENEW_MS);
+    timer.unref();
+    session.heldLocks.set(key, { count: 1, timer });
+}
+async function _renew(session, key) {
+    try {
+        if (!(await writeLease(session, key))) {
+            _drop(session, key);
+        }
+    }
+    catch (err) {
+        distExports.logger.error('lock.renew: err:', err, key);
+    }
+}
+function _drop(session, key) {
+    const lease = session.heldLocks.get(key);
+    if (lease) {
+        clearInterval(lease.timer);
+        session.heldLocks.delete(key);
+    }
+}
+async function release(session, name) {
+    const key = `${session.transactionDomain}_${name}`;
+    const lease = session.heldLocks.get(key);
+    if (!lease) {
+        return (await holder(session, name)) === null ? null : false;
+    }
+    lease.count--;
+    if (lease.count > 0) {
+        return true;
+    }
+    await _releaseLease(session, key);
+    return true;
+}
+async function _releaseLease(session, key) {
+    _drop(session, key);
+    try {
+        await session.dynamodb.updateItem({
+            table: LOCK_TABLE,
+            key: { lock_key: { S: key } },
+            expression: 'SET expires_at = :expired',
+            condition: 'owner_id = :owner',
+            values: {
+                ':owner': { S: session.lockOwner },
+                ':expired': { N: String(Math.floor(Date.now() / 1000) - 1) },
+            },
+        });
+    }
+    catch (err) {
+        if (!isConditionFailure(err)) {
+            throw err;
+        }
+    }
+}
+async function releaseAll(session) {
+    const keys = [...session.heldLocks.keys()];
+    await Promise.all(keys.map((key) => _releaseLease(session, key)));
+    return keys.length;
+}
+async function holder(session, name) {
+    const key = `${session.transactionDomain}_${name}`;
+    const sql = `SELECT owner_id, expires_at FROM "${LOCK_TABLE}" WHERE lock_key = '${escapeString(key)}'`;
+    const rows = await session.dynamodb.queryQL(sql);
+    const row = rows[0];
+    const owner = row?.owner_id?.S;
+    const expires = Number(row?.expires_at?.N ?? 0);
+    if (!owner || expires < Math.floor(Date.now() / 1000)) {
+        return null;
+    }
+    return owner;
+}
+async function runLockFunction(session, request) {
+    const { fn, args } = request;
+    if (fn === 'RELEASE_ALL_LOCKS') {
+        return { type: 'longlong', value: await releaseAll(session) };
+    }
+    const nameValue = args[0]?.value;
+    const name = normalizeLockName(nameValue === null || nameValue === undefined ? '' : String(nameValue));
+    switch (fn) {
+        case 'GET_LOCK': {
+            const timeout = Number(args[1]?.value ?? 0);
+            const timeout_s = timeout < 0 ? Infinity : timeout;
+            const got = await acquire(session, name, timeout_s);
+            return { type: 'longlong', value: got ? 1 : 0 };
+        }
+        case 'RELEASE_LOCK': {
+            const released = await release(session, name);
+            return released === null
+                ? { type: 'null', value: null }
+                : { type: 'longlong', value: released ? 1 : 0 };
+        }
+        case 'IS_FREE_LOCK':
+            return {
+                type: 'longlong',
+                value: (await holder(session, name)) === null ? 1 : 0,
+            };
+        case 'IS_USED_LOCK': {
+            const owner = await holder(session, name);
+            return owner === null
+                ? { type: 'null', value: null }
+                : { type: 'longlong', value: Number(owner.split('-').pop()) };
+        }
+    }
+    return { type: 'null', value: null };
+}
 
 const DEFAULT_OPT = {
   database: "mysql",
@@ -40412,6 +40670,27 @@ if (typeof global === "object" && global && global.window) {
   };
 }
 
+const UNIQUE_CONSTRAINT_TYPES = [
+    'unique',
+    'unique key',
+    'unique index',
+];
+function isUniqueConstraint(constraint_type) {
+    return UNIQUE_CONSTRAINT_TYPES.includes(String(constraint_type));
+}
+function uniqueIndexName(name, column_list, used_list) {
+    if (name) {
+        return name;
+    }
+    const base = column_list[0] ?? '';
+    const taken = new Set(used_list.map((item) => item.toLowerCase()));
+    let candidate = base;
+    for (let suffix = 2; taken.has(candidate.toLowerCase()); suffix++) {
+        candidate = `${base}_${suffix}`;
+    }
+    return candidate;
+}
+
 const CATALOGS_LIST = [
     {
         catalog_name: { value: 'def', type: 'string' },
@@ -40421,6 +40700,7 @@ const CATALOGS_LIST = [
 ];
 const CATALOGS_INFO = {
     isCaseSensitive: false,
+    is_open: true,
     columns: [
         {
             name: 'CATALOG_NAME',
@@ -40444,6 +40724,7 @@ const CATALOGS_INFO = {
 };
 const SCHEMATA_INFO = {
     isCaseSensitive: false,
+    is_open: true,
     columns: [
         {
             name: 'CATALOG_NAME',
@@ -40490,6 +40771,7 @@ const SCHEMATA_INFO = {
 };
 const TABLES_INFO = {
     isCaseSensitive: false,
+    is_open: true,
     columns: [
         {
             name: 'TABLE_CATALOG',
@@ -40615,6 +40897,7 @@ const TABLES_INFO = {
 };
 const COLUMNS_INFO = {
     isCaseSensitive: false,
+    is_open: true,
     columns: [
         {
             name: 'TABLE_CATALOG',
@@ -41092,24 +41375,25 @@ async function insertRowList$2() {
 }
 
 var InformationSchemaEngine = /*#__PURE__*/Object.freeze({
-    __proto__: null,
-    addColumn: addColumn$2,
-    commit: commit$3,
-    createIndex: createIndex$2,
-    createTable: createTable$3,
-    deleteIndex: deleteIndex$2,
-    dropTable: dropTable$3,
-    getRowList: getRowList$2,
-    getTableInfo: getTableInfo$2,
-    getTableList: getTableList$3,
-    insertRowList: insertRowList$2,
-    multipleDelete: multipleDelete$2,
-    multipleUpdate: multipleUpdate$2,
-    rollback: rollback$3,
-    singleDelete: singleDelete$2,
-    singleUpdate: singleUpdate$2
+	__proto__: null,
+	addColumn: addColumn$2,
+	commit: commit$3,
+	createIndex: createIndex$2,
+	createTable: createTable$3,
+	deleteIndex: deleteIndex$2,
+	dropTable: dropTable$3,
+	getRowList: getRowList$2,
+	getTableInfo: getTableInfo$2,
+	getTableList: getTableList$3,
+	insertRowList: insertRowList$2,
+	multipleDelete: multipleDelete$2,
+	multipleUpdate: multipleUpdate$2,
+	rollback: rollback$3,
+	singleDelete: singleDelete$2,
+	singleUpdate: singleUpdate$2
 });
 
+const ROW_ID_NAME = 'DB_ROW_ID';
 const g_tableMap = new Map();
 function getTable(database, table, session) {
     const data = session.getTempTable(database, table) ??
@@ -41153,6 +41437,1652 @@ function saveTable(database, table, data) {
 function deleteTable(database, table) {
     g_tableMap.delete(`${database}.${table}`);
 }
+function cloneState(data) {
+    return {
+        row_list: data.row_list.slice(),
+        primary_map: new Map(data.primary_map),
+        unique_list: data.unique_list.map((index) => ({
+            ...index,
+            map: index.map.clone(),
+        })),
+    };
+}
+function primaryKeyOf(primary_key, row) {
+    return JSON.stringify(primary_key.map((name) => row[name]?.value));
+}
+function uniqueKeyOf(column_list, row) {
+    const values = column_list.map((name) => row[name]?.value);
+    if (values.some((value) => value === null || value === undefined)) {
+        return null;
+    }
+    return JSON.stringify(values);
+}
+function findConflicts(state, row, primary_key, self) {
+    const positions = new Set();
+    const pk_position = state.primary_map.get(primaryKeyOf(primary_key, row));
+    if (pk_position !== undefined && pk_position !== self) {
+        positions.add(pk_position);
+    }
+    for (const index of state.unique_list) {
+        const key = uniqueKeyOf(index.column_list, row);
+        const pk = key === null ? undefined : index.map.get(key);
+        const position = pk === undefined ? undefined : state.primary_map.get(pk);
+        if (position !== undefined && position !== self) {
+            positions.add(position);
+        }
+    }
+    return [...positions].sort((a, b) => a - b);
+}
+function duplicateEntryError(state, row, primary_key) {
+    const pk = primaryKeyOf(primary_key, row);
+    if (!state.primary_map.has(pk)) {
+        for (const index of state.unique_list) {
+            const key = uniqueKeyOf(index.column_list, row);
+            if (key !== null && index.map.has(key)) {
+                return new SQLError({
+                    err: 'dup_primary_key_entry',
+                    args: [index.name, key],
+                });
+            }
+        }
+    }
+    return new SQLError({ err: 'dup_primary_key_entry', args: [primary_key, pk] });
+}
+function appendRow(state, row, primary_key) {
+    _setRow(state, state.row_list.length, row, primary_key);
+}
+function replaceRow(state, position, row, primary_key) {
+    _unsetRow(state, position, primary_key);
+    _setRow(state, position, row, primary_key);
+}
+function removeRow(state, position, primary_key) {
+    _unsetRow(state, position, primary_key);
+    state.row_list.splice(position, 1);
+    state.primary_map.forEach((value, key) => {
+        if (value > position) {
+            state.primary_map.set(key, value - 1);
+        }
+    });
+}
+function _setRow(state, position, row, primary_key) {
+    const pk = primaryKeyOf(primary_key, row);
+    state.row_list[position] = row;
+    state.primary_map.set(pk, position);
+    for (const index of state.unique_list) {
+        const key = uniqueKeyOf(index.column_list, row);
+        if (key !== null) {
+            index.map.set(key, pk);
+        }
+    }
+}
+function _unsetRow(state, position, primary_key) {
+    const row = state.row_list[position];
+    if (!row) {
+        return;
+    }
+    state.primary_map.delete(primaryKeyOf(primary_key, row));
+    for (const index of state.unique_list) {
+        const key = uniqueKeyOf(index.column_list, row);
+        if (key !== null) {
+            index.map.delete(key);
+        }
+    }
+}
+
+var b_tree = {};
+
+var hasRequiredB_tree;
+
+function requireB_tree () {
+	if (hasRequiredB_tree) return b_tree;
+	hasRequiredB_tree = 1;
+	var __extends = (b_tree && b_tree.__extends) || (function () {
+	    var extendStatics = function (d, b) {
+	        extendStatics = Object.setPrototypeOf ||
+	            ({ __proto__: [] } instanceof Array && function (d, b) { d.__proto__ = b; }) ||
+	            function (d, b) { for (var p in b) if (Object.prototype.hasOwnProperty.call(b, p)) d[p] = b[p]; };
+	        return extendStatics(d, b);
+	    };
+	    return function (d, b) {
+	        if (typeof b !== "function" && b !== null)
+	            throw new TypeError("Class extends value " + String(b) + " is not a constructor or null");
+	        extendStatics(d, b);
+	        function __() { this.constructor = d; }
+	        d.prototype = b === null ? Object.create(b) : (__.prototype = b.prototype, new __());
+	    };
+	})();
+	Object.defineProperty(b_tree, "__esModule", { value: true });
+	b_tree.EmptyBTree = b_tree.check = b_tree.areOverlapping = b_tree.sumChildSizes = b_tree.BNodeInternal = b_tree.BNode = b_tree.asSet = b_tree.fixMaxSize = b_tree.simpleComparator = b_tree.defaultComparator = void 0;
+	/**
+	 * Compares DefaultComparables to form a strict partial ordering.
+	 *
+	 * Handles +/-0 and NaN like Map: NaN is equal to NaN, and -0 is equal to +0.
+	 *
+	 * Arrays are compared using '<' and '>', which may cause unexpected equality:
+	 * for example [1] will be considered equal to ['1'].
+	 *
+	 * Two objects with equal valueOf compare the same, but compare unequal to
+	 * primitives that have the same value.
+	 */
+	function defaultComparator(a, b) {
+	    // Special case finite numbers first for performance.
+	    // Note that the trick of using 'a - b' and checking for NaN to detect non-numbers
+	    // does not work if the strings are numeric (ex: "5"). This would leading most 
+	    // comparison functions using that approach to fail to have transitivity.
+	    if (Number.isFinite(a) && Number.isFinite(b)) {
+	        return a - b;
+	    }
+	    // The default < and > operators are not totally ordered. To allow types to be mixed
+	    // in a single collection, compare types and order values of different types by type.
+	    var ta = typeof a;
+	    var tb = typeof b;
+	    if (ta !== tb) {
+	        return ta < tb ? -1 : 1;
+	    }
+	    if (ta === 'object') {
+	        // standardized JavaScript bug: null is not an object, but typeof says it is
+	        if (a === null)
+	            return b === null ? 0 : -1;
+	        else if (b === null)
+	            return 1;
+	        a = a.valueOf();
+	        b = b.valueOf();
+	        ta = typeof a;
+	        tb = typeof b;
+	        // Deal with the two valueOf()s producing different types
+	        if (ta !== tb) {
+	            return ta < tb ? -1 : 1;
+	        }
+	    }
+	    // a and b are now the same type, and will be a number, string or array 
+	    // (which we assume holds numbers or strings), or something unsupported.
+	    if (a < b)
+	        return -1;
+	    if (a > b)
+	        return 1;
+	    if (a === b)
+	        return 0;
+	    // Order NaN less than other numbers
+	    if (Number.isNaN(a))
+	        return Number.isNaN(b) ? 0 : -1;
+	    else if (Number.isNaN(b))
+	        return 1;
+	    // This could be two objects (e.g. [7] and ['7']) that aren't ordered
+	    return Array.isArray(a) ? 0 : Number.NaN;
+	}
+	b_tree.defaultComparator = defaultComparator;
+	function simpleComparator(a, b) {
+	    return a > b ? 1 : a < b ? -1 : 0;
+	}
+	b_tree.simpleComparator = simpleComparator;
+	/** Sanitizes a requested max node size.
+	 *  @internal */
+	function fixMaxSize(maxNodeSize) {
+	    return maxNodeSize >= 4 ? Math.min(maxNodeSize | 0, 256) : 32;
+	}
+	b_tree.fixMaxSize = fixMaxSize;
+	/**
+	 * A reasonably fast collection of key-value pairs with a powerful API.
+	 * Largely compatible with the standard Map. BTree is a B+ tree data structure,
+	 * so the collection is sorted by key.
+	 *
+	 * B+ trees tend to use memory more efficiently than hashtables such as the
+	 * standard Map, especially when the collection contains a large number of
+	 * items. However, maintaining the sort order makes them modestly slower:
+	 * O(log size) rather than O(1). This B+ tree implementation supports O(1)
+	 * fast cloning. It also supports freeze(), which can be used to ensure that
+	 * a BTree is not changed accidentally.
+	 *
+	 * Confusingly, the ES6 Map.forEach(c) method calls c(value,key) instead of
+	 * c(key,value), in contrast to other methods such as set() and entries()
+	 * which put the key first. I can only assume that the order was reversed on
+	 * the theory that users would usually want to examine values and ignore keys.
+	 * BTree's forEach() therefore works the same way, but a second method
+	 * `.forEachPair((key,value)=>{...})` is provided which sends you the key
+	 * first and the value second; this method is slightly faster because it is
+	 * the "native" for-each method for this class.
+	 *
+	 * Out of the box, BTree supports keys that are numbers, strings, arrays of
+	 * numbers/strings, Date, and objects that have a valueOf() method returning a
+	 * number or string. Other data types, such as arrays of Date or custom
+	 * objects, require a custom comparator, which you must pass as the second
+	 * argument to the constructor (the first argument is an optional list of
+	 * initial items). Symbols cannot be used as keys because they are unordered
+	 * (one Symbol is never "greater" or "less" than another).
+	 *
+	 * @example
+	 * Given a {name: string, age: number} object, you can create a tree sorted by
+	 * name and then by age like this:
+	 *
+	 *     var tree = new BTree(undefined, (a, b) => {
+	 *       if (a.name > b.name)
+	 *         return 1; // Return a number >0 when a > b
+	 *       else if (a.name < b.name)
+	 *         return -1; // Return a number <0 when a < b
+	 *       else // names are equal (or incomparable)
+	 *         return a.age - b.age; // Return >0 when a.age > b.age
+	 *     });
+	 *
+	 *     tree.set({name:"Bill", age:17}, "happy");
+	 *     tree.set({name:"Fran", age:40}, "busy & stressed");
+	 *     tree.set({name:"Bill", age:55}, "recently laid off");
+	 *     tree.forEachPair((k, v) => {
+	 *       console.log(`Name: ${k.name} Age: ${k.age} Status: ${v}`);
+	 *     });
+	 *
+	 * @description
+	 * The "range" methods (`forEach, forRange, editRange`) will return the number
+	 * of elements that were scanned. In addition, the callback can return {break:R}
+	 * to stop early and return R from the outer function.
+	 *
+	 * - TODO: Test performance of preallocating values array at max size
+	 * - TODO: Add fast initialization when a sorted array is provided to constructor
+	 *
+	 * For more documentation see https://github.com/qwertie/btree-typescript
+	 *
+	 * Are you a C# developer? You might like the similar data structures I made for C#:
+	 * BDictionary, BList, etc. See http://core.loyc.net/collections/
+	 *
+	 * @author David Piepgrass
+	 */
+	var BTree = /** @class */ (function () {
+	    /**
+	     * Initializes an empty B+ tree.
+	     * @param compare Custom function to compare pairs of elements in the tree.
+	     *   If not specified, defaultComparator will be used which is valid as long as K extends DefaultComparable.
+	     * @param entries A set of key-value pairs to initialize the tree
+	     * @param maxNodeSize Branching factor (maximum items or children per node)
+	     *   Must be in range 4..256. If undefined or <4 then default is used; if >256 then 256.
+	     */
+	    function BTree(entries, compare, maxNodeSize) {
+	        this._root = EmptyLeaf;
+	        this._maxNodeSize = fixMaxSize(maxNodeSize);
+	        this._compare = compare || defaultComparator;
+	        if (entries)
+	            this.setPairs(entries);
+	    }
+	    Object.defineProperty(BTree.prototype, "size", {
+	        /////////////////////////////////////////////////////////////////////////////
+	        // ES6 Map<K,V> methods /////////////////////////////////////////////////////
+	        /** Gets the number of key-value pairs in the tree. */
+	        get: function () { return this._root.size(); },
+	        enumerable: false,
+	        configurable: true
+	    });
+	    Object.defineProperty(BTree.prototype, "length", {
+	        /** Gets the number of key-value pairs in the tree. */
+	        get: function () { return this.size; },
+	        enumerable: false,
+	        configurable: true
+	    });
+	    Object.defineProperty(BTree.prototype, "isEmpty", {
+	        /** Returns true iff the tree contains no key-value pairs. */
+	        get: function () { return this._root.size() === 0; },
+	        enumerable: false,
+	        configurable: true
+	    });
+	    /** Releases the tree so that its size is 0. */
+	    BTree.prototype.clear = function () {
+	        this._root = EmptyLeaf;
+	    };
+	    /** Runs a function for each key-value pair, in order from smallest to
+	     *  largest key. For compatibility with ES6 Map, the argument order to
+	     *  the callback is backwards: value first, then key. Call forEachPair
+	     *  instead to receive the key as the first argument.
+	     * @param thisArg If provided, this parameter is assigned as the `this`
+	     *        value for each callback.
+	     * @returns the number of values that were sent to the callback,
+	     *        or the R value if the callback returned {break:R}. */
+	    BTree.prototype.forEach = function (callback, thisArg) {
+	        var _this = this;
+	        if (thisArg !== undefined)
+	            callback = callback.bind(thisArg);
+	        return this.forEachPair(function (k, v) { return callback(v, k, _this); });
+	    };
+	    /** Runs a function for each key-value pair, in order from smallest to
+	     *  largest key. The callback can return {break:R} (where R is any value
+	     *  except undefined) to stop immediately and return R from forEachPair.
+	     * @param onFound A function that is called for each key-value pair. This
+	     *        function can return {break:R} to stop early with result R.
+	     *        The reason that you must return {break:R} instead of simply R
+	     *        itself is for consistency with editRange(), which allows
+	     *        multiple actions, not just breaking.
+	     * @param initialCounter This is the value of the third argument of
+	     *        `onFound` the first time it is called. The counter increases
+	     *        by one each time `onFound` is called. Default value: 0
+	     * @returns the number of pairs sent to the callback (plus initialCounter,
+	     *        if you provided one). If the callback returned {break:R} then
+	     *        the R value is returned instead. */
+	    BTree.prototype.forEachPair = function (callback, initialCounter) {
+	        var low = this.minKey(), high = this.maxKey();
+	        return this.forRange(low, high, true, callback, initialCounter);
+	    };
+	    /**
+	     * Finds a pair in the tree and returns the associated value.
+	     * @param defaultValue a value to return if the key was not found.
+	     * @returns the value, or defaultValue if the key was not found.
+	     * @description Computational complexity: O(log size)
+	     */
+	    BTree.prototype.get = function (key, defaultValue) {
+	        return this._root.get(key, defaultValue, this);
+	    };
+	    /**
+	     * Adds or overwrites a key-value pair in the B+ tree.
+	     * @param key the key is used to determine the sort order of
+	     *        data in the tree.
+	     * @param value data to associate with the key (optional)
+	     * @param overwrite Whether to overwrite an existing key-value pair
+	     *        (default: true). If this is false and there is an existing
+	     *        key-value pair then this method has no effect.
+	     * @returns true if a new key-value pair was added.
+	     * @description Computational complexity: O(log size)
+	     * Note: when overwriting a previous entry, the key is updated
+	     * as well as the value. This has no effect unless the new key
+	     * has data that does not affect its sort order.
+	     */
+	    BTree.prototype.set = function (key, value, overwrite) {
+	        if (this._root.isShared)
+	            this._root = this._root.clone();
+	        var result = this._root.set(key, value, overwrite, this);
+	        if (result === true || result === false)
+	            return result;
+	        // Root node has split, so create a new root node.
+	        var children = [this._root, result];
+	        this._root = new BNodeInternal(children, sumChildSizes(children));
+	        return true;
+	    };
+	    /**
+	     * Returns true if the key exists in the B+ tree, false if not.
+	     * Use get() for best performance; use has() if you need to
+	     * distinguish between "undefined value" and "key not present".
+	     * @param key Key to detect
+	     * @description Computational complexity: O(log size)
+	     */
+	    BTree.prototype.has = function (key) {
+	        return this.forRange(key, key, true, undefined) !== 0;
+	    };
+	    /**
+	     * Removes a single key-value pair from the B+ tree.
+	     * @param key Key to find
+	     * @returns true if a pair was found and removed, false otherwise.
+	     * @description Computational complexity: O(log size)
+	     */
+	    BTree.prototype.delete = function (key) {
+	        return this.editRange(key, key, true, DeleteRange) !== 0;
+	    };
+	    BTree.prototype.with = function (key, value, overwrite) {
+	        var nu = this.clone();
+	        return nu.set(key, value, overwrite) || overwrite ? nu : this;
+	    };
+	    /** Returns a copy of the tree with the specified key-value pairs set. */
+	    BTree.prototype.withPairs = function (pairs, overwrite) {
+	        var nu = this.clone();
+	        return nu.setPairs(pairs, overwrite) !== 0 || overwrite ? nu : this;
+	    };
+	    /** Returns a copy of the tree with the specified keys present.
+	     *  @param keys The keys to add. If a key is already present in the tree,
+	     *         neither the existing key nor the existing value is modified.
+	     *  @param returnThisIfUnchanged if true, returns this if all keys already
+	     *  existed. Performance note: due to the architecture of this class, all
+	     *  node(s) leading to existing keys are cloned even if the collection is
+	     *  ultimately unchanged.
+	    */
+	    BTree.prototype.withKeys = function (keys, returnThisIfUnchanged) {
+	        var nu = this.clone(), changed = false;
+	        for (var i = 0; i < keys.length; i++)
+	            changed = nu.set(keys[i], undefined, false) || changed;
+	        return returnThisIfUnchanged && !changed ? this : nu;
+	    };
+	    /** Returns a copy of the tree with the specified key removed.
+	     * @param returnThisIfUnchanged if true, returns this if the key didn't exist.
+	     *  Performance note: due to the architecture of this class, node(s) leading
+	     *  to where the key would have been stored are cloned even when the key
+	     *  turns out not to exist and the collection is unchanged.
+	     */
+	    BTree.prototype.without = function (key, returnThisIfUnchanged) {
+	        return this.withoutRange(key, key, true, returnThisIfUnchanged);
+	    };
+	    /** Returns a copy of the tree with the specified keys removed.
+	     * @param returnThisIfUnchanged if true, returns this if none of the keys
+	     *  existed. Performance note: due to the architecture of this class,
+	     *  node(s) leading to where the key would have been stored are cloned
+	     *  even when the key turns out not to exist.
+	     */
+	    BTree.prototype.withoutKeys = function (keys, returnThisIfUnchanged) {
+	        var nu = this.clone();
+	        return nu.deleteKeys(keys) || !returnThisIfUnchanged ? nu : this;
+	    };
+	    /** Returns a copy of the tree with the specified range of keys removed. */
+	    BTree.prototype.withoutRange = function (low, high, includeHigh, returnThisIfUnchanged) {
+	        var nu = this.clone();
+	        if (nu.deleteRange(low, high, includeHigh) === 0 && returnThisIfUnchanged)
+	            return this;
+	        return nu;
+	    };
+	    /** Returns a copy of the tree with pairs removed whenever the callback
+	     *  function returns false. `where()` is a synonym for this method. */
+	    BTree.prototype.filter = function (callback, returnThisIfUnchanged) {
+	        var nu = this.greedyClone();
+	        var del;
+	        nu.editAll(function (k, v, i) {
+	            if (!callback(k, v, i))
+	                return del = Delete;
+	        });
+	        if (!del && returnThisIfUnchanged)
+	            return this;
+	        return nu;
+	    };
+	    /** Returns a copy of the tree with all values altered by a callback function. */
+	    BTree.prototype.mapValues = function (callback) {
+	        var tmp = {};
+	        var nu = this.greedyClone();
+	        nu.editAll(function (k, v, i) {
+	            return tmp.value = callback(v, k, i), tmp;
+	        });
+	        return nu;
+	    };
+	    BTree.prototype.reduce = function (callback, initialValue) {
+	        var i = 0, p = initialValue;
+	        var it = this.entries(this.minKey(), ReusedArray), next;
+	        while (!(next = it.next()).done)
+	            p = callback(p, next.value, i++, this);
+	        return p;
+	    };
+	    /////////////////////////////////////////////////////////////////////////////
+	    // Iterator methods /////////////////////////////////////////////////////////
+	    /** Returns an iterator that provides items in order (ascending order if
+	     *  the collection's comparator uses ascending order, as is the default.)
+	     *  @param lowestKey First key to be iterated, or undefined to start at
+	     *         minKey(). If the specified key doesn't exist then iteration
+	     *         starts at the next higher key (according to the comparator).
+	     *  @param reusedArray Optional array used repeatedly to store key-value
+	     *         pairs, to avoid creating a new array on every iteration.
+	     */
+	    BTree.prototype.entries = function (lowestKey, reusedArray) {
+	        var info = this.findPath(lowestKey);
+	        if (info === undefined)
+	            return iterator();
+	        var nodequeue = info.nodequeue, nodeindex = info.nodeindex, leaf = info.leaf;
+	        var state = reusedArray !== undefined ? 1 : 0;
+	        var i = (lowestKey === undefined ? -1 : leaf.indexOf(lowestKey, 0, this._compare) - 1);
+	        return iterator(function () {
+	            jump: for (;;) {
+	                switch (state) {
+	                    case 0:
+	                        if (++i < leaf.keys.length)
+	                            return { done: false, value: [leaf.keys[i], leaf.values[i]] };
+	                        state = 2;
+	                        continue;
+	                    case 1:
+	                        if (++i < leaf.keys.length) {
+	                            reusedArray[0] = leaf.keys[i], reusedArray[1] = leaf.values[i];
+	                            return { done: false, value: reusedArray };
+	                        }
+	                        state = 2;
+	                    case 2:
+	                        // Advance to the next leaf node
+	                        for (var level = -1;;) {
+	                            if (++level >= nodequeue.length) {
+	                                state = 3;
+	                                continue jump;
+	                            }
+	                            if (++nodeindex[level] < nodequeue[level].length)
+	                                break;
+	                        }
+	                        for (; level > 0; level--) {
+	                            nodequeue[level - 1] = nodequeue[level][nodeindex[level]].children;
+	                            nodeindex[level - 1] = 0;
+	                        }
+	                        leaf = nodequeue[0][nodeindex[0]];
+	                        i = -1;
+	                        state = reusedArray !== undefined ? 1 : 0;
+	                        continue;
+	                    case 3:
+	                        return { done: true, value: undefined };
+	                }
+	            }
+	        });
+	    };
+	    /** Returns an iterator that provides items in reversed order.
+	     *  @param highestKey Key at which to start iterating, or undefined to
+	     *         start at maxKey(). If the specified key doesn't exist then iteration
+	     *         starts at the next lower key (according to the comparator).
+	     *  @param reusedArray Optional array used repeatedly to store key-value
+	     *         pairs, to avoid creating a new array on every iteration.
+	     *  @param skipHighest Iff this flag is true and the highestKey exists in the
+	     *         collection, the pair matching highestKey is skipped, not iterated.
+	     */
+	    BTree.prototype.entriesReversed = function (highestKey, reusedArray, skipHighest) {
+	        if (highestKey === undefined) {
+	            highestKey = this.maxKey();
+	            skipHighest = undefined;
+	            if (highestKey === undefined)
+	                return iterator(); // collection is empty
+	        }
+	        var _a = this.findPath(highestKey) || this.findPath(this.maxKey()), nodequeue = _a.nodequeue, nodeindex = _a.nodeindex, leaf = _a.leaf;
+	        check(!nodequeue[0] || leaf === nodequeue[0][nodeindex[0]], "wat!");
+	        var i = leaf.indexOf(highestKey, 0, this._compare);
+	        if (!skipHighest && i < leaf.keys.length && this._compare(leaf.keys[i], highestKey) <= 0)
+	            i++;
+	        var state = reusedArray !== undefined ? 1 : 0;
+	        return iterator(function () {
+	            jump: for (;;) {
+	                switch (state) {
+	                    case 0:
+	                        if (--i >= 0)
+	                            return { done: false, value: [leaf.keys[i], leaf.values[i]] };
+	                        state = 2;
+	                        continue;
+	                    case 1:
+	                        if (--i >= 0) {
+	                            reusedArray[0] = leaf.keys[i], reusedArray[1] = leaf.values[i];
+	                            return { done: false, value: reusedArray };
+	                        }
+	                        state = 2;
+	                    case 2:
+	                        // Advance to the next leaf node
+	                        for (var level = -1;;) {
+	                            if (++level >= nodequeue.length) {
+	                                state = 3;
+	                                continue jump;
+	                            }
+	                            if (--nodeindex[level] >= 0)
+	                                break;
+	                        }
+	                        for (; level > 0; level--) {
+	                            nodequeue[level - 1] = nodequeue[level][nodeindex[level]].children;
+	                            nodeindex[level - 1] = nodequeue[level - 1].length - 1;
+	                        }
+	                        leaf = nodequeue[0][nodeindex[0]];
+	                        i = leaf.keys.length;
+	                        state = reusedArray !== undefined ? 1 : 0;
+	                        continue;
+	                    case 3:
+	                        return { done: true, value: undefined };
+	                }
+	            }
+	        });
+	    };
+	    /* Used by entries() and entriesReversed() to prepare to start iterating.
+	     * It develops a "node queue" for each non-leaf level of the tree.
+	     * Levels are numbered "bottom-up" so that level 0 is a list of leaf
+	     * nodes from a low-level non-leaf node. The queue at a given level L
+	     * consists of nodequeue[L] which is the children of a BNodeInternal,
+	     * and nodeindex[L], the current index within that child list, such
+	     * such that nodequeue[L-1] === nodequeue[L][nodeindex[L]].children.
+	     * (However inside this function the order is reversed.)
+	     */
+	    BTree.prototype.findPath = function (key) {
+	        var nextnode = this._root;
+	        var nodequeue, nodeindex;
+	        if (nextnode.isLeaf) {
+	            nodequeue = EmptyArray, nodeindex = EmptyArray; // avoid allocations
+	        }
+	        else {
+	            nodequeue = [], nodeindex = [];
+	            for (var d = 0; !nextnode.isLeaf; d++) {
+	                nodequeue[d] = nextnode.children;
+	                nodeindex[d] = key === undefined ? 0 : nextnode.indexOf(key, 0, this._compare);
+	                if (nodeindex[d] >= nodequeue[d].length)
+	                    return; // first key > maxKey()
+	                nextnode = nodequeue[d][nodeindex[d]];
+	            }
+	            nodequeue.reverse();
+	            nodeindex.reverse();
+	        }
+	        return { nodequeue: nodequeue, nodeindex: nodeindex, leaf: nextnode };
+	    };
+	    /** Returns a new iterator for iterating the keys of each pair in ascending order.
+	     *  @param firstKey: Minimum key to include in the output. */
+	    BTree.prototype.keys = function (firstKey) {
+	        var it = this.entries(firstKey, ReusedArray);
+	        return iterator(function () {
+	            var n = it.next();
+	            if (n.value)
+	                n.value = n.value[0];
+	            return n;
+	        });
+	    };
+	    /** Returns a new iterator for iterating the values of each pair in order by key.
+	     *  @param firstKey: Minimum key whose associated value is included in the output. */
+	    BTree.prototype.values = function (firstKey) {
+	        var it = this.entries(firstKey, ReusedArray);
+	        return iterator(function () {
+	            var n = it.next();
+	            if (n.value)
+	                n.value = n.value[1];
+	            return n;
+	        });
+	    };
+	    Object.defineProperty(BTree.prototype, "maxNodeSize", {
+	        /////////////////////////////////////////////////////////////////////////////
+	        // Additional methods ///////////////////////////////////////////////////////
+	        /** Returns the maximum number of children/values before nodes will split. */
+	        get: function () {
+	            return this._maxNodeSize;
+	        },
+	        enumerable: false,
+	        configurable: true
+	    });
+	    /** Gets the lowest key in the tree. Complexity: O(log size) */
+	    BTree.prototype.minKey = function () { return this._root.minKey(); };
+	    /** Gets the highest key in the tree. Complexity: O(1) */
+	    BTree.prototype.maxKey = function () { return this._root.maxKey(); };
+	    /** Quickly clones the tree by marking the root node as shared.
+	     *  Both copies remain editable. When you modify either copy, any
+	     *  nodes that are shared (or potentially shared) between the two
+	     *  copies are cloned so that the changes do not affect other copies.
+	     *  This is known as copy-on-write behavior, or "lazy copying". */
+	    BTree.prototype.clone = function () {
+	        this._root.isShared = true;
+	        var result = new BTree(undefined, this._compare, this._maxNodeSize);
+	        result._root = this._root;
+	        return result;
+	    };
+	    /** Performs a greedy clone, immediately duplicating any nodes that are
+	     *  not currently marked as shared, in order to avoid marking any
+	     *  additional nodes as shared.
+	     *  @param force Clone all nodes, even shared ones.
+	     */
+	    BTree.prototype.greedyClone = function (force) {
+	        var result = new BTree(undefined, this._compare, this._maxNodeSize);
+	        result._root = this._root.greedyClone(force);
+	        return result;
+	    };
+	    /** Gets an array filled with the contents of the tree, sorted by key */
+	    BTree.prototype.toArray = function (maxLength) {
+	        if (maxLength === void 0) { maxLength = 0x7FFFFFFF; }
+	        var min = this.minKey(), max = this.maxKey();
+	        if (min !== undefined)
+	            return this.getRange(min, max, true, maxLength);
+	        return [];
+	    };
+	    /** Gets an array of all keys, sorted */
+	    BTree.prototype.keysArray = function () {
+	        var results = [];
+	        this._root.forRange(this.minKey(), this.maxKey(), true, false, this, 0, function (k, v) { results.push(k); });
+	        return results;
+	    };
+	    /** Gets an array of all values, sorted by key */
+	    BTree.prototype.valuesArray = function () {
+	        var results = [];
+	        this._root.forRange(this.minKey(), this.maxKey(), true, false, this, 0, function (k, v) { results.push(v); });
+	        return results;
+	    };
+	    /** Gets a string representing the tree's data based on toArray(). */
+	    BTree.prototype.toString = function () {
+	        return this.toArray().toString();
+	    };
+	    /** Stores a key-value pair only if the key doesn't already exist in the tree.
+	     * @returns true if a new key was added
+	    */
+	    BTree.prototype.setIfNotPresent = function (key, value) {
+	        return this.set(key, value, false);
+	    };
+	    /** Returns the next pair whose key is larger than the specified key (or undefined if there is none).
+	     * If key === undefined, this function returns the lowest pair.
+	     * @param key The key to search for.
+	     * @param reusedArray Optional array used repeatedly to store key-value pairs, to
+	     * avoid creating a new array on every iteration.
+	     */
+	    BTree.prototype.nextHigherPair = function (key, reusedArray) {
+	        reusedArray = reusedArray || [];
+	        if (key === undefined) {
+	            return this._root.minPair(reusedArray);
+	        }
+	        return this._root.getPairOrNextHigher(key, this._compare, false, reusedArray);
+	    };
+	    /** Returns the next key larger than the specified key, or undefined if there is none.
+	     *  Also, nextHigherKey(undefined) returns the lowest key.
+	     */
+	    BTree.prototype.nextHigherKey = function (key) {
+	        var p = this.nextHigherPair(key, ReusedArray);
+	        return p && p[0];
+	    };
+	    /** Returns the next pair whose key is smaller than the specified key (or undefined if there is none).
+	     *  If key === undefined, this function returns the highest pair.
+	     * @param key The key to search for.
+	     * @param reusedArray Optional array used repeatedly to store key-value pairs, to
+	     *        avoid creating a new array each time you call this method.
+	     */
+	    BTree.prototype.nextLowerPair = function (key, reusedArray) {
+	        reusedArray = reusedArray || [];
+	        if (key === undefined) {
+	            return this._root.maxPair(reusedArray);
+	        }
+	        return this._root.getPairOrNextLower(key, this._compare, false, reusedArray);
+	    };
+	    /** Returns the next key smaller than the specified key, or undefined if there is none.
+	     *  Also, nextLowerKey(undefined) returns the highest key.
+	     */
+	    BTree.prototype.nextLowerKey = function (key) {
+	        var p = this.nextLowerPair(key, ReusedArray);
+	        return p && p[0];
+	    };
+	    /** Returns the key-value pair associated with the supplied key if it exists
+	     *  or the pair associated with the next lower pair otherwise. If there is no
+	     *  next lower pair, undefined is returned.
+	     * @param key The key to search for.
+	     * @param reusedArray Optional array used repeatedly to store key-value pairs, to
+	     *        avoid creating a new array each time you call this method.
+	     * */
+	    BTree.prototype.getPairOrNextLower = function (key, reusedArray) {
+	        return this._root.getPairOrNextLower(key, this._compare, true, reusedArray || []);
+	    };
+	    /** Returns the key-value pair associated with the supplied key if it exists
+	     *  or the pair associated with the next lower pair otherwise. If there is no
+	     *  next lower pair, undefined is returned.
+	     * @param key The key to search for.
+	     * @param reusedArray Optional array used repeatedly to store key-value pairs, to
+	     *        avoid creating a new array each time you call this method.
+	     * */
+	    BTree.prototype.getPairOrNextHigher = function (key, reusedArray) {
+	        return this._root.getPairOrNextHigher(key, this._compare, true, reusedArray || []);
+	    };
+	    /** Edits the value associated with a key in the tree, if it already exists.
+	     * @returns true if the key existed, false if not.
+	    */
+	    BTree.prototype.changeIfPresent = function (key, value) {
+	        return this.editRange(key, key, true, function (k, v) { return ({ value: value }); }) !== 0;
+	    };
+	    /**
+	     * Builds an array of pairs from the specified range of keys, sorted by key.
+	     * Each returned pair is also an array: pair[0] is the key, pair[1] is the value.
+	     * @param low The first key in the array will be greater than or equal to `low`.
+	     * @param high This method returns when a key larger than this is reached.
+	     * @param includeHigh If the `high` key is present, its pair will be included
+	     *        in the output if and only if this parameter is true. Note: if the
+	     *        `low` key is present, it is always included in the output.
+	     * @param maxLength Length limit. getRange will stop scanning the tree when
+	     *                  the array reaches this size.
+	     * @description Computational complexity: O(result.length + log size)
+	     */
+	    BTree.prototype.getRange = function (low, high, includeHigh, maxLength) {
+	        if (maxLength === void 0) { maxLength = 0x3FFFFFF; }
+	        var results = [];
+	        this._root.forRange(low, high, includeHigh, false, this, 0, function (k, v) {
+	            results.push([k, v]);
+	            return results.length > maxLength ? Break : undefined;
+	        });
+	        return results;
+	    };
+	    /** Adds all pairs from a list of key-value pairs.
+	     * @param pairs Pairs to add to this tree. If there are duplicate keys,
+	     *        later pairs currently overwrite earlier ones (e.g. [[0,1],[0,7]]
+	     *        associates 0 with 7.)
+	     * @param overwrite Whether to overwrite pairs that already exist (if false,
+	     *        pairs[i] is ignored when the key pairs[i][0] already exists.)
+	     * @returns The number of pairs added to the collection.
+	     * @description Computational complexity: O(pairs.length * log(size + pairs.length))
+	     */
+	    BTree.prototype.setPairs = function (pairs, overwrite) {
+	        var added = 0;
+	        for (var i = 0; i < pairs.length; i++)
+	            if (this.set(pairs[i][0], pairs[i][1], overwrite))
+	                added++;
+	        return added;
+	    };
+	    /**
+	     * Scans the specified range of keys, in ascending order by key.
+	     * Note: the callback `onFound` must not insert or remove items in the
+	     * collection. Doing so may cause incorrect data to be sent to the
+	     * callback afterward.
+	     * @param low The first key scanned will be greater than or equal to `low`.
+	     * @param high Scanning stops when a key larger than this is reached.
+	     * @param includeHigh If the `high` key is present, `onFound` is called for
+	     *        that final pair if and only if this parameter is true.
+	     * @param onFound A function that is called for each key-value pair. This
+	     *        function can return {break:R} to stop early with result R.
+	     * @param initialCounter Initial third argument of onFound. This value
+	     *        increases by one each time `onFound` is called. Default: 0
+	     * @returns The number of values found, or R if the callback returned
+	     *        `{break:R}` to stop early.
+	     * @description Computational complexity: O(number of items scanned + log size)
+	     */
+	    BTree.prototype.forRange = function (low, high, includeHigh, onFound, initialCounter) {
+	        var r = this._root.forRange(low, high, includeHigh, false, this, initialCounter || 0, onFound);
+	        return typeof r === "number" ? r : r.break;
+	    };
+	    /**
+	     * Scans and potentially modifies values for a subsequence of keys.
+	     * Note: the callback `onFound` should ideally be a pure function.
+	     *   Specfically, it must not insert items, call clone(), or change
+	     *   the collection except via return value; out-of-band editing may
+	     *   cause an exception or may cause incorrect data to be sent to
+	     *   the callback (duplicate or missed items). It must not cause a
+	     *   clone() of the collection, otherwise the clone could be modified
+	     *   by changes requested by the callback.
+	     * @param low The first key scanned will be greater than or equal to `low`.
+	     * @param high Scanning stops when a key larger than this is reached.
+	     * @param includeHigh If the `high` key is present, `onFound` is called for
+	     *        that final pair if and only if this parameter is true.
+	     * @param onFound A function that is called for each key-value pair. This
+	     *        function can return `{value:v}` to change the value associated
+	     *        with the current key, `{delete:true}` to delete the current pair,
+	     *        `{break:R}` to stop early with result R, or it can return nothing
+	     *        (undefined or {}) to cause no effect and continue iterating.
+	     *        `{break:R}` can be combined with one of the other two commands.
+	     *        The third argument `counter` is the number of items iterated
+	     *        previously; it equals 0 when `onFound` is called the first time.
+	     * @returns The number of values scanned, or R if the callback returned
+	     *        `{break:R}` to stop early.
+	     * @description
+	     *   Computational complexity: O(number of items scanned + log size)
+	     *   Note: if the tree has been cloned with clone(), any shared
+	     *   nodes are copied before `onFound` is called. This takes O(n) time
+	     *   where n is proportional to the amount of shared data scanned.
+	     */
+	    BTree.prototype.editRange = function (low, high, includeHigh, onFound, initialCounter) {
+	        var root = this._root;
+	        if (root.isShared)
+	            this._root = root = root.clone();
+	        try {
+	            var r = root.forRange(low, high, includeHigh, true, this, initialCounter || 0, onFound);
+	            return typeof r === "number" ? r : r.break;
+	        }
+	        finally {
+	            var isShared = void 0;
+	            while (root.keys.length <= 1 && !root.isLeaf) {
+	                isShared || (isShared = root.isShared);
+	                this._root = root = root.keys.length === 0 ? EmptyLeaf :
+	                    root.children[0];
+	            }
+	            // If any ancestor of the new root was shared, the new root must also be shared
+	            if (isShared) {
+	                root.isShared = true;
+	            }
+	        }
+	    };
+	    /** Same as `editRange` except that the callback is called for all pairs. */
+	    BTree.prototype.editAll = function (onFound, initialCounter) {
+	        return this.editRange(this.minKey(), this.maxKey(), true, onFound, initialCounter);
+	    };
+	    /**
+	     * Removes a range of key-value pairs from the B+ tree.
+	     * @param low The first key scanned will be greater than or equal to `low`.
+	     * @param high Scanning stops when a key larger than this is reached.
+	     * @param includeHigh Specifies whether the `high` key, if present, is deleted.
+	     * @returns The number of key-value pairs that were deleted.
+	     * @description Computational complexity: O(log size + number of items deleted)
+	     */
+	    BTree.prototype.deleteRange = function (low, high, includeHigh) {
+	        return this.editRange(low, high, includeHigh, DeleteRange);
+	    };
+	    /** Deletes a series of keys from the collection. */
+	    BTree.prototype.deleteKeys = function (keys) {
+	        for (var i = 0, r = 0; i < keys.length; i++)
+	            if (this.delete(keys[i]))
+	                r++;
+	        return r;
+	    };
+	    Object.defineProperty(BTree.prototype, "height", {
+	        /** Gets the height of the tree: the number of internal nodes between the
+	         *  BTree object and its leaf nodes (zero if there are no internal nodes). */
+	        get: function () {
+	            var node = this._root;
+	            var height = -1;
+	            while (node) {
+	                height++;
+	                node = node.isLeaf ? undefined : node.children[0];
+	            }
+	            return height;
+	        },
+	        enumerable: false,
+	        configurable: true
+	    });
+	    /** Makes the object read-only to ensure it is not accidentally modified.
+	     *  Freezing does not have to be permanent; unfreeze() reverses the effect.
+	     *  This is accomplished by replacing mutator functions with a function
+	     *  that throws an Error. Compared to using a property (e.g. this.isFrozen)
+	     *  this implementation gives better performance in non-frozen BTrees.
+	     */
+	    BTree.prototype.freeze = function () {
+	        var t = this;
+	        // Note: all other mutators ultimately call set() or editRange() 
+	        //       so we don't need to override those others.
+	        t.clear = t.set = t.editRange = function () {
+	            throw new Error("Attempted to modify a frozen BTree");
+	        };
+	    };
+	    /** Ensures mutations are allowed, reversing the effect of freeze(). */
+	    BTree.prototype.unfreeze = function () {
+	        // @ts-ignore "The operand of a 'delete' operator must be optional."
+	        //            (wrong: delete does not affect the prototype.)
+	        delete this.clear;
+	        // @ts-ignore
+	        delete this.set;
+	        // @ts-ignore
+	        delete this.editRange;
+	    };
+	    Object.defineProperty(BTree.prototype, "isFrozen", {
+	        /** Returns true if the tree appears to be frozen. */
+	        get: function () {
+	            return this.hasOwnProperty('editRange');
+	        },
+	        enumerable: false,
+	        configurable: true
+	    });
+	    /** Scans the tree for signs of serious bugs (e.g. this.size doesn't match
+	     *  number of elements, internal nodes not caching max element properly...).
+	     *  Computational complexity: O(number of nodes). This method validates cached size
+	     *  information and, optionally, the ordering of keys (including leaves), which
+	     *  takes more time to check (O(size), which is technically the same big-O). */
+	    BTree.prototype.checkValid = function (checkOrdering) {
+	        if (checkOrdering === void 0) { checkOrdering = false; }
+	        var size = this._root.checkValid(0, this, 0, checkOrdering)[0];
+	        check(size === this.size, "size mismatch: counted ", size, "but stored", this.size);
+	    };
+	    return BTree;
+	}());
+	b_tree.default = BTree;
+	/** A TypeScript helper function that simply returns its argument, typed as
+	 *  `ISortedSet<K>` if the BTree implements it, as it does if `V extends undefined`.
+	 *  If `V` cannot be `undefined`, it returns `unknown` instead. Or at least, that
+	 *  was the intention, but TypeScript is acting weird and may return `ISortedSet<K>`
+	 *  even if `V` can't be `undefined` (discussion: btree-typescript issue #14) */
+	function asSet(btree) {
+	    return btree;
+	}
+	b_tree.asSet = asSet;
+	if (Symbol && Symbol.iterator) // iterator is equivalent to entries()
+	    BTree.prototype[Symbol.iterator] = BTree.prototype.entries;
+	BTree.prototype.where = BTree.prototype.filter;
+	BTree.prototype.setRange = BTree.prototype.setPairs;
+	BTree.prototype.add = BTree.prototype.set; // for compatibility with ISetSink<K>
+	function iterator(next) {
+	    if (next === void 0) { next = (function () { return ({ done: true, value: undefined }); }); }
+	    var result = { next: next };
+	    if (Symbol && Symbol.iterator)
+	        result[Symbol.iterator] = function () { return this; };
+	    return result;
+	}
+	/** @internal */
+	var BNode = /** @class */ (function () {
+	    function BNode(keys, values) {
+	        if (keys === void 0) { keys = []; }
+	        this.keys = keys;
+	        this.values = values || undefVals;
+	        this.isShared = undefined;
+	    }
+	    Object.defineProperty(BNode.prototype, "isLeaf", {
+	        get: function () { return this.children === undefined; },
+	        enumerable: false,
+	        configurable: true
+	    });
+	    BNode.prototype.size = function () {
+	        return this.keys.length;
+	    };
+	    ///////////////////////////////////////////////////////////////////////////
+	    // Shared methods /////////////////////////////////////////////////////////
+	    BNode.prototype.maxKey = function () {
+	        return this.keys[this.keys.length - 1];
+	    };
+	    // If key not found, returns i^failXor where i is the insertion index.
+	    // Callers that don't care whether there was a match will set failXor=0.
+	    BNode.prototype.indexOf = function (key, failXor, cmp) {
+	        var keys = this.keys;
+	        var lo = 0, hi = keys.length, mid = hi >> 1;
+	        while (lo < hi) {
+	            var c = cmp(keys[mid], key);
+	            if (c < 0)
+	                lo = mid + 1;
+	            else if (c > 0) // key < keys[mid]
+	                hi = mid;
+	            else if (c === 0)
+	                return mid;
+	            else {
+	                // c is NaN or otherwise invalid
+	                if (key === key) // at least the search key is not NaN
+	                    return keys.length;
+	                else
+	                    throw new Error("BTree: NaN was used as a key");
+	            }
+	            mid = (lo + hi) >> 1;
+	        }
+	        return mid ^ failXor;
+	        // Unrolled version: benchmarks show same speed, not worth using
+	        /*var i = 1, c: number = 0, sum = 0;
+	        if (keys.length >= 4) {
+	          i = 3;
+	          if (keys.length >= 8) {
+	            i = 7;
+	            if (keys.length >= 16) {
+	              i = 15;
+	              if (keys.length >= 32) {
+	                i = 31;
+	                if (keys.length >= 64) {
+	                  i = 127;
+	                  i += (c = i < keys.length ? cmp(keys[i], key) : 1) < 0 ? 64 : -64;
+	                  sum += c;
+	                  i += (c = i < keys.length ? cmp(keys[i], key) : 1) < 0 ? 32 : -32;
+	                  sum += c;
+	                }
+	                i += (c = i < keys.length ? cmp(keys[i], key) : 1) < 0 ? 16 : -16;
+	                sum += c;
+	              }
+	              i += (c = i < keys.length ? cmp(keys[i], key) : 1) < 0 ? 8 : -8;
+	              sum += c;
+	            }
+	            i += (c = i < keys.length ? cmp(keys[i], key) : 1) < 0 ? 4 : -4;
+	            sum += c;
+	          }
+	          i += (c = i < keys.length ? cmp(keys[i], key) : 1) < 0 ? 2 : -2;
+	          sum += c;
+	        }
+	        i += (c = i < keys.length ? cmp(keys[i], key) : 1) < 0 ? 1 : -1;
+	        c = i < keys.length ? cmp(keys[i], key) : 1;
+	        sum += c;
+	        if (c < 0) {
+	          ++i;
+	          c = i < keys.length ? cmp(keys[i], key) : 1;
+	          sum += c;
+	        }
+	        if (sum !== sum) {
+	          if (key === key) // at least the search key is not NaN
+	            return keys.length ^ failXor;
+	          else
+	            throw new Error("BTree: NaN was used as a key");
+	        }
+	        return c === 0 ? i : i ^ failXor;*/
+	    };
+	    /////////////////////////////////////////////////////////////////////////////
+	    // Leaf Node: misc //////////////////////////////////////////////////////////
+	    BNode.prototype.minKey = function () {
+	        return this.keys[0];
+	    };
+	    BNode.prototype.minPair = function (reusedArray) {
+	        if (this.keys.length === 0)
+	            return undefined;
+	        reusedArray[0] = this.keys[0];
+	        reusedArray[1] = this.values[0];
+	        return reusedArray;
+	    };
+	    BNode.prototype.maxPair = function (reusedArray) {
+	        if (this.keys.length === 0)
+	            return undefined;
+	        var lastIndex = this.keys.length - 1;
+	        reusedArray[0] = this.keys[lastIndex];
+	        reusedArray[1] = this.values[lastIndex];
+	        return reusedArray;
+	    };
+	    BNode.prototype.clone = function () {
+	        var v = this.values;
+	        return new BNode(this.keys.slice(0), v === undefVals ? v : v.slice(0));
+	    };
+	    BNode.prototype.greedyClone = function (force) {
+	        return this.isShared && !force ? this : this.clone();
+	    };
+	    BNode.prototype.get = function (key, defaultValue, tree) {
+	        var i = this.indexOf(key, -1, tree._compare);
+	        return i < 0 ? defaultValue : this.values[i];
+	    };
+	    BNode.prototype.getPairOrNextLower = function (key, compare, inclusive, reusedArray) {
+	        var i = this.indexOf(key, -1, compare);
+	        var indexOrLower = i < 0 ? ~i - 1 : (inclusive ? i : i - 1);
+	        if (indexOrLower >= 0) {
+	            reusedArray[0] = this.keys[indexOrLower];
+	            reusedArray[1] = this.values[indexOrLower];
+	            return reusedArray;
+	        }
+	        return undefined;
+	    };
+	    BNode.prototype.getPairOrNextHigher = function (key, compare, inclusive, reusedArray) {
+	        var i = this.indexOf(key, -1, compare);
+	        var indexOrLower = i < 0 ? ~i : (inclusive ? i : i + 1);
+	        var keys = this.keys;
+	        if (indexOrLower < keys.length) {
+	            reusedArray[0] = keys[indexOrLower];
+	            reusedArray[1] = this.values[indexOrLower];
+	            return reusedArray;
+	        }
+	        return undefined;
+	    };
+	    BNode.prototype.checkValid = function (depth, tree, baseIndex, checkOrdering) {
+	        var kL = this.keys.length, vL = this.values.length;
+	        check(this.values === undefVals ? kL <= vL : kL === vL, "keys/values length mismatch: depth", depth, "with lengths", kL, vL, "and baseIndex", baseIndex);
+	        // Note: we don't check for "node too small" because sometimes a node
+	        // can legitimately have size 1. This occurs if there is a batch 
+	        // deletion, leaving a node of size 1, and the siblings are full so
+	        // it can't be merged with adjacent nodes. However, the parent will
+	        // verify that the average node size is at least half of the maximum.
+	        check(depth == 0 || kL > 0, "empty leaf at depth", depth, "and baseIndex", baseIndex);
+	        if (checkOrdering === true) {
+	            for (var i = 1; i < kL; i++) {
+	                var c = tree._compare(this.keys[i - 1], this.keys[i]);
+	                check(c < 0, "keys out of order at depth", depth, "and baseIndex", baseIndex + i - 1, ": ", this.keys[i - 1], " !< ", this.keys[i]);
+	            }
+	        }
+	        return [kL, this.keys[0], this.keys[kL - 1]];
+	    };
+	    /////////////////////////////////////////////////////////////////////////////
+	    // Leaf Node: set & node splitting //////////////////////////////////////////
+	    BNode.prototype.set = function (key, value, overwrite, tree) {
+	        var i = this.indexOf(key, -1, tree._compare);
+	        if (i < 0) {
+	            // key does not exist yet
+	            i = ~i;
+	            if (this.keys.length < tree._maxNodeSize) {
+	                return this.insertInLeaf(i, key, value, tree);
+	            }
+	            else {
+	                // This leaf node is full and must split
+	                var newRightSibling = this.splitOffRightSide(), target = this;
+	                if (i > this.keys.length) {
+	                    i -= this.keys.length;
+	                    target = newRightSibling;
+	                }
+	                target.insertInLeaf(i, key, value, tree);
+	                return newRightSibling;
+	            }
+	        }
+	        else {
+	            // Key already exists
+	            if (overwrite !== false) {
+	                if (value !== undefined)
+	                    this.reifyValues();
+	                // usually this is a no-op, but some users may wish to edit the key
+	                this.keys[i] = key;
+	                this.values[i] = value;
+	            }
+	            return false;
+	        }
+	    };
+	    BNode.prototype.reifyValues = function () {
+	        if (this.values === undefVals)
+	            return this.values = this.values.slice(0, this.keys.length);
+	        return this.values;
+	    };
+	    BNode.prototype.insertInLeaf = function (i, key, value, tree) {
+	        this.keys.splice(i, 0, key);
+	        if (this.values === undefVals) {
+	            while (undefVals.length < tree._maxNodeSize)
+	                undefVals.push(undefined);
+	            if (value === undefined) {
+	                return true;
+	            }
+	            else {
+	                this.values = undefVals.slice(0, this.keys.length - 1);
+	            }
+	        }
+	        this.values.splice(i, 0, value);
+	        return true;
+	    };
+	    BNode.prototype.takeFromRight = function (rhs) {
+	        // Reminder: parent node must update its copy of key for this node
+	        // assert: neither node is shared
+	        // assert rhs.keys.length > (maxNodeSize/2 && this.keys.length<maxNodeSize)
+	        var v = this.values;
+	        if (rhs.values === undefVals) {
+	            if (v !== undefVals)
+	                v.push(undefined);
+	        }
+	        else {
+	            v = this.reifyValues();
+	            v.push(rhs.values.shift());
+	        }
+	        this.keys.push(rhs.keys.shift());
+	    };
+	    BNode.prototype.takeFromLeft = function (lhs) {
+	        // Reminder: parent node must update its copy of key for this node
+	        // assert: neither node is shared
+	        // assert rhs.keys.length > (maxNodeSize/2 && this.keys.length<maxNodeSize)
+	        var v = this.values;
+	        if (lhs.values === undefVals) {
+	            if (v !== undefVals)
+	                v.unshift(undefined);
+	        }
+	        else {
+	            v = this.reifyValues();
+	            v.unshift(lhs.values.pop());
+	        }
+	        this.keys.unshift(lhs.keys.pop());
+	    };
+	    BNode.prototype.splitOffRightSide = function () {
+	        // Reminder: parent node must update its copy of key for this node
+	        var half = this.keys.length >> 1, keys = this.keys.splice(half);
+	        var values = this.values === undefVals ? undefVals : this.values.splice(half);
+	        return new BNode(keys, values);
+	    };
+	    /////////////////////////////////////////////////////////////////////////////
+	    // Leaf Node: scanning & deletions //////////////////////////////////////////
+	    BNode.prototype.forRange = function (low, high, includeHigh, editMode, tree, count, onFound) {
+	        var cmp = tree._compare;
+	        var iLow, iHigh;
+	        if (high === low) {
+	            if (!includeHigh)
+	                return count;
+	            iHigh = (iLow = this.indexOf(low, -1, cmp)) + 1;
+	            if (iLow < 0)
+	                return count;
+	        }
+	        else {
+	            iLow = this.indexOf(low, 0, cmp);
+	            iHigh = this.indexOf(high, -1, cmp);
+	            if (iHigh < 0)
+	                iHigh = ~iHigh;
+	            else if (includeHigh === true)
+	                iHigh++;
+	        }
+	        var keys = this.keys, values = this.values;
+	        if (onFound !== undefined) {
+	            for (var i = iLow; i < iHigh; i++) {
+	                var key = keys[i];
+	                var result = onFound(key, values[i], count++);
+	                if (result !== undefined) {
+	                    if (editMode === true) {
+	                        if (key !== keys[i] || this.isShared === true)
+	                            throw new Error("BTree illegally changed or cloned in editRange");
+	                        if (result.delete) {
+	                            this.keys.splice(i, 1);
+	                            if (this.values !== undefVals)
+	                                this.values.splice(i, 1);
+	                            i--;
+	                            iHigh--;
+	                        }
+	                        else if (result.hasOwnProperty('value')) {
+	                            values[i] = result.value;
+	                        }
+	                    }
+	                    if (result.break !== undefined)
+	                        return result;
+	                }
+	            }
+	        }
+	        else
+	            count += iHigh - iLow;
+	        return count;
+	    };
+	    /** Adds entire contents of right-hand sibling (rhs is left unchanged) */
+	    BNode.prototype.mergeSibling = function (rhs, _) {
+	        this.keys.push.apply(this.keys, rhs.keys);
+	        if (this.values === undefVals) {
+	            if (rhs.values === undefVals)
+	                return;
+	            this.values = this.values.slice(0, this.keys.length);
+	        }
+	        this.values.push.apply(this.values, rhs.reifyValues());
+	    };
+	    return BNode;
+	}());
+	b_tree.BNode = BNode;
+	/** Internal node (non-leaf node) ********************************************/
+	/** @internal */
+	var BNodeInternal = /** @class */ (function (_super) {
+	    __extends(BNodeInternal, _super);
+	    /**
+	     * This does not mark `children` as shared, so it is the responsibility of the caller
+	     * to ensure children are either marked shared, or aren't included in another tree.
+	     */
+	    function BNodeInternal(children, size, keys) {
+	        var _this = this;
+	        if (!keys) {
+	            keys = [];
+	            for (var i = 0; i < children.length; i++)
+	                keys[i] = children[i].maxKey();
+	        }
+	        _this = _super.call(this, keys) || this;
+	        _this.children = children;
+	        _this._size = size;
+	        return _this;
+	    }
+	    BNodeInternal.prototype.clone = function () {
+	        var children = this.children.slice(0);
+	        for (var i = 0; i < children.length; i++)
+	            children[i].isShared = true;
+	        return new BNodeInternal(children, this._size, this.keys.slice(0));
+	    };
+	    BNodeInternal.prototype.size = function () {
+	        return this._size;
+	    };
+	    BNodeInternal.prototype.greedyClone = function (force) {
+	        if (this.isShared && !force)
+	            return this;
+	        var nu = new BNodeInternal(this.children.slice(0), this._size, this.keys.slice(0));
+	        for (var i = 0; i < nu.children.length; i++)
+	            nu.children[i] = nu.children[i].greedyClone(force);
+	        return nu;
+	    };
+	    BNodeInternal.prototype.minKey = function () {
+	        return this.children[0].minKey();
+	    };
+	    BNodeInternal.prototype.minPair = function (reusedArray) {
+	        return this.children[0].minPair(reusedArray);
+	    };
+	    BNodeInternal.prototype.maxPair = function (reusedArray) {
+	        return this.children[this.children.length - 1].maxPair(reusedArray);
+	    };
+	    BNodeInternal.prototype.get = function (key, defaultValue, tree) {
+	        var i = this.indexOf(key, 0, tree._compare), children = this.children;
+	        return i < children.length ? children[i].get(key, defaultValue, tree) : undefined;
+	    };
+	    BNodeInternal.prototype.getPairOrNextLower = function (key, compare, inclusive, reusedArray) {
+	        var i = this.indexOf(key, 0, compare), children = this.children;
+	        if (i >= children.length)
+	            return this.maxPair(reusedArray);
+	        var result = children[i].getPairOrNextLower(key, compare, inclusive, reusedArray);
+	        if (result === undefined && i > 0) {
+	            return children[i - 1].maxPair(reusedArray);
+	        }
+	        return result;
+	    };
+	    BNodeInternal.prototype.getPairOrNextHigher = function (key, compare, inclusive, reusedArray) {
+	        var i = this.indexOf(key, 0, compare), children = this.children, length = children.length;
+	        if (i >= length)
+	            return undefined;
+	        var result = children[i].getPairOrNextHigher(key, compare, inclusive, reusedArray);
+	        if (result === undefined && i < length - 1) {
+	            return children[i + 1].minPair(reusedArray);
+	        }
+	        return result;
+	    };
+	    BNodeInternal.prototype.checkValid = function (depth, tree, baseIndex, checkOrdering) {
+	        var kL = this.keys.length, cL = this.children.length;
+	        check(kL === cL, "keys/children length mismatch: depth", depth, "lengths", kL, cL, "baseIndex", baseIndex);
+	        check(kL > 1 || depth > 0, "internal node has length", kL, "at depth", depth, "baseIndex", baseIndex);
+	        var size = 0, c = this.children, k = this.keys, childSize = 0;
+	        var prevMinKey = undefined;
+	        var prevMaxKey = undefined;
+	        for (var i = 0; i < cL; i++) {
+	            var child = c[i];
+	            var _a = child.checkValid(depth + 1, tree, baseIndex + size, checkOrdering), subtreeSize = _a[0], minKey = _a[1], maxKey = _a[2];
+	            check(subtreeSize === child.size(), "cached size mismatch at depth", depth, "index", i, "baseIndex", baseIndex);
+	            check(subtreeSize === 1 || tree._compare(minKey, maxKey) < 0, "child node keys not sorted at depth", depth, "index", i, "baseIndex", baseIndex);
+	            if (prevMinKey !== undefined && prevMaxKey !== undefined && checkOrdering) {
+	                check(!areOverlapping(prevMinKey, prevMaxKey, minKey, maxKey, tree._compare), "children keys not sorted at depth", depth, "index", i, "baseIndex", baseIndex, ": ", prevMaxKey, " !< ", minKey);
+	                check(tree._compare(prevMaxKey, minKey) < 0, "children keys not sorted at depth", depth, "index", i, "baseIndex", baseIndex, ": ", prevMaxKey, " !< ", minKey);
+	            }
+	            prevMinKey = minKey;
+	            prevMaxKey = maxKey;
+	            size += subtreeSize;
+	            childSize += child.keys.length;
+	            check(size >= childSize, "wtf", baseIndex); // no way this will ever fail
+	            check(i === 0 || c[i - 1].constructor === child.constructor, "type mismatch, baseIndex:", baseIndex);
+	            if (child.maxKey() != k[i])
+	                check(false, "keys[", i, "] =", k[i], "is wrong, should be ", child.maxKey(), "at depth", depth, "baseIndex", baseIndex);
+	            if (!(i === 0 || tree._compare(k[i - 1], k[i]) < 0))
+	                check(false, "sort violation at depth", depth, "index", i, "keys", k[i - 1], k[i]);
+	        }
+	        check(this._size === size, "internal node cached size mismatch at depth", depth, "baseIndex", baseIndex, "cached", this._size, "actual", size);
+	        // 2020/08: BTree doesn't always avoid grossly undersized nodes,
+	        // but AFAIK such nodes are pretty harmless, so accept them.
+	        var toofew = childSize === 0; // childSize < (tree.maxNodeSize >> 1)*cL;
+	        if (toofew || childSize > tree.maxNodeSize * cL)
+	            check(false, toofew ? "too few" : "too many", "children (", childSize, size, ") at depth", depth, "maxNodeSize:", tree.maxNodeSize, "children.length:", cL, "baseIndex:", baseIndex);
+	        return [size, this.minKey(), this.maxKey()];
+	    };
+	    /////////////////////////////////////////////////////////////////////////////
+	    // Internal Node: set & node splitting //////////////////////////////////////
+	    BNodeInternal.prototype.set = function (key, value, overwrite, tree) {
+	        var c = this.children, max = tree._maxNodeSize, cmp = tree._compare;
+	        var i = Math.min(this.indexOf(key, 0, cmp), c.length - 1), child = c[i];
+	        if (child.isShared)
+	            c[i] = child = child.clone();
+	        if (child.keys.length >= max) {
+	            // child is full; inserting anything else will cause a split.
+	            // Shifting an item to the left or right sibling may avoid a split.
+	            // We can do a shift if the adjacent node is not full and if the
+	            // current key can still be placed in the same node after the shift.
+	            var other;
+	            if (i > 0 && (other = c[i - 1]).keys.length < max && cmp(child.keys[0], key) < 0) {
+	                if (other.isShared)
+	                    c[i - 1] = other = other.clone();
+	                other.takeFromRight(child);
+	                this.keys[i - 1] = other.maxKey();
+	            }
+	            else if ((other = c[i + 1]) !== undefined && other.keys.length < max && cmp(child.maxKey(), key) < 0) {
+	                if (other.isShared)
+	                    c[i + 1] = other = other.clone();
+	                other.takeFromLeft(child);
+	                this.keys[i] = c[i].maxKey();
+	            }
+	        }
+	        var oldSize = child.size();
+	        var result = child.set(key, value, overwrite, tree);
+	        this._size += child.size() - oldSize;
+	        if (result === false)
+	            return false;
+	        this.keys[i] = child.maxKey();
+	        if (result === true)
+	            return true;
+	        // The child has split and `result` is a new right child... does it fit?
+	        if (this.keys.length < max) { // yes
+	            this.insert(i + 1, result);
+	            return true;
+	        }
+	        else { // no, we must split also
+	            var newRightSibling = this.splitOffRightSide(), target = this;
+	            if (cmp(result.maxKey(), this.maxKey()) > 0) {
+	                target = newRightSibling;
+	                i -= this.keys.length;
+	            }
+	            target.insert(i + 1, result);
+	            return newRightSibling;
+	        }
+	    };
+	    /**
+	     * Inserts `child` at index `i`.
+	     * This does not mark `child` as shared, so it is the responsibility of the caller
+	     * to ensure that either child is marked shared, or it is not included in another tree.
+	     */
+	    BNodeInternal.prototype.insert = function (i, child) {
+	        this.children.splice(i, 0, child);
+	        this.keys.splice(i, 0, child.maxKey());
+	        this._size += child.size();
+	    };
+	    /**
+	     * Split this node.
+	     * Modifies this to remove the second half of the items, returning a separate node containing them.
+	     */
+	    BNodeInternal.prototype.splitOffRightSide = function () {
+	        // assert !this.isShared;
+	        var half = this.children.length >> 1;
+	        var newChildren = this.children.splice(half);
+	        var newKeys = this.keys.splice(half);
+	        var sizePrev = this._size;
+	        this._size = sumChildSizes(this.children);
+	        var newNode = new BNodeInternal(newChildren, sizePrev - this._size, newKeys);
+	        return newNode;
+	    };
+	    /**
+	     * Split this node.
+	     * Modifies this to remove the first half of the items, returning a separate node containing them.
+	     */
+	    BNodeInternal.prototype.splitOffLeftSide = function () {
+	        // assert !this.isShared;
+	        var half = this.children.length >> 1;
+	        var newChildren = this.children.splice(0, half);
+	        var newKeys = this.keys.splice(0, half);
+	        var sizePrev = this._size;
+	        this._size = sumChildSizes(this.children);
+	        var newNode = new BNodeInternal(newChildren, sizePrev - this._size, newKeys);
+	        return newNode;
+	    };
+	    BNodeInternal.prototype.takeFromRight = function (rhs) {
+	        // Reminder: parent node must update its copy of key for this node
+	        // assert: neither node is shared
+	        // assert rhs.keys.length > (maxNodeSize/2 && this.keys.length<maxNodeSize)
+	        var rhsInternal = rhs;
+	        this.keys.push(rhs.keys.shift());
+	        var child = rhsInternal.children.shift();
+	        this.children.push(child);
+	        var size = child.size();
+	        rhsInternal._size -= size;
+	        this._size += size;
+	    };
+	    BNodeInternal.prototype.takeFromLeft = function (lhs) {
+	        // Reminder: parent node must update its copy of key for this node
+	        // assert: neither node is shared
+	        // assert rhs.keys.length > (maxNodeSize/2 && this.keys.length<maxNodeSize)
+	        var lhsInternal = lhs;
+	        var child = lhsInternal.children.pop();
+	        this.keys.unshift(lhs.keys.pop());
+	        this.children.unshift(child);
+	        var size = child.size();
+	        lhsInternal._size -= size;
+	        this._size += size;
+	    };
+	    /////////////////////////////////////////////////////////////////////////////
+	    // Internal Node: scanning & deletions //////////////////////////////////////
+	    // Note: `count` is the next value of the third argument to `onFound`. 
+	    //       A leaf node's `forRange` function returns a new value for this counter,
+	    //       unless the operation is to stop early.
+	    BNodeInternal.prototype.forRange = function (low, high, includeHigh, editMode, tree, count, onFound) {
+	        var cmp = tree._compare;
+	        var keys = this.keys, children = this.children;
+	        var iLow = this.indexOf(low, 0, cmp), i = iLow;
+	        var iHigh = Math.min(high === low ? iLow : this.indexOf(high, 0, cmp), keys.length - 1);
+	        if (!editMode) {
+	            // Simple case
+	            for (; i <= iHigh; i++) {
+	                var result = children[i].forRange(low, high, includeHigh, editMode, tree, count, onFound);
+	                if (typeof result !== 'number')
+	                    return result;
+	                count = result;
+	            }
+	        }
+	        else if (i <= iHigh) {
+	            try {
+	                for (; i <= iHigh; i++) {
+	                    var child = children[i];
+	                    if (child.isShared)
+	                        children[i] = child = child.clone();
+	                    var beforeSize = child.size();
+	                    var result_1 = child.forRange(low, high, includeHigh, editMode, tree, count, onFound);
+	                    // Note: if children[i] is empty then keys[i]=undefined.
+	                    //       This is an invalid state, but it is fixed below.
+	                    keys[i] = child.maxKey();
+	                    this._size += child.size() - beforeSize;
+	                    if (typeof result_1 !== 'number')
+	                        return result_1;
+	                    count = result_1;
+	                }
+	            }
+	            finally {
+	                // Deletions may have occurred, so look for opportunities to merge nodes.
+	                var half = tree._maxNodeSize >> 1;
+	                if (iLow > 0)
+	                    iLow--;
+	                for (i = iHigh; i >= iLow; i--) {
+	                    if (children[i].keys.length <= half) {
+	                        if (children[i].keys.length !== 0) {
+	                            this.tryMerge(i, tree._maxNodeSize);
+	                        }
+	                        else { // child is empty! delete it!
+	                            keys.splice(i, 1);
+	                            var removed = children.splice(i, 1);
+	                            check(removed[0].size() === 0, "emptiness cleanup");
+	                        }
+	                    }
+	                }
+	                if (children.length !== 0 && children[0].keys.length === 0)
+	                    check(false, "emptiness bug");
+	            }
+	        }
+	        return count;
+	    };
+	    /** Merges child i with child i+1 if their combined size is not too large */
+	    BNodeInternal.prototype.tryMerge = function (i, maxSize) {
+	        var children = this.children;
+	        if (i >= 0 && i + 1 < children.length) {
+	            if (children[i].keys.length + children[i + 1].keys.length <= maxSize) {
+	                if (children[i].isShared) // cloned already UNLESS i is outside scan range
+	                    children[i] = children[i].clone();
+	                children[i].mergeSibling(children[i + 1], maxSize);
+	                children.splice(i + 1, 1);
+	                this.keys.splice(i + 1, 1);
+	                this.keys[i] = children[i].maxKey();
+	                return true;
+	            }
+	        }
+	        return false;
+	    };
+	    /**
+	     * Move children from `rhs` into this.
+	     * `rhs` must be part of this tree, and be removed from it after this call
+	     * (otherwise isShared for its children could be incorrect).
+	     */
+	    BNodeInternal.prototype.mergeSibling = function (rhs, maxNodeSize) {
+	        // assert !this.isShared;
+	        var oldLength = this.keys.length;
+	        this.keys.push.apply(this.keys, rhs.keys);
+	        var rhsChildren = rhs.children;
+	        this.children.push.apply(this.children, rhsChildren);
+	        this._size += rhs.size();
+	        if (rhs.isShared && !this.isShared) {
+	            // All children of a shared node are implicitly shared, and since their new
+	            // parent is not shared, they must now be explicitly marked as shared.
+	            for (var i = 0; i < rhsChildren.length; i++)
+	                rhsChildren[i].isShared = true;
+	        }
+	        // If our children are themselves almost empty due to a mass-delete,
+	        // they may need to be merged too (but only the oldLength-1 and its
+	        // right sibling should need this).
+	        this.tryMerge(oldLength - 1, maxNodeSize);
+	    };
+	    return BNodeInternal;
+	}(BNode));
+	b_tree.BNodeInternal = BNodeInternal;
+	// Optimization: this array of `undefined`s is used instead of a normal
+	// array of values in nodes where `undefined` is the only value.
+	// Its length is extended to max node size on first use; since it can
+	// be shared between trees with different maximums, its length can only
+	// increase, never decrease. Its type should be undefined[] but strangely
+	// TypeScript won't allow the comparison V[] === undefined[]. To prevent
+	// users from making this array too large, BTree has a maximum node size.
+	//
+	// FAQ: undefVals[i] is already undefined, so why increase the array size?
+	// Reading outside the bounds of an array is relatively slow because it
+	// has the side effect of scanning the prototype chain.
+	var undefVals = [];
+	/**
+	 * Sums the sizes of the given child nodes.
+	 * @param children the child nodes
+	 * @returns the total size
+	 * @internal
+	 */
+	function sumChildSizes(children) {
+	    var total = 0;
+	    for (var i = 0; i < children.length; i++)
+	        total += children[i].size();
+	    return total;
+	}
+	b_tree.sumChildSizes = sumChildSizes;
+	/**
+	 * Determines whether two nodes are overlapping in key range.
+	 * @internal
+	 */
+	function areOverlapping(aMin, aMax, bMin, bMax, cmp) {
+	    return cmp(aMin, bMax) <= 0 && cmp(aMax, bMin) >= 0;
+	}
+	b_tree.areOverlapping = areOverlapping;
+	var Delete = { delete: true }, DeleteRange = function () { return Delete; };
+	var Break = { break: true };
+	var EmptyLeaf = (function () {
+	    var n = new BNode();
+	    n.isShared = true;
+	    return n;
+	})();
+	var EmptyArray = [];
+	var ReusedArray = []; // assumed thread-local
+	/** @internal */
+	function check(fact) {
+	    var args = [];
+	    for (var _i = 1; _i < arguments.length; _i++) {
+	        args[_i - 1] = arguments[_i];
+	    }
+	    if (!fact) {
+	        args.unshift('B+ tree'); // at beginning of message
+	        throw new Error(args.join(' '));
+	    }
+	}
+	b_tree.check = check;
+	/** A BTree frozen in the empty state. */
+	b_tree.EmptyBTree = (function () { var t = new BTree(); t.freeze(); return t; })();
+	return b_tree;
+}
+
+var b_treeExports = /*@__PURE__*/ requireB_tree();
+var BTree = /*@__PURE__*/getDefaultExportFromCjs(b_treeExports);
 
 async function getTableInfo$1(params) {
     const { session, database, table } = params;
@@ -41174,13 +43104,13 @@ async function getTableList$2(_params) {
     return [];
 }
 async function createTable$2(params) {
-    const { session, database, table, primary_key, is_temp } = params;
-    if (primary_key.length === 0) {
-        throw new SQLError({
-            err: 'unsupported',
-            message: 'primary key is required',
-        });
+    const { session, database, table, is_temp } = params;
+    for (const col of params.column_list) {
+        if (col.name.toLowerCase() === ROW_ID_NAME.toLowerCase()) {
+            throw new SQLError({ err: 'ER_WRONG_COLUMN_NAME', args: [col.name] });
+        }
     }
+    const primary_key = params.primary_key.length > 0 ? params.primary_key : [ROW_ID_NAME];
     const column_list = params.column_list.map((col) => {
         const ret = {
             name: col.name,
@@ -41213,7 +43143,11 @@ async function createTable$2(params) {
         collation: params.collation,
         row_list: [],
         primary_map: new Map(),
+        unique_list: [],
     };
+    for (const unique of params.unique_list) {
+        data.unique_list.push(_buildUniqueIndex(data, unique.name, unique.key_list));
+    }
     if (is_temp) {
         session.saveTempTable(database, table, data);
     }
@@ -41231,8 +43165,55 @@ async function dropTable$2(params) {
     }
 }
 async function addColumn$1(_params) { }
-async function createIndex$1(_params) { }
-async function deleteIndex$1(_params) { }
+async function createIndex$1(params) {
+    if (!params.is_unique) {
+        return;
+    }
+    const { session, database, table, index_name, key_list } = params;
+    const data = getTable(database, table, session);
+    if (!data) {
+        throw new SQLError({ err: 'table_not_found', args: [table] });
+    }
+    const index = _buildUniqueIndex(data, index_name, key_list);
+    updateTableData(database, table, session, {
+        unique_list: [...data.unique_list, index],
+    });
+}
+async function deleteIndex$1(params) {
+    const { session, database, table, index_name } = params;
+    const data = getTable(database, table, session);
+    if (!data) {
+        throw new SQLError({ err: 'table_not_found', args: [table] });
+    }
+    const unique_list = data.unique_list.filter((index) => index.name !== index_name);
+    if (unique_list.length === data.unique_list.length) {
+        throw new SQLError({ err: 'index_not_found', args: [index_name] });
+    }
+    updateTableData(database, table, session, { unique_list });
+}
+function _buildUniqueIndex(data, name, key_list) {
+    if (data.unique_list.some((index) => index.name === name)) {
+        throw new SQLError({ err: 'ER_DUP_KEYNAME', args: [name] });
+    }
+    const column_list = key_list.map((key) => key.name.toLowerCase());
+    for (const column of column_list) {
+        if (!data.column_list.some((col) => col.name_lc === column)) {
+            throw new SQLError({ err: 'ER_KEY_COLUMN_DOES_NOT_EXITS', args: [column] });
+        }
+    }
+    const index = { name, column_list, map: new BTree() };
+    for (const row of data.row_list) {
+        const key = uniqueKeyOf(column_list, row);
+        if (key === null) {
+            continue;
+        }
+        if (index.map.has(key)) {
+            throw new SQLError({ err: 'dup_primary_key_entry', args: [name, key] });
+        }
+        index.map.set(key, primaryKeyOf(data.primary_key, row));
+    }
+    return index;
+}
 function _getDefault(column) {
     if (column.default !== undefined) {
         return { type: column.type, value: column.default };
@@ -41260,8 +43241,7 @@ async function multipleDelete$1(params) {
         if (!data) {
             throw new SQLError('table_not_found');
         }
-        const row_list = data.row_list.slice();
-        const primary_map = new Map(data.primary_map);
+        const state = cloneState(data);
         for (const object of delete_list) {
             const key_list = object.map((key) => {
                 if (!isCellValue$1(key)) {
@@ -41270,23 +43250,16 @@ async function multipleDelete$1(params) {
                 return key.value;
             });
             const delete_key = JSON.stringify(key_list);
-            const index = primary_map.get(delete_key);
+            const index = state.primary_map.get(delete_key);
             if (index !== undefined && index >= 0) {
-                primary_map.delete(delete_key);
-                row_list.splice(index, 1);
-                const deletedIndex = index;
-                primary_map.forEach((value, key) => {
-                    if (value > deletedIndex) {
-                        primary_map.set(key, value - 1);
-                    }
-                });
+                removeRow(state, index, data.primary_key);
                 affectedRows++;
             }
             else {
                 distExports.logger.info('memory.delete: failed to find key:', key_list, 'for table:', table);
             }
         }
-        txSaveData(database, table, session, { row_list, primary_map });
+        txSaveData(database, table, session, state);
     }
     return { affectedRows };
 }
@@ -41479,12 +43452,23 @@ function isAggregateNode(node) {
     if (typeof node !== 'object' || node === null || !('type' in node)) {
         return false;
     }
+    if (isWindowNode(node)) {
+        return false;
+    }
     if (node.type === 'aggr_func') {
         return true;
     }
     return (node.type === 'function' &&
         'name' in node &&
         FUNCTION_NODE_AGGREGATES.has(getFunctionName(node.name).toLowerCase()));
+}
+function isWindowNode(node) {
+    return (typeof node === 'object' &&
+        node !== null &&
+        'type' in node &&
+        (node.type === 'aggr_func' || node.type === 'function') &&
+        'over' in node &&
+        node.over != null);
 }
 function functionAsAggregate(expr) {
     return {
@@ -42759,8 +44743,15 @@ function div(expr, state) {
         value !== null &&
         left_num !== undefined &&
         right_num !== undefined) {
-        // Division by zero returns NULL in MySQL
         if (right_num === 0 || right_num === 0n) {
+            if (state.isWrite && !state.isIgnore) {
+                return {
+                    err: 'ER_DIVISION_BY_ZERO',
+                    value: null,
+                    name,
+                    type: 'number',
+                };
+            }
             value = null;
         }
         else if (typeof left_num === 'bigint' || typeof right_num === 'bigint') {
@@ -47188,6 +49179,36 @@ function values(expr, state) {
         value: cell?.value ?? null,
     };
 }
+function _lockRequest(expr, state, fn) {
+    const stored = state.lockValues?.get(expr);
+    if (stored) {
+        return { err: null, type: stored.type, value: stored.value };
+    }
+    const args = [];
+    for (const arg of expr.args?.value ?? []) {
+        const result = getValue(arg, state);
+        if (result.err) {
+            return result;
+        }
+        args.push({ type: result.type, value: result.value });
+    }
+    throw new LockValueRequiredError({ fn, args, node: expr });
+}
+function get_lock(expr, state) {
+    return _lockRequest(expr, state, 'GET_LOCK');
+}
+function release_lock(expr, state) {
+    return _lockRequest(expr, state, 'RELEASE_LOCK');
+}
+function is_free_lock(expr, state) {
+    return _lockRequest(expr, state, 'IS_FREE_LOCK');
+}
+function is_used_lock(expr, state) {
+    return _lockRequest(expr, state, 'IS_USED_LOCK');
+}
+function release_all_locks(expr, state) {
+    return _lockRequest(expr, state, 'RELEASE_ALL_LOCKS');
+}
 
 function elt(expr, state) {
     assertArgCount(expr, 2, Infinity);
@@ -48568,6 +50589,11 @@ const methods$2 = {
     system_user: user,
     version,
     connection_id,
+    get_lock,
+    release_lock,
+    is_free_lock,
+    is_used_lock,
+    release_all_locks,
 };
 
 function interval(expr, state) {
@@ -48640,6 +50666,19 @@ function isAggrFunc(expr) {
         expr !== null &&
         'type' in expr &&
         expr.type === 'aggr_func');
+}
+function _windowValue(expr, state) {
+    const stored = (state.row && state.rowWindowValues?.get(state.row)?.get(expr)) ??
+        state.windowValues?.get(expr);
+    if (!stored) {
+        return {
+            err: { err: 'ER_NOT_SUPPORTED_YET' },
+            type: 'null',
+            value: undefined,
+            name: undefined,
+        };
+    }
+    return { ...stored };
 }
 function isBinary(expr) {
     return (typeof expr === 'object' &&
@@ -48786,7 +50825,10 @@ function getValue(expr, state) {
         const funcName = getFunctionName(expr.name);
         const aggregate = methods$5[funcName.toLowerCase()];
         const func = methods$2[funcName.toLowerCase()];
-        if (isAggregateNode(expr) && aggregate) {
+        if (isWindowNode(expr)) {
+            result = _windowValue(expr, state);
+        }
+        else if (isAggregateNode(expr) && aggregate) {
             result = aggregate(functionAsAggregate(expr), state);
             result.name ??= funcName + '()';
         }
@@ -48802,7 +50844,10 @@ function getValue(expr, state) {
     else if (isAggrFunc(expr)) {
         const funcName = getFunctionName(expr.name);
         const func = methods$5[funcName.toLowerCase()];
-        if (func) {
+        if (isWindowNode(expr)) {
+            result = _windowValue(expr, state);
+        }
+        else if (func) {
             result = func(expr, state);
             result.name ??= funcName + '()';
         }
@@ -49062,7 +51107,7 @@ function buildSetReferences(set, from) {
     return columnRefMap;
 }
 function evaluateDuplicateUpdate(params) {
-    const { session, set, existing, inserted } = params;
+    const { session, set, existing, inserted, isIgnore } = params;
     const from = { db: null, table: null, as: null };
     const columnRefMap = buildSetReferences(set, from);
     const row = {
@@ -49073,7 +51118,7 @@ function evaluateDuplicateUpdate(params) {
         result: null,
     };
     const tableInfoMap = new Map([
-        [from, { isCaseSensitive: false, columns: [] }],
+        [from, { isCaseSensitive: false, is_open: true, columns: [] }],
     ]);
     const insertRow = lowerKeys(inserted);
     return set.map((item) => {
@@ -49083,6 +51128,8 @@ function evaluateDuplicateUpdate(params) {
             columnRefMap,
             tableInfoMap,
             insertRow,
+            isWrite: true,
+            isIgnore,
         });
         if (value.err) {
             throw new SQLError(value.err);
@@ -49141,8 +51188,9 @@ function findKey(record, name) {
     return (Object.keys(record).find((key) => key.toLowerCase() === name.toLowerCase()) ?? name);
 }
 
+let g_last_row_id = 0;
 async function insertRowList$1(params) {
-    const { session, database, table, list, duplicate_mode, on_duplicate_update, } = params;
+    const { session, database, table, list, duplicate_mode, on_duplicate_update, is_ignore, } = params;
     const data = getTable(database, table, session);
     if (list.length === 0) {
         return { affectedRows: 0, changedRows: 0 };
@@ -49151,21 +51199,39 @@ async function insertRowList$1(params) {
         throw new SQLError('table_not_found');
     }
     const { primary_key } = data;
-    const row_list = data.row_list.slice();
-    const primary_map = new Map(data.primary_map);
+    const state = cloneState(data);
     let affectedRows = 0;
     let duplicateRows = 0;
     for (const row of list) {
-        const cellRow = _transformRow(row, data.column_list);
-        const key_values = primary_key.map((name) => cellRow[name]?.value);
-        const key = JSON.stringify(key_values);
-        const index = primary_map.get(key);
-        if (index === undefined) {
-            primary_map.set(key, row_list.push(cellRow) - 1);
+        for (const name of Object.keys(row)) {
+            if (!data.column_list.some((col) => col.name_lc === name.toLowerCase())) {
+                throw new SQLError({ err: 'column_not_found', args: [name] });
+            }
+        }
+        const cellRow = _transformRow(row, data.column_list, is_ignore ?? false);
+        if (primary_key[0] === ROW_ID_NAME) {
+            cellRow[ROW_ID_NAME] = { type: 'longlong', value: ++g_last_row_id };
+        }
+        const conflicts = findConflicts(state, cellRow, primary_key);
+        const target = conflicts[0];
+        if (target === undefined) {
+            appendRow(state, cellRow, primary_key);
             affectedRows++;
         }
+        else if (duplicate_mode === 'replace') {
+            const old_row = state.row_list[target];
+            if (!old_row) {
+                continue;
+            }
+            const same = _rowEqual(old_row, cellRow);
+            for (const position of conflicts.slice(1).reverse()) {
+                removeRow(state, position, primary_key);
+            }
+            replaceRow(state, target, cellRow, primary_key);
+            affectedRows += conflicts.length - 1 + (same ? 1 : 2);
+        }
         else if (duplicate_mode === 'update' && on_duplicate_update) {
-            const old_row = row_list[index];
+            const old_row = state.row_list[target];
             if (!old_row) {
                 continue;
             }
@@ -49174,6 +51240,7 @@ async function insertRowList$1(params) {
                 set: on_duplicate_update,
                 existing: old_row,
                 inserted: row,
+                isIgnore: is_ignore,
             });
             const new_row = { ...old_row };
             let changed = false;
@@ -49182,51 +51249,36 @@ async function insertRowList$1(params) {
                 if (!data.column_list.some((col) => col.name_lc === name)) {
                     throw new SQLError({ err: 'column_not_found', args: [column] });
                 }
-                new_row[name] = { type: value.type, value: value.value };
-                if (old_row[name]?.value !== value.value) {
+                const stored = _storedCell(value, data.column_list.find((col) => col.name_lc === name), is_ignore ?? false);
+                new_row[name] = { type: stored.type, value: stored.value };
+                if (old_row[name]?.value !== stored.value) {
                     changed = true;
                 }
             }
-            const new_key = JSON.stringify(primary_key.map((name) => new_row[name]?.value));
-            if (new_key !== key) {
-                if (primary_map.has(new_key)) {
-                    throw new SQLError({
-                        err: 'dup_primary_key_entry',
-                        args: [primary_key, new_key],
-                    });
-                }
-                primary_map.delete(key);
-                primary_map.set(new_key, index);
+            if (findConflicts(state, new_row, primary_key, target).length) {
+                throw duplicateEntryError(state, new_row, primary_key);
             }
-            row_list[index] = new_row;
+            replaceRow(state, target, new_row, primary_key);
             affectedRows += changed ? 2 : 1;
             duplicateRows++;
         }
-        else if (duplicate_mode === 'replace') {
-            const existingRow = row_list[index];
-            if (existingRow && !_rowEqual(existingRow, cellRow)) {
-                affectedRows++;
-            }
-            row_list[index] = cellRow;
-            affectedRows++;
+        else if (duplicate_mode === 'ignore') {
+            continue;
         }
-        else if (!duplicate_mode) {
-            throw new SQLError({
-                err: 'dup_primary_key_entry',
-                args: [primary_key, key_values],
-            });
+        else {
+            throw duplicateEntryError(state, cellRow, primary_key);
         }
     }
-    txSaveData(database, table, session, { row_list, primary_map });
+    txSaveData(database, table, session, state);
     return { affectedRows, changedRows: duplicateRows };
 }
-function _transformRow(row, column_list) {
+function _transformRow(row, column_list, ignore) {
     const result = {};
     for (const column of column_list) {
         const cell = row[column.name_lc];
         if (cell !== undefined) {
             _checkJsonText(column, cell.value);
-            result[column.name_lc] = { type: cell.type, value: cell.value };
+            result[column.name_lc] = _storedCell(cell, column, ignore);
         }
         else if (column.defaultValue === undefined) {
             throw new SQLError({
@@ -49239,6 +51291,29 @@ function _transformRow(row, column_list) {
         }
     }
     return result;
+}
+function roundInt(value) {
+    if (typeof value !== 'string' && typeof value !== 'number') {
+        return value;
+    }
+    if (typeof value === 'string' &&
+        value.trim() !== '' &&
+        isNaN(Number(value))) {
+        throw new SQLError({ err: 'ER_TRUNCATED_WRONG_VALUE_FOR_FIELD' });
+    }
+    const num = convertNum(value) ?? 0;
+    return Math.sign(num) * Math.round(Math.abs(num));
+}
+function isInteger(type) {
+    return type === 'long' || type === 'longlong';
+}
+function _storedCell(cell, column, ignore) {
+    const zeroForNull = ignore && !column?.nullable && cell.value === null;
+    const value = zeroForNull ? 0 : cell.value;
+    return {
+        type: cell.type,
+        value: isInteger(column?.type) ? roundInt(value) : value,
+    };
 }
 function _checkJsonText(column, value) {
     if (column.type !== 'json' || typeof value !== 'string') {
@@ -49278,7 +51353,11 @@ function _getFromTable$1(params) {
     }
     return {
         rowList: data.row_list,
-        tableInfo: { isCaseSensitive: false, columns: data.column_list },
+        tableInfo: {
+            isCaseSensitive: false,
+            is_open: false,
+            columns: data.column_list,
+        },
     };
 }
 async function* _listToItetator$1(list) {
@@ -49301,8 +51380,7 @@ async function multipleUpdate$1(params) {
         if (!data) {
             throw new SQLError('table_not_found');
         }
-        const row_list = data.row_list.slice();
-        const primary_map = new Map(data.primary_map);
+        const state = cloneState(data);
         for (const update of update_list) {
             const { set_list } = update;
             const key_list = update.key.map((key) => {
@@ -49312,36 +51390,37 @@ async function multipleUpdate$1(params) {
                 return key.value;
             });
             const update_key = JSON.stringify(key_list);
-            const index = primary_map.get(update_key);
+            const index = state.primary_map.get(update_key);
             if (index !== undefined && index >= 0) {
-                const old_row = row_list[index];
+                const old_row = state.row_list[index];
                 if (!old_row) {
                     continue;
                 }
                 const new_row = Object.assign({}, old_row);
                 let changed = false;
                 for (const set of set_list) {
-                    new_row[set.column] = _transformCell(set.value);
+                    if (!data.column_list.some((col) => col.name_lc === set.column.toLowerCase())) {
+                        throw new SQLError({ err: 'column_not_found', args: [set.column] });
+                    }
+                    const column = data.column_list.find((col) => col.name_lc === set.column.toLowerCase());
+                    const zeroForNull = ignore && !column?.nullable && set.value.value === null;
+                    const value = zeroForNull ? 0 : set.value.value;
+                    new_row[set.column] = _transformCell({
+                        ...set.value,
+                        value: isInteger(column?.type) ? roundInt(value) : value,
+                    });
                     if (old_row[set.column]?.value !== new_row[set.column]?.value) {
                         changed = true;
                     }
                 }
-                const new_key = _makePrimaryKey(data.primary_key, new_row);
-                if (new_key !== update_key && primary_map.has(new_key)) {
+                if (findConflicts(state, new_row, data.primary_key, index).length) {
                     if (!ignore) {
-                        throw new SQLError({
-                            err: 'dup_primary_key_entry',
-                            args: [data.primary_key, new_key],
-                        });
+                        throw duplicateEntryError(state, new_row, data.primary_key);
                     }
                     affectedRows++;
                     continue;
                 }
-                else if (new_key !== update_key) {
-                    primary_map.delete(update_key);
-                    primary_map.set(new_key, index);
-                }
-                row_list[index] = new_row;
+                replaceRow(state, index, new_row, data.primary_key);
                 affectedRows++;
                 if (changed) {
                     changedRows++;
@@ -49351,16 +51430,12 @@ async function multipleUpdate$1(params) {
                 distExports.logger.error('memory.update: failed to find key:', key_list, 'for table:', table);
             }
         }
-        txSaveData(database, table, session, { row_list, primary_map });
+        txSaveData(database, table, session, state);
     }
     return { affectedRows, changedRows };
 }
 function _transformCell(cell) {
     return { value: cell.value, type: cell.type };
-}
-function _makePrimaryKey(primary_key, row) {
-    const key_values = primary_key.map((key) => row[key]?.value);
-    return JSON.stringify(key_values);
 }
 
 async function commit$2(params) {
@@ -49375,22 +51450,24 @@ async function commit$2(params) {
 async function rollback$2(_params) { }
 
 var MemoryEngine = /*#__PURE__*/Object.freeze({
-    __proto__: null,
-    addColumn: addColumn$1,
-    commit: commit$2,
-    createIndex: createIndex$1,
-    createTable: createTable$2,
-    deleteIndex: deleteIndex$1,
-    dropTable: dropTable$2,
-    getRowList: getRowList$1,
-    getTableInfo: getTableInfo$1,
-    getTableList: getTableList$2,
-    insertRowList: insertRowList$1,
-    multipleDelete: multipleDelete$1,
-    multipleUpdate: multipleUpdate$1,
-    rollback: rollback$2,
-    singleDelete: singleDelete$1,
-    singleUpdate: singleUpdate$1
+	__proto__: null,
+	addColumn: addColumn$1,
+	commit: commit$2,
+	createIndex: createIndex$1,
+	createTable: createTable$2,
+	deleteIndex: deleteIndex$1,
+	dropTable: dropTable$2,
+	getRowList: getRowList$1,
+	getTableInfo: getTableInfo$1,
+	getTableList: getTableList$2,
+	insertRowList: insertRowList$1,
+	isInteger: isInteger,
+	multipleDelete: multipleDelete$1,
+	multipleUpdate: multipleUpdate$1,
+	rollback: rollback$2,
+	roundInt: roundInt,
+	singleDelete: singleDelete$1,
+	singleUpdate: singleUpdate$1
 });
 
 const TYPE_MAP = { S: 'string', N: 'number', B: 'buffer' };
@@ -49492,6 +51569,9 @@ async function dropTable$1(params) {
 async function addColumn(_params) { }
 async function createIndex(params) {
     const { dynamodb, table, index_name } = params;
+    if (params.is_unique) {
+        throw new SQLError({ err: 'unsupported' });
+    }
     const key_list = params.key_list.map((key) => {
         return { name: key.name, type: _valueToDynamoKeyType(key.type) };
     });
@@ -49861,6 +51941,10 @@ var Functions = { foo };
 function convertWhere(expr, state) {
     if (expr && 'type' in expr && expr.type === 'column_ref') {
         const col = String(expr.column);
+        const refInfo = state.columnRefMap?.get(expr);
+        if (state.from && refInfo?.from !== state.from) {
+            return { err: 'unsupported', value: null };
+        }
         return {
             err: null,
             value: `(${col} IS NOT NULL AND ${col} <> 0 AND ${col} <> '' AND ${col} <> false)`,
@@ -50446,7 +52530,7 @@ async function _getFromTable(params) {
         }
         return {
             resultIter: _makeIter(),
-            tableInfo: { isCaseSensitive: true, columns },
+            tableInfo: { isCaseSensitive: true, is_open: true, columns },
         };
     }
     catch (err) {
@@ -50548,22 +52632,22 @@ async function commit$1(_params) { }
 async function rollback$1(_params) { }
 
 var RawEngine = /*#__PURE__*/Object.freeze({
-    __proto__: null,
-    addColumn: addColumn,
-    commit: commit$1,
-    createIndex: createIndex,
-    createTable: createTable$1,
-    deleteIndex: deleteIndex,
-    dropTable: dropTable$1,
-    getRowList: getRowList,
-    getTableInfo: getTableInfo,
-    getTableList: getTableList$1,
-    insertRowList: insertRowList,
-    multipleDelete: multipleDelete,
-    multipleUpdate: multipleUpdate,
-    rollback: rollback$1,
-    singleDelete: singleDelete,
-    singleUpdate: singleUpdate
+	__proto__: null,
+	addColumn: addColumn,
+	commit: commit$1,
+	createIndex: createIndex,
+	createTable: createTable$1,
+	deleteIndex: deleteIndex,
+	dropTable: dropTable$1,
+	getRowList: getRowList,
+	getTableInfo: getTableInfo,
+	getTableList: getTableList$1,
+	insertRowList: insertRowList,
+	multipleDelete: multipleDelete,
+	multipleUpdate: multipleUpdate,
+	rollback: rollback$1,
+	singleDelete: singleDelete,
+	singleUpdate: singleUpdate
 });
 
 const NullEngine = {
@@ -51071,56 +53155,52 @@ async function _runAlterTable(params) {
             await engine.addColumn(opts);
         }
     }
-    // Process index operations
+    const known_list = [...info.column_list, ...column_list];
     for (const def of ast.expr) {
-        if (def.resource === 'index' && 'action' in def) {
-            if (def.action === 'add') {
-                const addIndexDef = def;
-                const key_list = addIndexDef.definition.map((sub) => {
-                    const column_def = column_list.find((col) => col.name === sub.column);
-                    return {
-                        name: sub.column,
-                        order_by: sub.order_by,
-                        type: column_def?.type ?? 'string',
-                    };
-                });
-                const opts = {
+        if (def.resource === 'constraint' && 'action' in def && def.action === 'add') {
+            const constraint = def.create_definitions;
+            if (isUniqueConstraint(constraint.constraint_type)) {
+                const columns = constraint.definition.map((sub) => String(sub.column));
+                const index_name = uniqueIndexName(('index' in constraint ? constraint.index : null) ?? constraint.constraint, columns, []);
+                await _addIndex(engine, {
                     dynamodb,
                     session,
+                    database,
                     table,
-                    index_name: addIndexDef.index,
-                    key_list,
-                };
-                try {
-                    await engine.createIndex(opts);
-                }
-                catch (err) {
-                    if (err instanceof Error && err.message === 'index_exists') {
-                        throw new SQLError({
-                            err: 'ER_DUP_KEYNAME',
-                            args: [addIndexDef.index],
-                        });
-                    }
-                    throw err;
-                }
+                    index_name,
+                    key_list: _keyList(columns, known_list),
+                    is_unique: true,
+                });
+            }
+        }
+        else if (def.resource === 'index' && 'action' in def) {
+            if (def.action === 'add') {
+                const columns = def.definition.map((sub) => String(sub.column));
+                await _addIndex(engine, {
+                    dynamodb,
+                    session,
+                    database,
+                    table,
+                    index_name: def.index,
+                    key_list: _keyList(columns, known_list),
+                    is_unique: false,
+                });
             }
             else {
-                // action === 'drop'
-                const dropIndexDef = def;
-                const opts = {
-                    dynamodb,
-                    session,
-                    table,
-                    index_name: dropIndexDef.index,
-                };
                 try {
-                    await engine.deleteIndex(opts);
+                    await engine.deleteIndex({
+                        dynamodb,
+                        session,
+                        database,
+                        table,
+                        index_name: def.index,
+                    });
                 }
                 catch (err) {
                     if (err instanceof Error && err.message === 'index_not_found') {
                         throw new SQLError({
                             err: 'ER_CANT_DROP_FIELD_OR_KEY',
-                            args: [dropIndexDef.index],
+                            args: [def.index],
                         });
                     }
                     throw err;
@@ -51129,41 +53209,24 @@ async function _runAlterTable(params) {
         }
     }
 }
-
-function buildUsingCondition(lefts, right, columns) {
-    return columns
-        .map((column) => {
-        const leftRefs = lefts.map((left) => ({
-            type: 'column_ref',
-            table: getSourceName(left),
-            column,
-        }));
-        const left = leftRefs.length === 1
-            ? leftRefs[0]
-            : {
-                type: 'function',
-                name: 'COALESCE',
-                args: { type: 'expr_list', value: leftRefs },
-            };
-        const condition = {
-            type: 'binary_expr',
-            operator: '=',
-            left,
-            right: {
-                type: 'column_ref',
-                table: getSourceName(right),
-                column,
-            },
-        };
-        return condition;
-    })
-        .reduce((acc, condition) => ({
-        type: 'binary_expr',
-        operator: 'AND',
-        left: acc,
-        right: condition,
+function _keyList(columns, known) {
+    return columns.map((name) => ({
+        name,
+        type: known.find((col) => col.name === name)?.type ?? 'string',
     }));
 }
+async function _addIndex(engine, params) {
+    try {
+        await engine.createIndex(params);
+    }
+    catch (err) {
+        if (err instanceof Error && err.message === 'index_exists') {
+            throw new SQLError({ err: 'ER_DUP_KEYNAME', args: [params.index_name] });
+        }
+        throw err;
+    }
+}
+
 function resolveReferences(ast, current_database) {
     const requestSets = new Map();
     const requestAll = new Map();
@@ -51171,7 +53234,6 @@ function resolveReferences(ast, current_database) {
     const setListMap = new Map();
     const table_map = {};
     const db_map = {};
-    const using_owners = {};
     const fromRaw = ast.type === 'select' || ast.type === 'delete' ? ast.from : ast.table;
     const from = Array.isArray(fromRaw) ? fromRaw : null;
     const natural = from?.some((item) => 'join' in item && String(item.join).includes('NATURAL')) ?? false;
@@ -51213,21 +53275,17 @@ function resolveReferences(ast, current_database) {
             }
         }
     });
-    from?.forEach((joined, index, list) => {
-        if (index === 0 || !('using' in joined)) {
-            return;
-        }
-        const lefts = list.slice(0, index);
-        const owner = lefts[0];
-        if (!owner || !joined.using) {
+    from?.forEach((joined, index) => {
+        if (index === 0 || !('using' in joined) || !joined.using) {
             return;
         }
         const columns = joined.using.map((item) => item.value);
-        columns.forEach((column) => {
-            using_owners[column] ??= owner;
-        });
-        joined.on = buildUsingCondition(lefts, joined, columns);
         joined.using = columns;
+        for (const table of from.slice(0, index + 1)) {
+            for (const column of columns) {
+                requestSets.get(table)?.add(column);
+            }
+        }
     });
     const tableRaw = ast.type === 'delete' ? ast.table : null;
     const table = Array.isArray(tableRaw) ? tableRaw : null;
@@ -51250,7 +53308,7 @@ function resolveReferences(ast, current_database) {
     const set = ast.type === 'update' ? ast.set : undefined;
     const where = ast.where;
     function resolveObject(object, result_map) {
-        _resolveObject(object, ast, db_map, table_map, name_cache, using_owners, requestSets, requestAll, columnRefMap, setListMap, result_map);
+        _resolveObject(object, ast, db_map, table_map, name_cache, requestSets, requestAll, columnRefMap, setListMap, result_map);
     }
     const joinConditions = from?.map((item) => ('on' in item ? item.on : null));
     [joinConditions, columns, where].forEach((item) => {
@@ -51351,7 +53409,7 @@ function walkHavingColumnRefs(node, cb, inAggregate = false) {
         walkHavingColumnRefs(child, cb, nested);
     }
 }
-function _resolveObject(object, ast, db_map, table_map, name_cache, using_owners, requestSets, requestAll, columnRefMap, setListMap, result_map) {
+function _resolveObject(object, ast, db_map, table_map, name_cache, requestSets, requestAll, columnRefMap, setListMap, result_map) {
     const fixup_object = object;
     if (fixup_object.db &&
         typeof fixup_object.db === 'object' &&
@@ -51415,8 +53473,23 @@ function _resolveObject(object, ast, db_map, table_map, name_cache, using_owners
                 columnRefMap.set(object, { resultIndex: index });
             }
             else {
-                const cached = using_owners[obj.column ?? ''] ?? name_cache[obj.column ?? ''];
+                const cached = name_cache[obj.column ?? ''];
                 const astFrom = ast.type === 'update' ? ast.table : ast.from;
+                const baseFroms = Array.isArray(astFrom)
+                    ? astFrom.filter(isBaseFrom$2)
+                    : [];
+                const isUsingName = Array.isArray(astFrom)
+                    ? astFrom.some((item) => 'using' in item &&
+                        Array.isArray(item.using) &&
+                        item.using.includes(obj.column ?? ''))
+                    : false;
+                if (obj.column && baseFroms.length > 1 && !isUsingName) {
+                    for (const base of baseFroms) {
+                        requestSets.get(base)?.add(obj.column);
+                    }
+                    columnRefMap.set(object, {});
+                    return;
+                }
                 const firstFrom = Array.isArray(astFrom) ? astFrom[0] : undefined;
                 const isSource = firstFrom && (isBaseFrom$2(firstFrom) || isDerivedFrom(firstFrom));
                 from = cached ?? (isSource ? firstFrom : undefined);
@@ -51660,7 +53733,7 @@ async function* formJoin(params) {
     }
     let upstream = _firstRowIter(first, sourceMap);
     for (let i = 1; i < from.length; i++) {
-        upstream = _join(upstream, from[i], sourceMap, state);
+        upstream = _join(upstream, from.slice(0, i), from[i], sourceMap, state);
     }
     for await (const batch of upstream) {
         if (batch.length > 0) {
@@ -51695,9 +53768,11 @@ async function* _firstRowIter(from, sourceMap) {
         }
     }
 }
-function _join(upstream, from, sourceMap, state) {
+function _join(upstream, lefts, from, sourceMap, state) {
     const isLeft = 'join' in from && from.join.includes('LEFT');
-    const on = 'on' in from ? from.on : undefined;
+    const using_cols = 'using' in from ? from.using : undefined;
+    let on = 'on' in from ? from.on : undefined;
+    const columnRefMap = state.columnRefMap;
     const childIter = sourceMap.get(from) ??
         (async function* () {
             yield [];
@@ -51706,6 +53781,41 @@ function _join(upstream, from, sourceMap, state) {
     let childRows = [];
     return drainBoth(upstream, childIter, (parentBatch, childBatch, parentDone, childDone) => {
         const outputs = [];
+        const first_parent = parentBatch?.[0];
+        if (using_cols && !on && first_parent && columnRefMap) {
+            const conditions = using_cols.map((column) => {
+                const owner = lefts.find((left) => {
+                    const left_row = first_parent.source.get(left);
+                    return (Boolean(left_row) &&
+                        (Object.hasOwn(left_row, column) ||
+                            Object.hasOwn(left_row, column.toLowerCase())));
+                }) ?? lefts[lefts.length - 1];
+                const left_ref = {
+                    type: 'column_ref',
+                    table: getSourceName(owner),
+                    column,
+                };
+                const right_ref = {
+                    type: 'column_ref',
+                    table: getSourceName(from),
+                    column,
+                };
+                columnRefMap.set(left_ref, { from: owner });
+                columnRefMap.set(right_ref, { from });
+                return {
+                    type: 'binary_expr',
+                    operator: '=',
+                    left: left_ref,
+                    right: right_ref,
+                };
+            });
+            on = conditions.reduce((acc, condition) => ({
+                type: 'binary_expr',
+                operator: 'AND',
+                left: acc,
+                right: condition,
+            }));
+        }
         function _handleParentChild(parent, child) {
             if (on) {
                 const source = new Map(parent.source);
@@ -52123,7 +54233,11 @@ async function* sort(params) {
             result_list = result_list.concat(batch);
         }
     }
-    const row = result_list[0];
+    sortRows(result_list, orderby, queryColumns, state);
+    yield result_list;
+}
+function sortRows(list, orderby, queryColumns, state) {
+    const row = list[0];
     if (row) {
         const orders = [];
         for (const order of orderby) {
@@ -52131,9 +54245,8 @@ async function* sort(params) {
                 ...state});
             orders.push({ order, collation });
         }
-        result_list.sort(_sort.bind(null, orders, state));
+        list.sort(_sort.bind(null, orders, state));
     }
-    yield result_list;
 }
 function _sort(orders, state, a, b) {
     for (const step of orders) {
@@ -52145,7 +54258,7 @@ function _sort(orders, state, a, b) {
             'value' in expr &&
             typeof expr.value === 'number') {
             const index = expr.value - 1;
-            const result = func(a.result[index]?.value, b.result[index]?.value, a.result[index]?.type, collation);
+            const result = func(a.result?.[index]?.value, b.result?.[index]?.value, a.result?.[index]?.type, collation);
             if (result !== 0) {
                 return result;
             }
@@ -52232,6 +54345,296 @@ function _getCollationForOrderBy(order, queryColumns, state) {
     else {
         return getExprCollation(expr, state);
     }
+}
+
+function hasWindow(node) {
+    if (typeof node !== 'object' || node === null) {
+        return false;
+    }
+    if (Array.isArray(node)) {
+        return node.some(hasWindow);
+    }
+    if (isWindowNode(node)) {
+        return true;
+    }
+    if ('type' in node && node.type === 'select') {
+        return false;
+    }
+    return Object.values(node).some(hasWindow);
+}
+async function* applyWindows(params) {
+    const { iter, ast, queryColumns, state } = params;
+    const nodes = [];
+    for (const column of ast.columns) {
+        _findWindowNodes(column.expr, nodes);
+    }
+    const rankPlans = [];
+    const leadPlans = [];
+    const aggregatePlans = [];
+    for (const node of nodes) {
+        const name = getFunctionName(node.name).toLowerCase();
+        const over = node.over;
+        const asSpec = over && over.type === 'window' ? over.as_window_specification : null;
+        if (typeof asSpec !== 'object' ||
+            asSpec === null ||
+            asSpec.window_specification.name ||
+            asSpec.window_specification.window_frame_clause) {
+            throw new SQLError({ err: 'ER_NOT_SUPPORTED_YET' });
+        }
+        const spec = asSpec.window_specification;
+        const partitionby = spec.partitionby ?? [];
+        const orderby = _windowOrderBy(spec);
+        if (node.type === 'function' && name === 'row_number') {
+            assertArgCount(node, 0);
+            const counts = new Map();
+            rankPlans.push({
+                node,
+                partitionby,
+                orderby,
+                step: (_row, key) => {
+                    const count = (counts.get(key) ?? 0) + 1;
+                    counts.set(key, count);
+                    return { err: null, type: 'longlong', value: count };
+                },
+            });
+        }
+        else if (node.type === 'function' && name === 'lag') {
+            assertArgCount(node, 1, 3);
+            const [valueExpr, offsetExpr, defaultExpr] = node.args.value;
+            const offset = _offsetArg(offsetExpr);
+            const histories = new Map();
+            rankPlans.push({
+                node,
+                partitionby,
+                orderby,
+                step: (row, key) => {
+                    const current = getValue(valueExpr, { ...state, row });
+                    if (offset === 0) {
+                        return current;
+                    }
+                    let history = histories.get(key);
+                    if (!history) {
+                        history = [];
+                        histories.set(key, history);
+                    }
+                    const lagged = history.length < offset ? null : history.shift();
+                    history.push(current);
+                    return (lagged ??
+                        (defaultExpr
+                            ? getValue(defaultExpr, { ...state, row })
+                            : { err: null, type: 'null', value: null }));
+                },
+            });
+        }
+        else if (node.type === 'function' && name === 'lead') {
+            assertArgCount(node, 1, 3);
+            const [valueExpr, offsetExpr, defaultExpr] = node.args.value;
+            leadPlans.push({
+                node,
+                partitionby,
+                orderby,
+                offset: _offsetArg(offsetExpr),
+                valueExpr,
+                defaultExpr,
+                pending: new Map(),
+            });
+        }
+        else {
+            const aggregate = methods$5[name];
+            const bare = !spec.partitionby?.length &&
+                !spec.orderby &&
+                !node.args?.distinct;
+            if (!aggregate || !bare) {
+                throw new SQLError({ err: 'ER_NOT_SUPPORTED_YET' });
+            }
+            aggregatePlans.push({ node, name, aggregate });
+        }
+    }
+    const needsAllRows = aggregatePlans.length > 0 ||
+        rankPlans.some((plan) => plan.orderby) ||
+        leadPlans.some((plan) => plan.orderby);
+    state.windowValues = new Map();
+    state.rowWindowValues ??= new WeakMap();
+    if (!needsAllRows) {
+        const unresolved = new Map();
+        const ready = [];
+        function settle(row, node, result) {
+            _storeRowValue(state, row, node, result);
+            const left = (unresolved.get(row) ?? 0) - 1;
+            if (left > 0) {
+                unresolved.set(row, left);
+            }
+            else {
+                unresolved.delete(row);
+                ready.push(row);
+            }
+        }
+        for await (const batch of iter) {
+            for (const row of batch) {
+                for (const plan of rankPlans) {
+                    const key = _partitionKey(plan.partitionby, row, state);
+                    _storeRowValue(state, row, plan.node, plan.step(row, key));
+                }
+                if (leadPlans.length === 0) {
+                    ready.push(row);
+                    continue;
+                }
+                unresolved.set(row, leadPlans.length);
+                for (const plan of leadPlans) {
+                    const key = _partitionKey(plan.partitionby, row, state);
+                    const current = getValue(plan.valueExpr, { ...state, row });
+                    if (plan.offset === 0) {
+                        settle(row, plan.node, current);
+                        continue;
+                    }
+                    let queue = plan.pending.get(key);
+                    if (!queue) {
+                        queue = [];
+                        plan.pending.set(key, queue);
+                    }
+                    queue.push(row);
+                    const resolved = queue.length > plan.offset ? queue.shift() : undefined;
+                    if (resolved) {
+                        settle(resolved, plan.node, current);
+                    }
+                }
+            }
+            if (ready.length > 0) {
+                yield ready.splice(0);
+            }
+        }
+        for (const plan of leadPlans) {
+            for (const queue of plan.pending.values()) {
+                for (const row of queue) {
+                    const result = plan.defaultExpr
+                        ? getValue(plan.defaultExpr, { ...state, row })
+                        : { err: null, type: 'null', value: null };
+                    settle(row, plan.node, result);
+                }
+            }
+        }
+        if (ready.length > 0) {
+            yield ready.splice(0);
+        }
+        return;
+    }
+    const rows = [];
+    for await (const batch of iter) {
+        rows.push(...batch);
+    }
+    for (const plan of aggregatePlans) {
+        const aggr = plan.node.type === 'aggr_func'
+            ? plan.node
+            : functionAsAggregate(plan.node);
+        const group_row = { source: new Map(), result: null, group: rows };
+        const result = plan.aggregate(aggr, { ...state, row: group_row });
+        if (result.err) {
+            throw new SQLError(result.err);
+        }
+        result.name = `${result.name ?? plan.name + '()'} OVER ()`;
+        state.windowValues.set(plan.node, result);
+    }
+    for (const plan of rankPlans) {
+        for (const [key, partition] of _groupPartitions(rows, plan.partitionby, state)) {
+            if (plan.orderby) {
+                sortRows(partition, plan.orderby, queryColumns, state);
+            }
+            for (const row of partition) {
+                _storeRowValue(state, row, plan.node, plan.step(row, key));
+            }
+        }
+    }
+    for (const plan of leadPlans) {
+        for (const partition of _groupPartitions(rows, plan.partitionby, state).values()) {
+            if (plan.orderby) {
+                sortRows(partition, plan.orderby, queryColumns, state);
+            }
+            partition.forEach((row, index) => {
+                const leadRow = partition[index + plan.offset];
+                const result = leadRow
+                    ? getValue(plan.valueExpr, { ...state, row: leadRow })
+                    : plan.defaultExpr
+                        ? getValue(plan.defaultExpr, { ...state, row })
+                        : { err: null, type: 'null', value: null };
+                _storeRowValue(state, row, plan.node, result);
+            });
+        }
+    }
+    yield rows;
+}
+function _findWindowNodes(node, found) {
+    if (typeof node !== 'object' || node === null) {
+        return;
+    }
+    if (isWindowNode(node)) {
+        found.push(node);
+        return;
+    }
+    if ('type' in node && node.type === 'select') {
+        return;
+    }
+    for (const child of Object.values(node)) {
+        _findWindowNodes(child, found);
+    }
+}
+function _offsetArg(offsetExpr) {
+    if (!offsetExpr) {
+        return 1;
+    }
+    if (!('type' in offsetExpr) ||
+        offsetExpr.type !== 'number' ||
+        !('value' in offsetExpr) ||
+        typeof offsetExpr.value !== 'number' ||
+        !Number.isInteger(offsetExpr.value) ||
+        offsetExpr.value < 0) {
+        throw new SQLError({ err: 'ER_NOT_SUPPORTED_YET' });
+    }
+    return offsetExpr.value;
+}
+function _windowOrderBy(spec) {
+    if (!spec.orderby) {
+        return null;
+    }
+    for (const order of spec.orderby) {
+        if ('type' in order.expr && order.expr.type === 'number') {
+            throw new SQLError({ err: 'ER_NOT_SUPPORTED_YET' });
+        }
+    }
+    return spec.orderby;
+}
+function _groupPartitions(rows, partitionby, state) {
+    const partitions = new Map();
+    for (const row of rows) {
+        const key = _partitionKey(partitionby, row, state);
+        const partition = partitions.get(key);
+        if (partition) {
+            partition.push(row);
+        }
+        else {
+            partitions.set(key, [row]);
+        }
+    }
+    return partitions;
+}
+function _partitionKey(partitionby, row, state) {
+    return partitionby
+        .map((part) => {
+        const result = getValue(part.expr, { ...state, row });
+        if (result.err) {
+            throw new SQLError(result.err);
+        }
+        return result.value === null ? '\u0001' : String(result.value);
+    })
+        .join('\u0000');
+}
+function _storeRowValue(state, row, node, result) {
+    const rowValues = state.rowWindowValues;
+    let values = rowValues?.get(row);
+    if (!values) {
+        values = new Map();
+        rowValues?.set(row, values);
+    }
+    values.set(node, result);
 }
 
 function _isSelect(ast) {
@@ -52400,7 +54803,11 @@ async function _iterQuery(params) {
                 sourceMap.set(item, (async function* () {
                     yield rowList;
                 })());
-                tableInfoMap.set(item, { isCaseSensitive: false, columns: specs });
+                tableInfoMap.set(item, {
+                    isCaseSensitive: false,
+                    is_open: true,
+                    columns: specs,
+                });
             }));
         }
         await Promise.all(tasks);
@@ -52417,14 +54824,28 @@ async function _iterQuery(params) {
                 return;
             }
             joined.using = columns;
-            joined.on = buildUsingCondition(lefts, joined, columns);
-            walkColumnRefs(joined.on, (ref) => {
-                const column_ref = ref;
-                const owner = [...lefts, joined].find((table) => getSourceName(table) === column_ref.table);
-                if (owner) {
-                    columnRefMap.set(column_ref, { from: owner });
+        });
+        from.forEach((item, index) => {
+            const joined = item;
+            if (index === 0 || !('using' in joined) || !Array.isArray(joined.using)) {
+                return;
+            }
+            const leftInfos = from
+                .slice(0, index)
+                .map((left) => tableInfoMap.get(left));
+            const rightInfo = tableInfoMap.get(joined);
+            const closed = [rightInfo, ...leftInfos].every((info) => info?.is_open === false);
+            if (!closed) {
+                return;
+            }
+            const leftNames = new Set(leftInfos.flatMap((info) => info?.columns.map((c) => c.name.toLowerCase()) ?? []));
+            const rightNames = new Set(rightInfo?.columns.map((c) => c.name.toLowerCase()));
+            for (const column of joined.using) {
+                const name_lc = column.toLowerCase();
+                if (!leftNames.has(name_lc) || !rightNames.has(name_lc)) {
+                    throw new SQLError({ err: 'column_not_found', args: [column] });
                 }
-            });
+            }
         });
     }
     return _evaluateReturn({
@@ -52438,6 +54859,46 @@ async function _iterQuery(params) {
 }
 async function _evaluateReturn(params) {
     const { ast, session, sourceMap, columnRefMap, tableInfoMap, subqueryValues, } = params;
+    for (const [ref, info] of columnRefMap) {
+        const bound = info.from ? tableInfoMap.get(info.from) : undefined;
+        if (bound && !bound.is_open && ref.column) {
+            const name_lc = String(ref.column).toLowerCase();
+            if (!bound.columns.some((col) => col.name.toLowerCase() === name_lc)) {
+                throw new SQLError({
+                    err: 'column_not_found',
+                    args: [String(ref.column)],
+                });
+            }
+        }
+    }
+    for (const [ref, info] of columnRefMap) {
+        if (info.from || info.resultIndex !== undefined || !ref.column) {
+            continue;
+        }
+        const name = String(ref.column);
+        const name_lc = name.toLowerCase();
+        const owners = [...tableInfoMap].filter(([, tableInfo]) => tableInfo.columns.some((col) => col.name.toLowerCase() === name_lc));
+        if (owners.length > 1) {
+            throw new SQLError({
+                code: 'ER_NON_UNIQ_ERROR',
+                sqlMessage: `Column '${name}' in field list is ambiguous`,
+            });
+        }
+        const owner = owners[0];
+        if (owner) {
+            columnRefMap.set(ref, { from: owner[0] });
+        }
+        else if ([...tableInfoMap.values()].every((tableInfo) => !tableInfo.is_open)) {
+            throw new SQLError({ err: 'column_not_found', args: [name] });
+        }
+        else {
+            const fromList = ast.type === 'update' ? ast.table : ast.from;
+            const openFrom = Array.isArray(fromList)
+                ? fromList.find((item) => tableInfoMap.get(item)?.is_open)
+                : undefined;
+            columnRefMap.set(ref, { from: openFrom });
+        }
+    }
     const queryColumns = _isSelect(ast)
         ? expandStarColumns({ ...params, ast })
         : [];
@@ -52459,13 +54920,36 @@ async function _evaluateReturn(params) {
     else {
         group_iter = rowIter;
     }
-    let resultIter = _makeResults({
-        iter: group_iter,
-        queryColumns,
-        state,
-        having,
-    });
+    if (having) {
+        const indexes = _referencedResultIndexes(having, state.columnRefMap, new Set());
+        group_iter = _projectColumns({
+            iter: group_iter,
+            queryColumns,
+            indexes,
+            state,
+        });
+        group_iter = _filterHaving({ iter: group_iter, having, state });
+    }
+    if (ast.type === 'select' && hasWindow(ast.columns)) {
+        group_iter = applyWindows({ iter: group_iter, ast, queryColumns, state });
+    }
+    let resultIter = group_iter;
     if (ast.orderby) {
+        const indexes = _referencedResultIndexes(ast.orderby, state.columnRefMap, new Set());
+        for (const order of ast.orderby) {
+            const expr = order.expr;
+            if ('value' in expr &&
+                expr.type === 'number' &&
+                typeof expr.value === 'number') {
+                indexes.add(expr.value - 1);
+            }
+        }
+        resultIter = _projectColumns({
+            iter: resultIter,
+            queryColumns,
+            indexes,
+            state,
+        });
         resultIter = sort({
             iter: resultIter,
             orderby: ast.orderby,
@@ -52476,39 +54960,98 @@ async function _evaluateReturn(params) {
     if (ast.limit) {
         resultIter = _makeLimit(resultIter, ast.limit);
     }
-    return { resultIter, queryColumns, columnRefMap };
+    const finalIter = _makeResults({ iter: resultIter, queryColumns, state });
+    return { resultIter: finalIter, queryColumns, columnRefMap };
 }
 async function* _listToItetator(list) {
     yield list;
 }
-async function* _makeResults(params) {
-    const { iter, queryColumns, state, having, signal } = params;
+function _referencedResultIndexes(node, columnRefMap, found) {
+    if (typeof node !== 'object' || node === null) {
+        return found;
+    }
+    if (Array.isArray(node)) {
+        for (const child of node) {
+            _referencedResultIndexes(child, columnRefMap, found);
+        }
+        return found;
+    }
+    const index = columnRefMap?.get(node)?.resultIndex;
+    if (index !== undefined && index >= 0) {
+        found.add(index);
+    }
+    if ('type' in node && node.type === 'select') {
+        return found;
+    }
+    for (const child of Object.values(node)) {
+        _referencedResultIndexes(child, columnRefMap, found);
+    }
+    return found;
+}
+async function* _projectColumns(params) {
+    const { iter, queryColumns, indexes, state } = params;
     for await (const batch of iter) {
-        const result_list = [];
         for (const row of batch) {
-            const output_row = [];
-            for (const column of queryColumns) {
-                const result = getValue(column.expr, { ...state, row });
+            const output_row = row.result ?? [];
+            for (const index of indexes) {
+                const column = queryColumns[index];
+                if (!column || output_row[index]) {
+                    continue;
+                }
+                const rowState = { ...state, row };
+                let result;
+                for (;;) {
+                    try {
+                        result = getValue(column.expr, rowState);
+                        break;
+                    }
+                    catch (err) {
+                        if (!(err instanceof LockValueRequiredError)) {
+                            throw err;
+                        }
+                        const { lock } = err;
+                        const value = await runLockFunction(state.session, lock);
+                        rowState.lockValues ??= new Map();
+                        rowState.lockValues.set(lock.node, value);
+                    }
+                }
                 if (result.err) {
                     throw new SQLError(result.err);
                 }
-                output_row.push(result);
+                output_row[index] = result;
                 if (result.sleep_ms) {
-                    await promises.setTimeout(result.sleep_ms, undefined, { signal });
+                    await promises.setTimeout(result.sleep_ms);
                 }
             }
-            _makeResult(row, output_row);
-            if (having) {
-                const having_result = getValue(having, { ...state, row });
-                if (having_result.err) {
-                    throw new SQLError(having_result.err);
-                }
-                if (!convertNum(having_result.value)) {
-                    continue;
-                }
+            row.result = output_row;
+        }
+        yield batch;
+    }
+}
+async function* _filterHaving(params) {
+    const { iter, having, state } = params;
+    for await (const batch of iter) {
+        const kept = [];
+        for (const row of batch) {
+            const having_result = getValue(having, { ...state, row });
+            if (having_result.err) {
+                throw new SQLError(having_result.err);
             }
+            if (convertNum(having_result.value)) {
+                kept.push(row);
+            }
+        }
+        yield kept;
+    }
+}
+async function* _makeResults(params) {
+    const { iter, queryColumns, state } = params;
+    const indexes = new Set(queryColumns.keys());
+    const projected = _projectColumns({ iter, queryColumns, indexes, state });
+    for await (const batch of projected) {
+        for (const row of batch) {
             for (const [index, column] of queryColumns.entries()) {
-                const result = output_row[index];
+                const result = row.result?.[index];
                 if (!result) {
                     continue;
                 }
@@ -52520,13 +55063,9 @@ async function* _makeResults(params) {
                     column.result.nullable = true;
                 }
             }
-            result_list.push(row);
         }
-        yield result_list;
+        yield batch;
     }
-}
-function _makeResult(row, result) {
-    row.result = result;
 }
 async function* _makeLimit(iter, limit) {
     let skip_count = 0;
@@ -52592,6 +55131,9 @@ function isCreateDatabase(ast) {
 function isCreateTable(ast) {
     return ast.keyword === 'table';
 }
+function isCreateUniqueIndex(ast) {
+    return ast.keyword === 'index' && ast.index_type === 'unique';
+}
 async function query$6(params) {
     const { ast } = params;
     if (isCreateDatabase(ast)) {
@@ -52600,10 +55142,46 @@ async function query$6(params) {
     else if (isCreateTable(ast)) {
         return await _createTable({ ...params, ast });
     }
+    else if (isCreateUniqueIndex(ast)) {
+        return await _createUniqueIndex({ ...params, ast });
+    }
     else {
         distExports.logger.error('unsupported create:', ast.keyword);
         throw new SQLError('unsupported');
     }
+}
+async function _createUniqueIndex(params) {
+    const { ast, session, dynamodb } = params;
+    const tableRef = ast.table?.[0];
+    const database = tableRef?.db ?? session.getCurrentDatabase();
+    if (!database) {
+        throw new SQLError('no_current_database');
+    }
+    const table = tableRef?.table;
+    if (!table || !ast.index) {
+        throw new SQLError('bad_table_name');
+    }
+    const engine = getEngine(database, table, session);
+    const info = await engine.getTableInfo({
+        dynamodb,
+        session,
+        database,
+        table,
+    });
+    const key_list = ast.index_columns.map((sub) => {
+        const name = sub.column;
+        return { name, type: info.column_list.find((col) => col.name === name)?.type ?? 'string' };
+    });
+    await engine.createIndex({
+        dynamodb,
+        session,
+        database,
+        table,
+        index_name: ast.index.name,
+        key_list,
+        is_unique: true,
+    });
+    return { affectedRows: 0 };
 }
 async function _createDatabase(params) {
     const { ast } = params;
@@ -52684,6 +55262,7 @@ async function _createTable(params) {
     const duplicate_mode = ast.ignore_replace ?? undefined;
     const column_list = [];
     const primary_key = [];
+    const unique_list = [];
     for (const def of ast.create_definitions ?? []) {
         if (def.resource === 'column') {
             const col = {
@@ -52695,9 +55274,16 @@ async function _createTable(params) {
                 collation: makeCollation(def, collation),
                 nullable: def.nullable?.value !== 'not null',
             };
+            if (column_list.some((c) => c.name.toLowerCase() === col.name.toLowerCase())) {
+                throw new SQLError({ err: 'ER_DUP_FIELDNAME', args: [col.name] });
+            }
             column_list.push(col);
             if (def.primary_key === 'primary key') {
                 primary_key.push(col.name);
+            }
+            if (def.unique) {
+                const name = uniqueIndexName(null, [col.name], unique_list.map((u) => u.name));
+                unique_list.push({ name, key_list: [{ name: col.name, type: col.type }] });
             }
         }
         else if (def.resource === 'constraint' &&
@@ -52705,6 +55291,16 @@ async function _createTable(params) {
             for (const sub of def.definition) {
                 primary_key.push(sub.column);
             }
+        }
+        else if (def.resource === 'constraint' &&
+            isUniqueConstraint(def.constraint_type)) {
+            const columns = def.definition.map((sub) => String(sub.column));
+            const name = uniqueIndexName(('index' in def ? def.index : null) ?? def.constraint, columns, unique_list.map((u) => u.name));
+            const key_list = columns.map((column) => ({
+                name: column,
+                type: column_list.find((col) => col.name === column)?.type ?? 'string',
+            }));
+            unique_list.push({ name, key_list });
         }
     }
     for (const name of primary_key) {
@@ -52745,6 +55341,7 @@ async function _createTable(params) {
             table,
             collation,
             column_list,
+            unique_list,
             primary_key,
             is_temp,
             table_engine,
@@ -52994,6 +55591,33 @@ async function query$4(params) {
             throw err;
         }
     }
+    else if (ast.keyword === 'index') {
+        const indexAst = ast;
+        const tableRef = Array.isArray(indexAst.table)
+            ? indexAst.table[0]
+            : undefined;
+        const database = tableRef?.db ?? session.getCurrentDatabase();
+        if (!database) {
+            throw new SQLError('no_current_database');
+        }
+        const table = tableRef?.table ?? '';
+        const index_name = String(indexAst.name?.column ?? '');
+        try {
+            await getEngine(database, table, session).deleteIndex({
+                dynamodb,
+                session,
+                database,
+                table,
+                index_name,
+            });
+        }
+        catch (err) {
+            if (err instanceof Error && err.message === 'index_not_found') {
+                throw new SQLError({ err: 'ER_CANT_DROP_FIELD_OR_KEY', args: [index_name] });
+            }
+            throw err;
+        }
+    }
     else {
         distExports.logger.error('unsupported:', ast);
         throw new SQLError('unsupported');
@@ -53140,6 +55764,7 @@ async function query$3(params) {
 }
 async function _runInsert(params) {
     const { ast, session, engine, dynamodb, duplicate_mode } = params;
+    const is_ignore = ast.prefix === 'ignore into';
     const tableArray = Array.isArray(ast.table) ? ast.table : [ast.table];
     const firstTable = tableArray[0];
     const table = firstTable && 'table' in firstTable ? firstTable.table : undefined;
@@ -53148,7 +55773,11 @@ async function _runInsert(params) {
     if (ast.set && ast.set.length > 0) {
         const obj = {};
         for (const item of ast.set) {
-            const expr_result = getValue(item.value, { session });
+            const expr_result = getValue(item.value, {
+                session,
+                isWrite: true,
+                isIgnore: is_ignore,
+            });
             if (expr_result.err) {
                 throw new SQLError(expr_result.err);
             }
@@ -53181,7 +55810,11 @@ async function _runInsert(params) {
                 const obj = {};
                 if (ast.columns && row.value.length === ast.columns.length) {
                     ast.columns.forEach((name, j) => {
-                        const expr_result = getValue(row.value[j], { session });
+                        const expr_result = getValue(row.value[j], {
+                            session,
+                            isWrite: true,
+                            isIgnore: is_ignore,
+                        });
                         if (expr_result.err) {
                             throw new SQLError(expr_result.err);
                         }
@@ -53196,8 +55829,38 @@ async function _runInsert(params) {
         }
     }
     else {
-        distExports.logger.error('unsupported insert without column names');
-        throw new SQLError('unsupported');
+        const { column_list, is_open } = await engine.getTableInfo({
+            dynamodb,
+            database: params.database,
+            table: table ?? '',
+            session,
+        });
+        if (is_open) {
+            distExports.logger.error('unsupported insert without column names');
+            throw new SQLError('unsupported');
+        }
+        list = [];
+        const values = ast.values?.type === 'values' ? ast.values.values : [];
+        if (Array.isArray(values)) {
+            values.forEach((row, i) => {
+                if (row.value.length !== column_list.length) {
+                    throw new SQLError({ err: 'ER_WRONG_VALUE_COUNT_ON_ROW', args: [i] });
+                }
+                const obj = {};
+                column_list.forEach((col, j) => {
+                    const expr_result = getValue(row.value[j], {
+                        session,
+                        isWrite: true,
+                        isIgnore: is_ignore,
+                    });
+                    if (expr_result.err) {
+                        throw new SQLError(expr_result.err);
+                    }
+                    obj[col.name] = expr_result;
+                });
+                list.push(obj);
+            });
+        }
     }
     // Insert the rows
     if (!table) {
@@ -53212,6 +55875,7 @@ async function _runInsert(params) {
             list,
             duplicate_mode: duplicate_mode ?? undefined,
             on_duplicate_update: ast.on_duplicate_update?.set,
+            is_ignore,
         };
         try {
             let result;
@@ -53295,6 +55959,7 @@ async function _runInsert(params) {
                         set,
                         existing: entry.cur,
                         inserted: row,
+                        isIgnore: is_ignore,
                     });
                     for (const { column: name, value } of values) {
                         const attr = findKey(entry.cur, name);
@@ -53557,6 +56222,8 @@ async function _multipleUpdate(params) {
                     session,
                     row,
                     columnRefMap,
+                    isWrite: true,
+                    isIgnore: Boolean(ast.ignore),
                 });
                 if (expr_result.err) {
                     throw new SQLError(expr_result.err);
@@ -53859,11 +56526,14 @@ class Session extends SQLMode {
     config;
     state = 'connected';
     threadId = g_threadId++;
+    lockOwner;
+    heldLocks = new Map();
     dynamodb;
     typeCastOptions = { bigNumType: 'number' };
     typeCast;
     resultObjects;
     multipleStatements;
+    transactionDomain;
     _currentDatabase = null;
     _localVariables = new Map();
     _transaction = null;
@@ -53900,6 +56570,8 @@ class Session extends SQLMode {
         this.dynamodb = createDynamoDB(params);
         this.multipleStatements = Boolean(params?.multipleStatements ?? false);
         this.resultObjects = Boolean(params?.resultObjects ?? true);
+        this.transactionDomain = params?.transactionDomain ?? '__dynamosql_default';
+        this.lockOwner = `${node_os.hostname()}-${GlobalSettings$1.serverUUID}-${this.threadId}`;
         this.typeCast = params?.typeCast ?? true;
         this._collationConnection = GlobalSettings$1.collationConnection;
         this._divPrecisionIncrement = GlobalSettings$1.divPrecisionIncrement;
@@ -53924,6 +56596,9 @@ class Session extends SQLMode {
     }
     release(done) {
         this._isReleased = true;
+        void releaseAll(this).catch((err) => {
+            distExports.logger.error('session.release: releaseAll err:', err);
+        });
         done?.();
     }
     end(done) {

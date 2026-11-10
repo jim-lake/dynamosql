@@ -157,6 +157,7 @@ interface SessionConfig extends DynamoDBWithCacheConstructorParams {
     supportBigNumbers?: boolean | undefined;
     bigNumberStrings?: boolean | undefined;
     bigintNative?: boolean | undefined;
+    transactionDomain?: string | undefined;
 }
 declare function createSession$1(args?: SessionConfig): PoolConnection;
 

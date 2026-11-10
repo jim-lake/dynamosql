@@ -1,0 +1,10 @@
+CREATE DATABASE IF NOT EXISTS mem_unique_db;
+USE mem_unique_db;
+CREATE TEMPORARY TABLE ue_col (id INT PRIMARY KEY, c VARCHAR(10) UNIQUE);
+INSERT INTO ue_col VALUES (1, 'a');
+INSERT INTO ue_col VALUES (2, 'a');
+INSERT INTO ue_col VALUES (3, 'x'), (4, 'x');
+UPDATE ue_col SET c = 'a' WHERE id = 1;
+CREATE TEMPORARY TABLE ue_dup (id INT PRIMARY KEY, c INT, UNIQUE KEY ue_dup_c (c), UNIQUE KEY ue_dup_c (id));
+CREATE TEMPORARY TABLE ue_named (id INT PRIMARY KEY, c INT, UNIQUE KEY ue_named_c (c));
+DROP INDEX ue_missing ON ue_named;

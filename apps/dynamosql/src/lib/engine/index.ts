@@ -128,9 +128,14 @@ export interface CreateTableParams {
   collation: COLLATIONS;
   primary_key: string[];
   column_list: ColumnDefParam[];
+  unique_list: UniqueDefParam[];
   session: Session;
   database: string;
   is_temp?: boolean;
+}
+export interface UniqueDefParam {
+  name: string;
+  key_list: KeyDef[];
 }
 export interface DropTableParams {
   dynamodb: DynamoDBClient;
@@ -144,12 +149,17 @@ export interface KeyDef {
 }
 export interface IndexParams {
   dynamodb: DynamoDBClient;
+  session: Session;
+  database: string;
   table: string;
   index_name: string;
   key_list: KeyDef[];
+  is_unique: boolean;
 }
 export interface DeleteIndexParams {
   dynamodb: DynamoDBClient;
+  session: Session;
+  database: string;
   table: string;
   index_name: string;
 }
