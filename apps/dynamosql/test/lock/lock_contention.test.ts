@@ -180,7 +180,7 @@ describe('Lock contention between sessions', () => {
     try {
       await scalar(a, "SELECT GET_LOCK('ct_warmup', 0) AS g", 'g');
       await run(a, "SELECT RELEASE_LOCK('ct_warmup') AS r");
-      const stale = Date.now() - 1000;
+      const stale = Math.floor(Date.now() / 1000) - 1;
       await a.dynamodb.updateItem({
         table: LOCK_TABLE,
         key: { lock_key: { S: `${a.transactionDomain}_ct_expired` } },

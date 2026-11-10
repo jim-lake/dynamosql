@@ -14,6 +14,7 @@ import {
   BillingMode,
   ReturnValuesOnConditionCheckFailure,
   UpdateItemCommand,
+  UpdateTimeToLiveCommand,
 } from '@aws-sdk/client-dynamodb';
 
 import {
@@ -423,6 +424,21 @@ export class DynamoDB {
   async deleteTable(raw_table: string): Promise<void> {
     const table = `${this.namespace}${raw_table}`;
     const command = new DeleteTableCommand({ TableName: table });
+    try {
+      await this.client.send(command);
+    } catch (err) {
+      throw safeConvertError(err);
+    }
+  }
+
+  async enableTimeToLive(
+    raw_table: string,
+    attribute_name: string
+  ): Promise<void> {
+    const command = new UpdateTimeToLiveCommand({
+      TableName: `${this.namespace}${raw_table}`,
+      TimeToLiveSpecification: { AttributeName: attribute_name, Enabled: true },
+    });
     try {
       await this.client.send(command);
     } catch (err) {

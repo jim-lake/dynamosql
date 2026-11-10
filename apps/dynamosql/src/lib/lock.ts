@@ -10,7 +10,7 @@ import type { EvaluationValue, LockRequest } from './expression';
 import type { Session } from '../session';
 
 export const LOCK_TABLE = '__dynamosql_locks';
-export const LEASE_MS = 10_000;
+export const LEASE_S = 10;
 export const RENEW_MS = 1_000;
 const POLL_MS = 250;
 const MAX_NAME_LENGTH = 64;
@@ -37,11 +37,13 @@ async function ensureLockTable(dynamodb: DynamoDBWithCache): Promise<void> {
       throw err;
     }
   }
+  let created = false;
   try {
     await dynamodb.createTable({
       table: LOCK_TABLE,
       primary_key: [{ name: 'lock_key', type: 'S' }],
     });
+    created = true;
   } catch (err) {
     if (!(err instanceof Error) || err.message !== 'resource_in_use') {
       throw err;
@@ -50,9 +52,12 @@ async function ensureLockTable(dynamodb: DynamoDBWithCache): Promise<void> {
   for (;;) {
     const result = await dynamodb.getTable(LOCK_TABLE);
     if (result.Table?.TableStatus === 'ACTIVE') {
-      return;
+      break;
     }
     await sleepMs(POLL_MS);
+  }
+  if (created) {
+    await dynamodb.enableTimeToLive(LOCK_TABLE, 'expires_at');
   }
 }
 
@@ -65,7 +70,7 @@ function isConditionFailure(err: unknown): boolean {
 
 // Returns false when another owner holds an unexpired lease.
 async function writeLease(session: Session, key: string): Promise<boolean> {
-  const now = Date.now();
+  const nowS = Math.floor(Date.now() / 1000);
   try {
     await session.dynamodb.updateItem({
       table: LOCK_TABLE,
@@ -75,8 +80,8 @@ async function writeLease(session: Session, key: string): Promise<boolean> {
         'attribute_not_exists(owner_id) OR expires_at < :now OR owner_id = :owner',
       values: {
         ':owner': { S: session.lockOwner },
-        ':expires': { N: String(now + LEASE_MS) },
-        ':now': { N: String(now) },
+        ':expires': { N: String(nowS + LEASE_S) },
+        ':now': { N: String(nowS) },
       },
     });
     return true;
@@ -162,9 +167,12 @@ async function _releaseLease(session: Session, key: string): Promise<void> {
     await session.dynamodb.updateItem({
       table: LOCK_TABLE,
       key: { lock_key: { S: key } },
-      expression: 'REMOVE owner_id, expires_at',
+      expression: 'SET expires_at = :expired',
       condition: 'owner_id = :owner',
-      values: { ':owner': { S: session.lockOwner } },
+      values: {
+        ':owner': { S: session.lockOwner },
+        ':expired': { N: String(Math.floor(Date.now() / 1000) - 1) },
+      },
     });
   } catch (err) {
     if (!isConditionFailure(err)) {
@@ -186,7 +194,7 @@ async function holder(session: Session, name: string): Promise<string | null> {
   const row = rows[0];
   const owner = row?.owner_id?.S;
   const expires = Number(row?.expires_at?.N ?? 0);
-  if (!owner || expires < Date.now()) {
+  if (!owner || expires < Math.floor(Date.now() / 1000)) {
     return null;
   }
   return owner;

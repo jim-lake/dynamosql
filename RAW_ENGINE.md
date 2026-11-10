@@ -93,7 +93,7 @@ Raw tables have no schema, so `JOIN ... USING (col)` decides which table owns `c
 
 # Raw engine: named locks
 
-`GET_LOCK`, `RELEASE_LOCK`, `IS_FREE_LOCK`, `IS_USED_LOCK`, and `RELEASE_ALL_LOCKS` store leases in the `__dynamosql_locks` table. The partition key is `lock_key`, set to `${transactionDomain}_${name}`. Each lease keeps `owner_id` and `expires_at`. A lease lasts 10 seconds, and the holding session renews it every second while it holds the lock. A session that ends releases its leases in the background.
+`GET_LOCK`, `RELEASE_LOCK`, `IS_FREE_LOCK`, `IS_USED_LOCK`, and `RELEASE_ALL_LOCKS` store leases in the `__dynamosql_locks` table. The partition key is `lock_key`, set to `${transactionDomain}_${name}`. Each lease keeps `owner_id` and `expires_at`, where `expires_at` is epoch seconds. `expires_at` is the table's TTL attribute, so DynamoDB deletes expired rows in the background. A released lease sets `expires_at` to one second in the past, so the row is expired immediately and DynamoDB removes it on a later TTL sweep. A lease lasts 10 seconds, and the holding session renews it every second while it holds the lock. A session that ends releases its leases in the background. Lease checks ignore expired rows, because TTL deletion can lag expiry by up to 48 hours.
 
 Lock names are case-insensitive, as in MySQL. Names are limited to 64 bytes. A NULL or empty name raises `ER_USER_LOCK_WRONG_NAME`.
 
