@@ -82,7 +82,8 @@ describe('Lock contention between sessions', () => {
         a.destroy();
         b.destroy();
       }
-    }
+    },
+    true
   );
 
   addUnitTest(
@@ -104,7 +105,8 @@ describe('Lock contention between sessions', () => {
         a.destroy();
         b.destroy();
       }
-    }
+    },
+    true
   );
 
   addUnitTest(

@@ -10,9 +10,13 @@ const dbConfig = {
 
 export function addUnitTest(
   name: string,
-  testFunction: (lib: typeof mysql, config: any) => void | Promise<void>
+  testFunction: (lib: typeof mysql, config: any) => void | Promise<void>,
+  slow = false
 ) {
-  it(`${name} => mysql`, async () => {
+  it(`${name} => mysql`, async function () {
+    if (slow && !process.env.TEST_RUN_SLOW) {
+      return this.skip();
+    }
     const mysql_opts = {
       host: dbConfig.host,
       port: dbConfig.port,
@@ -23,7 +27,10 @@ export function addUnitTest(
     };
     await testFunction(mysql, mysql_opts);
   });
-  it(`${name} => dynamosql`, async () => {
+  it(`${name} => dynamosql`, async function () {
+    if (slow && !process.env.TEST_RUN_SLOW) {
+      return this.skip();
+    }
     await testFunction(DynamoSQL as unknown as typeof mysql, {
       namespace: process.env.DYNAMO_NAMESPACE ?? 'dynamosql_test',
     });
