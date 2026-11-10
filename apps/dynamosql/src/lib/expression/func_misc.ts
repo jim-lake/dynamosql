@@ -1,5 +1,6 @@
 import { assertArgCount, assertArgCountParse } from '../helpers/arg_count';
 import { convertNum } from '../helpers/sql_conversion';
+import { LockValueRequiredError } from '../lock';
 
 import { getValue } from './evaluate';
 
@@ -102,6 +103,10 @@ function _lockRequest(
   state: EvaluationState,
   fn: string
 ): EvaluationResult {
+  const stored = state.lockValues?.get(expr);
+  if (stored) {
+    return { err: null, type: stored.type, value: stored.value };
+  }
   const args: EvaluationValue[] = [];
   for (const arg of expr.args?.value ?? []) {
     const result = getValue(arg, state);
@@ -110,7 +115,7 @@ function _lockRequest(
     }
     args.push({ type: result.type, value: result.value });
   }
-  return { err: null, type: 'null', value: null, lock: { fn, args } };
+  throw new LockValueRequiredError({ fn, args, node: expr });
 }
 export function get_lock(
   expr: Function,

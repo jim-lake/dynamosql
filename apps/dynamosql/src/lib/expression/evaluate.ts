@@ -65,6 +65,7 @@ export interface EvaluationState {
   subqueryValues?: SubqueryValues;
   windowValues?: WindowValues;
   rowWindowValues?: RowWindowValues;
+  lockValues?: LockValues;
   isWrite?: boolean;
   isIgnore?: boolean;
 }
@@ -77,11 +78,6 @@ export interface EvaluationResult extends EvaluationValue {
   name?: string;
   decimals?: number;
   sleep_ms?: number;
-  lock?: LockRequest;
-}
-export interface LockRequest {
-  fn: string;
-  args: EvaluationValue[];
 }
 export interface SelectSubquery {
   ast: Select;
@@ -92,6 +88,7 @@ export function isSelectSubquery(expr: unknown): expr is SelectSubquery {
 export type SubqueryValues = Map<SelectSubquery, EvaluationValue>;
 export type WindowValues = Map<unknown, EvaluationResult>;
 export type RowWindowValues = WeakMap<object, WindowValues>;
+export type LockValues = Map<unknown, EvaluationValue>;
 
 // Type guards
 function isValueExpr(expr: unknown): expr is ValueExpr {

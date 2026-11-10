@@ -18,3 +18,10 @@ MySQL picks a value from one row of each group for a non-aggregated column. The 
 - `SELECT AVG(v) AS a FROM w;` on values 10, 20, 5 and a NULL: MySQL returns `11.6666666667`. DynamoSQL returns `11.666666666666666`, the full double.
 
 DynamoSQL keeps the double from the calculation and never converts it to a string and back. The extra digits are intentional. The same applies to `AVG(v) OVER ()`.
+
+## Lock function placement
+
+`GET_LOCK()`, `RELEASE_LOCK()`, `IS_FREE_LOCK()`, `IS_USED_LOCK()`, and `RELEASE_ALL_LOCKS()` are supported only in the select list of a SELECT. MySQL accepts them in WHERE, HAVING, and other clauses. DynamoSQL raises `ER_FEATURE_UNSUPPORTED` when it evaluates a lock call in those positions.
+
+- `SELECT a FROM t WHERE GET_LOCK('x', 0) = 1;`: MySQL runs the query. DynamoSQL returns `ER_FEATURE_UNSUPPORTED`.
+- `SELECT id FROM t ORDER BY GET_LOCK('x', 0), id;`: MySQL runs the query. DynamoSQL returns `ER_FEATURE_UNSUPPORTED` once the sort compares rows.

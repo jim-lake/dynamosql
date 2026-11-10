@@ -56,6 +56,10 @@ const ERROR_MAP: Record<string, ErrorMapEntry> = {
     code: 'ER_NOT_SUPPORTED_YET',
     sqlMessage: "This version of MySQL doesn't yet support this feature",
   },
+  LOCK_VALUE_REQUIRED: {
+    code: 'ER_FEATURE_UNSUPPORTED',
+    sqlMessage: errStr`${0} is only supported in the select list of a SELECT`,
+  },
   unsupported_type: {
     code: 'ER_NO',
     sqlMessage: errStr`Unsupported query type: ${0}`,

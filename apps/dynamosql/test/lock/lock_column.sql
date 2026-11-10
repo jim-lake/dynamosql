@@ -1,0 +1,13 @@
+CREATE DATABASE IF NOT EXISTS lock_col_mem;
+CREATE TEMPORARY TABLE lock_col_mem.t (id INT PRIMARY KEY, name VARCHAR(20));
+INSERT INTO lock_col_mem.t (id, name) VALUES (1, 'col_a'), (2, 'col_b'), (3, 'col_c');
+SELECT id, GET_LOCK(name, 0) AS g FROM lock_col_mem.t ORDER BY id;
+SELECT id, IS_FREE_LOCK(name) AS f FROM lock_col_mem.t ORDER BY id;
+SELECT id, IS_USED_LOCK(name) IS NOT NULL AS used FROM lock_col_mem.t ORDER BY id;
+SELECT id, IF(GET_LOCK(name, 0), 'got', 'no') AS g FROM lock_col_mem.t ORDER BY id;
+SELECT id, RELEASE_LOCK(name) AS r FROM lock_col_mem.t ORDER BY id;
+SELECT id, RELEASE_LOCK(name) AS r FROM lock_col_mem.t ORDER BY id;
+SELECT id, GET_LOCK(CONCAT('col_', name), 0) AS g FROM lock_col_mem.t WHERE id = 1;
+SELECT id, RELEASE_LOCK(CONCAT('col_', name)) AS r FROM lock_col_mem.t WHERE id = 1;
+SELECT id, GET_LOCK(name, 0) + 10 AS g FROM lock_col_mem.t ORDER BY id;
+SELECT id, RELEASE_LOCK(name) AS r FROM lock_col_mem.t ORDER BY id;

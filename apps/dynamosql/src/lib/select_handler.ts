@@ -523,15 +523,24 @@ async function* _projectColumns(
         if (!column || output_row[index]) {
           continue;
         }
-        const result = Expression.getValue(column.expr, { ...state, row });
+        const rowState = { ...state, row };
+        let result: EvaluationResult;
+        for (;;) {
+          try {
+            result = Expression.getValue(column.expr, rowState);
+            break;
+          } catch (err) {
+            if (!(err instanceof Lock.LockValueRequiredError)) {
+              throw err;
+            }
+            const { lock } = err;
+            const value = await Lock.runLockFunction(state.session, lock);
+            rowState.lockValues ??= new Map();
+            rowState.lockValues.set(lock.node, value);
+          }
+        }
         if (result.err) {
           throw new SQLError(result.err);
-        }
-        if (result.lock) {
-          const value = await Lock.runLockFunction(state.session, result.lock);
-          result.type = value.type;
-          result.value = value.value;
-          delete result.lock;
         }
         output_row[index] = result;
         if (result.sleep_ms) {

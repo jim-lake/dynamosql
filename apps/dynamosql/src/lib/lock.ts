@@ -6,7 +6,7 @@ import { SQLError } from '../error';
 import { escapeString } from '../tools/dynamodb_helper';
 
 import type { DynamoDBWithCache } from './dynamodb';
-import type { EvaluationValue, LockRequest } from './expression';
+import type { EvaluationValue } from './expression';
 import type { Session } from '../session';
 
 export const LOCK_TABLE = '__dynamosql_locks';
@@ -18,6 +18,21 @@ const MAX_NAME_LENGTH = 64;
 export interface HeldLease {
   count: number;
   timer: NodeJS.Timeout;
+}
+
+export interface LockRequest {
+  fn: string;
+  args: EvaluationValue[];
+  node: unknown;
+}
+
+export class LockValueRequiredError extends SQLError {
+  public readonly lock: LockRequest;
+
+  constructor(lock: LockRequest) {
+    super({ err: 'LOCK_VALUE_REQUIRED', args: [lock.fn] });
+    this.lock = lock;
+  }
 }
 
 export function normalizeLockName(name: string): string {
@@ -234,7 +249,7 @@ export async function runLockFunction(
       const owner = await holder(session, name);
       return owner === null
         ? { type: 'null', value: null }
-        : { type: 'longlong', value: Number(owner.split('_')[0]) };
+        : { type: 'longlong', value: Number(owner.split('-').pop()) };
     }
   }
   return { type: 'null', value: null };
