@@ -1,3 +1,5 @@
+import { randomUUID } from 'node:crypto';
+
 import { COLLATIONS } from './constants/mysql';
 import { SYSTEM_VARIABLE_TYPES } from './constants/system_variables';
 import { SQLError } from './error';
@@ -6,6 +8,7 @@ import { getCollation } from './lib/helpers/collation';
 import type { EvaluationValue } from './lib/expression';
 
 const SYSTEM_TIME_ZONE = _getSystemTimezone();
+const SERVER_UUID = randomUUID();
 
 class GlobalSettings {
   private _collationConnection = COLLATIONS.UTF8MB4_0900_AI_CI;
@@ -27,6 +30,9 @@ class GlobalSettings {
   }
   public get systemTimeZone() {
     return SYSTEM_TIME_ZONE;
+  }
+  public get serverUUID() {
+    return SERVER_UUID;
   }
 
   public getGlobalVariable(name: string): EvaluationValue | undefined {

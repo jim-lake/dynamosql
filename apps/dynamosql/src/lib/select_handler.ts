@@ -12,6 +12,7 @@ import { expandStarColumns, calcColumns } from './helpers/query_columns';
 import { sort } from './helpers/sort';
 import { convertNum } from './helpers/sql_conversion';
 import { applyWindows, hasWindow } from './helpers/window';
+import * as Lock from './lock';
 
 import type { TableInfoMap, SourceMap, CellRow } from './engine';
 import type {
@@ -526,6 +527,12 @@ async function* _projectColumns(
         if (result.err) {
           throw new SQLError(result.err);
         }
+        if (result.lock) {
+          const value = await Lock.runLockFunction(state.session, result.lock);
+          result.type = value.type;
+          result.value = value.value;
+          delete result.lock;
+        }
         output_row[index] = result;
         if (result.sleep_ms) {
           await setTimeout(result.sleep_ms);
@@ -568,25 +575,12 @@ async function* _makeResults(
   params: MakeResultsParams
 ): AsyncIterableIterator<SourceRowResult[]> {
   const { iter, queryColumns, state } = params;
-  for await (const batch of iter) {
+  const indexes = new Set(queryColumns.keys());
+  const projected = _projectColumns({ iter, queryColumns, indexes, state });
+  for await (const batch of projected) {
     for (const row of batch) {
-      const output_row: EvaluationResult[] = row.result ?? [];
       for (const [index, column] of queryColumns.entries()) {
-        if (output_row[index]) {
-          continue;
-        }
-        const result = Expression.getValue(column.expr, { ...state, row });
-        if (result.err) {
-          throw new SQLError(result.err);
-        }
-        output_row[index] = result;
-        if (result.sleep_ms) {
-          await setTimeout(result.sleep_ms);
-        }
-      }
-      row.result = output_row;
-      for (const [index, column] of queryColumns.entries()) {
-        const result = output_row[index];
+        const result = row.result?.[index];
         if (!result) {
           continue;
         }

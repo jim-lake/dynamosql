@@ -77,6 +77,11 @@ export interface EvaluationResult extends EvaluationValue {
   name?: string;
   decimals?: number;
   sleep_ms?: number;
+  lock?: LockRequest;
+}
+export interface LockRequest {
+  fn: string;
+  args: EvaluationValue[];
 }
 export interface SelectSubquery {
   ast: Select;

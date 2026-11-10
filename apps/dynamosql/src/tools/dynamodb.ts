@@ -114,8 +114,9 @@ export interface UpdateItemParams {
   table: string;
   key: ItemRecord;
   expression: string;
-  names: Record<string, string>;
+  names?: Record<string, string>;
   values: ItemRecord;
+  condition?: string;
 }
 
 export class DynamoDB {
@@ -338,7 +339,11 @@ export class DynamoDB {
       TableName: `${this.namespace}${params.table}`,
       Key: params.key,
       UpdateExpression: params.expression,
-      ExpressionAttributeNames: params.names,
+      ConditionExpression: params.condition,
+      ExpressionAttributeNames:
+        params.names && Object.keys(params.names).length > 0
+          ? params.names
+          : undefined,
       ExpressionAttributeValues: params.values,
       ReturnValues: 'ALL_OLD',
     });
@@ -360,7 +365,10 @@ export class DynamoDB {
           if (namespace_len === 0) {
             results.push(table);
           } else if (table.startsWith(this.namespace)) {
-            results.push(table.substring(namespace_len));
+            const name = table.substring(namespace_len);
+            if (name !== '__dynamosql_locks') {
+              results.push(name);
+            }
           }
         }
       }

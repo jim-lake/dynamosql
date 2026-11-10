@@ -1,3 +1,6 @@
+import { hostname } from 'node:os';
+
+import { logger } from '@dynamosql/shared';
 import * as SqlString from 'sqlstring';
 
 import { COLLATIONS } from './constants/mysql';
@@ -8,10 +11,12 @@ import * as DynamoDB from './lib/dynamodb';
 import { getCollation } from './lib/helpers/collation';
 import { SQLMode } from './lib/helpers/sql_mode';
 import { offsetAtTime } from './lib/helpers/timezone';
+import * as Lock from './lib/lock';
 import { Query } from './query';
 
 import type { DynamoDBWithCacheConstructorParams } from './lib/dynamodb';
 import type { EvaluationValue } from './lib/expression';
+import type { HeldLease } from './lib/lock';
 import type { Transaction } from './lib/transaction_manager';
 import type {
   TypeCast,
@@ -38,6 +43,7 @@ export interface SessionConfig extends DynamoDBWithCacheConstructorParams {
   supportBigNumbers?: boolean | undefined;
   bigNumberStrings?: boolean | undefined;
   bigintNative?: boolean | undefined;
+  transactionDomain?: string | undefined;
 }
 
 export interface SqlValue {
@@ -53,12 +59,15 @@ export class Session extends SQLMode implements PoolConnection {
   public readonly config: SessionConfig;
   public readonly state: string = 'connected';
   public readonly threadId: number | null = g_threadId++;
+  public readonly lockOwner: string;
+  public readonly heldLocks = new Map<string, HeldLease>();
 
   public readonly dynamodb: ReturnType<typeof DynamoDB.createDynamoDB>;
   public readonly typeCastOptions: TypeCastOptions = { bigNumType: 'number' };
   public readonly typeCast: TypeCast;
   public readonly resultObjects: boolean;
   public readonly multipleStatements: boolean;
+  public readonly transactionDomain: string;
 
   private _currentDatabase: string | null = null;
   private readonly _localVariables = new Map<string, EvaluationValue>();
@@ -99,6 +108,8 @@ export class Session extends SQLMode implements PoolConnection {
     this.dynamodb = DynamoDB.createDynamoDB(params);
     this.multipleStatements = Boolean(params?.multipleStatements ?? false);
     this.resultObjects = Boolean(params?.resultObjects ?? true);
+    this.transactionDomain = params?.transactionDomain ?? '__dynamosql_default';
+    this.lockOwner = `${hostname()}-${GlobalSettings.serverUUID}-${this.threadId}`;
     this.typeCast = params?.typeCast ?? true;
     this._collationConnection = GlobalSettings.collationConnection;
     this._divPrecisionIncrement = GlobalSettings.divPrecisionIncrement;
@@ -123,6 +134,9 @@ export class Session extends SQLMode implements PoolConnection {
   }
   release(done?: () => void) {
     this._isReleased = true;
+    void Lock.releaseAll(this).catch((err: unknown) => {
+      logger.error('session.release: releaseAll err:', err);
+    });
     done?.();
   }
   end(done?: () => void) {

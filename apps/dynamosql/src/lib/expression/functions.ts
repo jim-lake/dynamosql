@@ -116,6 +116,11 @@ import {
   version,
   connection_id,
   values,
+  get_lock,
+  release_lock,
+  is_free_lock,
+  is_used_lock,
+  release_all_locks,
 } from './func_misc';
 import {
   elt,
@@ -376,4 +381,9 @@ export const methods: Record<
   system_user: user,
   version,
   connection_id,
+  get_lock,
+  release_lock,
+  is_free_lock,
+  is_used_lock,
+  release_all_locks,
 };

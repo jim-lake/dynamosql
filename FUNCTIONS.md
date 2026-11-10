@@ -146,7 +146,7 @@ and geometry
 | GeomCollection()                |    ❌     | Construct geometry collection from geometries                                                                                                           |
 | GeometryCollection()            |    ❌     | Construct geometry collection from geometries                                                                                                           |
 | GET_FORMAT()                    |    ❌     | Return a date format string                                                                                                                             |
-| GET_LOCK()                      |    ❌     | Get a named lock                                                                                                                                        |
+| GET_LOCK()                      |    ✅     | Get a named lock                                                                                                                                        |
 | GREATEST()                      |    ✅     | Return the largest argument                                                                                                                             |
 | GROUP_CONCAT()                  |    ❌     | Return a concatenated string                                                                                                                            |
 | GROUPING()                      |    ❌     | Distinguish super-aggregate ROLLUP rows from regular rows                                                                                               |
@@ -161,8 +161,8 @@ and geometry
 | INSERT()                        |    ❌     | Insert substring at specified position up to specified number of characters                                                                             |
 | INSTR()                         |    ✅     | Return the index of the first occurrence of substring                                                                                                   |
 | INTERVAL()                      |    ❌     | Return the index of the argument that is less than the first argument                                                                                   |
-| IS_FREE_LOCK()                  |    ❌     | Whether the named lock is free                                                                                                                          |
-| IS_USED_LOCK()                  |    ❌     | Whether the named lock is in use; return connection identifier if true                                                                                  |
+| IS_FREE_LOCK()                  |    ✅     | Whether the named lock is free                                                                                                                          |
+| IS_USED_LOCK()                  |    ✅     | Whether the named lock is in use; return connection identifier if true                                                                                  |
 | IS_UUID()                       |    ❌     | Whether argument is a valid UUID                                                                                                                        |
 | ISNULL()                        |    ✅     | Test whether the argument is NULL                                                                                                                       |
 | JSON_ARRAY()                    |    ✅     | Create JSON array                                                                                                                                       |
@@ -257,8 +257,8 @@ and geometry
 | REGEXP_LIKE()                   |    ❌     | Whether string matches regular expression                                                                                                               |
 | REGEXP_REPLACE()                |    ❌     | Replace substrings matching regular expression                                                                                                          |
 | REGEXP_SUBSTR()                 |    ❌     | Return substring matching regular expression                                                                                                            |
-| RELEASE_ALL_LOCKS()             |    ❌     | Release all current named locks                                                                                                                         |
-| RELEASE_LOCK()                  |    ❌     | Release the named lock                                                                                                                                  |
+| RELEASE_ALL_LOCKS()             |    ✅     | Release all current named locks                                                                                                                         |
+| RELEASE_LOCK()                  |    ✅     | Release the named lock                                                                                                                                  |
 | REPEAT()                        |    ✅     | Repeat a string the specified number of times                                                                                                           |
 | REPLACE()                       |    ✅     | Replace occurrences of a specified string                                                                                                               |
 | REVERSE()                       |    ✅     | Reverse the characters in a string                                                                                                                      |

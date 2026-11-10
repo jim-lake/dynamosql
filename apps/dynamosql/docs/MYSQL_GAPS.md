@@ -18,3 +18,7 @@ MySQL accepts `INSERT INTO t VALUES (...)` and maps the values to columns by pos
 
 - `SELECT extra FROM t JOIN u ON u.id = t.id;`, where `extra` exists only in `u`: MySQL returns the values of `u.extra`. DynamoSQL returns NULL. An unqualified column resolves to the first FROM item (`firstFrom` in `_resolveObject`), unless an earlier qualified reference cached it. Derived tables are affected the same way, for example `SELECT extra FROM t JOIN (SELECT id, extra FROM u) s ON s.id = t.id`.
 - `SELECT s.ID FROM (SELECT id FROM t) s;` with a mismatched alias case, such as `S.NAME` for alias `s`: MySQL returns `ER_BAD_FIELD_ERROR`. DynamoSQL returns `ER_NO_SUCH_TABLE`, because table and alias lookup both fail with the table error. This is an error case for an invalid statement, so it is kept as reference only.
+
+## Named locks
+
+- `SELECT IS_USED_LOCK('x');` while another session holds `x`: MySQL returns that session's connection id. DynamoSQL returns the holder's session thread id, which can differ from the MySQL connection id.

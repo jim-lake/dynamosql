@@ -90,3 +90,13 @@ The memory engine converts values the way MySQL does, so the same query works th
 # Raw engine: JOIN USING on sparse tables
 
 Raw tables have no schema, so `JOIN ... USING (col)` decides which table owns `col` from the first row of each table, in FROM order. The first table whose first row has `col` owns it. If no earlier table's first row has `col`, the join uses the previous table in FROM order. For a sparse table, where the first row lacks a column that later rows have, the join can match on the wrong table. This is accepted.
+
+# Raw engine: named locks
+
+`GET_LOCK`, `RELEASE_LOCK`, `IS_FREE_LOCK`, `IS_USED_LOCK`, and `RELEASE_ALL_LOCKS` store leases in the `__dynamosql_locks` table. The partition key is `lock_key`, set to `${transactionDomain}_${name}`. Each lease keeps `owner_id` and `expires_at`. A lease lasts 10 seconds, and the holding session renews it every second while it holds the lock. A session that ends releases its leases in the background.
+
+Lock names are case-insensitive, as in MySQL. Names are limited to 64 bytes. A NULL or empty name raises `ER_USER_LOCK_WRONG_NAME`.
+
+Lock calls run before the statement, so they are supported only in the select list with one lock call per SELECT. A lock call in WHERE or HAVING, or one that takes a column argument, is not supported.
+
+`IS_USED_LOCK` returns the session's thread id, not the MySQL connection id. The owner string is `${threadId}_${uuid}`, so the thread id is the only part that matches a connection id here.
