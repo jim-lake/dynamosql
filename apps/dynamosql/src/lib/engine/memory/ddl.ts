@@ -151,14 +151,21 @@ function _buildUniqueIndex(
       });
     }
   }
-  const index: UniqueIndex = { name, column_list, map: new BTree() };
+  const map = new BTree<Storage.UniqueKey, string>(
+    undefined,
+    Storage.compareUniqueKeys
+  );
+  const index: UniqueIndex = { name, column_list, map };
   for (const row of data.row_list) {
     const key = Storage.uniqueKeyOf(column_list, row);
     if (key === null) {
       continue;
     }
-    if (index.map.has(key)) {
-      throw new SQLError({ err: 'dup_primary_key_entry', args: [name, key] });
+    if (map.has(key)) {
+      throw new SQLError({
+        err: 'dup_primary_key_entry',
+        args: [name, key.join('-')],
+      });
     }
     index.map.set(key, Storage.primaryKeyOf(data.primary_key, row));
   }

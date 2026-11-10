@@ -12,10 +12,11 @@ export interface MemoryColumnDef extends ColumnDef {
 
 export const ROW_ID_NAME = 'DB_ROW_ID';
 
+export type UniqueKey = unknown[];
 export interface UniqueIndex {
   name: string;
   column_list: string[];
-  map: BTree<string, string>;
+  map: BTree<UniqueKey, string>;
 }
 export interface TableState {
   row_list: CellRow[];
@@ -122,12 +123,33 @@ export function primaryKeyOf(
 export function uniqueKeyOf(
   column_list: readonly string[],
   row: CellRow
-): string | null {
+): UniqueKey | null {
   const values = column_list.map((name) => row[name]?.value);
   if (values.some((value) => value === null || value === undefined)) {
     return null;
   }
-  return JSON.stringify(values);
+  return values;
+}
+export function compareUniqueKeys(a: UniqueKey, b: UniqueKey): number {
+  for (let i = 0; i < a.length; i++) {
+    const diff = _compareCell(a[i], b[i]);
+    if (diff !== 0) {
+      return diff;
+    }
+  }
+  return 0;
+}
+function _compareCell(a: unknown, b: unknown): number {
+  if (typeof a === 'number' && typeof b === 'number') {
+    return _compareOrdered(a, b);
+  }
+  if (Buffer.isBuffer(a) && Buffer.isBuffer(b)) {
+    return Buffer.compare(a, b);
+  }
+  return _compareOrdered(String(a), String(b));
+}
+function _compareOrdered(a: number | string, b: number | string): number {
+  return a < b ? -1 : a > b ? 1 : 0;
 }
 
 export function findConflicts(
@@ -163,7 +185,7 @@ export function duplicateEntryError(
       if (key !== null && index.map.has(key)) {
         return new SQLError({
           err: 'dup_primary_key_entry',
-          args: [index.name, key],
+          args: [index.name, key.join('-')],
         });
       }
     }
