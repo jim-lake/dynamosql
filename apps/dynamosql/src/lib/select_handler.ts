@@ -14,7 +14,14 @@ import { convertNum } from './helpers/sql_conversion';
 import { applyWindows, hasWindow } from './helpers/window';
 import * as Lock from './lock';
 
+import type { Session } from '../session';
+import type { FieldInfo } from '../types';
 import type { TableInfoMap, SourceMap, CellRow } from './engine';
+import type {
+  EvaluationResult,
+  EvaluationState,
+  SubqueryValues,
+} from './expression';
 import type {
   HandlerParams,
   DynamoDBClient,
@@ -22,13 +29,6 @@ import type {
   SourceRowResult,
   SourceRowResultGroup,
 } from './handler_types';
-import type { Session } from '../session';
-import type { FieldInfo } from '../types';
-import type {
-  EvaluationResult,
-  EvaluationState,
-  SubqueryValues,
-} from './expression';
 import type { ColumnRefInfo } from './helpers/column_ref_helper';
 import type { QueryColumn } from './helpers/query_columns';
 import type { SelectModifyAST } from './helpers/select_modify';
@@ -610,7 +610,7 @@ async function* _makeLimit(
   limit: Limit
 ): AsyncIterableIterator<SourceRow[]> {
   let skip_count = 0;
-  let send_count = 0;
+  let send_count: number;
   if (limit.seperator === 'offset') {
     const offsetValue = limit.value[1];
     const limitValue = limit.value[0];

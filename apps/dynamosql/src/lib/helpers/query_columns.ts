@@ -5,8 +5,8 @@ import { convertType } from './column_type_helper';
 import type { COLLATIONS } from '../../constants/mysql';
 import type { FieldInfo } from '../../types';
 import type { QueryColumnInfo, TableInfoMap } from '../engine';
-import type { ColumnRefInfo } from './column_ref_helper';
 import type { MysqlType, ValueType } from '../types/value_type';
+import type { ColumnRefInfo } from './column_ref_helper';
 import type {
   Select,
   ColumnRef,

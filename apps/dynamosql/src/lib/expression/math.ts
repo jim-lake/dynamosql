@@ -10,8 +10,8 @@ import { SQLTime } from '../types/sql_time';
 
 import { getValue } from './evaluate';
 
-import type { EvaluationState, EvaluationResult } from './evaluate';
 import type { ValueType } from '../types/value_type';
+import type { EvaluationState, EvaluationResult } from './evaluate';
 import type { Binary } from 'node-sql-parser/build/mysql';
 
 function isSQLInterval(value: unknown): value is SQLInterval {

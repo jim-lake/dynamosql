@@ -14,12 +14,12 @@ export function deepClone<T>(input: T): DeepMutable<T> {
     if (value === null || typeof value !== 'object') {
       return value;
     }
-    const cached = seen.get(value as unknown as object);
+    const cached = seen.get(value);
     if (cached !== undefined) {
       return cached as V;
     } else if (Array.isArray(value)) {
       const arr: unknown[] = [];
-      seen.set(value as unknown as object, arr);
+      seen.set(value, arr);
       for (const item of value) {
         arr.push(_clone(item));
       }
@@ -41,7 +41,7 @@ export function deepClone<T>(input: T): DeepMutable<T> {
     }
 
     const obj: Record<string, unknown> = {};
-    seen.set(value as unknown as object, obj);
+    seen.set(value, obj);
     for (const key in value as object) {
       if (Object.prototype.hasOwnProperty.call(value, key)) {
         obj[key] = _clone((value as Record<string, unknown>)[key]);

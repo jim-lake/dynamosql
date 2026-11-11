@@ -1,9 +1,9 @@
 import * as Engine from './engine';
 
-import type { DynamoDBWithCache } from './dynamodb';
-import type { HandlerParams } from './handler_types';
 import type { Session } from '../session';
+import type { DynamoDBWithCache } from './dynamodb';
 import type { CommitParams } from './engine';
+import type { HandlerParams } from './handler_types';
 import type { Transaction as TransactionAST } from 'node-sql-parser/build/mysql';
 
 export async function query(

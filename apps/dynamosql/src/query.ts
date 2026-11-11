@@ -298,7 +298,7 @@ interface PegError {
   location?: { start?: { line?: number; column?: number } };
 }
 function _astify(sql: string): AST[] {
-  let list: AST[] = [];
+  let list: AST[];
   try {
     const result = g_parser.astify(sql, { database: 'MySQL' });
     if (Array.isArray(result)) {

@@ -1,6 +1,6 @@
 import js from '@eslint/js';
 import tseslint from 'typescript-eslint';
-import importPlugin from 'eslint-plugin-import';
+import importPlugin from 'eslint-plugin-import-x';
 import { plugin as localPlugin } from '@dynamosql/lint';
 
 export default tseslint.config(
@@ -26,7 +26,7 @@ export default tseslint.config(
         clearInterval: 'readonly',
       },
     },
-    plugins: { local: localPlugin, import: importPlugin },
+    plugins: { local: localPlugin, 'import-x': importPlugin },
     rules: {
       'no-console': 'error',
       'local/no-bare-node-sql-parser': 'error',
@@ -101,7 +101,7 @@ export default tseslint.config(
         },
       ],
       'no-duplicate-imports': ['error', { allowSeparateTypeImports: true }],
-      'import/order': [
+      'import-x/order': [
         'error',
         {
           groups: [
@@ -120,7 +120,7 @@ export default tseslint.config(
           pathGroups: [{ pattern: '@/**', group: 'internal' }],
         },
       ],
-      'import/consistent-type-specifier-style': ['error', 'prefer-top-level'],
+      'import-x/consistent-type-specifier-style': ['error', 'prefer-top-level'],
       '@typescript-eslint/prefer-nullish-coalescing': 'error',
       '@typescript-eslint/only-throw-error': 0,
       '@typescript-eslint/no-base-to-string': 0,

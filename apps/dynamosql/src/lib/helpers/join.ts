@@ -29,19 +29,17 @@ export async function* formJoin(
   params: FormJoinParams
 ): AsyncIterableIterator<SourceRow[]> {
   const { sourceMap, from, where, state } = params;
-  const first = from[0];
+  const [first, ...rest] = from;
   if (!first) {
     return;
   }
   let upstream = _firstRowIter(first, sourceMap);
-  for (let i = 1; i < from.length; i++) {
-    upstream = _join(
-      upstream,
-      from.slice(0, i),
-      from[i] as From,
-      sourceMap,
-      state
-    );
+  const lefts: From[] = [first];
+  let previous = first;
+  for (const next of rest) {
+    upstream = _join(upstream, [...lefts], previous, next, sourceMap, state);
+    lefts.push(next);
+    previous = next;
   }
 
   for await (const batch of upstream) {
@@ -84,6 +82,7 @@ async function* _firstRowIter(
 function _join(
   upstream: AsyncIterable<SourceRow[]>,
   lefts: From[],
+  previous: From,
   from: From,
   sourceMap: Map<From, AsyncIterable<Row[]>>,
   state: EvaluationState
@@ -118,7 +117,7 @@ function _join(
                 (Object.hasOwn(left_row as object, column) ||
                   Object.hasOwn(left_row as object, column.toLowerCase()))
               );
-            }) ?? (lefts[lefts.length - 1] as From);
+            }) ?? previous;
           const left_ref = {
             type: 'column_ref' as const,
             table: getSourceName(owner),

@@ -114,7 +114,7 @@ export class SQLInterval {
     }
     const decimals = Math.max(datetime.getDecimals(), this._decimals);
     const number = this._number * mult;
-    let value = null;
+    let value: SQLTime | SQLDate | SQLDateTime | null;
     if (type === 'time') {
       value = createSQLTime({ time: old_time + number, decimals });
     } else {

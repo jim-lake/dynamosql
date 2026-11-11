@@ -17,15 +17,15 @@ import * as SchemaManager from './schema_manager';
 import * as SelectHandler from './select_handler';
 import { mysqlStringToValueType } from './types/value_type';
 
+import type { CHARSETS } from '../constants/mysql';
+import type { FieldInfo } from '../types';
 import type {
   ColumnDefParam,
   EvaluationResultRow,
   UniqueDefParam,
 } from './engine';
-import type { HandlerParams, AffectedResult } from './handler_types';
-import type { FieldInfo } from '../types';
 import type { EvaluationResult } from './expression';
-import type { CHARSETS } from '../constants/mysql';
+import type { HandlerParams, AffectedResult } from './handler_types';
 import type {
   Create,
   CreateTable,

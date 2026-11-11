@@ -11,8 +11,8 @@ import {
 
 import { getValue } from './evaluate';
 
-import type { EvaluationState, EvaluationResult } from './evaluate';
 import type { ValueType } from '../types/value_type';
+import type { EvaluationState, EvaluationResult } from './evaluate';
 import type { Function } from 'node-sql-parser/build/mysql';
 
 export function coalesce(
@@ -159,7 +159,7 @@ function _ltList<T extends Comparable<T>>(
       convert_list.push(ret);
     }
   }
-  let value: T | string | undefined = undefined;
+  let value: T | string | undefined;
   let decimals = 0;
   if (convert_list.length !== list.length) {
     let val: string | undefined = undefined;

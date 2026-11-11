@@ -179,7 +179,7 @@ export function dateFormat(date: Date, format: string): string {
   });
 }
 function _nthNumber(number: number): string {
-  let ret = '';
+  let ret: string;
   if (number > 3 && number < 21) {
     ret = 'th';
   } else {

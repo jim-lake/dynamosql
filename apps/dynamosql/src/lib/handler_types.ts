@@ -1,5 +1,5 @@
-import type { createDynamoDB } from './dynamodb';
 import type { Session } from '../session';
+import type { createDynamoDB } from './dynamodb';
 import type { Row } from './engine';
 import type { EvaluationResult } from './expression';
 import type { From } from 'node-sql-parser/build/mysql';

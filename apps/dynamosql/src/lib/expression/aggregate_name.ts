@@ -1,7 +1,7 @@
 import { getValue } from './evaluate';
 
-import type { EvaluationState } from './evaluate';
 import type { SourceRow } from '../handler_types';
+import type { EvaluationState } from './evaluate';
 
 const EMPTY_ROW: SourceRow = { source: new Map(), result: null, group: null };
 

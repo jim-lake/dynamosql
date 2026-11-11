@@ -291,9 +291,7 @@ export function getValue(
       result.type = 'buffer';
     }
   } else if (isInterval(expr)) {
-    const intervalFunc = Interval.interval as
-      | ((expr: IntervalType, state: EvaluationState) => EvaluationResult)
-      | undefined;
+    const intervalFunc = Interval.interval;
     if (typeof intervalFunc === 'function') {
       result = intervalFunc(expr, state);
     }

@@ -6,10 +6,10 @@ import { getValue } from '../expression/evaluate';
 
 import { walkColumnRefs } from './ast_helper';
 
-import type { EngineValue, EvaluationResultRow, Row } from '../engine';
-import type { ColumnRefInfo } from './column_ref_helper';
 import type { Session } from '../../session';
+import type { EngineValue, EvaluationResultRow, Row } from '../engine';
 import type { EvaluationResult } from '../expression/evaluate';
+import type { ColumnRefInfo } from './column_ref_helper';
 import type {
   BaseFrom,
   ColumnRef,

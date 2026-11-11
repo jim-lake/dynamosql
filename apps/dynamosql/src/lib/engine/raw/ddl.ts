@@ -143,7 +143,7 @@ export async function createIndex(params: IndexParams): Promise<void> {
         err.message === 'resource_in_use' ||
         err.message.indexOf('already exists') >= 0
       ) {
-        throw new Error('index_exists');
+        throw new Error('index_exists', { cause: err });
       }
     }
     logger.error('raw_engine.createIndex: err:', err);
@@ -159,7 +159,7 @@ export async function deleteIndex(params: DeleteIndexParams): Promise<void> {
     await _waitForTable({ dynamodb, table, index_name });
   } catch (err: unknown) {
     if (err instanceof Error && err.message === 'resource_not_found') {
-      throw new Error('index_not_found');
+      throw new Error('index_not_found', { cause: err });
     }
     logger.error('raw_engine.deleteIndex: err:', err);
     throw err;

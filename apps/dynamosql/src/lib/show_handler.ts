@@ -3,8 +3,8 @@ import { SQLError } from '../error';
 import { convertType } from './helpers/column_type_helper';
 import * as SchemaManager from './schema_manager';
 
-import type { HandlerParams } from './handler_types';
 import type { FieldInfo } from '../types';
+import type { HandlerParams } from './handler_types';
 import type { Show } from 'node-sql-parser/build/mysql';
 
 export interface ShowResult {

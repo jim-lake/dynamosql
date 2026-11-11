@@ -363,7 +363,11 @@ function _partitionKey(
 ): string {
   return partitionby
     .map((part) => {
-      const result = getValue(part.expr as never, { ...state, row });
+      const expr = part.expr;
+      if ('type' in expr && (expr.type === 'star' || expr.type === 'assign')) {
+        throw new SQLError({ err: 'ER_NOT_SUPPORTED_YET' });
+      }
+      const result = getValue(expr, { ...state, row });
       if (result.err) {
         throw new SQLError(result.err);
       }

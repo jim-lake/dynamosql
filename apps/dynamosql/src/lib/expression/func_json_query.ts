@@ -120,7 +120,7 @@ export function json_overlaps(
 
   const left_node = SQLJson.parseText(left, 'json_overlaps', 1);
   const right_node = SQLJson.parseText(right, 'json_overlaps', 2);
-  let overlap = false;
+  let overlap: boolean;
   if (_isRecord(left_node) && _isRecord(right_node)) {
     overlap = Object.keys(left_node).some(
       (key) =>

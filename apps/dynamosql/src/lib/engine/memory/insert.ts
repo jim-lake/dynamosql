@@ -5,7 +5,6 @@ import { convertNum } from '../../helpers/sql_conversion';
 import * as Storage from './storage';
 import { ROW_ID_NAME } from './storage';
 
-import type { MemoryColumnDef } from './storage';
 import type {
   CellValue,
   EvaluationResultRow,
@@ -13,6 +12,7 @@ import type {
   ChangedResult,
   CellRow,
 } from '../index';
+import type { MemoryColumnDef } from './storage';
 
 let g_last_row_id = 0;
 
@@ -164,7 +164,7 @@ function _storedCell(
   return {
     type: cell.type,
     value: isInteger(column?.type) ? roundInt(value) : value,
-  } as CellValue;
+  };
 }
 function _checkJsonText(column: MemoryColumnDef, value: unknown) {
   if (column.type !== 'json' || typeof value !== 'string') {

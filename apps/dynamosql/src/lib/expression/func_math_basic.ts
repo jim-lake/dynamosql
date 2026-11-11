@@ -4,8 +4,8 @@ import { convertNum } from '../helpers/sql_conversion';
 import { getValue } from './evaluate';
 import { modHelper } from './math';
 
-import type { EvaluationState, EvaluationResult } from './evaluate';
 import type { ValueType } from '../types/value_type';
+import type { EvaluationState, EvaluationResult } from './evaluate';
 import type { Function } from 'node-sql-parser/build/mysql';
 
 export function abs(expr: Function, state: EvaluationState): EvaluationResult {

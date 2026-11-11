@@ -5,9 +5,9 @@ import { logger } from '@dynamosql/shared';
 import { SQLError } from '../error';
 import { escapeString } from '../tools/dynamodb_helper';
 
+import type { Session } from '../session';
 import type { DynamoDBWithCache } from './dynamodb';
 import type { EvaluationValue } from './expression';
-import type { Session } from '../session';
 
 export const LOCK_TABLE = '__dynamosql_locks';
 export const LEASE_S = 10;

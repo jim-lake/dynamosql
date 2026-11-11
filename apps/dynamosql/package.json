@@ -34,7 +34,7 @@
     "@types/mysql": "^2.15.27",
     "@types/sqlstring": "^2.3.2",
     "mysql": "^2.18.1",
-    "node-sql-parser": "*",
+    "node-sql-parser": "file:../../packages/node-sql-parser",
     "prettier": "^3.9.10",
     "sorted-btree": "2.1.0"
   }

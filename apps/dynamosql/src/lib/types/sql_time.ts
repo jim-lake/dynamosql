@@ -64,7 +64,6 @@ export class SQLTime {
       const hours = Math.floor(seconds / HOUR);
       seconds -= hours * HOUR;
       const minutes = Math.floor(seconds / MINUTE);
-      seconds -= minutes * MINUTE;
 
       if (ret_secs.length < (decimals > 0 ? decimals + 3 : 2)) {
         ret_secs = '0' + ret_secs;
