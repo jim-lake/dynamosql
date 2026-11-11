@@ -60,10 +60,179 @@ function makeComparator(kinds: Kind[]): CellCompare {
   };
 }
 
+function makeHashKeyFunction(kinds: Kind[]): (tuple: UniqueKey) => unknown {
+  switch (kinds.join('.')) {
+    case 'number':
+    case 'string':
+      return (tuple) => tuple[0];
+    case 'number.string':
+    case 'number.string.number':
+      return (tuple) => JSON.stringify(tuple);
+    default:
+      throw new Error(`unsupported key types: ${kinds.join('.')}`);
+  }
+}
+
+function makeHashKeyComparatorFunction(
+  kinds: Kind[]
+): (a: unknown, b: unknown) => number {
+  switch (kinds.join('.')) {
+    case 'number':
+      return (a, b) => (a as number) - (b as number);
+    case 'string':
+    case 'number.string':
+    case 'number.string.number':
+      return (a, b) => {
+        const x = a as string;
+        const y = b as string;
+        return x > y ? 1 : x < y ? -1 : 0;
+      };
+    default:
+      throw new Error(`unsupported key types: ${kinds.join('.')}`);
+  }
+}
+
+function makeOrderedKeyFunction(kinds: Kind[]): (tuple: UniqueKey) => unknown {
+  switch (kinds.join('.')) {
+    case 'number':
+    case 'string':
+      return (tuple) => tuple[0];
+    case 'number.string':
+      return (tuple) => [tuple[0] as number, tuple[1] as string];
+    case 'number.string.number':
+      return (tuple) => [
+        tuple[0] as number,
+        tuple[1] as string,
+        tuple[2] as number,
+      ];
+    default:
+      throw new Error(`unsupported key types: ${kinds.join('.')}`);
+  }
+}
+
+function makeOrderedKeyComparatorFunction(
+  kinds: Kind[]
+): (a: unknown, b: unknown) => number {
+  switch (kinds.join('.')) {
+    case 'number':
+      return (a, b) => (a as number) - (b as number);
+    case 'string':
+      return (a, b) => {
+        const x = a as string;
+        const y = b as string;
+        return x > y ? 1 : x < y ? -1 : 0;
+      };
+    case 'number.string':
+      return (a, b) => {
+        const x = a as [number, string];
+        const y = b as [number, string];
+        const diff = x[0] - y[0];
+        if (diff) {
+          return diff;
+        }
+        return x[1] > y[1] ? 1 : x[1] < y[1] ? -1 : 0;
+      };
+    case 'number.string.number':
+      return (a, b) => {
+        const x = a as [number, string, number];
+        const y = b as [number, string, number];
+        const diff = x[0] - y[0];
+        if (diff) {
+          return diff;
+        }
+        const middle = x[1] > y[1] ? 1 : x[1] < y[1] ? -1 : 0;
+        if (middle) {
+          return middle;
+        }
+        return x[2] - y[2];
+      };
+    default:
+      throw new Error(`unsupported key types: ${kinds.join('.')}`);
+  }
+}
+
 const singleTupleCompare = makeComparator(['number']);
 const pairCompare = makeComparator(['number', 'string']);
 const tripleCompare = makeComparator(['number', 'string', 'number']);
 const bareNumberCompare = makeCellCompare('number');
+function bareNumberSubtractCompare(a: unknown, b: unknown): number {
+  return (a as number) - (b as number);
+}
+const bufferCompare = Buffer.compare as CellCompare;
+
+function makeKey(key: (string | number | bigint | Buffer)[]): Buffer {
+  const parts: Buffer[] = [];
+
+  for (const value of key) {
+    if (typeof value === 'string' || Buffer.isBuffer(value)) {
+      const bytes =
+        typeof value === 'string' ? Buffer.from(value, 'utf8') : value;
+      const encoded = Buffer.allocUnsafe(bytes.length * 2 + 2);
+      let offset = 0;
+
+      for (const byte of bytes) {
+        if (byte === 0) {
+          encoded[offset++] = 0;
+          encoded[offset++] = 0xff;
+        } else {
+          encoded[offset++] = byte;
+        }
+      }
+
+      encoded[offset++] = 0;
+      encoded[offset++] = 0;
+      parts.push(encoded.subarray(0, offset));
+      continue;
+    }
+
+    if (typeof value === 'number') {
+      if (Number.isNaN(value)) {
+        throw new TypeError('NaN is not supported');
+      }
+
+      const encoded = Buffer.allocUnsafe(8);
+      encoded.writeDoubleBE(value === 0 ? 0 : value);
+
+      if ((encoded[0]! & 0x80) !== 0) {
+        for (let i = 0; i < 8; i++) {
+          encoded[i] = ~encoded[i]!;
+        }
+      } else {
+        encoded[0] ^= 0x80;
+      }
+
+      parts.push(encoded);
+      continue;
+    }
+
+    const negative = value < 0n;
+    let hex = (negative ? -value : value).toString(16);
+
+    if (hex.length % 2 !== 0) {
+      hex = `0${hex}`;
+    }
+
+    const magnitude = Buffer.from(hex, 'hex');
+    const encoded = Buffer.allocUnsafe(5 + magnitude.length);
+
+    encoded[0] = negative ? 0 : 1;
+
+    const length = magnitude.length;
+    encoded.writeUInt32BE(negative ? 0xffffffff - length : length, 1);
+
+    magnitude.copy(encoded, 5);
+
+    if (negative) {
+      for (let i = 5; i < encoded.length; i++) {
+        encoded[i] = ~encoded[i]!;
+      }
+    }
+
+    parts.push(encoded);
+  }
+
+  return Buffer.concat(parts);
+}
 
 function randomValue(kind: Kind, random: () => number): unknown {
   if (kind === 'number') {
@@ -74,6 +243,10 @@ function randomValue(kind: Kind, random: () => number): unknown {
 
 function verifyComparator(kinds: Kind[], label: string): void {
   const compare = makeComparator(kinds);
+  const specialized = makeHashKeyComparatorFunction(kinds);
+  const hash = makeHashKeyFunction(kinds);
+  const ordered = makeOrderedKeyFunction(kinds);
+  const orderedCompare = makeOrderedKeyComparatorFunction(kinds);
   let state = 987654321;
   function random(): number {
     state = (Math.imul(state, 1664525) + 1013904223) >>> 0;
@@ -87,8 +260,39 @@ function verifyComparator(kinds: Kind[], label: string): void {
     if (expected !== actual) {
       throw new Error(`${label} mismatch on ${JSON.stringify([a, b])}`);
     }
+    const specializedSign = Math.sign(specialized(hash(a), hash(b)));
+    if (kinds.length === 1 && expected !== specializedSign) {
+      throw new Error(
+        `${label} specialized mismatch on ${JSON.stringify([a, b])}`
+      );
+    }
+    if ((expected === 0) !== (specializedSign === 0)) {
+      throw new Error(
+        `${label} specialized equality mismatch on ${JSON.stringify([a, b])}`
+      );
+    }
+    if ((expected === 0) !== (hash(a) === hash(b))) {
+      throw new Error(
+        `${label} hash equality mismatch on ${JSON.stringify([a, b])}`
+      );
+    }
+    const orderedSign = Math.sign(orderedCompare(ordered(a), ordered(b)));
+    if (expected !== orderedSign) {
+      throw new Error(`${label} ordered mismatch on ${JSON.stringify([a, b])}`);
+    }
+    const encoded = Math.sign(
+      Buffer.compare(
+        makeKey(a as (string | number)[]),
+        makeKey(b as (string | number)[])
+      )
+    );
+    if (expected !== encoded) {
+      throw new Error(`${label} encoded mismatch on ${JSON.stringify([a, b])}`);
+    }
   }
-  console.log(`${label} matches compareUniqueKeys on 200,000 random key pairs`);
+  console.log(
+    `${label} matches compareUniqueKeys and makeKey + Buffer.compare on 200,000 random key pairs`
+  );
 }
 
 interface Container {
@@ -135,6 +339,23 @@ function btreeContainer(
   };
 }
 
+function mapWithKeyFunction(
+  name: string,
+  toKey: (tuple: UniqueKey) => unknown
+): () => Container {
+  return () => {
+    const map = new Map<unknown, number>();
+    return {
+      name,
+      set: (tuple, value) => map.set(toKey(tuple), value),
+      get: (tuple) => map.get(toKey(tuple)),
+      delete: (tuple) => {
+        map.delete(toKey(tuple));
+      },
+    };
+  };
+}
+
 function identityKey(tuple: UniqueKey): unknown {
   return tuple;
 }
@@ -161,10 +382,50 @@ const SHAPES: Shape[] = [
     tupleOf: (i) => [i],
     factories: [
       mapWithJsonKey,
-      btreeContainer('BTree tuple + makeComparator', singleTupleCompare, identityKey),
-      btreeContainer('BTree bare number + makeCellCompare', bareNumberCompare, firstValueKey),
-      btreeContainer('BTree<number> default comparator', undefined, firstValueKey),
+      btreeContainer(
+        'BTree tuple + makeComparator',
+        singleTupleCompare,
+        identityKey
+      ),
+      btreeContainer(
+        'BTree bare number + makeCellCompare',
+        bareNumberCompare,
+        firstValueKey
+      ),
+      btreeContainer(
+        'BTree bare number + subtraction',
+        bareNumberSubtractCompare,
+        firstValueKey
+      ),
+      btreeContainer(
+        'BTree<number> default comparator',
+        undefined,
+        firstValueKey
+      ),
+      btreeContainer(
+        'BTree + makeKey + Buffer.compare',
+        bufferCompare,
+        (tuple) => makeKey(tuple as (string | number)[])
+      ),
       rawMapNumber,
+      mapWithKeyFunction(
+        'Map + makeHashKeyFunction',
+        makeHashKeyFunction(['number'])
+      ),
+      btreeContainer(
+        'BTree + makeHashKeyComparatorFunction',
+        makeHashKeyComparatorFunction(['number']),
+        makeHashKeyFunction(['number'])
+      ),
+      mapWithKeyFunction(
+        'Map + makeOrderedKeyFunction',
+        makeOrderedKeyFunction(['number'])
+      ),
+      btreeContainer(
+        'BTree + makeOrderedKeyComparatorFunction',
+        makeOrderedKeyComparatorFunction(['number']),
+        makeOrderedKeyFunction(['number'])
+      ),
     ],
   },
   {
@@ -173,8 +434,31 @@ const SHAPES: Shape[] = [
     tupleOf: (i) => [i % 1000, `s${Math.floor(i / 1000)}`],
     factories: [
       mapWithJsonKey,
-      btreeContainer('BTree + compareUniqueKeys', compareUniqueKeys, identityKey),
+      btreeContainer(
+        'BTree + compareUniqueKeys',
+        compareUniqueKeys,
+        identityKey
+      ),
       btreeContainer('BTree + makeComparator', pairCompare, identityKey),
+      mapWithKeyFunction(
+        'Map + makeHashKeyFunction',
+        makeHashKeyFunction(['number', 'string'])
+      ),
+      btreeContainer(
+        'BTree + makeHashKeyComparatorFunction',
+        makeHashKeyComparatorFunction(['number', 'string']),
+        makeHashKeyFunction(['number', 'string'])
+      ),
+      btreeContainer(
+        'BTree + makeOrderedKeyComparatorFunction',
+        makeOrderedKeyComparatorFunction(['number', 'string']),
+        makeOrderedKeyFunction(['number', 'string'])
+      ),
+      btreeContainer(
+        'BTree + makeKey + Buffer.compare',
+        bufferCompare,
+        (tuple) => makeKey(tuple as (string | number)[])
+      ),
     ],
   },
   {
@@ -183,8 +467,31 @@ const SHAPES: Shape[] = [
     tupleOf: (i) => [Math.floor(i / 1000), `x${i % 1000}`, i % 3],
     factories: [
       mapWithJsonKey,
-      btreeContainer('BTree + compareUniqueKeys', compareUniqueKeys, identityKey),
+      btreeContainer(
+        'BTree + compareUniqueKeys',
+        compareUniqueKeys,
+        identityKey
+      ),
       btreeContainer('BTree + makeComparator', tripleCompare, identityKey),
+      mapWithKeyFunction(
+        'Map + makeHashKeyFunction',
+        makeHashKeyFunction(['number', 'string', 'number'])
+      ),
+      btreeContainer(
+        'BTree + makeHashKeyComparatorFunction',
+        makeHashKeyComparatorFunction(['number', 'string', 'number']),
+        makeHashKeyFunction(['number', 'string', 'number'])
+      ),
+      btreeContainer(
+        'BTree + makeOrderedKeyComparatorFunction',
+        makeOrderedKeyComparatorFunction(['number', 'string', 'number']),
+        makeOrderedKeyFunction(['number', 'string', 'number'])
+      ),
+      btreeContainer(
+        'BTree + makeKey + Buffer.compare',
+        bufferCompare,
+        (tuple) => makeKey(tuple as (string | number)[])
+      ),
     ],
   },
 ];
@@ -226,8 +533,8 @@ for (const shape of SHAPES) {
       });
       time(c.name, 'hit lookup', () => {
         for (let j = 0; j < N; j++) {
-          if (c.get(tuples[order[j]]) === undefined) {
-            throw new Error(`${c.name}: expected hit`);
+          if (c.get(tuples[order[j]]) !== j) {
+            throw new Error(`${c.name}: expected hit with value ${j}`);
           }
         }
       });
@@ -243,13 +550,20 @@ for (const shape of SHAPES) {
           c.delete(tuples[order[j]]);
         }
       });
+      for (let j = 0; j < N; j++) {
+        if (c.get(tuples[order[j]]) !== undefined) {
+          throw new Error(`${c.name}: key still present after delete`);
+        }
+      }
     }
   }
 
   console.log(
     `\n== ${shape.name} (${N.toLocaleString()} rows, best of ${ROUNDS} rounds, ms) ==`
   );
-  console.log('container'.padEnd(40) + OPS.map((op) => op.padStart(14)).join(''));
+  console.log(
+    'container'.padEnd(40) + OPS.map((op) => op.padStart(14)).join('')
+  );
   for (const factory of shape.factories) {
     const name = factory().name;
     const cells = OPS.map((op) =>
