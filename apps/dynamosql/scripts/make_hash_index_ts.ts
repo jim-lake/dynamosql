@@ -115,7 +115,7 @@ function renderGenericBranch(nullable: boolean): string[] {
 
 function renderFunction(nullable: boolean): string[] {
   const name = nullable ? 'createMakeKeyNullable' : 'createMakeKey';
-  const returnType = nullable ? 'NullableMakeKey' : 'MakeKey';
+  const returnType = nullable ? 'MakeKeyNullable' : 'MakeKey';
   return [
     `export function ${name}(types: KeyType[]): ${returnType} {`,
     ...renderGenericBranch(nullable),
@@ -130,14 +130,16 @@ function renderFunction(nullable: boolean): string[] {
 }
 
 const fileLines = [
-  "type KeyType = 'string' | 'number' | 'bigint' | 'buffer' | 'string_ci';",
-  'type KeyValue = string | number | bigint | Buffer;',
-  'type MakeKey = (keys: KeyValue[]) => string | number | bigint;',
+  "export type KeyType = 'string' | 'number' | 'bigint' | 'buffer' | 'string_ci';",
+  'export type KeyValue = string | number | bigint | Buffer;',
+  'export type MakeKeyResult = string | number | bigint;',
+  'export type MakeKey = (keys: KeyValue[]) => MakeKeyResult;',
   '',
   ...renderFunction(false),
   '',
-  'type NullableKeyValue = KeyValue | null;',
-  'type NullableMakeKey = (keys: NullableKeyValue[]) => string | number | bigint | null;',
+  'export type KeyValueNullable = KeyValue | null;',
+  'export type MakeKeyResultNullable = string | number | bigint | null;',
+  'export type MakeKeyNullable = (keys: KeyValueNullable[]) => MakeKeyResultNullable;',
   '',
   ...renderFunction(true),
 ];

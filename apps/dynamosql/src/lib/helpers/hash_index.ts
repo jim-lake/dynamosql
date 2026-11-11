@@ -1,6 +1,7 @@
-type KeyType = 'string' | 'number' | 'bigint' | 'buffer' | 'string_ci';
-type KeyValue = string | number | bigint | Buffer;
-type MakeKey = (keys: KeyValue[]) => string | number | bigint;
+export type KeyType = 'string' | 'number' | 'bigint' | 'buffer' | 'string_ci';
+export type KeyValue = string | number | bigint | Buffer;
+export type MakeKeyResult = string | number | bigint;
+export type MakeKey = (keys: KeyValue[]) => MakeKeyResult;
 
 export function createMakeKey(types: KeyType[]): MakeKey {
   if (types.length > 3) {
@@ -676,12 +677,13 @@ export function createMakeKey(types: KeyType[]): MakeKey {
   throw new Error(`Unsupported hash key types: ${types.join(',')}`);
 }
 
-type NullableKeyValue = KeyValue | null;
-type NullableMakeKey = (
-  keys: NullableKeyValue[]
-) => string | number | bigint | null;
+export type KeyValueNullable = KeyValue | null;
+export type MakeKeyResultNullable = string | number | bigint | null;
+export type MakeKeyNullable = (
+  keys: KeyValueNullable[]
+) => MakeKeyResultNullable;
 
-export function createMakeKeyNullable(types: KeyType[]): NullableMakeKey {
+export function createMakeKeyNullable(types: KeyType[]): MakeKeyNullable {
   if (types.length > 3) {
     const kinds = types.slice();
     return (keys) =>
