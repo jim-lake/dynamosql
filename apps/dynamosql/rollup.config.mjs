@@ -1,6 +1,6 @@
 import resolve from '@rollup/plugin-node-resolve';
 import commonjs from '@rollup/plugin-commonjs';
-import typescript from '@rollup/plugin-typescript';
+import esbuild from 'rollup-plugin-esbuild';
 import dts from 'rollup-plugin-dts';
 import path from 'node:path';
 
@@ -35,9 +35,12 @@ export default [
     },
     plugins: [
       srcAlias(),
-      resolve({ preferBuiltins: true }),
+      resolve({
+        preferBuiltins: true,
+        extensions: ['.ts', '.mjs', '.js', '.json', '.node'],
+      }),
       commonjs(),
-      typescript({ declaration: false, declarationMap: false }),
+      esbuild({ target: 'es2022', tsconfig: 'tsconfig.json' }),
     ],
     external: isExternal,
   },
