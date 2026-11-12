@@ -12,7 +12,11 @@ function deleteAddedRows(table: string) {
   };
 }
 
-function insertLoopCase(name: string, table: string, primaryKey: boolean): CaseDef {
+function insertLoopCase(
+  name: string,
+  table: string,
+  primaryKey: boolean
+): CaseDef {
   return {
     name,
     sizes: TABLE_SIZES,
@@ -39,7 +43,10 @@ function batchCase(rowsPerStatement: number): CaseDef {
         for (let i = base; i < base + rowsPerStatement; i++) {
           rows.push(rowValues(n + i));
         }
-        await ctx.exec(`INSERT INTO bench_t VALUES ${rows.join(', ')}`, 'batch');
+        await ctx.exec(
+          `INSERT INTO bench_t VALUES ${rows.join(', ')}`,
+          'batch'
+        );
       }
     },
   };

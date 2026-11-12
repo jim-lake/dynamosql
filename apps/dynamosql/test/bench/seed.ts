@@ -68,7 +68,15 @@ export async function insertRange(
   }
 }
 
-const BENCH_TABLES = ['bench_t', 'bench_k', 'bench_u', 'bench_d1', 'bench_d2', 'bench_d3', 'bench_d4'];
+const BENCH_TABLES = [
+  'bench_t',
+  'bench_k',
+  'bench_u',
+  'bench_d1',
+  'bench_d2',
+  'bench_d3',
+  'bench_d4',
+];
 
 export async function dropBenchTables(t: Target) {
   for (const name of BENCH_TABLES) {

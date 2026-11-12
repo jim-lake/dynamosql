@@ -11,7 +11,7 @@
     "lint": "eslint src test examples --fix",
     "lint:single": "eslint",
     "pretty": "prettier -u --write \"**/*\" --log-level warn",
-    "ts:check": "tsc --noEmit",
+    "ts:check": "tsc --noEmit -p tsconfig.test.json",
     "test:export:check": "tsc --noEmit -p test/import_compare_tsconfig.json",
     "test:setup": "bash scripts/run-tests.sh setup test/setup/setup.js",
     "test:single": "bash scripts/run-tests.sh single",
@@ -24,8 +24,7 @@
     "query:parse": "npx tsx test/test_parse.ts",
     "example:query": "dotenv -- node examples/query.js",
     "bench": "bash scripts/run-bench.sh",
-    "bench:compare": "node --require tsx/cjs test/bench/run.ts compare",
-    "bench:check": "tsc --noEmit -p test/bench/tsconfig.json"
+    "bench:compare": "node --require tsx/cjs test/bench/run.ts compare"
   },
   "dependencies": {
     "@aws-sdk/client-dynamodb": "^3.922.0",
@@ -34,6 +33,7 @@
   },
   "devDependencies": {
     "@dynamosql/lint": "*",
+    "@types/chai": "^5.2.3",
     "@types/mysql": "^2.15.27",
     "@types/sqlstring": "^2.3.2",
     "mysql": "^2.18.1",

@@ -128,7 +128,10 @@ export class RoundCtx {
 
   private _sample() {
     const usage = process.memoryUsage();
-    this._peakHeap = Math.max(this._peakHeap, usage.heapUsed - this._baseline.heapUsed);
+    this._peakHeap = Math.max(
+      this._peakHeap,
+      usage.heapUsed - this._baseline.heapUsed
+    );
     this._peakRss = Math.max(this._peakRss, usage.rss - this._baseline.rss);
   }
 

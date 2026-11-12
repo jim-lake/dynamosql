@@ -46,7 +46,8 @@ function joinCase(opts: JoinOptions): CaseDef {
 }
 
 const CROSS2 = 'SELECT a.id, b.id FROM bench_d1 a, bench_d2 b';
-const CROSS3 = 'SELECT a.id, b.id, c.id FROM bench_d1 a, bench_d2 b, bench_d3 c';
+const CROSS3 =
+  'SELECT a.id, b.id, c.id FROM bench_d1 a, bench_d2 b, bench_d3 c';
 function cube(n: number): number {
   return n ** 3;
 }
@@ -56,8 +57,20 @@ function square(n: number): number {
 }
 
 export const cases: CaseDef[] = [
-  joinCase({ name: 'cross_k2', sql: CROSS2, tables: 2, sizes: DIM_SIZES, pairs: (n) => n ** 2 }),
-  joinCase({ name: 'cross_k3', sql: CROSS3, tables: 3, sizes: K3_SIZES, pairs: cube }),
+  joinCase({
+    name: 'cross_k2',
+    sql: CROSS2,
+    tables: 2,
+    sizes: DIM_SIZES,
+    pairs: (n) => n ** 2,
+  }),
+  joinCase({
+    name: 'cross_k3',
+    sql: CROSS3,
+    tables: 3,
+    sizes: K3_SIZES,
+    pairs: cube,
+  }),
   joinCase({
     name: 'cross_k4',
     sql: 'SELECT a.id, b.id, c.id, d.id FROM bench_d1 a, bench_d2 b, bench_d3 c, bench_d4 d',

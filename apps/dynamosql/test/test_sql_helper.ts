@@ -1,12 +1,34 @@
 process.env.TZ = 'UTC';
 
-const { assert, expect } = require('chai');
-const fs = require('node:fs');
-const mysql = require('mysql');
-const { createSession } = require('../src/session');
+import { assert, expect } from 'chai';
+import fs from 'node:fs';
+import * as mysql from 'mysql';
+import { createSession } from '../src/session';
+import { Types } from '../src/types';
+import { isDeepStrictEqual } from 'node:util';
 
-const { Types } = require('../src/types');
-const { isDeepStrictEqual } = require('node:util');
+interface FieldInfo {
+  name: string;
+  table: string;
+  type: number;
+}
+
+interface TestExtra {
+  mysql?: Record<string, unknown>;
+  session?: Record<string, unknown>;
+  timeout?: number;
+  allowedErrors?: string;
+  nestTables?: boolean;
+  verify_field_types?: boolean;
+  skipAffected?: boolean;
+  checkChanged?: boolean;
+}
+
+interface QueryOutcome {
+  err?: any;
+  results?: any;
+  fields?: FieldInfo[];
+}
 
 const SECONDS_REGEX = /:[0-9]{2}(\.[0-9]*)?$/g;
 
@@ -19,7 +41,12 @@ process.on('unhandledRejection', (err) => {
   process.exit(1);
 });
 
-export function runTests(test_name, file_path, extra, maybe_skip) {
+export function runTests(
+  test_name: string,
+  file_path: string,
+  extra?: TestExtra,
+  maybe_skip?: boolean
+) {
   const skip = maybe_skip && !process.env.TEST_RUN_SLOW;
 
   const mysql_opts = Object.assign(
@@ -58,34 +85,34 @@ export function runTests(test_name, file_path, extra, maybe_skip) {
     .map((s) => s.trim())
     .filter((s) => s.length > 0);
 
-  describe(test_name, function () {
+  describe(test_name, function (this: Mocha.Suite) {
     this.timeout(extra?.timeout || 5000);
     sql_list.forEach((sql) => _runTest(sql));
   });
-  function _runTest(sql) {
-    it(sql, async function () {
+  function _runTest(sql: string) {
+    it(sql, async function (this: Mocha.Context) {
       if (skip) {
         return this.skip();
       }
-      const mysql_result = {};
-      const ddb_result = {};
+      const mysql_result: QueryOutcome = {};
+      const ddb_result: QueryOutcome = {};
 
-      const opts = { sql };
+      const opts: { sql: string; nestTables?: boolean } = { sql };
       if (extra?.nestTables) {
         opts.nestTables = true;
       }
 
       await Promise.all([
-        new Promise((resolve) => {
-          mysql_conn.query(opts, (err, results, fields) => {
+        new Promise<void>((resolve) => {
+          mysql_conn.query(opts, (err: any, results: any, fields: any) => {
             mysql_result.err = err;
             mysql_result.results = results;
             mysql_result.fields = fields;
             resolve();
           });
         }),
-        new Promise((resolve) => {
-          ddb_session.query(opts, (err, results, fields) => {
+        new Promise<void>((resolve) => {
+          ddb_session.query(opts, (err: any, results: any, fields: any) => {
             if (err) {
               err.cause = null;
             }
@@ -127,16 +154,17 @@ export function runTests(test_name, file_path, extra, maybe_skip) {
       ).to.equal(Array.isArray(mysql_result.results));
 
       if (Array.isArray(ddb_result.results)) {
-        ddb_result.results?.forEach?.((result, i) => {
+        const ddb_fields = ddb_result.fields ?? [];
+        ddb_result.results?.forEach?.((result: any, i: number) => {
           if (Array.isArray(result)) {
-            ddb_result.fields.forEach((column, j) => {
+            ddb_fields.forEach((column, j) => {
               const name = column.name;
               const left = String(result[j]);
               const right = String(mysql_result.results[i][name]);
               _checkEqual(name, i, left, right);
             });
           } else {
-            ddb_result.fields.forEach((column) => {
+            ddb_fields.forEach((column) => {
               const { table, name } = column;
               const left = opts.nestTables
                 ? result[table]?.[name]
@@ -153,13 +181,12 @@ export function runTests(test_name, file_path, extra, maybe_skip) {
             .undefined;
         } else {
           expect(
-            ddb_result.fields.length,
+            ddb_fields.length,
             'fields should be the same length'
           ).to.equal(mysql_result.fields.length);
           if (extra?.verify_field_types) {
-            for (let i = 0; i < ddb_result.fields.length; i++) {
-              const ddb_field = ddb_result.fields[i];
-              const mysql_field = mysql_result.fields[i];
+            for (const [i, ddb_field] of ddb_fields.entries()) {
+              const mysql_field = mysql_result.fields[i]!;
               const ddb_type = Types[ddb_field.type];
               const mysql_type = Types[mysql_field.type];
               if (mysql_type === 'MEDIUM_BLOB' || mysql_type === 'LONG_BLOB') {
@@ -194,7 +221,7 @@ export function runTests(test_name, file_path, extra, maybe_skip) {
     });
   }
 }
-function _checkEqual(name, i, left, right) {
+function _checkEqual(name: string, i: number, left: any, right: any) {
   if (name === 'ignore_seconds') {
     expect(
       left.length,

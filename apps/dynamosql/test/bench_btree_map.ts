@@ -8,9 +8,11 @@ const N = Number(process.env.BENCH_ROWS ?? 1_000_000);
 const ROUNDS = Number(process.env.BENCH_ROUNDS ?? 3);
 const OPS = ['build', 'hit lookup', 'miss lookup', 'delete'];
 
-function compareUniqueKeys(a: UniqueKey, b: UniqueKey): number {
-  for (let i = 0; i < a.length; i++) {
-    const diff = _compareCell(a[i], b[i]);
+function compareUniqueKeys(a: unknown, b: unknown): number {
+  const x = a as UniqueKey;
+  const y = b as UniqueKey;
+  for (let i = 0; i < x.length; i++) {
+    const diff = _compareCell(x[i], y[i]);
     if (diff !== 0) {
       return diff;
     }
@@ -51,7 +53,7 @@ function makeComparator(kinds: Kind[]): CellCompare {
     const x = a as UniqueKey;
     const y = b as UniqueKey;
     for (let i = 0; i < cells.length; i++) {
-      const diff = cells[i](x[i], y[i]);
+      const diff = cells[i]!(x[i], y[i]);
       if (diff !== 0) {
         return diff;
       }
@@ -198,7 +200,7 @@ function makeKey(key: (string | number | bigint | Buffer)[]): Buffer {
           encoded[i] = ~encoded[i]!;
         }
       } else {
-        encoded[0] ^= 0x80;
+        encoded[0]! ^= 0x80;
       }
 
       parts.push(encoded);
@@ -508,7 +510,7 @@ for (let i = 0; i < N; i++) {
 for (let i = N - 1; i > 0; i--) {
   seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0;
   const j = Math.floor((seed / 0x100000000) * (i + 1));
-  [order[i], order[j]] = [order[j], order[i]];
+  [order[i]!, order[j]!] = [order[j]!, order[i]!];
 }
 
 for (const shape of SHAPES) {
@@ -528,30 +530,30 @@ for (const shape of SHAPES) {
       const c = factory();
       time(c.name, 'build', () => {
         for (let j = 0; j < N; j++) {
-          c.set(tuples[order[j]], j);
+          c.set(tuples[order[j]!]!, j);
         }
       });
       time(c.name, 'hit lookup', () => {
         for (let j = 0; j < N; j++) {
-          if (c.get(tuples[order[j]]) !== j) {
+          if (c.get(tuples[order[j]!]!) !== j) {
             throw new Error(`${c.name}: expected hit with value ${j}`);
           }
         }
       });
       time(c.name, 'miss lookup', () => {
         for (let j = 0; j < N; j++) {
-          if (c.get(misses[order[j]]) !== undefined) {
+          if (c.get(misses[order[j]!]!) !== undefined) {
             throw new Error(`${c.name}: expected miss`);
           }
         }
       });
       time(c.name, 'delete', () => {
         for (let j = 0; j < N; j++) {
-          c.delete(tuples[order[j]]);
+          c.delete(tuples[order[j]!]!);
         }
       });
       for (let j = 0; j < N; j++) {
-        if (c.get(tuples[order[j]]) !== undefined) {
+        if (c.get(tuples[order[j]!]!) !== undefined) {
           throw new Error(`${c.name}: key still present after delete`);
         }
       }

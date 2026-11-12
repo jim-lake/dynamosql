@@ -3,14 +3,20 @@
     "target": "ES2022",
     "module": "ESNext",
     "lib": ["ES2022"],
-    "moduleResolution": "node",
+    "moduleResolution": "bundler",
+    "types": ["node"],
     "esModuleInterop": true,
     "allowSyntheticDefaultImports": true,
     "forceConsistentCasingInFileNames": true,
-    "strict": false,
+    "strict": true,
+    "noImplicitAny": true,
     "skipLibCheck": true,
     "declaration": true,
-    "noEmit": true
+    "noEmit": true,
+    "strictFunctionTypes": true,
+    "isolatedModules": true,
+    "noUncheckedIndexedAccess": true,
+    "paths": { "@/*": ["../src/*"] }
   },
   "files": ["import_compare.ts"],
   "exclude": ["../node_modules", "../dist"]

@@ -1,16 +1,17 @@
+export {};
 process.env.TZ = 'UTC';
 
 const mysql = require('mysql');
 const { Types } = require('../src/types');
 const { COLLATIONS, FIELD_FLAGS } = require('../src/constants/mysql');
 
-const sql = process.argv.pop();
+const sql = process.argv.pop()!;
 const arg_len = process.argv.length;
 console.log('Arg_len:', arg_len);
 const host =
-  arg_len > 3 ? process.argv[2] : (process.env.DB_HOST ?? 'localhost');
+  arg_len > 3 ? process.argv[2]! : (process.env.DB_HOST ?? 'localhost');
 const port = parseInt(
-  arg_len > 4 ? process.argv[3] : (process.env.DB_PORT ?? '3306')
+  arg_len > 4 ? process.argv[3]! : (process.env.DB_PORT ?? '3306')
 );
 console.log('host:', host);
 console.log('port:', port);
@@ -31,7 +32,7 @@ const conn = mysql.createConnection({
   charset: 'utf8mb4',
   multipleStatements: true,
   dateStrings: true,
-  typeCast(field, next) {
+  typeCast(field: any, next: () => any) {
     if (field.type === 'LONGLONG') {
       const val = field.string();
       if (val === null) {
@@ -42,13 +43,13 @@ const conn = mysql.createConnection({
     return next();
   },
 });
-conn.connect((err) => {
+conn.connect((err: any) => {
   if (err) {
     console.log('connect: err:', err);
     process.exit(-1);
   } else {
     console.log('connect: success');
-    conn.query(sql, [], (err, result, fields) => {
+    conn.query(sql, [], (err: any, result: any, fields: any) => {
       for (let field_list of fields ?? []) {
         if (!Array.isArray(field_list)) {
           field_list = [field_list];
@@ -68,7 +69,7 @@ conn.connect((err) => {
     });
   }
 });
-conn.on('handshake', (handshake) => {
+conn.on('handshake', (handshake: unknown) => {
   console.log('handshake:', handshake);
 });
 

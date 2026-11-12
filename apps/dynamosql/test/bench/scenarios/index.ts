@@ -35,8 +35,7 @@ export function allCases(): BenchCase[] {
 export function selectCases(filter: string[]): BenchCase[] {
   return allCases().filter(
     (c) =>
-      filter.length === 0 ||
-      filter.some((f) => f === c.scenario || f === c.id)
+      filter.length === 0 || filter.some((f) => f === c.scenario || f === c.id)
   );
 }
 

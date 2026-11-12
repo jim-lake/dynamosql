@@ -1,3 +1,4 @@
+export {};
 process.env.TZ = 'UTC';
 
 const path = require('node:path');
@@ -18,7 +19,7 @@ const opts = {
   dateStrings: true,
   resultObjects: true,
   charset: 'utf8mb4',
-  typeCast(field, next) {
+  typeCast(field: any, next: () => any) {
     if (field.type === 'LONGLONG') {
       const val = field.string();
       if (val === null || val === undefined) {
@@ -35,7 +36,7 @@ if (!session) {
   console.error('failed to init session');
   process.exit(-2);
 }
-session.query({ sql }, (err, results, fields) => {
+session.query({ sql }, (err: any, results: any, fields: any) => {
   if (err) {
     console.log('err:', err);
   }

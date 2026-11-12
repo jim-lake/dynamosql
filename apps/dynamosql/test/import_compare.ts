@@ -15,7 +15,7 @@ const _mysqlErrorCheck: _MysqlErrorProps = {
   stack: true,
   code: true,
   errno: true,
-  sqlStateMarker: true,
+  sqlStateMarker: false, // DynamoSQL SQLError has no sqlStateMarker
   sqlState: true,
   fieldCount: true,
   fatal: true,
@@ -40,7 +40,7 @@ const _fieldInfoCheck: _FieldInfoProps = {
   orgName: true,
   charsetNr: true,
   length: true,
-  type: false,
+  type: false, // DynamoSQL narrows to its Types enum
   flags: true,
   decimals: true,
   default: true,
@@ -60,8 +60,8 @@ const _queryOptionsCheck: _QueryOptionsProps = {
   sql: true,
   values: true,
   timeout: true,
-  nestTables: true,
-  typeCast: true,
+  nestTables: false, // DynamoSQL widens to boolean | string
+  typeCast: false, // DynamoSQL field has Types number type and no geometry()
 };
 
 // Connection method validation
@@ -96,7 +96,7 @@ function _testPool(pool: ReturnType<typeof dynamosql.createPool>) {
 function _testCallback(
   _err: dynamosql.MysqlError | null,
   _results?: any,
-  _fields?: dynamosql.FieldInfo[]
+  _fields?: dynamosql.FieldInfo[] | dynamosql.FieldInfo[][]
 ) {}
 const _checkCallback: dynamosql.queryCallback = _testCallback;
 

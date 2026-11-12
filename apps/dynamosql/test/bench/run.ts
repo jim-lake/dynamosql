@@ -72,7 +72,12 @@ class ChildRunner {
     });
     const body = line ? parseChildBody(line) : undefined;
     if (body) {
-      return { ...base, status: 'OK', seedMs: body.seedMs, rounds: body.rounds };
+      return {
+        ...base,
+        status: 'OK',
+        seedMs: body.seedMs,
+        rounds: body.rounds,
+      };
     }
     if (timedOut) {
       return this.failed(base, 'TIMEOUT', `over ${this.opts.caseTimeoutSec}s`);
@@ -88,7 +93,11 @@ class ChildRunner {
     this.proc?.stdin?.end();
   }
 
-  private failed(base: { id: string; size: number }, status: CaseStatus, error: string): CaseResult {
+  private failed(
+    base: { id: string; size: number },
+    status: CaseStatus,
+    error: string
+  ): CaseResult {
     this.proc = undefined;
     this.stdout = '';
     this.stderrTail = '';
@@ -193,14 +202,24 @@ async function main() {
     const sizes = [...def.sizes[scale]].sort((a, b) => a - b);
     for (const size of sizes) {
       if (def.pairs && def.pairs(size) > maxPairs) {
-        report.cases.push({ id, size, status: 'SKIP', error: `pairs ${def.pairs(size)} exceed --max-pairs ${maxPairs}` });
+        report.cases.push({
+          id,
+          size,
+          status: 'SKIP',
+          error: `pairs ${def.pairs(size)} exceed --max-pairs ${maxPairs}`,
+        });
         break;
       }
       console.error(`[bench] ${id} n=${size} start`);
-      const result = await runner.run({ caseId: id, size, rounds, churnSeconds }, { id, size });
+      const result = await runner.run(
+        { caseId: id, size, rounds, churnSeconds },
+        { id, size }
+      );
       report.cases.push(result);
       writeReports(report, jsonPath);
-      console.error(`[bench] ${id} n=${size} ${result.status}${result.error ? `: ${result.error}` : ''}`);
+      console.error(
+        `[bench] ${id} n=${size} ${result.status}${result.error ? `: ${result.error}` : ''}`
+      );
       if (result.status !== 'OK') {
         break;
       }
@@ -209,8 +228,12 @@ async function main() {
   runner.stop();
 
   writeReports(report, jsonPath);
-  const failed = report.cases.filter((c) => c.status !== 'OK' && c.status !== 'SKIP').length;
-  console.log(`DONE ${report.cases.length} cases, ${failed} failed, target=${target}`);
+  const failed = report.cases.filter(
+    (c) => c.status !== 'OK' && c.status !== 'SKIP'
+  ).length;
+  console.log(
+    `DONE ${report.cases.length} cases, ${failed} failed, target=${target}`
+  );
 }
 
 main().catch((err: unknown) => {

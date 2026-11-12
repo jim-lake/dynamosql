@@ -59,7 +59,10 @@ function perSecond(count: number, wallMs: number): number {
   return count / (wallMs / 1000);
 }
 
-function medianOf(rounds: RoundResult[], pick: (r: RoundResult) => number): number {
+function medianOf(
+  rounds: RoundResult[],
+  pick: (r: RoundResult) => number
+): number {
   return median(rounds.map(pick));
 }
 
@@ -71,7 +74,9 @@ function summarize(result: CaseResult): CaseSummary | undefined {
   const labelNames = new Set(rounds.flatMap((r) => Object.keys(r.latencies)));
   const labels: Record<string, Percentiles> = {};
   for (const label of labelNames) {
-    labels[label] = percentiles(rounds.flatMap((r) => r.latencies[label] ?? []));
+    labels[label] = percentiles(
+      rounds.flatMap((r) => r.latencies[label] ?? [])
+    );
   }
   const allLatencies = rounds.flatMap((r) => Object.values(r.latencies).flat());
   const extraNames = new Set(rounds.flatMap((r) => Object.keys(r.extra)));
@@ -89,8 +94,12 @@ function summarize(result: CaseResult): CaseSummary | undefined {
     rowsOut,
     rowsOutPerSec: medianOf(rounds, (r) => perSecond(r.rowsOut, r.wallMs)),
     rowsReadPerSec: medianOf(rounds, (r) => perSecond(r.rowsRead, r.wallMs)),
-    pairsPerSec: medianOf(rounds, (r) => (r.pairs > 0 ? perSecond(r.pairs, r.wallMs) : NaN)),
-    statementsPerSec: medianOf(rounds, (r) => perSecond(r.statements, r.wallMs)),
+    pairsPerSec: medianOf(rounds, (r) =>
+      r.pairs > 0 ? perSecond(r.pairs, r.wallMs) : NaN
+    ),
+    statementsPerSec: medianOf(rounds, (r) =>
+      perSecond(r.statements, r.wallMs)
+    ),
     firstRowMs: medianOf(rounds, (r) => r.firstRowMs ?? NaN),
     peakDeltaMB,
     bytesPerRow: rowsOut >= 100 ? (peakDeltaMB * 1024 * 1024) / rowsOut : NaN,
@@ -132,7 +141,10 @@ function renderTable(headers: string[], rows: string[][]): string {
 }
 
 function renderLine(cells: string[], widths: number[]): string {
-  return cells.map((cell, i) => cell.padEnd(widths[i] ?? 0)).join('  ').trimEnd();
+  return cells
+    .map((cell, i) => cell.padEnd(widths[i] ?? 0))
+    .join('  ')
+    .trimEnd();
 }
 
 function flatnessNotes(summaries: CaseSummary[]): Map<string, string> {
@@ -146,7 +158,9 @@ function flatnessNotes(summaries: CaseSummary[]): Map<string, string> {
     if (!base || series.length < 2 || base.rowsOut <= 0) {
       continue;
     }
-    const top = series.find((s) => s.rowsOut >= 16 * base.rowsOut) ?? series[series.length - 1];
+    const top =
+      series.find((s) => s.rowsOut >= 16 * base.rowsOut) ??
+      series[series.length - 1];
     if (!top || top === base) {
       continue;
     }
@@ -169,9 +183,16 @@ export function formatReport(report: RunReport): string {
   for (const result of report.cases) {
     const s = summarize(result);
     if (!s) {
-      rows.push([result.id, String(result.size), result.status, ...Array<string>(14).fill('-')]);
+      rows.push([
+        result.id,
+        String(result.size),
+        result.status,
+        ...Array<string>(14).fill('-'),
+      ]);
       if (result.error) {
-        notes.push(`${result.id} n=${result.size} ${result.status}: ${result.error}`);
+        notes.push(
+          `${result.id} n=${result.size} ${result.status}: ${result.error}`
+        );
       }
       continue;
     }
@@ -202,7 +223,9 @@ export function formatReport(report: RunReport): string {
     if (Object.keys(s.labels).length > 1) {
       latencyDetail.push(`${s.id} n=${s.size}`);
       for (const [label, p] of Object.entries(s.labels)) {
-        latencyDetail.push(`  ${label}: p50 ${fmt(p.p50, 3)} p95 ${fmt(p.p95, 3)} p99 ${fmt(p.p99, 3)} max ${fmt(p.max, 3)} ms`);
+        latencyDetail.push(
+          `  ${label}: p50 ${fmt(p.p50, 3)} p95 ${fmt(p.p95, 3)} p99 ${fmt(p.p99, 3)} max ${fmt(p.max, 3)} ms`
+        );
       }
     }
     const extra = Object.entries(s.extra).map(([k, v]) => `${k}=${fmt(v, 2)}`);
@@ -211,8 +234,12 @@ export function formatReport(report: RunReport): string {
     }
   }
 
-  lines.push(`target: ${report.target} (measures server memory: ${report.measuresServerMemory ? 'yes' : 'no'})`);
-  lines.push(`node ${report.node}, commit ${report.commit}, heap ${report.heapMb} MB, scale ${report.scale}, rounds ${report.rounds}, case timeout ${report.caseTimeoutSec}s, max pairs ${report.maxPairs}`);
+  lines.push(
+    `target: ${report.target} (measures server memory: ${report.measuresServerMemory ? 'yes' : 'no'})`
+  );
+  lines.push(
+    `node ${report.node}, commit ${report.commit}, heap ${report.heapMb} MB, scale ${report.scale}, rounds ${report.rounds}, case timeout ${report.caseTimeoutSec}s, max pairs ${report.maxPairs}`
+  );
   lines.push(
     'Memory columns are heap deltas in the benchmark process. For targets without server memory they cover only the client.'
   );
@@ -222,7 +249,25 @@ export function formatReport(report: RunReport): string {
   lines.push('');
   lines.push(
     renderTable(
-      ['case', 'n', 'status', 'seed s', 'wall ms', 'rows/s', 'read/s', 'pairs/s', 'stmt/s', 'p50 ms', 'p99 ms', 'first ms', 'peak MB', 'B/row', 'retained MB', 'gc ms', 'cpu ms'],
+      [
+        'case',
+        'n',
+        'status',
+        'seed s',
+        'wall ms',
+        'rows/s',
+        'read/s',
+        'pairs/s',
+        'stmt/s',
+        'p50 ms',
+        'p99 ms',
+        'first ms',
+        'peak MB',
+        'B/row',
+        'retained MB',
+        'gc ms',
+        'cpu ms',
+      ],
       rows
     )
   );

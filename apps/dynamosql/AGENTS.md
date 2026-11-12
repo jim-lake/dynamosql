@@ -36,21 +36,20 @@ Module-level notes:
 
 Run these from `apps/dynamosql/`:
 
-| Task                                            | Command                                                                 |
-| ----------------------------------------------- | ----------------------------------------------------------------------- |
-| Create DynamoDB/MySQL tables                    | `npm run test:setup`                                                    |
-| Full test run                                   | `npm test`                                                              |
-| Single test file                                | `npm run test:single -- test/select/<file>.test.js`                     |
-| Include slow tests                              | `npm run test:slow` or `npm run test:single:slow -- <file>`             |
-| Type check                                      | `npm run ts:check`                                                      |
-| Lint                                            | `npm run lint` (runs `eslint src test examples --fix`)                  |
-| Format (run only when the user explicitly asks) | `npm run pretty`                                                        |
-| Build                                           | `npm run build`                                                         |
-| Export check                                    | `npm run test:export:check`                                             |
-| Memory engine benchmarks (default: dynamosql-memory, small scale, under 2 min) | `npm run bench -- [--target=mysql-memory] [--scale=...]` |
-| Compare two benchmark runs                      | `npm run bench:compare -- <a.json> <b.json>`                            |
-| Type check benchmark harness                    | `npm run bench:check`                                                   |
-| Manual query (MySQL / Dynamo / parse tree)      | `npm run query:mysql` / `npm run query:session` / `npm run query:parse` |
+| Task                                                                           | Command                                                                 |
+| ------------------------------------------------------------------------------ | ----------------------------------------------------------------------- |
+| Create DynamoDB/MySQL tables                                                   | `npm run test:setup`                                                    |
+| Full test run                                                                  | `npm test`                                                              |
+| Single test file                                                               | `npm run test:single -- test/select/<file>.test.js`                     |
+| Include slow tests                                                             | `npm run test:slow` or `npm run test:single:slow -- <file>`             |
+| Type check                                                                     | `npm run ts:check`                                                      |
+| Lint                                                                           | `npm run lint` (runs `eslint src test examples --fix`)                  |
+| Format (run only when the user explicitly asks)                                | `npm run pretty`                                                        |
+| Build                                                                          | `npm run build`                                                         |
+| Export check                                                                   | `npm run test:export:check`                                             |
+| Memory engine benchmarks (default: dynamosql-memory, small scale, under 2 min) | `npm run bench -- [--target=mysql-memory] [--scale=...]`                |
+| Compare two benchmark runs                                                     | `npm run bench:compare -- <a.json> <b.json>`                            |
+| Manual query (MySQL / Dynamo / parse tree)                                     | `npm run query:mysql` / `npm run query:session` / `npm run query:parse` |
 
 After any code change, run `npm run ts:check && npm run lint`, then `npm test`. Run `npm run test:setup` first if table definitions changed.
 

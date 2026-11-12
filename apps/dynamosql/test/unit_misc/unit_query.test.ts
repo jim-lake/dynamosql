@@ -1,7 +1,24 @@
 import { logger } from '@dynamosql/shared';
 import { expect } from 'chai';
-import { promisify } from 'node:util';
+import type { FieldInfo } from '../../src';
 import { addUnitTest } from '../unit_helper';
+
+function queryAsync(target: any): (...args: any[]) => Promise<any> {
+  return (...args) =>
+    new Promise((resolve, reject) => {
+      target.query(...args, (err: unknown, result: unknown) =>
+        err ? reject(err) : resolve(result)
+      );
+    });
+}
+
+function getConnectionAsync(pool: any): Promise<any> {
+  return new Promise((resolve, reject) => {
+    pool.getConnection((err: unknown, conn: unknown) =>
+      err ? reject(err) : resolve(conn)
+    );
+  });
+}
 
 describe('Unit tests for query interface', () => {
   addUnitTest('create connection', async (mod, config) => {
@@ -11,9 +28,9 @@ describe('Unit tests for query interface', () => {
   });
   addUnitTest('empty query', async (mod, config) => {
     const conn = mod.createConnection(config);
-    let err;
+    let err: unknown;
     try {
-      await promisify(conn.query.bind(conn))('', []);
+      await queryAsync(conn)('', []);
     } catch (e) {
       err = e;
     } finally {
@@ -34,7 +51,7 @@ describe('Unit tests for query interface', () => {
   });
   addUnitTest('empty query object start', async (mod, config) => {
     const conn = mod.createConnection(config);
-    let err;
+    let err: unknown;
     try {
       const q = conn.query('', []);
       await new Promise<void>((resolve, reject) => {
@@ -42,7 +59,7 @@ describe('Unit tests for query interface', () => {
           logger.trace('error:', err);
           reject(err);
         });
-        q.on('end', (data) => {
+        q.on('end', (data: unknown) => {
           logger.trace('end:', data);
           resolve();
         });
@@ -57,7 +74,7 @@ describe('Unit tests for query interface', () => {
   });
   addUnitTest('error should still call end', async (mod, config) => {
     const conn = mod.createConnection(config);
-    let err;
+    let err: unknown;
     try {
       const q = conn.query('', []);
       await new Promise<void>((resolve) => {
@@ -65,7 +82,7 @@ describe('Unit tests for query interface', () => {
           logger.trace('on.error:', error);
           err = error;
         });
-        q.on('end', (data) => {
+        q.on('end', (data: unknown) => {
           logger.trace('on.end:', data);
           resolve();
         });
@@ -79,12 +96,12 @@ describe('Unit tests for query interface', () => {
   });
   addUnitTest('query events work', async (mod, config) => {
     const conn = mod.createConnection(config);
-    const fields = [];
-    const results = [];
+    const fields: FieldInfo[][] = [];
+    const results: unknown[] = [];
     try {
       await new Promise<void>((resolve, reject) => {
         const q = conn.query('SELECT 1 + 1 AS result', []);
-        q.on('fields', (data) => {
+        q.on('fields', (data: FieldInfo[]) => {
           logger.trace('fields:', data);
           fields.push(data);
         });
@@ -105,20 +122,20 @@ describe('Unit tests for query interface', () => {
       conn.destroy();
     }
     expect(fields.length, 'fields should have 1 item').to.equal(1);
-    expect(fields[0].length, 'fields[0] should have 1 item').to.equal(1);
+    expect(fields[0]?.length, 'fields[0] should have 1 item').to.equal(1);
     expect(results.length, 'results should have 1 item').to.equal(1);
   });
   addUnitTest('multi query events work', async (mod, config) => {
     const conn = mod.createConnection({ ...config, multipleStatements: true });
-    const fields = [];
-    const rows = [];
+    const fields: FieldInfo[][] = [];
+    const rows: unknown[] = [];
     try {
       await new Promise<void>((resolve, reject) => {
         const q = conn.query(
           'SELECT 1 + 1 AS result; SELECT 1 + 2 AS result2;',
           []
         );
-        q.on('fields', (data) => {
+        q.on('fields', (data: FieldInfo[]) => {
           logger.trace('fields:', data);
           fields.push(data);
         });
@@ -143,14 +160,14 @@ describe('Unit tests for query interface', () => {
   });
   addUnitTest('set doesnt make fields events', async (mod, config) => {
     const conn = mod.createConnection(config);
-    const fields = [];
-    const results = [];
+    const fields: FieldInfo[][] = [];
+    const results: unknown[] = [];
     try {
       await new Promise<void>((resolve, reject) => {
         const q = conn.query('SET @foo = 1', []);
-        q.on('fields', (data) => {
+        q.on('fields', (data: FieldInfo[]) => {
           logger.trace('fields:', data);
-          fields = data;
+          fields.push(data);
         });
         q.on('result', (result) => {
           logger.trace('result:', result);
@@ -176,12 +193,12 @@ describe('Unit tests for query interface', () => {
       ...config,
       database: 'information_schema',
     });
-    const fields = [];
-    const results = [];
+    const fields: FieldInfo[][] = [];
+    const results: unknown[] = [];
     try {
       await new Promise<void>((resolve, reject) => {
         const q = conn.query('SHOW TABLES', []);
-        q.on('fields', (data) => {
+        q.on('fields', (data: FieldInfo[]) => {
           logger.trace('fields:', data);
           fields.push(data);
         });
@@ -207,9 +224,7 @@ describe('Unit tests for query interface', () => {
   addUnitTest('simple query', async (mod, config) => {
     const conn = mod.createConnection(config);
     try {
-      const result = await promisify(conn.query.bind(conn))(
-        'SELECT 1 + 1 AS result'
-      );
+      const result = await queryAsync(conn)('SELECT 1 + 1 AS result');
       expect(result.length).to.equal(1);
       expect(result[0].result).to.equal(2);
     } finally {
@@ -219,10 +234,7 @@ describe('Unit tests for query interface', () => {
   addUnitTest('query with values', async (mod, config) => {
     const conn = mod.createConnection(config);
     try {
-      const result = await promisify(conn.query.bind(conn))(
-        'SELECT 1 + ? AS result',
-        [2]
-      );
+      const result = await queryAsync(conn)('SELECT 1 + ? AS result', [2]);
       expect(result.length).to.equal(1);
       expect(result[0].result).to.equal(3);
     } finally {
@@ -232,7 +244,7 @@ describe('Unit tests for query interface', () => {
   addUnitTest('query with options object', async (mod, config) => {
     const conn = mod.createConnection(config);
     try {
-      const result = await promisify(conn.query.bind(conn))({
+      const result = await queryAsync(conn)({
         sql: 'SELECT ? AS value',
         values: [42],
       });
@@ -244,9 +256,7 @@ describe('Unit tests for query interface', () => {
   addUnitTest('pool query', async (mod, config) => {
     const pool = mod.createPool(config);
     try {
-      const result = await promisify(pool.query.bind(pool))(
-        'SELECT 1 AS value'
-      );
+      const result = await queryAsync(pool)('SELECT 1 AS value');
       expect(result[0].value).to.equal(1);
     } finally {
       pool.end();
@@ -255,10 +265,8 @@ describe('Unit tests for query interface', () => {
   addUnitTest('pool getConnection', async (mod, config) => {
     const pool = mod.createPool(config);
     try {
-      const conn = await promisify(pool.getConnection.bind(pool))();
-      const result = await promisify(conn.query.bind(conn))(
-        'SELECT 2 AS value'
-      );
+      const conn = await getConnectionAsync(pool);
+      const result = await queryAsync(conn)('SELECT 2 AS value');
       expect(result[0].value).to.equal(2);
       conn.release();
     } finally {

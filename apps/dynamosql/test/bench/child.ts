@@ -59,7 +59,9 @@ async function main() {
   for await (const line of lines) {
     const job = JSON.parse(line) as Job;
     const body = await runJob(target, job);
-    process.stdout.write(`${RESULT_PREFIX}${JSON.stringify({ status: 'OK', ...body })}\n`);
+    process.stdout.write(
+      `${RESULT_PREFIX}${JSON.stringify({ status: 'OK', ...body })}\n`
+    );
   }
   await target.close();
   process.exit(0);

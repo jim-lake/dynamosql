@@ -20,7 +20,10 @@ export const cases: CaseDef[] = [
     'projection',
     "SELECT id, val * 2 + grp, CONCAT(s, '-x') FROM bench_t"
   ),
-  streamCase('filter_all', 'SELECT id, grp, val, s FROM bench_t WHERE val >= 0'),
+  streamCase(
+    'filter_all',
+    'SELECT id, grp, val, s FROM bench_t WHERE val >= 0'
+  ),
   streamCase(
     'filter_selective',
     'SELECT id, grp, val, s FROM bench_t WHERE grp = 7'

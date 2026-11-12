@@ -28,7 +28,10 @@ export const cases: CaseDef[] = [
           `SELECT id, grp, val, s FROM bench_t WHERE id = ${id}`,
           'select'
         );
-        await ctx.exec(`UPDATE bench_t SET val = val + 1 WHERE id = ${id}`, 'update');
+        await ctx.exec(
+          `UPDATE bench_t SET val = val + 1 WHERE id = ${id}`,
+          'update'
+        );
         await ctx.exec(`DELETE FROM bench_t WHERE id = ${i}`, 'delete');
         i++;
         if (Date.now() >= nextSample) {
@@ -38,8 +41,10 @@ export const cases: CaseDef[] = [
           nextSample += HEAP_SAMPLE_MS;
         }
       }
-      const meanX = points.reduce((sum, p) => sum + p.seconds, 0) / points.length;
-      const meanY = points.reduce((sum, p) => sum + p.heapMB, 0) / points.length;
+      const meanX =
+        points.reduce((sum, p) => sum + p.seconds, 0) / points.length;
+      const meanY =
+        points.reduce((sum, p) => sum + p.heapMB, 0) / points.length;
       let num = 0;
       let den = 0;
       for (const p of points) {

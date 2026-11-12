@@ -11,7 +11,9 @@ export const cases: CaseDef[] = [
       const count = loopCount(n, 200);
       for (let i = 0; i < count; i++) {
         const id = (i * 7919) % n;
-        await ctx.stream(`SELECT id, grp, val, s FROM bench_t WHERE id = ${id}`);
+        await ctx.stream(
+          `SELECT id, grp, val, s FROM bench_t WHERE id = ${id}`
+        );
       }
       ctx.rowsRead += count * n;
     },

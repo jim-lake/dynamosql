@@ -1,12 +1,13 @@
 import { assert } from 'chai';
-import type { Connection } from 'mysql';
 import * as DynamoSQL from '../../src';
+import type { PoolConnection } from '../../src/types';
+import type { Session } from '../../src/session';
 import { LOCK_TABLE } from '../../src/lib/lock';
 import { addUnitTest } from '../unit_helper';
 
 type Row = Record<string, unknown>;
 
-function run(conn: Connection, sql: string): Promise<Row[]> {
+function run(conn: PoolConnection, sql: string): Promise<Row[]> {
   return new Promise<Row[]>((resolve, reject) => {
     const rows: Row[] = [];
     const q = conn.query(sql, []);
@@ -21,7 +22,7 @@ function run(conn: Connection, sql: string): Promise<Row[]> {
 }
 
 async function scalar(
-  conn: Connection,
+  conn: PoolConnection,
   sql: string,
   column: string
 ): Promise<number> {
@@ -183,9 +184,11 @@ describe('Lock contention between sessions', () => {
       await scalar(a, "SELECT GET_LOCK('ct_warmup', 0) AS g", 'g');
       await run(a, "SELECT RELEASE_LOCK('ct_warmup') AS r");
       const stale = Math.floor(Date.now() / 1000) - 1;
-      await a.dynamodb.updateItem({
+      await (a as Session).dynamodb.updateItem({
         table: LOCK_TABLE,
-        key: { lock_key: { S: `${a.transactionDomain}_ct_expired` } },
+        key: {
+          lock_key: { S: `${(a as Session).transactionDomain}_ct_expired` },
+        },
         expression: 'SET owner_id = :owner, expires_at = :expires',
         values: {
           ':owner': { S: 'stale-owner' },

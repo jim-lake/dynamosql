@@ -10,7 +10,10 @@ const dbConfig = {
 
 export function addUnitTest(
   name: string,
-  testFunction: (lib: typeof mysql, config: any) => void | Promise<void>,
+  testFunction: (
+    lib: typeof DynamoSQL,
+    config: Record<string, unknown>
+  ) => void | Promise<void>,
   slow = false
 ) {
   it(`${name} => mysql`, async function () {
@@ -25,13 +28,13 @@ export function addUnitTest(
       multipleStatements: true,
       dateStrings: true,
     };
-    await testFunction(mysql, mysql_opts);
+    await testFunction(mysql as unknown as typeof DynamoSQL, mysql_opts);
   });
   it(`${name} => dynamosql`, async function () {
     if (slow && !process.env.TEST_RUN_SLOW) {
       return this.skip();
     }
-    await testFunction(DynamoSQL as unknown as typeof mysql, {
+    await testFunction(DynamoSQL, {
       namespace: process.env.DYNAMO_NAMESPACE ?? 'dynamosql_test',
     });
   });

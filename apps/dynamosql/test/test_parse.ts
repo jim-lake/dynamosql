@@ -1,3 +1,4 @@
+export {};
 const path = require('node:path');
 const { Parser } = require('node-sql-parser/build/mysql');
 
