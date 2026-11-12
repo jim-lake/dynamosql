@@ -2,6 +2,7 @@ import { writeFileSync } from 'fs';
 import { join } from 'path';
 
 type KeyType = 'string' | 'number' | 'bigint' | 'buffer' | 'string_ci';
+type PrimaryKeyType = 'string' | 'bigint' | 'number';
 
 const KEY_TYPES: KeyType[] = [
   'string',
@@ -10,6 +11,7 @@ const KEY_TYPES: KeyType[] = [
   'buffer',
   'string_ci',
 ];
+const PRIMARY_KEY_TYPES: PrimaryKeyType[] = ['string', 'bigint', 'number'];
 const HARDCODED_MAX_KEYS = 3;
 const OUTPUT_PATH = join(
   __dirname,
@@ -19,6 +21,14 @@ const OUTPUT_PATH = join(
   'helpers',
   'hash_index.ts'
 );
+
+const PLAIN_NULLABLE_SINGLE: Record<KeyType, string> = {
+  string: 'keys[0] as string',
+  number: 'String(keys[0])',
+  bigint: 'String(keys[0])',
+  buffer: "(keys[0] as Buffer).toString('latin1')",
+  string_ci: '(keys[0] as string).toLowerCase()',
+};
 
 function typeCombinations(length: number): KeyType[][] {
   if (length === 0) {
@@ -50,78 +60,100 @@ function keyExpression(
   }
 }
 
-function singleKeyBody(type: KeyType, nullable: boolean): string {
-  if (type === 'string' || type === 'number' || type === 'bigint') {
-    return `keys[0] as string | number | bigint${nullable ? ' | null' : ''}`;
-  }
-  const expr = keyExpression(type, 0, nullable);
-  return nullable ? `${expr} ?? null` : expr;
-}
-
-function multiKeyBody(types: KeyType[], nullable: boolean): string {
-  if (types.every((type) => type === 'string' || type === 'number')) {
-    return 'JSON.stringify(keys)';
-  }
-  const exprs = types.map((type, i) => keyExpression(type, i, nullable));
-  return `JSON.stringify([${exprs.join(', ')}])`;
-}
-
-function renderSwitchCases(nullable: boolean): string[] {
-  const labelsByBody = new Map<string, string[]>();
-  for (let length = 1; length <= HARDCODED_MAX_KEYS; length++) {
-    for (const types of typeCombinations(length)) {
-      const body =
-        length === 1
-          ? singleKeyBody(types[0] as KeyType, nullable)
-          : multiKeyBody(types, nullable);
-      labelsByBody.set(body, [
-        ...(labelsByBody.get(body) ?? []),
-        types.join(','),
-      ]);
-    }
-  }
-
-  const lines: string[] = [];
-  for (const [body, labels] of labelsByBody) {
-    lines.push(...labels.map((label) => `    case '${label}':`));
-    lines.push(`      return keys => ${body};`, '');
-  }
-  lines.pop();
-  return lines;
-}
-
-function renderGenericBranch(nullable: boolean): string[] {
-  const stringCi = nullable
-    ? '(key as string | null)?.toLowerCase()'
-    : 'String(key).toLowerCase()';
-  return [
-    `  if (types.length > ${HARDCODED_MAX_KEYS}) {`,
-    '    const kinds = types.slice();',
-    '    return keys =>',
-    '      JSON.stringify(',
-    '        keys.map((key, i) => {',
-    '          if (Buffer.isBuffer(key)) {',
-    "            return key.toString('latin1');",
-    '          }',
-    "          if (typeof key === 'bigint') {",
-    '            return key.toString();',
-    '          }',
-    `          return kinds[i] === 'string_ci' ? ${stringCi} : key;`,
-    '        }),',
-    '      );',
-    '  }',
-  ];
-}
-
 function renderFunction(nullable: boolean): string[] {
   const name = nullable ? 'createMakeKeyNullable' : 'createMakeKey';
   const returnType = nullable ? 'MakeKeyNullable' : 'MakeKey';
+  const params = nullable
+    ? 'types: KeyType[], primaryType: PrimaryKeyType'
+    : 'types: KeyType[]';
+  const switchSubject = nullable
+    ? "  switch (`${primaryType}.${types.join(',')}`) {"
+    : "  switch (types.join(',')) {";
+  const primaryTypes: (PrimaryKeyType | null)[] = nullable
+    ? PRIMARY_KEY_TYPES
+    : [null];
+
+  const labelsByStatement = new Map<string, string[]>();
+  for (let length = 1; length <= HARDCODED_MAX_KEYS; length++) {
+    for (const types of typeCombinations(length)) {
+      const exprs = types.map((type, i) => keyExpression(type, i, nullable));
+      const multiBody = types.every(
+        (type) => type === 'string' || type === 'number'
+      )
+        ? 'JSON.stringify(keys)'
+        : `JSON.stringify([${exprs.join(', ')}])`;
+      const singleBody =
+        types[0] === 'buffer' || types[0] === 'string_ci'
+          ? exprs[0]
+          : 'keys[0] as string | number | bigint';
+      const nullTest = types.map((_, i) => `keys[${i}] === null`).join(' || ');
+
+      for (const primaryType of primaryTypes) {
+        let statement: string;
+        if (primaryType === null) {
+          statement = `      return keys => ${length > 1 ? multiBody : singleBody};`;
+        } else if (length > 1) {
+          statement = `      return (keys, primaryKey) => ${nullTest} ? \`\${${multiBody}}:\${primaryKey}\` : ${multiBody};`;
+        } else if (
+          primaryType === 'string' &&
+          (types[0] === 'string' || types[0] === 'buffer')
+        ) {
+          statement = `      return (keys, primaryKey) => keys[0] === null ? JSON.stringify([null, primaryKey]) : ${PLAIN_NULLABLE_SINGLE[types[0]]};`;
+        } else {
+          statement = `      return (keys, primaryKey) => keys[0] === null ? \`null:\${primaryKey}\` : ${PLAIN_NULLABLE_SINGLE[types[0]]};`;
+        }
+        const label =
+          primaryType === null
+            ? types.join(',')
+            : `${primaryType}.${types.join(',')}`;
+        labelsByStatement.set(statement, [
+          ...(labelsByStatement.get(statement) ?? []),
+          label,
+        ]);
+      }
+    }
+  }
+
+  const switchCases: string[] = [];
+  for (const [statement, labels] of labelsByStatement) {
+    switchCases.push(...labels.map((label) => `    case '${label}':`));
+    switchCases.push(statement, '');
+  }
+  switchCases.pop();
+
+  const stringCi = nullable
+    ? '(key as string | null)?.toLowerCase()'
+    : '(key as string).toLowerCase()';
+  const mapped = [
+    'keys.map((key, i) => {',
+    '  if (Buffer.isBuffer(key)) {',
+    "    return key.toString('latin1');",
+    '  }',
+    "  if (typeof key === 'bigint') {",
+    '    return key.toString();',
+    '  }',
+    `  return types[i] === 'string_ci' ? ${stringCi} : key;`,
+    '})',
+  ];
+  const genericBody = nullable
+    ? [
+        '    return (keys, primaryKey) => {',
+        '      const json = JSON.stringify(',
+        ...mapped,
+        '      );',
+        '      return keys.includes(null) ? `${json}:${primaryKey}` : json;',
+        '    };',
+      ]
+    : ['    return keys => JSON.stringify(', ...mapped, '    );'];
+
   return [
-    `export function ${name}(types: KeyType[]): ${returnType} {`,
-    ...renderGenericBranch(nullable),
+    `export function ${name}(${params}): ${returnType} {`,
+    `  if (types.length > ${HARDCODED_MAX_KEYS}) {`,
+    ...genericBody,
+    '  }',
     '',
-    "  switch (types.join(',')) {",
-    ...renderSwitchCases(nullable),
+    switchSubject,
+    ...switchCases,
     '  }',
     '',
     "  throw new Error(`Unsupported hash key types: ${types.join(',')}`);",
@@ -138,8 +170,11 @@ const fileLines = [
   ...renderFunction(false),
   '',
   'export type KeyValueNullable = KeyValue | null;',
-  'export type MakeKeyResultNullable = string | number | bigint | null;',
-  'export type MakeKeyNullable = (keys: KeyValueNullable[]) => MakeKeyResultNullable;',
+  "export type PrimaryKeyType = 'string' | 'bigint' | 'number';",
+  'export type MakeKeyNullable = (',
+  '  keys: KeyValueNullable[],',
+  '  primaryKey: string | bigint | number',
+  ') => string;',
   '',
   ...renderFunction(true),
 ];
