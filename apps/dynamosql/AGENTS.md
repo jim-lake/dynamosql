@@ -47,6 +47,9 @@ Run these from `apps/dynamosql/`:
 | Format (run only when the user explicitly asks) | `npm run pretty`                                                        |
 | Build                                           | `npm run build`                                                         |
 | Export check                                    | `npm run test:export:check`                                             |
+| Memory engine benchmarks (default: dynamosql-memory, small scale, under 2 min) | `npm run bench -- [--target=mysql-memory] [--scale=...]` |
+| Compare two benchmark runs                      | `npm run bench:compare -- <a.json> <b.json>`                            |
+| Type check benchmark harness                    | `npm run bench:check`                                                   |
 | Manual query (MySQL / Dynamo / parse tree)      | `npm run query:mysql` / `npm run query:session` / `npm run query:parse` |
 
 After any code change, run `npm run ts:check && npm run lint`, then `npm test`. Run `npm run test:setup` first if table definitions changed.
@@ -161,6 +164,9 @@ A behavior is supported only when all four docs cover it. If any one of them doe
 - `docs/TEST_GAPS.md` holds supported statements that match MySQL 8.4 but have no test. When you find one, add it there instead of leaving it untested.
 
 ## Notes
+
+- NEVER start a command in the background and then sleep or poll in the foreground to wait for it. Run commands synchronously and read their output. Background runs gain nothing here and waste time.
+- NEVER run any command for more than 30 minutes. Do not start a background process to get around this limit. If a task seems to need more than 30 minutes, ASK the user first.
 
 - The agent ALWAYS has DynamoDB access. Use the settings in `.env` (including `AWS_REGION`) for all development, testing, and investigation. Do not assume DynamoDB is unavailable, and do not report it as unavailable without checking `.env` first.
 - The agent ALWAYS has MySQL access too, using the `DB_*` settings in `.env`. Never complain about a missing environment or say tests cannot be run because of it.

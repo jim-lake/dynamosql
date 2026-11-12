@@ -22,7 +22,10 @@
     "query:mysql": "dotenv -- npx tsx test/test_client.js",
     "query:session": "dotenv -- npx tsx test/test_session.js",
     "query:parse": "npx tsx test/test_parse.ts",
-    "example:query": "dotenv -- node examples/query.js"
+    "example:query": "dotenv -- node examples/query.js",
+    "bench": "bash scripts/run-bench.sh",
+    "bench:compare": "node --require tsx/cjs test/bench/run.ts compare",
+    "bench:check": "tsc --noEmit -p test/bench/tsconfig.json"
   },
   "dependencies": {
     "@aws-sdk/client-dynamodb": "^3.922.0",
