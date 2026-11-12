@@ -6,6 +6,7 @@ import { roundInt, isInteger } from './insert';
 import * as Storage from './storage';
 
 import type { EvaluationResult } from '../../expression';
+import type { KeyValue } from '../../helpers/hash_unique_index';
 import type {
   MultiUpdateParams,
   UpdateParams,
@@ -48,7 +49,7 @@ export async function multipleUpdate(
         }
         return key.value;
       });
-      const update_key = JSON.stringify(key_list);
+      const update_key = data.primary_key.makeKey(key_list as KeyValue[]);
       const index = state.primary_map.get(update_key);
 
       if (index !== undefined && index >= 0) {

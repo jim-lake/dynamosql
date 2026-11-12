@@ -2,6 +2,11 @@ import { SQLError } from '../../../error';
 
 import type { COLLATIONS } from '../../../constants/mysql';
 import type { Session } from '../../../session';
+import type {
+  KeyValue,
+  MakeKey,
+  MakeKeyResult,
+} from '../../helpers/hash_unique_index';
 import type { CellValue, ColumnDef, CellRow } from '../index';
 import type BTree from 'sorted-btree';
 
@@ -12,22 +17,26 @@ export interface MemoryColumnDef extends ColumnDef {
 
 export const ROW_ID_NAME = 'DB_ROW_ID';
 
+export interface PrimaryKey {
+  columns: string[];
+  makeKey: MakeKey;
+}
 export type UniqueKey = unknown[];
 export interface UniqueIndex {
   name: string;
   column_list: string[];
-  map: BTree<UniqueKey, string>;
+  map: BTree<UniqueKey, MakeKeyResult>;
 }
 export interface TableState {
   row_list: CellRow[];
-  primary_map: Map<string, number>;
+  primary_map: Map<MakeKeyResult, number>;
   unique_list: UniqueIndex[];
 }
 export interface TableData extends TableState {
   table: string;
   collation: COLLATIONS;
   column_list: MemoryColumnDef[];
-  primary_key: string[];
+  primary_key: PrimaryKey;
 }
 export interface TxData {
   database: string;
@@ -115,10 +124,11 @@ export function cloneState(data: TableState): TableState {
   };
 }
 export function primaryKeyOf(
-  primary_key: readonly string[],
+  primary_key: PrimaryKey,
   row: CellRow
-): string {
-  return JSON.stringify(primary_key.map((name) => row[name]?.value));
+): MakeKeyResult {
+  const values = primary_key.columns.map((name) => row[name]?.value);
+  return primary_key.makeKey(values as KeyValue[]);
 }
 export function uniqueKeyOf(
   column_list: readonly string[],
@@ -155,7 +165,7 @@ function _compareOrdered(a: number | string, b: number | string): number {
 export function findConflicts(
   state: TableState,
   row: CellRow,
-  primary_key: readonly string[],
+  primary_key: PrimaryKey,
   self?: number
 ): number[] {
   const positions = new Set<number>();
@@ -176,7 +186,7 @@ export function findConflicts(
 export function duplicateEntryError(
   state: TableState,
   row: CellRow,
-  primary_key: readonly string[]
+  primary_key: PrimaryKey
 ): SQLError {
   const pk = primaryKeyOf(primary_key, row);
   if (!state.primary_map.has(pk)) {
@@ -192,13 +202,13 @@ export function duplicateEntryError(
   }
   return new SQLError({
     err: 'dup_primary_key_entry',
-    args: [primary_key, pk],
+    args: [primary_key.columns, pk],
   });
 }
 export function appendRow(
   state: TableState,
   row: CellRow,
-  primary_key: readonly string[]
+  primary_key: PrimaryKey
 ): void {
   _setRow(state, state.row_list.length, row, primary_key);
 }
@@ -206,7 +216,7 @@ export function replaceRow(
   state: TableState,
   position: number,
   row: CellRow,
-  primary_key: readonly string[]
+  primary_key: PrimaryKey
 ): void {
   _unsetRow(state, position, primary_key);
   _setRow(state, position, row, primary_key);
@@ -214,7 +224,7 @@ export function replaceRow(
 export function removeRow(
   state: TableState,
   position: number,
-  primary_key: readonly string[]
+  primary_key: PrimaryKey
 ): void {
   _unsetRow(state, position, primary_key);
   state.row_list.splice(position, 1);
@@ -229,7 +239,7 @@ function _setRow(
   state: TableState,
   position: number,
   row: CellRow,
-  primary_key: readonly string[]
+  primary_key: PrimaryKey
 ): void {
   const pk = primaryKeyOf(primary_key, row);
   state.row_list[position] = row;
@@ -244,7 +254,7 @@ function _setRow(
 function _unsetRow(
   state: TableState,
   position: number,
-  primary_key: readonly string[]
+  primary_key: PrimaryKey
 ): void {
   const row = state.row_list[position];
   if (!row) {

@@ -4,6 +4,7 @@ import { SQLError, NoSingleOperationError } from '../../../error';
 
 import * as Storage from './storage';
 
+import type { KeyValue } from '../../helpers/hash_unique_index';
 import type {
   DeleteParams,
   MultiDeleteParams,
@@ -46,7 +47,7 @@ export async function multipleDelete(
         }
         return key.value;
       });
-      const delete_key = JSON.stringify(key_list);
+      const delete_key = data.primary_key.makeKey(key_list as KeyValue[]);
       const index = state.primary_map.get(delete_key);
 
       if (index !== undefined && index >= 0) {

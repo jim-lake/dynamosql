@@ -11,6 +11,37 @@ set -uo pipefail
 target=dynamosql-memory
 for arg in "$@"; do
   case "$arg" in
+    -h | --help)
+      cat <<'EOF'
+Usage: npm run bench -- [flags]
+
+Runs the benchmark cases in test/bench/scenarios against one target.
+Writes a log, a JSON report, and a text report to /tmp.
+
+Flags:
+  --target=<name>        dynamosql-memory (default) or mysql-memory
+  --scenario=<a,b>       Comma-separated scenario or case names, such as
+                         select_scan,join or select_point/point_loop.
+                         Default: all cases.
+                         Scenarios: select_scan, select_point, select_group,
+                         join, insert, update, delete, churn
+  --scale=<name>         small (default), default, or large
+  --rounds=<n>           Measured rounds per case (default 1)
+  --churn-seconds=<n>    Duration of the churn scenario (default 5)
+  --heap-mb=<n>          Node heap limit for the child process (default 2048)
+  --case-timeout=<sec>   Timeout per case (default 600)
+  --max-pairs=<n>        Skip cases with more join pairs than this
+                         (default 20000000)
+  --out=<path>           JSON report path (default /tmp/dynamosql-bench-...json)
+  -h, --help             Show this help and exit
+
+Examples:
+  npm run bench
+  npm run bench -- --scenario=join --scale=default
+  npm run bench -- --target=mysql-memory --scenario=select_point
+EOF
+      exit 0
+      ;;
     --target=*) target=${arg#--target=} ;;
   esac
 done

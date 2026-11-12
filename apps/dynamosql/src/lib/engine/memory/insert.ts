@@ -38,7 +38,7 @@ export async function insertRowList(
     throw new SQLError('table_not_found');
   }
 
-  const { primary_key } = data;
+  const primary_key = data.primary_key;
   const state = Storage.cloneState(data);
   let affectedRows = 0;
   let duplicateRows = 0;
@@ -50,7 +50,7 @@ export async function insertRowList(
       }
     }
     const cellRow = _transformRow(row, data.column_list, is_ignore ?? false);
-    if (primary_key[0] === ROW_ID_NAME) {
+    if (primary_key.columns[0] === ROW_ID_NAME) {
       cellRow[ROW_ID_NAME] = { type: 'longlong', value: ++g_last_row_id };
     }
     const conflicts = Storage.findConflicts(state, cellRow, primary_key);

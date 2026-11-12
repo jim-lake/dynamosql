@@ -1,9 +1,16 @@
 import BTree from 'sorted-btree';
 
 import { SQLError } from '../../../error';
+import { createMakeKey } from '../../helpers/hash_unique_index';
 
 import * as Storage from './storage';
 
+import type {
+  KeyType,
+  KeyValue,
+  MakeKeyResult,
+} from '../../helpers/hash_unique_index';
+import type { ValueType } from '../../types/value_type';
 import type {
   ColumnDefParam,
   CellValue,
@@ -19,6 +26,14 @@ import type {
 } from '../index';
 import type { MemoryColumnDef, TableData, UniqueIndex } from './storage';
 
+const KEY_TYPE_BY_VALUE_TYPE: Partial<Record<ValueType, KeyType>> = {
+  string: 'string',
+  char: 'string',
+  text: 'string',
+  long: 'number',
+  longlong: 'number',
+};
+
 export async function getTableInfo(
   params: TableInfoParams
 ): Promise<TableInfo> {
@@ -28,7 +43,7 @@ export async function getTableInfo(
     return {
       table,
       collation: data.collation,
-      primary_key: data.primary_key,
+      primary_key: data.primary_key.columns,
       column_list: data.column_list,
       is_open: false,
       rowCount: BigInt(data.row_list.length),
@@ -49,7 +64,7 @@ export async function createTable(params: CreateTableParams): Promise<void> {
       throw new SQLError({ err: 'ER_WRONG_COLUMN_NAME', args: [col.name] });
     }
   }
-  const primary_key =
+  const primary_columns =
     params.primary_key.length > 0 ? params.primary_key : [Storage.ROW_ID_NAME];
   const column_list = params.column_list.map((col) => {
     const ret: MemoryColumnDef = {
@@ -76,10 +91,22 @@ export async function createTable(params: CreateTableParams): Promise<void> {
     }
     return ret;
   });
+  const key_type_list: (KeyType | undefined)[] = primary_columns.map((name) => {
+    if (name === Storage.ROW_ID_NAME) {
+      return 'number';
+    }
+    const column = column_list.find(
+      (col) => col.name_lc === name.toLowerCase()
+    );
+    return column && KEY_TYPE_BY_VALUE_TYPE[column.type];
+  });
+  const makeKey = key_type_list.every((type) => type !== undefined)
+    ? createMakeKey(key_type_list)
+    : _jsonKey;
   const data: TableData = {
     table,
     column_list,
-    primary_key,
+    primary_key: { columns: primary_columns, makeKey },
     collation: params.collation,
     row_list: [],
     primary_map: new Map(),
@@ -151,7 +178,7 @@ function _buildUniqueIndex(
       });
     }
   }
-  const map = new BTree<Storage.UniqueKey, string>(
+  const map = new BTree<Storage.UniqueKey, MakeKeyResult>(
     undefined,
     Storage.compareUniqueKeys
   );
@@ -170,6 +197,9 @@ function _buildUniqueIndex(
     index.map.set(key, Storage.primaryKeyOf(data.primary_key, row));
   }
   return index;
+}
+function _jsonKey(values: KeyValue[]): string {
+  return JSON.stringify(values);
 }
 function _getDefault(column: ColumnDefParam): CellValue | undefined {
   if (column.default !== undefined) {
