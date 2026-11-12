@@ -3,6 +3,7 @@ import { join } from 'path';
 
 type KeyType = 'string' | 'number' | 'bigint' | 'buffer' | 'string_ci';
 type PrimaryKeyType = 'string' | 'bigint' | 'number';
+type Mode = 'unique' | 'nullable' | 'nonunique';
 
 const KEY_TYPES: KeyType[] = [
   'string',
@@ -13,14 +14,7 @@ const KEY_TYPES: KeyType[] = [
 ];
 const PRIMARY_KEY_TYPES: PrimaryKeyType[] = ['string', 'bigint', 'number'];
 const HARDCODED_MAX_KEYS = 3;
-const OUTPUT_PATH = join(
-  __dirname,
-  '..',
-  'src',
-  'lib',
-  'helpers',
-  'hash_index.ts'
-);
+const HELPERS_DIR = join(__dirname, '..', 'src', 'lib', 'helpers');
 
 const PLAIN_NULLABLE_SINGLE: Record<KeyType, string> = {
   string: 'keys[0] as string',
@@ -28,6 +22,20 @@ const PLAIN_NULLABLE_SINGLE: Record<KeyType, string> = {
   bigint: 'String(keys[0])',
   buffer: "(keys[0] as Buffer).toString('latin1')",
   string_ci: '(keys[0] as string).toLowerCase()',
+};
+
+const NULL_SAFE_SINGLE: Record<KeyType, string> = {
+  string: 'keys[0]',
+  number: 'keys[0]',
+  bigint: 'keys[0]',
+  buffer: "((keys[0] as Buffer | null)?.toString('latin1') ?? null)",
+  string_ci: '((keys[0] as string | null)?.toLowerCase() ?? null)',
+};
+
+const RETURN_TYPES: Record<Mode, string> = {
+  unique: 'MakeKey',
+  nullable: 'MakeKeyNullable',
+  nonunique: 'MakeKeyNonunique',
 };
 
 function typeCombinations(length: number): KeyType[][] {
@@ -60,9 +68,9 @@ function keyExpression(
   }
 }
 
-function renderFunction(nullable: boolean): string[] {
-  const name = nullable ? 'createMakeKeyNullable' : 'createMakeKey';
-  const returnType = nullable ? 'MakeKeyNullable' : 'MakeKey';
+function renderFunction(mode: Mode): string[] {
+  const nullable = mode !== 'unique';
+  const returnType = RETURN_TYPES[mode];
   const params = nullable
     ? 'types: KeyType[], primaryType: PrimaryKeyType'
     : 'types: KeyType[]';
@@ -87,11 +95,22 @@ function renderFunction(nullable: boolean): string[] {
           ? exprs[0]
           : 'keys[0] as string | number | bigint';
       const nullTest = types.map((_, i) => `keys[${i}] === null`).join(' || ');
+      const isTextKey =
+        length === 1 &&
+        (types[0] === 'string' ||
+          types[0] === 'buffer' ||
+          types[0] === 'string_ci');
 
       for (const primaryType of primaryTypes) {
         let statement: string;
         if (primaryType === null) {
           statement = `      return keys => ${length > 1 ? multiBody : singleBody};`;
+        } else if (mode === 'nonunique') {
+          const keyText = length > 1 ? multiBody : NULL_SAFE_SINGLE[types[0]];
+          statement =
+            isTextKey && primaryType === 'string'
+              ? `      return (keys, primaryKey) => JSON.stringify([${keyText}, primaryKey]);`
+              : `      return (keys, primaryKey) => \`\${${keyText}}:\${primaryKey}\`;`;
         } else if (length > 1) {
           statement = `      return (keys, primaryKey) => ${nullTest} ? \`\${${multiBody}}:\${primaryKey}\` : ${multiBody};`;
         } else if (
@@ -135,19 +154,22 @@ function renderFunction(nullable: boolean): string[] {
     `  return types[i] === 'string_ci' ? ${stringCi} : key;`,
     '})',
   ];
-  const genericBody = nullable
-    ? [
-        '    return (keys, primaryKey) => {',
-        '      const json = JSON.stringify(',
-        ...mapped,
-        '      );',
-        '      return keys.includes(null) ? `${json}:${primaryKey}` : json;',
-        '    };',
-      ]
-    : ['    return keys => JSON.stringify(', ...mapped, '    );'];
+  const genericBody =
+    mode === 'unique'
+      ? ['    return keys => JSON.stringify(', ...mapped, '    );']
+      : [
+          '    return (keys, primaryKey) => {',
+          '      const json = JSON.stringify(',
+          ...mapped,
+          '      );',
+          mode === 'nullable'
+            ? '      return keys.includes(null) ? `${json}:${primaryKey}` : json;'
+            : '      return `${json}:${primaryKey}`;',
+          '    };',
+        ];
 
   return [
-    `export function ${name}(${params}): ${returnType} {`,
+    `export function createMakeKey(${params}): ${returnType} {`,
     `  if (types.length > ${HARDCODED_MAX_KEYS}) {`,
     ...genericBody,
     '  }',
@@ -161,13 +183,17 @@ function renderFunction(nullable: boolean): string[] {
   ];
 }
 
-const fileLines = [
+const uniqueLines = [
   "export type KeyType = 'string' | 'number' | 'bigint' | 'buffer' | 'string_ci';",
   'export type KeyValue = string | number | bigint | Buffer;',
   'export type MakeKeyResult = string | number | bigint;',
   'export type MakeKey = (keys: KeyValue[]) => MakeKeyResult;',
   '',
-  ...renderFunction(false),
+  ...renderFunction('unique'),
+];
+
+const nullableLines = [
+  "import type { KeyType, KeyValue } from './hash_unique_index';",
   '',
   'export type KeyValueNullable = KeyValue | null;',
   "export type PrimaryKeyType = 'string' | 'bigint' | 'number';",
@@ -176,8 +202,28 @@ const fileLines = [
   '  primaryKey: string | bigint | number',
   ') => string;',
   '',
-  ...renderFunction(true),
+  ...renderFunction('nullable'),
 ];
 
-writeFileSync(OUTPUT_PATH, fileLines.join('\n') + '\n');
-console.log(`Wrote ${OUTPUT_PATH}`);
+const nonuniqueLines = [
+  "import type { KeyType } from './hash_unique_index';",
+  "import type { KeyValueNullable, PrimaryKeyType } from './hash_nullable_index';",
+  '',
+  'export type MakeKeyNonunique = (',
+  '  keys: KeyValueNullable[],',
+  '  primaryKey: string | bigint | number',
+  ') => string;',
+  '',
+  ...renderFunction('nonunique'),
+];
+
+const outputs: [string, string[]][] = [
+  ['hash_unique_index.ts', uniqueLines],
+  ['hash_nullable_index.ts', nullableLines],
+  ['hash_nonunique_index.ts', nonuniqueLines],
+];
+for (const [fileName, lines] of outputs) {
+  const outputPath = join(HELPERS_DIR, fileName);
+  writeFileSync(outputPath, lines.join('\n') + '\n');
+  console.log(`Wrote ${outputPath}`);
+}

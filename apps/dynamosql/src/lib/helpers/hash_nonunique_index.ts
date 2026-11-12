@@ -1,0 +1,758 @@
+import type { KeyValueNullable, PrimaryKeyType } from './hash_nullable_index';
+import type { KeyType } from './hash_unique_index';
+
+export type MakeKeyNonunique = (
+  keys: KeyValueNullable[],
+  primaryKey: string | bigint | number
+) => string;
+
+export function createMakeKey(
+  types: KeyType[],
+  primaryType: PrimaryKeyType
+): MakeKeyNonunique {
+  if (types.length > 3) {
+    return (keys, primaryKey) => {
+      const json = JSON.stringify(
+        keys.map((key, i) => {
+          if (Buffer.isBuffer(key)) {
+            return key.toString('latin1');
+          }
+          if (typeof key === 'bigint') {
+            return key.toString();
+          }
+          return types[i] === 'string_ci'
+            ? (key as string | null)?.toLowerCase()
+            : key;
+        })
+      );
+      return `${json}:${primaryKey}`;
+    };
+  }
+
+  switch (`${primaryType}.${types.join(',')}`) {
+    case 'string.string':
+      return (keys, primaryKey) => JSON.stringify([keys[0], primaryKey]);
+
+    case 'bigint.string':
+    case 'number.string':
+    case 'string.number':
+    case 'bigint.number':
+    case 'number.number':
+    case 'string.bigint':
+    case 'bigint.bigint':
+    case 'number.bigint':
+      return (keys, primaryKey) => `${keys[0]}:${primaryKey}`;
+
+    case 'string.buffer':
+      return (keys, primaryKey) =>
+        JSON.stringify([
+          (keys[0] as Buffer | null)?.toString('latin1') ?? null,
+          primaryKey,
+        ]);
+
+    case 'bigint.buffer':
+    case 'number.buffer':
+      return (keys, primaryKey) =>
+        `${(keys[0] as Buffer | null)?.toString('latin1') ?? null}:${primaryKey}`;
+
+    case 'string.string_ci':
+      return (keys, primaryKey) =>
+        JSON.stringify([
+          (keys[0] as string | null)?.toLowerCase() ?? null,
+          primaryKey,
+        ]);
+
+    case 'bigint.string_ci':
+    case 'number.string_ci':
+      return (keys, primaryKey) =>
+        `${(keys[0] as string | null)?.toLowerCase() ?? null}:${primaryKey}`;
+
+    case 'string.string,string':
+    case 'bigint.string,string':
+    case 'number.string,string':
+    case 'string.string,number':
+    case 'bigint.string,number':
+    case 'number.string,number':
+    case 'string.number,string':
+    case 'bigint.number,string':
+    case 'number.number,string':
+    case 'string.number,number':
+    case 'bigint.number,number':
+    case 'number.number,number':
+    case 'string.string,string,string':
+    case 'bigint.string,string,string':
+    case 'number.string,string,string':
+    case 'string.string,string,number':
+    case 'bigint.string,string,number':
+    case 'number.string,string,number':
+    case 'string.string,number,string':
+    case 'bigint.string,number,string':
+    case 'number.string,number,string':
+    case 'string.string,number,number':
+    case 'bigint.string,number,number':
+    case 'number.string,number,number':
+    case 'string.number,string,string':
+    case 'bigint.number,string,string':
+    case 'number.number,string,string':
+    case 'string.number,string,number':
+    case 'bigint.number,string,number':
+    case 'number.number,string,number':
+    case 'string.number,number,string':
+    case 'bigint.number,number,string':
+    case 'number.number,number,string':
+    case 'string.number,number,number':
+    case 'bigint.number,number,number':
+    case 'number.number,number,number':
+      return (keys, primaryKey) => `${JSON.stringify(keys)}:${primaryKey}`;
+
+    case 'string.string,bigint':
+    case 'bigint.string,bigint':
+    case 'number.string,bigint':
+    case 'string.number,bigint':
+    case 'bigint.number,bigint':
+    case 'number.number,bigint':
+      return (keys, primaryKey) =>
+        `${JSON.stringify([keys[0], (keys[1] as bigint | null)?.toString()])}:${primaryKey}`;
+
+    case 'string.string,buffer':
+    case 'bigint.string,buffer':
+    case 'number.string,buffer':
+    case 'string.number,buffer':
+    case 'bigint.number,buffer':
+    case 'number.number,buffer':
+      return (keys, primaryKey) =>
+        `${JSON.stringify([keys[0], (keys[1] as Buffer | null)?.toString('latin1')])}:${primaryKey}`;
+
+    case 'string.string,string_ci':
+    case 'bigint.string,string_ci':
+    case 'number.string,string_ci':
+    case 'string.number,string_ci':
+    case 'bigint.number,string_ci':
+    case 'number.number,string_ci':
+      return (keys, primaryKey) =>
+        `${JSON.stringify([keys[0], (keys[1] as string | null)?.toLowerCase()])}:${primaryKey}`;
+
+    case 'string.bigint,string':
+    case 'bigint.bigint,string':
+    case 'number.bigint,string':
+    case 'string.bigint,number':
+    case 'bigint.bigint,number':
+    case 'number.bigint,number':
+      return (keys, primaryKey) =>
+        `${JSON.stringify([(keys[0] as bigint | null)?.toString(), keys[1]])}:${primaryKey}`;
+
+    case 'string.bigint,bigint':
+    case 'bigint.bigint,bigint':
+    case 'number.bigint,bigint':
+      return (keys, primaryKey) =>
+        `${JSON.stringify([(keys[0] as bigint | null)?.toString(), (keys[1] as bigint | null)?.toString()])}:${primaryKey}`;
+
+    case 'string.bigint,buffer':
+    case 'bigint.bigint,buffer':
+    case 'number.bigint,buffer':
+      return (keys, primaryKey) =>
+        `${JSON.stringify([(keys[0] as bigint | null)?.toString(), (keys[1] as Buffer | null)?.toString('latin1')])}:${primaryKey}`;
+
+    case 'string.bigint,string_ci':
+    case 'bigint.bigint,string_ci':
+    case 'number.bigint,string_ci':
+      return (keys, primaryKey) =>
+        `${JSON.stringify([(keys[0] as bigint | null)?.toString(), (keys[1] as string | null)?.toLowerCase()])}:${primaryKey}`;
+
+    case 'string.buffer,string':
+    case 'bigint.buffer,string':
+    case 'number.buffer,string':
+    case 'string.buffer,number':
+    case 'bigint.buffer,number':
+    case 'number.buffer,number':
+      return (keys, primaryKey) =>
+        `${JSON.stringify([(keys[0] as Buffer | null)?.toString('latin1'), keys[1]])}:${primaryKey}`;
+
+    case 'string.buffer,bigint':
+    case 'bigint.buffer,bigint':
+    case 'number.buffer,bigint':
+      return (keys, primaryKey) =>
+        `${JSON.stringify([(keys[0] as Buffer | null)?.toString('latin1'), (keys[1] as bigint | null)?.toString()])}:${primaryKey}`;
+
+    case 'string.buffer,buffer':
+    case 'bigint.buffer,buffer':
+    case 'number.buffer,buffer':
+      return (keys, primaryKey) =>
+        `${JSON.stringify([(keys[0] as Buffer | null)?.toString('latin1'), (keys[1] as Buffer | null)?.toString('latin1')])}:${primaryKey}`;
+
+    case 'string.buffer,string_ci':
+    case 'bigint.buffer,string_ci':
+    case 'number.buffer,string_ci':
+      return (keys, primaryKey) =>
+        `${JSON.stringify([(keys[0] as Buffer | null)?.toString('latin1'), (keys[1] as string | null)?.toLowerCase()])}:${primaryKey}`;
+
+    case 'string.string_ci,string':
+    case 'bigint.string_ci,string':
+    case 'number.string_ci,string':
+    case 'string.string_ci,number':
+    case 'bigint.string_ci,number':
+    case 'number.string_ci,number':
+      return (keys, primaryKey) =>
+        `${JSON.stringify([(keys[0] as string | null)?.toLowerCase(), keys[1]])}:${primaryKey}`;
+
+    case 'string.string_ci,bigint':
+    case 'bigint.string_ci,bigint':
+    case 'number.string_ci,bigint':
+      return (keys, primaryKey) =>
+        `${JSON.stringify([(keys[0] as string | null)?.toLowerCase(), (keys[1] as bigint | null)?.toString()])}:${primaryKey}`;
+
+    case 'string.string_ci,buffer':
+    case 'bigint.string_ci,buffer':
+    case 'number.string_ci,buffer':
+      return (keys, primaryKey) =>
+        `${JSON.stringify([(keys[0] as string | null)?.toLowerCase(), (keys[1] as Buffer | null)?.toString('latin1')])}:${primaryKey}`;
+
+    case 'string.string_ci,string_ci':
+    case 'bigint.string_ci,string_ci':
+    case 'number.string_ci,string_ci':
+      return (keys, primaryKey) =>
+        `${JSON.stringify([(keys[0] as string | null)?.toLowerCase(), (keys[1] as string | null)?.toLowerCase()])}:${primaryKey}`;
+
+    case 'string.string,string,bigint':
+    case 'bigint.string,string,bigint':
+    case 'number.string,string,bigint':
+    case 'string.string,number,bigint':
+    case 'bigint.string,number,bigint':
+    case 'number.string,number,bigint':
+    case 'string.number,string,bigint':
+    case 'bigint.number,string,bigint':
+    case 'number.number,string,bigint':
+    case 'string.number,number,bigint':
+    case 'bigint.number,number,bigint':
+    case 'number.number,number,bigint':
+      return (keys, primaryKey) =>
+        `${JSON.stringify([keys[0], keys[1], (keys[2] as bigint | null)?.toString()])}:${primaryKey}`;
+
+    case 'string.string,string,buffer':
+    case 'bigint.string,string,buffer':
+    case 'number.string,string,buffer':
+    case 'string.string,number,buffer':
+    case 'bigint.string,number,buffer':
+    case 'number.string,number,buffer':
+    case 'string.number,string,buffer':
+    case 'bigint.number,string,buffer':
+    case 'number.number,string,buffer':
+    case 'string.number,number,buffer':
+    case 'bigint.number,number,buffer':
+    case 'number.number,number,buffer':
+      return (keys, primaryKey) =>
+        `${JSON.stringify([keys[0], keys[1], (keys[2] as Buffer | null)?.toString('latin1')])}:${primaryKey}`;
+
+    case 'string.string,string,string_ci':
+    case 'bigint.string,string,string_ci':
+    case 'number.string,string,string_ci':
+    case 'string.string,number,string_ci':
+    case 'bigint.string,number,string_ci':
+    case 'number.string,number,string_ci':
+    case 'string.number,string,string_ci':
+    case 'bigint.number,string,string_ci':
+    case 'number.number,string,string_ci':
+    case 'string.number,number,string_ci':
+    case 'bigint.number,number,string_ci':
+    case 'number.number,number,string_ci':
+      return (keys, primaryKey) =>
+        `${JSON.stringify([keys[0], keys[1], (keys[2] as string | null)?.toLowerCase()])}:${primaryKey}`;
+
+    case 'string.string,bigint,string':
+    case 'bigint.string,bigint,string':
+    case 'number.string,bigint,string':
+    case 'string.string,bigint,number':
+    case 'bigint.string,bigint,number':
+    case 'number.string,bigint,number':
+    case 'string.number,bigint,string':
+    case 'bigint.number,bigint,string':
+    case 'number.number,bigint,string':
+    case 'string.number,bigint,number':
+    case 'bigint.number,bigint,number':
+    case 'number.number,bigint,number':
+      return (keys, primaryKey) =>
+        `${JSON.stringify([keys[0], (keys[1] as bigint | null)?.toString(), keys[2]])}:${primaryKey}`;
+
+    case 'string.string,bigint,bigint':
+    case 'bigint.string,bigint,bigint':
+    case 'number.string,bigint,bigint':
+    case 'string.number,bigint,bigint':
+    case 'bigint.number,bigint,bigint':
+    case 'number.number,bigint,bigint':
+      return (keys, primaryKey) =>
+        `${JSON.stringify([keys[0], (keys[1] as bigint | null)?.toString(), (keys[2] as bigint | null)?.toString()])}:${primaryKey}`;
+
+    case 'string.string,bigint,buffer':
+    case 'bigint.string,bigint,buffer':
+    case 'number.string,bigint,buffer':
+    case 'string.number,bigint,buffer':
+    case 'bigint.number,bigint,buffer':
+    case 'number.number,bigint,buffer':
+      return (keys, primaryKey) =>
+        `${JSON.stringify([keys[0], (keys[1] as bigint | null)?.toString(), (keys[2] as Buffer | null)?.toString('latin1')])}:${primaryKey}`;
+
+    case 'string.string,bigint,string_ci':
+    case 'bigint.string,bigint,string_ci':
+    case 'number.string,bigint,string_ci':
+    case 'string.number,bigint,string_ci':
+    case 'bigint.number,bigint,string_ci':
+    case 'number.number,bigint,string_ci':
+      return (keys, primaryKey) =>
+        `${JSON.stringify([keys[0], (keys[1] as bigint | null)?.toString(), (keys[2] as string | null)?.toLowerCase()])}:${primaryKey}`;
+
+    case 'string.string,buffer,string':
+    case 'bigint.string,buffer,string':
+    case 'number.string,buffer,string':
+    case 'string.string,buffer,number':
+    case 'bigint.string,buffer,number':
+    case 'number.string,buffer,number':
+    case 'string.number,buffer,string':
+    case 'bigint.number,buffer,string':
+    case 'number.number,buffer,string':
+    case 'string.number,buffer,number':
+    case 'bigint.number,buffer,number':
+    case 'number.number,buffer,number':
+      return (keys, primaryKey) =>
+        `${JSON.stringify([keys[0], (keys[1] as Buffer | null)?.toString('latin1'), keys[2]])}:${primaryKey}`;
+
+    case 'string.string,buffer,bigint':
+    case 'bigint.string,buffer,bigint':
+    case 'number.string,buffer,bigint':
+    case 'string.number,buffer,bigint':
+    case 'bigint.number,buffer,bigint':
+    case 'number.number,buffer,bigint':
+      return (keys, primaryKey) =>
+        `${JSON.stringify([keys[0], (keys[1] as Buffer | null)?.toString('latin1'), (keys[2] as bigint | null)?.toString()])}:${primaryKey}`;
+
+    case 'string.string,buffer,buffer':
+    case 'bigint.string,buffer,buffer':
+    case 'number.string,buffer,buffer':
+    case 'string.number,buffer,buffer':
+    case 'bigint.number,buffer,buffer':
+    case 'number.number,buffer,buffer':
+      return (keys, primaryKey) =>
+        `${JSON.stringify([keys[0], (keys[1] as Buffer | null)?.toString('latin1'), (keys[2] as Buffer | null)?.toString('latin1')])}:${primaryKey}`;
+
+    case 'string.string,buffer,string_ci':
+    case 'bigint.string,buffer,string_ci':
+    case 'number.string,buffer,string_ci':
+    case 'string.number,buffer,string_ci':
+    case 'bigint.number,buffer,string_ci':
+    case 'number.number,buffer,string_ci':
+      return (keys, primaryKey) =>
+        `${JSON.stringify([keys[0], (keys[1] as Buffer | null)?.toString('latin1'), (keys[2] as string | null)?.toLowerCase()])}:${primaryKey}`;
+
+    case 'string.string,string_ci,string':
+    case 'bigint.string,string_ci,string':
+    case 'number.string,string_ci,string':
+    case 'string.string,string_ci,number':
+    case 'bigint.string,string_ci,number':
+    case 'number.string,string_ci,number':
+    case 'string.number,string_ci,string':
+    case 'bigint.number,string_ci,string':
+    case 'number.number,string_ci,string':
+    case 'string.number,string_ci,number':
+    case 'bigint.number,string_ci,number':
+    case 'number.number,string_ci,number':
+      return (keys, primaryKey) =>
+        `${JSON.stringify([keys[0], (keys[1] as string | null)?.toLowerCase(), keys[2]])}:${primaryKey}`;
+
+    case 'string.string,string_ci,bigint':
+    case 'bigint.string,string_ci,bigint':
+    case 'number.string,string_ci,bigint':
+    case 'string.number,string_ci,bigint':
+    case 'bigint.number,string_ci,bigint':
+    case 'number.number,string_ci,bigint':
+      return (keys, primaryKey) =>
+        `${JSON.stringify([keys[0], (keys[1] as string | null)?.toLowerCase(), (keys[2] as bigint | null)?.toString()])}:${primaryKey}`;
+
+    case 'string.string,string_ci,buffer':
+    case 'bigint.string,string_ci,buffer':
+    case 'number.string,string_ci,buffer':
+    case 'string.number,string_ci,buffer':
+    case 'bigint.number,string_ci,buffer':
+    case 'number.number,string_ci,buffer':
+      return (keys, primaryKey) =>
+        `${JSON.stringify([keys[0], (keys[1] as string | null)?.toLowerCase(), (keys[2] as Buffer | null)?.toString('latin1')])}:${primaryKey}`;
+
+    case 'string.string,string_ci,string_ci':
+    case 'bigint.string,string_ci,string_ci':
+    case 'number.string,string_ci,string_ci':
+    case 'string.number,string_ci,string_ci':
+    case 'bigint.number,string_ci,string_ci':
+    case 'number.number,string_ci,string_ci':
+      return (keys, primaryKey) =>
+        `${JSON.stringify([keys[0], (keys[1] as string | null)?.toLowerCase(), (keys[2] as string | null)?.toLowerCase()])}:${primaryKey}`;
+
+    case 'string.bigint,string,string':
+    case 'bigint.bigint,string,string':
+    case 'number.bigint,string,string':
+    case 'string.bigint,string,number':
+    case 'bigint.bigint,string,number':
+    case 'number.bigint,string,number':
+    case 'string.bigint,number,string':
+    case 'bigint.bigint,number,string':
+    case 'number.bigint,number,string':
+    case 'string.bigint,number,number':
+    case 'bigint.bigint,number,number':
+    case 'number.bigint,number,number':
+      return (keys, primaryKey) =>
+        `${JSON.stringify([(keys[0] as bigint | null)?.toString(), keys[1], keys[2]])}:${primaryKey}`;
+
+    case 'string.bigint,string,bigint':
+    case 'bigint.bigint,string,bigint':
+    case 'number.bigint,string,bigint':
+    case 'string.bigint,number,bigint':
+    case 'bigint.bigint,number,bigint':
+    case 'number.bigint,number,bigint':
+      return (keys, primaryKey) =>
+        `${JSON.stringify([(keys[0] as bigint | null)?.toString(), keys[1], (keys[2] as bigint | null)?.toString()])}:${primaryKey}`;
+
+    case 'string.bigint,string,buffer':
+    case 'bigint.bigint,string,buffer':
+    case 'number.bigint,string,buffer':
+    case 'string.bigint,number,buffer':
+    case 'bigint.bigint,number,buffer':
+    case 'number.bigint,number,buffer':
+      return (keys, primaryKey) =>
+        `${JSON.stringify([(keys[0] as bigint | null)?.toString(), keys[1], (keys[2] as Buffer | null)?.toString('latin1')])}:${primaryKey}`;
+
+    case 'string.bigint,string,string_ci':
+    case 'bigint.bigint,string,string_ci':
+    case 'number.bigint,string,string_ci':
+    case 'string.bigint,number,string_ci':
+    case 'bigint.bigint,number,string_ci':
+    case 'number.bigint,number,string_ci':
+      return (keys, primaryKey) =>
+        `${JSON.stringify([(keys[0] as bigint | null)?.toString(), keys[1], (keys[2] as string | null)?.toLowerCase()])}:${primaryKey}`;
+
+    case 'string.bigint,bigint,string':
+    case 'bigint.bigint,bigint,string':
+    case 'number.bigint,bigint,string':
+    case 'string.bigint,bigint,number':
+    case 'bigint.bigint,bigint,number':
+    case 'number.bigint,bigint,number':
+      return (keys, primaryKey) =>
+        `${JSON.stringify([(keys[0] as bigint | null)?.toString(), (keys[1] as bigint | null)?.toString(), keys[2]])}:${primaryKey}`;
+
+    case 'string.bigint,bigint,bigint':
+    case 'bigint.bigint,bigint,bigint':
+    case 'number.bigint,bigint,bigint':
+      return (keys, primaryKey) =>
+        `${JSON.stringify([(keys[0] as bigint | null)?.toString(), (keys[1] as bigint | null)?.toString(), (keys[2] as bigint | null)?.toString()])}:${primaryKey}`;
+
+    case 'string.bigint,bigint,buffer':
+    case 'bigint.bigint,bigint,buffer':
+    case 'number.bigint,bigint,buffer':
+      return (keys, primaryKey) =>
+        `${JSON.stringify([(keys[0] as bigint | null)?.toString(), (keys[1] as bigint | null)?.toString(), (keys[2] as Buffer | null)?.toString('latin1')])}:${primaryKey}`;
+
+    case 'string.bigint,bigint,string_ci':
+    case 'bigint.bigint,bigint,string_ci':
+    case 'number.bigint,bigint,string_ci':
+      return (keys, primaryKey) =>
+        `${JSON.stringify([(keys[0] as bigint | null)?.toString(), (keys[1] as bigint | null)?.toString(), (keys[2] as string | null)?.toLowerCase()])}:${primaryKey}`;
+
+    case 'string.bigint,buffer,string':
+    case 'bigint.bigint,buffer,string':
+    case 'number.bigint,buffer,string':
+    case 'string.bigint,buffer,number':
+    case 'bigint.bigint,buffer,number':
+    case 'number.bigint,buffer,number':
+      return (keys, primaryKey) =>
+        `${JSON.stringify([(keys[0] as bigint | null)?.toString(), (keys[1] as Buffer | null)?.toString('latin1'), keys[2]])}:${primaryKey}`;
+
+    case 'string.bigint,buffer,bigint':
+    case 'bigint.bigint,buffer,bigint':
+    case 'number.bigint,buffer,bigint':
+      return (keys, primaryKey) =>
+        `${JSON.stringify([(keys[0] as bigint | null)?.toString(), (keys[1] as Buffer | null)?.toString('latin1'), (keys[2] as bigint | null)?.toString()])}:${primaryKey}`;
+
+    case 'string.bigint,buffer,buffer':
+    case 'bigint.bigint,buffer,buffer':
+    case 'number.bigint,buffer,buffer':
+      return (keys, primaryKey) =>
+        `${JSON.stringify([(keys[0] as bigint | null)?.toString(), (keys[1] as Buffer | null)?.toString('latin1'), (keys[2] as Buffer | null)?.toString('latin1')])}:${primaryKey}`;
+
+    case 'string.bigint,buffer,string_ci':
+    case 'bigint.bigint,buffer,string_ci':
+    case 'number.bigint,buffer,string_ci':
+      return (keys, primaryKey) =>
+        `${JSON.stringify([(keys[0] as bigint | null)?.toString(), (keys[1] as Buffer | null)?.toString('latin1'), (keys[2] as string | null)?.toLowerCase()])}:${primaryKey}`;
+
+    case 'string.bigint,string_ci,string':
+    case 'bigint.bigint,string_ci,string':
+    case 'number.bigint,string_ci,string':
+    case 'string.bigint,string_ci,number':
+    case 'bigint.bigint,string_ci,number':
+    case 'number.bigint,string_ci,number':
+      return (keys, primaryKey) =>
+        `${JSON.stringify([(keys[0] as bigint | null)?.toString(), (keys[1] as string | null)?.toLowerCase(), keys[2]])}:${primaryKey}`;
+
+    case 'string.bigint,string_ci,bigint':
+    case 'bigint.bigint,string_ci,bigint':
+    case 'number.bigint,string_ci,bigint':
+      return (keys, primaryKey) =>
+        `${JSON.stringify([(keys[0] as bigint | null)?.toString(), (keys[1] as string | null)?.toLowerCase(), (keys[2] as bigint | null)?.toString()])}:${primaryKey}`;
+
+    case 'string.bigint,string_ci,buffer':
+    case 'bigint.bigint,string_ci,buffer':
+    case 'number.bigint,string_ci,buffer':
+      return (keys, primaryKey) =>
+        `${JSON.stringify([(keys[0] as bigint | null)?.toString(), (keys[1] as string | null)?.toLowerCase(), (keys[2] as Buffer | null)?.toString('latin1')])}:${primaryKey}`;
+
+    case 'string.bigint,string_ci,string_ci':
+    case 'bigint.bigint,string_ci,string_ci':
+    case 'number.bigint,string_ci,string_ci':
+      return (keys, primaryKey) =>
+        `${JSON.stringify([(keys[0] as bigint | null)?.toString(), (keys[1] as string | null)?.toLowerCase(), (keys[2] as string | null)?.toLowerCase()])}:${primaryKey}`;
+
+    case 'string.buffer,string,string':
+    case 'bigint.buffer,string,string':
+    case 'number.buffer,string,string':
+    case 'string.buffer,string,number':
+    case 'bigint.buffer,string,number':
+    case 'number.buffer,string,number':
+    case 'string.buffer,number,string':
+    case 'bigint.buffer,number,string':
+    case 'number.buffer,number,string':
+    case 'string.buffer,number,number':
+    case 'bigint.buffer,number,number':
+    case 'number.buffer,number,number':
+      return (keys, primaryKey) =>
+        `${JSON.stringify([(keys[0] as Buffer | null)?.toString('latin1'), keys[1], keys[2]])}:${primaryKey}`;
+
+    case 'string.buffer,string,bigint':
+    case 'bigint.buffer,string,bigint':
+    case 'number.buffer,string,bigint':
+    case 'string.buffer,number,bigint':
+    case 'bigint.buffer,number,bigint':
+    case 'number.buffer,number,bigint':
+      return (keys, primaryKey) =>
+        `${JSON.stringify([(keys[0] as Buffer | null)?.toString('latin1'), keys[1], (keys[2] as bigint | null)?.toString()])}:${primaryKey}`;
+
+    case 'string.buffer,string,buffer':
+    case 'bigint.buffer,string,buffer':
+    case 'number.buffer,string,buffer':
+    case 'string.buffer,number,buffer':
+    case 'bigint.buffer,number,buffer':
+    case 'number.buffer,number,buffer':
+      return (keys, primaryKey) =>
+        `${JSON.stringify([(keys[0] as Buffer | null)?.toString('latin1'), keys[1], (keys[2] as Buffer | null)?.toString('latin1')])}:${primaryKey}`;
+
+    case 'string.buffer,string,string_ci':
+    case 'bigint.buffer,string,string_ci':
+    case 'number.buffer,string,string_ci':
+    case 'string.buffer,number,string_ci':
+    case 'bigint.buffer,number,string_ci':
+    case 'number.buffer,number,string_ci':
+      return (keys, primaryKey) =>
+        `${JSON.stringify([(keys[0] as Buffer | null)?.toString('latin1'), keys[1], (keys[2] as string | null)?.toLowerCase()])}:${primaryKey}`;
+
+    case 'string.buffer,bigint,string':
+    case 'bigint.buffer,bigint,string':
+    case 'number.buffer,bigint,string':
+    case 'string.buffer,bigint,number':
+    case 'bigint.buffer,bigint,number':
+    case 'number.buffer,bigint,number':
+      return (keys, primaryKey) =>
+        `${JSON.stringify([(keys[0] as Buffer | null)?.toString('latin1'), (keys[1] as bigint | null)?.toString(), keys[2]])}:${primaryKey}`;
+
+    case 'string.buffer,bigint,bigint':
+    case 'bigint.buffer,bigint,bigint':
+    case 'number.buffer,bigint,bigint':
+      return (keys, primaryKey) =>
+        `${JSON.stringify([(keys[0] as Buffer | null)?.toString('latin1'), (keys[1] as bigint | null)?.toString(), (keys[2] as bigint | null)?.toString()])}:${primaryKey}`;
+
+    case 'string.buffer,bigint,buffer':
+    case 'bigint.buffer,bigint,buffer':
+    case 'number.buffer,bigint,buffer':
+      return (keys, primaryKey) =>
+        `${JSON.stringify([(keys[0] as Buffer | null)?.toString('latin1'), (keys[1] as bigint | null)?.toString(), (keys[2] as Buffer | null)?.toString('latin1')])}:${primaryKey}`;
+
+    case 'string.buffer,bigint,string_ci':
+    case 'bigint.buffer,bigint,string_ci':
+    case 'number.buffer,bigint,string_ci':
+      return (keys, primaryKey) =>
+        `${JSON.stringify([(keys[0] as Buffer | null)?.toString('latin1'), (keys[1] as bigint | null)?.toString(), (keys[2] as string | null)?.toLowerCase()])}:${primaryKey}`;
+
+    case 'string.buffer,buffer,string':
+    case 'bigint.buffer,buffer,string':
+    case 'number.buffer,buffer,string':
+    case 'string.buffer,buffer,number':
+    case 'bigint.buffer,buffer,number':
+    case 'number.buffer,buffer,number':
+      return (keys, primaryKey) =>
+        `${JSON.stringify([(keys[0] as Buffer | null)?.toString('latin1'), (keys[1] as Buffer | null)?.toString('latin1'), keys[2]])}:${primaryKey}`;
+
+    case 'string.buffer,buffer,bigint':
+    case 'bigint.buffer,buffer,bigint':
+    case 'number.buffer,buffer,bigint':
+      return (keys, primaryKey) =>
+        `${JSON.stringify([(keys[0] as Buffer | null)?.toString('latin1'), (keys[1] as Buffer | null)?.toString('latin1'), (keys[2] as bigint | null)?.toString()])}:${primaryKey}`;
+
+    case 'string.buffer,buffer,buffer':
+    case 'bigint.buffer,buffer,buffer':
+    case 'number.buffer,buffer,buffer':
+      return (keys, primaryKey) =>
+        `${JSON.stringify([(keys[0] as Buffer | null)?.toString('latin1'), (keys[1] as Buffer | null)?.toString('latin1'), (keys[2] as Buffer | null)?.toString('latin1')])}:${primaryKey}`;
+
+    case 'string.buffer,buffer,string_ci':
+    case 'bigint.buffer,buffer,string_ci':
+    case 'number.buffer,buffer,string_ci':
+      return (keys, primaryKey) =>
+        `${JSON.stringify([(keys[0] as Buffer | null)?.toString('latin1'), (keys[1] as Buffer | null)?.toString('latin1'), (keys[2] as string | null)?.toLowerCase()])}:${primaryKey}`;
+
+    case 'string.buffer,string_ci,string':
+    case 'bigint.buffer,string_ci,string':
+    case 'number.buffer,string_ci,string':
+    case 'string.buffer,string_ci,number':
+    case 'bigint.buffer,string_ci,number':
+    case 'number.buffer,string_ci,number':
+      return (keys, primaryKey) =>
+        `${JSON.stringify([(keys[0] as Buffer | null)?.toString('latin1'), (keys[1] as string | null)?.toLowerCase(), keys[2]])}:${primaryKey}`;
+
+    case 'string.buffer,string_ci,bigint':
+    case 'bigint.buffer,string_ci,bigint':
+    case 'number.buffer,string_ci,bigint':
+      return (keys, primaryKey) =>
+        `${JSON.stringify([(keys[0] as Buffer | null)?.toString('latin1'), (keys[1] as string | null)?.toLowerCase(), (keys[2] as bigint | null)?.toString()])}:${primaryKey}`;
+
+    case 'string.buffer,string_ci,buffer':
+    case 'bigint.buffer,string_ci,buffer':
+    case 'number.buffer,string_ci,buffer':
+      return (keys, primaryKey) =>
+        `${JSON.stringify([(keys[0] as Buffer | null)?.toString('latin1'), (keys[1] as string | null)?.toLowerCase(), (keys[2] as Buffer | null)?.toString('latin1')])}:${primaryKey}`;
+
+    case 'string.buffer,string_ci,string_ci':
+    case 'bigint.buffer,string_ci,string_ci':
+    case 'number.buffer,string_ci,string_ci':
+      return (keys, primaryKey) =>
+        `${JSON.stringify([(keys[0] as Buffer | null)?.toString('latin1'), (keys[1] as string | null)?.toLowerCase(), (keys[2] as string | null)?.toLowerCase()])}:${primaryKey}`;
+
+    case 'string.string_ci,string,string':
+    case 'bigint.string_ci,string,string':
+    case 'number.string_ci,string,string':
+    case 'string.string_ci,string,number':
+    case 'bigint.string_ci,string,number':
+    case 'number.string_ci,string,number':
+    case 'string.string_ci,number,string':
+    case 'bigint.string_ci,number,string':
+    case 'number.string_ci,number,string':
+    case 'string.string_ci,number,number':
+    case 'bigint.string_ci,number,number':
+    case 'number.string_ci,number,number':
+      return (keys, primaryKey) =>
+        `${JSON.stringify([(keys[0] as string | null)?.toLowerCase(), keys[1], keys[2]])}:${primaryKey}`;
+
+    case 'string.string_ci,string,bigint':
+    case 'bigint.string_ci,string,bigint':
+    case 'number.string_ci,string,bigint':
+    case 'string.string_ci,number,bigint':
+    case 'bigint.string_ci,number,bigint':
+    case 'number.string_ci,number,bigint':
+      return (keys, primaryKey) =>
+        `${JSON.stringify([(keys[0] as string | null)?.toLowerCase(), keys[1], (keys[2] as bigint | null)?.toString()])}:${primaryKey}`;
+
+    case 'string.string_ci,string,buffer':
+    case 'bigint.string_ci,string,buffer':
+    case 'number.string_ci,string,buffer':
+    case 'string.string_ci,number,buffer':
+    case 'bigint.string_ci,number,buffer':
+    case 'number.string_ci,number,buffer':
+      return (keys, primaryKey) =>
+        `${JSON.stringify([(keys[0] as string | null)?.toLowerCase(), keys[1], (keys[2] as Buffer | null)?.toString('latin1')])}:${primaryKey}`;
+
+    case 'string.string_ci,string,string_ci':
+    case 'bigint.string_ci,string,string_ci':
+    case 'number.string_ci,string,string_ci':
+    case 'string.string_ci,number,string_ci':
+    case 'bigint.string_ci,number,string_ci':
+    case 'number.string_ci,number,string_ci':
+      return (keys, primaryKey) =>
+        `${JSON.stringify([(keys[0] as string | null)?.toLowerCase(), keys[1], (keys[2] as string | null)?.toLowerCase()])}:${primaryKey}`;
+
+    case 'string.string_ci,bigint,string':
+    case 'bigint.string_ci,bigint,string':
+    case 'number.string_ci,bigint,string':
+    case 'string.string_ci,bigint,number':
+    case 'bigint.string_ci,bigint,number':
+    case 'number.string_ci,bigint,number':
+      return (keys, primaryKey) =>
+        `${JSON.stringify([(keys[0] as string | null)?.toLowerCase(), (keys[1] as bigint | null)?.toString(), keys[2]])}:${primaryKey}`;
+
+    case 'string.string_ci,bigint,bigint':
+    case 'bigint.string_ci,bigint,bigint':
+    case 'number.string_ci,bigint,bigint':
+      return (keys, primaryKey) =>
+        `${JSON.stringify([(keys[0] as string | null)?.toLowerCase(), (keys[1] as bigint | null)?.toString(), (keys[2] as bigint | null)?.toString()])}:${primaryKey}`;
+
+    case 'string.string_ci,bigint,buffer':
+    case 'bigint.string_ci,bigint,buffer':
+    case 'number.string_ci,bigint,buffer':
+      return (keys, primaryKey) =>
+        `${JSON.stringify([(keys[0] as string | null)?.toLowerCase(), (keys[1] as bigint | null)?.toString(), (keys[2] as Buffer | null)?.toString('latin1')])}:${primaryKey}`;
+
+    case 'string.string_ci,bigint,string_ci':
+    case 'bigint.string_ci,bigint,string_ci':
+    case 'number.string_ci,bigint,string_ci':
+      return (keys, primaryKey) =>
+        `${JSON.stringify([(keys[0] as string | null)?.toLowerCase(), (keys[1] as bigint | null)?.toString(), (keys[2] as string | null)?.toLowerCase()])}:${primaryKey}`;
+
+    case 'string.string_ci,buffer,string':
+    case 'bigint.string_ci,buffer,string':
+    case 'number.string_ci,buffer,string':
+    case 'string.string_ci,buffer,number':
+    case 'bigint.string_ci,buffer,number':
+    case 'number.string_ci,buffer,number':
+      return (keys, primaryKey) =>
+        `${JSON.stringify([(keys[0] as string | null)?.toLowerCase(), (keys[1] as Buffer | null)?.toString('latin1'), keys[2]])}:${primaryKey}`;
+
+    case 'string.string_ci,buffer,bigint':
+    case 'bigint.string_ci,buffer,bigint':
+    case 'number.string_ci,buffer,bigint':
+      return (keys, primaryKey) =>
+        `${JSON.stringify([(keys[0] as string | null)?.toLowerCase(), (keys[1] as Buffer | null)?.toString('latin1'), (keys[2] as bigint | null)?.toString()])}:${primaryKey}`;
+
+    case 'string.string_ci,buffer,buffer':
+    case 'bigint.string_ci,buffer,buffer':
+    case 'number.string_ci,buffer,buffer':
+      return (keys, primaryKey) =>
+        `${JSON.stringify([(keys[0] as string | null)?.toLowerCase(), (keys[1] as Buffer | null)?.toString('latin1'), (keys[2] as Buffer | null)?.toString('latin1')])}:${primaryKey}`;
+
+    case 'string.string_ci,buffer,string_ci':
+    case 'bigint.string_ci,buffer,string_ci':
+    case 'number.string_ci,buffer,string_ci':
+      return (keys, primaryKey) =>
+        `${JSON.stringify([(keys[0] as string | null)?.toLowerCase(), (keys[1] as Buffer | null)?.toString('latin1'), (keys[2] as string | null)?.toLowerCase()])}:${primaryKey}`;
+
+    case 'string.string_ci,string_ci,string':
+    case 'bigint.string_ci,string_ci,string':
+    case 'number.string_ci,string_ci,string':
+    case 'string.string_ci,string_ci,number':
+    case 'bigint.string_ci,string_ci,number':
+    case 'number.string_ci,string_ci,number':
+      return (keys, primaryKey) =>
+        `${JSON.stringify([(keys[0] as string | null)?.toLowerCase(), (keys[1] as string | null)?.toLowerCase(), keys[2]])}:${primaryKey}`;
+
+    case 'string.string_ci,string_ci,bigint':
+    case 'bigint.string_ci,string_ci,bigint':
+    case 'number.string_ci,string_ci,bigint':
+      return (keys, primaryKey) =>
+        `${JSON.stringify([(keys[0] as string | null)?.toLowerCase(), (keys[1] as string | null)?.toLowerCase(), (keys[2] as bigint | null)?.toString()])}:${primaryKey}`;
+
+    case 'string.string_ci,string_ci,buffer':
+    case 'bigint.string_ci,string_ci,buffer':
+    case 'number.string_ci,string_ci,buffer':
+      return (keys, primaryKey) =>
+        `${JSON.stringify([(keys[0] as string | null)?.toLowerCase(), (keys[1] as string | null)?.toLowerCase(), (keys[2] as Buffer | null)?.toString('latin1')])}:${primaryKey}`;
+
+    case 'string.string_ci,string_ci,string_ci':
+    case 'bigint.string_ci,string_ci,string_ci':
+    case 'number.string_ci,string_ci,string_ci':
+      return (keys, primaryKey) =>
+        `${JSON.stringify([(keys[0] as string | null)?.toLowerCase(), (keys[1] as string | null)?.toLowerCase(), (keys[2] as string | null)?.toLowerCase()])}:${primaryKey}`;
+  }
+
+  throw new Error(`Unsupported hash key types: ${types.join(',')}`);
+}
