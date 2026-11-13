@@ -5,7 +5,6 @@ import { cellConvert } from '../helpers/cell_convert';
 
 import * as Storage from './storage';
 
-import type { KeyValue } from '../../helpers/hash_unique_index';
 import type {
   MultiUpdateParams,
   UpdateParams,
@@ -42,13 +41,14 @@ export async function multipleUpdate(
 
     for (const update of update_list) {
       const { set_list } = update;
-      const key_list = update.key.map((key) => {
+      const cells = update.key.map((key) => {
         if (!isCellValue(key)) {
           throw new SQLError('invalid_key_type');
         }
-        return key.value;
+        return key;
       });
-      const update_key = data.primary_key.makeKey(key_list as KeyValue[]);
+      const key_list = cells.map((cell) => cell.value);
+      const update_key = Storage.lookupKeyOf(data, cells, session.timeZone);
       const index = state.primary_map.get(update_key);
 
       if (index !== undefined && index >= 0) {
@@ -70,6 +70,7 @@ export async function multipleUpdate(
             strict: session.strictMode,
             singleRow: false,
             ignore: !!ignore,
+            timeZone: session.timeZone,
           });
           if (old_row[set.column]?.value !== new_row[set.column]?.value) {
             changed = true;

@@ -4,7 +4,6 @@ import { SQLError, NoSingleOperationError } from '../../../error';
 
 import * as Storage from './storage';
 
-import type { KeyValue } from '../../helpers/hash_unique_index';
 import type {
   DeleteParams,
   MultiDeleteParams,
@@ -41,13 +40,14 @@ export async function multipleDelete(
     const state = Storage.cloneState(data);
 
     for (const object of delete_list) {
-      const key_list = object.map((key) => {
+      const cells = object.map((key) => {
         if (!isCellValue(key)) {
           throw new SQLError('invalid_key_type');
         }
-        return key.value;
+        return key;
       });
-      const delete_key = data.primary_key.makeKey(key_list as KeyValue[]);
+      const key_list = cells.map((cell) => cell.value);
+      const delete_key = Storage.lookupKeyOf(data, cells, session.timeZone);
       const index = state.primary_map.get(delete_key);
 
       if (index !== undefined && index >= 0) {

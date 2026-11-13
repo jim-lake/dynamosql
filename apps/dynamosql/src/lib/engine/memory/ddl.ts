@@ -1,16 +1,13 @@
 import BTree from 'sorted-btree';
 
 import { SQLError } from '../../../error';
+import { createConvertKey } from '../../helpers/convert_key';
 import { createMakeKey } from '../../helpers/hash_unique_index';
+import { getKeyTypes } from '../../helpers/key_type_convert';
 
 import * as Storage from './storage';
 
-import type {
-  KeyType,
-  KeyValue,
-  MakeKeyResult,
-} from '../../helpers/hash_unique_index';
-import type { ValueType } from '../../types/value_type';
+import type { MakeKeyResult } from '../../helpers/hash_unique_index';
 import type {
   ColumnDefParam,
   CellValue,
@@ -25,14 +22,6 @@ import type {
   KeyDef,
 } from '../index';
 import type { MemoryColumnDef, TableData, UniqueIndex } from './storage';
-
-const KEY_TYPE_BY_VALUE_TYPE: Partial<Record<ValueType, KeyType>> = {
-  string: 'string',
-  char: 'string',
-  text: 'string',
-  long: 'number',
-  longlong: 'number',
-};
 
 export async function getTableInfo(
   params: TableInfoParams
@@ -91,22 +80,28 @@ export async function createTable(params: CreateTableParams): Promise<void> {
     }
     return ret;
   });
-  const key_type_list: (KeyType | undefined)[] = primary_columns.map((name) => {
+  const key_column_list = primary_columns.map((name) => {
     if (name === Storage.ROW_ID_NAME) {
-      return 'number';
+      return { name, type: 'longlong' as const, mysqlType: 'BIGINT' as const };
     }
     const column = column_list.find(
       (col) => col.name_lc === name.toLowerCase()
     );
-    return column && KEY_TYPE_BY_VALUE_TYPE[column.type];
+    if (!column) {
+      throw new SQLError({ err: 'ER_KEY_COLUMN_DOES_NOT_EXITS', args: [name] });
+    }
+    return column;
   });
-  const makeKey = key_type_list.every((type) => type !== undefined)
-    ? createMakeKey(key_type_list)
-    : _jsonKey;
+  const key_types = getKeyTypes(key_column_list);
   const data: TableData = {
     table,
     column_list,
-    primary_key: { columns: primary_columns, makeKey },
+    primary_key: {
+      columns: primary_columns,
+      makeKey: createMakeKey(key_types),
+      convertKey: createConvertKey(key_column_list, key_types),
+    },
+
     collation: params.collation,
     row_list: [],
     primary_map: new Map(),
@@ -197,9 +192,6 @@ function _buildUniqueIndex(
     index.map.set(key, Storage.primaryKeyOf(data.primary_key, row));
   }
   return index;
-}
-function _jsonKey(values: KeyValue[]): string {
-  return JSON.stringify(values);
 }
 function _getDefault(column: ColumnDefParam): CellValue | undefined {
   if (column.default !== undefined) {

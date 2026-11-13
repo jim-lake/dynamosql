@@ -1,4 +1,9 @@
 import { SQLError } from '../../../error';
+import {
+  convertDate,
+  convertDateTime,
+  convertTime,
+} from '../../helpers/sql_conversion';
 
 import type { EvaluationResult } from '../../expression';
 import type { CellValue, ColumnDef } from '../index';
@@ -7,6 +12,7 @@ export interface CellConvertFlags {
   strict: boolean;
   singleRow: boolean;
   ignore: boolean;
+  timeZone: string;
 }
 
 interface NumericParts {
@@ -68,6 +74,26 @@ export function cellConvert(
       );
       const small = n >= -MAX_SAFE_BIG && n <= MAX_SAFE_BIG;
       return { type: column.type, value: small ? Number(n) : n };
+    }
+    case 'date': {
+      return {
+        type: column.type,
+        value: convertDate({ value, timeZone: flags.timeZone }),
+      };
+    }
+    case 'datetime': {
+      const decimals = column.decimals ?? 0;
+      return {
+        type: column.type,
+        value: convertDateTime({ value, decimals, timeZone: flags.timeZone }),
+      };
+    }
+    case 'time': {
+      const decimals = column.decimals ?? 0;
+      return {
+        type: column.type,
+        value: convertTime({ value, decimals, timeZone: flags.timeZone }),
+      };
     }
     case 'number': {
       const precision = column.length ?? 10;

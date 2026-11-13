@@ -1,7 +1,9 @@
 import { SQLError } from '../../../error';
+import { cellConvert } from '../helpers/cell_convert';
 
 import type { COLLATIONS } from '../../../constants/mysql';
 import type { Session } from '../../../session';
+import type { ConvertKeyFunction } from '../../helpers/convert_key';
 import type {
   KeyValue,
   MakeKey,
@@ -20,6 +22,7 @@ export const ROW_ID_NAME = 'DB_ROW_ID';
 export interface PrimaryKey {
   columns: string[];
   makeKey: MakeKey;
+  convertKey: ConvertKeyFunction;
 }
 export type UniqueKey = unknown[];
 export interface UniqueIndex {
@@ -127,8 +130,30 @@ export function primaryKeyOf(
   primary_key: PrimaryKey,
   row: CellRow
 ): MakeKeyResult {
-  const values = primary_key.columns.map((name) => row[name]?.value);
-  return primary_key.makeKey(values as KeyValue[]);
+  const cells = primary_key.columns.map((name) => row[name] as CellValue);
+  return primary_key.makeKey(primary_key.convertKey(cells) as KeyValue[]);
+}
+export function lookupKeyOf(
+  data: TableData,
+  cells: CellValue[],
+  timeZone: string
+): MakeKeyResult {
+  const { primary_key } = data;
+  const normalized = cells.map((cell, index) => {
+    const name = primary_key.columns[index]?.toLowerCase();
+    const column = data.column_list.find((col) => col.name_lc === name);
+    const temporal = ['date', 'datetime', 'time'].includes(column?.type ?? '');
+    if (!column || !temporal || cell.value === null) {
+      return cell;
+    }
+    return cellConvert({ ...cell, err: null }, column, {
+      strict: false,
+      singleRow: false,
+      ignore: false,
+      timeZone,
+    });
+  });
+  return primary_key.makeKey(primary_key.convertKey(normalized) as KeyValue[]);
 }
 export function uniqueKeyOf(
   column_list: readonly string[],

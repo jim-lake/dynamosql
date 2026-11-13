@@ -54,6 +54,7 @@ export async function insertRowList(
       strict: session.strictMode,
       singleRow: single_row ?? false,
       ignore: is_ignore ?? false,
+      timeZone: session.timeZone,
     });
     if (primary_key.columns[0] === ROW_ID_NAME) {
       cellRow[ROW_ID_NAME] = { type: 'longlong', value: ++g_last_row_id };
@@ -99,6 +100,7 @@ export async function insertRowList(
           strict: session.strictMode,
           singleRow: single_row ?? false,
           ignore: !!is_ignore,
+          timeZone: session.timeZone,
         });
         new_row[name] = stored;
         if (old_row[name]?.value !== stored.value) {

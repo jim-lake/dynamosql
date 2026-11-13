@@ -58,6 +58,16 @@ describe('Temp', function () {
   runTests('memory_intstr.sql', path.join(__dirname, 'memory_intstr.sql'), {
     checkChanged: true,
   });
+  runTests(
+    'memory_key_normalize.sql',
+    path.join(__dirname, 'memory_key_normalize.sql'),
+    { checkChanged: true }
+  );
+  runTests(
+    'memory_key_normalize_error.sql',
+    path.join(__dirname, 'memory_key_normalize_error.sql'),
+    { allowedErrors: 'SAME_CODE', skipAffected: true, checkChanged: true }
+  );
   runTests('memory_unique.sql', path.join(__dirname, 'memory_unique.sql'), {
     checkChanged: true,
   });

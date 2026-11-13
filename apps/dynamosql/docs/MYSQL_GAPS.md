@@ -19,6 +19,10 @@ MySQL accepts `INSERT INTO t VALUES (...)` and maps the values to columns by pos
 - `SELECT extra FROM t JOIN u ON u.id = t.id;`, where `extra` exists only in `u`: MySQL returns the values of `u.extra`. DynamoSQL returns NULL. An unqualified column resolves to the first FROM item (`firstFrom` in `_resolveObject`), unless an earlier qualified reference cached it. Derived tables are affected the same way, for example `SELECT extra FROM t JOIN (SELECT id, extra FROM u) s ON s.id = t.id`.
 - `SELECT s.ID FROM (SELECT id FROM t) s;` with a mismatched alias case, such as `S.NAME` for alias `s`: MySQL returns `ER_BAD_FIELD_ERROR`. DynamoSQL returns `ER_NO_SUCH_TABLE`, because table and alias lookup both fail with the table error. This is an error case for an invalid statement, so it is kept as reference only.
 
+## TIME(n) comparison through a derived table
+
+- `SELECT t FROM (SELECT CAST('10:00:00.0099' AS TIME(2)) AS t) s WHERE t = '10:00:00.0099';`: MySQL returns `10:00:00.01`, because the stored value is rounded to 2 decimals and the string literal is converted to a TIME with the same rounding. DynamoSQL returns no rows. The same comparison against `'10:00:00.01'` returns the row on both engines. A direct `CAST('10:00:00.0099' AS TIME(2)) = '10:00:00.0099'` returns 0 on both, so the mismatch appears only when the cast value comes from the derived table.
+
 ## Named locks
 
 - `SELECT IS_USED_LOCK('x');` while another session holds `x`: MySQL returns that session's connection id. DynamoSQL returns the holder's session thread id, which can differ from the MySQL connection id.
@@ -26,3 +30,4 @@ MySQL accepts `INSERT INTO t VALUES (...)` and maps the values to columns by pos
 ## Negative BIGINT minimum literal
 
 - `INSERT INTO c (id, b) VALUES (2, -9223372036854775808);` into a `BIGINT` column: MySQL stores `-9223372036854775808`. DynamoSQL raises `ER_WARN_DATA_OUT_OF_RANGE`, because unary minus converts the literal through a JavaScript double, which rounds to `-9223372036854775808` and stringifies to `-9223372036854776000`.
+- `INSERT INTO t (id) VALUES (-9223372036854775807);` into a `BIGINT PRIMARY KEY` in strict mode: MySQL stores the exact value. DynamoSQL raises `ER_WARN_DATA_OUT_OF_RANGE` for the same double-rounding reason. Any negative integer literal past 2^53 in magnitude, such as `-1234567890123456789`, is affected only when it rounds out of range; `-1234567890123456789` stores correctly.
