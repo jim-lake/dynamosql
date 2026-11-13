@@ -61,7 +61,6 @@ export function runTests(
     },
     extra?.mysql
   );
-  const mysql_conn = mysql.createConnection(mysql_opts);
 
   const session_opts = Object.assign(
     {
@@ -72,11 +71,6 @@ export function runTests(
     },
     extra?.session
   );
-  const ddb_session = createSession(session_opts);
-  after(() => {
-    mysql_conn.destroy();
-    ddb_session.destroy();
-  });
 
   const data = fs.readFileSync(file_path, 'utf8');
   const sql_list = data
@@ -85,8 +79,21 @@ export function runTests(
     .map((s) => s.trim())
     .filter((s) => s.length > 0);
 
+  let mysql_conn: mysql.Connection;
+  let ddb_session: ReturnType<typeof createSession>;
   describe(test_name, function (this: Mocha.Suite) {
     this.timeout(extra?.timeout || 5000);
+    before(() => {
+      if (skip) {
+        return;
+      }
+      mysql_conn = mysql.createConnection(mysql_opts);
+      ddb_session = createSession(session_opts);
+    });
+    after(() => {
+      mysql_conn?.destroy();
+      ddb_session?.destroy();
+    });
     sql_list.forEach((sql) => _runTest(sql));
   });
   function _runTest(sql: string) {
