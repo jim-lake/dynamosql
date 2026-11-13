@@ -4,11 +4,7 @@ import { cellConvert } from '../helpers/cell_convert';
 import type { COLLATIONS } from '../../../constants/mysql';
 import type { Session } from '../../../session';
 import type { ConvertKeyFunction } from '../../helpers/convert_key';
-import type {
-  KeyValue,
-  MakeKey,
-  MakeKeyResult,
-} from '../../helpers/hash_unique_index';
+import type { MakeKey, MakeKeyResult } from '../../helpers/hash_unique_index';
 import type { CellValue, ColumnDef, CellRow } from '../index';
 import type BTree from 'sorted-btree';
 
@@ -131,7 +127,7 @@ export function primaryKeyOf(
   row: CellRow
 ): MakeKeyResult {
   const cells = primary_key.columns.map((name) => row[name] as CellValue);
-  return primary_key.makeKey(primary_key.convertKey(cells) as KeyValue[]);
+  return primary_key.makeKey(primary_key.convertKey(cells));
 }
 export function lookupKeyOf(
   data: TableData,
@@ -153,7 +149,7 @@ export function lookupKeyOf(
       timeZone,
     });
   });
-  return primary_key.makeKey(primary_key.convertKey(normalized) as KeyValue[]);
+  return primary_key.makeKey(primary_key.convertKey(normalized));
 }
 export function uniqueKeyOf(
   column_list: readonly string[],
