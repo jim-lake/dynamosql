@@ -1,0 +1,10 @@
+CREATE DATABASE IF NOT EXISTS mem_conv_dbl_err_db;
+USE mem_conv_dbl_err_db;
+CREATE TEMPORARY TABLE conv_dbl_err (id INT PRIMARY KEY, f DOUBLE);
+INSERT INTO conv_dbl_err (id, f) VALUES (1, 'abc');
+INSERT INTO conv_dbl_err (id, f) VALUES (2, '1.5x');
+INSERT INTO conv_dbl_err (id, f) VALUES (3, '1e400');
+INSERT INTO conv_dbl_err (id, f) VALUES (4, '-1e400');
+INSERT INTO conv_dbl_err (id, f) VALUES (5, 'nan');
+USE _dynamodb;
+DROP DATABASE mem_conv_dbl_err_db;

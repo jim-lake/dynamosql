@@ -1,0 +1,12 @@
+CREATE DATABASE IF NOT EXISTS mem_conv_upd_db;
+USE mem_conv_upd_db;
+CREATE TEMPORARY TABLE conv_upd (id INT PRIMARY KEY, t TINYINT, d DECIMAL(5,2), f DOUBLE, v VARCHAR(3));
+INSERT INTO conv_upd (id, t, d, f, v) VALUES (1, 0, 0, 0, 'a');
+UPDATE conv_upd SET t = '12', d = '3.456', f = '1e2', v = 'xyz' WHERE id = 1;
+SELECT id, t, d, f, v FROM conv_upd ORDER BY id;
+UPDATE conv_upd SET t = 2.5, d = 2.5 WHERE id = 1;
+SELECT id, t, d FROM conv_upd ORDER BY id;
+UPDATE conv_upd SET t = NULL WHERE id = 1;
+SELECT id, t, d FROM conv_upd ORDER BY id;
+USE _dynamodb;
+DROP DATABASE mem_conv_upd_db;

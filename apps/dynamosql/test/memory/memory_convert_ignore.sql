@@ -1,0 +1,10 @@
+CREATE DATABASE IF NOT EXISTS mem_conv_ignore_db;
+USE mem_conv_ignore_db;
+CREATE TEMPORARY TABLE conv_ign (id INT PRIMARY KEY, t TINYINT NOT NULL, d DECIMAL(4,1) NOT NULL, v VARCHAR(2) NOT NULL);
+INSERT IGNORE INTO conv_ign (id, t, d, v) VALUES (1, 200, 1.25, 'abc');
+INSERT IGNORE INTO conv_ign (id, t, d, v) VALUES (2, 'abc', 'x', NULL);
+INSERT IGNORE INTO conv_ign (id, t, d, v) VALUES (3, NULL, NULL, NULL);
+INSERT IGNORE INTO conv_ign (id, t, d, v) VALUES (4, '-500', '12345', 'ok');
+SELECT id, t, d, v FROM conv_ign ORDER BY id;
+USE _dynamodb;
+DROP DATABASE mem_conv_ignore_db;

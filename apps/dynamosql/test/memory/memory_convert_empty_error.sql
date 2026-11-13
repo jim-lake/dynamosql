@@ -1,0 +1,17 @@
+CREATE DATABASE IF NOT EXISTS mem_conv_empty_err_db;
+USE mem_conv_empty_err_db;
+CREATE TEMPORARY TABLE conv_empty_int (id INT PRIMARY KEY, c INT);
+INSERT INTO conv_empty_int (id, c) VALUES (1, '');
+INSERT INTO conv_empty_int (id, c) VALUES (2, '.');
+INSERT INTO conv_empty_int (id, c) VALUES (3, '   ');
+INSERT INTO conv_empty_int (id, c) VALUES (4, '1e400');
+CREATE TEMPORARY TABLE conv_empty_dbl (id INT PRIMARY KEY, c DOUBLE);
+INSERT INTO conv_empty_dbl (id, c) VALUES (5, '');
+INSERT INTO conv_empty_dbl (id, c) VALUES (6, '  ');
+INSERT INTO conv_empty_dbl (id, c) VALUES (7, '-1e400');
+CREATE TEMPORARY TABLE conv_empty_dec (id INT PRIMARY KEY, c DECIMAL(5,2));
+INSERT INTO conv_empty_dec (id, c) VALUES (8, '');
+INSERT INTO conv_empty_dec (id, c) VALUES (9, '  ');
+INSERT INTO conv_empty_dec (id, c) VALUES (10, '.');
+USE _dynamodb;
+DROP DATABASE mem_conv_empty_err_db;

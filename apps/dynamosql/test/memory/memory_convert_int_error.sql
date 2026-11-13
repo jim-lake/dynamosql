@@ -1,0 +1,11 @@
+CREATE DATABASE IF NOT EXISTS mem_conv_int_err_db;
+USE mem_conv_int_err_db;
+CREATE TEMPORARY TABLE conv_int_err (id INT PRIMARY KEY, t TINYINT);
+INSERT INTO conv_int_err (id, t) VALUES (1, 128);
+INSERT INTO conv_int_err (id, t) VALUES (2, -129);
+INSERT INTO conv_int_err (id, t) VALUES (3, '1e4');
+INSERT INTO conv_int_err (id, t) VALUES (4, 'abc');
+INSERT INTO conv_int_err (id, t) VALUES (5, '12abc');
+INSERT INTO conv_int_err (id, t) VALUES (6, NULL);
+USE _dynamodb;
+DROP DATABASE mem_conv_int_err_db;

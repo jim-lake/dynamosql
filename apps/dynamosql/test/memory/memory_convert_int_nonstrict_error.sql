@@ -1,0 +1,8 @@
+CREATE DATABASE IF NOT EXISTS mem_conv_nonstrict_err_db;
+USE mem_conv_nonstrict_err_db;
+SET SESSION sql_mode = '';
+CREATE TEMPORARY TABLE conv_ns_err (id INT PRIMARY KEY, t TINYINT, i INT NOT NULL, d VARCHAR(3));
+INSERT INTO conv_ns_err (id, t, i, d) VALUES (4, 'abc', NULL, NULL);
+SET SESSION sql_mode = 'STRICT_TRANS_TABLES,STRICT_ALL_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,TRADITIONAL,NO_ENGINE_SUBSTITUTION';
+USE _dynamodb;
+DROP DATABASE mem_conv_nonstrict_err_db;

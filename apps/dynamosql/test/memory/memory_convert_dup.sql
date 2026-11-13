@@ -1,0 +1,10 @@
+CREATE DATABASE IF NOT EXISTS mem_conv_dup_db;
+USE mem_conv_dup_db;
+CREATE TEMPORARY TABLE conv_dup (id INT PRIMARY KEY, t TINYINT, d DECIMAL(5,2));
+INSERT INTO conv_dup (id, t, d) VALUES (1, '5', '1.1');
+INSERT INTO conv_dup (id, t, d) VALUES (1, '7', '2.25') ON DUPLICATE KEY UPDATE t = VALUES(t), d = VALUES(d);
+SELECT id, t, d FROM conv_dup ORDER BY id;
+INSERT INTO conv_dup (id, t, d) VALUES (2, 1.5, 3.456) ON DUPLICATE KEY UPDATE t = t + 1;
+SELECT id, t, d FROM conv_dup ORDER BY id;
+USE _dynamodb;
+DROP DATABASE mem_conv_dup_db;

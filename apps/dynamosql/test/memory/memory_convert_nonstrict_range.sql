@@ -1,0 +1,10 @@
+CREATE DATABASE IF NOT EXISTS mem_conv_ns_range_db;
+USE mem_conv_ns_range_db;
+SET SESSION sql_mode = '';
+CREATE TEMPORARY TABLE conv_ns_range (id INT PRIMARY KEY, dd DECIMAL(10,2), dz DECIMAL(10,0), tt TINYINT, f DOUBLE, b BIGINT, d2 DECIMAL(4,1));
+INSERT INTO conv_ns_range (id, dd, dz, tt, f, b, d2) VALUES (1, '1e20', 1.5, '-0.5', '1e400', '1e30', '-1e400'), (2, '1e400', 2.4999, 200, '-1e400', '-1e30', 12345);
+INSERT INTO conv_ns_range (id, dd, dz, tt, f, b, d2) VALUES (3, -1e20, '-2.5', -129, 1e308, '-9223372036854775809', '-0.05');
+SELECT id, dd, dz, tt, f, b, d2 FROM conv_ns_range ORDER BY id;
+SET SESSION sql_mode = 'STRICT_TRANS_TABLES,STRICT_ALL_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,TRADITIONAL,NO_ENGINE_SUBSTITUTION';
+USE _dynamodb;
+DROP DATABASE mem_conv_ns_range_db;

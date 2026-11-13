@@ -196,7 +196,12 @@ async function _createTable(
         type: mysqlStringToValueType(def.definition.dataType),
         mysqlType: def.definition.dataType,
         length: def.definition.length ?? null,
-        decimals: def.definition.scale ?? def.definition.length ?? null,
+        decimals:
+          def.definition.scale ??
+          (mysqlStringToValueType(def.definition.dataType) === 'number'
+            ? 0
+            : def.definition.length) ??
+          null,
         collation: makeCollation(def, collation),
         nullable: def.nullable?.value !== 'not null',
       };

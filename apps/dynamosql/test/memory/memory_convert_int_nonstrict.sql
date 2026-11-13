@@ -1,0 +1,13 @@
+CREATE DATABASE IF NOT EXISTS mem_conv_nonstrict_db;
+USE mem_conv_nonstrict_db;
+SET SESSION sql_mode = '';
+CREATE TEMPORARY TABLE conv_ns (id INT PRIMARY KEY, t TINYINT, i INT NOT NULL, d VARCHAR(3));
+INSERT INTO conv_ns (id, t, i, d) VALUES (1, 128, 1, 'abcdef');
+INSERT INTO conv_ns (id, t, i, d) VALUES (2, -129, 2, 'xy');
+INSERT INTO conv_ns (id, t, i, d) VALUES (3, '1e4', '12abc', 'a');
+INSERT INTO conv_ns (id, t, i, d) VALUES (5, '12abc', 3.7, 1234);
+INSERT INTO conv_ns (id, t, i, d) VALUES (6, NULL, 'x', 'ok');
+SELECT id, t, i, d FROM conv_ns ORDER BY id;
+SET SESSION sql_mode = 'STRICT_TRANS_TABLES,STRICT_ALL_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,TRADITIONAL,NO_ENGINE_SUBSTITUTION';
+USE _dynamodb;
+DROP DATABASE mem_conv_nonstrict_db;

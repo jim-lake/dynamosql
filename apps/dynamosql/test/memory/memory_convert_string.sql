@@ -1,0 +1,12 @@
+CREATE DATABASE IF NOT EXISTS mem_conv_str_db;
+USE mem_conv_str_db;
+CREATE TEMPORARY TABLE conv_str (id INT PRIMARY KEY, v VARCHAR(5), c CHAR(3));
+INSERT INTO conv_str (id, v, c) VALUES (1, 'abc', 'xy');
+INSERT INTO conv_str (id, v, c) VALUES (2, 'abcde', 'xyz');
+INSERT INTO conv_str (id, v, c) VALUES (3, 12345, 1.5);
+INSERT INTO conv_str (id, v, c) VALUES (4, '', '');
+INSERT INTO conv_str (id, v, c) VALUES (5, NULL, NULL);
+INSERT INTO conv_str (id, v, c) VALUES (6, 1e3, 'a');
+SELECT id, v, c, LENGTH(v), LENGTH(c) FROM conv_str ORDER BY id;
+USE _dynamodb;
+DROP DATABASE mem_conv_str_db;

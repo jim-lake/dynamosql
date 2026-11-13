@@ -58,6 +58,12 @@ export function valueTypeToMysqlType(s: ValueType): MysqlType {
 export function mysqlStringToValueType(s: string): ValueType {
   switch (s) {
     case 'INT':
+    case 'INTEGER':
+    case 'TINYINT':
+    case 'SMALLINT':
+    case 'MEDIUMINT':
+    case 'BOOL':
+    case 'BOOLEAN':
       return 'long';
     case 'BIGINT':
       return 'longlong';
@@ -73,9 +79,12 @@ export function mysqlStringToValueType(s: string): ValueType {
     case 'TIME':
       return 'time';
     case 'DECIMAL':
+    case 'NUMERIC':
       return 'number';
-    case 'BOOL':
-      return 'bool';
+    case 'DOUBLE':
+    case 'FLOAT':
+    case 'REAL':
+      return 'double';
     case 'JSON':
       return 'json';
     default:

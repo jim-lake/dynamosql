@@ -1,0 +1,11 @@
+CREATE DATABASE IF NOT EXISTS mem_conv_numlit_db;
+USE mem_conv_numlit_db;
+CREATE TEMPORARY TABLE conv_numlit (id INT PRIMARY KEY, i INT, d DOUBLE, dm DECIMAL(5,2), t TINYINT);
+INSERT INTO conv_numlit (id, i, d, dm, t) VALUES (1, '.5', '.5', '.5', '-.5');
+INSERT INTO conv_numlit (id, i, d, dm, t) VALUES (2, '-.5', '-.5', '-.5', '+.5');
+INSERT INTO conv_numlit (id, i, d, dm, t) VALUES (3, '5.', '5.', '5.', '5.');
+INSERT INTO conv_numlit (id, i, d, dm, t) VALUES (4, '+.5', '1e-400', '1e-4', '0.4');
+INSERT INTO conv_numlit (id, i, d, dm, t) VALUES (5, '  .5  ', '  2.5  ', '  3.25  ', ' 7 ');
+SELECT id, i, d, dm, t FROM conv_numlit ORDER BY id;
+USE _dynamodb;
+DROP DATABASE mem_conv_numlit_db;

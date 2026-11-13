@@ -1,0 +1,11 @@
+CREATE DATABASE IF NOT EXISTS mem_conv_trim_db;
+USE mem_conv_trim_db;
+CREATE TEMPORARY TABLE conv_trim (id INT PRIMARY KEY, v VARCHAR(3), c CHAR(2));
+INSERT INTO conv_trim (id, v, c) VALUES (1, 'abc  ', 'ab   ');
+INSERT INTO conv_trim (id, v, c) VALUES (2, 'ab   ', 'a ');
+INSERT INTO conv_trim (id, v, c) VALUES (3, '   ', '  ');
+INSERT INTO conv_trim (id, v, c) VALUES (4, '', '');
+INSERT INTO conv_trim (id, v, c) VALUES (5, '.5', '.5');
+SELECT id, v, LENGTH(v), c, LENGTH(c) FROM conv_trim ORDER BY id;
+USE _dynamodb;
+DROP DATABASE mem_conv_trim_db;

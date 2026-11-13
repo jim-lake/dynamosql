@@ -59,7 +59,10 @@ async function _runAlterTable(
         type,
         mysqlType,
         length: def.definition.length ?? null,
-        decimals: def.definition.scale ?? null,
+        decimals:
+          def.definition.scale ??
+          (type === 'number' ? 0 : def.definition.length) ??
+          null,
         collation: makeCollation(def, info.collation),
         nullable: def.nullable?.value !== 'not null',
       };

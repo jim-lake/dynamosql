@@ -128,6 +128,9 @@ const ERROR_MAP: Record<string, ErrorMapEntry> = {
   ER_TRUNCATED_WRONG_VALUE_FOR_FIELD: {
     code: 'ER_TRUNCATED_WRONG_VALUE_FOR_FIELD',
   },
+  ER_WARN_DATA_OUT_OF_RANGE: { code: 'ER_WARN_DATA_OUT_OF_RANGE' },
+  WARN_DATA_TRUNCATED: { code: 'WARN_DATA_TRUNCATED' },
+  ER_DATA_TOO_LONG: { code: 'ER_DATA_TOO_LONG' },
   ER_DUP_FIELDNAME: {
     code: 'ER_DUP_FIELDNAME',
     sqlMessage: errStr`Duplicate column name '${0}'`,

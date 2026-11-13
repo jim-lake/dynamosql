@@ -1,0 +1,12 @@
+CREATE DATABASE IF NOT EXISTS mem_conv_dbl_db;
+USE mem_conv_dbl_db;
+CREATE TEMPORARY TABLE conv_dbl (id INT PRIMARY KEY, f DOUBLE, r REAL, x FLOAT);
+INSERT INTO conv_dbl (id, f, r, x) VALUES (1, 1.5, 2.25, 3.125);
+INSERT INTO conv_dbl (id, f, r, x) VALUES (2, '1.5e3', '-2.5', '0.5');
+INSERT INTO conv_dbl (id, f, r, x) VALUES (3, '  4.25  ', 7, '1e-3');
+INSERT INTO conv_dbl (id, f, r, x) VALUES (4, 0, 0, 0);
+INSERT INTO conv_dbl (id, f, r, x) VALUES (5, NULL, NULL, NULL);
+SELECT id, f, r, x FROM conv_dbl ORDER BY id;
+SELECT id, f * 2, r + 1 FROM conv_dbl WHERE id <= 4 ORDER BY id;
+USE _dynamodb;
+DROP DATABASE mem_conv_dbl_db;

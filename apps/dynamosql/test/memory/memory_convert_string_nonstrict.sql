@@ -1,0 +1,12 @@
+CREATE DATABASE IF NOT EXISTS mem_conv_str_ns_db;
+USE mem_conv_str_ns_db;
+SET SESSION sql_mode = '';
+CREATE TEMPORARY TABLE conv_str_ns (id INT PRIMARY KEY, v VARCHAR(3) NOT NULL, c CHAR(2));
+INSERT INTO conv_str_ns (id, v, c) VALUES (1, 'abcdef', 'xyz');
+INSERT INTO conv_str_ns (id, v, c) VALUES (2, 'ab', 'q');
+INSERT INTO conv_str_ns (id, v, c) VALUES (4, 12345, 1.5);
+INSERT INTO conv_str_ns (id, v, c) VALUES (5, 'abcdef', 'xyz'), (6, NULL, 'ok');
+SELECT id, v, c, LENGTH(v), LENGTH(c) FROM conv_str_ns ORDER BY id;
+SET SESSION sql_mode = 'STRICT_TRANS_TABLES,STRICT_ALL_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,TRADITIONAL,NO_ENGINE_SUBSTITUTION';
+USE _dynamodb;
+DROP DATABASE mem_conv_str_ns_db;

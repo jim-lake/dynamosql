@@ -22,3 +22,7 @@ MySQL accepts `INSERT INTO t VALUES (...)` and maps the values to columns by pos
 ## Named locks
 
 - `SELECT IS_USED_LOCK('x');` while another session holds `x`: MySQL returns that session's connection id. DynamoSQL returns the holder's session thread id, which can differ from the MySQL connection id.
+
+## Negative BIGINT minimum literal
+
+- `INSERT INTO c (id, b) VALUES (2, -9223372036854775808);` into a `BIGINT` column: MySQL stores `-9223372036854775808`. DynamoSQL raises `ER_WARN_DATA_OUT_OF_RANGE`, because unary minus converts the literal through a JavaScript double, which rounds to `-9223372036854775808` and stringifies to `-9223372036854776000`.

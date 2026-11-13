@@ -84,4 +84,39 @@ describe('Temp', function () {
     path.join(__dirname, 'memory_misuse_error.sql'),
     { allowedErrors: 'SAME_CODE', skipAffected: true, checkChanged: true }
   );
+  for (const name of [
+    'memory_convert_int.sql',
+    'memory_convert_int_nonstrict.sql',
+    'memory_convert_decimal.sql',
+    'memory_convert_double.sql',
+    'memory_convert_string.sql',
+    'memory_convert_update.sql',
+    'memory_convert_dup.sql',
+    'memory_convert_string_nonstrict.sql',
+    'memory_convert_ignore.sql',
+    'memory_convert_nonstrict_range.sql',
+    'memory_convert_precision.sql',
+    'memory_convert_trim.sql',
+    'memory_convert_numeric_literal.sql',
+  ]) {
+    runTests(name, path.join(__dirname, name), { checkChanged: true });
+  }
+  for (const name of [
+    'memory_convert_int_error.sql',
+    'memory_convert_int_nonstrict_error.sql',
+    'memory_convert_decimal_error.sql',
+    'memory_convert_double_error.sql',
+    'memory_convert_string_error.sql',
+    'memory_convert_string_nonstrict_error.sql',
+    'memory_convert_ignore_error.sql',
+    'memory_convert_precision_error.sql',
+    'memory_convert_empty_error.sql',
+    'memory_convert_char_error.sql',
+  ]) {
+    runTests(name, path.join(__dirname, name), {
+      allowedErrors: 'SAME_CODE',
+      skipAffected: true,
+      checkChanged: true,
+    });
+  }
 });

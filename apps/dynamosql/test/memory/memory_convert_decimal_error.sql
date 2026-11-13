@@ -1,0 +1,11 @@
+CREATE DATABASE IF NOT EXISTS mem_conv_dec_err_db;
+USE mem_conv_dec_err_db;
+CREATE TEMPORARY TABLE conv_dec_err (id INT PRIMARY KEY, d1 DECIMAL(5,2), d2 DECIMAL(4,0));
+INSERT INTO conv_dec_err (id, d1) VALUES (1, 1000);
+INSERT INTO conv_dec_err (id, d1) VALUES (2, '-1000');
+INSERT INTO conv_dec_err (id, d2) VALUES (3, 10000);
+INSERT INTO conv_dec_err (id, d2) VALUES (4, 'abc');
+INSERT INTO conv_dec_err (id, d2) VALUES (5, '12abc');
+INSERT INTO conv_dec_err (id, d2) VALUES (6, 'nan');
+USE _dynamodb;
+DROP DATABASE mem_conv_dec_err_db;
