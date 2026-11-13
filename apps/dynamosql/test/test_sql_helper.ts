@@ -31,6 +31,8 @@ interface QueryOutcome {
 }
 
 const SECONDS_REGEX = /:[0-9]{2}(\.[0-9]*)?$/g;
+const SQL_MODE =
+  'STRICT_TRANS_TABLES,STRICT_ALL_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,TRADITIONAL,NO_ENGINE_SUBSTITUTION';
 
 process.on('uncaughtException', (err) => {
   console.error('Caught uncaught exception:', err);
@@ -83,12 +85,23 @@ export function runTests(
   let ddb_session: ReturnType<typeof createSession>;
   describe(test_name, function (this: Mocha.Suite) {
     this.timeout(extra?.timeout || 5000);
-    before(() => {
+    before(async () => {
       if (skip) {
         return;
       }
       mysql_conn = mysql.createConnection(mysql_opts);
       ddb_session = createSession(session_opts);
+      const set_mode = `SET SESSION sql_mode = '${SQL_MODE}'`;
+      await Promise.all([
+        new Promise<void>((resolve, reject) => {
+          mysql_conn.query(set_mode, (err) => (err ? reject(err) : resolve()));
+        }),
+        new Promise<void>((resolve, reject) => {
+          ddb_session.query(set_mode, (err: unknown) =>
+            err ? reject(err) : resolve()
+          );
+        }),
+      ]);
     });
     after(() => {
       mysql_conn?.destroy();
