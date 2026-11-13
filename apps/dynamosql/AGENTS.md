@@ -119,6 +119,7 @@ The entire point of the query engine is its async iterator, end to end. Rows flo
 - After the code is written, verified, and finished, re-read the changed code for every function invoked in only one place. Decide for each one whether it should be inlined. A single-caller helper that adds no reuse or recursion is wrong and must be inlined before the work is reported as complete.
 - Round float arguments used as counts, positions, or lengths with `Math.round()`.
 - Import directly from the defining module. Do not add unnecessary re-export chains.
+- Never use non-null assertions (`!`), in source, tests, or generators, under any circumstance.
 - Match the Prettier style: single quotes, 2-space indent, ES5 trailing commas. Do not run `npm run pretty` unless the user explicitly instructs you to. Never run it on your own initiative, including before finishing. When the user does ask for it, `npm run pretty` writes changes to files on disk, so do not assume files stay unchanged after it runs. Never revert those changes, and never mention them in reports.
 - ESLint enforces Unix line endings.
 

@@ -70,7 +70,7 @@ export function convertBigInt(value: unknown): bigint | null {
 export function convertBooleanValue(value: unknown): number | null {
   if (value === null) {
     return null;
-  } else if (typeof value === 'number') {
+  } else if (typeof value === 'number' || typeof value === 'boolean') {
     return value ? 1 : 0;
   } else {
     return convertNum(value) ? 1 : 0;
