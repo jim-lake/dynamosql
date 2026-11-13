@@ -4,12 +4,12 @@ import type { SQLDate } from '../types/sql_date';
 import type { SQLDateTime } from '../types/sql_datetime';
 import type { SQLInterval } from '../types/sql_interval';
 import type { SQLTime } from '../types/sql_time';
-import type { KeyType } from './hash_unique_index';
-import type { KeyValueNullable } from './ordered_nullable_index';
+import type { KeyType, KeyValue } from './hash_unique_index';
 
-type Converter = (value: unknown) => KeyValueNullable;
-export type ConvertKeyFunction = (cells: CellValue[]) => KeyValueNullable[];
+type Converter = (value: unknown) => KeyValue;
+export type ConvertKeyFunction = (cells: CellValue[]) => KeyValue[];
 
+// Untested assumption: key values are never null. A null column type throws here.
 export function createConvertKey(
   columns: ColumnDef[],
   types: KeyType[]
@@ -18,8 +18,6 @@ export function createConvertKey(
     const kinds = types.slice();
     const converters = columns.map((column, i): Converter => {
       switch (`${column.type}:${kinds[i]}`) {
-        case 'null:string':
-          return () => null;
         case 'string:string':
         case 'string:string_ci':
         case 'char:string':
@@ -54,8 +52,6 @@ export function createConvertKey(
       cells.map((cell, i) => (converters[i] as Converter)(cell.value));
   }
   switch (columns.map((column, i) => `${column.type}:${types[i]}`).join(',')) {
-    case 'null:string':
-      return () => [null];
     case 'string:string':
     case 'string:string_ci':
     case 'char:string':
@@ -100,73 +96,6 @@ export function createConvertKey(
     case 'buffer:buffer':
       return ((cells: [CellValue]) => [
         cells[0].value as Buffer,
-      ]) as ConvertKeyFunction;
-    case 'null:string,null:string':
-      return () => [null, null];
-    case 'null:string,string:string':
-    case 'null:string,string:string_ci':
-    case 'null:string,char:string':
-    case 'null:string,char:string_ci':
-    case 'null:string,text:string':
-    case 'null:string,text:string_ci':
-    case 'null:string,json:string':
-      return ((cells: [CellValue, CellValue]) => [
-        null,
-        cells[1].value as string,
-      ]) as ConvertKeyFunction;
-    case 'null:string,bool:number':
-      return ((cells: [CellValue, CellValue]) => [
-        null,
-        Number(cells[1].value),
-      ]) as ConvertKeyFunction;
-    case 'null:string,long:number':
-    case 'null:string,year:number':
-    case 'null:string,number:number':
-    case 'null:string,double:number':
-      return ((cells: [CellValue, CellValue]) => [
-        null,
-        cells[1].value as number,
-      ]) as ConvertKeyFunction;
-    case 'null:string,longlong:bigint':
-      return ((cells: [CellValue, CellValue]) => [
-        null,
-        BigInt(cells[1].value as number | bigint),
-      ]) as ConvertKeyFunction;
-    case 'null:string,interval:number':
-      return ((cells: [CellValue, CellValue]) => [
-        null,
-        (cells[1].value as SQLInterval).getNumber(),
-      ]) as ConvertKeyFunction;
-    case 'null:string,datetime:number':
-      return ((cells: [CellValue, CellValue]) => [
-        null,
-        (cells[1].value as SQLDateTime).toNumber(),
-      ]) as ConvertKeyFunction;
-    case 'null:string,date:number':
-      return ((cells: [CellValue, CellValue]) => [
-        null,
-        (cells[1].value as SQLDate).toNumber(),
-      ]) as ConvertKeyFunction;
-    case 'null:string,time:number':
-      return ((cells: [CellValue, CellValue]) => [
-        null,
-        (cells[1].value as SQLTime).toNumber(),
-      ]) as ConvertKeyFunction;
-    case 'null:string,buffer:buffer':
-      return ((cells: [CellValue, CellValue]) => [
-        null,
-        cells[1].value as Buffer,
-      ]) as ConvertKeyFunction;
-    case 'string:string,null:string':
-    case 'string:string_ci,null:string':
-    case 'char:string,null:string':
-    case 'char:string_ci,null:string':
-    case 'text:string,null:string':
-    case 'text:string_ci,null:string':
-    case 'json:string,null:string':
-      return ((cells: [CellValue, CellValue]) => [
-        cells[0].value as string,
-        null,
       ]) as ConvertKeyFunction;
     case 'string:string,string:string':
     case 'string:string,string:string_ci':
@@ -330,11 +259,6 @@ export function createConvertKey(
         cells[0].value as string,
         cells[1].value as Buffer,
       ]) as ConvertKeyFunction;
-    case 'bool:number,null:string':
-      return ((cells: [CellValue, CellValue]) => [
-        Number(cells[0].value),
-        null,
-      ]) as ConvertKeyFunction;
     case 'bool:number,string:string':
     case 'bool:number,string:string_ci':
     case 'bool:number,char:string':
@@ -388,14 +312,6 @@ export function createConvertKey(
       return ((cells: [CellValue, CellValue]) => [
         Number(cells[0].value),
         cells[1].value as Buffer,
-      ]) as ConvertKeyFunction;
-    case 'long:number,null:string':
-    case 'year:number,null:string':
-    case 'number:number,null:string':
-    case 'double:number,null:string':
-      return ((cells: [CellValue, CellValue]) => [
-        cells[0].value as number,
-        null,
       ]) as ConvertKeyFunction;
     case 'long:number,string:string':
     case 'long:number,string:string_ci':
@@ -505,11 +421,6 @@ export function createConvertKey(
         cells[0].value as number,
         cells[1].value as Buffer,
       ]) as ConvertKeyFunction;
-    case 'longlong:bigint,null:string':
-      return ((cells: [CellValue, CellValue]) => [
-        BigInt(cells[0].value as number | bigint),
-        null,
-      ]) as ConvertKeyFunction;
     case 'longlong:bigint,string:string':
     case 'longlong:bigint,string:string_ci':
     case 'longlong:bigint,char:string':
@@ -563,11 +474,6 @@ export function createConvertKey(
       return ((cells: [CellValue, CellValue]) => [
         BigInt(cells[0].value as number | bigint),
         cells[1].value as Buffer,
-      ]) as ConvertKeyFunction;
-    case 'interval:number,null:string':
-      return ((cells: [CellValue, CellValue]) => [
-        (cells[0].value as SQLInterval).getNumber(),
-        null,
       ]) as ConvertKeyFunction;
     case 'interval:number,string:string':
     case 'interval:number,string:string_ci':
@@ -623,11 +529,6 @@ export function createConvertKey(
         (cells[0].value as SQLInterval).getNumber(),
         cells[1].value as Buffer,
       ]) as ConvertKeyFunction;
-    case 'datetime:number,null:string':
-      return ((cells: [CellValue, CellValue]) => [
-        (cells[0].value as SQLDateTime).toNumber(),
-        null,
-      ]) as ConvertKeyFunction;
     case 'datetime:number,string:string':
     case 'datetime:number,string:string_ci':
     case 'datetime:number,char:string':
@@ -681,11 +582,6 @@ export function createConvertKey(
       return ((cells: [CellValue, CellValue]) => [
         (cells[0].value as SQLDateTime).toNumber(),
         cells[1].value as Buffer,
-      ]) as ConvertKeyFunction;
-    case 'date:number,null:string':
-      return ((cells: [CellValue, CellValue]) => [
-        (cells[0].value as SQLDate).toNumber(),
-        null,
       ]) as ConvertKeyFunction;
     case 'date:number,string:string':
     case 'date:number,string:string_ci':
@@ -741,11 +637,6 @@ export function createConvertKey(
         (cells[0].value as SQLDate).toNumber(),
         cells[1].value as Buffer,
       ]) as ConvertKeyFunction;
-    case 'time:number,null:string':
-      return ((cells: [CellValue, CellValue]) => [
-        (cells[0].value as SQLTime).toNumber(),
-        null,
-      ]) as ConvertKeyFunction;
     case 'time:number,string:string':
     case 'time:number,string:string_ci':
     case 'time:number,char:string':
@@ -799,11 +690,6 @@ export function createConvertKey(
       return ((cells: [CellValue, CellValue]) => [
         (cells[0].value as SQLTime).toNumber(),
         cells[1].value as Buffer,
-      ]) as ConvertKeyFunction;
-    case 'buffer:buffer,null:string':
-      return ((cells: [CellValue, CellValue]) => [
-        cells[0].value as Buffer,
-        null,
       ]) as ConvertKeyFunction;
     case 'buffer:buffer,string:string':
     case 'buffer:buffer,string:string_ci':
