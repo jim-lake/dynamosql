@@ -223,6 +223,7 @@ export interface InsertParams {
   duplicate_mode?: 'ignore' | 'replace' | 'update';
   on_duplicate_update?: SetList[];
   is_ignore?: boolean;
+  single_row?: boolean;
 }
 
 export interface Engine {

@@ -93,6 +93,9 @@ async function _runInsert(
 ): Promise<AffectedResult> {
   const { ast, session, engine, dynamodb, duplicate_mode } = params;
   const is_ignore = ast.prefix === 'ignore into';
+  const is_single_row =
+    !!ast.set ||
+    (ast.values?.type === 'values' && ast.values.values.length === 1);
   const tableArray = Array.isArray(ast.table) ? ast.table : [ast.table];
   const firstTable = tableArray[0];
   const table =
@@ -205,6 +208,7 @@ async function _runInsert(
       duplicate_mode: duplicate_mode ?? undefined,
       on_duplicate_update: ast.on_duplicate_update?.set,
       is_ignore,
+      single_row: is_single_row,
     };
     try {
       let result: ChangedResult;
@@ -357,6 +361,8 @@ async function _runInsert(
             database,
             table,
             list: insert_list,
+            is_ignore,
+            single_row: is_single_row,
           });
         }
         result = { affectedRows, changedRows };

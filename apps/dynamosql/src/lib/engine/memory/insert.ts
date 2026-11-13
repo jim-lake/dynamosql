@@ -1,12 +1,12 @@
 import { SQLError } from '../../../error';
 import { evaluateDuplicateUpdate } from '../../helpers/duplicate_update';
-import { convertNum } from '../../helpers/sql_conversion';
+import { cellConvert } from '../helpers/cell_convert';
 
 import * as Storage from './storage';
 import { ROW_ID_NAME } from './storage';
 
+import type { CellConvertFlags } from '../helpers/cell_convert';
 import type {
-  CellValue,
   EvaluationResultRow,
   InsertParams,
   ChangedResult,
@@ -27,6 +27,7 @@ export async function insertRowList(
     duplicate_mode,
     on_duplicate_update,
     is_ignore,
+    single_row,
   } = params;
   const data = Storage.getTable(database, table, session);
 
@@ -49,7 +50,11 @@ export async function insertRowList(
         throw new SQLError({ err: 'column_not_found', args: [name] });
       }
     }
-    const cellRow = _transformRow(row, data.column_list, is_ignore ?? false);
+    const cellRow = _transformRow(row, data.column_list, {
+      strict: session.strictMode,
+      singleRow: single_row ?? false,
+      ignore: is_ignore ?? false,
+    });
     if (primary_key.columns[0] === ROW_ID_NAME) {
       cellRow[ROW_ID_NAME] = { type: 'longlong', value: ++g_last_row_id };
     }
@@ -84,17 +89,18 @@ export async function insertRowList(
       });
       const new_row: CellRow = { ...old_row };
       let changed = false;
-      for (const { column, value } of sets) {
-        const name = column.toLowerCase();
-        if (!data.column_list.some((col) => col.name_lc === name)) {
-          throw new SQLError({ err: 'column_not_found', args: [column] });
+      for (const { column: set_column, value } of sets) {
+        const name = set_column.toLowerCase();
+        const column = data.column_list.find((col) => col.name_lc === name);
+        if (!column) {
+          throw new SQLError({ err: 'column_not_found', args: [set_column] });
         }
-        const stored = _storedCell(
-          value,
-          data.column_list.find((col) => col.name_lc === name),
-          is_ignore ?? false
-        );
-        new_row[name] = { type: stored.type, value: stored.value };
+        const stored = cellConvert(value, column, {
+          strict: session.strictMode,
+          singleRow: single_row ?? false,
+          ignore: !!is_ignore,
+        });
+        new_row[name] = stored;
         if (old_row[name]?.value !== stored.value) {
           changed = true;
         }
@@ -118,14 +124,14 @@ export async function insertRowList(
 function _transformRow(
   row: EvaluationResultRow,
   column_list: readonly MemoryColumnDef[],
-  ignore: boolean
+  flags: CellConvertFlags
 ): CellRow {
   const result: CellRow = {};
   for (const column of column_list) {
     const cell = row[column.name_lc];
     if (cell !== undefined) {
       _checkJsonText(column, cell.value);
-      result[column.name_lc] = _storedCell(cell, column, ignore);
+      result[column.name_lc] = cellConvert(cell, column, flags);
     } else if (column.defaultValue === undefined) {
       throw new SQLError({
         err: 'ER_NO_DEFAULT_FOR_FIELD',
@@ -136,35 +142,6 @@ function _transformRow(
     }
   }
   return result;
-}
-export function roundInt(value: unknown): unknown {
-  if (typeof value !== 'string' && typeof value !== 'number') {
-    return value;
-  }
-  if (
-    typeof value === 'string' &&
-    value.trim() !== '' &&
-    isNaN(Number(value))
-  ) {
-    throw new SQLError({ err: 'ER_TRUNCATED_WRONG_VALUE_FOR_FIELD' });
-  }
-  const num = convertNum(value) ?? 0;
-  return Math.sign(num) * Math.round(Math.abs(num));
-}
-export function isInteger(type: string | undefined): boolean {
-  return type === 'long' || type === 'longlong';
-}
-function _storedCell(
-  cell: { type: CellValue['type']; value: unknown },
-  column: MemoryColumnDef | undefined,
-  ignore: boolean
-): CellValue {
-  const zeroForNull = ignore && !column?.nullable && cell.value === null;
-  const value = zeroForNull ? 0 : cell.value;
-  return {
-    type: cell.type,
-    value: isInteger(column?.type) ? roundInt(value) : value,
-  };
 }
 function _checkJsonText(column: MemoryColumnDef, value: unknown) {
   if (column.type !== 'json' || typeof value !== 'string') {

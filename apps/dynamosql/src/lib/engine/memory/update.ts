@@ -1,11 +1,10 @@
 import { logger } from '@dynamosql/shared';
 
 import { SQLError, NoSingleOperationError } from '../../../error';
+import { cellConvert } from '../helpers/cell_convert';
 
-import { roundInt, isInteger } from './insert';
 import * as Storage from './storage';
 
-import type { EvaluationResult } from '../../expression';
 import type { KeyValue } from '../../helpers/hash_unique_index';
 import type {
   MultiUpdateParams,
@@ -61,22 +60,16 @@ export async function multipleUpdate(
         let changed = false;
 
         for (const set of set_list) {
-          if (
-            !data.column_list.some(
-              (col) => col.name_lc === set.column.toLowerCase()
-            )
-          ) {
-            throw new SQLError({ err: 'column_not_found', args: [set.column] });
-          }
           const column = data.column_list.find(
             (col) => col.name_lc === set.column.toLowerCase()
           );
-          const zeroForNull =
-            ignore && !column?.nullable && set.value.value === null;
-          const value = zeroForNull ? 0 : set.value.value;
-          new_row[set.column] = _transformCell({
-            ...set.value,
-            value: isInteger(column?.type) ? roundInt(value) : value,
+          if (!column) {
+            throw new SQLError({ err: 'column_not_found', args: [set.column] });
+          }
+          new_row[set.column] = cellConvert(set.value, column, {
+            strict: session.strictMode,
+            singleRow: false,
+            ignore: !!ignore,
           });
           if (old_row[set.column]?.value !== new_row[set.column]?.value) {
             changed = true;
@@ -112,7 +105,4 @@ export async function multipleUpdate(
   }
 
   return { affectedRows, changedRows };
-}
-function _transformCell(cell: EvaluationResult): CellValue {
-  return { value: cell.value, type: cell.type };
 }

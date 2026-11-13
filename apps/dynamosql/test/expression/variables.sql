@@ -82,5 +82,6 @@ SET @@global.div_precision_increment = 10;
 SELECT @@global.div_precision_increment AS div_prec;
 
 SET @@global.sql_mode = "TRADITIONAL";
+SET @@global.sql_mode = "STRICT_TRANS_TABLES,STRICT_ALL_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,TRADITIONAL,NO_ENGINE_SUBSTITUTION";
 
 SELECT @@global.system_time_zone IS NOT NULL AS has_system_tz;
