@@ -79,13 +79,18 @@ function insertToSQL(stmt) {
     returning,
     set,
   } = stmt
-  const { keyword, set: duplicateSet } = onDuplicateUpdate || {}
+  const { keyword, set: duplicateSet, row_alias: rowAlias } = onDuplicateUpdate || {}
   const clauses = [toUpper(type), orExpr.map(literalToSQL).join(' '), toUpper(prefix), tablesToSQL(table), partitionToSQL(partition)]
   if (Array.isArray(columns)) clauses.push(`(${columns.map(literalToSQL).join(', ')})`)
   clauses.push(commonOptionConnector(values && values.type === 'values' ? 'VALUES' : '', valuesToSQL, values))
   clauses.push(commonOptionConnector('ON CONFLICT', conflictToSQL, conflict))
   clauses.push(commonOptionConnector('SET', setToSQL, set))
   clauses.push(commonOptionConnector('WHERE', exprToSQL, where))
+  if (rowAlias) {
+    const { name, columns: aliasCols } = rowAlias
+    clauses.push('AS', identifierToSql(name))
+    if (aliasCols) clauses.push(`(${aliasCols.map(col => identifierToSql(col.column || col)).join(', ')})`)
+  }
   clauses.push(commonOptionConnector(keyword, setToSQL, duplicateSet))
   clauses.push(returningToSQL(returning))
   return clauses.filter(hasVal).join(' ')

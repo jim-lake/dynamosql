@@ -6,7 +6,7 @@ import { explainToSQL } from './explain'
 import { selectToSQL } from './select'
 import { deleteToSQL } from './delete'
 import { updateToSQL } from './update'
-import { insertToSQL } from './insert'
+import { insertToSQL, valuesToSQL } from './insert'
 import {
   callToSQL,
   commonCmdToSQL,
@@ -33,6 +33,10 @@ import { transactionToSQL } from './transaction'
 import { showToSQL } from './show'
 import { hasVal, toUpper } from './util'
 
+function valuesStmtToSQL(stmt) {
+  return ['VALUES', valuesToSQL(stmt.values)].join(' ')
+}
+
 const typeToSQLFn = {
   alter       : alterToSQL,
   analyze     : analyzeToSQL,
@@ -40,6 +44,7 @@ const typeToSQLFn = {
   create      : createToSQL,
   comment     : commentOnToSQL,
   select      : selectToSQL,
+  values      : valuesStmtToSQL,
   deallocate  : deallocateToSQL,
   delete      : deleteToSQL,
   exec        : execToSQL,

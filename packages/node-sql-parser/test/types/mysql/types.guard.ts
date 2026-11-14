@@ -2,7 +2,7 @@
  * Generated type guards for "mysql.d.ts".
  * WARNING: Do not manually change this file.
  */
-import { With, Location, LocationRange, ParseOptions, Option, TableColumnAst, BaseFrom, Join, Values, TableExpr, Dual, From, LimitValue, Limit, OrderBy, ValueExpr, StringValue, OriginValue, DefaultValue, NumberValue, IntervalExprValue, SeparatorValue, SortDirection, ColumnRefItem, ColumnRef, SetList, InsertReplaceValue, Star, Case, Cast, AggrFunc, FunctionNameValue, FunctionName, Function, JsonOnClause, JsonTable, JsonTableColumn, FulltextSearch, Column, Interval, Param, Var, Assign, Binary, Unary, Expr, ExtractFunc, ExpressionValue, ExprList, PartitionBy, WindowSpec, WindowFrameClause, AsWindowSpec, NamedWindowExpr, WindowExpr, Select, Insert_Replace, Update, Delete, Alter, AlterExpr, AlterColumnPosition, AlterAddColumn, AlterDropColumn, AlterModifyColumn, AlterChangeColumn, AlterRenameTable, AlterRenameColumn, AlterAddIndex, AlterDropIndex, AlterDropKey, AlterAddConstraint, AlterDropConstraint, AlterEnableConstraint, AlterDisableConstraint, AlterAddPartition, AlterDropPartition, AlterOperatePartition, AlterAlgorithm, AlterLock, AlterTableOption, Use, KeywordComment, CollateExpr, MysqlType, ConvertDataType, DataType, OnUpdateCurrentTimestamp, LiteralNotNull, LiteralNull, ColumnConstraint, ColumnDefinitionOptList, ReferenceDefinition, OnReference, CreateColumnDefinition, IndexType, IndexOption, CreateIndexDefinition, CreateFulltextSpatialIndexDefinition, ConstraintName, CreateConstraintPrimary, CreateConstraintUnique, CreateConstraintForeign, CreateConstraintCheck, CreateConstraintDefinition, CreateDefinition, CreateTable, DatabaseOption, CreateDatabase, CreateSchema, CreateIndex, CreateView, CreateTrigger, CreateUser, Create, TriggerEvent, UserAuthOption, RequireOption, ResourceOption, PasswordOption, TableOption, DropTable, DropDatabase, DropView, DropIndex, DropTrigger, Drop, ShowLogs, ShowTables, ShowSimple, ShowProcedureFunctionStatus, ShowBinlogEvents, ShowCharacterSet, ShowCollationDatabases, ShowColumnsIndexes, ShowCreateTable, ShowCreateView, ShowCreateEvent, ShowCreateTrigger, ShowCreateProcedure, ShowGrants, Show, Desc, Explain, Call, SetAssign, SetStatement, Lock, LockTable, Unlock, Grant, LoadData, LoadDataField, LoadDataLine, Truncate, Rename, Transaction, AST } from "./mysql";
+import { With, Location, LocationRange, ParseOptions, Option, TableColumnAst, BaseFrom, Join, Values, TableExpr, Dual, From, LimitValue, Limit, OrderBy, ValueExpr, StringValue, OriginValue, DefaultValue, NumberValue, IntervalExprValue, SeparatorValue, SortDirection, ColumnRefItem, ColumnRef, SetList, InsertReplaceValue, Star, Case, Cast, AggrFunc, FunctionNameValue, FunctionName, Function, JsonOnClause, JsonTable, JsonTableColumn, FulltextSearch, Column, Interval, Param, Var, Assign, Binary, Unary, Expr, ExtractFunc, ExpressionValue, ExprList, PartitionBy, WindowSpec, WindowFrameClause, AsWindowSpec, NamedWindowExpr, WindowExpr, Select, Insert_Replace, Update, Delete, Alter, AlterIndexVisibility, AlterExpr, AlterColumnPosition, AlterAddColumn, AlterDropColumn, AlterModifyColumn, AlterChangeColumn, AlterRenameTable, AlterRenameColumn, AlterAddIndex, AlterDropIndex, AlterDropKey, AlterAddConstraint, AlterDropConstraint, AlterEnableConstraint, AlterDisableConstraint, AlterAddPartition, AlterDropPartition, AlterOperatePartition, AlterAlgorithm, AlterLock, AlterTableOption, Use, KeywordComment, CollateExpr, MysqlType, ConvertDataType, DataType, OnUpdateCurrentTimestamp, LiteralNotNull, LiteralNull, ColumnConstraint, ColumnDefinitionOptList, ReferenceDefinition, OnReference, CreateColumnDefinition, IndexType, IndexOption, CreateIndexDefinition, CreateFulltextSpatialIndexDefinition, ConstraintName, CreateConstraintPrimary, CreateConstraintUnique, CreateConstraintForeign, CreateConstraintCheck, CreateConstraintDefinition, CreateDefinition, CreateTable, DatabaseOption, CreateDatabase, CreateSchema, CreateIndex, CreateView, CreateTrigger, CreateUser, Create, TriggerEvent, UserAuthOption, RequireOption, ResourceOption, PasswordOption, TableOption, DropTable, DropDatabase, DropView, DropIndex, DropTrigger, Drop, ShowLogs, ShowTables, ShowSimple, ShowProcedureFunctionStatus, ShowBinlogEvents, ShowCharacterSet, ShowCollationDatabases, ShowColumnsIndexes, ShowCreateTable, ShowCreateView, ShowCreateEvent, ShowCreateTrigger, ShowCreateProcedure, ShowGrants, Show, Desc, Explain, Call, SetAssign, SetStatement, Lock, LockTable, Unlock, Grant, LoadData, LoadDataField, LoadDataLine, Truncate, Rename, Transaction, AST } from "./mysql";
 
 export function isWith(obj: unknown): obj is With {
     const typedObj = obj as With
@@ -1465,6 +1465,17 @@ export function isDelete(obj: unknown): obj is Delete {
                 isWith(e) as boolean
             )) &&
         typedObj["type"] === "delete" &&
+        (typeof typedObj["priority"] === "undefined" ||
+            Array.isArray(typedObj["priority"]) &&
+            typedObj["priority"].every((e: any) =>
+                typeof e === "string"
+            )) &&
+        (typeof typedObj["quick"] === "undefined" ||
+            typedObj["quick"] === null ||
+            typedObj["quick"] === "quick") &&
+        (typeof typedObj["ignore"] === "undefined" ||
+            typedObj["ignore"] === null ||
+            typedObj["ignore"] === "ignore") &&
         (typedObj["table"] === null ||
             Array.isArray(typedObj["table"]) &&
             typedObj["table"].every((e: any) =>
@@ -1501,6 +1512,12 @@ export function isDelete(obj: unknown): obj is Delete {
         typedObj["from"].every((e: any) =>
             isFrom(e) as boolean
         ) &&
+        (typeof typedObj["using"] === "undefined" ||
+            typedObj["using"] === null ||
+            Array.isArray(typedObj["using"]) &&
+            typedObj["using"].every((e: any) =>
+                isFrom(e) as boolean
+            )) &&
         (typedObj["where"] === null ||
             isFunction(typedObj["where"]) as boolean ||
             isFulltextSearch(typedObj["where"]) as boolean ||
@@ -1543,10 +1560,27 @@ export function isAlter(obj: unknown): obj is Alter {
     )
 }
 
+export function isAlterIndexVisibility(obj: unknown): obj is AlterIndexVisibility {
+    const typedObj = obj as AlterIndexVisibility
+    return (
+        (typedObj !== null &&
+            typeof typedObj === "object" ||
+            typeof typedObj === "function") &&
+        typedObj["type"] === "alter" &&
+        typedObj["action"] === "alter index" &&
+        typedObj["keyword"] === "index" &&
+        typedObj["resource"] === "index" &&
+        typeof typedObj["index"] === "string" &&
+        (typedObj["visibility"] === "VISIBLE" ||
+            typedObj["visibility"] === "INVISIBLE")
+    )
+}
+
 export function isAlterExpr(obj: unknown): obj is AlterExpr {
     const typedObj = obj as AlterExpr
     return (
-        (isAlterAddColumn(typedObj) as boolean ||
+        (isAlterIndexVisibility(typedObj) as boolean ||
+            isAlterAddColumn(typedObj) as boolean ||
             isAlterDropColumn(typedObj) as boolean ||
             isAlterModifyColumn(typedObj) as boolean ||
             isAlterChangeColumn(typedObj) as boolean ||
@@ -2144,8 +2178,8 @@ export function isAlterAddIndex(obj: unknown): obj is AlterAddIndex {
         typedObj["type"] === "alter" &&
         typedObj["resource"] === "index" &&
         typedObj["action"] === "add" &&
-        (typedObj["keyword"] === "key" ||
-            typedObj["keyword"] === "index" ||
+        (typedObj["keyword"] === "index" ||
+            typedObj["keyword"] === "key" ||
             typedObj["keyword"] === "fulltext" ||
             typedObj["keyword"] === "spatial" ||
             typedObj["keyword"] === "fulltext key" ||
@@ -2177,8 +2211,8 @@ export function isAlterDropIndex(obj: unknown): obj is AlterDropIndex {
         typedObj["type"] === "alter" &&
         typedObj["resource"] === "index" &&
         typedObj["action"] === "drop" &&
-        (typedObj["keyword"] === "key" ||
-            typedObj["keyword"] === "index") &&
+        (typedObj["keyword"] === "index" ||
+            typedObj["keyword"] === "key") &&
         typeof typedObj["index"] === "string"
     )
 }
@@ -3010,8 +3044,8 @@ export function isCreateIndexDefinition(obj: unknown): obj is CreateIndexDefinit
         typedObj["definition"].every((e: any) =>
             isColumnRefItem(e) as boolean
         ) &&
-        (typedObj["keyword"] === "key" ||
-            typedObj["keyword"] === "index") &&
+        (typedObj["keyword"] === "index" ||
+            typedObj["keyword"] === "key") &&
         (typedObj["index_type"] === null ||
             isIndexType(typedObj["index_type"]) as boolean) &&
         typedObj["resource"] === "index" &&
@@ -4751,6 +4785,9 @@ export function isTransaction(obj: unknown): obj is Transaction {
             typedObj["expr"]["modes"].every((e: any) =>
                 isOriginValue(e) as boolean
             )) &&
+        (typeof typedObj["expr"]["savepoint"] === "undefined" ||
+            typedObj["expr"]["savepoint"] === null ||
+            typeof typedObj["expr"]["savepoint"] === "string") &&
         (typeof typedObj["loc"] === "undefined" ||
             isLocationRange(typedObj["loc"]) as boolean)
     )

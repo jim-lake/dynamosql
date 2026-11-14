@@ -13,8 +13,8 @@ function callToSQL(stmt) {
 }
 
 function commonCmdToSQL(stmt) {
-  const { type, keyword, name, prefix, suffix } = stmt
-  const clauses = [toUpper(type), toUpper(keyword), toUpper(prefix)]
+  const { type, keyword, name, prefix, suffix, temporary } = stmt
+  const clauses = [toUpper(type), toUpper(temporary), toUpper(keyword), toUpper(prefix)]
   switch (keyword) {
     case 'table':
       clauses.push(tablesToSQL(name))
@@ -44,10 +44,15 @@ function commonCmdToSQL(stmt) {
 }
 
 function descToSQL(stmt) {
-  const { type, table } = stmt
+  const { type, table, column } = stmt
   const action = toUpper(type)
   const tableName = typeof table === 'string' ? identifierToSql(table) : tableToSQL(table)
-  return `${action} ${tableName}`
+  let target = null
+  if (column) {
+    if (column.type === 'column_ref') target = columnRefToSQL(column)
+    else target = literalToSQL(column)
+  }
+  return [action, tableName, target].filter(hasVal).join(' ')
 }
 
 function executeToSQL(stmt) {
@@ -94,8 +99,15 @@ function useToSQL(stmt) {
 }
 
 function setVarToSQL(stmt) {
-  const { type, expr, keyword } = stmt
+  const { type, expr, keyword, charset, collate, modes, scope } = stmt
   const action = toUpper(type)
+  if (keyword === 'names') {
+    return [action, 'NAMES', identifierToSql(charset), collate && 'COLLATE', collate && identifierToSql(collate)].filter(hasVal).join(' ')
+  }
+  if (keyword === 'charset') return [action, 'CHARACTER SET', identifierToSql(charset)].join(' ')
+  if (keyword === 'transaction') {
+    return [action, scope && toUpper(scope), 'TRANSACTION', modes.map(literalToSQL).join(', ')].filter(hasVal).join(' ')
+  }
   const setItems = expr.map(exprToSQL).join(', ')
   return [action, toUpper(keyword), setItems].filter(hasVal).join(' ')
 }

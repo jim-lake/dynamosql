@@ -32,12 +32,30 @@ function alterExprToSQL(expr) {
   let dataType = []
   switch (resource) {
     case 'column':
-      dataType = [columnDefinitionToSQL(expr)]
+      if (expr.columns) {
+        dataType = [`(${expr.columns.map(columnDefinitionToSQL).join(', ')})`]
+      } else if (action === 'set default' || action === 'drop default') {
+        name = columnRefToSQL(expr.column)
+        if (action === 'set default') dataType = [`SET DEFAULT ${exprToSQL(expr.default)}`]
+        else dataType = ['DROP DEFAULT']
+        return ['ALTER COLUMN', name, ...dataType].join(' ')
+      } else {
+        dataType = [columnDefinitionToSQL(expr)]
+      }
       break
     case 'index':
+      if (expr.visibility) return ['ALTER INDEX', identifierToSql(expr.index), expr.visibility].join(' ')
       dataType = indexTypeAndOptionToSQL(expr)
       name = expr[resource]
       break
+    case 'charset':
+      return ['CONVERT TO CHARACTER SET', identifierToSql(expr.charset)].join(' ')
+    case 'keys':
+      return [toUpper(action), 'KEYS'].join(' ')
+    case 'order':
+      return ['ORDER BY', expr.orderby.map(orderItem => exprToSQL(orderItem.expr) + (orderItem.type ? ` ${toUpper(orderItem.type)}` : '')).join(', ')].join(' ')
+    case 'force':
+      return 'FORCE'
     case 'table':
     case 'schema':
       name = identifierToSql(expr[resource])

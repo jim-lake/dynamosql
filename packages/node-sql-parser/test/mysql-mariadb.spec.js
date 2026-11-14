@@ -1381,10 +1381,10 @@ describe('mysql', () => {
 
     it('should throw error when args is not right', () => {
       let sql = `select convert(json_unquote(json_extract('{"thing": "252"}', "$.thing")));`
-      expect(parser.astify.bind(parser, sql)).to.throw('Expected "!=", "#", "#-", "#>", "#>>", "&", "&&", ",", "--", "->", "->>", "/*", "<<", "<=", "<=>", "<>", "<@", ">", ">=", ">>", "?", "?&", "?|", "@>", "AND", "BETWEEN", "COLLATE", "IN", "IS", "LIKE", "MEMBER", "NOT", "ON", "OR", "OVER", "REGEXP", "RLIKE", "USING", "XOR", "div", "mod", "||", [ \\t\\n\\r], [%*/], [+\\-], [<-=], or [\\^|] but ")" found.')
-      expect(parser.astify.bind(parser, 'select convert("");')).to.throw('Expected "!=", "#", "#-", "#>", "#>>", "&", "&&", ",", "--", "->", "->>", "/*", "<<", "<=", "<=>", "<>", "<@", ">", ">=", ">>", "?", "?&", "?|", "@>", "AND", "BETWEEN", "COLLATE", "IN", "IS", "LIKE", "MEMBER", "NOT", "OR", "REGEXP", "RLIKE", "USING", "XOR", "div", "mod", "||", [ \\t\\n\\r], [%*/], [+\\-], [<-=], or [\\^|] but ")" found.')
+      expect(parser.astify.bind(parser, sql)).to.throw('Expected "!=", "#", "#-", "#>", "#>>", "&", "&&", ",", "--", "->", "->>", "/*", "<<", "<=", "<=>", "<>", "<@", ">", ">=", ">>", "?", "?&", "?|", "@>", "AND", "BETWEEN", "COLLATE", "IN", "IS", "LIKE", "MEMBER", "NOT", "ON", "OR", "OVER", "REGEXP", "RLIKE", "SOUNDS", "USING", "XOR", "div", "mod", "||", [ \\t\\n\\r], [%*/], [+\\-], [<-=], or [\\^|] but ")" found.')
+      expect(parser.astify.bind(parser, 'select convert("");')).to.throw('Expected "!=", "#", "#-", "#>", "#>>", "&", "&&", ",", "--", "->", "->>", "/*", "<<", "<=", "<=>", "<>", "<@", ">", ">=", ">>", "?", "?&", "?|", "@>", "AND", "BETWEEN", "COLLATE", "IN", "IS", "LIKE", "MEMBER", "NOT", "OR", "REGEXP", "RLIKE", "SOUNDS", "USING", "XOR", "div", "mod", "||", [ \\t\\n\\r], [%*/], [+\\-], [<-=], or [\\^|] but ")" found.')
       sql = 'SELECT AVG(Quantity,age) FROM table1;'
-      expect(parser.astify.bind(parser, sql)).to.throw('Expected "!=", "#", "#-", "#>", "#>>", "&", "&&", "(", ")", "--", "->", "->>", ".", "/*", "<<", "<=", "<=>", "<>", "<@", ">", ">=", ">>", "?", "?&", "?|", "@>", "AND", "BETWEEN", "COLLATE", "IN", "IS", "LIKE", "MEMBER", "NOT", "OR", "REGEXP", "RLIKE", "XOR", "div", "mod", "||", [ \\t\\n\\r], [%*/], [+\\-], [<-=], [A-Za-z0-9_$\\x80-\\u{FFFF}], [A-Za-z0-9_:一-龥À-ſ], or [\\^|] but "," found.')
+      expect(parser.astify.bind(parser, sql)).to.throw('Expected "!=", "#", "#-", "#>", "#>>", "&", "&&", "(", ")", "--", "->", "->>", ".", "/*", "<<", "<=", "<=>", "<>", "<@", ">", ">=", ">>", "?", "?&", "?|", "@>", "AND", "BETWEEN", "COLLATE", "IN", "IS", "LIKE", "MEMBER", "NOT", "OR", "REGEXP", "RLIKE", "SOUNDS", "XOR", "div", "mod", "||", [ \\t\\n\\r], [%*/], [+\\-], [<-=], [A-Za-z0-9_$\\x80-\\u{FFFF}], [A-Za-z0-9_:一-龥À-ſ], or [\\^|] but "," found.')
     })
 
     it('should join multiple table with comma', () => {
@@ -1401,7 +1401,7 @@ describe('mysql', () => {
 
     it('should have spaces between keywords', () => {
       const sql = 'CREATE TABLE `foo` (`id` int UNIQUEKEYONUPDATECASCADE)'
-      expect(parser.astify.bind(parser, sql)).to.throw('Expected "#", ")", ",", "--", "/*", "AS", "AUTO_INCREMENT", "CHARACTER", "CHECK", "COLLATE", "COLUMN_FORMAT", "COMMENT", "CONSTRAINT", "DEFAULT", "GENERATED", "KEY", "NOT NULL", "NULL", "PRIMARY", "REFERENCES", "STORAGE", "UNIQUE", or [ \\t\\n\\r] but "O" found.')
+      expect(parser.astify.bind(parser, sql)).to.throw('Expected "#", ")", ",", "--", "/*", "AS", "AUTO_INCREMENT", "CHARACTER", "CHECK", "COLLATE", "COLUMN_FORMAT", "COMMENT", "CONSTRAINT", "DEFAULT", "GENERATED", "INVISIBLE", "KEY", "NOT NULL", "NULL", "PRIMARY", "REFERENCES", "STORAGE", "UNIQUE", "VISIBLE", or [ \\t\\n\\r] but "O" found.')
       expect(parser.astify.bind(parser, sql, mariadb)).to.throw('Expected "#", ")", ",", "--", "/*", "AUTO_INCREMENT", "CHARACTER", "CHECK", "COLLATE", "COLUMN_FORMAT", "COMMENT", "CONSTRAINT", "DEFAULT", "KEY", "NOT NULL", "NULL", "PRIMARY", "REFERENCES", "STORAGE", "UNIQUE", or [ \\t\\n\\r] but "O" found.')
     })
 
@@ -1535,6 +1535,86 @@ describe('mysql', () => {
         expect(getParsedSql(sql, mariadb)).to.equal(parsedSQL)
       })
     })
+
+    describe('mysql 8.4 parser gaps', () => {
+      const cases = [
+        ['SELECT (@y := 2) + 1', 'SELECT (@y := 2) + 1'],
+        ['SELECT @x := 5', 'SELECT @x := 5'],
+        ["SELECT {d '2020-01-02'}", "SELECT DATE '2020-01-02'"],
+        ["SELECT {ts '2020-01-02 10:00:00'}", "SELECT TIMESTAMP '2020-01-02 10:00:00'"],
+        ['SELECT 0b101', "SELECT b'101'"],
+        ['INSERT INTO c (id, b) VALUES (2, -9223372036854775808)', 'INSERT INTO `c` (id, b) VALUES (2,-9223372036854775808)'],
+        ['UPDATE t SET db.t.col = 1', 'UPDATE `t` SET `db`.`t`.`col` = 1'],
+        ['SELECT STD(x) FROM t', 'SELECT STD(`x`) FROM `t`'],
+        ['SELECT VARIANCE(x) FROM t', 'SELECT VARIANCE(`x`) FROM `t`'],
+        ['SET NAMES utf8mb4 COLLATE utf8mb4_bin', 'SET NAMES `utf8mb4` COLLATE `utf8mb4_bin`'],
+        ["SELECT 'a' 'b'", "SELECT 'ab'"],
+        ['SELECT x SOUNDS LIKE y', 'SELECT `x` SOUNDS LIKE `y`'],
+        ['ALTER TABLE t ADD COLUMN (a INT, b INT)', 'ALTER TABLE `t` ADD COLUMN (`a` INT, `b` INT)'],
+        ['ALTER TABLE t ALTER COLUMN c SET DEFAULT 1', 'ALTER TABLE `t` ALTER COLUMN `c` SET DEFAULT 1'],
+        ['ALTER TABLE t ALTER INDEX i INVISIBLE', 'ALTER TABLE `t` ALTER INDEX `i` INVISIBLE'],
+        ['ALTER TABLE t CONVERT TO CHARACTER SET utf8mb4', 'ALTER TABLE `t` CONVERT TO CHARACTER SET `utf8mb4`'],
+        ['ALTER TABLE t ORDER BY c', 'ALTER TABLE `t` ORDER BY `c`'],
+        ['ALTER TABLE t FORCE', 'ALTER TABLE `t` FORCE'],
+        ['ALTER TABLE t DISABLE KEYS', 'ALTER TABLE `t` DISABLE KEYS'],
+        ['SHOW FULL TABLES', 'SHOW FULL TABLES'],
+        ["SHOW TABLES LIKE 'x'", "SHOW TABLES LIKE 'x'"],
+        ['DROP TABLE t RESTRICT', 'DROP TABLE `t` RESTRICT'],
+        ['DELETE FROM t USING t JOIN u ON t.id = u.id', 'DELETE FROM `t` USING `t` INNER JOIN `u` ON `t`.`id` = `u`.`id`'],
+        ['INSERT LOW_PRIORITY INTO t (a) VALUES (1)', 'INSERT LOW_PRIORITY INTO `t` (a) VALUES (1)'],
+        ['INSERT INTO t (a) VALUES (1) AS r ON DUPLICATE KEY UPDATE a = r.a', 'INSERT INTO `t` (a) VALUES (1) AS `r` ON DUPLICATE KEY UPDATE `a` = `r`.`a`'],
+        ['SELECT ALL a FROM t', 'SELECT ALL `a` FROM `t`'],
+        ['SELECT a FROM t FOR SHARE', 'SELECT `a` FROM `t` FOR SHARE'],
+        ['SELECT * FROM t USE INDEX (i)', 'SELECT * FROM `t` USE INDEX (`i`)'],
+        ['START TRANSACTION WITH CONSISTENT SNAPSHOT', 'START TRANSACTION WITH CONSISTENT SNAPSHOT'],
+        ['SAVEPOINT s1', 'SAVEPOINT `s1`'],
+        ['ROLLBACK TO SAVEPOINT s1', 'ROLLBACK TO SAVEPOINT `s1`'],
+        ['COMMIT WORK', 'COMMIT WORK'],
+        ['SELECT CAST(x AS NCHAR(10))', 'SELECT CAST(`x` AS NCHAR(10))'],
+        ['CREATE TABLE t (a DEC(10,2))', 'CREATE TABLE `t` (`a` DEC(10, 2))'],
+        ['CREATE TABLE t (a INT INVISIBLE)', 'CREATE TABLE `t` (`a` INT INVISIBLE)'],
+        ['TABLE t', 'SELECT * FROM `t`'],
+        ['VALUES ROW(1,2)', 'VALUES ROW(1,2)'],
+        ['INSERT INTO t (a) VALUES (DEFAULT)', 'INSERT INTO `t` (a) VALUES (DEFAULT)'],
+        ['INSERT INTO t SET a = DEFAULT', 'INSERT INTO `t` SET `a` = DEFAULT'],
+        ['UPDATE t SET a = DEFAULT', 'UPDATE `t` SET `a` = DEFAULT'],
+        ['INSERT INTO t VALUE (1)', 'INSERT INTO `t` VALUES (1)'],
+        ['REPLACE LOW_PRIORITY INTO t (a) VALUES (1)', 'REPLACE LOW_PRIORITY INTO `t` (a) VALUES (1)'],
+        ['REPLACE DELAYED INTO t (a) VALUES (1)', 'REPLACE DELAYED INTO `t` (a) VALUES (1)'],
+        ['UPDATE LOW_PRIORITY t SET a = 1', 'UPDATE LOW_PRIORITY `t` SET `a` = 1'],
+        ['DELETE QUICK FROM t WHERE a = 1', 'DELETE QUICK FROM `t` WHERE `a` = 1'],
+        ['DELETE IGNORE FROM t WHERE a = 1', 'DELETE IGNORE FROM `t` WHERE `a` = 1'],
+        ['SET @@session.time_zone = DEFAULT', 'SET @@session.time_zone = DEFAULT'],
+        ['SET TRANSACTION ISOLATION LEVEL READ COMMITTED', 'SET TRANSACTION ISOLATION LEVEL READ COMMITTED'],
+        ['SET SESSION TRANSACTION READ WRITE', 'SET SESSION TRANSACTION READ WRITE'],
+        ['DROP TEMPORARY TABLE t', 'DROP TEMPORARY TABLE `t`'],
+        ['SHOW WARNINGS', 'SHOW WARNINGS'],
+        ["SHOW VARIABLES LIKE 'x'", "SHOW VARIABLES LIKE 'x'"],
+        ["SHOW SESSION VARIABLES LIKE 'x'", "SHOW SESSION VARIABLES LIKE 'x'"],
+        ['SHOW CREATE DATABASE d', 'SHOW CREATE DATABASE `d`'],
+        ["SHOW TABLE STATUS LIKE 't'", "SHOW TABLE STATUS LIKE 't'"],
+        ['SHOW FIELDS FROM t', 'SHOW COLUMNS FROM `t`'],
+        ['SHOW FULL COLUMNS FROM t', 'SHOW FULL COLUMNS FROM `t`'],
+        ['DESC t col', 'DESC `t` `col`'],
+        ["DESC t 'pat%'", "DESC `t` 'pat%'"],
+        ['INSERT HIGH_PRIORITY IGNORE INTO t (a) VALUES (1)', 'INSERT HIGH_PRIORITY IGNORE INTO `t` (a) VALUES (1)'],
+        ['INSERT DELAYED INTO t (a) VALUES (1)', 'INSERT DELAYED INTO `t` (a) VALUES (1)'],
+        ['SELECT HIGH_PRIORITY a FROM t', 'SELECT HIGH_PRIORITY `a` FROM `t`'],
+        ['SELECT STRAIGHT_JOIN a FROM t', 'SELECT STRAIGHT_JOIN `a` FROM `t`'],
+        ['SELECT DISTINCTROW a FROM t', 'SELECT DISTINCTROW `a` FROM `t`'],
+        ['SELECT a FROM t LOCK IN SHARE MODE', 'SELECT `a` FROM `t` LOCK IN SHARE MODE'],
+        ['SELECT * FROM t FORCE INDEX (i)', 'SELECT * FROM `t` FORCE INDEX (`i`)'],
+        ['SELECT * FROM t IGNORE INDEX (i)', 'SELECT * FROM `t` IGNORE INDEX (`i`)'],
+        ['CREATE TABLE t (a NCHAR(10), b NVARCHAR(20))', 'CREATE TABLE `t` (`a` NCHAR(10), `b` NVARCHAR(20))'],
+        ['ALTER TABLE t ENABLE KEYS', 'ALTER TABLE `t` ENABLE KEYS'],
+      ]
+      cases.forEach(([sql, parsedSQL]) => {
+        it(`should parse ${sql}`, () => {
+          expect(getParsedSql(sql)).to.equal(parsedSQL)
+        })
+      })
+    })
+
   })
 
 })

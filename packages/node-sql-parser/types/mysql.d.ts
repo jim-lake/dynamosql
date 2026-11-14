@@ -450,8 +450,15 @@ export interface Update {
 export interface Delete {
   with: With[] | null;
   type: "delete";
+  /** Lowercased DML modifiers such as "low_priority", "quick" (MySQL 8.4 DELETE). */
+  priority?: string[];
+  /** Set only when QUICK is not consumed by the priority list. */
+  quick?: "quick" | null;
+  ignore?: "ignore" | null;
   table: (From & { addition?: boolean })[] | null;
   from: Array<From | Dual>;
+  /** Tables listed after USING in a multi-table DELETE. */
+  using?: Array<From | Dual> | null;
   where: Binary | Unary | Function | FulltextSearch | null;
   orderby: OrderBy[] | null;
   limit: Limit | null;
@@ -463,6 +470,16 @@ export interface Alter {
   table: Array<{ db: string | null; table: string }>;
   expr: AlterExpr[];
   loc?: LocationRange;
+}
+
+/** ALTER TABLE t ALTER INDEX i VISIBLE | INVISIBLE */
+export interface AlterIndexVisibility {
+  type: "alter";
+  action: "alter index";
+  keyword: "index";
+  resource: "index";
+  index: string;
+  visibility: "VISIBLE" | "INVISIBLE";
 }
 
 export type AlterExpr = 
@@ -480,6 +497,7 @@ export type AlterExpr =
   | AlterEnableConstraint
   | AlterDisableConstraint
   | AlterAddPartition
+  | AlterIndexVisibility
   | AlterDropPartition
   | AlterOperatePartition
   | AlterAlgorithm
@@ -1379,6 +1397,8 @@ export interface Transaction {
     action: OriginValue;
     keyword?: "TRANSACTION" | "WORK" | null;
     modes?: OriginValue[] | null;
+    /** Set for SAVEPOINT, ROLLBACK TO SAVEPOINT and RELEASE SAVEPOINT. */
+    savepoint?: string | null;
   };
   loc?: LocationRange;
 }

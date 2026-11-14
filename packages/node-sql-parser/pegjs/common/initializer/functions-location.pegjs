@@ -34,7 +34,8 @@
   function isBigInt(numberStr) {
     const previousMaxSafe = BigInt(Number.MAX_SAFE_INTEGER)
     const num = BigInt(numberStr)
-    if (num < previousMaxSafe) return false
+    const abs = num < 0n ? -num : num
+    if (abs <= previousMaxSafe) return false
     return true
   }
 

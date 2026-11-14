@@ -1,6 +1,6 @@
 import { unionToSQL, multipleToSQL } from './union'
 
-const supportedTypes = ['analyze', 'attach', 'select', 'deallocate', 'delete', 'exec', 'update', 'insert', 'drop', 'rename', 'truncate', 'call', 'desc', 'describe', 'use', 'alter', 'set', 'create', 'lock', 'unlock', 'declare', 'do', 'show', 'replace', 'if', 'grant', 'revoke', 'proc', 'raise', 'execute', 'transaction', 'explain', 'comment', 'load_data']
+const supportedTypes = ['analyze', 'attach', 'select', 'deallocate', 'delete', 'exec', 'update', 'insert', 'drop', 'rename', 'truncate', 'call', 'desc', 'describe', 'use', 'alter', 'set', 'create', 'lock', 'unlock', 'declare', 'do', 'show', 'replace', 'if', 'grant', 'revoke', 'proc', 'raise', 'execute', 'transaction', 'explain', 'comment', 'load_data', 'values']
 
 function checkSupported(expr) {
   const ast = expr && expr.ast ? expr.ast : expr

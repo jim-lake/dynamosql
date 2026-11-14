@@ -22,6 +22,8 @@ KW_SELECT   = "SELECT"i     !ident_start
 KW_UPDATE   = "UPDATE"i     !ident_start
 KW_CREATE   = "CREATE"i     !ident_start
 KW_TEMPORARY = "TEMPORARY"i !ident_start
+KW_RESTRICT = "RESTRICT"i !ident_start { return 'RESTRICT'; }
+KW_CASCADE = "CASCADE"i !ident_start { return 'CASCADE'; }
 KW_TEMP     = "TEMP"i       !ident_start
 KW_DELETE   = "DELETE"i     !ident_start
 KW_INSERT   = "INSERT"i     !ident_start
@@ -31,6 +33,14 @@ KW_RETURN   = "RETURN"i     !ident_start { return 'RETURN'; }
 KW_RETURNING = "RETURNING"i !ident_start { return 'RETURNING'; }
 KW_RENAME   = "RENAME"i     !ident_start
 KW_IGNORE   = "IGNORE"i     !ident_start
+KW_FORCE    = "FORCE"i      !ident_start
+KW_CONVERT  = "CONVERT"i    !ident_start { return 'CONVERT'; }
+KW_KEYS     = "KEYS"i       !ident_start { return 'KEYS'; }
+KW_FOR      = "FOR"i        !ident_start
+KW_LOW_PRIORITY = "LOW_PRIORITY"i !ident_start
+KW_HIGH_PRIORITY = "HIGH_PRIORITY"i !ident_start
+KW_DELAYED = "DELAYED"i !ident_start
+KW_QUICK = "QUICK"i !ident_start
 KW_EXPLAIN  = "EXPLAIN"i    !ident_start
 KW_DESCRIBE = "DESCRIBE"i   !ident_start { return 'DESCRIBE'; }
 KW_PARTITION = "PARTITION"i !ident_start { return 'PARTITION'; }
@@ -117,6 +127,7 @@ KW_DESC     = "DESC"i       !ident_start { return 'DESC'; }
 
 KW_ALL      = "ALL"i        !ident_start { return 'ALL'; }
 KW_DISTINCT = "DISTINCT"i   !ident_start { return 'DISTINCT'; }
+KW_DISTINCTROW = "DISTINCTROW"i !ident_start { return 'DISTINCTROW'; }
 
 // ============================================================================
 // Comparison/Logical Keywords
@@ -207,6 +218,7 @@ KW_BYTEA    = "BYTEA"i      !ident_start { return 'BYTEA'; }
 // ============================================================================
 KW_NUMERIC  = "NUMERIC"i    !ident_start { return 'NUMERIC'; }
 KW_DECIMAL  = "DECIMAL"i    !ident_start { return 'DECIMAL'; }
+KW_DEC      = "DEC"i        !ident_start { return 'DEC'; }
 KW_NUMBER   = "NUMBER"i     !ident_start { return 'NUMBER'; }
 KW_SIGNED   = "SIGNED"i     !ident_start { return 'SIGNED'; }
 KW_UNSIGNED = "UNSIGNED"i   !ident_start { return 'UNSIGNED'; }

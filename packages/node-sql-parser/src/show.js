@@ -1,7 +1,7 @@
 import { exprToSQL, varToSQL } from './expr'
 import { limitToSQL } from './limit'
 import { tableToSQL, tablesToSQL } from './tables'
-import { commonOptionConnector, hasVal, literalToSQL, toUpper } from './util'
+import { commonOptionConnector, hasVal, identifierToSql, literalToSQL, toUpper } from './util'
 
 function showEventToSQL(showEventExpr) {
   const { in: inClause, from , limit } = showEventExpr
@@ -46,11 +46,22 @@ function showToSQL(showExpr) {
     case 'INDEX':
       str = commonOptionConnector('FROM', tablesToSQL, showExpr.from)
       break
+    case 'TABLES':
+    case 'TABLE STATUS':
+      str = [commonOptionConnector('FROM', identifierToSql, showExpr.from), showLikeAndWhereToSQL(showExpr)].filter(hasVal).join(' ')
+      break
+    case 'VARIABLES':
+      str = showLikeAndWhereToSQL(showExpr)
+      break
+    case 'WARNINGS':
+    case 'ERRORS':
+      str = limitToSQL(showExpr.limit)
+      break
     case 'GRANTS':
       str = showGrantsForUser(showExpr)
       break
     case 'CREATE':
-      str = commonOptionConnector('', tableToSQL, showExpr[suffix])
+      str = suffix === 'database' ? identifierToSql(showExpr.database) : commonOptionConnector('', tableToSQL, showExpr[suffix])
       break
     case 'VAR':
       str = varToSQL(showExpr.var)
@@ -59,7 +70,7 @@ function showToSQL(showExpr) {
     default:
       break
   }
-  return ['SHOW', toUpper(keyword), toUpper(suffix), str].filter(hasVal).join(' ')
+  return ['SHOW', toUpper(showExpr.full), toUpper(showExpr.scope), toUpper(keyword), toUpper(suffix), str].filter(hasVal).join(' ')
 }
 
 export {

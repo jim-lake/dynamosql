@@ -362,6 +362,8 @@ alter_stmt
 
 crud_stmt
   = set_op_stmt
+  / table_stmt
+  / values_stmt
   / update_stmt
   / replace_insert_stmt
   / insert_no_columns_stmt
@@ -369,6 +371,39 @@ crud_stmt
   / delete_stmt
   / cmd_stmt
   / proc_stmts
+
+// TABLE t is shorthand for SELECT * FROM t
+table_stmt
+  = KW_TABLE __ t:table_name {
+    if (t) tableList.add(`select::${t.db}::${t.table}`);
+    return {
+      tableList: Array.from(tableList),
+      columnList: columnListTableAlias(columnList),
+      ast: {
+        with: null,
+        type: 'select',
+        options: null,
+        distinct: null,
+        columns: [{ expr: { type: 'star', value: '*' }, as: null }],
+        from: [t],
+        where: null,
+        groupby: null,
+        having: null,
+        orderby: null,
+        limit: null,
+      }
+    };
+  }
+
+// VALUES ROW(...) as a standalone statement
+values_stmt
+  = v:value_clause {
+    return {
+      tableList: Array.from(tableList),
+      columnList: columnListTableAlias(columnList),
+      ast: v,
+    };
+  }
 
 multiple_stmt
   = head:crud_stmt tail:(__ SEMICOLON __ crud_stmt)* {
@@ -784,6 +819,9 @@ column_definition_opt
   / a:('AUTO_INCREMENT'i) {
     return { auto_increment: a.toLowerCase() }
   }
+  / v:('VISIBLE'i / 'INVISIBLE'i) {
+    return { visibility: v.toUpperCase() }
+  }
   / 'UNIQUE'i __ k:('KEY'i)? {
     const sql = ['unique']
     if (k) sql.push(k)
@@ -827,6 +865,11 @@ column_definition_opt_list
       opt = { ...opt, ...tail[i][1] }
     }
     return opt
+  }
+
+create_column_definition_list
+  = head:create_column_definition tail:(__ COMMA __ create_column_definition)* {
+    return createList(head, tail)
   }
 
 create_column_definition
@@ -989,9 +1032,11 @@ if_exists
 
 drop_stmt
   = a:KW_DROP __
+    tmp:(KW_TEMPORARY __)?
     r:KW_TABLE __
     ife: if_exists? __
-    t:table_ref_list {
+    t:table_ref_list __
+    rc:(KW_RESTRICT / KW_CASCADE)? {
       if(t) t.forEach(tt => tableList.add(`${a}::${tt.db}::${tt.table}`));
       return {
         tableList: Array.from(tableList),
@@ -1000,7 +1045,9 @@ drop_stmt
           type: a.toLowerCase(),
           keyword: r.toLowerCase(),
           prefix: ife,
-          name: t
+          name: t,
+          temporary: tmp ? 'temporary' : undefined,
+          suffix: rc ? [{ type: 'origin', value: rc.toLowerCase() }] : undefined,
         }
       };
     }
@@ -1148,6 +1195,12 @@ alter_action
   / ALTER_LOCK
   / ALTER_CHANGE_COLUMN
   / ALTER_OPERATE_PARTITION
+  / ALTER_COLUMN_DEFAULT
+  / ALTER_INDEX_VISIBILITY
+  / ALTER_CONVERT_CHARSET
+  / ALTER_ORDER_BY
+  / ALTER_FORCE
+  / ALTER_KEYS_SWITCH
   / t:table_option {
     t.resource = t.keyword
     t[t.keyword] = t.value
@@ -1199,8 +1252,97 @@ ALTER_OPERATE_PARTITION
       return expr
   }
 
+ALTER_COLUMN_DEFAULT
+  = KW_ALTER __ KW_COLUMN __ c:column_ref __ KW_SET __ KW_DEFAULT __ v:expr {
+    return {
+      action: 'set default',
+      column: c,
+      keyword: 'column',
+      resource: 'column',
+      type: 'alter',
+      default: v,
+    }
+  }
+  / KW_ALTER __ KW_COLUMN __ c:column_ref __ KW_DROP __ KW_DEFAULT {
+    return {
+      action: 'drop default',
+      column: c,
+      keyword: 'column',
+      resource: 'column',
+      type: 'alter',
+    }
+  }
+
+ALTER_INDEX_VISIBILITY
+  = KW_ALTER __ KW_INDEX __ i:ident __ v:('VISIBLE'i / 'INVISIBLE'i) {
+    return {
+      action: 'alter index',
+      keyword: 'index',
+      index: i,
+      resource: 'index',
+      type: 'alter',
+      visibility: v.toUpperCase(),
+    }
+  }
+
+ALTER_CONVERT_CHARSET
+  = KW_CONVERT __ KW_TO __ KW_CHARACTER __ KW_SET __ cs:ident_name {
+    return {
+      action: 'convert',
+      keyword: 'charset',
+      resource: 'charset',
+      type: 'alter',
+      charset: cs,
+    }
+  }
+
+ALTER_ORDER_BY
+  = KW_ORDER __ KW_BY __ l:order_by_list {
+    return {
+      action: 'order by',
+      resource: 'order',
+      type: 'alter',
+      orderby: l,
+    }
+  }
+
+ALTER_FORCE
+  = KW_FORCE {
+    return {
+      action: 'force',
+      resource: 'force',
+      type: 'alter',
+    }
+  }
+
+ALTER_KEYS_SWITCH
+  = a:('DISABLE'i / 'ENABLE'i) __ KW_KEYS {
+    return {
+      action: a.toLowerCase(),
+      resource: 'keys',
+      type: 'alter',
+    }
+  }
+
 ALTER_ADD_COLUMN
-  = KW_ADD __
+  = KW_ADD __ KW_COLUMN __ LPAREN __ cds:create_column_definition_list __ RPAREN {
+    return {
+      action: 'add',
+      keyword: 'column',
+      resource: 'column',
+      type: 'alter',
+      columns: cds,
+    }
+  }
+  / KW_ADD __ LPAREN __ cds:create_column_definition_list __ RPAREN {
+    return {
+      action: 'add',
+      resource: 'column',
+      type: 'alter',
+      columns: cds,
+    }
+  }
+  / KW_ADD __
     kc:KW_COLUMN __
     cd:create_column_definition __ af:alter_column_suffix? {
       return {
@@ -1678,7 +1820,42 @@ rename_stmt
     }
 
 set_stmt
-  = KW_SET __
+  = KW_SET __ 'NAMES'i __ c:ident_name __ col:('COLLATE'i __ ident_name)? {
+    return {
+      tableList: Array.from(tableList),
+      columnList: columnListTableAlias(columnList),
+      ast: {
+        type: 'set',
+        keyword: 'names',
+        charset: c,
+        collate: col && col[2]
+      }
+    }
+  }
+  / KW_SET __ k:('CHARACTER'i __ 'SET'i / 'CHARSET'i) __ c:ident_name {
+    return {
+      tableList: Array.from(tableList),
+      columnList: columnListTableAlias(columnList),
+      ast: {
+        type: 'set',
+        keyword: 'charset',
+        charset: c
+      }
+    }
+  }
+  / KW_SET __ scope:(KW_GLOBAL / KW_SESSION)? __ 'TRANSACTION'i __ m:transaction_mode_list {
+    return {
+      tableList: Array.from(tableList),
+      columnList: columnListTableAlias(columnList),
+      ast: {
+        type: 'set',
+        keyword: 'transaction',
+        scope,
+        modes: m
+      }
+    }
+  }
+  / KW_SET __
   kw: (KW_GLOBAL / KW_SESSION / KW_LOCAL / KW_PERSIST / KW_PERSIST_ONLY)? __
   a: assign_stmt_list {
     a.keyword = kw
@@ -1770,17 +1947,6 @@ show_stmt
       }
     }
   }
-  / KW_SHOW __ KW_TABLES {
-    tableList.add(`show::null::null`)
-    return {
-      tableList: Array.from(tableList),
-      columnList: columnListTableAlias(columnList),
-      ast: {
-        type: 'show',
-        keyword: 'tables'
-      }
-    }
-  }
   / KW_SHOW __ keyword:('TRIGGERS'i / 'STATUS'i / 'PROCESSLIST'i) {
     return {
       tableList: Array.from(tableList),
@@ -1853,6 +2019,68 @@ show_stmt
         }
       };
   }
+  / KW_SHOW __ full:(KW_FULL __)? k:('TABLES'i / 'TABLE'i __ 'STATUS'i) __ from:(KW_FROM __ ident_name)? __ e:(like_op_right / where_clause)? {
+    if (!Array.isArray(k)) tableList.add(`show::null::null`)
+    return {
+      tableList: Array.from(tableList),
+      columnList: columnListTableAlias(columnList),
+      ast: {
+        type: 'show',
+        keyword: Array.isArray(k) ? 'table status' : k.toLowerCase(),
+        full: full ? 'full' : undefined,
+        from: from ? from[2] : undefined,
+        expr: e,
+      }
+    }
+  }
+  / KW_SHOW __ full:(KW_FULL __)? k:('COLUMNS'i / 'FIELDS'i) __ from:from_clause __ e:(like_op_right / where_clause)? {
+    return {
+      tableList: Array.from(tableList),
+      columnList: columnListTableAlias(columnList),
+      ast: {
+        type: 'show',
+        keyword: 'columns',
+        full: full ? 'full' : undefined,
+        from,
+        expr: e,
+      }
+    }
+  }
+  / KW_SHOW __ k:(KW_SESSION / KW_GLOBAL)? __ 'VARIABLES'i __ e:(like_op_right / where_clause)? {
+    return {
+      tableList: Array.from(tableList),
+      columnList: columnListTableAlias(columnList),
+      ast: {
+        type: 'show',
+        keyword: 'variables',
+        scope: k ? k.toLowerCase() : undefined,
+        expr: e,
+      }
+    }
+  }
+  / KW_SHOW __ k:('WARNINGS'i / 'ERRORS'i) __ l:limit_clause? {
+    return {
+      tableList: Array.from(tableList),
+      columnList: columnListTableAlias(columnList),
+      ast: {
+        type: 'show',
+        keyword: k.toLowerCase(),
+        limit: l,
+      }
+    }
+  }
+  / KW_SHOW __ KW_CREATE __ 'DATABASE'i __ db:ident_name {
+    return {
+      tableList: Array.from(tableList),
+      columnList: columnListTableAlias(columnList),
+      ast: {
+        type: 'show',
+        keyword: 'create',
+        suffix: 'database',
+        database: db,
+      }
+    }
+  }
   / show_grant_stmt
 
 show_grant_stmt
@@ -1888,13 +2116,14 @@ show_grant_for_using_list
   }
 
 desc_stmt
-  = (KW_DESC / KW_DESCRIBE) __ t:ident {
+  = (KW_DESC / KW_DESCRIBE) __ t:ident __ c:(literal_string / column_ref / ident_name)? {
     return {
       tableList: Array.from(tableList),
       columnList: columnListTableAlias(columnList),
       ast: {
         type: 'desc',
-        table: t
+        table: t,
+        column: c
       }
     };
   }
@@ -1950,13 +2179,19 @@ transaction_mode
       value: n ? 'not deferrable' : 'deferrable'
     }
   }
+  / 'WITH'i __ 'CONSISTENT'i __ 'SNAPSHOT'i {
+    return {
+      type: 'origin',
+      value: 'with consistent snapshot'
+    }
+  }
 
 transaction_mode_list
   = head: transaction_mode tail:(__ COMMA __ transaction_mode)* {
     return createList(head, tail)
   }
 transaction_stmt
-  = k:('commit'i / 'rollback'i) {
+  = k:('commit'i / 'rollback'i) __ w:('WORK'i)? __ t:(KW_TO __ ('SAVEPOINT'i __)? ident)? {
     return {
       type: 'transaction',
       expr: {
@@ -1964,6 +2199,32 @@ transaction_stmt
           type: 'origin',
           value: k
         },
+        keyword: w,
+        savepoint: t && t[3]
+      }
+    }
+  }
+  / 'savepoint'i __ n:ident {
+    return {
+      type: 'transaction',
+      expr: {
+        action: {
+          type: 'origin',
+          value: 'savepoint'
+        },
+        savepoint: n
+      }
+    }
+  }
+  / 'release'i __ 'SAVEPOINT'i __ n:ident {
+    return {
+      type: 'transaction',
+      expr: {
+        action: {
+          type: 'origin',
+          value: 'release'
+        },
+        savepoint: n
       }
     }
   }
@@ -2237,6 +2498,11 @@ for_update
     return `${fu[0]} ${fu[2][0]}`
   }
 
+for_share
+  = m:('FOR'i __ 'SHARE'i) {
+    return `${m[0]} ${m[2]}`
+  }
+
 lock_in_share_mode
   = m:('LOCK'i __ 'IN'i __ 'SHARE'i __ 'MODE'i) {
     return `${m[0]} ${m[2]} ${m[4]} ${m[6]}`
@@ -2248,14 +2514,15 @@ lock_option
   / sl:('SKIP'i __ 'LOCKED'i) { return `${sl[0]} ${sl[2]}` }
 
 locking_read
-  = t:(for_update / lock_in_share_mode) __ lo:lock_option? {
+  = t:(for_update / for_share / lock_in_share_mode) __ lo:lock_option? {
     return t + (lo ? ` ${lo}` : '')
   }
 
 select_stmt_nake
   = __ cte:with_clause? __ KW_SELECT __
     opts:option_clause? __
-    d:KW_DISTINCT?      __
+    sm:select_modifier_list __
+    d:(KW_DISTINCT / KW_DISTINCTROW / KW_ALL)?      __
     c:column_clause     __
     ci:into_clause?      __
     f:from_clause?      __
@@ -2279,7 +2546,7 @@ select_stmt_nake
       return {
           with: cte,
           type: 'select',
-          options: opts,
+          options: [...(opts || []), ...sm].length > 0 ? [...(opts || []), ...sm] : null,
           distinct: d,
           columns: c,
           into: {
@@ -2308,6 +2575,16 @@ option_clause
     }
     return opts;
   }
+
+select_modifier_list
+  = head:select_modifier tail:(__ select_modifier)* {
+    return [head, ...tail.map(t => t[1])]
+  }
+  / '' { return [] }
+
+select_modifier
+  = KW_HIGH_PRIORITY { return 'HIGH_PRIORITY' }
+  / KW_STRAIGHT_JOIN
 
 query_option
   = option:(
@@ -2558,17 +2835,19 @@ table_base
         as: alias,
       };
     }
-  / t:table_name __ alias:alias_clause? {
+  / t:table_name __ alias:alias_clause? __ hints:index_hint_list? {
       if (t.type === 'var') {
         t.as = alias;
         return t;
       }
-      return {
+      const ref = {
         db: t.db,
         table: t.table,
         as: alias,
         ...getLocationObject(),
       };
+      if (hints) ref.index_hints = hints;
+      return ref;
     }
   / LPAREN __ t:table_name __ alias:alias_clause? __ r:RPAREN {
     const parentheses =  true
@@ -2600,6 +2879,26 @@ table_base
       if (l) result.prefix = l;
       return result
     }
+
+index_hint_list
+  = head:index_hint tail:(__ index_hint)* {
+    return [head, ...tail.map(t => t[1])]
+  }
+
+index_hint
+  = k:(KW_USE / KW_IGNORE / KW_FORCE) __ t:(KW_INDEX / KW_KEY) __ f:index_hint_for? __ LPAREN __ l:index_hint_names? __ RPAREN {
+    return { action: k[0].toUpperCase(), type: t.toUpperCase(), for: f, indexes: l || [] }
+  }
+
+index_hint_for
+  = KW_FOR __ 'JOIN'i { return 'JOIN' }
+  / KW_FOR __ KW_ORDER __ KW_BY { return 'ORDER BY' }
+  / KW_FOR __ KW_GROUP __ KW_BY { return 'GROUP BY' }
+
+index_hint_names
+  = head:ident_name tail:(__ COMMA __ ident_name)* {
+    return createList(head, tail)
+  }
 
 join_op
   = KW_LEFT __ KW_OUTER? __ KW_JOIN { return 'LEFT JOIN'; }
@@ -2712,6 +3011,7 @@ limit_clause
 
 update_stmt
   = __ cte:with_clause? __ KW_UPDATE    __
+    pr:dml_priority_list __
     ig:KW_IGNORE? __
     t:table_ref_list __
     KW_SET       __
@@ -2741,6 +3041,7 @@ update_stmt
         ast: {
           with: cte,
           type: 'update',
+          priority: pr,
           ignore: ig && ig[0].toLowerCase(),
           table: t,
           set: l,
@@ -2751,10 +3052,17 @@ update_stmt
       };
     }
 
+delete_using_clause
+  = KW_USING __ t:table_ref_list { return t }
+
 delete_stmt
   = __ cte:with_clause? __ KW_DELETE    __
+    pr:dml_priority_list __
+    qk:KW_QUICK? __
+    ig:KW_IGNORE? __
     t:table_ref_list? __
     f:from_clause __
+    u:delete_using_clause? __
     w:where_clause? __
     or:order_by_clause? __
     l:limit_clause? {
@@ -2782,8 +3090,12 @@ delete_stmt
         ast: {
           with: cte,
           type: 'delete',
+          priority: pr,
+          quick: qk && qk[0].toLowerCase(),
+          ignore: ig && ig[0].toLowerCase(),
           table: t,
           from: f,
+          using: u,
           where: w,
           orderby: or,
           limit: l,
@@ -2801,12 +3113,19 @@ set_list
  * 'col1 = (col2 > 3)'
  */
 set_item
-  = tbl:(ident __ DOT)? __ c:column_without_kw __ '=' __ v:expr {
-      return { column: c, value: v, table: tbl && tbl[0] };
+  = q:set_item_qualifier __ c:column_without_kw __ '=' __ v:expr {
+      return { column: c, value: v, ...q };
   }
-  / tbl:(ident __ DOT)? __ c:column_without_kw __ '=' __ KW_VALUES __ LPAREN __ v:column_ref __ RPAREN {
-      return { column: c, value: v, table: tbl && tbl[0], keyword: 'values' };
+  / q:set_item_qualifier __ c:column_without_kw __ '=' __ KW_VALUES __ LPAREN __ v:column_ref __ RPAREN {
+      return { column: c, value: v, ...q, keyword: 'values' };
   }
+
+// Optional `tbl.` or `db.tbl.` prefix on a SET target column
+set_item_qualifier
+  = a:(ident __ DOT __) b:(ident __ DOT __)? {
+      return b ? { db: a[0], table: b[0] } : { table: a[0] };
+  }
+  / '' { return { table: null } }
 
 insert_value_clause
   = value_clause
@@ -2824,6 +3143,7 @@ insert_partition
 
 replace_insert_stmt
   = ri:replace_insert       __
+    pr:dml_priority_list __
     ig:KW_IGNORE?  __
     it:KW_INTO? __
     t:table_name  __
@@ -2845,7 +3165,7 @@ replace_insert_stmt
         }
         c.forEach(c => columnList.add(`insert::${table}::${c}`));
       }
-      const prefix = [ig, it].filter(v => v).map(v => v[0] && v[0].toLowerCase()).join(' ')
+      const prefix = [...pr, ig && ig[0].toLowerCase(), it && it[0].toLowerCase()].filter(v => v).join(' ')
       return {
         tableList: Array.from(tableList),
         columnList: columnListTableAlias(columnList),
@@ -2863,6 +3183,7 @@ replace_insert_stmt
 
 insert_no_columns_stmt
   = ri:replace_insert __
+    pr:dml_priority_list __
     ig:KW_IGNORE?  __
     it:KW_INTO?   __
     t:table_name  __
@@ -2874,7 +3195,7 @@ insert_no_columns_stmt
         columnList.add(`insert::${t.table}::(.*)`);
         t.as = null
       }
-      const prefix = [ig, it].filter(v => v).map(v => v[0] && v[0].toLowerCase()).join(' ')
+      const prefix = [...pr, ig && ig[0].toLowerCase(), it && it[0].toLowerCase()].filter(v => v).join(' ')
       return {
         tableList: Array.from(tableList),
         columnList: columnListTableAlias(columnList),
@@ -2892,6 +3213,7 @@ insert_no_columns_stmt
 
 insert_into_set
   = ri:replace_insert __
+    pr:dml_priority_list __
     ig:KW_IGNORE?  __
     it:KW_INTO? __
     t:table_name  __
@@ -2904,7 +3226,7 @@ insert_into_set
         columnList.add(`insert::${t.table}::(.*)`);
         t.as = null
       }
-      const prefix = [ig, it].filter(v => v).map(v => v[0] && v[0].toLowerCase()).join(' ')
+      const prefix = [...pr, ig && ig[0].toLowerCase(), it && it[0].toLowerCase()].filter(v => v).join(' ')
       return {
         tableList: Array.from(tableList),
         columnList: columnListTableAlias(columnList),
@@ -2921,19 +3243,32 @@ insert_into_set
     }
 
 on_duplicate_update_stmt
-  = KW_ON __ 'DUPLICATE'i __ KW_KEY __ KW_UPDATE __ s:set_list {
+  = a:insert_row_alias? __ KW_ON __ 'DUPLICATE'i __ KW_KEY __ KW_UPDATE __ s:set_list {
     return {
       keyword: 'on duplicate key update',
+      row_alias: a,
       set: s
     }
+  }
+
+insert_row_alias
+  = KW_AS __ n:ident_name __ c:(LPAREN __ column_list __ RPAREN)? {
+    return { name: n, columns: c && c[2] }
   }
 
 replace_insert
   = KW_INSERT   { return 'insert'; }
   / KW_REPLACE  { return 'replace'; }
 
+dml_priority_list
+  = l:dml_priority* { return l }
+
+dml_priority
+  = k:(KW_LOW_PRIORITY / KW_HIGH_PRIORITY / KW_DELAYED / KW_QUICK) __ { return k[0].toLowerCase() }
+
 value_clause
   = KW_VALUES __ l:value_list  { return { type: 'values', values: l } }
+  / KW_VALUE __ l:value_list  { return { type: 'values', values: l } }
 
 value_list
   = head:value_item tail:(__ COMMA __ value_item)* {
@@ -3091,6 +3426,12 @@ comparison_op_right
   / like_op_right
   / regexp_op_right
   / member_of_op_right
+  / sounds_like_op_right
+
+sounds_like_op_right
+  = 'SOUNDS'i !ident_part __ KW_LIKE __ right:additive_expr {
+    return { op: 'SOUNDS LIKE', right: right };
+  }
 
 member_of_op_right
   = 'MEMBER'i !ident_part __ 'OF'i !ident_part __ LPAREN __ e:expr __ RPAREN {
@@ -3213,6 +3554,18 @@ jsonb_expr
     return result
   }
 
+// ODBC escape: {d '2020-01-02'}, {t '10:00:00'}, {ts '2020-01-02 10:00:00'}
+odbc_datetime_literal
+  = '{' __ k:('ts'i / 'd'i / 't'i) !ident_part __ ca:("'" single_char* "'") __ '}' {
+    return { type: k.toLowerCase() === 'd' ? 'date' : k.toLowerCase() === 't' ? 'time' : 'timestamp', value: ca[1].join('') };
+  }
+
+// 0b101 bit literal
+bit_literal_0b
+  = '0b'i b:[01]+ !ident_part {
+    return { type: 'bit_string', prefix: null, value: b.join('') };
+  }
+
 primary
   = interval_expr
   / aggr_func
@@ -3220,15 +3573,32 @@ primary
   / func_call
   / cast_expr
   / case_expr
+  / odbc_datetime_literal
   / literal_basic
+  / bit_literal_0b
   / n:literal_numeric !ident_part { return n }
   / column_ref
   / param
+  / LPAREN __ va:var_decl __ s:KW_ASSIGN __ e:expr __ RPAREN {
+    return {
+      type: 'assign',
+      left: va,
+      symbol: s,
+      right: e,
+      parentheses: true,
+    }
+  }
   / LPAREN __ list:or_and_where_expr __ RPAREN {
     list.parentheses = true
     return list
   }
   / var_decl
+  / 'DEFAULT'i !ident_part {
+    return {
+      type: 'origin',
+      value: 'default'
+    }
+  }
   / __ prepared_symbol:'?' {
     return {
       type: 'origin',
@@ -3381,7 +3751,24 @@ param
 aggr_func
   = aggr_fun_count
   / aggr_fun_smma
+  / aggr_fun_stat
   / aggr_fun_json
+
+aggr_fun_stat
+  = name:KW_STAT_AGGR __ LPAREN __ d:KW_DISTINCT? __ e:or_and_expr __ RPAREN __ bc:over_partition? {
+      return {
+        type: 'aggr_func',
+        name: name,
+        args: d ? { distinct: d, expr: e } : { expr: e },
+        over: bc,
+        ...getLocationObject(),
+      };
+    }
+
+KW_STAT_AGGR
+  = n:$('STDDEV_SAMP'i / 'STDDEV_POP'i / 'STDDEV'i / 'STD'i / 'VARIANCE'i / 'VAR_SAMP'i / 'VAR_POP'i / 'BIT_AND'i / 'BIT_OR'i / 'BIT_XOR'i) !ident_part {
+    return n.toUpperCase()
+  }
 
 aggr_fun_smma
   = name:KW_SUM_MAX_MIN_AVG  __ LPAREN __ d:KW_DISTINCT? __ e:or_and_expr __ RPAREN __ bc:over_partition? {
@@ -3871,7 +4258,12 @@ cast_expr
 
 
 literal_basic
-  = b:('binary'i / '_binary'i)? __ s:literal_string ca:(__ collate_expr)? {
+  = intro:charset_introducer __ s:literal_string ca:(__ collate_expr)? {
+    s.prefix = intro
+    if (ca) s.suffix = { collate: ca[1] }
+    return s
+  }
+  / b:('binary'i / '_binary'i)? __ s:literal_string ca:(__ collate_expr)? {
     if (b) s.prefix = b.toLowerCase()
     if (ca) s.suffix = { collate: ca[1] }
     return s
@@ -3879,6 +4271,9 @@ literal_basic
   / literal_bool
   / literal_null
   / literal_datetime
+
+charset_introducer
+  = '_' cs:$([a-zA-Z] [a-zA-Z0-9_]*) &(__ "'") { return `_${cs}` }
 
 literal
   = literal_basic / literal_numeric

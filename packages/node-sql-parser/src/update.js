@@ -2,7 +2,7 @@ import { tablesToSQL } from './tables'
 import { exprToSQL, orderOrPartitionByToSQL } from './expr'
 import { columnRefToSQL } from './column'
 import { limitToSQL } from './limit'
-import { hasVal, commonOptionConnector, returningToSQL } from './util'
+import { hasVal, commonOptionConnector, returningToSQL, toUpper } from './util'
 import { withToSQL } from './with'
 
 /**
@@ -32,10 +32,11 @@ function setToSQL(sets) {
 }
 
 function updateToSQL(stmt) {
-  const { from, table, set, where, orderby, with: withInfo, limit, returning, ignore } = stmt
+  const { from, table, set, where, orderby, with: withInfo, limit, returning, ignore, priority } = stmt
   const clauses = [
     withToSQL(withInfo),
     'UPDATE',
+    ...(priority || []).map(toUpper),
     ignore ? 'IGNORE' : '',
     tablesToSQL(table),
     commonOptionConnector('SET', setToSQL, set),

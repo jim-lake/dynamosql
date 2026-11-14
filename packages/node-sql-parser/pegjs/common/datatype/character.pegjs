@@ -4,7 +4,7 @@ character_varying
   }
 
 character_string_type
-  = t:(KW_CHAR / KW_VARCHAR / character_varying) num:(__ LPAREN __ [0-9]+ __ RPAREN __ ('ARRAY'i)?)? {
+  = t:(KW_CHAR / KW_VARCHAR / KW_NCHAR / KW_NVARCHAR / character_varying) num:(__ LPAREN __ [0-9]+ __ RPAREN __ ('ARRAY'i)?)? {
     const result = { dataType: t }
     if (num) {
       result.length = parseInt(num[3].join(''), 10)

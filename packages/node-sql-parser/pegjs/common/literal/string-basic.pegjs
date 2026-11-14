@@ -47,6 +47,14 @@ literal_string
         value: ca[1].join('')
       };
     }
+  / head:("'" single_char* "'") tail:(__ "'" single_char* "'")+ {
+      // Adjacent single-quoted literals concatenate, e.g. 'a' 'b' => 'ab'
+      const parts = [head[1], ...tail.map(t => t[2])]
+      return {
+        type: 'single_quote_string',
+        value: parts.map(chars => chars.join('')).join('')
+      };
+    }
   / ca:("'" single_char* "'") [\n]+ __ fs:("'" single_char* "'") {
       return {
         type: 'single_quote_string',

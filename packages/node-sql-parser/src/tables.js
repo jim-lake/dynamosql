@@ -45,6 +45,14 @@ function operatorToSQL(operator) {
   }
 }
 
+function indexHintToSQL(hint) {
+  const { action, type, for: forClause, indexes } = hint
+  const clauses = [action, type]
+  if (forClause) clauses.push('FOR', forClause)
+  clauses.push(`(${indexes.map(name => identifierToSql(name)).join(', ')})`)
+  return clauses.join(' ')
+}
+
 function tableHintToSQL(tableHintExpr) {
   if (!tableHintExpr) return
   const { keyword, expr, index, index_columns, parentheses, prefix } = tableHintExpr
@@ -127,7 +135,7 @@ function jsonTableToSQL(jsonTable) {
 
 function tableToSQL(tableInfo) {
   if (toUpper(tableInfo.type) === 'UNNEST') return unnestToSQL(tableInfo)
-  const { table, db, as, expr, operator, prefix: prefixStr, schema, server, suffix, tablesample, temporal_table, table_hint, surround = {} } = tableInfo
+  const { table, db, as, expr, operator, prefix: prefixStr, schema, server, suffix, tablesample, temporal_table, table_hint, index_hints: indexHints, surround = {} } = tableInfo
   const serverName = identifierToSql(server, false, surround.server)
   const database = identifierToSql(db, false, surround.db)
   const schemaStr = identifierToSql(schema, false, surround.schema)
@@ -165,6 +173,7 @@ function tableToSQL(tableInfo) {
   }
   result.push(temporalTableToSQL(temporal_table), commonOptionConnector('AS', typeof as === 'string' ? identifierToSql : exprToSQL, as), operatorToSQL(operator))
   if (table_hint) result.push(toUpper(table_hint.keyword), `(${table_hint.expr.map(tableHintToSQL).filter(hasVal).join(', ')})`)
+  if (indexHints) result.push(...indexHints.map(indexHintToSQL))
   const tableSQL = result.filter(hasVal).join(' ')
   return tableInfo.parentheses ? `(${tableSQL})` : tableSQL
 }
