@@ -1,5 +1,9 @@
 import { getExprCollation, stringCompare } from '../helpers/collation';
-import { convertNum, convertDateTime } from '../helpers/sql_conversion';
+import {
+  convertNum,
+  convertDateTime,
+  convertTime,
+} from '../helpers/sql_conversion';
 import { SQLDate } from '../types/sql_date';
 import { SQLDateTime } from '../types/sql_datetime';
 import { SQLTime } from '../types/sql_time';
@@ -175,6 +179,36 @@ export function convertCompare(
   }
 
   if (
+    left_val instanceof SQLTime &&
+    typeof right_val === 'string' &&
+    _needsTimeRounding(right_val, left_val.getDecimals())
+  ) {
+    const right_time = convertTime({
+      value: right_val,
+      decimals: left_val.getDecimals(),
+      timeZone,
+    });
+    if (right_time === null) {
+      return [null, null];
+    }
+    return [left_val.toString(), right_time.toString()];
+  } else if (
+    right_val instanceof SQLTime &&
+    typeof left_val === 'string' &&
+    _needsTimeRounding(left_val, right_val.getDecimals())
+  ) {
+    const left_time = convertTime({
+      value: left_val,
+      decimals: right_val.getDecimals(),
+      timeZone,
+    });
+    if (left_time === null) {
+      return [null, null];
+    }
+    return [left_time.toString(), right_val.toString()];
+  }
+
+  if (
     typeof left_val === 'number' ||
     typeof right_val === 'number' ||
     left.type === 'number' ||
@@ -302,6 +336,10 @@ function _gte(
     }
   }
   return { err, value, type: 'bool', name };
+}
+function _needsTimeRounding(value: string, decimals: number): boolean {
+  const fraction = /^[\d:]+\.(\d+)$/.exec(value)?.[1] ?? '';
+  return fraction.length > decimals;
 }
 function _isDateLike(value: unknown): value is SQLDate | SQLDateTime {
   return value instanceof SQLDate || value instanceof SQLDateTime;

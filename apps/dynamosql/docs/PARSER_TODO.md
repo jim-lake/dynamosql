@@ -46,3 +46,5 @@ Mismatches between node-sql-parser (MySQL grammar) and MySQL 8.4. Each form was 
 - `SHOW FIELDS FROM t`, `SHOW FULL COLUMNS FROM t`, and `SHOW FULL TABLES` fail with ER_PARSE_ERROR. MySQL 8.4 accepts them.
 - `SHOW WARNINGS`, `SHOW VARIABLES LIKE 'x'`, `SHOW SESSION VARIABLES LIKE 'x'`, `SHOW CREATE DATABASE db`, and `SHOW TABLE STATUS LIKE 'x'` fail with ER_PARSE_ERROR. MySQL 8.4 accepts them.
 - `TABLE t` and `VALUES ROW(...)` statements fail with ER_PARSE_ERROR. MySQL 8.4 accepts them.
+
+- `INSERT INTO c (id, b) VALUES (2, -9223372036854775808)` and `-9223372036854775807` (negative BIGINT literal past 2^53): the parser folds `-<digits>` into one `number` node rounded to a double, so the exact value is lost and strict mode raises ER_WARN_DATA_OUT_OF_RANGE. MySQL 8.4 stores the exact value.

@@ -30,6 +30,7 @@ describe('Select', function () {
     skipAffected: true,
   });
   runTests('derived_table.sql', path.join(__dirname, 'derived_table.sql'));
+  runTests('derived_time.sql', path.join(__dirname, 'derived_time.sql'));
   runTests(
     'derived_table_error.sql',
     path.join(__dirname, 'derived_table_error.sql'),
