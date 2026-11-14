@@ -1517,6 +1517,10 @@ type KW_CREATE = never;
 
 type KW_TEMPORARY = never;
 
+type KW_RESTRICT = never;
+
+type KW_CASCADE = never;
+
 type KW_TEMP = never;
 
 type KW_DELETE = never;
@@ -1534,6 +1538,22 @@ type KW_RETURNING = never;
 type KW_RENAME = never;
 
 type KW_IGNORE = never;
+
+type KW_FORCE = never;
+
+type KW_CONVERT = never;
+
+type KW_KEYS = never;
+
+type KW_FOR = never;
+
+type KW_LOW_PRIORITY = never;
+
+type KW_HIGH_PRIORITY = never;
+
+type KW_DELAYED = never;
+
+type KW_QUICK = never;
 
 type KW_EXPLAIN = never;
 
@@ -1659,6 +1679,8 @@ type KW_ALL = never;
 
 type KW_DISTINCT = never;
 
+type KW_DISTINCTROW = never;
+
 type KW_BETWEEN = never;
 
 type KW_IN = never;
@@ -1764,6 +1786,8 @@ type KW_BYTEA = never;
 type KW_NUMERIC = never;
 
 type KW_DECIMAL = never;
+
+type KW_DEC = never;
 
 type KW_NUMBER = never;
 
