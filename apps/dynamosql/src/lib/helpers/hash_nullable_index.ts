@@ -36,15 +36,10 @@ export function createHashNullableMakeKey(
 
   switch (`${primaryType}.${types.join(',')}`) {
     case 'string.string':
-      return (keys, primaryKey) =>
-        keys[0] === null
-          ? JSON.stringify([null, primaryKey])
-          : (keys[0] as string);
-
     case 'bigint.string':
     case 'number.string':
       return (keys, primaryKey) =>
-        keys[0] === null ? `null:${primaryKey}` : (keys[0] as string);
+        keys[0] === null ? `n:${primaryKey}` : `nn:${keys[0] as string}`;
 
     case 'string.number':
     case 'bigint.number':
@@ -53,28 +48,23 @@ export function createHashNullableMakeKey(
     case 'bigint.bigint':
     case 'number.bigint':
       return (keys, primaryKey) =>
-        keys[0] === null ? `null:${primaryKey}` : String(keys[0]);
+        keys[0] === null ? `n:${primaryKey}` : String(keys[0]);
 
     case 'string.buffer':
-      return (keys, primaryKey) =>
-        keys[0] === null
-          ? JSON.stringify([null, primaryKey])
-          : (keys[0] as Buffer).toString('latin1');
-
     case 'bigint.buffer':
     case 'number.buffer':
       return (keys, primaryKey) =>
         keys[0] === null
-          ? `null:${primaryKey}`
-          : (keys[0] as Buffer).toString('latin1');
+          ? `n:${primaryKey}`
+          : `nn:${(keys[0] as Buffer).toString('latin1')}`;
 
     case 'string.string_ci':
     case 'bigint.string_ci':
     case 'number.string_ci':
       return (keys, primaryKey) =>
         keys[0] === null
-          ? `null:${primaryKey}`
-          : (keys[0] as string).toLowerCase();
+          ? `n:${primaryKey}`
+          : `nn:${(keys[0] as string).toLowerCase()}`;
 
     case 'string.string,string':
     case 'bigint.string,string':

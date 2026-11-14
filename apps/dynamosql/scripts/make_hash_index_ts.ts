@@ -120,13 +120,10 @@ function renderFunction(mode: Mode): string[] {
               : `      return (keys, primaryKey) => \`\${${keyText}}:\${primaryKey}\`;`;
         } else if (length > 1) {
           statement = `      return (keys, primaryKey) => ${nullTest} ? \`\${${multiBody}}:\${primaryKey}\` : ${multiBody};`;
-        } else if (
-          primaryType === 'string' &&
-          (types[0] === 'string' || types[0] === 'buffer')
-        ) {
-          statement = `      return (keys, primaryKey) => keys[0] === null ? JSON.stringify([null, primaryKey]) : ${PLAIN_NULLABLE_SINGLE[types[0]]};`;
+        } else if (isTextKey) {
+          statement = `      return (keys, primaryKey) => keys[0] === null ? \`n:\${primaryKey}\` : \`nn:\${${PLAIN_NULLABLE_SINGLE[types[0]]}}\`;`;
         } else {
-          statement = `      return (keys, primaryKey) => keys[0] === null ? \`null:\${primaryKey}\` : ${PLAIN_NULLABLE_SINGLE[types[0]]};`;
+          statement = `      return (keys, primaryKey) => keys[0] === null ? \`n:\${primaryKey}\` : ${PLAIN_NULLABLE_SINGLE[types[0]]};`;
         }
         const label =
           primaryType === null
