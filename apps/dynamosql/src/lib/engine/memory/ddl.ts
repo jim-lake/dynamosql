@@ -32,7 +32,7 @@ export async function getTableInfo(
       primary_key: data.primary_key.columns,
       column_list: data.column_list,
       is_open: false,
-      rowCount: BigInt(data.row_list.length),
+      rowCount: BigInt(data.row_map.size),
       tableSize: 0n,
     };
   }
@@ -100,8 +100,7 @@ export async function createTable(params: CreateTableParams): Promise<void> {
     },
 
     collation: params.collation,
-    row_list: [],
-    primary_map: new Map(),
+    row_map: new Map(),
     unique_list: [],
   };
   for (const unique of params.unique_list) {
@@ -180,7 +179,7 @@ function _buildUniqueIndex(
     convertKey: createConvertKey(key_column_list, key_types),
     map: new Map(),
   };
-  for (const row of data.row_list) {
+  for (const row of data.row_map.values()) {
     const key = Storage.uniqueKeyOf(index, row);
     if (key === null) {
       continue;

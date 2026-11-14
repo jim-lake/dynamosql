@@ -66,18 +66,18 @@ export async function insertRowList(
       Storage.appendRow(state, cellRow, primary_key);
       affectedRows++;
     } else if (duplicate_mode === 'replace') {
-      const old_row = state.row_list[target];
+      const old_row = state.row_map.get(target);
       if (!old_row) {
         continue;
       }
       const same = _rowEqual(old_row, cellRow);
-      for (const position of conflicts.slice(1).reverse()) {
-        Storage.removeRow(state, position, primary_key);
+      for (const key of conflicts.slice(1)) {
+        Storage.removeRow(state, key);
       }
       Storage.replaceRow(state, target, cellRow, primary_key);
       affectedRows += conflicts.length - 1 + (same ? 1 : 2);
     } else if (duplicate_mode === 'update' && on_duplicate_update) {
-      const old_row = state.row_list[target];
+      const old_row = state.row_map.get(target);
       if (!old_row) {
         continue;
       }

@@ -104,7 +104,7 @@ export interface RowListResult {
 export interface TableData<T = Row> {
   database: string;
   table: string;
-  data: { row_list: T[]; primary_map: Map<string, number> };
+  data: { row_map: Map<string, T> };
 }
 export interface CommitParams<T = Row> {
   engine: Engine;

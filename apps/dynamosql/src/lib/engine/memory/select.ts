@@ -5,6 +5,8 @@ import * as Storage from './storage';
 import type { QueryTableInfo, RowListParams, Row, RowListResult } from '..';
 import type { BaseFrom } from 'node-sql-parser/build/mysql';
 
+const BATCH_SIZE = 1000;
+
 export async function getRowList(
   params: RowListParams
 ): Promise<RowListResult> {
@@ -12,14 +14,14 @@ export async function getRowList(
   const sourceMap: RowListResult['sourceMap'] = new Map();
   const tableInfoMap: RowListResult['tableInfoMap'] = new Map();
   for (const from of list) {
-    const { rowList, tableInfo } = _getFromTable({ ...params, from });
-    sourceMap.set(from, _listToItetator(rowList));
+    const { rowMap, tableInfo } = _getFromTable({ ...params, from });
+    sourceMap.set(from, _mapToIterator(rowMap.values()));
     tableInfoMap.set(from, tableInfo);
   }
   return { sourceMap, tableInfoMap };
 }
 function _getFromTable(params: RowListParams & { from: BaseFrom }): {
-  rowList: Row[];
+  rowMap: Map<unknown, Row>;
   tableInfo: QueryTableInfo;
 } {
   const { session, from } = params;
@@ -29,7 +31,7 @@ function _getFromTable(params: RowListParams & { from: BaseFrom }): {
     throw new SQLError('table_not_found');
   }
   return {
-    rowList: data.row_list,
+    rowMap: data.row_map,
     tableInfo: {
       isCaseSensitive: false,
       is_open: false,
@@ -37,6 +39,16 @@ function _getFromTable(params: RowListParams & { from: BaseFrom }): {
     },
   };
 }
-async function* _listToItetator<T>(list: T[]) {
-  yield list;
+async function* _mapToIterator<T>(rows: IterableIterator<T>) {
+  let batch: T[] = [];
+  for (const row of rows) {
+    batch.push(row);
+    if (batch.length === BATCH_SIZE) {
+      yield batch;
+      batch = [];
+    }
+  }
+  if (batch.length > 0) {
+    yield batch;
+  }
 }

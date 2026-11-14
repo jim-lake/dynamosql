@@ -49,13 +49,9 @@ export async function multipleUpdate(
       });
       const key_list = cells.map((cell) => cell.value);
       const update_key = Storage.lookupKeyOf(data, cells, session.timeZone);
-      const index = state.primary_map.get(update_key);
+      const old_row = state.row_map.get(update_key);
 
-      if (index !== undefined && index >= 0) {
-        const old_row = state.row_list[index];
-        if (!old_row) {
-          continue;
-        }
+      if (old_row) {
         const new_row = Object.assign({}, old_row);
         let changed = false;
 
@@ -78,7 +74,8 @@ export async function multipleUpdate(
         }
 
         if (
-          Storage.findConflicts(state, new_row, data.primary_key, index).length
+          Storage.findConflicts(state, new_row, data.primary_key, update_key)
+            .length
         ) {
           if (!ignore) {
             throw Storage.duplicateEntryError(state, new_row, data.primary_key);
@@ -87,7 +84,7 @@ export async function multipleUpdate(
           continue;
         }
 
-        Storage.replaceRow(state, index, new_row, data.primary_key);
+        Storage.replaceRow(state, update_key, new_row, data.primary_key);
         affectedRows++;
         if (changed) {
           changedRows++;

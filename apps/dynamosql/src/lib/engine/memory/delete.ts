@@ -48,10 +48,9 @@ export async function multipleDelete(
       });
       const key_list = cells.map((cell) => cell.value);
       const delete_key = Storage.lookupKeyOf(data, cells, session.timeZone);
-      const index = state.primary_map.get(delete_key);
 
-      if (index !== undefined && index >= 0) {
-        Storage.removeRow(state, index, data.primary_key);
+      if (state.row_map.has(delete_key)) {
+        Storage.removeRow(state, delete_key);
         affectedRows++;
       } else {
         logger.info(

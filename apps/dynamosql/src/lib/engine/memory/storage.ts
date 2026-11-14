@@ -30,8 +30,7 @@ export interface UniqueIndex {
   map: Map<HashUniqueMakeKeyResult, HashUniqueMakeKeyResult>;
 }
 export interface TableState {
-  row_list: CellRow[];
-  primary_map: Map<HashUniqueMakeKeyResult, number>;
+  row_map: Map<HashUniqueMakeKeyResult, CellRow>;
   unique_list: UniqueIndex[];
 }
 export interface TableData extends TableState {
@@ -117,8 +116,7 @@ export function deleteTable(database: string, table: string): void {
 
 export function cloneState(data: TableState): TableState {
   return {
-    row_list: data.row_list.slice(),
-    primary_map: new Map(data.primary_map),
+    row_map: new Map(data.row_map),
     unique_list: data.unique_list.map((index) => ({
       ...index,
       map: new Map(index.map),
@@ -170,22 +168,21 @@ export function findConflicts(
   state: TableState,
   row: CellRow,
   primary_key: PrimaryKey,
-  self?: number
-): number[] {
-  const positions = new Set<number>();
-  const pk_position = state.primary_map.get(primaryKeyOf(primary_key, row));
-  if (pk_position !== undefined && pk_position !== self) {
-    positions.add(pk_position);
+  self?: HashUniqueMakeKeyResult
+): HashUniqueMakeKeyResult[] {
+  const keys = new Set<HashUniqueMakeKeyResult>();
+  const pk = primaryKeyOf(primary_key, row);
+  if (state.row_map.has(pk)) {
+    keys.add(pk);
   }
   for (const index of state.unique_list) {
     const key = uniqueKeyOf(index, row);
-    const pk = key === null ? undefined : index.map.get(key);
-    const position = pk === undefined ? undefined : state.primary_map.get(pk);
-    if (position !== undefined && position !== self) {
-      positions.add(position);
+    const found = key === null ? undefined : index.map.get(key);
+    if (found !== undefined) {
+      keys.add(found);
     }
   }
-  return [...positions].sort((a, b) => a - b);
+  return [...keys].filter((key) => key !== self);
 }
 export function duplicateEntryError(
   state: TableState,
@@ -193,7 +190,7 @@ export function duplicateEntryError(
   primary_key: PrimaryKey
 ): SQLError {
   const pk = primaryKeyOf(primary_key, row);
-  if (!state.primary_map.has(pk)) {
+  if (!state.row_map.has(pk)) {
     for (const index of state.unique_list) {
       const key = uniqueKeyOf(index, row);
       if (key !== null && index.map.has(key)) {
@@ -215,61 +212,54 @@ export function appendRow(
   row: CellRow,
   primary_key: PrimaryKey
 ): void {
-  _setRow(state, state.row_list.length, row, primary_key);
+  _setRow(state, primaryKeyOf(primary_key, row), row);
 }
 export function replaceRow(
   state: TableState,
-  position: number,
+  key: HashUniqueMakeKeyResult,
   row: CellRow,
   primary_key: PrimaryKey
 ): void {
-  _unsetRow(state, position, primary_key);
-  _setRow(state, position, row, primary_key);
+  const old_row = state.row_map.get(key);
+  if (!old_row) {
+    return;
+  }
+  _unsetIndexes(state, old_row);
+  const new_key = primaryKeyOf(primary_key, row);
+  if (new_key !== key) {
+    state.row_map.delete(key);
+  }
+  _setRow(state, new_key, row);
 }
 export function removeRow(
   state: TableState,
-  position: number,
-  primary_key: PrimaryKey
+  key: HashUniqueMakeKeyResult
 ): void {
-  _unsetRow(state, position, primary_key);
-  state.row_list.splice(position, 1);
-  state.primary_map.forEach((value, key) => {
-    if (value > position) {
-      state.primary_map.set(key, value - 1);
-    }
-  });
+  const old_row = state.row_map.get(key);
+  if (old_row) {
+    _unsetIndexes(state, old_row);
+  }
+  state.row_map.delete(key);
 }
 
 function _setRow(
   state: TableState,
-  position: number,
-  row: CellRow,
-  primary_key: PrimaryKey
+  key: HashUniqueMakeKeyResult,
+  row: CellRow
 ): void {
-  const pk = primaryKeyOf(primary_key, row);
-  state.row_list[position] = row;
-  state.primary_map.set(pk, position);
+  state.row_map.set(key, row);
   for (const index of state.unique_list) {
-    const key = uniqueKeyOf(index, row);
-    if (key !== null) {
-      index.map.set(key, pk);
+    const unique_key = uniqueKeyOf(index, row);
+    if (unique_key !== null) {
+      index.map.set(unique_key, key);
     }
   }
 }
-function _unsetRow(
-  state: TableState,
-  position: number,
-  primary_key: PrimaryKey
-): void {
-  const row = state.row_list[position];
-  if (!row) {
-    return;
-  }
-  state.primary_map.delete(primaryKeyOf(primary_key, row));
+function _unsetIndexes(state: TableState, row: CellRow): void {
   for (const index of state.unique_list) {
-    const key = uniqueKeyOf(index, row);
-    if (key !== null) {
-      index.map.delete(key);
+    const unique_key = uniqueKeyOf(index, row);
+    if (unique_key !== null) {
+      index.map.delete(unique_key);
     }
   }
 }
