@@ -452,8 +452,6 @@ export interface Delete {
   type: "delete";
   /** Lowercased DML modifiers such as "low_priority", "quick" (MySQL 8.4 DELETE). */
   priority?: string[];
-  /** Set only when QUICK is not consumed by the priority list. */
-  quick?: "quick" | null;
   ignore?: "ignore" | null;
   table: (From & { addition?: boolean })[] | null;
   from: Array<From | Dual>;

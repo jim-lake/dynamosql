@@ -1470,9 +1470,6 @@ export function isDelete(obj: unknown): obj is Delete {
             typedObj["priority"].every((e: any) =>
                 typeof e === "string"
             )) &&
-        (typeof typedObj["quick"] === "undefined" ||
-            typedObj["quick"] === null ||
-            typedObj["quick"] === "quick") &&
         (typeof typedObj["ignore"] === "undefined" ||
             typedObj["ignore"] === null ||
             typedObj["ignore"] === "ignore") &&
