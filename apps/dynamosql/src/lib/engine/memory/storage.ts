@@ -9,7 +9,6 @@ import type {
   HashUniqueMakeKeyResult,
 } from '../../helpers/hash_unique_index';
 import type { CellValue, ColumnDef, CellRow } from '../index';
-import type BTree from 'sorted-btree';
 
 export interface MemoryColumnDef extends ColumnDef {
   name_lc: string;
@@ -23,11 +22,12 @@ export interface PrimaryKey {
   makeKey: HashUniqueMakeKey;
   convertKey: ConvertKeyFunction;
 }
-export type UniqueKey = unknown[];
 export interface UniqueIndex {
   name: string;
   column_list: string[];
-  map: BTree<UniqueKey, HashUniqueMakeKeyResult>;
+  makeKey: HashUniqueMakeKey;
+  convertKey: ConvertKeyFunction;
+  map: Map<HashUniqueMakeKeyResult, HashUniqueMakeKeyResult>;
 }
 export interface TableState {
   row_list: CellRow[];
@@ -121,7 +121,7 @@ export function cloneState(data: TableState): TableState {
     primary_map: new Map(data.primary_map),
     unique_list: data.unique_list.map((index) => ({
       ...index,
-      map: index.map.clone(),
+      map: new Map(index.map),
     })),
   };
 }
@@ -155,35 +155,15 @@ export function lookupKeyOf(
   return primary_key.makeKey(primary_key.convertKey(normalized));
 }
 export function uniqueKeyOf(
-  column_list: readonly string[],
+  index: UniqueIndex,
   row: CellRow
-): UniqueKey | null {
-  const values = column_list.map((name) => row[name]?.value);
+): HashUniqueMakeKeyResult | null {
+  const values = index.column_list.map((name) => row[name]?.value);
   if (values.some((value) => value === null || value === undefined)) {
     return null;
   }
-  return values;
-}
-export function compareUniqueKeys(a: UniqueKey, b: UniqueKey): number {
-  for (let i = 0; i < a.length; i++) {
-    const diff = _compareCell(a[i], b[i]);
-    if (diff !== 0) {
-      return diff;
-    }
-  }
-  return 0;
-}
-function _compareCell(a: unknown, b: unknown): number {
-  if (typeof a === 'number' && typeof b === 'number') {
-    return _compareOrdered(a, b);
-  }
-  if (Buffer.isBuffer(a) && Buffer.isBuffer(b)) {
-    return Buffer.compare(a, b);
-  }
-  return _compareOrdered(String(a), String(b));
-}
-function _compareOrdered(a: number | string, b: number | string): number {
-  return a < b ? -1 : a > b ? 1 : 0;
+  const cells = index.column_list.map((name) => row[name] as CellValue);
+  return index.makeKey(index.convertKey(cells));
 }
 
 export function findConflicts(
@@ -198,7 +178,7 @@ export function findConflicts(
     positions.add(pk_position);
   }
   for (const index of state.unique_list) {
-    const key = uniqueKeyOf(index.column_list, row);
+    const key = uniqueKeyOf(index, row);
     const pk = key === null ? undefined : index.map.get(key);
     const position = pk === undefined ? undefined : state.primary_map.get(pk);
     if (position !== undefined && position !== self) {
@@ -215,11 +195,12 @@ export function duplicateEntryError(
   const pk = primaryKeyOf(primary_key, row);
   if (!state.primary_map.has(pk)) {
     for (const index of state.unique_list) {
-      const key = uniqueKeyOf(index.column_list, row);
+      const key = uniqueKeyOf(index, row);
       if (key !== null && index.map.has(key)) {
+        const values = index.column_list.map((name) => row[name]?.value);
         return new SQLError({
           err: 'dup_primary_key_entry',
-          args: [index.name, key.join('-')],
+          args: [index.name, values.join('-')],
         });
       }
     }
@@ -269,7 +250,7 @@ function _setRow(
   state.row_list[position] = row;
   state.primary_map.set(pk, position);
   for (const index of state.unique_list) {
-    const key = uniqueKeyOf(index.column_list, row);
+    const key = uniqueKeyOf(index, row);
     if (key !== null) {
       index.map.set(key, pk);
     }
@@ -286,7 +267,7 @@ function _unsetRow(
   }
   state.primary_map.delete(primaryKeyOf(primary_key, row));
   for (const index of state.unique_list) {
-    const key = uniqueKeyOf(index.column_list, row);
+    const key = uniqueKeyOf(index, row);
     if (key !== null) {
       index.map.delete(key);
     }

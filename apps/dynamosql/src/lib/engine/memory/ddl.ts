@@ -1,5 +1,3 @@
-import BTree from 'sorted-btree';
-
 import { SQLError } from '../../../error';
 import { createConvertKey } from '../../helpers/convert_key';
 import { createHashUniqueMakeKey } from '../../helpers/hash_unique_index';
@@ -7,7 +5,6 @@ import { getKeyTypes } from '../../helpers/key_type_convert';
 
 import * as Storage from './storage';
 
-import type { HashUniqueMakeKeyResult } from '../../helpers/hash_unique_index';
 import type {
   ColumnDefParam,
   CellValue,
@@ -165,28 +162,34 @@ function _buildUniqueIndex(
     throw new SQLError({ err: 'ER_DUP_KEYNAME', args: [name] });
   }
   const column_list = key_list.map((key) => key.name.toLowerCase());
-  for (const column of column_list) {
-    if (!data.column_list.some((col) => col.name_lc === column)) {
+  const key_column_list = column_list.map((column) => {
+    const found = data.column_list.find((col) => col.name_lc === column);
+    if (!found) {
       throw new SQLError({
         err: 'ER_KEY_COLUMN_DOES_NOT_EXITS',
         args: [column],
       });
     }
-  }
-  const map = new BTree<Storage.UniqueKey, HashUniqueMakeKeyResult>(
-    undefined,
-    Storage.compareUniqueKeys
-  );
-  const index: UniqueIndex = { name, column_list, map };
+    return found;
+  });
+  const key_types = getKeyTypes(key_column_list);
+  const index: UniqueIndex = {
+    name,
+    column_list,
+    makeKey: createHashUniqueMakeKey(key_types),
+    convertKey: createConvertKey(key_column_list, key_types),
+    map: new Map(),
+  };
   for (const row of data.row_list) {
-    const key = Storage.uniqueKeyOf(column_list, row);
+    const key = Storage.uniqueKeyOf(index, row);
     if (key === null) {
       continue;
     }
-    if (map.has(key)) {
+    if (index.map.has(key)) {
+      const row_values = index.column_list.map((col) => row[col]?.value);
       throw new SQLError({
         err: 'dup_primary_key_entry',
-        args: [name, key.join('-')],
+        args: [name, row_values.join('-')],
       });
     }
     index.map.set(key, Storage.primaryKeyOf(data.primary_key, row));

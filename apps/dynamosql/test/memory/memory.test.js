@@ -76,6 +76,16 @@ describe('Temp', function () {
     path.join(__dirname, 'memory_unique_error.sql'),
     { allowedErrors: 'SAME_CODE', skipAffected: true, checkChanged: true }
   );
+  runTests(
+    'memory_unique_key.sql',
+    path.join(__dirname, 'memory_unique_key.sql'),
+    { skipAffected: true, checkChanged: true }
+  );
+  runTests(
+    'memory_unique_key_error.sql',
+    path.join(__dirname, 'memory_unique_key_error.sql'),
+    { allowedErrors: 'SAME_CODE', skipAffected: true, checkChanged: true }
+  );
   runTests('memory_strict.sql', path.join(__dirname, 'memory_strict.sql'), {
     checkChanged: true,
   });

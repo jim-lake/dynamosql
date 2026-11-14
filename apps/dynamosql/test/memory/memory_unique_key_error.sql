@@ -1,0 +1,16 @@
+CREATE DATABASE IF NOT EXISTS mem_unique_key_db;
+USE mem_unique_key_db;
+CREATE TEMPORARY TABLE uke_ci (id INT PRIMARY KEY, c VARCHAR(20) COLLATE utf8mb4_unicode_ci, UNIQUE KEY (c));
+INSERT INTO uke_ci VALUES (1, 'Alpha');
+INSERT INTO uke_ci VALUES (2, 'alpha');
+INSERT INTO uke_ci VALUES (3, 'x'), (4, 'ALPHA');
+UPDATE uke_ci SET c = 'ALPHA' WHERE id = 3;
+CREATE TEMPORARY TABLE uke_pad (id INT PRIMARY KEY, c CHAR(5) COLLATE utf8mb4_bin, UNIQUE KEY (c));
+INSERT INTO uke_pad VALUES (1, 'a');
+INSERT INTO uke_pad VALUES (2, 'a ');
+CREATE TEMPORARY TABLE uke_multi (id INT PRIMARY KEY, a VARCHAR(10) COLLATE utf8mb4_unicode_ci, b INT, UNIQUE KEY uke_multi_ab (a, b));
+INSERT INTO uke_multi VALUES (1, 'X', 1);
+INSERT INTO uke_multi VALUES (2, 'x', 1);
+CREATE TEMPORARY TABLE uke_build (id INT PRIMARY KEY, c VARCHAR(10) COLLATE utf8mb4_unicode_ci);
+INSERT INTO uke_build VALUES (1, 'one'), (2, 'ONE');
+CREATE UNIQUE INDEX uke_build_c ON uke_build (c);

@@ -34,9 +34,9 @@ import type {
 } from 'node-sql-parser/build/mysql';
 
 type CreateUniqueIndex = Create & {
-  index: { schema: string | null; name: string };
+  index: string;
   index_columns: { column: string }[];
-  table: { db: string | null; table: string }[];
+  table: { db: string | null; table: string };
 };
 
 function isCreateDatabase(ast: Create): ast is CreateDatabase {
@@ -70,12 +70,11 @@ async function _createUniqueIndex(
   params: HandlerParams<CreateUniqueIndex>
 ): Promise<AffectedResult> {
   const { ast, session, dynamodb } = params;
-  const tableRef = ast.table[0];
-  const database = tableRef?.db ?? session.getCurrentDatabase();
+  const database = ast.table.db ?? session.getCurrentDatabase();
   if (!database) {
     throw new SQLError('no_current_database');
   }
-  const table = tableRef?.table;
+  const table = ast.table.table;
   if (!table || !ast.index) {
     throw new SQLError('bad_table_name');
   }
@@ -98,7 +97,7 @@ async function _createUniqueIndex(
     session,
     database,
     table,
-    index_name: ast.index.name,
+    index_name: ast.index,
     key_list,
     is_unique: true,
   });
