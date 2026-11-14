@@ -4,17 +4,17 @@ import type { SQLDate } from '../types/sql_date';
 import type { SQLDateTime } from '../types/sql_datetime';
 import type { SQLInterval } from '../types/sql_interval';
 import type { SQLTime } from '../types/sql_time';
-import type { KeyType } from './hash_unique_index';
-import type { KeyValueNullable } from './ordered_nullable_index';
+import type { HashUniqueKeyType } from './hash_unique_index';
+import type { OrderedNullableKeyValue } from './ordered_nullable_index';
 
-type Converter = (value: unknown) => KeyValueNullable;
+type Converter = (value: unknown) => OrderedNullableKeyValue;
 export type ConvertKeyNullableFunction = (
   cells: CellValue[]
-) => KeyValueNullable[];
+) => OrderedNullableKeyValue[];
 
-export function createConvertKey(
+export function createConvertKeyNullable(
   columns: ColumnDef[],
-  types: KeyType[]
+  types: HashUniqueKeyType[]
 ): ConvertKeyNullableFunction {
   if (types.length > 2) {
     const kinds = types.slice();

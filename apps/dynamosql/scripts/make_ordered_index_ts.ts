@@ -2,10 +2,11 @@ import { writeFileSync } from 'fs';
 import { join } from 'path';
 import { format, resolveConfig } from 'prettier';
 
-type KeyType = 'string' | 'number' | 'bigint' | 'buffer' | 'string_ci';
+type OrderedUniqueKeyType =
+  'string' | 'number' | 'bigint' | 'buffer' | 'string_ci';
 type Mode = 'unique' | 'nullable' | 'nonunique';
 
-const KEY_TYPES: KeyType[] = [
+const KEY_TYPES: OrderedUniqueKeyType[] = [
   'string',
   'number',
   'bigint',
@@ -15,13 +16,13 @@ const KEY_TYPES: KeyType[] = [
 const HARDCODED_MAX_KEYS = 2;
 const HELPERS_DIR = join(__dirname, '..', 'src', 'lib', 'helpers');
 const GENERATOR_PATH = 'scripts/make_ordered_index_ts.ts';
-const SUFFIXES: Record<Mode, string> = {
-  unique: '',
-  nullable: 'Nullable',
-  nonunique: 'Nonunique',
+const PREFIXES: Record<Mode, string> = {
+  unique: 'OrderedUnique',
+  nullable: 'OrderedNullable',
+  nonunique: 'OrderedNonunique',
 };
 
-function typeCombinations(length: number): KeyType[][] {
+function typeCombinations(length: number): OrderedUniqueKeyType[][] {
   if (length === 0) {
     return [[]];
   }
@@ -51,8 +52,8 @@ function renderMakeKey(mode: Mode): string[] {
           case 'number':
           case 'bigint':
             return nullable
-              ? `${ref} as OrderedKeyPartNullable`
-              : `${ref} as OrderedKeyPart`;
+              ? `${ref} as OrderedNullableKeyPart`
+              : `${ref} as OrderedUniqueKeyPart`;
           case 'buffer':
             return nullable
               ? `((${ref} as Buffer | null)?.toString('latin1') ?? null)`
@@ -74,7 +75,7 @@ function renderMakeKey(mode: Mode): string[] {
           length === 1
             ? parts[0]
             : passThrough
-              ? 'keys as OrderedKeyPart[]'
+              ? 'keys as OrderedUniqueKeyPart[]'
               : keyArray;
       } else if (mode === 'nonunique') {
         body = keyArrayWithPrimary;
@@ -112,7 +113,7 @@ function renderMakeKey(mode: Mode): string[] {
           '    return keys =>',
           '      keys.map((key, i) => {',
           ...transform,
-          '        return key as OrderedKeyPart;',
+          '        return key as OrderedUniqueKeyPart;',
           '      });',
         ]
       : [
@@ -122,7 +123,7 @@ function renderMakeKey(mode: Mode): string[] {
           '          return null;',
           '        }',
           ...transform.map((line) => `  ${line}`),
-          '        return key as OrderedKeyPartNullable;',
+          '        return key as OrderedNullableKeyPart;',
           '      });',
           mode === 'nullable'
             ? '      return parts.includes(null) ? [...parts, primaryKey] : parts;'
@@ -131,7 +132,7 @@ function renderMakeKey(mode: Mode): string[] {
         ];
 
   return [
-    `export function createMakeOrderedKey(types: KeyType[]): MakeOrderedKey${SUFFIXES[mode]} {`,
+    `export function create${PREFIXES[mode]}MakeKey(types: OrderedUniqueKeyType[]): ${PREFIXES[mode]}MakeKey {`,
     `  if (types.length > ${HARDCODED_MAX_KEYS}) {`,
     '    const kinds = types.slice();',
     ...genericBody,
@@ -148,16 +149,18 @@ function renderMakeKey(mode: Mode): string[] {
 
 function renderComparator(mode: Mode): string[] {
   const nullable = mode !== 'unique';
-  const elementType = nullable ? 'OrderedKeyPartNullable' : 'OrderedKeyPart';
+  const elementType = nullable
+    ? 'OrderedNullableKeyPart'
+    : 'OrderedUniqueKeyPart';
   const lines = [
-    `export function createKeyComparator(types: KeyType[]): KeyComparator${SUFFIXES[mode]} {`,
+    `export function create${PREFIXES[mode]}KeyComparator(types: OrderedUniqueKeyType[]): ${PREFIXES[mode]}KeyComparator {`,
   ];
 
   for (let length = 1; length <= HARDCODED_MAX_KEYS; length++) {
     const scalar = !nullable && length === 1;
     const count = nullable ? length + 1 : length;
     const type = scalar
-      ? 'OrderedKeyPart'
+      ? 'OrderedUniqueKeyPart'
       : `[${Array(count).fill(elementType).join(', ')}]`;
     const comparisons = Array.from({ length: count }, (_, i) => {
       const ref = scalar ? '' : `[${i}]`;
@@ -194,12 +197,12 @@ function renderComparator(mode: Mode): string[] {
 }
 
 const uniqueLines = [
-  "export type KeyType = 'string' | 'number' | 'bigint' | 'buffer' | 'string_ci';",
-  'export type KeyValue = string | number | bigint | Buffer;',
-  'export type OrderedKeyPart = string | number | bigint;',
-  'export type OrderedKey = OrderedKeyPart | OrderedKeyPart[];',
-  'export type MakeOrderedKey = (keys: KeyValue[]) => OrderedKey;',
-  'export type KeyComparator = (a: OrderedKey, b: OrderedKey) => number;',
+  "export type OrderedUniqueKeyType = 'string' | 'number' | 'bigint' | 'buffer' | 'string_ci';",
+  'export type OrderedUniqueKeyValue = string | number | bigint | Buffer;',
+  'export type OrderedUniqueKeyPart = string | number | bigint;',
+  'export type OrderedUniqueKey = OrderedUniqueKeyPart | OrderedUniqueKeyPart[];',
+  'export type OrderedUniqueMakeKey = (keys: OrderedUniqueKeyValue[]) => OrderedUniqueKey;',
+  'export type OrderedUniqueKeyComparator = (a: OrderedUniqueKey, b: OrderedUniqueKey) => number;',
   '',
   ...renderMakeKey('unique'),
   '',
@@ -207,18 +210,18 @@ const uniqueLines = [
 ];
 
 const nullableLines = [
-  "import type { KeyType, KeyValue, OrderedKeyPart } from './ordered_unique_index';",
+  "import type { OrderedUniqueKeyType, OrderedUniqueKeyValue, OrderedUniqueKeyPart } from './ordered_unique_index';",
   '',
-  'export type KeyValueNullable = KeyValue | null;',
-  'export type OrderedKeyPartNullable = OrderedKeyPart | null;',
-  'export type PrimaryKey = string | number | bigint;',
-  'export type MakeOrderedKeyNullable = (',
-  '  keys: KeyValueNullable[],',
-  '  primaryKey: PrimaryKey',
-  ') => OrderedKeyPartNullable[];',
-  'export type KeyComparatorNullable = (',
-  '  a: OrderedKeyPartNullable[],',
-  '  b: OrderedKeyPartNullable[]',
+  'export type OrderedNullableKeyValue = OrderedUniqueKeyValue | null;',
+  'export type OrderedNullableKeyPart = OrderedUniqueKeyPart | null;',
+  'export type OrderedNullablePrimaryKey = string | number | bigint;',
+  'export type OrderedNullableMakeKey = (',
+  '  keys: OrderedNullableKeyValue[],',
+  '  primaryKey: OrderedNullablePrimaryKey',
+  ') => OrderedNullableKeyPart[];',
+  'export type OrderedNullableKeyComparator = (',
+  '  a: OrderedNullableKeyPart[],',
+  '  b: OrderedNullableKeyPart[]',
   ') => number;',
   '',
   ...renderMakeKey('nullable'),
@@ -227,16 +230,16 @@ const nullableLines = [
 ];
 
 const nonuniqueLines = [
-  "import type { KeyType } from './ordered_unique_index';",
-  "import type { KeyValueNullable, OrderedKeyPartNullable, PrimaryKey } from './ordered_nullable_index';",
+  "import type { OrderedUniqueKeyType } from './ordered_unique_index';",
+  "import type { OrderedNullableKeyValue, OrderedNullableKeyPart, OrderedNullablePrimaryKey } from './ordered_nullable_index';",
   '',
-  'export type MakeOrderedKeyNonunique = (',
-  '  keys: KeyValueNullable[],',
-  '  primaryKey: PrimaryKey',
-  ') => OrderedKeyPartNullable[];',
-  'export type KeyComparatorNonunique = (',
-  '  a: OrderedKeyPartNullable[],',
-  '  b: OrderedKeyPartNullable[]',
+  'export type OrderedNonuniqueMakeKey = (',
+  '  keys: OrderedNullableKeyValue[],',
+  '  primaryKey: OrderedNullablePrimaryKey',
+  ') => OrderedNullableKeyPart[];',
+  'export type OrderedNonuniqueKeyComparator = (',
+  '  a: OrderedNullableKeyPart[],',
+  '  b: OrderedNullableKeyPart[]',
   ') => number;',
   '',
   ...renderMakeKey('nonunique'),

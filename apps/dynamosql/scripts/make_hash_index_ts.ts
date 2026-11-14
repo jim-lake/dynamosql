@@ -2,23 +2,28 @@ import { writeFileSync } from 'fs';
 import { join } from 'path';
 import { format, resolveConfig } from 'prettier';
 
-type KeyType = 'string' | 'number' | 'bigint' | 'buffer' | 'string_ci';
-type PrimaryKeyType = 'string' | 'bigint' | 'number';
+type HashUniqueKeyType =
+  'string' | 'number' | 'bigint' | 'buffer' | 'string_ci';
+type HashNullablePrimaryKeyType = 'string' | 'bigint' | 'number';
 type Mode = 'unique' | 'nullable' | 'nonunique';
 
-const KEY_TYPES: KeyType[] = [
+const KEY_TYPES: HashUniqueKeyType[] = [
   'string',
   'number',
   'bigint',
   'buffer',
   'string_ci',
 ];
-const PRIMARY_KEY_TYPES: PrimaryKeyType[] = ['string', 'bigint', 'number'];
+const PRIMARY_KEY_TYPES: HashNullablePrimaryKeyType[] = [
+  'string',
+  'bigint',
+  'number',
+];
 const HARDCODED_MAX_KEYS = 3;
 const HELPERS_DIR = join(__dirname, '..', 'src', 'lib', 'helpers');
 const GENERATOR_PATH = 'scripts/make_hash_index_ts.ts';
 
-const PLAIN_NULLABLE_SINGLE: Record<KeyType, string> = {
+const PLAIN_NULLABLE_SINGLE: Record<HashUniqueKeyType, string> = {
   string: 'keys[0] as string',
   number: 'String(keys[0])',
   bigint: 'String(keys[0])',
@@ -26,7 +31,7 @@ const PLAIN_NULLABLE_SINGLE: Record<KeyType, string> = {
   string_ci: '(keys[0] as string).toLowerCase()',
 };
 
-const NULL_SAFE_SINGLE: Record<KeyType, string> = {
+const NULL_SAFE_SINGLE: Record<HashUniqueKeyType, string> = {
   string: 'keys[0]',
   number: 'keys[0]',
   bigint: 'keys[0]',
@@ -35,12 +40,12 @@ const NULL_SAFE_SINGLE: Record<KeyType, string> = {
 };
 
 const RETURN_TYPES: Record<Mode, string> = {
-  unique: 'MakeKey',
-  nullable: 'MakeKeyNullable',
-  nonunique: 'MakeKeyNonunique',
+  unique: 'HashUniqueMakeKey',
+  nullable: 'HashNullableMakeKey',
+  nonunique: 'HashNonuniqueMakeKey',
 };
 
-function typeCombinations(length: number): KeyType[][] {
+function typeCombinations(length: number): HashUniqueKeyType[][] {
   if (length === 0) {
     return [[]];
   }
@@ -50,7 +55,7 @@ function typeCombinations(length: number): KeyType[][] {
 }
 
 function keyExpression(
-  type: KeyType,
+  type: HashUniqueKeyType,
   index: number,
   nullable: boolean
 ): string {
@@ -74,12 +79,12 @@ function renderFunction(mode: Mode): string[] {
   const nullable = mode !== 'unique';
   const returnType = RETURN_TYPES[mode];
   const params = nullable
-    ? 'types: KeyType[], primaryType: PrimaryKeyType'
-    : 'types: KeyType[]';
+    ? 'types: HashUniqueKeyType[], primaryType: HashNullablePrimaryKeyType'
+    : 'types: HashUniqueKeyType[]';
   const switchSubject = nullable
     ? "  switch (`${primaryType}.${types.join(',')}`) {"
     : "  switch (types.join(',')) {";
-  const primaryTypes: (PrimaryKeyType | null)[] = nullable
+  const primaryTypes: (HashNullablePrimaryKeyType | null)[] = nullable
     ? PRIMARY_KEY_TYPES
     : [null];
 
@@ -171,7 +176,7 @@ function renderFunction(mode: Mode): string[] {
         ];
 
   return [
-    `export function createMakeKey(${params}): ${returnType} {`,
+    `export function create${returnType}(${params}): ${returnType} {`,
     `  if (types.length > ${HARDCODED_MAX_KEYS}) {`,
     ...genericBody,
     '  }',
@@ -186,21 +191,21 @@ function renderFunction(mode: Mode): string[] {
 }
 
 const uniqueLines = [
-  "export type KeyType = 'string' | 'number' | 'bigint' | 'buffer' | 'string_ci';",
-  'export type KeyValue = string | number | bigint | Buffer;',
-  'export type MakeKeyResult = string | number | bigint;',
-  'export type MakeKey = (keys: KeyValue[]) => MakeKeyResult;',
+  "export type HashUniqueKeyType = 'string' | 'number' | 'bigint' | 'buffer' | 'string_ci';",
+  'export type HashUniqueKeyValue = string | number | bigint | Buffer;',
+  'export type HashUniqueMakeKeyResult = string | number | bigint;',
+  'export type HashUniqueMakeKey = (keys: HashUniqueKeyValue[]) => HashUniqueMakeKeyResult;',
   '',
   ...renderFunction('unique'),
 ];
 
 const nullableLines = [
-  "import type { KeyType, KeyValue } from './hash_unique_index';",
+  "import type { HashUniqueKeyType, HashUniqueKeyValue } from './hash_unique_index';",
   '',
-  'export type KeyValueNullable = KeyValue | null;',
-  "export type PrimaryKeyType = 'string' | 'bigint' | 'number';",
-  'export type MakeKeyNullable = (',
-  '  keys: KeyValueNullable[],',
+  'export type HashNullableKeyValue = HashUniqueKeyValue | null;',
+  "export type HashNullablePrimaryKeyType = 'string' | 'bigint' | 'number';",
+  'export type HashNullableMakeKey = (',
+  '  keys: HashNullableKeyValue[],',
   '  primaryKey: string | bigint | number',
   ') => string;',
   '',
@@ -208,11 +213,11 @@ const nullableLines = [
 ];
 
 const nonuniqueLines = [
-  "import type { KeyType } from './hash_unique_index';",
-  "import type { KeyValueNullable, PrimaryKeyType } from './hash_nullable_index';",
+  "import type { HashUniqueKeyType } from './hash_unique_index';",
+  "import type { HashNullableKeyValue, HashNullablePrimaryKeyType } from './hash_nullable_index';",
   '',
-  'export type MakeKeyNonunique = (',
-  '  keys: KeyValueNullable[],',
+  'export type HashNonuniqueMakeKey = (',
+  '  keys: HashNullableKeyValue[],',
   '  primaryKey: string | bigint | number',
   ') => string;',
   '',

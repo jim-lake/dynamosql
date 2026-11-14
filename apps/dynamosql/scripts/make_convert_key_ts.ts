@@ -2,10 +2,10 @@ import { writeFileSync } from 'fs';
 import { join } from 'path';
 import { format, resolveConfig } from 'prettier';
 
-import type { KeyType } from '../src/lib/helpers/hash_unique_index';
+import type { HashUniqueKeyType } from '../src/lib/helpers/hash_unique_index';
 import type { ValueType } from '../src/lib/types/value_type';
 
-type Conversion = [ValueType, KeyType, string];
+type Conversion = [ValueType, HashUniqueKeyType, string];
 type LabeledConversion = [string, string];
 
 const HARDCODED_MAX_KEYS = 2;
@@ -79,7 +79,9 @@ async function main(): Promise<void> {
         expression,
       ]
     );
-    const keyValue = nullable ? 'KeyValueNullable' : 'KeyValue';
+    const keyValue = nullable
+      ? 'OrderedNullableKeyValue'
+      : 'HashUniqueKeyValue';
     const convertKeyFunction = nullable
       ? 'ConvertKeyNullableFunction'
       : 'ConvertKeyFunction';
@@ -113,10 +115,12 @@ async function main(): Promise<void> {
 
     const keyImports = nullable
       ? [
-          "import type { KeyType } from './hash_unique_index';",
-          "import type { KeyValueNullable } from './ordered_nullable_index';",
+          "import type { HashUniqueKeyType } from './hash_unique_index';",
+          "import type { OrderedNullableKeyValue } from './ordered_nullable_index';",
         ]
-      : ["import type { KeyType, KeyValue } from './hash_unique_index';"];
+      : [
+          "import type { HashUniqueKeyType, HashUniqueKeyValue } from './hash_unique_index';",
+        ];
     const nonNullAssumption = nullable
       ? []
       : [
@@ -136,7 +140,7 @@ async function main(): Promise<void> {
       `export type ${convertKeyFunction} = (cells: CellValue[]) => ${keyValue}[];`,
       '',
       ...nonNullAssumption,
-      `export function createConvertKey(columns: ColumnDef[], types: KeyType[]): ${convertKeyFunction} {`,
+      `export function ${nullable ? 'createConvertKeyNullable' : 'createConvertKey'}(columns: ColumnDef[], types: HashUniqueKeyType[]): ${convertKeyFunction} {`,
       `if (types.length > ${HARDCODED_MAX_KEYS}) {`,
       'const kinds = types.slice();',
       'const converters = columns.map((column, i): Converter => {',

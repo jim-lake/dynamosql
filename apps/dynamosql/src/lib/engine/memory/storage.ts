@@ -4,7 +4,10 @@ import { cellConvert } from '../helpers/cell_convert';
 import type { COLLATIONS } from '../../../constants/mysql';
 import type { Session } from '../../../session';
 import type { ConvertKeyFunction } from '../../helpers/convert_key';
-import type { MakeKey, MakeKeyResult } from '../../helpers/hash_unique_index';
+import type {
+  HashUniqueMakeKey,
+  HashUniqueMakeKeyResult,
+} from '../../helpers/hash_unique_index';
 import type { CellValue, ColumnDef, CellRow } from '../index';
 import type BTree from 'sorted-btree';
 
@@ -17,18 +20,18 @@ export const ROW_ID_NAME = 'DB_ROW_ID';
 
 export interface PrimaryKey {
   columns: string[];
-  makeKey: MakeKey;
+  makeKey: HashUniqueMakeKey;
   convertKey: ConvertKeyFunction;
 }
 export type UniqueKey = unknown[];
 export interface UniqueIndex {
   name: string;
   column_list: string[];
-  map: BTree<UniqueKey, MakeKeyResult>;
+  map: BTree<UniqueKey, HashUniqueMakeKeyResult>;
 }
 export interface TableState {
   row_list: CellRow[];
-  primary_map: Map<MakeKeyResult, number>;
+  primary_map: Map<HashUniqueMakeKeyResult, number>;
   unique_list: UniqueIndex[];
 }
 export interface TableData extends TableState {
@@ -125,7 +128,7 @@ export function cloneState(data: TableState): TableState {
 export function primaryKeyOf(
   primary_key: PrimaryKey,
   row: CellRow
-): MakeKeyResult {
+): HashUniqueMakeKeyResult {
   const cells = primary_key.columns.map((name) => row[name] as CellValue);
   return primary_key.makeKey(primary_key.convertKey(cells));
 }
@@ -133,7 +136,7 @@ export function lookupKeyOf(
   data: TableData,
   cells: CellValue[],
   timeZone: string
-): MakeKeyResult {
+): HashUniqueMakeKeyResult {
   const { primary_key } = data;
   const normalized = cells.map((cell, index) => {
     const name = primary_key.columns[index]?.toLowerCase();

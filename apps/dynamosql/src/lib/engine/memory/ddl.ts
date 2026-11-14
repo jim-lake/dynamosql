@@ -2,12 +2,12 @@ import BTree from 'sorted-btree';
 
 import { SQLError } from '../../../error';
 import { createConvertKey } from '../../helpers/convert_key';
-import { createMakeKey } from '../../helpers/hash_unique_index';
+import { createHashUniqueMakeKey } from '../../helpers/hash_unique_index';
 import { getKeyTypes } from '../../helpers/key_type_convert';
 
 import * as Storage from './storage';
 
-import type { MakeKeyResult } from '../../helpers/hash_unique_index';
+import type { HashUniqueMakeKeyResult } from '../../helpers/hash_unique_index';
 import type {
   ColumnDefParam,
   CellValue,
@@ -98,7 +98,7 @@ export async function createTable(params: CreateTableParams): Promise<void> {
     column_list,
     primary_key: {
       columns: primary_columns,
-      makeKey: createMakeKey(key_types),
+      makeKey: createHashUniqueMakeKey(key_types),
       convertKey: createConvertKey(key_column_list, key_types),
     },
 
@@ -173,7 +173,7 @@ function _buildUniqueIndex(
       });
     }
   }
-  const map = new BTree<Storage.UniqueKey, MakeKeyResult>(
+  const map = new BTree<Storage.UniqueKey, HashUniqueMakeKeyResult>(
     undefined,
     Storage.compareUniqueKeys
   );

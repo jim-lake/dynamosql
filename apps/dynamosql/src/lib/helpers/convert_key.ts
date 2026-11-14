@@ -4,15 +4,18 @@ import type { SQLDate } from '../types/sql_date';
 import type { SQLDateTime } from '../types/sql_datetime';
 import type { SQLInterval } from '../types/sql_interval';
 import type { SQLTime } from '../types/sql_time';
-import type { KeyType, KeyValue } from './hash_unique_index';
+import type {
+  HashUniqueKeyType,
+  HashUniqueKeyValue,
+} from './hash_unique_index';
 
-type Converter = (value: unknown) => KeyValue;
-export type ConvertKeyFunction = (cells: CellValue[]) => KeyValue[];
+type Converter = (value: unknown) => HashUniqueKeyValue;
+export type ConvertKeyFunction = (cells: CellValue[]) => HashUniqueKeyValue[];
 
 // Untested assumption: key values are never null. A null column type throws here.
 export function createConvertKey(
   columns: ColumnDef[],
-  types: KeyType[]
+  types: HashUniqueKeyType[]
 ): ConvertKeyFunction {
   if (types.length > 2) {
     const kinds = types.slice();

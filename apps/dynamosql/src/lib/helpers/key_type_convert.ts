@@ -1,10 +1,10 @@
 import { isCaseInsensitive } from './collation';
 
 import type { ColumnDef } from '../engine';
-import type { KeyType } from './hash_unique_index';
+import type { HashUniqueKeyType } from './hash_unique_index';
 
-export function getKeyTypes(columns: ColumnDef[]): KeyType[] {
-  return columns.map((column): KeyType => {
+export function getKeyTypes(columns: ColumnDef[]): HashUniqueKeyType[] {
+  return columns.map((column): HashUniqueKeyType => {
     switch (column.type) {
       case 'string':
       case 'char':
