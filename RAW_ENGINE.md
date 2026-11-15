@@ -1,108 +1,76 @@
-# Raw engine: INSERT ... ON DUPLICATE KEY UPDATE
+# Raw engine differences from MySQL 8.4
 
-The raw engine (DynamoDB) implements `ON DUPLICATE KEY UPDATE` in three paths. The differences from MySQL below are deliberate. The raw engine trades exact `affectedRows` and `changedRows` for stronger transaction behavior. It avoids retries and avoids reading rows the statement does not need.
+The raw engine stores data in DynamoDB. This page lists where its behavior differs from MySQL 8.4. Behavior not listed here matches MySQL.
 
-The memory engine follows MySQL counts exactly and is unaffected.
-
-## The three paths
-
-The engine picks a path per statement.
-
-**Path A: one UpdateItem per row.** Used when every `SET` value either equals the inserted value for that column, or is an increment or decrement by the inserted value. Examples:
-
-- `ON DUPLICATE KEY UPDATE c = VALUES(c)`
-- `VALUES (k, 1) ... ON DUPLICATE KEY UPDATE c = c + 1`
-- `VALUES (k, 5) ... ON DUPLICATE KEY UPDATE c = 5`
-
-Each row is one `UpdateItem` call with `ReturnValues: ALL_OLD`. The call returns the previous item, so the engine knows whether the row existed and whether it changed. The call has no condition, so it never fails because of a concurrent write.
-
-**Path B: batch PartiQL.** Used when every `SET` value translates to PartiQL and no key repeats in the statement. The engine sends one batch `UPDATE` for all rows, then one batch `INSERT` for the rows whose update failed with `ConditionalCheckFailed`. It does not read rows first.
-
-**Path C: read, then write.** Used when a `SET` value cannot be translated to PartiQL (for example, it calls a function), or when a key repeats in the statement. The engine runs one `SELECT ... WHERE key IN (...)` for the keys in the statement, applies the rows in order in memory, then calls `multipleUpdate` for changed existing rows and `insertRowList` for new rows.
-
-Statements that set a key column are rejected with `unsupported`. DynamoDB keys cannot change in an update.
-
-## Differences from MySQL
+## INSERT ... ON DUPLICATE KEY UPDATE
 
 ### affectedRows
 
-| Path | New row   | Existing row, changed | Existing row, unchanged |
-| ---- | --------- | --------------------- | ----------------------- |
-| A    | 1 (exact) | 2 (exact)             | 1 (exact)               |
-| B    | 1 (exact) | 2 (assumed changed)   | 2 (assumed changed)     |
-| C    | 1 (exact) | 2 (exact)             | 1 (exact)               |
+Counts match MySQL when the statement's SET values are plain values (`c = VALUES(c)`, `c = 5`), increments or decrements by the inserted value (`c = c + 1` with an inserted 1), or expressions that cannot be sent to DynamoDB. The exception is a statement whose SET values can all be sent to DynamoDB as a batch update, with no repeated keys. For that statement, the raw engine cannot see whether an existing row changed:
 
-Path B cannot see the previous row, because a batch `UPDATE` does not return it. It reports every matched row as changed. An update that leaves a row unchanged is counted as 2 instead of 1.
+| Row                     | MySQL 8.4 | Raw engine, batch update |
+| ----------------------- | --------- | ------------------------ |
+| New row                 | 1         | 1                        |
+| Existing row, changed   | 2         | 2                        |
+| Existing row, unchanged | 1         | 2                        |
 
 ### changedRows
 
-MySQL's driver reports `changedRows` as the number of input rows that hit an existing key, read from the server's row-count message. The message appears for multi-row `VALUES` and for `INSERT ... SELECT`. For a single-row `VALUES` or `INSERT ... SET`, the message is absent and `changedRows` is 0.
+The raw engine reports `changedRows` the same way MySQL does. A multi-row `VALUES` list or `INSERT ... SELECT` reports the number of rows that hit an existing key. A single-row `VALUES` or `INSERT ... SET` reports 0.
 
-The raw engine follows that rule. Paths A and C report the duplicate count exactly. Path B reports the number of matched rows, which is the same duplicate count, because it does not check whether the rows changed.
+In the exception case above, `changedRows` counts every row that hit an existing key, including rows whose values did not change.
 
 ### Atomicity
 
-| Path | Behavior                                                                                                                                                                                                                   |
-| ---- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| A    | Each row is one atomic `UpdateItem`. A multi-row statement is not atomic: a later row can fail after an earlier row was written.                                                                                           |
-| B    | Each batch statement succeeds or fails on its own. A multi-row statement can partly apply.                                                                                                                                 |
-| C    | The read and the writes are separate. A row changed by another writer between the read and the write has its changed columns overwritten with values computed from the stale read. A multi-row statement can partly apply. |
+- A multi-row statement is not atomic. Each row is written separately, so an error on a later row leaves earlier rows written.
+- Writes apply immediately. `ROLLBACK` does not undo an `INSERT ... ON DUPLICATE KEY UPDATE` statement. In the memory engine, `ROLLBACK` does undo it.
+- If the statement repeats a key, or sets a column to an expression that cannot be sent to DynamoDB (for example, a function call), the engine reads the existing rows, computes the new values, and writes them. If another writer changes one of those rows between the read and the write, the computed values overwrite that writer's changes to the columns being set.
 
-The raw engine applies each write immediately. A `ROLLBACK` does not undo an ODKU statement. The memory engine applies the whole statement inside the session transaction, so `ROLLBACK` undoes it.
+### Errors and retries
 
-### Retries
+The raw engine does not retry. A write conflict is returned as an error.
 
-The raw engine does not retry. A conflict is returned as an error. In path B, if a row was missing when the update ran but another writer inserts it before the batch `INSERT` runs, the `INSERT` fails with `DuplicateItem` and the error is returned. In path C, a failed write is returned as an error.
+If a row is missing when the update runs, and another writer inserts that row before the statement's insert runs, the statement fails with a `DuplicateItem` error. MySQL would update the row instead.
 
 ### Arithmetic on NULL
 
-`ADD` treats a missing attribute as 0. If the existing attribute is NULL, DynamoDB rejects the `ADD`, and the error is returned. MySQL keeps NULL in this case.
+- `c = c + 1` on a row whose `c` is NULL returns an error. MySQL keeps `c` as NULL.
+- `c = c + 1` on a row that has no `c` attribute sets `c` to 1. MySQL would keep `c` as NULL.
 
-## Why these differences are accepted
+## INSERT without a column list
 
-Exact counts would need a read of every row before each write, and a read cannot be made atomic with the write without retries. Path A and path B avoid that read on the common case. Path C reads only the rows the statement touches. The cost is a small mismatch in counts and a weaker transaction boundary for multi-row statements. These trade-offs are intentional.
+`INSERT INTO t VALUES (...)` without a column list is not supported. The statement fails with `ER_NO: Unsupport sql feature.` before it reaches DynamoDB. Use `INSERT INTO t (cols) VALUES (...)` instead.
 
-# Raw engine: INSERT without a column list
+## WHERE conditions
 
-`INSERT INTO t VALUES (...)` without a column list is not supported on the raw engine. DynamoDB tables have no schema, so the engine cannot map positional values to columns. The statement fails with `ER_NO: Unsupport sql feature.` before it reaches DynamoDB. Use `INSERT INTO t (cols) VALUES (...)` instead.
+### Bare column as a condition
 
-# Raw engine: WHERE conditions
+A bare column used as a condition is true when the value is not NULL, not 0, not an empty string, and not false. Numeric and boolean columns match MySQL.
 
-The raw engine sends WHERE conditions to DynamoDB as PartiQL. DynamoDB compares values by attribute type and does not convert strings to numbers the way MySQL does. The two differences below are design decisions.
+For string columns, MySQL converts the string to a number to decide truth, so `'0'`, `'0.0'`, and `'x'` are false in MySQL. The raw engine treats these values as true.
 
-## Bare column as a condition
+- `SELECT`: The result matches MySQL. The engine removes the extra rows.
+- `UPDATE` and `DELETE`: These statements can change or delete rows that MySQL would not match. For example, `DELETE FROM t WHERE s` deletes rows where `s` is `'x'`.
 
-`WHERE col` is sent as `(col IS NOT NULL AND col <> 0 AND col <> '' AND col <> false)`. The condition keeps every row that MySQL treats as true. For number and boolean columns it is exact, and it also drops NULL and empty strings correctly.
+`NOT col` has the same behavior and the same string difference.
 
-For string columns it is not exact. MySQL converts a string to a number to decide truth, so `'0'`, `'0.0'`, and `'x'` are false in MySQL. The raw engine keeps those rows.
+`col IS TRUE` and `col IS FALSE` are not sent to DynamoDB.
 
-- `SELECT`: the engine applies the full WHERE to every row in memory, so the extra rows are removed. The result matches MySQL.
-- `UPDATE` and `DELETE`: the condition is the filter. A bare string column can change or delete rows that MySQL would keep, for example rows where `col = 'x'`.
+### Comparisons do not convert types
 
-`NOT col` is sent as `NOT (col IS NOT NULL AND col <> 0 AND col <> '' AND col <> false)`, so it has the same boolean behavior and the same string errata. `col IS TRUE` and `col IS FALSE` are not sent to DynamoDB. The bare column is unsupported there, so the statement uses the general path.
+The raw engine compares values by their DynamoDB attribute type. It does not convert strings to numbers as MySQL does. For example, if `id` is a string attribute, `WHERE id > 100` matches no rows. MySQL converts `'111'` to 111 and matches `'111'` through `'115'`.
 
-## Comparisons do not convert types
+## String collation
 
-The raw engine sends a comparison as written. `WHERE id > 100` on a string attribute compares the string with the number, and DynamoDB matches no rows. MySQL converts `'111'` to 111 and matches rows `'111'` to `'115'`.
+String columns on the raw engine behave as `utf8mb4_0900_bin`. Comparisons, sorting, and `DISTINCT` are case-sensitive and accent-sensitive, and trailing spaces are significant. MySQL's default `utf8mb4_0900_ai_ci` ignores case and accents.
 
-The memory engine converts values the way MySQL does, so the same query works there. The raw engine does not add the conversion.
+## JOIN USING on sparse tables
 
-# Raw engine: JOIN USING on sparse tables
+Raw tables have no schema. For `JOIN ... USING (col)`, the engine decides which table owns `col` from the first row of each table, in FROM order. The first table whose first row has `col` owns it. If no earlier table's first row has `col`, the engine uses the previous table in FROM order.
 
-Raw tables have no schema, so `JOIN ... USING (col)` decides which table owns `col` from the first row of each table, in FROM order. The first table whose first row has `col` owns it. If no earlier table's first row has `col`, the join uses the previous table in FROM order. For a sparse table, where the first row lacks a column that later rows have, the join can match on the wrong table. This is accepted.
+If the first row of a table lacks a column that later rows have, the join can match on the wrong table.
 
-# Raw engine: named locks
+## Indexes
 
-`GET_LOCK`, `RELEASE_LOCK`, `IS_FREE_LOCK`, `IS_USED_LOCK`, and `RELEASE_ALL_LOCKS` store leases in the `__dynamosql_locks` table. The partition key is `lock_key`, set to `${transactionDomain}_${name}`. Each lease keeps `owner_id` and `expires_at`, where `expires_at` is epoch seconds. `expires_at` is the table's TTL attribute, so DynamoDB deletes expired rows in the background. A released lease sets `expires_at` to one second in the past, so the row is expired immediately and DynamoDB removes it on a later TTL sweep. A lease lasts 10 seconds, and the holding session renews it every second while it holds the lock. A session that ends releases its leases in the background. Lease checks ignore expired rows, because TTL deletion can lag expiry by up to 48 hours.
-
-Lock names are case-insensitive, as in MySQL. Names are limited to 64 bytes. A NULL or empty name raises `ER_USER_LOCK_WRONG_NAME`.
-
-Lock calls are supported only in the select list of a SELECT. A lock call anywhere else, such as WHERE, HAVING, or ORDER BY, raises `ER_FEATURE_UNSUPPORTED`. Lock arguments may be column values, which are evaluated per row.
-
-`IS_USED_LOCK` returns the session's thread id, not the MySQL connection id. The owner string is `${threadId}_${uuid}`, so the thread id is the only part that matches a connection id here.
-
-# Raw engine limitation: UNIQUE indexes
-
-The raw engine does not support UNIQUE indexes, and it will not. `CREATE UNIQUE INDEX`, `UNIQUE` column and table constraints, and `ALTER TABLE ... ADD UNIQUE` are rejected with the `unsupported` error (`ER_NO`) on DynamoDB tables. DynamoDB global secondary indexes cannot enforce uniqueness, so this is a permanent limitation of the engine. Memory tables enforce UNIQUE; see `test/memory/memory_unique.sql`.
-
-Plain `CREATE INDEX` on a DynamoDB table creates a global secondary index. The `USING BTREE` and `USING HASH` clauses are ignored for DynamoDB tables.
+- `UNIQUE` is not supported on DynamoDB tables. `CREATE UNIQUE INDEX`, `UNIQUE` column and table constraints, and `ALTER TABLE ... ADD UNIQUE` fail with `ER_NO`. Memory tables enforce `UNIQUE`.
+- `CREATE INDEX` on a DynamoDB table creates a global secondary index. The `USING BTREE` and `USING HASH` clauses are ignored.
