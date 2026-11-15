@@ -1,13 +1,18 @@
+import BTree from 'sorted-btree';
+
 import { SQLError } from '../../../error';
 import { cellConvert } from '../helpers/cell_convert';
 
 import type { COLLATIONS } from '../../../constants/mysql';
 import type { Session } from '../../../session';
 import type { ConvertKeyFunction } from '../../helpers/convert_key';
+import type { HashNullablePrimaryKeyType } from '../../helpers/hash_nullable_index';
 import type {
   HashUniqueMakeKey,
   HashUniqueMakeKeyResult,
 } from '../../helpers/hash_unique_index';
+import type { OrderedNullableKeyPart } from '../../helpers/ordered_nullable_index';
+import type { OrderedUniqueKey } from '../../helpers/ordered_unique_index';
 import type { CellValue, ColumnDef, CellRow } from '../index';
 
 export interface MemoryColumnDef extends ColumnDef {
@@ -20,18 +25,24 @@ export const ROW_ID_NAME = 'DB_ROW_ID';
 export interface PrimaryKey {
   columns: string[];
   makeKey: HashUniqueMakeKey;
+  primaryType: HashNullablePrimaryKeyType;
   convertKey: ConvertKeyFunction;
 }
-export interface UniqueIndex {
+export type IndexKey =
+  HashUniqueMakeKeyResult | OrderedUniqueKey | OrderedNullableKeyPart[];
+export type IndexMap =
+  | Map<IndexKey, HashUniqueMakeKeyResult[]>
+  | BTree<IndexKey, HashUniqueMakeKeyResult>;
+export interface MemoryIndex {
   name: string;
+  unique: boolean;
   column_list: string[];
-  makeKey: HashUniqueMakeKey;
-  convertKey: ConvertKeyFunction;
-  map: Map<HashUniqueMakeKeyResult, HashUniqueMakeKeyResult>;
+  keyOf: (row: CellRow, primaryKey: HashUniqueMakeKeyResult) => IndexKey;
+  map: IndexMap;
 }
 export interface TableState {
   row_map: Map<HashUniqueMakeKeyResult, CellRow>;
-  unique_list: UniqueIndex[];
+  index_list: MemoryIndex[];
 }
 export interface TableData extends TableState {
   table: string;
@@ -117,9 +128,9 @@ export function deleteTable(database: string, table: string): void {
 export function cloneState(data: TableState): TableState {
   return {
     row_map: new Map(data.row_map),
-    unique_list: data.unique_list.map((index) => ({
+    index_list: data.index_list.map((index) => ({
       ...index,
-      map: new Map(index.map),
+      map: index.map instanceof BTree ? index.map.clone() : new Map(index.map),
     })),
   };
 }
@@ -152,16 +163,26 @@ export function lookupKeyOf(
   });
   return primary_key.makeKey(primary_key.convertKey(normalized));
 }
-export function uniqueKeyOf(
-  index: UniqueIndex,
-  row: CellRow
-): HashUniqueMakeKeyResult | null {
-  const values = index.column_list.map((name) => row[name]?.value);
-  if (values.some((value) => value === null || value === undefined)) {
-    return null;
+
+export function indexFind(
+  map: IndexMap,
+  key: IndexKey
+): HashUniqueMakeKeyResult | undefined {
+  if (map instanceof BTree) {
+    return map.get(key);
   }
-  const cells = index.column_list.map((name) => row[name] as CellValue);
-  return index.makeKey(index.convertKey(cells));
+  return map.get(key)?.[0];
+}
+export function indexAdd(
+  map: IndexMap,
+  key: IndexKey,
+  primaryKey: HashUniqueMakeKeyResult
+): void {
+  if (map instanceof BTree) {
+    map.set(key, primaryKey);
+    return;
+  }
+  map.set(key, [...(map.get(key) ?? []), primaryKey]);
 }
 
 export function findConflicts(
@@ -175,9 +196,11 @@ export function findConflicts(
   if (state.row_map.has(pk)) {
     keys.add(pk);
   }
-  for (const index of state.unique_list) {
-    const key = uniqueKeyOf(index, row);
-    const found = key === null ? undefined : index.map.get(key);
+  for (const index of state.index_list) {
+    if (!index.unique) {
+      continue;
+    }
+    const found = indexFind(index.map, index.keyOf(row, pk));
     if (found !== undefined) {
       keys.add(found);
     }
@@ -191,9 +214,11 @@ export function duplicateEntryError(
 ): SQLError {
   const pk = primaryKeyOf(primary_key, row);
   if (!state.row_map.has(pk)) {
-    for (const index of state.unique_list) {
-      const key = uniqueKeyOf(index, row);
-      if (key !== null && index.map.has(key)) {
+    for (const index of state.index_list) {
+      if (!index.unique) {
+        continue;
+      }
+      if (indexFind(index.map, index.keyOf(row, pk)) !== undefined) {
         const values = index.column_list.map((name) => row[name]?.value);
         return new SQLError({
           err: 'dup_primary_key_entry',
@@ -224,7 +249,7 @@ export function replaceRow(
   if (!old_row) {
     return;
   }
-  _unsetIndexes(state, old_row);
+  _unsetIndexes(state, old_row, key);
   const new_key = primaryKeyOf(primary_key, row);
   if (new_key !== key) {
     state.row_map.delete(key);
@@ -237,7 +262,7 @@ export function removeRow(
 ): void {
   const old_row = state.row_map.get(key);
   if (old_row) {
-    _unsetIndexes(state, old_row);
+    _unsetIndexes(state, old_row, key);
   }
   state.row_map.delete(key);
 }
@@ -248,18 +273,28 @@ function _setRow(
   row: CellRow
 ): void {
   state.row_map.set(key, row);
-  for (const index of state.unique_list) {
-    const unique_key = uniqueKeyOf(index, row);
-    if (unique_key !== null) {
-      index.map.set(unique_key, key);
-    }
+  for (const index of state.index_list) {
+    indexAdd(index.map, index.keyOf(row, key), key);
   }
 }
-function _unsetIndexes(state: TableState, row: CellRow): void {
-  for (const index of state.unique_list) {
-    const unique_key = uniqueKeyOf(index, row);
-    if (unique_key !== null) {
-      index.map.delete(unique_key);
+function _unsetIndexes(
+  state: TableState,
+  row: CellRow,
+  key: HashUniqueMakeKeyResult
+): void {
+  for (const index of state.index_list) {
+    const index_key = index.keyOf(row, key);
+    if (index.map instanceof BTree) {
+      index.map.delete(index_key);
+    } else {
+      const remaining = (index.map.get(index_key) ?? []).filter(
+        (primaryKey) => primaryKey !== key
+      );
+      if (remaining.length) {
+        index.map.set(index_key, remaining);
+      } else {
+        index.map.delete(index_key);
+      }
     }
   }
 }

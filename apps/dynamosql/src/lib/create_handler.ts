@@ -33,9 +33,11 @@ import type {
   ColumnRef,
 } from 'node-sql-parser/build/mysql';
 
-type CreateUniqueIndex = Create & {
+type CreateIndex = Create & {
   index: string;
+  index_type: 'unique' | null;
   index_columns: { column: string }[];
+  index_using: { type: 'btree' | 'hash' } | null;
   table: { db: string | null; table: string };
 };
 
@@ -47,8 +49,8 @@ function isCreateTable(ast: Create): ast is CreateTable {
   return ast.keyword === 'table';
 }
 
-function isCreateUniqueIndex(ast: Create): ast is CreateUniqueIndex {
-  return ast.keyword === 'index' && ast.index_type === 'unique';
+function isCreateIndex(ast: Create): ast is CreateIndex {
+  return ast.keyword === 'index';
 }
 
 export async function query(
@@ -59,15 +61,15 @@ export async function query(
     return await _createDatabase({ ...params, ast });
   } else if (isCreateTable(ast)) {
     return await _createTable({ ...params, ast });
-  } else if (isCreateUniqueIndex(ast)) {
-    return await _createUniqueIndex({ ...params, ast });
+  } else if (isCreateIndex(ast)) {
+    return await _createIndex({ ...params, ast });
   } else {
     logger.error('unsupported create:', ast.keyword);
     throw new SQLError('unsupported');
   }
 }
-async function _createUniqueIndex(
-  params: HandlerParams<CreateUniqueIndex>
+async function _createIndex(
+  params: HandlerParams<CreateIndex>
 ): Promise<AffectedResult> {
   const { ast, session, dynamodb } = params;
   const database = ast.table.db ?? session.getCurrentDatabase();
@@ -99,7 +101,8 @@ async function _createUniqueIndex(
     table,
     index_name: ast.index,
     key_list,
-    is_unique: true,
+    is_unique: ast.index_type === 'unique',
+    index_using: ast.index_using?.type ?? null,
   });
   return { affectedRows: 0 };
 }

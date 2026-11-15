@@ -86,6 +86,26 @@ describe('Temp', function () {
     path.join(__dirname, 'memory_unique_key_error.sql'),
     { allowedErrors: 'SAME_CODE', skipAffected: true, checkChanged: true }
   );
+  runTests(
+    'memory_btree_index.sql',
+    path.join(__dirname, 'memory_btree_index.sql'),
+    { checkChanged: true, skipAffected: true }
+  );
+  runTests(
+    'memory_btree_index_error.sql',
+    path.join(__dirname, 'memory_btree_index_error.sql'),
+    { allowedErrors: 'SAME_CODE', skipAffected: true, checkChanged: true }
+  );
+  runTests(
+    'memory_index_kinds.sql',
+    path.join(__dirname, 'memory_index_kinds.sql'),
+    { checkChanged: true, skipAffected: true }
+  );
+  runTests(
+    'memory_index_kinds_error.sql',
+    path.join(__dirname, 'memory_index_kinds_error.sql'),
+    { allowedErrors: 'SAME_CODE', skipAffected: true, checkChanged: true }
+  );
   runTests('memory_strict.sql', path.join(__dirname, 'memory_strict.sql'), {
     checkChanged: true,
   });

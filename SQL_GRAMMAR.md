@@ -433,7 +433,7 @@ Subqueries are independent (no reference to the outer query) or dependent (corre
 
 | Feature                                                                                                                            | Supported | Notes |
 | :--------------------------------------------------------------------------------------------------------------------------------- | :-------: | ----- |
-| `CREATE INDEX name ON tbl (key_part, ...)`                                                                                         |    ❌     |       |
+| `CREATE INDEX name ON tbl (key_part, ...)`                                                                                         |    ✅     |       | Memory tables only. Non-unique, BTREE by default. DynamoDB tables create a GSI and ignore `USING`. 
 | `CREATE UNIQUE INDEX`                                                                                                              |    ✅     |       | Memory tables only. DynamoDB tables return `unsupported`. 
 | `CREATE FULLTEXT INDEX`                                                                                                            |    ❌     |       |
 | `CREATE SPATIAL INDEX`                                                                                                             |    ❌     |       |
@@ -441,7 +441,7 @@ Subqueries are independent (no reference to the outer query) or dependent (corre
 | Key part `(expr)` (functional index)                                                                                               |    ❌     |       |
 | Key part `(CAST json_expr AS type ARRAY)` (multi-valued index)                                                                     |    ❌     |       |
 | Key part sort order `ASC` / `DESC`                                                                                                 |    ❌     |       |
-| Index type `USING {BTREE \| HASH}`                                                                                                 |    ❌     |       |
+| Index type `USING {BTREE \| HASH}` on `CREATE INDEX` and `CREATE UNIQUE INDEX`                                                    |    ✅     |       | Memory tables only. Unique indexes default to HASH, non-unique to BTREE. |
 | Index options `KEY_BLOCK_SIZE`, `WITH PARSER`, `COMMENT`, `VISIBLE`, `INVISIBLE`, `ENGINE_ATTRIBUTE`, `SECONDARY_ENGINE_ATTRIBUTE` |    ❌     |       |
 | `ALGORITHM = {DEFAULT \| INPLACE \| COPY}` and `LOCK = ...` on index creation                                                      |    ❌     |       |
 

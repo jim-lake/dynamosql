@@ -104,3 +104,5 @@ Lock calls are supported only in the select list of a SELECT. A lock call anywhe
 # Raw engine limitation: UNIQUE indexes
 
 The raw engine does not support UNIQUE indexes, and it will not. `CREATE UNIQUE INDEX`, `UNIQUE` column and table constraints, and `ALTER TABLE ... ADD UNIQUE` are rejected with the `unsupported` error (`ER_NO`) on DynamoDB tables. DynamoDB global secondary indexes cannot enforce uniqueness, so this is a permanent limitation of the engine. Memory tables enforce UNIQUE; see `test/memory/memory_unique.sql`.
+
+Plain `CREATE INDEX` on a DynamoDB table creates a global secondary index. The `USING BTREE` and `USING HASH` clauses are ignored for DynamoDB tables.

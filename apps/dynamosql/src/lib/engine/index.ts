@@ -155,6 +155,7 @@ export interface IndexParams {
   index_name: string;
   key_list: KeyDef[];
   is_unique: boolean;
+  index_using: 'btree' | 'hash' | null;
 }
 export interface DeleteIndexParams {
   dynamodb: DynamoDBClient;

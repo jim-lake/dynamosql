@@ -98,6 +98,7 @@ async function _runAlterTable(
           index_name,
           key_list: _keyList(columns, known_list),
           is_unique: true,
+          index_using: null,
         });
       }
     } else if (def.resource === 'index' && 'action' in def) {
@@ -111,6 +112,7 @@ async function _runAlterTable(
           index_name: def.index,
           key_list: _keyList(columns, known_list),
           is_unique: false,
+          index_using: null,
         });
       } else {
         try {

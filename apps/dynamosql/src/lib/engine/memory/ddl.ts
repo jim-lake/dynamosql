@@ -1,12 +1,33 @@
+import BTree from 'sorted-btree';
+
 import { SQLError } from '../../../error';
 import { createConvertKey } from '../../helpers/convert_key';
+import { createConvertKeyNullable } from '../../helpers/convert_key_nullable';
+import { createHashNonuniqueMakeKey } from '../../helpers/hash_nonunique_index';
+import { createHashNullableMakeKey } from '../../helpers/hash_nullable_index';
 import { createHashUniqueMakeKey } from '../../helpers/hash_unique_index';
-import { getKeyTypes } from '../../helpers/key_type_convert';
+import { getKeyTypes, getPrimaryKeyType } from '../../helpers/key_type_convert';
+import {
+  createOrderedNonuniqueKeyComparator,
+  createOrderedNonuniqueMakeKey,
+} from '../../helpers/ordered_nonunique_index';
+import {
+  createOrderedNullableKeyComparator,
+  createOrderedNullableMakeKey,
+} from '../../helpers/ordered_nullable_index';
+import {
+  createOrderedUniqueKeyComparator,
+  createOrderedUniqueMakeKey,
+} from '../../helpers/ordered_unique_index';
 
 import * as Storage from './storage';
 
+import type { HashUniqueMakeKeyResult } from '../../helpers/hash_unique_index';
+import type { OrderedNullableKeyPart } from '../../helpers/ordered_nullable_index';
+import type { OrderedUniqueKey } from '../../helpers/ordered_unique_index';
 import type {
   ColumnDefParam,
+  CellRow,
   CellValue,
   TableInfoParams,
   TableInfo,
@@ -18,7 +39,13 @@ import type {
   AddColumnParams,
   KeyDef,
 } from '../index';
-import type { MemoryColumnDef, TableData, UniqueIndex } from './storage';
+import type {
+  IndexKey,
+  IndexMap,
+  MemoryColumnDef,
+  MemoryIndex,
+  TableData,
+} from './storage';
 
 export async function getTableInfo(
   params: TableInfoParams
@@ -96,16 +123,22 @@ export async function createTable(params: CreateTableParams): Promise<void> {
     primary_key: {
       columns: primary_columns,
       makeKey: createHashUniqueMakeKey(key_types),
+      primaryType: getPrimaryKeyType(key_types),
       convertKey: createConvertKey(key_column_list, key_types),
     },
 
     collation: params.collation,
     row_map: new Map(),
-    unique_list: [],
+    index_list: [],
   };
   for (const unique of params.unique_list) {
-    data.unique_list.push(
-      _buildUniqueIndex(data, unique.name, unique.key_list)
+    data.index_list.push(
+      _buildIndex(data, {
+        name: unique.name,
+        key_list: unique.key_list,
+        unique: true,
+        using: null,
+      })
     );
   }
   if (is_temp) {
@@ -125,17 +158,19 @@ export async function dropTable(params: DropTableParams): Promise<void> {
 
 export async function addColumn(_params: AddColumnParams): Promise<void> {}
 export async function createIndex(params: IndexParams): Promise<void> {
-  if (!params.is_unique) {
-    return;
-  }
   const { session, database, table, index_name, key_list } = params;
   const data = Storage.getTable(database, table, session);
   if (!data) {
     throw new SQLError({ err: 'table_not_found', args: [table] });
   }
-  const index = _buildUniqueIndex(data, index_name, key_list);
+  const index = _buildIndex(data, {
+    name: index_name,
+    key_list,
+    unique: params.is_unique,
+    using: params.index_using,
+  });
   Storage.updateTableData(database, table, session, {
-    unique_list: [...data.unique_list, index],
+    index_list: [...data.index_list, index],
   });
 }
 export async function deleteIndex(params: DeleteIndexParams): Promise<void> {
@@ -144,20 +179,25 @@ export async function deleteIndex(params: DeleteIndexParams): Promise<void> {
   if (!data) {
     throw new SQLError({ err: 'table_not_found', args: [table] });
   }
-  const unique_list = data.unique_list.filter(
+  const index_list = data.index_list.filter(
     (index) => index.name !== index_name
   );
-  if (unique_list.length === data.unique_list.length) {
+  if (index_list.length === data.index_list.length) {
     throw new SQLError({ err: 'index_not_found', args: [index_name] });
   }
-  Storage.updateTableData(database, table, session, { unique_list });
+  Storage.updateTableData(database, table, session, { index_list });
 }
-function _buildUniqueIndex(
+function _buildIndex(
   data: TableData,
-  name: string,
-  key_list: readonly KeyDef[]
-): UniqueIndex {
-  if (data.unique_list.some((index) => index.name === name)) {
+  def: {
+    name: string;
+    key_list: readonly KeyDef[];
+    unique: boolean;
+    using: 'btree' | 'hash' | null;
+  }
+): MemoryIndex {
+  const { name, key_list, unique, using } = def;
+  if (data.index_list.some((index) => index.name === name)) {
     throw new SQLError({ err: 'ER_DUP_KEYNAME', args: [name] });
   }
   const column_list = key_list.map((key) => key.name.toLowerCase());
@@ -172,28 +212,60 @@ function _buildUniqueIndex(
     return found;
   });
   const key_types = getKeyTypes(key_column_list);
-  const index: UniqueIndex = {
-    name,
-    column_list,
-    makeKey: createHashUniqueMakeKey(key_types),
-    convertKey: createConvertKey(key_column_list, key_types),
-    map: new Map(),
-  };
+  const useBtree = using === 'btree' || (using === null && !unique);
+  let keyOf: MemoryIndex['keyOf'];
+  let map: IndexMap;
+  const nullable = key_column_list.some((col) => col.nullable);
+  if (useBtree && unique && !nullable) {
+    const makeKey = createOrderedUniqueMakeKey(key_types);
+    const convertKey = createConvertKey(key_column_list, key_types);
+    const compare = createOrderedUniqueKeyComparator(key_types);
+    keyOf = (row) => makeKey(convertKey(_cellList(row, column_list)));
+    map = new BTree<IndexKey, HashUniqueMakeKeyResult>(undefined, (a, b) =>
+      compare(a as OrderedUniqueKey, b as OrderedUniqueKey)
+    );
+  } else if (useBtree) {
+    const makeKey = unique
+      ? createOrderedNullableMakeKey(key_types)
+      : createOrderedNonuniqueMakeKey(key_types);
+    const compare = unique
+      ? createOrderedNullableKeyComparator(key_types)
+      : createOrderedNonuniqueKeyComparator(key_types);
+    const convertKey = createConvertKeyNullable(key_column_list, key_types);
+    keyOf = (row, pk) => makeKey(convertKey(_cellList(row, column_list)), pk);
+    map = new BTree<IndexKey, HashUniqueMakeKeyResult>(undefined, (a, b) =>
+      compare(a as OrderedNullableKeyPart[], b as OrderedNullableKeyPart[])
+    );
+  } else if (unique && !nullable) {
+    const makeKey = createHashUniqueMakeKey(key_types);
+    const convertKey = createConvertKey(key_column_list, key_types);
+    keyOf = (row) => makeKey(convertKey(_cellList(row, column_list)));
+    map = new Map();
+  } else {
+    const makeKey = unique
+      ? createHashNullableMakeKey(key_types, data.primary_key.primaryType)
+      : createHashNonuniqueMakeKey(key_types, data.primary_key.primaryType);
+    const convertKey = createConvertKeyNullable(key_column_list, key_types);
+    keyOf = (row, pk) => makeKey(convertKey(_cellList(row, column_list)), pk);
+    map = new Map();
+  }
+  const index: MemoryIndex = { name, unique, column_list, keyOf, map };
   for (const row of data.row_map.values()) {
-    const key = Storage.uniqueKeyOf(index, row);
-    if (key === null) {
-      continue;
-    }
-    if (index.map.has(key)) {
+    const pk = Storage.primaryKeyOf(data.primary_key, row);
+    const key = index.keyOf(row, pk);
+    if (unique && Storage.indexFind(index.map, key) !== undefined) {
       const row_values = index.column_list.map((col) => row[col]?.value);
       throw new SQLError({
         err: 'dup_primary_key_entry',
         args: [name, row_values.join('-')],
       });
     }
-    index.map.set(key, Storage.primaryKeyOf(data.primary_key, row));
+    Storage.indexAdd(index.map, key, pk);
   }
   return index;
+}
+function _cellList(row: CellRow, names: string[]): CellValue[] {
+  return names.map((name) => row[name] as CellValue);
 }
 function _getDefault(column: ColumnDefParam): CellValue | undefined {
   if (column.default !== undefined) {
