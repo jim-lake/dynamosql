@@ -106,6 +106,11 @@ describe('Temp', function () {
     path.join(__dirname, 'memory_index_kinds_error.sql'),
     { allowedErrors: 'SAME_CODE', skipAffected: true, checkChanged: true }
   );
+  runTests(
+    'memory_index_probe.sql',
+    path.join(__dirname, 'memory_index_probe.sql'),
+    { checkChanged: true, skipAffected: true }
+  );
   runTests('memory_strict.sql', path.join(__dirname, 'memory_strict.sql'), {
     checkChanged: true,
   });
