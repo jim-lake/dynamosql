@@ -41,7 +41,7 @@ server.on('connection', (conn) => {
     commandCode = cmd_code;
   });
 
-  const writeResult = (err, result, columns) => {
+  function writeResult(err, result, columns) {
     console.log('client: query:', err, result, columns);
     if (err) {
       conn.writeError({
@@ -58,11 +58,11 @@ server.on('connection', (conn) => {
     } else {
       conn.writeOk(result);
     }
-  };
+  }
 
   // mysql2 routes text-protocol SET, PREPARE and EXECUTE to the stmt_* events.
   // The 'packet' event fires after this handler returns, so the command code is read on the next tick.
-  const forwardStatement = (sql) => {
+  function forwardStatement(sql) {
     process.nextTick(() => {
       if (commandCode === COM_QUERY) {
         console.log('server: query:', sql);
@@ -74,7 +74,7 @@ server.on('connection', (conn) => {
         });
       }
     });
-  };
+  }
 
   conn.on('field_list', (table, fields) => {
     console.log('server: field_list:', table, fields);

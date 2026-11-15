@@ -1,0 +1,12 @@
+CREATE DATABASE IF NOT EXISTS mem_pad_probe_db;
+USE mem_pad_probe_db;
+CREATE TEMPORARY TABLE pad_probe (id INT PRIMARY KEY, v VARCHAR(10) COLLATE utf8mb4_0900_bin);
+INSERT INTO pad_probe (id, v) VALUES (1, 'abc'), (2, 'abc  '), (3, 'abd');
+SELECT id FROM pad_probe WHERE v = 'abc' COLLATE utf8mb4_bin ORDER BY id;
+SELECT id FROM pad_probe WHERE v = 'abc' COLLATE utf8mb4_0900_bin ORDER BY id;
+SELECT id FROM pad_probe WHERE v = 'abc  ' COLLATE utf8mb4_0900_bin ORDER BY id;
+SELECT id FROM pad_probe WHERE v <> 'abc' COLLATE utf8mb4_bin ORDER BY id;
+SELECT id FROM pad_probe WHERE v > 'abc' COLLATE utf8mb4_bin ORDER BY id;
+SELECT id FROM pad_probe WHERE v COLLATE utf8mb4_bin IN ('abc', 'zzz') ORDER BY id;
+USE _dynamodb;
+DROP DATABASE mem_pad_probe_db;

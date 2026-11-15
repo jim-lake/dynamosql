@@ -64,6 +64,8 @@ The raw engine compares values by their DynamoDB attribute type. It does not con
 
 String columns on the raw engine behave as `utf8mb4_0900_bin`. Comparisons, sorting, and `DISTINCT` are case-sensitive and accent-sensitive, and trailing spaces are significant. MySQL's default `utf8mb4_0900_ai_ci` ignores case and accents.
 
+The raw engine supports only `utf8mb4_0900_bin` for string columns. PAD collations (`utf8mb4_bin`, `utf8mb4_general_ci`, and others) do not apply trailing-space padding to column comparisons. An explicit `COLLATE utf8mb4_bin` on a column compares the same way as `utf8mb4_0900_bin`. MySQL's result for these queries can depend on the access path, so DynamoSQL does not match MySQL in these cases.
+
 ## JOIN USING on sparse tables
 
 Raw tables have no schema. For `JOIN ... USING (col)`, the engine decides which table owns `col` from the first row of each table, in FROM order. The first table whose first row has `col` owns it. If no earlier table's first row has `col`, the engine uses the previous table in FROM order.

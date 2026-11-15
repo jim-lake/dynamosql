@@ -170,6 +170,7 @@ describe('Temp', function () {
     'memory_pad_update.sql',
     'memory_pad_collation.sql',
     'memory_pad_unique.sql',
+    'memory_pad_column_collate.sql',
   ]) {
     runTests(name, path.join(__dirname, name), { checkChanged: true });
   }
