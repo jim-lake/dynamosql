@@ -12,3 +12,7 @@ Matching MySQL is not a goal for illegal statements. Parse errors (`ER_PARSE_ERR
 ## Named locks
 
 - `SELECT IS_USED_LOCK('x');` while another session holds `x`: MySQL returns that session's connection id. DynamoSQL returns the holder's session thread id, which can differ from the MySQL connection id.
+
+## Collation of GREATEST and LEAST results
+
+- `SELECT GREATEST("a", "a " COLLATE UTF8MB4_BIN) = "a" AS r;`: MySQL returns 1, because GREATEST's result takes the `utf8mb4_bin` collation of its arguments, so the outer `=` is PAD-equal. DynamoSQL returns 0, because a function call has no collation of its own in `_getExprCollation`, and the outer `=` uses the session default collation.

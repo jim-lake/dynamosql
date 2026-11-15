@@ -103,13 +103,13 @@ export function greatest(
   expr: Function,
   state: EvaluationState
 ): EvaluationResult {
-  return _compare(expr, state, 'GREATEST', _gtList, (d) => d > 0);
+  return _compare(expr, state, 'GREATEST', _gtList, (d) => d > 0, true);
 }
 export function least(
   expr: Function,
   state: EvaluationState
 ): EvaluationResult {
-  return _compare(expr, state, 'LEAST', _ltList, (d) => d < 0);
+  return _compare(expr, state, 'LEAST', _ltList, (d) => d < 0, false);
 }
 
 interface Comparable<T> {
@@ -273,7 +273,8 @@ export function _compare(
   state: EvaluationState,
   functionName: string,
   dateCompare: typeof _ltList,
-  nativeCompare: NativeCompareFunction
+  nativeCompare: NativeCompareFunction,
+  tieTakesLater = false
 ): EvaluationResult {
   assertArgCount(expr, 2, Infinity);
   let value: EvaluationResult['value'];
@@ -391,7 +392,9 @@ export function _compare(
             const val_s = String(sub.value);
             if (
               val === undefined ||
-              nativeCompare(stringCompare(val_s, val, collation))
+              nativeCompare(
+                stringCompare(val_s, val, collation) || (tieTakesLater ? 1 : 0)
+              )
             ) {
               val = val_s;
             }
