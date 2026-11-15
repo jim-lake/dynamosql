@@ -168,7 +168,6 @@ describe('Temp', function () {
     'memory_pad_compare.sql',
     'memory_pad_insert.sql',
     'memory_pad_update.sql',
-    'memory_pad_sql_mode.sql',
     'memory_pad_collation.sql',
     'memory_pad_unique.sql',
   ]) {

@@ -1,6 +1,8 @@
 import * as crypto from 'node:crypto';
 
+import { COLLATIONS } from '../../constants/mysql';
 import { assertArgCount } from '../helpers/arg_count';
+import { getExprCollation } from '../helpers/collation';
 import { convertNum } from '../helpers/sql_conversion';
 
 import { getValue } from './evaluate';
@@ -75,7 +77,9 @@ export function collation(
   if (arg.err) {
     return arg;
   }
-  const value = arg.type === 'string' ? 'utf8mb4_general_ci' : 'binary';
+  const coll =
+    arg.type === 'string' ? getExprCollation(expr.args.value[0], state) : null;
+  const value = coll === null ? 'binary' : COLLATIONS[coll].toLowerCase();
   return { err: null, value, type: 'string' };
 }
 

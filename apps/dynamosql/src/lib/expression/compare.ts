@@ -122,7 +122,13 @@ export function nullif(
       arg2,
       state.session.timeZone
     );
-    const isEqual = left_val !== null && left_val === right_val;
+    const collation = getExprCollation(args, state);
+    const isEqual =
+      left_val !== null &&
+      (left_val === right_val ||
+        (typeof left_val === 'string' &&
+          typeof right_val === 'string' &&
+          stringCompare(left_val, right_val, collation) === 0));
 
     value = isEqual ? null : origValue;
 
@@ -226,14 +232,14 @@ export function convertCompare(
   if (left_val instanceof SQLDateTime) {
     left_str = left_val.toString({ timeZone });
   } else {
-    left_str = String(left_val).trimEnd();
+    left_str = String(left_val);
   }
 
   let right_str: string;
   if (right_val instanceof SQLDateTime) {
     right_str = right_val.toString({ timeZone });
   } else {
-    right_str = String(right_val).trimEnd();
+    right_str = String(right_val);
   }
 
   return [left_str, right_str];

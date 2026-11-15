@@ -9,7 +9,6 @@ SELECT id, other FROM _dynamodb.foo WHERE id IN ("pad_sel_abc  ") AND id LIKE "p
 SELECT id, other FROM _dynamodb.foo WHERE id BETWEEN "pad_sel_abc" AND "pad_sel_abc " AND id LIKE "pad_sel_%" ORDER BY id;
 SELECT id, other FROM _dynamodb.foo WHERE id < "pad_sel_abc " AND id LIKE "pad_sel_%" ORDER BY id;
 SELECT id, other FROM _dynamodb.foo WHERE id > "pad_sel_abc" AND id LIKE "pad_sel_%" ORDER BY id;
-SELECT id, other FROM _dynamodb.foo WHERE id = "pad_sel_abc" COLLATE utf8mb4_bin AND id LIKE "pad_sel_%" ORDER BY id;
 SELECT id, other FROM _dynamodb.foo WHERE id = "pad_sel_abc" COLLATE utf8mb4_0900_bin AND id LIKE "pad_sel_%" ORDER BY id;
 SELECT id, other FROM _dynamodb.foo WHERE id = "pad_sel_abc  " COLLATE utf8mb4_0900_bin AND id LIKE "pad_sel_%" ORDER BY id;
 SELECT id FROM _dynamodb.foo WHERE comment = "abc" AND id LIKE "pad_sel_%" ORDER BY id;

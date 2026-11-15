@@ -33,6 +33,7 @@ interface QueryOutcome {
 const SECONDS_REGEX = /:[0-9]{2}(\.[0-9]*)?$/g;
 const SQL_MODE =
   'STRICT_TRANS_TABLES,STRICT_ALL_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,TRADITIONAL,NO_ENGINE_SUBSTITUTION';
+const CONNECTION_COLLATION = 'utf8mb4_0900_ai_ci';
 
 process.on('uncaughtException', (err) => {
   console.error('Caught uncaught exception:', err);
@@ -92,12 +93,23 @@ export function runTests(
       mysql_conn = mysql.createConnection(mysql_opts);
       ddb_session = createSession(session_opts);
       const set_mode = `SET SESSION sql_mode = '${SQL_MODE}'`;
+      const set_collation = `SET SESSION collation_connection = '${CONNECTION_COLLATION}'`;
       await Promise.all([
         new Promise<void>((resolve, reject) => {
           mysql_conn.query(set_mode, (err) => (err ? reject(err) : resolve()));
         }),
         new Promise<void>((resolve, reject) => {
           ddb_session.query(set_mode, (err: unknown) =>
+            err ? reject(err) : resolve()
+          );
+        }),
+        new Promise<void>((resolve, reject) => {
+          mysql_conn.query(set_collation, (err) =>
+            err ? reject(err) : resolve()
+          );
+        }),
+        new Promise<void>((resolve, reject) => {
+          ddb_session.query(set_collation, (err: unknown) =>
             err ? reject(err) : resolve()
           );
         }),

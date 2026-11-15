@@ -4,6 +4,7 @@ import {
   getExprCoercibility,
   getExprCollation,
   isCaseInsensitive,
+  isPadCollation,
 } from '../collation';
 
 import { convertValueExpression, convertWhere } from './convert_where';
@@ -172,9 +173,10 @@ function hasExplicitCaseInsensitiveCollation(
   operands: ExprArgument[],
   state: ConvertWhereState
 ): boolean {
+  const collation = getExprCollation(operands, state);
   return (
     getExprCoercibility(operands, state) === COERCIBILITY.EXPLICIT &&
-    isCaseInsensitive(getExprCollation(operands, state))
+    (isCaseInsensitive(collation) || isPadCollation(collation))
   );
 }
 

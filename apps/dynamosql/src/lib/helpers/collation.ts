@@ -68,13 +68,45 @@ export function isCaseInsensitive(collation: COLLATIONS | null): boolean {
   }
   return COLLATIONS[collation].endsWith('_CI');
 }
+const TRAILING_SPACES = / +$/;
+export function isPadCollation(collation: COLLATIONS | null): boolean {
+  return (
+    collation !== null &&
+    collation !== COLLATIONS.BINARY &&
+    !COLLATIONS[collation].includes('_0900_')
+  );
+}
 export function stringCompare(
   s1: string,
   s2: string,
   collation: COLLATIONS | null
 ): number {
+  if (isPadCollation(collation)) {
+    s1 = s1.replace(TRAILING_SPACES, '');
+    s2 = s2.replace(TRAILING_SPACES, '');
+  }
   if (s1 === s2) {
     return 0;
+  }
+  if (collation === COLLATIONS.UTF8MB4_0900_AS_CS) {
+    return s1.localeCompare(s2, 'und', {
+      sensitivity: 'variant',
+      ignorePunctuation: false,
+      numeric: false,
+      caseFirst: 'false',
+      usage: 'sort',
+    });
+  }
+  if (collation === COLLATIONS.UTF8MB4_0900_AS_CI) {
+    return s1
+      .toLocaleLowerCase('und')
+      .localeCompare(s2.toLocaleLowerCase('und'), 'und', {
+        sensitivity: 'variant',
+        ignorePunctuation: false,
+        numeric: false,
+        caseFirst: 'false',
+        usage: 'sort',
+      });
   }
   if (isCaseInsensitive(collation)) {
     return s1.localeCompare(s2, 'und', {
@@ -85,21 +117,7 @@ export function stringCompare(
       usage: 'sort',
     });
   }
-  switch (collation) {
-    case COLLATIONS.UTF8MB4_0900_AS_CS:
-      return s1.localeCompare(s2, 'und', {
-        sensitivity: 'variant',
-        ignorePunctuation: false,
-        numeric: false,
-        caseFirst: 'false',
-        usage: 'sort',
-      });
-    case COLLATIONS.UTF8_BIN:
-    case COLLATIONS.UTF8MB4_0900_BIN:
-    case COLLATIONS.BINARY:
-    default:
-      return s1 > s2 ? 1 : -1;
-  }
+  return s1 > s2 ? 1 : -1;
 }
 export type ExprArgument =
   | Assign
