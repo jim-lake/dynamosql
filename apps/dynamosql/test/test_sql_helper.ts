@@ -4,6 +4,7 @@ import { assert, expect } from 'chai';
 import fs from 'node:fs';
 import * as mysql from 'mysql';
 import { createSession } from '../src/session';
+import { testNamespace } from './test_namespace';
 import { Types } from '../src/types';
 import { isDeepStrictEqual } from 'node:util';
 
@@ -67,7 +68,7 @@ export function runTests(
 
   const session_opts = Object.assign(
     {
-      namespace: process.env.DYNAMO_NAMESPACE ?? 'dynamosql_test',
+      namespace: testNamespace(),
       region: process.env.AWS_REGION,
       resultObjects: false,
       dateStrings: true,

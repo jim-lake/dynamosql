@@ -3,6 +3,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const mysql = require('mysql');
 const Session = require('../../src/session');
+const { testNamespace } = require('../test_namespace');
 
 const mysql_conn = mysql.createConnection({
   host: process.env.DB_HOST ?? 'localhost',
@@ -15,7 +16,7 @@ const mysql_conn = mysql.createConnection({
   dateStrings: true,
 });
 
-const namespace = process.env.DYNAMO_NAMESPACE ?? 'dynamosql_test';
+const namespace = testNamespace();
 const region = process.env.AWS_REGION;
 console.log('namespace:', namespace);
 console.log('region:', region);

@@ -4,6 +4,7 @@ import type { PoolConnection } from '../../src/types';
 import type { Session } from '../../src/session';
 import { LOCK_TABLE } from '../../src/lib/lock';
 import { addUnitTest } from '../unit_helper';
+import { testNamespace } from '../test_namespace';
 
 type Row = Record<string, unknown>;
 
@@ -174,12 +175,8 @@ describe('Lock contention between sessions', () => {
   );
 
   it('a lock with an expired lease is acquired by another session', async () => {
-    const a = DynamoSQL.createConnection({
-      namespace: process.env.DYNAMO_NAMESPACE ?? 'dynamosql_test',
-    });
-    const b = DynamoSQL.createConnection({
-      namespace: process.env.DYNAMO_NAMESPACE ?? 'dynamosql_test',
-    });
+    const a = DynamoSQL.createConnection({ namespace: testNamespace() });
+    const b = DynamoSQL.createConnection({ namespace: testNamespace() });
     try {
       await scalar(a, "SELECT GET_LOCK('ct_warmup', 0) AS g", 'g');
       await run(a, "SELECT RELEASE_LOCK('ct_warmup') AS r");
@@ -211,11 +208,11 @@ describe('Lock contention between sessions', () => {
 
   it('different transactionDomain values do not contend', async () => {
     const a = DynamoSQL.createConnection({
-      namespace: process.env.DYNAMO_NAMESPACE ?? 'dynamosql_test',
+      namespace: testNamespace(),
       transactionDomain: 'ct_domain_a',
     });
     const b = DynamoSQL.createConnection({
-      namespace: process.env.DYNAMO_NAMESPACE ?? 'dynamosql_test',
+      namespace: testNamespace(),
       transactionDomain: 'ct_domain_b',
     });
     try {

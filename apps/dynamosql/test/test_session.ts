@@ -5,6 +5,7 @@ const path = require('node:path');
 const dynamosql = require('../src');
 const { Types } = require('../src/types');
 const { COLLATIONS, FIELD_FLAGS } = require('../src/constants/mysql');
+const { testNamespace } = require('./test_namespace');
 
 const sql = process.argv.slice(2).join(' ');
 if (!sql) {
@@ -14,7 +15,7 @@ if (!sql) {
 console.log('sql:', sql);
 
 const opts = {
-  namespace: process.env.DYNAMO_NAMESPACE ?? 'dynamosql_test',
+  namespace: testNamespace(),
   multipleStatements: true,
   dateStrings: true,
   resultObjects: true,

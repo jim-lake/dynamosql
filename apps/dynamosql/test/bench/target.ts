@@ -3,6 +3,7 @@ import * as mysql from 'mysql';
 import { createSession } from '../../src/session';
 
 import { elapsedMs } from './metrics';
+import { testNamespace } from '../test_namespace';
 
 import type { OkPacket } from '../../src/types';
 
@@ -21,7 +22,11 @@ export interface Target {
 const MYSQL_MAX_HEAP_BYTES = 2 * 1024 * 1024 * 1024;
 
 async function makeDynamosqlMemory(): Promise<Target> {
-  const session = createSession({ resultObjects: false, dateStrings: true });
+  const session = createSession({
+    namespace: testNamespace(),
+    resultObjects: false,
+    dateStrings: true,
+  });
   return {
     name: 'dynamosql-memory',
     tableOptions: 'ENGINE=MEMORY',

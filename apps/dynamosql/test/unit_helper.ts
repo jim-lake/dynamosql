@@ -1,5 +1,6 @@
 import * as mysql from 'mysql';
 import * as DynamoSQL from '../src';
+import { testNamespace } from './test_namespace';
 
 const dbConfig = {
   host: process.env.DB_HOST ?? 'localhost',
@@ -34,8 +35,6 @@ export function addUnitTest(
     if (slow && !process.env.TEST_RUN_SLOW) {
       return this.skip();
     }
-    await testFunction(DynamoSQL, {
-      namespace: process.env.DYNAMO_NAMESPACE ?? 'dynamosql_test',
-    });
+    await testFunction(DynamoSQL, { namespace: testNamespace() });
   });
 }

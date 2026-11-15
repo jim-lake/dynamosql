@@ -1,5 +1,6 @@
 import { assert } from 'chai';
 import * as DynamoSQL from '../../src';
+import { testNamespace } from '../test_namespace';
 
 function runQuery(conn: DynamoSQL.Connection, sql: string): Promise<void> {
   return new Promise<void>((resolve, reject) => {
@@ -16,9 +17,7 @@ const TWO_ROW_SETUP = [
 ];
 
 async function expectUnsupported(sql: string): Promise<void> {
-  const conn = DynamoSQL.createConnection({
-    namespace: process.env.DYNAMO_NAMESPACE ?? 'dynamosql_test',
-  });
+  const conn = DynamoSQL.createConnection({ namespace: testNamespace() });
   try {
     for (const stmt of TWO_ROW_SETUP) {
       await runQuery(conn, stmt);

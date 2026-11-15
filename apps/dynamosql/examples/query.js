@@ -13,7 +13,7 @@ console.log('sql:', sql);
 const opts = {
   multipleStatements: true,
   region: process.env.AWS_REGION,
-  namespace: process.env.DYNAMO_NAMESPACE ?? 'dynamosql_test',
+  namespace: process.env.DYNAMO_NAMESPACE,
 };
 
 const session = dynamosql.createSession(opts);
