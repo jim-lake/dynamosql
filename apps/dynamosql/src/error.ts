@@ -183,6 +183,10 @@ const ERROR_MAP: Record<string, ErrorMapEntry> = {
     code: 'ER_UNKNOWN_COLLATION',
     sqlMessage: errStr`Unknown collation: '${0}'`,
   },
+  ER_UNSUPPORTED_ENGINE_COLLATION: {
+    code: 'ER_UNKNOWN_COLLATION',
+    sqlMessage: errStr`Engine doesn't support collation '${0}'`,
+  },
   ER_UNKNOWN_CHARACTER_SET: {
     code: 'ER_UNKNOWN_CHARACTER_SET',
     sqlMessage: errStr`Unknown character set: '${0}'`,

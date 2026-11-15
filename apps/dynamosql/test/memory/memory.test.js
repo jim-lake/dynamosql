@@ -164,4 +164,25 @@ describe('Temp', function () {
       checkChanged: true,
     });
   }
+  for (const name of [
+    'memory_pad_compare.sql',
+    'memory_pad_insert.sql',
+    'memory_pad_update.sql',
+    'memory_pad_sql_mode.sql',
+    'memory_pad_collation.sql',
+    'memory_pad_unique.sql',
+  ]) {
+    runTests(name, path.join(__dirname, name), { checkChanged: true });
+  }
+  for (const name of [
+    'memory_pad_insert_error.sql',
+    'memory_pad_update_error.sql',
+    'memory_pad_unique_error.sql',
+  ]) {
+    runTests(name, path.join(__dirname, name), {
+      allowedErrors: 'SAME_CODE',
+      skipAffected: true,
+      checkChanged: true,
+    });
+  }
 });

@@ -25,4 +25,7 @@ describe('Update', function () {
     path.join(__dirname, 'division_by_zero_error.sql'),
     { allowedErrors: 'SAME_CODE', skipAffected: true, checkChanged: true }
   );
+  runTests('pad_update_raw.sql', path.join(__dirname, 'pad_update_raw.sql'), {
+    checkChanged: true,
+  });
 });

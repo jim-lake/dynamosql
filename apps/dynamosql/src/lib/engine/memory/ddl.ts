@@ -1,5 +1,6 @@
 import BTree from 'sorted-btree';
 
+import { COLLATIONS } from '../../../constants/mysql';
 import { SQLError } from '../../../error';
 import { createConvertKey } from '../../helpers/convert_key';
 import { createConvertKeyNullable } from '../../helpers/convert_key_nullable';
@@ -70,11 +71,25 @@ export async function getTableList(
 ): Promise<string[]> {
   return [];
 }
+const MEMORY_ENGINE_COLLATIONS: ReadonlySet<COLLATIONS> = new Set([
+  COLLATIONS.UTF8MB4_0900_AI_CI,
+  COLLATIONS.UTF8MB4_0900_AS_CS,
+  COLLATIONS.UTF8MB4_0900_BIN,
+]);
 export async function createTable(params: CreateTableParams): Promise<void> {
   const { session, database, table, is_temp } = params;
   for (const col of params.column_list) {
     if (col.name.toLowerCase() === Storage.ROW_ID_NAME.toLowerCase()) {
       throw new SQLError({ err: 'ER_WRONG_COLUMN_NAME', args: [col.name] });
+    }
+    if (
+      col.collation !== null &&
+      !MEMORY_ENGINE_COLLATIONS.has(col.collation)
+    ) {
+      throw new SQLError({
+        err: 'ER_UNSUPPORTED_ENGINE_COLLATION',
+        args: [COLLATIONS[col.collation]],
+      });
     }
   }
   const primary_columns =
@@ -156,7 +171,15 @@ export async function dropTable(params: DropTableParams): Promise<void> {
   }
 }
 
-export async function addColumn(_params: AddColumnParams): Promise<void> {}
+export async function addColumn(params: AddColumnParams): Promise<void> {
+  const { collation } = params.column;
+  if (collation !== null && !MEMORY_ENGINE_COLLATIONS.has(collation)) {
+    throw new SQLError({
+      err: 'ER_UNSUPPORTED_ENGINE_COLLATION',
+      args: [COLLATIONS[collation]],
+    });
+  }
+}
 export async function createIndex(params: IndexParams): Promise<void> {
   const { session, database, table, index_name, key_list } = params;
   const data = Storage.getTable(database, table, session);

@@ -54,4 +54,8 @@ describe('Insert', function () {
     { allowedErrors: 'SAME_CODE', skipAffected: true, checkChanged: true }
   );
   runTests('syntax.sql', path.join(__dirname, 'syntax.sql'));
+  runTests('pad_insert_raw.sql', path.join(__dirname, 'pad_insert_raw.sql'), {
+    checkChanged: true,
+    skipAffected: true,
+  });
 });

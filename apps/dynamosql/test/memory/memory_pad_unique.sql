@@ -1,0 +1,11 @@
+CREATE DATABASE IF NOT EXISTS mem_pad_uniq_db;
+USE mem_pad_uniq_db;
+CREATE TEMPORARY TABLE pad_uniq (id INT PRIMARY KEY, v VARCHAR(10) UNIQUE);
+INSERT INTO pad_uniq (id, v) VALUES (1, 'abc'), (2, 'abc  ');
+SELECT id, CONCAT('[', v, ']') AS v_br FROM pad_uniq ORDER BY id;
+INSERT IGNORE INTO pad_uniq (id, v) VALUES (3, 'abc  ');
+SELECT id, CONCAT('[', v, ']') AS v_br FROM pad_uniq ORDER BY id;
+INSERT INTO pad_uniq (id, v) VALUES (4, 'abc') ON DUPLICATE KEY UPDATE id = id;
+SELECT id, CONCAT('[', v, ']') AS v_br FROM pad_uniq ORDER BY id;
+USE _dynamodb;
+DROP DATABASE mem_pad_uniq_db;

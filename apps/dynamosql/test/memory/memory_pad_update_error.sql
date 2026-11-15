@@ -1,0 +1,11 @@
+CREATE DATABASE IF NOT EXISTS mem_pad_upd_err_db;
+USE mem_pad_upd_err_db;
+CREATE TEMPORARY TABLE pad_upd_err (id INT PRIMARY KEY, v VARCHAR(3), c CHAR(2));
+INSERT INTO pad_upd_err (id, v, c) VALUES (1, 'a', 'a');
+UPDATE pad_upd_err SET v = 'abcd' WHERE id = 1;
+UPDATE pad_upd_err SET c = 'abc' WHERE id = 1;
+UPDATE pad_upd_err SET v = 'ab  x' WHERE id = 1;
+UPDATE pad_upd_err SET c = 'a  b' WHERE id = 1;
+SELECT id, v, c FROM pad_upd_err ORDER BY id;
+USE _dynamodb;
+DROP DATABASE mem_pad_upd_err_db;

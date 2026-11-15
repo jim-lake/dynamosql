@@ -1,0 +1,10 @@
+CREATE DATABASE IF NOT EXISTS mem_pad_ins_err_db;
+USE mem_pad_ins_err_db;
+CREATE TEMPORARY TABLE pad_ins_err (id INT PRIMARY KEY, v VARCHAR(5), c CHAR(4));
+INSERT INTO pad_ins_err (id, v, c) VALUES (1, 'abcdef', 'ab');
+INSERT INTO pad_ins_err (id, v, c) VALUES (2, 'ab', 'abcde');
+INSERT INTO pad_ins_err (id, v, c) VALUES (3, 'ab', 'ab   x');
+INSERT INTO pad_ins_err (id, v, c) VALUES (4, 'abcdef ', 'x');
+SELECT id, v, c FROM pad_ins_err ORDER BY id;
+USE _dynamodb;
+DROP DATABASE mem_pad_ins_err_db;

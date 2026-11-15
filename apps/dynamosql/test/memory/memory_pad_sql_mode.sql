@@ -1,0 +1,13 @@
+CREATE DATABASE IF NOT EXISTS mem_pad_mode_db;
+USE mem_pad_mode_db;
+CREATE TEMPORARY TABLE pad_mode (id INT PRIMARY KEY, c CHAR(4), v VARCHAR(4));
+INSERT INTO pad_mode (id, c, v) VALUES (1, 'ab', 'ab');
+SET SESSION sql_mode = '';
+INSERT INTO pad_mode (id, c, v) VALUES (2, 'abc     ', 'xy      ');
+INSERT INTO pad_mode (id, c, v) VALUES (3, 'x', 'z');
+SELECT id, CONCAT('[', c, ']') AS c_br, LENGTH(c) AS c_len, CONCAT('[', v, ']') AS v_br, LENGTH(v) AS v_len FROM pad_mode ORDER BY id;
+SET SESSION sql_mode = 'PAD_CHAR_TO_FULL_LENGTH';
+SELECT id, CONCAT('[', c, ']') AS c_br, LENGTH(c) AS c_len, CONCAT('[', v, ']') AS v_br, LENGTH(v) AS v_len FROM pad_mode ORDER BY id;
+SET SESSION sql_mode = 'STRICT_TRANS_TABLES,STRICT_ALL_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,TRADITIONAL,NO_ENGINE_SUBSTITUTION';
+USE _dynamodb;
+DROP DATABASE mem_pad_mode_db;

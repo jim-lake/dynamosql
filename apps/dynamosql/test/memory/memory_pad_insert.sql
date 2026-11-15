@@ -1,0 +1,16 @@
+CREATE DATABASE IF NOT EXISTS mem_pad_ins_db;
+USE mem_pad_ins_db;
+CREATE TEMPORARY TABLE pad_ins (id INT PRIMARY KEY, v VARCHAR(5), c CHAR(4));
+INSERT INTO pad_ins (id, v, c) VALUES (1, 'ab  ', 'ab  ');
+INSERT INTO pad_ins (id, v, c) VALUES (2, '  ab', '  ab');
+INSERT INTO pad_ins (id, v, c) VALUES (3, '   ', '   ');
+INSERT INTO pad_ins (id, v, c) VALUES (4, '', '');
+INSERT INTO pad_ins (id, v, c) VALUES (5, NULL, NULL);
+INSERT INTO pad_ins (id, v, c) VALUES (6, 'abcde   ', 'abcd   ');
+INSERT INTO pad_ins (id, v, c) VALUES (7, 'abcde ', 'a');
+INSERT INTO pad_ins (id, v, c) VALUES (8, 'a', 'a   ');
+INSERT INTO pad_ins (id, v, c) SELECT 9, 'xy  ', 'xy  ';
+INSERT INTO pad_ins (id, v, c) VALUES (10, CONCAT('q', '  '), CONCAT('q', '  '));
+SELECT id, CONCAT('[', v, ']') AS v_br, LENGTH(v) AS v_len, CONCAT('[', c, ']') AS c_br, LENGTH(c) AS c_len FROM pad_ins ORDER BY id;
+USE _dynamodb;
+DROP DATABASE mem_pad_ins_db;

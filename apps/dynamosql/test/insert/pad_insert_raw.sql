@@ -1,0 +1,13 @@
+DELETE FROM _dynamodb.foo WHERE id LIKE "pad_raw_%";
+INSERT INTO _dynamodb.foo (id, other, comment) VALUES ("pad_raw_a", 1, "base");
+INSERT INTO _dynamodb.foo (id, other, comment) VALUES ("pad_raw_a  ", 2, "trailing two");
+INSERT INTO _dynamodb.foo (id, other, comment) VALUES ("  pad_raw_lead", 3, "leading");
+INSERT INTO _dynamodb.foo (id, other, comment) VALUES ("pad_raw_c", 4, "  padded comment   ");
+INSERT INTO _dynamodb.foo (id, other, comment) VALUES ("pad_raw_d", 5, "");
+INSERT INTO _dynamodb.foo (id, other, comment) VALUES ("pad_raw_e", 6, "   ");
+INSERT INTO _dynamodb.foo (id, other, comment) VALUES ("pad_raw_f   ", 7, NULL);
+SELECT id, CONCAT("[", id, "]") AS id_br, LENGTH(id) AS id_len, CONCAT("[", comment, "]") AS c_br, LENGTH(comment) AS c_len FROM _dynamodb.foo WHERE id LIKE "pad_raw_%" OR id LIKE "  pad_raw_%" ORDER BY id;
+INSERT INTO _dynamodb.foo (id, other, comment) VALUES ("pad_raw_a", 9, "dup") ON DUPLICATE KEY UPDATE other = other + 10;
+INSERT INTO _dynamodb.foo (id, other, comment) VALUES ("pad_raw_a  ", 9, "dup2") ON DUPLICATE KEY UPDATE other = other + 10;
+SELECT id, other, comment FROM _dynamodb.foo WHERE id LIKE "pad_raw_a%" ORDER BY id;
+DELETE FROM _dynamodb.foo WHERE id LIKE "pad_raw_%" OR id LIKE "  pad_raw_%";
