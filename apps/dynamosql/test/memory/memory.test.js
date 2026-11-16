@@ -97,6 +97,11 @@ describe('Temp', function () {
     { allowedErrors: 'SAME_CODE', skipAffected: true, checkChanged: true }
   );
   runTests(
+    'memory_btree_order.sql',
+    path.join(__dirname, 'memory_btree_order.sql'),
+    { checkChanged: true, skipAffected: true }
+  );
+  runTests(
     'memory_index_kinds.sql',
     path.join(__dirname, 'memory_index_kinds.sql'),
     { checkChanged: true, skipAffected: true }

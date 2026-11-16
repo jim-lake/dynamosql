@@ -16,7 +16,7 @@ import * as Lock from './lock';
 
 import type { Session } from '../session';
 import type { FieldInfo } from '../types';
-import type { TableInfoMap, SourceMap, CellRow } from './engine';
+import type { TableInfoMap, SourceMap, CellRow, OrderBySpec } from './engine';
 import type {
   EvaluationResult,
   EvaluationState,
@@ -187,6 +187,7 @@ async function _iterQuery(
   }
   const from = ast.type === 'update' ? ast.table : ast.from;
   const sourceMap: SourceMap = new Map();
+  let iterOrder: OrderBySpec | undefined;
   const tableInfoMap: TableInfoMap = new Map();
   if (Array.isArray(from) && from[0]) {
     if (!from.every((item) => isBaseFrom(item) || isDerivedFrom(item))) {
@@ -196,6 +197,44 @@ async function _iterQuery(
       .filter(isBaseFrom)
       .map((item) => ({ database: item.db, table: item.table, item }));
     const groups = makeEngineGroups(session, list);
+
+    const orderBy = new Map<From, OrderBySpec>();
+    const first = from[0];
+    if (
+      ast.type === 'select' &&
+      ast.orderby &&
+      from.length === 1 &&
+      isBaseFrom(first) &&
+      !ast.groupby &&
+      !ast.having &&
+      !hasAggregate(ast) &&
+      !hasWindow(ast.columns)
+    ) {
+      const spec: OrderBySpec = [];
+      const requestable = ast.orderby.every((order) => {
+        const expr = order.expr;
+        if (!_isColumnRef(expr)) {
+          return false;
+        }
+        const info = columnRefMap.get(expr);
+        if (
+          !info ||
+          info.from !== first ||
+          info.resultIndex !== undefined ||
+          typeof expr.column !== 'string'
+        ) {
+          return false;
+        }
+        spec.push({
+          column: expr.column,
+          direction: order.type === 'DESC' ? 'DESC' : 'ASC',
+        });
+        return true;
+      });
+      if (requestable) {
+        orderBy.set(first, spec);
+      }
+    }
 
     const tasks = groups.map(async (group) => {
       const opts = {
@@ -207,8 +246,12 @@ async function _iterQuery(
         requestAll,
         columnRefMap,
         subqueryValues,
+        orderBy,
       };
       const result = await group.engine.getRowList(opts);
+      for (const order of result.orderMap.values()) {
+        iterOrder = order;
+      }
       for (const [f, item] of result.sourceMap) {
         sourceMap.set(f, item);
       }
@@ -329,6 +372,7 @@ async function _iterQuery(
     requestSets,
     columnRefMap,
     subqueryValues,
+    iterOrder,
   });
 }
 interface EvaluateReturnParams {
@@ -340,6 +384,7 @@ interface EvaluateReturnParams {
   requestSets: Map<From, Set<string>>;
   columnRefMap: Map<ColumnRef, ColumnRefInfo>;
   subqueryValues: SubqueryValues;
+  iterOrder: OrderBySpec | undefined;
 }
 async function _evaluateReturn(
   params: EvaluateReturnParams
@@ -351,6 +396,7 @@ async function _evaluateReturn(
     columnRefMap,
     tableInfoMap,
     subqueryValues,
+    iterOrder,
   } = params;
   for (const [ref, info] of columnRefMap) {
     const bound = info.from ? tableInfoMap.get(info.from) : undefined;
@@ -466,6 +512,7 @@ async function _evaluateReturn(
       orderby: ast.orderby,
       queryColumns,
       state,
+      iterOrder,
     });
   }
   if (ast.limit) {

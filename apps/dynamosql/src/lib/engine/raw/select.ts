@@ -28,7 +28,7 @@ export async function getRowList(
     tableInfoMap.set(from, tableInfo);
   });
   await Promise.all(tasks);
-  return { sourceMap, tableInfoMap };
+  return { sourceMap, tableInfoMap, orderMap: new Map() };
 }
 interface InteralGetResult {
   resultIter: AsyncIterable<ItemRecord[]>;

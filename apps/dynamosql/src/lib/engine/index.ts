@@ -68,6 +68,11 @@ export interface TableInfo {
   tableSize: bigint;
 }
 export type FromJoin = BaseFrom & Partial<Join>;
+export interface ColumnDirection {
+  column: string;
+  direction: 'ASC' | 'DESC';
+}
+export type OrderBySpec = ColumnDirection[];
 export interface RowListParams {
   dynamodb: DynamoDBClient;
   session: Session;
@@ -77,6 +82,7 @@ export interface RowListParams {
   requestAll: Map<From, boolean>;
   columnRefMap: Map<ColumnRef, ColumnRefInfo>;
   subqueryValues?: SubqueryValues;
+  orderBy?: Map<From, OrderBySpec>;
 }
 export type EvaluationResultRow = Record<string, EvaluationResult>;
 export interface CellValue {
@@ -100,6 +106,7 @@ export type TableInfoMap = Map<From, QueryTableInfo>;
 export interface RowListResult {
   sourceMap: SourceMap;
   tableInfoMap: TableInfoMap;
+  orderMap: Map<From, OrderBySpec>;
 }
 export interface TableData<T = Row> {
   database: string;

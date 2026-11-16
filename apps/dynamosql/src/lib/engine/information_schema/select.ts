@@ -40,7 +40,7 @@ export async function getRowList(
     sourceMap.set(from, _listToItetator(results));
     tableInfoMap.set(from, tableInfo);
   }
-  return { sourceMap, tableInfoMap };
+  return { sourceMap, tableInfoMap, orderMap: new Map() };
 }
 async function _getFromTable(
   params: RowListParams & { from: BaseFrom }

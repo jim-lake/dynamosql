@@ -1,3 +1,5 @@
+import BTree from 'sorted-btree';
+
 import { SQLError } from '../../../error';
 import { getValue } from '../../expression/evaluate';
 import { cellConvert } from '../helpers/cell_convert';
@@ -9,16 +11,19 @@ import type {
   RowListParams,
   Row,
   RowListResult,
+  OrderBySpec,
   CellRow,
   CellValue,
 } from '..';
 import type { EvaluationState } from '../../expression/evaluate';
-import type { TableData } from './storage';
+import type { HashUniqueMakeKeyResult } from '../../helpers/hash_unique_index';
+import type { IndexKey, TableData } from './storage';
 import type { BaseFrom, ExpressionValue } from 'node-sql-parser/build/mysql';
 
 const BATCH_SIZE = 1000;
 const PROBE_COLUMN_TYPES = ['long', 'longlong', 'number'];
 const LITERAL_TYPES = ['number', 'bigint'];
+const ORDERED_COLUMN_TYPES = ['long', 'longlong', 'double', 'number'];
 
 interface ProbeContext {
   data: TableData;
@@ -33,18 +38,23 @@ export async function getRowList(
   const { list } = params;
   const sourceMap: RowListResult['sourceMap'] = new Map();
   const tableInfoMap: RowListResult['tableInfoMap'] = new Map();
+  const orderMap: RowListResult['orderMap'] = new Map();
   for (const from of list) {
-    const { rows, tableInfo } = _getFromTable({ ...params, from });
+    const { rows, tableInfo, order } = _getFromTable({ ...params, from });
     sourceMap.set(from, _mapToIterator(rows));
     tableInfoMap.set(from, tableInfo);
+    if (order) {
+      orderMap.set(from, order);
+    }
   }
-  return { sourceMap, tableInfoMap };
+  return { sourceMap, tableInfoMap, orderMap };
 }
 function _getFromTable(params: RowListParams & { from: BaseFrom }): {
   rows: Iterable<Row>;
   tableInfo: QueryTableInfo;
+  order?: OrderBySpec;
 } {
-  const { session, from, list, where } = params;
+  const { session, from, list, where, orderBy } = params;
   const { db, table } = from;
   const data = Storage.getTable(db ?? '', table, session);
   if (!data) {
@@ -85,7 +95,55 @@ function _getFromTable(params: RowListParams & { from: BaseFrom }): {
       return { rows: row ? [row] : [], tableInfo };
     }
   }
+  const orderSpec = orderBy?.get(from);
+  const orderedMap = orderSpec ? _orderedMap(data, orderSpec) : undefined;
+  if (orderSpec && orderedMap) {
+    const desc = orderSpec[0]?.direction === 'DESC';
+    return {
+      rows: _indexRows(data, orderedMap, desc),
+      tableInfo,
+      order: orderSpec,
+    };
+  }
   return { rows: data.row_map.values(), tableInfo };
+}
+function _orderedMap(
+  data: TableData,
+  spec: OrderBySpec
+): BTree<IndexKey, HashUniqueMakeKeyResult> | undefined {
+  if (spec.some((item) => item.direction !== spec[0]?.direction)) {
+    return undefined;
+  }
+  for (const index of data.index_list) {
+    if (
+      index.map instanceof BTree &&
+      spec.length <= index.column_list.length &&
+      spec.every((item, i) => {
+        const name = index.column_list[i];
+        const column = data.column_list.find((col) => col.name_lc === name);
+        return (
+          item.column.toLowerCase() === name &&
+          ORDERED_COLUMN_TYPES.includes(column?.type ?? '')
+        );
+      })
+    ) {
+      return index.map;
+    }
+  }
+  return undefined;
+}
+function* _indexRows(
+  data: TableData,
+  map: BTree<IndexKey, HashUniqueMakeKeyResult>,
+  desc: boolean
+): Iterable<Row> {
+  const entries = desc ? map.entriesReversed() : map.entries();
+  for (const [, key] of entries) {
+    const row = data.row_map.get(key);
+    if (row) {
+      yield row;
+    }
+  }
 }
 function _probeRow(
   names: string[],

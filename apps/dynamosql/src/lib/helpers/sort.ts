@@ -6,6 +6,7 @@ import { getExprCollation, stringCompare } from './collation';
 
 import type { COLLATIONS } from '../../constants/mysql';
 import type { FieldInfo } from '../../types';
+import type { OrderBySpec } from '../engine';
 import type { EvaluationState } from '../expression';
 import type { SourceRow } from '../handler_types';
 import type { QueryColumn } from '../helpers/query_columns';
@@ -16,11 +17,16 @@ export interface SortParams {
   orderby: OrderBy[];
   queryColumns: QueryColumn[];
   state: EvaluationState;
+  iterOrder?: OrderBySpec;
 }
 export async function* sort(
   params: SortParams
 ): AsyncIterableIterator<SourceRow[]> {
-  const { iter, orderby, queryColumns, state } = params;
+  const { iter, orderby, queryColumns, state, iterOrder } = params;
+  if (iterOrder && _isSatisfiedBy(orderby, iterOrder)) {
+    yield* iter;
+    return;
+  }
   let result_list: SourceRow[] = [];
   for await (const batch of iter) {
     if (batch.length < 10_000) {
@@ -33,6 +39,24 @@ export async function* sort(
   yield result_list;
 }
 
+function _isSatisfiedBy(orderby: OrderBy[], iterOrder: OrderBySpec): boolean {
+  if (orderby.length !== iterOrder.length) {
+    return false;
+  }
+  return orderby.every((order, i) => {
+    const expr = order.expr;
+    const spec = iterOrder[i];
+    const direction = order.type === 'DESC' ? 'DESC' : 'ASC';
+    return (
+      spec !== undefined &&
+      'type' in expr &&
+      expr.type === 'column_ref' &&
+      typeof expr.column === 'string' &&
+      expr.column.toLowerCase() === spec.column.toLowerCase() &&
+      direction === spec.direction
+    );
+  });
+}
 export function sortRows(
   list: SourceRow[],
   orderby: OrderBy[],
