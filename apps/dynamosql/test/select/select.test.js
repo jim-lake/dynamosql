@@ -15,6 +15,7 @@ describe('Select', function () {
     path.join(__dirname, 'where_truthiness.sql')
   );
   runTests('alias.sql', path.join(__dirname, 'alias.sql'));
+  runTests('select_star_mixed.sql', path.join(__dirname, 'select_star_mixed.sql'));
   runTests(
     'group_edge_cases.sql',
     path.join(__dirname, 'group_edge_cases.sql')

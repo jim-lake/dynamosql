@@ -37,6 +37,8 @@ Source: MySQL 8.4 Reference Manual, chapter 15 (SQL statements), chapter 11 (lan
 | `SELECT t.*`                                      |    ✅     | `join/join.sql`                                      |
 | `db.t.*` qualified star                           |    ❌     |                                                      |
 | Expression in select list                         |    ✅     | `select/alias.sql`                                   |
+| `SELECT *` followed by expressions (`*, expr AS a`) |    ✅     | `select/select_star_mixed.sql`                       |
+| `SELECT t.*` mixed with expressions               |    ✅     | `select/select_star_mixed.sql`                       |
 | Column alias with `AS`                            |    ✅     | `select/alias.sql`                                   |
 | Column alias without `AS`                         |    ✅     | `select/alias.sql`                                   |
 | Backtick-quoted alias                             |    ✅     | `select/alias.sql`                                   |
