@@ -9,6 +9,11 @@ Matching MySQL is not a goal for illegal statements. Parse errors (`ER_PARSE_ERR
 - `SELECT extra FROM t JOIN (SELECT id, extra FROM u) s ON s.id = t.id;`, where `extra` exists only in the derived table: MySQL returns the values of `s.extra`. DynamoSQL returns `ER_BAD_FIELD_ERROR`. An unqualified column resolves through the first FROM item (`firstFrom` in `_resolveObject`), and derived tables are not searched.
 - `SELECT s.ID FROM (SELECT id FROM t) s;` with a mismatched alias case, such as `S.NAME` for alias `s`: MySQL returns `ER_BAD_FIELD_ERROR`. DynamoSQL returns `ER_NO_SUCH_TABLE`, because table and alias lookup both fail with the table error. This is an error case for an invalid statement, so it is kept as reference only.
 
+## DECIMAL scale in string functions
+
+- `SELECT CONCAT(CAST(1.50 AS DECIMAL(5,2)), '') AS r;`: MySQL returns `'1.50'`. DynamoSQL returns `'1.5'`, because `concat` appends `String(result.value)` (`func_string_basic.ts:53`), which drops the decimal scale.
+- `SELECT LEFT(CAST(1.50 AS DECIMAL(5,2)), 4) AS r;`: MySQL returns `'1.50'`. DynamoSQL returns `'1.5'`, for the same reason in `left`.
+
 ## Named locks
 
 - `SELECT IS_USED_LOCK('x');` while another session holds `x`: MySQL returns that session's connection id. DynamoSQL returns the holder's session thread id, which can differ from the MySQL connection id.
