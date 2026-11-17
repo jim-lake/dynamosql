@@ -16,3 +16,7 @@ Matching MySQL is not a goal for illegal statements. Parse errors (`ER_PARSE_ERR
 ## Collation of GREATEST and LEAST results
 
 - `SELECT GREATEST("a", "a " COLLATE UTF8MB4_BIN) = "a" AS r;`: MySQL returns 1, because GREATEST's result takes the `utf8mb4_bin` collation of its arguments, so the outer `=` is PAD-equal. DynamoSQL returns 0, because a function call has no collation of its own in `_getExprCollation`, and the outer `=` uses the session default collation.
+
+## DROP DATABASE IF EXISTS
+
+- `DROP DATABASE IF EXISTS missing_db;`, where `missing_db` does not exist: MySQL 8.4 returns success with a warning (1008). DynamoSQL returns `ER_BAD_DB_ERROR`. `drop_handler.ts` never reads `ast.prefix`, and `schema_manager.dropDatabase` throws `db_not_found` without a check for the flag.

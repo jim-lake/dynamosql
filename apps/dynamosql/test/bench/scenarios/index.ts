@@ -1,5 +1,6 @@
 import * as churn from './churn';
 import * as deleteScenario from './delete';
+import * as derived from './derived';
 import * as insert from './insert';
 import * as join from './join';
 import * as selectGroup from './select_group';
@@ -21,6 +22,7 @@ const SCENARIOS: Record<string, CaseDef[]> = {
   sort: sort.cases,
   select_point: selectPoint.cases,
   select_group: selectGroup.cases,
+  derived: derived.cases,
   join: join.cases,
   insert: insert.cases,
   update: update.cases,

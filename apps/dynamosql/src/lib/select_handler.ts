@@ -267,22 +267,24 @@ async function _iterQuery(
     });
     for (const item of from.filter(isDerivedFrom)) {
       tasks.push(
-        internalQuery({ ast: item.expr.ast, session, dynamodb }).then(
-          ({ row_list, columns, queryColumns }) => {
-            const specs = columns.map((column, index) => {
-              const result: QueryColumn['result'] =
-                queryColumns[index]?.result ?? {};
-              return {
-                name: column.name,
-                name_lc: column.name.toLowerCase(),
-                type: result.type,
-                mysqlType: result.mysqlType,
-                length: result.length,
-                decimals: result.decimals,
-                collation: result.collation,
-                nullable: result.nullable,
-              };
-            });
+        _iterQuery({ ast: item.expr.ast, session, dynamodb }).then(
+          ({ resultIter, queryColumns, columnRefMap: innerColumnRefMap }) => {
+            const specs = calcColumns(queryColumns, innerColumnRefMap).map(
+              (column, index) => {
+                const result: QueryColumn['result'] =
+                  queryColumns[index]?.result ?? {};
+                return {
+                  name: column.name,
+                  name_lc: column.name.toLowerCase(),
+                  type: result.type,
+                  mysqlType: result.mysqlType,
+                  length: result.length,
+                  decimals: result.decimals,
+                  collation: result.collation,
+                  nullable: result.nullable,
+                };
+              }
+            );
             const duplicate = specs.find(
               (spec, index) =>
                 specs.findIndex((other) => other.name_lc === spec.name_lc) !==
@@ -294,20 +296,24 @@ async function _iterQuery(
                 sqlMessage: `Duplicate column name '${duplicate.name}'`,
               });
             }
-            const rowList = row_list.map((row) => {
-              const cells: CellRow = {};
-              row.result.forEach((cell, index) => {
-                const spec = specs[index];
-                if (spec) {
-                  cells[spec.name_lc] = { type: cell.type, value: cell.value };
-                }
-              });
-              return cells;
-            });
             sourceMap.set(
               item,
               (async function* () {
-                yield rowList;
+                for await (const batch of resultIter) {
+                  yield batch.map((row) => {
+                    const cells: CellRow = {};
+                    row.result.forEach((cell, index) => {
+                      const spec = specs[index];
+                      if (spec) {
+                        cells[spec.name_lc] = {
+                          type: cell.type,
+                          value: cell.value,
+                        };
+                      }
+                    });
+                    return cells;
+                  });
+                }
               })()
             );
             tableInfoMap.set(item, {

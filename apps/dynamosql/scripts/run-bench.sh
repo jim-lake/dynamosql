@@ -24,7 +24,7 @@ Flags:
                          select_scan,join or select_point/point_loop.
                          Default: all cases.
                          Scenarios: select_scan, sort, select_point, select_group,
-                         join, insert, update, delete, churn
+                         derived, join, insert, update, delete, churn
   --scale=<name>         small (default), default, or large
   --rounds=<n>           Measured rounds per case (default 1)
   --churn-seconds=<n>    Duration of the churn scenario (default 5)
