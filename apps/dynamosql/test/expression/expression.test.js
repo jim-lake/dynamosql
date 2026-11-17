@@ -154,6 +154,11 @@ describe('Expression', function () {
   runTests('function_tier3.sql', path.join(__dirname, 'function_tier3.sql'), {
     verify_field_types: true,
   });
+  runTests(
+    'function_substring_index.sql',
+    path.join(__dirname, 'function_substring_index.sql'),
+    { verify_field_types: true }
+  );
   runTests('function_utc.sql', path.join(__dirname, 'function_utc.sql'), {
     verify_field_types: true,
   });

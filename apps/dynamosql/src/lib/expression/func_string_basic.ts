@@ -539,8 +539,18 @@ export function substring_index(
     delim_result.value !== null &&
     count_result.value !== null
   ) {
-    const str = String(str_result.value);
-    const delim = String(delim_result.value);
+    const str =
+      convertString({
+        value: str_result.value,
+        decimals: str_result.decimals,
+        timeZone: state.session.timeZone,
+      }) ?? '';
+    const delim =
+      convertString({
+        value: delim_result.value,
+        decimals: delim_result.decimals,
+        timeZone: state.session.timeZone,
+      }) ?? '';
     const count = Math.round(convertNum(count_result.value) ?? 0);
 
     if (count === 0 || delim === '') {
