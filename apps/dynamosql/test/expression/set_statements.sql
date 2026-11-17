@@ -23,3 +23,10 @@ SET collation_connection = 'latin1_swedish_ci';
 SELECT @@collation_connection AS coll;
 SET collation_connection = 'utf8mb4_0900_ai_ci';
 SELECT @@collation_connection AS coll;
+
+-- Message locale with a bare SET
+SELECT @@lc_messages AS lc;
+SET lc_messages = 'ja_JP';
+SELECT @@lc_messages AS lc;
+SET lc_messages = 'en_US';
+SELECT @@lc_messages AS lc;

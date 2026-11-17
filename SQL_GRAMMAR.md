@@ -692,6 +692,8 @@ Subqueries are independent (no reference to the outer query) or dependent (corre
 | `SET GLOBAL a = x, b = y` (scope applies to later assignments)                       |    ❌     |                                           |
 | `SET @@time_zone = ...` (session variable forms)                                     |    ✅     | `expression/timezone.sql`                 |
 | `SET collation_connection = expr` with no scope keyword                              |    ✅     | `expression/set_statements.sql`           |
+| `SET lc_messages = expr` with no scope keyword                                       |    ✅     | `expression/set_statements.sql`           |
+| `SET lc_messages = unknown_locale`                                                   |    ❌     | Unknown locale not rejected.              |
 | `SET param_name = expr` and `SET local_var = expr` in stored programs                |    ❌     |                                           |
 | `SET autocommit = {0 \| 1}`                                                          |    ❌     | `ER_UNKNOWN_SYSTEM_VARIABLE`. Not tested. |
 | `SET sql_log_bin = {OFF \| ON}`                                                      |    ❌     |                                           |

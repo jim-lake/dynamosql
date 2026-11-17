@@ -8,5 +8,6 @@ export const SYSTEM_VARIABLE_TYPES = {
   TIME_ZONE: 'string',
   LAST_INSERT_ID: 'longlong',
   INSERT_ID: 'longlong',
+  LC_MESSAGES: 'string',
   TIMESTAMP: 'double',
 } as const satisfies Record<string, ValueType>;

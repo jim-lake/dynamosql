@@ -79,6 +79,7 @@ export class Session extends SQLMode implements PoolConnection {
   private _collationConnection: COLLATIONS;
   private _divPrecisionIncrement: number;
   private _timeZone: string;
+  private _lcMessages = 'en_US';
   private _timestamp = 0;
   private _insertId = 0n;
   private _lastInsertId = 0n;
@@ -180,6 +181,8 @@ export class Session extends SQLMode implements PoolConnection {
         return { value: this.lastInsertId, type };
       case 'INSERT_ID':
         return { value: this.insertId, type };
+      case 'LC_MESSAGES':
+        return { value: this._lcMessages, type };
     }
     return undefined;
   }
@@ -221,6 +224,9 @@ export class Session extends SQLMode implements PoolConnection {
         } else {
           throw new SQLError({ err: 'ER_WRONG_TYPE_FOR_VAR', args: [value] });
         }
+        return;
+      case 'LC_MESSAGES':
+        this._lcMessages = String(value);
         return;
     }
     throw new SQLError({ err: 'ER_UNKNOWN_SYSTEM_VARIABLE', args: [name] });
