@@ -4,4 +4,4 @@ Mismatches between node-sql-parser (MySQL grammar) and MySQL 8.4. Each form was 
 
 ## Open
 
-None. Every form listed in the earlier version of this file now parses under the default dialect and round-trips.
+- `SET NAMES 'utf8mb4' COLLATE 'utf8mb4_bin'`: rejected with a parse error. MySQL 8.4 accepts it.
