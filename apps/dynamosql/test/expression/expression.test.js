@@ -65,6 +65,9 @@ describe('Expression', function () {
   runTests('operators.sql', path.join(__dirname, 'operators.sql'), {
     verify_field_types: true,
   });
+  runTests('like_column.sql', path.join(__dirname, 'like_column.sql'), {
+    verify_field_types: true,
+  });
   runTests('null_handling.sql', path.join(__dirname, 'null_handling.sql'), {
     verify_field_types: true,
   });

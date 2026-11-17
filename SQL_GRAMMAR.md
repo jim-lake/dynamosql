@@ -128,6 +128,7 @@ Source: MySQL 8.4 Reference Manual, chapter 15 (SQL statements), chapter 11 (lan
 | `BETWEEN ... AND ...`                                      |    ✅     | `select/having.sql`                                                 |
 | `NOT BETWEEN ... AND ...`                                  |    ✅     | `expression/operator_control_flow.sql`                              |
 | `LIKE` pattern                                             |    ✅     | `select/operators.sql`                                              |
+| `LIKE` with a column or expression pattern                 |    ✅     | `expression/like_column.sql`                                        |
 | `NOT LIKE` pattern                                         |    ✅     | `expression/operators.sql`                                          |
 | `LIKE ... ESCAPE 'c'`                                      |    ❌     |                                                                     |
 | `REGEXP` / `RLIKE` / `NOT REGEXP`                          |    ❌     | See `FUNCTIONS.md`.                                                 |
