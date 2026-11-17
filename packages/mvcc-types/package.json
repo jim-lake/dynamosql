@@ -1,0 +1,20 @@
+{
+  "name": "@dynamodb/mvcc-types",
+  "description": "TypeScript types for the DynamoSQL MVCC storage specification JSON",
+  "version": "0.0.3",
+  "author": "github.com/jim-lake",
+  "license": "MIT",
+  "private": true,
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "ts:check": "tsc --noEmit --project tsconfig.json",
+    "lint": "eslint src --fix",
+    "pretty": "prettier -u --write \"**/*\" --log-level warn",
+    "build": "rm -rf dist && rollup -c"
+  },
+  "devDependencies": {
+    "@aws-sdk/client-dynamodb": "^3.922.0"
+  }
+}
