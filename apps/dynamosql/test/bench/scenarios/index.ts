@@ -5,6 +5,7 @@ import * as join from './join';
 import * as selectGroup from './select_group';
 import * as selectPoint from './select_point';
 import * as selectScan from './select_scan';
+import * as sort from './sort';
 import * as update from './update';
 
 import type { CaseDef } from '../types';
@@ -17,6 +18,7 @@ export interface BenchCase {
 
 const SCENARIOS: Record<string, CaseDef[]> = {
   select_scan: selectScan.cases,
+  sort: sort.cases,
   select_point: selectPoint.cases,
   select_group: selectGroup.cases,
   join: join.cases,

@@ -23,7 +23,7 @@ Flags:
   --scenario=<a,b>       Comma-separated scenario or case names, such as
                          select_scan,join or select_point/point_loop.
                          Default: all cases.
-                         Scenarios: select_scan, select_point, select_group,
+                         Scenarios: select_scan, sort, select_point, select_group,
                          join, insert, update, delete, churn
   --scale=<name>         small (default), default, or large
   --rounds=<n>           Measured rounds per case (default 1)

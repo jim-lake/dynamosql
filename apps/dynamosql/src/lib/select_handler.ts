@@ -216,17 +216,23 @@ async function _iterQuery(
         if (!_isColumnRef(expr)) {
           return false;
         }
-        const info = columnRefMap.get(expr);
+        const resultIndex = columnRefMap.get(expr)?.resultIndex;
+        const selected =
+          resultIndex === undefined
+            ? undefined
+            : ast.columns[resultIndex]?.expr;
+        const base = resultIndex === undefined ? expr : selected;
         if (
-          !info ||
-          info.from !== first ||
-          info.resultIndex !== undefined ||
-          typeof expr.column !== 'string'
+          !base ||
+          !('type' in base) ||
+          base.type !== 'column_ref' ||
+          columnRefMap.get(base)?.from !== first ||
+          typeof base.column !== 'string'
         ) {
           return false;
         }
         spec.push({
-          column: expr.column,
+          column: base.column,
           direction: order.type === 'DESC' ? 'DESC' : 'ASC',
         });
         return true;

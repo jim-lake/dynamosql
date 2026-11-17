@@ -24,6 +24,7 @@
     "query:parse": "npx tsx test/test_parse.ts",
     "example:query": "dotenv -- node examples/query.js",
     "bench": "bash scripts/run-bench.sh",
+    "bench:sort": "bash scripts/run-bench.sh --scenario=sort",
     "bench:compare": "node --require tsx/cjs test/bench/run.ts compare"
   },
   "dependencies": {
