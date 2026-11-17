@@ -9,5 +9,8 @@ export const SYSTEM_VARIABLE_TYPES = {
   LAST_INSERT_ID: 'longlong',
   INSERT_ID: 'longlong',
   LC_MESSAGES: 'string',
+  LOWER_CASE_TABLE_NAMES: 'longlong',
+  DEFAULT_STORAGE_ENGINE: 'string',
+  HAVE_PROFILING: 'string',
   TIMESTAMP: 'double',
 } as const satisfies Record<string, ValueType>;

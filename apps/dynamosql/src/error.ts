@@ -151,6 +151,10 @@ const ERROR_MAP: Record<string, ErrorMapEntry> = {
     code: 'ER_UNKNOWN_STORAGE_ENGINE',
     sqlMessage: errStr`Unknown storage engine '${0}'`,
   },
+  ER_INCORRECT_GLOBAL_LOCAL_VAR: {
+    code: 'ER_INCORRECT_GLOBAL_LOCAL_VAR',
+    sqlMessage: errStr`Variable '${0}' is a read only variable`,
+  },
   access_denied: {
     code: 'ER_DBACCESS_DENIED_ERROR',
     sqlMessage: 'Access denied',

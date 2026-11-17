@@ -81,6 +81,7 @@ export class Session extends SQLMode implements PoolConnection {
   private _timeZone: string;
   private _lcMessages = 'en_US';
   private _timestamp = 0;
+  private readonly _defaultStorageEngine = 'InnoDB';
   private _insertId = 0n;
   private _lastInsertId = 0n;
 
@@ -183,6 +184,12 @@ export class Session extends SQLMode implements PoolConnection {
         return { value: this.insertId, type };
       case 'LC_MESSAGES':
         return { value: this._lcMessages, type };
+      case 'LOWER_CASE_TABLE_NAMES':
+        return { value: 0, type };
+      case 'DEFAULT_STORAGE_ENGINE':
+        return { value: this._defaultStorageEngine, type };
+      case 'HAVE_PROFILING':
+        return { value: 'YES', type };
     }
     return undefined;
   }
@@ -228,6 +235,12 @@ export class Session extends SQLMode implements PoolConnection {
       case 'LC_MESSAGES':
         this._lcMessages = String(value);
         return;
+      case 'LOWER_CASE_TABLE_NAMES':
+      case 'HAVE_PROFILING':
+        throw new SQLError({
+          err: 'ER_INCORRECT_GLOBAL_LOCAL_VAR',
+          args: [name.toLowerCase()],
+        });
     }
     throw new SQLError({ err: 'ER_UNKNOWN_SYSTEM_VARIABLE', args: [name] });
   }
