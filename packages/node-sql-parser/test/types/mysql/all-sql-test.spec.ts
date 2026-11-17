@@ -6,7 +6,7 @@ import { join } from 'path';
 import { Parser } from './parser-loader.mjs';
 import {
   isSelect, isInsert_Replace, isUpdate, isDelete, isCreate, isDrop, isAlter, isTruncate,
-  isRename, isGrant, isDesc, isShow, isUse, isSetStatement, isLock, isUnlock, isCall, isLoadData, isExplain,
+  isRename, isGrant, isDesc, isShow, isUse, isSetStatement, isSetNames, isLock, isUnlock, isCall, isLoadData, isExplain,
   isTransaction
 } from './types.guard';
 
@@ -219,6 +219,14 @@ test('select.sql statements', () => {
   }
 });
 
+test('set-names.sql statements', () => {
+  const statements = readSqlFile('set-names.sql');
+  for (const sql of statements) {
+    const ast = astify(sql);
+    assertType(isSetNames, ast, `isSetNames: ${sql}`);
+  }
+});
+
 test('set.sql statements', () => {
   const statements = readSqlFile('set.sql');
   for (const sql of statements) {
@@ -229,6 +237,38 @@ test('set.sql statements', () => {
 
 test('show.sql statements', () => {
   const statements = readSqlFile('show.sql');
+  for (const sql of statements) {
+    const ast = astify(sql);
+    assertType(isShow, ast, `isShow: ${sql}`);
+  }
+});
+
+test('show-columns-keys.sql statements', () => {
+  const statements = readSqlFile('show-columns-keys.sql');
+  for (const sql of statements) {
+    const ast = astify(sql);
+    assertType(isShow, ast, `isShow: ${sql}`);
+  }
+});
+
+test('show-profile.sql statements', () => {
+  const statements = readSqlFile('show-profile.sql');
+  for (const sql of statements) {
+    const ast = astify(sql);
+    assertType(isShow, ast, `isShow: ${sql}`);
+  }
+});
+
+test('show-profiles-errors.sql statements', () => {
+  const statements = readSqlFile('show-profiles-errors.sql');
+  for (const sql of statements) {
+    const ast = astify(sql);
+    assertType(isShow, ast, `isShow: ${sql}`);
+  }
+});
+
+test('show-status.sql statements', () => {
+  const statements = readSqlFile('show-status.sql');
   for (const sql of statements) {
     const ast = astify(sql);
     assertType(isShow, ast, `isShow: ${sql}`);

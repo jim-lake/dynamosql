@@ -1819,8 +1819,12 @@ rename_stmt
       };
     }
 
+set_names_value
+  = quoted_ident
+  / ident_name
+
 set_stmt
-  = KW_SET __ 'NAMES'i __ c:ident_name __ col:('COLLATE'i __ ident_name)? {
+  = KW_SET __ 'NAMES'i __ c:set_names_value __ col:('COLLATE'i __ set_names_value)? {
     return {
       tableList: Array.from(tableList),
       columnList: columnListTableAlias(columnList),
@@ -1947,7 +1951,42 @@ show_stmt
       }
     }
   }
-  / KW_SHOW __ keyword:('TRIGGERS'i / 'STATUS'i / 'PROCESSLIST'i) {
+  / KW_SHOW __ t:'BINARY'i __ 'LOG'i __ 'STATUS'i {
+    return {
+      tableList: Array.from(tableList),
+      columnList: columnListTableAlias(columnList),
+      ast: {
+        type: 'show',
+        suffix: 'status',
+        keyword: t.toLowerCase()
+      }
+    }
+  }
+  / KW_SHOW __ t:'REPLICA'i __ 'STATUS'i {
+    return {
+      tableList: Array.from(tableList),
+      columnList: columnListTableAlias(columnList),
+      ast: {
+        type: 'show',
+        suffix: 'status',
+        keyword: t.toLowerCase()
+      }
+    }
+  }
+  / KW_SHOW __ 'PROFILE'i !ident_start __ types:show_profile_type_list? __ q:show_profile_for? __ l:limit_clause? {
+    return {
+      tableList: Array.from(tableList),
+      columnList: columnListTableAlias(columnList),
+      ast: {
+        type: 'show',
+        keyword: 'profile',
+        types: types,
+        query: q,
+        limit: l,
+      }
+    }
+  }
+  / KW_SHOW __ keyword:('TRIGGERS'i / 'STATUS'i / 'PROCESSLIST'i / 'PROFILES'i) {
     return {
       tableList: Array.from(tableList),
       columnList: columnListTableAlias(columnList),
@@ -1995,13 +2034,17 @@ show_stmt
       }
     }
   }
-  / KW_SHOW __ keyword:('COLUMNS'i / 'INDEXES'i / "INDEX"i) __ from:from_clause {
+  / KW_SHOW __ keyword:('COLUMNS'i / 'INDEXES'i / "INDEX"i / "KEYS"i) __ from:from_clause __ db:show_from_db? {
+    // MySQL also accepts a second FROM/IN that names the database. It replaces
+    // the table's db, so the AST keeps one db value per From entry.
+    if (db) from[0].db = db
+    const lower = keyword.toLowerCase()
     return {
         tableList: Array.from(tableList),
         columnList: columnListTableAlias(columnList),
         ast: {
           type: 'show',
-          keyword: keyword.toLowerCase(),
+          keyword: lower === 'keys' ? 'indexes' : lower,
           from
         }
       };
@@ -2033,7 +2076,8 @@ show_stmt
       }
     }
   }
-  / KW_SHOW __ full:(KW_FULL __)? k:('COLUMNS'i / 'FIELDS'i) __ from:from_clause __ e:(like_op_right / where_clause)? {
+  / KW_SHOW __ full:(KW_FULL __)? k:('COLUMNS'i / 'FIELDS'i) __ from:from_clause __ db:show_from_db? __ e:(like_op_right / where_clause)? {
+    if (db) from[0].db = db
     return {
       tableList: Array.from(tableList),
       columnList: columnListTableAlias(columnList),
@@ -2082,6 +2126,33 @@ show_stmt
     }
   }
   / show_grant_stmt
+
+// Optional second clause of SHOW COLUMNS/INDEX: `FROM db` or `IN db`. Returns the db name.
+show_from_db
+  = (KW_FROM / KW_IN) __ d:ident_name {
+    return d
+  }
+
+show_profile_type_list
+  = head:show_profile_type tail:(__ COMMA __ show_profile_type)* {
+    return createList(head, tail);
+  }
+
+show_profile_type
+  = 'ALL'i !ident_start { return 'all'; }
+  / 'BLOCK'i __ 'IO'i !ident_start { return 'block io'; }
+  / 'CONTEXT'i __ 'SWITCHES'i !ident_start { return 'context switches'; }
+  / 'CPU'i !ident_start { return 'cpu'; }
+  / 'IPC'i !ident_start { return 'ipc'; }
+  / 'MEMORY'i !ident_start { return 'memory'; }
+  / 'PAGE'i __ 'FAULTS'i !ident_start { return 'page faults'; }
+  / 'SOURCE'i !ident_start { return 'source'; }
+  / 'SWAPS'i !ident_start { return 'swaps'; }
+
+show_profile_for
+  = KW_FOR __ 'QUERY'i __ n:int {
+    return { keyword: 'query', value: Number(n) };
+  }
 
 show_grant_stmt
   = KW_SHOW __ 'GRANTS'i __ f:show_grant_for? {

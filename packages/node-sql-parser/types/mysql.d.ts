@@ -1155,6 +1155,14 @@ export interface ShowLogs {
   loc?: LocationRange;
 }
 
+/** `SHOW BINARY LOG STATUS` or `SHOW REPLICA STATUS`. */
+export interface ShowStatus {
+  type: "show";
+  keyword: "binary" | "replica";
+  suffix: "status";
+  loc?: LocationRange;
+}
+
 export interface ShowTables {
   type: "show";
   keyword: "tables";
@@ -1163,7 +1171,25 @@ export interface ShowTables {
 
 export interface ShowSimple {
   type: "show";
-  keyword: "triggers" | "status" | "processlist";
+  keyword: "triggers" | "status" | "processlist" | "profiles";
+  loc?: LocationRange;
+}
+
+/** `SHOW PROFILE [type[, type] ...] [FOR QUERY n] [LIMIT ...]`. `types` is null when no type list is given. */
+export interface ShowProfile {
+  type: "show";
+  keyword: "profile";
+  types: ("all" | "block io" | "context switches" | "cpu" | "ipc" | "memory" | "page faults" | "source" | "swaps")[] | null;
+  query: { keyword: "query"; value: number } | null;
+  limit: Limit | null;
+  loc?: LocationRange;
+}
+
+/** `SHOW WARNINGS [LIMIT ...]` or `SHOW ERRORS [LIMIT ...]`. `limit` is null when no LIMIT is given. */
+export interface ShowWarningsErrors {
+  type: "show";
+  keyword: "warnings" | "errors";
+  limit: Limit | null;
   loc?: LocationRange;
 }
 
@@ -1257,7 +1283,7 @@ export interface ShowGrants {
   loc?: LocationRange;
 }
 
-export type Show = ShowLogs | ShowTables | ShowSimple | ShowProcedureFunctionStatus | ShowBinlogEvents | ShowCharacterSet | ShowCollationDatabases | ShowColumnsIndexes | ShowCreateTable | ShowCreateView | ShowCreateEvent | ShowCreateTrigger | ShowCreateProcedure | ShowGrants;
+export type Show = ShowLogs | ShowStatus | ShowProfile | ShowTables | ShowSimple | ShowWarningsErrors | ShowProcedureFunctionStatus | ShowBinlogEvents | ShowCharacterSet | ShowCollationDatabases | ShowColumnsIndexes | ShowCreateTable | ShowCreateView | ShowCreateEvent | ShowCreateTrigger | ShowCreateProcedure | ShowGrants;
 
 export interface Desc {
   type: "desc";
@@ -1294,6 +1320,15 @@ export interface SetStatement {
   type: "set";
   keyword?: string | null;
   expr: SetAssign[];
+  loc?: LocationRange;
+}
+
+/** `SET NAMES charset [COLLATE collation]`. Quotes are stripped from both names. */
+export interface SetNames {
+  type: "set";
+  keyword: "names";
+  charset: string;
+  collate: string | null;
   loc?: LocationRange;
 }
 
@@ -1415,6 +1450,7 @@ export type AST =
   | Explain
   | Call
   | SetStatement
+  | SetNames
   | Lock
   | Unlock
   | Grant

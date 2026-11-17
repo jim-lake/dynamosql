@@ -2,7 +2,7 @@
  * Generated type guards for "mysql.d.ts".
  * WARNING: Do not manually change this file.
  */
-import { With, Location, LocationRange, ParseOptions, Option, TableColumnAst, BaseFrom, Join, Values, TableExpr, Dual, From, LimitValue, Limit, OrderBy, ValueExpr, StringValue, OriginValue, DefaultValue, NumberValue, IntervalExprValue, SeparatorValue, SortDirection, ColumnRefItem, ColumnRef, SetList, InsertReplaceValue, Star, Case, Cast, AggrFunc, FunctionNameValue, FunctionName, Function, JsonOnClause, JsonTable, JsonTableColumn, FulltextSearch, Column, Interval, Param, Var, Assign, Binary, Unary, Expr, ExtractFunc, ExpressionValue, ExprList, PartitionBy, WindowSpec, WindowFrameClause, AsWindowSpec, NamedWindowExpr, WindowExpr, Select, Insert_Replace, Update, Delete, Alter, AlterIndexVisibility, AlterExpr, AlterColumnPosition, AlterAddColumn, AlterDropColumn, AlterModifyColumn, AlterChangeColumn, AlterRenameTable, AlterRenameColumn, AlterAddIndex, AlterDropIndex, AlterDropKey, AlterAddConstraint, AlterDropConstraint, AlterEnableConstraint, AlterDisableConstraint, AlterAddPartition, AlterDropPartition, AlterOperatePartition, AlterAlgorithm, AlterLock, AlterTableOption, Use, KeywordComment, CollateExpr, MysqlType, ConvertDataType, DataType, OnUpdateCurrentTimestamp, LiteralNotNull, LiteralNull, ColumnConstraint, ColumnDefinitionOptList, ReferenceDefinition, OnReference, CreateColumnDefinition, IndexType, IndexOption, CreateIndexDefinition, CreateFulltextSpatialIndexDefinition, ConstraintName, CreateConstraintPrimary, CreateConstraintUnique, CreateConstraintForeign, CreateConstraintCheck, CreateConstraintDefinition, CreateDefinition, CreateTable, DatabaseOption, CreateDatabase, CreateSchema, CreateIndex, CreateView, CreateTrigger, CreateUser, Create, TriggerEvent, UserAuthOption, RequireOption, ResourceOption, PasswordOption, TableOption, DropTable, DropDatabase, DropView, DropIndex, DropTrigger, Drop, ShowLogs, ShowTables, ShowSimple, ShowProcedureFunctionStatus, ShowBinlogEvents, ShowCharacterSet, ShowCollationDatabases, ShowColumnsIndexes, ShowCreateTable, ShowCreateView, ShowCreateEvent, ShowCreateTrigger, ShowCreateProcedure, ShowGrants, Show, Desc, Explain, Call, SetAssign, SetStatement, Lock, LockTable, Unlock, Grant, LoadData, LoadDataField, LoadDataLine, Truncate, Rename, Transaction, AST } from "./mysql";
+import { With, Location, LocationRange, ParseOptions, Option, TableColumnAst, BaseFrom, Join, Values, TableExpr, Dual, From, LimitValue, Limit, OrderBy, ValueExpr, StringValue, OriginValue, DefaultValue, NumberValue, IntervalExprValue, SeparatorValue, SortDirection, ColumnRefItem, ColumnRef, SetList, InsertReplaceValue, Star, Case, Cast, AggrFunc, FunctionNameValue, FunctionName, Function, JsonOnClause, JsonTable, JsonTableColumn, FulltextSearch, Column, Interval, Param, Var, Assign, Binary, Unary, Expr, ExtractFunc, ExpressionValue, ExprList, PartitionBy, WindowSpec, WindowFrameClause, AsWindowSpec, NamedWindowExpr, WindowExpr, Select, Insert_Replace, Update, Delete, Alter, AlterIndexVisibility, AlterExpr, AlterColumnPosition, AlterAddColumn, AlterDropColumn, AlterModifyColumn, AlterChangeColumn, AlterRenameTable, AlterRenameColumn, AlterAddIndex, AlterDropIndex, AlterDropKey, AlterAddConstraint, AlterDropConstraint, AlterEnableConstraint, AlterDisableConstraint, AlterAddPartition, AlterDropPartition, AlterOperatePartition, AlterAlgorithm, AlterLock, AlterTableOption, Use, KeywordComment, CollateExpr, MysqlType, ConvertDataType, DataType, OnUpdateCurrentTimestamp, LiteralNotNull, LiteralNull, ColumnConstraint, ColumnDefinitionOptList, ReferenceDefinition, OnReference, CreateColumnDefinition, IndexType, IndexOption, CreateIndexDefinition, CreateFulltextSpatialIndexDefinition, ConstraintName, CreateConstraintPrimary, CreateConstraintUnique, CreateConstraintForeign, CreateConstraintCheck, CreateConstraintDefinition, CreateDefinition, CreateTable, DatabaseOption, CreateDatabase, CreateSchema, CreateIndex, CreateView, CreateTrigger, CreateUser, Create, TriggerEvent, UserAuthOption, RequireOption, ResourceOption, PasswordOption, TableOption, DropTable, DropDatabase, DropView, DropIndex, DropTrigger, Drop, ShowLogs, ShowStatus, ShowTables, ShowSimple, ShowProfile, ShowWarningsErrors, ShowProcedureFunctionStatus, ShowBinlogEvents, ShowCharacterSet, ShowCollationDatabases, ShowColumnsIndexes, ShowCreateTable, ShowCreateView, ShowCreateEvent, ShowCreateTrigger, ShowCreateProcedure, ShowGrants, Show, Desc, Explain, Call, SetAssign, SetStatement, SetNames, Lock, LockTable, Unlock, Grant, LoadData, LoadDataField, LoadDataLine, Truncate, Rename, Transaction, AST } from "./mysql";
 
 export function isWith(obj: unknown): obj is With {
     const typedObj = obj as With
@@ -129,8 +129,11 @@ export function isTableColumnAst(obj: unknown): obj is TableColumnAst {
             isDropIndex(typedObj["ast"]) as boolean ||
             isDropTrigger(typedObj["ast"]) as boolean ||
             isShowLogs(typedObj["ast"]) as boolean ||
+            isShowStatus(typedObj["ast"]) as boolean ||
             isShowTables(typedObj["ast"]) as boolean ||
             isShowSimple(typedObj["ast"]) as boolean ||
+            isShowProfile(typedObj["ast"]) as boolean ||
+            isShowWarningsErrors(typedObj["ast"]) as boolean ||
             isShowProcedureFunctionStatus(typedObj["ast"]) as boolean ||
             isShowBinlogEvents(typedObj["ast"]) as boolean ||
             isShowCharacterSet(typedObj["ast"]) as boolean ||
@@ -146,6 +149,7 @@ export function isTableColumnAst(obj: unknown): obj is TableColumnAst {
             isExplain(typedObj["ast"]) as boolean ||
             isCall(typedObj["ast"]) as boolean ||
             isSetStatement(typedObj["ast"]) as boolean ||
+            isSetNames(typedObj["ast"]) as boolean ||
             isLock(typedObj["ast"]) as boolean ||
             isUnlock(typedObj["ast"]) as boolean ||
             isGrant(typedObj["ast"]) as boolean ||
@@ -4073,6 +4077,21 @@ export function isShowLogs(obj: unknown): obj is ShowLogs {
     )
 }
 
+export function isShowStatus(obj: unknown): obj is ShowStatus {
+    const typedObj = obj as ShowStatus
+    return (
+        (typedObj !== null &&
+            typeof typedObj === "object" ||
+            typeof typedObj === "function") &&
+        typedObj["type"] === "show" &&
+        (typedObj["keyword"] === "binary" ||
+            typedObj["keyword"] === "replica") &&
+        typedObj["suffix"] === "status" &&
+        (typeof typedObj["loc"] === "undefined" ||
+            isLocationRange(typedObj["loc"]) as boolean)
+    )
+}
+
 export function isShowTables(obj: unknown): obj is ShowTables {
     const typedObj = obj as ShowTables
     return (
@@ -4093,9 +4112,60 @@ export function isShowSimple(obj: unknown): obj is ShowSimple {
             typeof typedObj === "object" ||
             typeof typedObj === "function") &&
         typedObj["type"] === "show" &&
-        (typedObj["keyword"] === "triggers" ||
-            typedObj["keyword"] === "status" ||
-            typedObj["keyword"] === "processlist") &&
+        (typedObj["keyword"] === "status" ||
+            typedObj["keyword"] === "triggers" ||
+            typedObj["keyword"] === "processlist" ||
+            typedObj["keyword"] === "profiles") &&
+        (typeof typedObj["loc"] === "undefined" ||
+            isLocationRange(typedObj["loc"]) as boolean)
+    )
+}
+
+export function isShowProfile(obj: unknown): obj is ShowProfile {
+    const typedObj = obj as ShowProfile
+    return (
+        (typedObj !== null &&
+            typeof typedObj === "object" ||
+            typeof typedObj === "function") &&
+        typedObj["type"] === "show" &&
+        typedObj["keyword"] === "profile" &&
+        (typedObj["types"] === null ||
+            Array.isArray(typedObj["types"]) &&
+            typedObj["types"].every((e: any) =>
+            (e === "all" ||
+                e === "block io" ||
+                e === "context switches" ||
+                e === "cpu" ||
+                e === "ipc" ||
+                e === "memory" ||
+                e === "page faults" ||
+                e === "source" ||
+                e === "swaps")
+            )) &&
+        (typedObj["query"] === null ||
+            (typedObj["query"] !== null &&
+                typeof typedObj["query"] === "object" ||
+                typeof typedObj["query"] === "function") &&
+            typedObj["query"]["keyword"] === "query" &&
+            typeof typedObj["query"]["value"] === "number") &&
+        (typedObj["limit"] === null ||
+            isLimit(typedObj["limit"]) as boolean) &&
+        (typeof typedObj["loc"] === "undefined" ||
+            isLocationRange(typedObj["loc"]) as boolean)
+    )
+}
+
+export function isShowWarningsErrors(obj: unknown): obj is ShowWarningsErrors {
+    const typedObj = obj as ShowWarningsErrors
+    return (
+        (typedObj !== null &&
+            typeof typedObj === "object" ||
+            typeof typedObj === "function") &&
+        typedObj["type"] === "show" &&
+        (typedObj["keyword"] === "warnings" ||
+            typedObj["keyword"] === "errors") &&
+        (typedObj["limit"] === null ||
+            isLimit(typedObj["limit"]) as boolean) &&
         (typeof typedObj["loc"] === "undefined" ||
             isLocationRange(typedObj["loc"]) as boolean)
     )
@@ -4336,8 +4406,11 @@ export function isShow(obj: unknown): obj is Show {
     const typedObj = obj as Show
     return (
         (isShowLogs(typedObj) as boolean ||
+            isShowStatus(typedObj) as boolean ||
             isShowTables(typedObj) as boolean ||
             isShowSimple(typedObj) as boolean ||
+            isShowProfile(typedObj) as boolean ||
+            isShowWarningsErrors(typedObj) as boolean ||
             isShowProcedureFunctionStatus(typedObj) as boolean ||
             isShowBinlogEvents(typedObj) as boolean ||
             isShowCharacterSet(typedObj) as boolean ||
@@ -4446,6 +4519,22 @@ export function isSetStatement(obj: unknown): obj is SetStatement {
         typedObj["expr"].every((e: any) =>
             isSetAssign(e) as boolean
         ) &&
+        (typeof typedObj["loc"] === "undefined" ||
+            isLocationRange(typedObj["loc"]) as boolean)
+    )
+}
+
+export function isSetNames(obj: unknown): obj is SetNames {
+    const typedObj = obj as SetNames
+    return (
+        (typedObj !== null &&
+            typeof typedObj === "object" ||
+            typeof typedObj === "function") &&
+        typedObj["type"] === "set" &&
+        typedObj["keyword"] === "names" &&
+        typeof typedObj["charset"] === "string" &&
+        (typedObj["collate"] === null ||
+            typeof typedObj["collate"] === "string") &&
         (typeof typedObj["loc"] === "undefined" ||
             isLocationRange(typedObj["loc"]) as boolean)
     )
@@ -4812,8 +4901,11 @@ export function isAST(obj: unknown): obj is AST {
             isDropIndex(typedObj) as boolean ||
             isDropTrigger(typedObj) as boolean ||
             isShowLogs(typedObj) as boolean ||
+            isShowStatus(typedObj) as boolean ||
             isShowTables(typedObj) as boolean ||
             isShowSimple(typedObj) as boolean ||
+            isShowProfile(typedObj) as boolean ||
+            isShowWarningsErrors(typedObj) as boolean ||
             isShowProcedureFunctionStatus(typedObj) as boolean ||
             isShowBinlogEvents(typedObj) as boolean ||
             isShowCharacterSet(typedObj) as boolean ||
@@ -4829,6 +4921,7 @@ export function isAST(obj: unknown): obj is AST {
             isExplain(typedObj) as boolean ||
             isCall(typedObj) as boolean ||
             isSetStatement(typedObj) as boolean ||
+            isSetNames(typedObj) as boolean ||
             isLock(typedObj) as boolean ||
             isUnlock(typedObj) as boolean ||
             isGrant(typedObj) as boolean ||

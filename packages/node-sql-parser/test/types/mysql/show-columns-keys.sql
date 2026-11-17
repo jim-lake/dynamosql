@@ -1,0 +1,12 @@
+SHOW COLUMNS FROM users FROM mydb;
+SHOW COLUMNS FROM users IN mydb;
+SHOW FIELDS FROM users FROM mydb;
+SHOW FULL COLUMNS FROM users FROM mydb;
+SHOW FULL COLUMNS FROM users FROM mydb LIKE 'id%';
+SHOW COLUMNS FROM mydb.users FROM mydb;
+SHOW KEYS FROM users;
+SHOW KEYS FROM mydb.users;
+SHOW KEYS FROM users FROM mydb;
+SHOW KEYS FROM users IN mydb;
+SHOW INDEX FROM users FROM mydb;
+SHOW INDEXES FROM users FROM mydb;
