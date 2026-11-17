@@ -207,6 +207,15 @@ export class Query extends EventEmitter {
         return { result: null, resultIter, columns };
       }
       case 'set':
+        if (!('expr' in ast)) {
+          throw new SQLError(
+            {
+              code: 'ER_PARSE_ERROR',
+              sqlMessage: 'SET NAMES is not supported',
+            },
+            this.sql
+          );
+        }
         await SetHandler.query({ ...params, ast });
         return { result: DEFAULT_RESULT, columns: undefined };
       case 'update':
