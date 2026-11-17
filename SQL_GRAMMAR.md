@@ -108,6 +108,7 @@ Source: MySQL 8.4 Reference Manual, chapter 15 (SQL statements), chapter 11 (lan
 | :----------------------------------------------------------- | :-------: | --------------------------------------------- |
 | Derived table `(SELECT ...) [AS] alias` in `FROM`            |    ✅     | `select/derived_table.sql`                    |
 | Nested derived tables                                        |    ✅     | `select/derived_table.sql`                    |
+| `ORDER BY` and `LIMIT` inside a derived table                |    ✅     | `select/derived_table_order_limit.sql`        |
 | Derived table from `SELECT` with no `FROM`                   |    ✅     | `select/derived_table.sql` (`SELECT 1 AS id`) |
 | Derived table with column alias list `(SELECT ...) s (a, b)` |    ❌     |                                               |
 | `LATERAL (SELECT ...) alias`                                 |    ❌     |                                               |
@@ -178,6 +179,7 @@ Source: MySQL 8.4 Reference Manual, chapter 15 (SQL statements), chapter 11 (lan
 | `LIMIT row_count`                       |    ✅     | `select/limit.sql`  |
 | `LIMIT row_count OFFSET offset`         |    ✅     | `select/limit.sql`  |
 | `LIMIT offset, row_count`               |    ✅     | `select/syntax.sql` |
+| `ORDER BY ... LIMIT` in a derived table |    ✅     | `select/derived_table_order_limit.sql` |
 | Placeholders in `LIMIT ?`               |    ❌     |                     |
 
 ### Locking reads

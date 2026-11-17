@@ -35,6 +35,10 @@ describe('Select', function () {
     'derived_table_stream.sql',
     path.join(__dirname, 'derived_table_stream.sql')
   );
+  runTests(
+    'derived_table_order_limit.sql',
+    path.join(__dirname, 'derived_table_order_limit.sql')
+  );
   runTests('derived_time.sql', path.join(__dirname, 'derived_time.sql'));
   runTests(
     'derived_table_error.sql',
