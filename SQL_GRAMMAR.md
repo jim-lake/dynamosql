@@ -885,7 +885,7 @@ Subqueries are independent (no reference to the outer query) or dependent (corre
 | System variable read `@@name`                           |    ✅     | `expression/variables.sql` (`SELECT @@time_zone`) |
 | Undefined system variable `@@name` raises `ER_UNKNOWN_SYSTEM_VARIABLE` (1193) | ✅ | `expression/variables_error.sql` (`SELECT @@storage_engine`) |
 | System variable read `@@lower_case_table_names` (returns `0`)  |    ✅     | `expression/variables.sql`                        |
-| System variable read `@@default_storage_engine` (returns `InnoDB`) |    ✅     | `expression/variables.sql`                        |
+| System variable read `@@default_storage_engine` (returns a non-empty name, `MEMORY` in DynamoSQL) |    ✅     | `expression/variables.sql`                        |
 | System variable read `@@have_profiling` (returns `YES`)  |    ✅     | `expression/variables.sql`                        |
 | `SET` on read-only `@@lower_case_table_names` or `@@have_profiling` raises `ER_INCORRECT_GLOBAL_LOCAL_VAR` (1238) | ✅ | `expression/variables_error.sql` |
 | `SET @@default_storage_engine = ...`                    |    ❌     | Not implemented. MySQL accepts any known engine name, and DynamoSQL has no engine list. |

@@ -81,7 +81,7 @@ export class Session extends SQLMode implements PoolConnection {
   private _timeZone: string;
   private _lcMessages = 'en_US';
   private _timestamp = 0;
-  private readonly _defaultStorageEngine = 'InnoDB';
+  private readonly _defaultStorageEngine = 'MEMORY';
   private _insertId = 0n;
   private _lastInsertId = 0n;
 

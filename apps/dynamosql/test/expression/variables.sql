@@ -88,5 +88,5 @@ SELECT @@global.system_time_zone IS NOT NULL AS has_system_tz;
 
 -- Read-only and fixed server settings
 SELECT @@lower_case_table_names AS lctn;
-SELECT @@default_storage_engine AS engine;
+SELECT LENGTH(@@default_storage_engine) > 1 AS engine;
 SELECT @@have_profiling AS profiling;

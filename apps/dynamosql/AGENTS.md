@@ -149,14 +149,15 @@ Development:
 
 ## Supported Behavior
 
-Supported behavior is the intersection of what these four docs state as supported:
+Supported behavior is what the three support docs state as supported:
 
 - `../../SQL_GRAMMAR.md`: SQL syntax.
 - `../../FUNCTIONS.md`: SQL functions.
-- `../../RAW_ENGINE.md`: raw (DynamoDB) engine behavior.
-- `../../MEMORY_ENGINE.md`: memory engine behavior.
+- `../../INFORMATION_SCHEMA.md`: which `information_schema` tables and columns are implemented.
 
-A behavior is supported only when all four docs cover it. If any one of them does not state it as supported, it is unimplemented or out of scope, not supported. Do not treat a behavior as supported because it exists in the code or matches MySQL.
+A behavior is supported only when one of these three docs states it as supported. Anything they do not state is unimplemented or out of scope, not supported. Do not treat a behavior as supported because it exists in the code or matches MySQL.
+
+`../../RAW_ENGINE.md` and `../../MEMORY_ENGINE.md` are errata, not support docs. They list where the raw and memory engines differ from MySQL 8.4 (raw) or design gaps (memory). Behavior they do not list matches MySQL. They do not decide whether a behavior is supported.
 
 ## Gap Documents
 
