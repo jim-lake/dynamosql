@@ -15,3 +15,11 @@ SET time_zone = '+00:00';
 SELECT @@session.time_zone AS tz;
 SET @@time_zone = '+00:00';
 SELECT @@time_zone AS tz;
+
+-- Connection collation with a bare SET
+SET collation_connection = 'utf8mb4_bin';
+SELECT @@collation_connection AS coll;
+SET collation_connection = 'latin1_swedish_ci';
+SELECT @@collation_connection AS coll;
+SET collation_connection = 'utf8mb4_0900_ai_ci';
+SELECT @@collation_connection AS coll;
