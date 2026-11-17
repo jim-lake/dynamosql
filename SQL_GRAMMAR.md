@@ -875,6 +875,7 @@ Subqueries are independent (no reference to the outer query) or dependent (corre
 | User variable `` @`name` ``, `@'name'`, `@"name"`       |    ❌     |                                                   |
 | `@name := expr` assignment inside an expression         |    ✅     | `select/syntax.sql`                               |
 | System variable read `@@name`                           |    ✅     | `expression/variables.sql` (`SELECT @@time_zone`) |
+| Undefined system variable `@@name` raises `ER_UNKNOWN_SYSTEM_VARIABLE` (1193) | ✅ | `expression/variables_error.sql` (`SELECT @@storage_engine`) |
 | System variable `@@SESSION.name`                        |    ✅     | `expression/variables.sql`                        |
 | System variable `@@GLOBAL.name`, `@@LOCAL.name`         |    ❌     |                                                   |
 | System variable `@@PERSIST.name`, `@@PERSIST_ONLY.name` |    ❌     |                                                   |
