@@ -24,6 +24,8 @@ Direct use requires native equality to match SQL equality and every permitted va
 
 A DOUBLE PK permitting both N and B storage uses the binary tuple representation for every key; its partition-key type cannot vary per row. Composite PKs always use binary tuples, including those containing buffers. `DB_ROW_KEY` for a declared PK is its encoding, not an allocated surrogate. The data-table sort key remains numeric `TX_ID`.
 
+The data-table partition key is accessed only by hashed equality, so its encoding is for identity, not range order, and `DB_ROW_KEY` need not be byte-order-preserving. A PRIMARY key MAY, but is not required to, have a separate ordered index table to support range scans and ordering on the primary key. Whether and when to provide one is left to the implementation.
+
 ## Secondary sort key
 
 Let I be the tuple of indexed values and P the tuple of primary-key values in PRIMARY column order. For a hidden PK, P contains its generated `DB_ROW_ID`. For a declared composite PK, P contains the declared key columns, the same values `DB_ROW_KEY` encodes. Append the full P, including columns also present in I.
@@ -74,7 +76,7 @@ Hex bytes are written without `0x`. `||` concatenates bytes. `U_w(x)` is unsigne
 | TIME | `U64(duration_microseconds + 2^63)` |
 | YEAR | `U_2(year)`; SQL zero year uses 0 |
 
-Escape and terminate variable-width payloads exactly once, using tuple framing. Integer/decimal arithmetic is exact. DECIMAL uses the same bias for signed and unsigned declarations; no binary floating-point conversion. Width and scale never depend on the current value.
+Escape and terminate variable-width payloads exactly once, using tuple framing. Integer/decimal arithmetic is exact. DECIMAL uses the same bias for signed and unsigned declarations; no binary floating-point conversion. Width and scale never depend on the current value. An unsigned DECIMAL only ever occupies the upper half of the biased range, so its bytes are not comparable to a signed DECIMAL of the same `(p,s)`; re-encode per the index column's own type before constructing any byte range, as with the N-versus-B DOUBLE and mixed-numeric cases.
 
 For FLOAT/DOUBLE, apply SQL precision and normalize either zero to positive zero. Interpret IEEE bits as unsigned: complement every bit for negative values; otherwise flip the sign bit. Write the result big-endian. NaN and infinities are invalid. Out-of-N-range DOUBLE row values store these same eight value bytes without the component marker. Index encoding is identical for N-backed and B-backed DOUBLEs; reuse a B-backed value's ordered bytes without transforming them again.
 
@@ -101,8 +103,12 @@ The raw weight bytes equal MySQL 8.4's `WEIGHT_STRING(value COLLATE <collation> 
 | `a` | utf8mb4_0900_ai_ci (NO PAD) | natural | `1C47` | `011c470000` |
 | `ab` | utf8mb4_0900_ai_ci (NO PAD) | natural | `1C471C60` | `011c471c600000` |
 | `a` | utf8mb4_general_ci (PAD SPACE) | CHAR(3) | `004100200020` | `0100ff4100ff2000ff200000` |
+| `''` (empty) | utf8mb4_0900_ai_ci (NO PAD) | natural | (empty) | `010000` |
+| `''` (empty) | utf8mb4_general_ci (PAD SPACE) | CHAR(3) | `002000200020` | `0100ff2000ff2000ff200000` |
 
 Under utf8mb4_0900_ai_ci, `a` and `a`+combining acute (U+0301) are two distinct inputs that both transform to `1C47`, so their framed components are byte-identical. The PAD SPACE example pads the weight output to the column's maximum character count with the space weight `0020`, not the input string.
+
+An empty text value is distinct from NULL under every collation: its framed component always begins `01`, never the NULL marker `00`. Under a NO PAD collation its weight is empty, so it frames to `010000`, identical to an empty binary component. Under a PAD SPACE collation its weight is the maximum-length run of space weights, so the empty string, a single space, and any trailing-space-only string collide on one key, matching MySQL's PAD SPACE comparison. This collision is between text values, never with NULL.
 
 ## Reads and updates
 
