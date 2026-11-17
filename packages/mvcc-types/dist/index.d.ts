@@ -237,24 +237,36 @@ interface MvccReaderLeaseItem {
 
 /** Attributes that can appear on a data row: key, user column, or system attribute. */
 type RowAttr = KeyAttr | ColumnAttr | BoolAttr;
-type RowItem = Record<string, RowAttr> & {
+interface HiddenRowIdKey {
+    DB_ROW_ID: NumberAttr;
+    DB_ROW_KEY?: never;
+}
+interface TupleRowKey {
+    DB_ROW_KEY: BinaryAttr;
+    DB_ROW_ID?: never;
+}
+interface DirectRowKey {
+    DB_ROW_ID?: never;
+    DB_ROW_KEY?: never;
+}
+type RowKeyAttrs = HiddenRowIdKey | TupleRowKey | DirectRowKey;
+type RowItem = Record<string, RowAttr> & RowKeyAttrs & {
     TX_ID: NumberAttr;
     /** True for a tombstone. Absent on live rows. */
     DELETED?: BoolAttr;
 };
-/** A live row: a partition key plus every user column, with no DELETED marker. */
-type LiveRowItem = Record<string, ColumnAttr | KeyAttr> & {
+/** A live row: partition key, every user column, and TX_ID. No DELETED attribute. */
+type LiveRowItem = Record<string, ColumnAttr | KeyAttr> & RowKeyAttrs & {
     TX_ID: NumberAttr;
-    DELETED?: never;
 };
 /** A tombstone: only key attributes, TX_ID, and DELETED. */
-type RowTombstoneItem = Record<string, KeyAttr | NumberAttr | BoolAttr> & {
+type RowTombstoneItem = Record<string, KeyAttr | NumberAttr | BoolAttr> & RowKeyAttrs & {
     TX_ID: NumberAttr;
     DELETED: BoolAttr;
 };
 /** Attributes that can appear on an index entry. */
 type IndexAttr = KeyAttr | ColumnAttr | BoolAttr;
-type IndexItem = Record<string, IndexAttr> & {
+type IndexItem = Record<string, IndexAttr> & RowKeyAttrs & {
     INDEX_PARTITION: StringAttr;
     INDEX_TX_ID: BinaryAttr;
     TX_ID: NumberAttr;
@@ -262,4 +274,4 @@ type IndexItem = Record<string, IndexAttr> & {
     DELETED?: BoolAttr;
 };
 
-export type { Base64Value, BinaryAttr, BoolAttr, ChangeTarget, ColumnAttr, ColumnDef, ColumnDefault, ColumnValue, ColumnValues, CreateTableIntent, DatabaseDef, DdlChange, DdlTransactionPayload, DeleteIndexChange, DeleteRowChange, DmlChange, DmlTransactionPayload, IndexAttr, IndexChange, IndexChangeTarget, IndexDef, IndexItem, InsertIndexChange, InsertRowChange, KeyAttr, LiteralDefault, LiveRowItem, MvccAutoIncrementItem, MvccReaderLeaseItem, MvccSchemaItem, MvccSpillItem, MvccStateItem, MvccTransactionItem, MysqlType, NoDefault, NullAttr, NumberAttr, PrimaryIndexDef, PrimaryKey, PrimaryKeyValue, RetireTableIntent, RowAttr, RowChange, RowItem, RowTombstoneItem, SchemaCatalog, SecondaryIndexDef, SpillPayload, StringAttr, TableDef, TransactionPayload, UpdateIndexChange, UpdateRowChange };
+export type { Base64Value, BinaryAttr, BoolAttr, ChangeTarget, ColumnAttr, ColumnDef, ColumnDefault, ColumnValue, ColumnValues, CreateTableIntent, DatabaseDef, DdlChange, DdlTransactionPayload, DeleteIndexChange, DeleteRowChange, DirectRowKey, DmlChange, DmlTransactionPayload, HiddenRowIdKey, IndexAttr, IndexChange, IndexChangeTarget, IndexDef, IndexItem, InsertIndexChange, InsertRowChange, KeyAttr, LiteralDefault, LiveRowItem, MvccAutoIncrementItem, MvccReaderLeaseItem, MvccSchemaItem, MvccSpillItem, MvccStateItem, MvccTransactionItem, MysqlType, NoDefault, NullAttr, NumberAttr, PrimaryIndexDef, PrimaryKey, PrimaryKeyValue, RetireTableIntent, RowAttr, RowChange, RowItem, RowKeyAttrs, RowTombstoneItem, SchemaCatalog, SecondaryIndexDef, SpillPayload, StringAttr, TableDef, TransactionPayload, TupleRowKey, UpdateIndexChange, UpdateRowChange };

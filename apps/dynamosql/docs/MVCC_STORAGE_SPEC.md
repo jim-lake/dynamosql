@@ -42,7 +42,7 @@ Genesis values are zero; schema 0 is an empty catalog. M and F are monotonic, wi
 | `tx_id`        | N    | Sort key                                                                 |
 | `tx_uuid`      | S    | Stable UUID for allocation retries                                       |
 | `last_alive`   | N    | Last writer heartbeat in Unix epoch seconds, for vacuum only             |
-| `invalidated` | BOOL | Vacuum sets this to true to permanently fence an uncommitted transaction |
+| `invalidated`  | BOOL | Vacuum sets this to true to permanently fence an uncommitted transaction |
 | `parent_tx_id` | N    | Validated head; finalized as the committed predecessor at publication    |
 | `schema_id`    | N    | Resulting schema                                                         |
 | `payload_zstd` | B    | Compressed JSON changes                                                  |
@@ -278,7 +278,7 @@ Use the table’s `dynamodb_table` value from the snapshot schema verbatim after
 | ----------------------- | ---------- | --------------------------------------- |
 | PRIMARY `dynamodb_name` | N/S/B      | Partition key                           |
 | `TX_ID`                 | N          | Sort key; creating transaction          |
-| `DELETED`              | BOOL       | True for a tombstone; absent means live |
+| `DELETED`               | BOOL       | True for a tombstone; absent means live |
 | Column `dynamodb_name`  | N/S/B/NULL | User value; lowercase attribute name    |
 
 User attributes are lowercase; system attributes are uppercase. `column_name` is the SQL name; `dynamodb_name` is the stored name. A direct PK attribute also holds its user value; do not duplicate it.
@@ -298,7 +298,7 @@ Use the secondary index's `dynamodb_table` value from the snapshot schema verbat
 | `INDEX_PARTITION`            | S          | Partition key; always `ALL`                                   |
 | `INDEX_TX_ID`                | B          | Sort key; encoded index identity followed by TX_ID            |
 | `TX_ID`                      | N          | Creating transaction; matches encoded suffix                  |
-| `DELETED`                   | BOOL       | True for a tombstone; absent means live                       |
+| `DELETED`                    | BOOL       | True for a tombstone; absent means live                       |
 | Index column `dynamodb_name` | N/S/B/NULL | Indexed user value                                            |
 | PK column `dynamodb_name`    | N/S/B      | Target primary-key value                                      |
 | `DB_ROW_ID`                  | N          | Target generated partition key, for a hidden PK               |
