@@ -1,0 +1,62 @@
+# @dynamosql/mvcc-index-encode
+
+Ordered byte encoding for DynamoSQL MVCC primary-key and index values. The
+source of truth is `apps/dynamosql/docs/MVCC_INDEX_ENCODING.md`. Read it before
+changing any encoding.
+
+## Status
+
+Only `weightString` and the tuple framing are implemented. Other value encodings
+(integers, DECIMAL, FLOAT/DOUBLE, temporal types) and the key/index builders are
+not written yet.
+
+## Layout
+
+```
+packages/mvcc-index-encode/
+├── src/
+│   ├── index.ts              # Public entry; re-exports the modules below
+│   ├── weight_string.ts      # weightString: MySQL 8.4 collation weights for a SQL value
+│   ├── collations.ts         # Supported collation list and per-character weight tables
+│   ├── collation_weights.ts  # GENERATED from MySQL. Do not edit.
+│   ├── tuple.ts              # encodeVariable: `01 || escape || 00 00` framing
+│   └── bytes.ts              # hex and byte helpers
+├── test/
+│   ├── weight_string.test.ts
+│   └── fixtures/oracle.json  # GENERATED from MySQL. Do not edit.
+├── scripts/
+│   ├── dump-oracle.mjs       # Regenerates the two generated files above
+│   └── rollup-plugin-inc-version.mjs
+├── rollup.config.mjs
+├── eslint.config.mjs
+└── tsconfig.json
+```
+
+## Rules
+
+- Collations: only `ascii_bin`, `ascii_general_ci`, `utf8mb4_0900_bin`, and
+  `utf8mb4_0900_ai_ci`. Do not add others without an oracle check. The
+  `utf8mb4_0900_as_ci` and `as_cs` collations are excluded because their MySQL
+  output groups weights by collation level, which the per-character model in the
+  spec cannot produce.
+- Non-ASCII input throws. Until full UCA weight tables exist, the code must not
+  return bytes for non-ASCII values.
+- Never truncate a value to fit a bound. Values longer than the bound throw.
+- Empty PAD SPACE text pads the weight output, not the input. Empty NO PAD text
+  has an empty weight.
+- Regenerate, do not hand-edit, `collation_weights.ts` and `oracle.json`. Run
+  `node scripts/dump-oracle.mjs` against a local MySQL 8.4 server.
+
+## Commands
+
+Run from `packages/mvcc-index-encode/`:
+
+| Task       | Command            |
+| ---------- | ------------------ |
+| Type check | `npm run ts:check` |
+| Test       | `npm test`         |
+| Build      | `npm run build`    |
+| Lint       | `npm run lint`     |
+
+`npm run build` bumps the patch version in `package.json`. `npm run pretty`
+rewrites files on disk. Run it only when the user asks.

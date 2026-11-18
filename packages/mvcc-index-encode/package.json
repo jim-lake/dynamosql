@@ -1,0 +1,29 @@
+{
+  "name": "@dynamosql/mvcc-index-encode",
+  "description": "Ordered MVCC primary-key and index encoding for DynamoSQL",
+  "version": "0.0.2",
+  "author": "github.com/jim-lake",
+  "license": "MIT",
+  "private": true,
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "ts:check": "tsc --noEmit --project tsconfig.json",
+    "lint": "eslint src test --fix",
+    "pretty": "prettier -u --write \"**/*\" --log-level warn",
+    "build": "rm -rf dist && rollup -c",
+    "test": "mocha --require tsx \"test/**/*.test.ts\""
+  },
+  "devDependencies": {
+    "@types/node": "^24.10.0",
+    "mocha": "^11.7.5",
+    "@types/mocha": "^10.0.10",
+    "chai": "^6.2.0",
+    "tsx": "^4.23.15",
+    "esbuild": "^0.28.2",
+    "rollup": "^4.52.5",
+    "rollup-plugin-dts": "^6.5.1",
+    "rollup-plugin-esbuild": "^6.2.1"
+  }
+}
