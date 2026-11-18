@@ -78,12 +78,42 @@ export function ucaWeight(codePoint: number): Uint8Array {
   return index.weights.subarray(start, start + len);
 }
 
+interface AsciiTable {
+  readonly start: Uint32Array;
+  readonly length: Uint8Array;
+}
+
+let asciiTable: AsciiTable | undefined;
+
+function buildAsciiTable(idx: UcaIndex): AsciiTable {
+  const start = new Uint32Array(128);
+  const length = new Uint8Array(128);
+  for (let cp = 0; cp < 128; cp++) {
+    const slot = slotOf(cp, idx);
+    if (slot >= 0) {
+      start[cp] = idx.offset[slot] ?? 0;
+      length[cp] = idx.length[slot] ?? 0;
+    }
+  }
+  return { start, length };
+}
+
 export function ucaWriteWeight(
   codePoint: number,
   dst: Uint8Array,
   at: number
 ): number {
   index ??= loadIndex();
+  if (codePoint >= 0 && codePoint < 128) {
+    asciiTable ??= buildAsciiTable(index);
+    const len = asciiTable.length[codePoint] ?? 0;
+    const start = asciiTable.start[codePoint] ?? 0;
+    const src = index.weights;
+    for (let k = 0; k < len; k++) {
+      dst[at + k] = src[start + k] ?? 0;
+    }
+    return len;
+  }
   const slot = slotOf(codePoint, index);
   if (slot < 0) {
     return 0;
