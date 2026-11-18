@@ -76,6 +76,22 @@ export function isPadCollation(collation: COLLATIONS | null): boolean {
     !COLLATIONS[collation].includes('_0900_')
   );
 }
+export function foldString(s: string, collation: COLLATIONS | null): string {
+  const trimmed = isPadCollation(collation)
+    ? s.replace(TRAILING_SPACES, '')
+    : s;
+  if (collation === COLLATIONS.UTF8MB4_0900_AS_CI) {
+    return trimmed.toLowerCase();
+  }
+  if (isCaseInsensitive(collation)) {
+    return trimmed
+      .normalize('NFKD')
+      .replace(/\p{M}/gu, '')
+      .toLowerCase()
+      .replace(/ß/g, 'ss');
+  }
+  return trimmed;
+}
 export function stringCompare(
   s1: string,
   s2: string,

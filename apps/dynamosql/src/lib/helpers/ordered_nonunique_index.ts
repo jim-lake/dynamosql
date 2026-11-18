@@ -28,9 +28,6 @@ export function createOrderedNonuniqueMakeKey(
         if (kinds[i] === 'buffer') {
           return (key as Buffer).toString('latin1');
         }
-        if (kinds[i] === 'string_ci') {
-          return (key as string).toLowerCase();
-        }
         return key as OrderedNullableKeyPart;
       });
       return [...parts, primaryKey];
@@ -49,12 +46,6 @@ export function createOrderedNonuniqueMakeKey(
     case 'buffer':
       return (keys, primaryKey) => [
         (keys[0] as Buffer | null)?.toString('latin1') ?? null,
-        primaryKey,
-      ];
-
-    case 'string_ci':
-      return (keys, primaryKey) => [
-        (keys[0] as string | null)?.toLowerCase() ?? null,
         primaryKey,
       ];
 
@@ -82,15 +73,6 @@ export function createOrderedNonuniqueMakeKey(
         primaryKey,
       ];
 
-    case 'string,string_ci':
-    case 'number,string_ci':
-    case 'bigint,string_ci':
-      return (keys, primaryKey) => [
-        keys[0] as OrderedNullableKeyPart,
-        (keys[1] as string | null)?.toLowerCase() ?? null,
-        primaryKey,
-      ];
-
     case 'buffer,string':
     case 'buffer,number':
     case 'buffer,bigint':
@@ -104,36 +86,6 @@ export function createOrderedNonuniqueMakeKey(
       return (keys, primaryKey) => [
         (keys[0] as Buffer | null)?.toString('latin1') ?? null,
         (keys[1] as Buffer | null)?.toString('latin1') ?? null,
-        primaryKey,
-      ];
-
-    case 'buffer,string_ci':
-      return (keys, primaryKey) => [
-        (keys[0] as Buffer | null)?.toString('latin1') ?? null,
-        (keys[1] as string | null)?.toLowerCase() ?? null,
-        primaryKey,
-      ];
-
-    case 'string_ci,string':
-    case 'string_ci,number':
-    case 'string_ci,bigint':
-      return (keys, primaryKey) => [
-        (keys[0] as string | null)?.toLowerCase() ?? null,
-        keys[1] as OrderedNullableKeyPart,
-        primaryKey,
-      ];
-
-    case 'string_ci,buffer':
-      return (keys, primaryKey) => [
-        (keys[0] as string | null)?.toLowerCase() ?? null,
-        (keys[1] as Buffer | null)?.toString('latin1') ?? null,
-        primaryKey,
-      ];
-
-    case 'string_ci,string_ci':
-      return (keys, primaryKey) => [
-        (keys[0] as string | null)?.toLowerCase() ?? null,
-        (keys[1] as string | null)?.toLowerCase() ?? null,
         primaryKey,
       ];
   }

@@ -1,5 +1,3 @@
-import { isCaseInsensitive } from './collation';
-
 import type { ColumnDef } from '../engine';
 import type {
   HashUniqueKeyType,
@@ -21,9 +19,6 @@ export function getKeyTypes(columns: ColumnDef[]): HashUniqueKeyType[] {
       case 'string':
       case 'char':
       case 'text':
-        return isCaseInsensitive(column.collation ?? null)
-          ? 'string_ci'
-          : 'string';
       case 'null':
       case 'json':
         return 'string';

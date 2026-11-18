@@ -26,11 +26,6 @@ describe('Hash index makeKey', () => {
       expect(makeKey([Buffer.from([0x61, 0xff])])).to.equal('aÿ');
     });
 
-    it('single string_ci key ignores case', () => {
-      const makeKey = createHashUniqueMakeKey(['string_ci']);
-      expect(makeKey(['Alpha'])).to.equal(makeKey(['ALPHA']));
-    });
-
     it('two-column key with string and bigint serializes both parts', () => {
       const makeKey = createHashUniqueMakeKey(['string', 'bigint']);
       expect(makeKey(['a', BigInt(5)])).to.equal(JSON.stringify(['a', '5']));
@@ -41,20 +36,10 @@ describe('Hash index makeKey', () => {
       expect(makeKey(['a,b', 'c'])).to.not.equal(makeKey(['a', 'b,c']));
     });
 
-    it('two-column key with string_ci ignores case in that column only', () => {
-      const makeKey = createHashUniqueMakeKey(['string_ci', 'string']);
-      expect(makeKey(['ABC', 'x'])).to.equal(makeKey(['abc', 'x']));
-      expect(makeKey(['abc', 'X'])).to.not.equal(makeKey(['abc', 'x']));
-    });
-
     it('three-column key with buffer and number is stable', () => {
-      const makeKey = createHashUniqueMakeKey([
-        'buffer',
-        'number',
-        'string_ci',
-      ]);
+      const makeKey = createHashUniqueMakeKey(['buffer', 'number', 'string']);
       expect(makeKey([Buffer.from('ab'), 1, 'Q'])).to.equal(
-        makeKey([Buffer.from('ab'), 1, 'q'])
+        makeKey([Buffer.from('ab'), 1, 'Q'])
       );
     });
 
@@ -63,11 +48,11 @@ describe('Hash index makeKey', () => {
         'string',
         'number',
         'bigint',
-        'string_ci',
+        'string',
       ]);
       const first = makeKey(['a', 1, BigInt(2), 'X']);
-      expect(first).to.equal(makeKey(['a', 1, BigInt(2), 'x']));
-      expect(first).to.not.equal(makeKey(['a', 1, BigInt(3), 'x']));
+      expect(first).to.equal(makeKey(['a', 1, BigInt(2), 'X']));
+      expect(first).to.not.equal(makeKey(['a', 1, BigInt(3), 'X']));
     });
   });
 
@@ -113,10 +98,9 @@ describe('Hash index makeKey', () => {
       );
     });
 
-    it('NULL single string_ci key differs between primary keys', () => {
-      const makeKey = createHashNullableMakeKey(['string_ci'], 'string');
+    it('NULL single string key differs between primary keys', () => {
+      const makeKey = createHashNullableMakeKey(['string'], 'string');
       expect(makeKey([null], 'a')).to.not.equal(makeKey([null], 'b'));
-      expect(makeKey(['ABC'], 'a')).to.equal(makeKey(['abc'], 'a'));
     });
 
     it('two-column key with no NULL matches the unique key', () => {
@@ -152,7 +136,7 @@ describe('Hash index makeKey', () => {
 
     it('three-column key with NULL differs between primary keys', () => {
       const makeKey = createHashNullableMakeKey(
-        ['string', 'bigint', 'string_ci'],
+        ['string', 'bigint', 'string'],
         'bigint'
       );
       expect(makeKey(['a', BigInt(1), null], BigInt(1))).to.not.equal(
@@ -161,9 +145,9 @@ describe('Hash index makeKey', () => {
     });
 
     it('three-column key without NULL matches the unique key', () => {
-      const unique = createHashUniqueMakeKey(['string', 'bigint', 'string_ci']);
+      const unique = createHashUniqueMakeKey(['string', 'bigint', 'string']);
       const makeKey = createHashNullableMakeKey(
-        ['string', 'bigint', 'string_ci'],
+        ['string', 'bigint', 'string'],
         'bigint'
       );
       expect(makeKey(['a', BigInt(1), 'X'], BigInt(9))).to.equal(
@@ -176,10 +160,10 @@ describe('Hash index makeKey', () => {
         'string',
         'number',
         'bigint',
-        'string_ci',
+        'string',
       ]);
       const makeKey = createHashNullableMakeKey(
-        ['string', 'number', 'bigint', 'string_ci'],
+        ['string', 'number', 'bigint', 'string'],
         'string'
       );
       expect(makeKey(['a', 1, BigInt(2), 'X'], 'p1')).to.equal(

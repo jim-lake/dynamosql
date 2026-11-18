@@ -17,16 +17,14 @@ export function createHashNonuniqueMakeKey(
   if (types.length > 3) {
     return (keys, primaryKey) => {
       const json = JSON.stringify(
-        keys.map((key, i) => {
+        keys.map((key) => {
           if (Buffer.isBuffer(key)) {
             return key.toString('latin1');
           }
           if (typeof key === 'bigint') {
             return key.toString();
           }
-          return types[i] === 'string_ci'
-            ? (key as string | null)?.toLowerCase()
-            : key;
+          return key;
         })
       );
       return `${json}:${primaryKey}`;
@@ -58,18 +56,6 @@ export function createHashNonuniqueMakeKey(
     case 'number.buffer':
       return (keys, primaryKey) =>
         `${(keys[0] as Buffer | null)?.toString('latin1') ?? null}:${primaryKey}`;
-
-    case 'string.string_ci':
-      return (keys, primaryKey) =>
-        JSON.stringify([
-          (keys[0] as string | null)?.toLowerCase() ?? null,
-          primaryKey,
-        ]);
-
-    case 'bigint.string_ci':
-    case 'number.string_ci':
-      return (keys, primaryKey) =>
-        `${(keys[0] as string | null)?.toLowerCase() ?? null}:${primaryKey}`;
 
     case 'string.string,string':
     case 'bigint.string,string':
@@ -127,15 +113,6 @@ export function createHashNonuniqueMakeKey(
       return (keys, primaryKey) =>
         `${JSON.stringify([keys[0], (keys[1] as Buffer | null)?.toString('latin1')])}:${primaryKey}`;
 
-    case 'string.string,string_ci':
-    case 'bigint.string,string_ci':
-    case 'number.string,string_ci':
-    case 'string.number,string_ci':
-    case 'bigint.number,string_ci':
-    case 'number.number,string_ci':
-      return (keys, primaryKey) =>
-        `${JSON.stringify([keys[0], (keys[1] as string | null)?.toLowerCase()])}:${primaryKey}`;
-
     case 'string.bigint,string':
     case 'bigint.bigint,string':
     case 'number.bigint,string':
@@ -157,12 +134,6 @@ export function createHashNonuniqueMakeKey(
       return (keys, primaryKey) =>
         `${JSON.stringify([(keys[0] as bigint | null)?.toString(), (keys[1] as Buffer | null)?.toString('latin1')])}:${primaryKey}`;
 
-    case 'string.bigint,string_ci':
-    case 'bigint.bigint,string_ci':
-    case 'number.bigint,string_ci':
-      return (keys, primaryKey) =>
-        `${JSON.stringify([(keys[0] as bigint | null)?.toString(), (keys[1] as string | null)?.toLowerCase()])}:${primaryKey}`;
-
     case 'string.buffer,string':
     case 'bigint.buffer,string':
     case 'number.buffer,string':
@@ -183,39 +154,6 @@ export function createHashNonuniqueMakeKey(
     case 'number.buffer,buffer':
       return (keys, primaryKey) =>
         `${JSON.stringify([(keys[0] as Buffer | null)?.toString('latin1'), (keys[1] as Buffer | null)?.toString('latin1')])}:${primaryKey}`;
-
-    case 'string.buffer,string_ci':
-    case 'bigint.buffer,string_ci':
-    case 'number.buffer,string_ci':
-      return (keys, primaryKey) =>
-        `${JSON.stringify([(keys[0] as Buffer | null)?.toString('latin1'), (keys[1] as string | null)?.toLowerCase()])}:${primaryKey}`;
-
-    case 'string.string_ci,string':
-    case 'bigint.string_ci,string':
-    case 'number.string_ci,string':
-    case 'string.string_ci,number':
-    case 'bigint.string_ci,number':
-    case 'number.string_ci,number':
-      return (keys, primaryKey) =>
-        `${JSON.stringify([(keys[0] as string | null)?.toLowerCase(), keys[1]])}:${primaryKey}`;
-
-    case 'string.string_ci,bigint':
-    case 'bigint.string_ci,bigint':
-    case 'number.string_ci,bigint':
-      return (keys, primaryKey) =>
-        `${JSON.stringify([(keys[0] as string | null)?.toLowerCase(), (keys[1] as bigint | null)?.toString()])}:${primaryKey}`;
-
-    case 'string.string_ci,buffer':
-    case 'bigint.string_ci,buffer':
-    case 'number.string_ci,buffer':
-      return (keys, primaryKey) =>
-        `${JSON.stringify([(keys[0] as string | null)?.toLowerCase(), (keys[1] as Buffer | null)?.toString('latin1')])}:${primaryKey}`;
-
-    case 'string.string_ci,string_ci':
-    case 'bigint.string_ci,string_ci':
-    case 'number.string_ci,string_ci':
-      return (keys, primaryKey) =>
-        `${JSON.stringify([(keys[0] as string | null)?.toLowerCase(), (keys[1] as string | null)?.toLowerCase()])}:${primaryKey}`;
 
     case 'string.string,string,bigint':
     case 'bigint.string,string,bigint':
@@ -246,21 +184,6 @@ export function createHashNonuniqueMakeKey(
     case 'number.number,number,buffer':
       return (keys, primaryKey) =>
         `${JSON.stringify([keys[0], keys[1], (keys[2] as Buffer | null)?.toString('latin1')])}:${primaryKey}`;
-
-    case 'string.string,string,string_ci':
-    case 'bigint.string,string,string_ci':
-    case 'number.string,string,string_ci':
-    case 'string.string,number,string_ci':
-    case 'bigint.string,number,string_ci':
-    case 'number.string,number,string_ci':
-    case 'string.number,string,string_ci':
-    case 'bigint.number,string,string_ci':
-    case 'number.number,string,string_ci':
-    case 'string.number,number,string_ci':
-    case 'bigint.number,number,string_ci':
-    case 'number.number,number,string_ci':
-      return (keys, primaryKey) =>
-        `${JSON.stringify([keys[0], keys[1], (keys[2] as string | null)?.toLowerCase()])}:${primaryKey}`;
 
     case 'string.string,bigint,string':
     case 'bigint.string,bigint,string':
@@ -295,15 +218,6 @@ export function createHashNonuniqueMakeKey(
       return (keys, primaryKey) =>
         `${JSON.stringify([keys[0], (keys[1] as bigint | null)?.toString(), (keys[2] as Buffer | null)?.toString('latin1')])}:${primaryKey}`;
 
-    case 'string.string,bigint,string_ci':
-    case 'bigint.string,bigint,string_ci':
-    case 'number.string,bigint,string_ci':
-    case 'string.number,bigint,string_ci':
-    case 'bigint.number,bigint,string_ci':
-    case 'number.number,bigint,string_ci':
-      return (keys, primaryKey) =>
-        `${JSON.stringify([keys[0], (keys[1] as bigint | null)?.toString(), (keys[2] as string | null)?.toLowerCase()])}:${primaryKey}`;
-
     case 'string.string,buffer,string':
     case 'bigint.string,buffer,string':
     case 'number.string,buffer,string':
@@ -336,57 +250,6 @@ export function createHashNonuniqueMakeKey(
     case 'number.number,buffer,buffer':
       return (keys, primaryKey) =>
         `${JSON.stringify([keys[0], (keys[1] as Buffer | null)?.toString('latin1'), (keys[2] as Buffer | null)?.toString('latin1')])}:${primaryKey}`;
-
-    case 'string.string,buffer,string_ci':
-    case 'bigint.string,buffer,string_ci':
-    case 'number.string,buffer,string_ci':
-    case 'string.number,buffer,string_ci':
-    case 'bigint.number,buffer,string_ci':
-    case 'number.number,buffer,string_ci':
-      return (keys, primaryKey) =>
-        `${JSON.stringify([keys[0], (keys[1] as Buffer | null)?.toString('latin1'), (keys[2] as string | null)?.toLowerCase()])}:${primaryKey}`;
-
-    case 'string.string,string_ci,string':
-    case 'bigint.string,string_ci,string':
-    case 'number.string,string_ci,string':
-    case 'string.string,string_ci,number':
-    case 'bigint.string,string_ci,number':
-    case 'number.string,string_ci,number':
-    case 'string.number,string_ci,string':
-    case 'bigint.number,string_ci,string':
-    case 'number.number,string_ci,string':
-    case 'string.number,string_ci,number':
-    case 'bigint.number,string_ci,number':
-    case 'number.number,string_ci,number':
-      return (keys, primaryKey) =>
-        `${JSON.stringify([keys[0], (keys[1] as string | null)?.toLowerCase(), keys[2]])}:${primaryKey}`;
-
-    case 'string.string,string_ci,bigint':
-    case 'bigint.string,string_ci,bigint':
-    case 'number.string,string_ci,bigint':
-    case 'string.number,string_ci,bigint':
-    case 'bigint.number,string_ci,bigint':
-    case 'number.number,string_ci,bigint':
-      return (keys, primaryKey) =>
-        `${JSON.stringify([keys[0], (keys[1] as string | null)?.toLowerCase(), (keys[2] as bigint | null)?.toString()])}:${primaryKey}`;
-
-    case 'string.string,string_ci,buffer':
-    case 'bigint.string,string_ci,buffer':
-    case 'number.string,string_ci,buffer':
-    case 'string.number,string_ci,buffer':
-    case 'bigint.number,string_ci,buffer':
-    case 'number.number,string_ci,buffer':
-      return (keys, primaryKey) =>
-        `${JSON.stringify([keys[0], (keys[1] as string | null)?.toLowerCase(), (keys[2] as Buffer | null)?.toString('latin1')])}:${primaryKey}`;
-
-    case 'string.string,string_ci,string_ci':
-    case 'bigint.string,string_ci,string_ci':
-    case 'number.string,string_ci,string_ci':
-    case 'string.number,string_ci,string_ci':
-    case 'bigint.number,string_ci,string_ci':
-    case 'number.number,string_ci,string_ci':
-      return (keys, primaryKey) =>
-        `${JSON.stringify([keys[0], (keys[1] as string | null)?.toLowerCase(), (keys[2] as string | null)?.toLowerCase()])}:${primaryKey}`;
 
     case 'string.bigint,string,string':
     case 'bigint.bigint,string,string':
@@ -421,15 +284,6 @@ export function createHashNonuniqueMakeKey(
       return (keys, primaryKey) =>
         `${JSON.stringify([(keys[0] as bigint | null)?.toString(), keys[1], (keys[2] as Buffer | null)?.toString('latin1')])}:${primaryKey}`;
 
-    case 'string.bigint,string,string_ci':
-    case 'bigint.bigint,string,string_ci':
-    case 'number.bigint,string,string_ci':
-    case 'string.bigint,number,string_ci':
-    case 'bigint.bigint,number,string_ci':
-    case 'number.bigint,number,string_ci':
-      return (keys, primaryKey) =>
-        `${JSON.stringify([(keys[0] as bigint | null)?.toString(), keys[1], (keys[2] as string | null)?.toLowerCase()])}:${primaryKey}`;
-
     case 'string.bigint,bigint,string':
     case 'bigint.bigint,bigint,string':
     case 'number.bigint,bigint,string':
@@ -451,12 +305,6 @@ export function createHashNonuniqueMakeKey(
       return (keys, primaryKey) =>
         `${JSON.stringify([(keys[0] as bigint | null)?.toString(), (keys[1] as bigint | null)?.toString(), (keys[2] as Buffer | null)?.toString('latin1')])}:${primaryKey}`;
 
-    case 'string.bigint,bigint,string_ci':
-    case 'bigint.bigint,bigint,string_ci':
-    case 'number.bigint,bigint,string_ci':
-      return (keys, primaryKey) =>
-        `${JSON.stringify([(keys[0] as bigint | null)?.toString(), (keys[1] as bigint | null)?.toString(), (keys[2] as string | null)?.toLowerCase()])}:${primaryKey}`;
-
     case 'string.bigint,buffer,string':
     case 'bigint.bigint,buffer,string':
     case 'number.bigint,buffer,string':
@@ -477,39 +325,6 @@ export function createHashNonuniqueMakeKey(
     case 'number.bigint,buffer,buffer':
       return (keys, primaryKey) =>
         `${JSON.stringify([(keys[0] as bigint | null)?.toString(), (keys[1] as Buffer | null)?.toString('latin1'), (keys[2] as Buffer | null)?.toString('latin1')])}:${primaryKey}`;
-
-    case 'string.bigint,buffer,string_ci':
-    case 'bigint.bigint,buffer,string_ci':
-    case 'number.bigint,buffer,string_ci':
-      return (keys, primaryKey) =>
-        `${JSON.stringify([(keys[0] as bigint | null)?.toString(), (keys[1] as Buffer | null)?.toString('latin1'), (keys[2] as string | null)?.toLowerCase()])}:${primaryKey}`;
-
-    case 'string.bigint,string_ci,string':
-    case 'bigint.bigint,string_ci,string':
-    case 'number.bigint,string_ci,string':
-    case 'string.bigint,string_ci,number':
-    case 'bigint.bigint,string_ci,number':
-    case 'number.bigint,string_ci,number':
-      return (keys, primaryKey) =>
-        `${JSON.stringify([(keys[0] as bigint | null)?.toString(), (keys[1] as string | null)?.toLowerCase(), keys[2]])}:${primaryKey}`;
-
-    case 'string.bigint,string_ci,bigint':
-    case 'bigint.bigint,string_ci,bigint':
-    case 'number.bigint,string_ci,bigint':
-      return (keys, primaryKey) =>
-        `${JSON.stringify([(keys[0] as bigint | null)?.toString(), (keys[1] as string | null)?.toLowerCase(), (keys[2] as bigint | null)?.toString()])}:${primaryKey}`;
-
-    case 'string.bigint,string_ci,buffer':
-    case 'bigint.bigint,string_ci,buffer':
-    case 'number.bigint,string_ci,buffer':
-      return (keys, primaryKey) =>
-        `${JSON.stringify([(keys[0] as bigint | null)?.toString(), (keys[1] as string | null)?.toLowerCase(), (keys[2] as Buffer | null)?.toString('latin1')])}:${primaryKey}`;
-
-    case 'string.bigint,string_ci,string_ci':
-    case 'bigint.bigint,string_ci,string_ci':
-    case 'number.bigint,string_ci,string_ci':
-      return (keys, primaryKey) =>
-        `${JSON.stringify([(keys[0] as bigint | null)?.toString(), (keys[1] as string | null)?.toLowerCase(), (keys[2] as string | null)?.toLowerCase()])}:${primaryKey}`;
 
     case 'string.buffer,string,string':
     case 'bigint.buffer,string,string':
@@ -544,15 +359,6 @@ export function createHashNonuniqueMakeKey(
       return (keys, primaryKey) =>
         `${JSON.stringify([(keys[0] as Buffer | null)?.toString('latin1'), keys[1], (keys[2] as Buffer | null)?.toString('latin1')])}:${primaryKey}`;
 
-    case 'string.buffer,string,string_ci':
-    case 'bigint.buffer,string,string_ci':
-    case 'number.buffer,string,string_ci':
-    case 'string.buffer,number,string_ci':
-    case 'bigint.buffer,number,string_ci':
-    case 'number.buffer,number,string_ci':
-      return (keys, primaryKey) =>
-        `${JSON.stringify([(keys[0] as Buffer | null)?.toString('latin1'), keys[1], (keys[2] as string | null)?.toLowerCase()])}:${primaryKey}`;
-
     case 'string.buffer,bigint,string':
     case 'bigint.buffer,bigint,string':
     case 'number.buffer,bigint,string':
@@ -574,12 +380,6 @@ export function createHashNonuniqueMakeKey(
       return (keys, primaryKey) =>
         `${JSON.stringify([(keys[0] as Buffer | null)?.toString('latin1'), (keys[1] as bigint | null)?.toString(), (keys[2] as Buffer | null)?.toString('latin1')])}:${primaryKey}`;
 
-    case 'string.buffer,bigint,string_ci':
-    case 'bigint.buffer,bigint,string_ci':
-    case 'number.buffer,bigint,string_ci':
-      return (keys, primaryKey) =>
-        `${JSON.stringify([(keys[0] as Buffer | null)?.toString('latin1'), (keys[1] as bigint | null)?.toString(), (keys[2] as string | null)?.toLowerCase()])}:${primaryKey}`;
-
     case 'string.buffer,buffer,string':
     case 'bigint.buffer,buffer,string':
     case 'number.buffer,buffer,string':
@@ -600,162 +400,6 @@ export function createHashNonuniqueMakeKey(
     case 'number.buffer,buffer,buffer':
       return (keys, primaryKey) =>
         `${JSON.stringify([(keys[0] as Buffer | null)?.toString('latin1'), (keys[1] as Buffer | null)?.toString('latin1'), (keys[2] as Buffer | null)?.toString('latin1')])}:${primaryKey}`;
-
-    case 'string.buffer,buffer,string_ci':
-    case 'bigint.buffer,buffer,string_ci':
-    case 'number.buffer,buffer,string_ci':
-      return (keys, primaryKey) =>
-        `${JSON.stringify([(keys[0] as Buffer | null)?.toString('latin1'), (keys[1] as Buffer | null)?.toString('latin1'), (keys[2] as string | null)?.toLowerCase()])}:${primaryKey}`;
-
-    case 'string.buffer,string_ci,string':
-    case 'bigint.buffer,string_ci,string':
-    case 'number.buffer,string_ci,string':
-    case 'string.buffer,string_ci,number':
-    case 'bigint.buffer,string_ci,number':
-    case 'number.buffer,string_ci,number':
-      return (keys, primaryKey) =>
-        `${JSON.stringify([(keys[0] as Buffer | null)?.toString('latin1'), (keys[1] as string | null)?.toLowerCase(), keys[2]])}:${primaryKey}`;
-
-    case 'string.buffer,string_ci,bigint':
-    case 'bigint.buffer,string_ci,bigint':
-    case 'number.buffer,string_ci,bigint':
-      return (keys, primaryKey) =>
-        `${JSON.stringify([(keys[0] as Buffer | null)?.toString('latin1'), (keys[1] as string | null)?.toLowerCase(), (keys[2] as bigint | null)?.toString()])}:${primaryKey}`;
-
-    case 'string.buffer,string_ci,buffer':
-    case 'bigint.buffer,string_ci,buffer':
-    case 'number.buffer,string_ci,buffer':
-      return (keys, primaryKey) =>
-        `${JSON.stringify([(keys[0] as Buffer | null)?.toString('latin1'), (keys[1] as string | null)?.toLowerCase(), (keys[2] as Buffer | null)?.toString('latin1')])}:${primaryKey}`;
-
-    case 'string.buffer,string_ci,string_ci':
-    case 'bigint.buffer,string_ci,string_ci':
-    case 'number.buffer,string_ci,string_ci':
-      return (keys, primaryKey) =>
-        `${JSON.stringify([(keys[0] as Buffer | null)?.toString('latin1'), (keys[1] as string | null)?.toLowerCase(), (keys[2] as string | null)?.toLowerCase()])}:${primaryKey}`;
-
-    case 'string.string_ci,string,string':
-    case 'bigint.string_ci,string,string':
-    case 'number.string_ci,string,string':
-    case 'string.string_ci,string,number':
-    case 'bigint.string_ci,string,number':
-    case 'number.string_ci,string,number':
-    case 'string.string_ci,number,string':
-    case 'bigint.string_ci,number,string':
-    case 'number.string_ci,number,string':
-    case 'string.string_ci,number,number':
-    case 'bigint.string_ci,number,number':
-    case 'number.string_ci,number,number':
-      return (keys, primaryKey) =>
-        `${JSON.stringify([(keys[0] as string | null)?.toLowerCase(), keys[1], keys[2]])}:${primaryKey}`;
-
-    case 'string.string_ci,string,bigint':
-    case 'bigint.string_ci,string,bigint':
-    case 'number.string_ci,string,bigint':
-    case 'string.string_ci,number,bigint':
-    case 'bigint.string_ci,number,bigint':
-    case 'number.string_ci,number,bigint':
-      return (keys, primaryKey) =>
-        `${JSON.stringify([(keys[0] as string | null)?.toLowerCase(), keys[1], (keys[2] as bigint | null)?.toString()])}:${primaryKey}`;
-
-    case 'string.string_ci,string,buffer':
-    case 'bigint.string_ci,string,buffer':
-    case 'number.string_ci,string,buffer':
-    case 'string.string_ci,number,buffer':
-    case 'bigint.string_ci,number,buffer':
-    case 'number.string_ci,number,buffer':
-      return (keys, primaryKey) =>
-        `${JSON.stringify([(keys[0] as string | null)?.toLowerCase(), keys[1], (keys[2] as Buffer | null)?.toString('latin1')])}:${primaryKey}`;
-
-    case 'string.string_ci,string,string_ci':
-    case 'bigint.string_ci,string,string_ci':
-    case 'number.string_ci,string,string_ci':
-    case 'string.string_ci,number,string_ci':
-    case 'bigint.string_ci,number,string_ci':
-    case 'number.string_ci,number,string_ci':
-      return (keys, primaryKey) =>
-        `${JSON.stringify([(keys[0] as string | null)?.toLowerCase(), keys[1], (keys[2] as string | null)?.toLowerCase()])}:${primaryKey}`;
-
-    case 'string.string_ci,bigint,string':
-    case 'bigint.string_ci,bigint,string':
-    case 'number.string_ci,bigint,string':
-    case 'string.string_ci,bigint,number':
-    case 'bigint.string_ci,bigint,number':
-    case 'number.string_ci,bigint,number':
-      return (keys, primaryKey) =>
-        `${JSON.stringify([(keys[0] as string | null)?.toLowerCase(), (keys[1] as bigint | null)?.toString(), keys[2]])}:${primaryKey}`;
-
-    case 'string.string_ci,bigint,bigint':
-    case 'bigint.string_ci,bigint,bigint':
-    case 'number.string_ci,bigint,bigint':
-      return (keys, primaryKey) =>
-        `${JSON.stringify([(keys[0] as string | null)?.toLowerCase(), (keys[1] as bigint | null)?.toString(), (keys[2] as bigint | null)?.toString()])}:${primaryKey}`;
-
-    case 'string.string_ci,bigint,buffer':
-    case 'bigint.string_ci,bigint,buffer':
-    case 'number.string_ci,bigint,buffer':
-      return (keys, primaryKey) =>
-        `${JSON.stringify([(keys[0] as string | null)?.toLowerCase(), (keys[1] as bigint | null)?.toString(), (keys[2] as Buffer | null)?.toString('latin1')])}:${primaryKey}`;
-
-    case 'string.string_ci,bigint,string_ci':
-    case 'bigint.string_ci,bigint,string_ci':
-    case 'number.string_ci,bigint,string_ci':
-      return (keys, primaryKey) =>
-        `${JSON.stringify([(keys[0] as string | null)?.toLowerCase(), (keys[1] as bigint | null)?.toString(), (keys[2] as string | null)?.toLowerCase()])}:${primaryKey}`;
-
-    case 'string.string_ci,buffer,string':
-    case 'bigint.string_ci,buffer,string':
-    case 'number.string_ci,buffer,string':
-    case 'string.string_ci,buffer,number':
-    case 'bigint.string_ci,buffer,number':
-    case 'number.string_ci,buffer,number':
-      return (keys, primaryKey) =>
-        `${JSON.stringify([(keys[0] as string | null)?.toLowerCase(), (keys[1] as Buffer | null)?.toString('latin1'), keys[2]])}:${primaryKey}`;
-
-    case 'string.string_ci,buffer,bigint':
-    case 'bigint.string_ci,buffer,bigint':
-    case 'number.string_ci,buffer,bigint':
-      return (keys, primaryKey) =>
-        `${JSON.stringify([(keys[0] as string | null)?.toLowerCase(), (keys[1] as Buffer | null)?.toString('latin1'), (keys[2] as bigint | null)?.toString()])}:${primaryKey}`;
-
-    case 'string.string_ci,buffer,buffer':
-    case 'bigint.string_ci,buffer,buffer':
-    case 'number.string_ci,buffer,buffer':
-      return (keys, primaryKey) =>
-        `${JSON.stringify([(keys[0] as string | null)?.toLowerCase(), (keys[1] as Buffer | null)?.toString('latin1'), (keys[2] as Buffer | null)?.toString('latin1')])}:${primaryKey}`;
-
-    case 'string.string_ci,buffer,string_ci':
-    case 'bigint.string_ci,buffer,string_ci':
-    case 'number.string_ci,buffer,string_ci':
-      return (keys, primaryKey) =>
-        `${JSON.stringify([(keys[0] as string | null)?.toLowerCase(), (keys[1] as Buffer | null)?.toString('latin1'), (keys[2] as string | null)?.toLowerCase()])}:${primaryKey}`;
-
-    case 'string.string_ci,string_ci,string':
-    case 'bigint.string_ci,string_ci,string':
-    case 'number.string_ci,string_ci,string':
-    case 'string.string_ci,string_ci,number':
-    case 'bigint.string_ci,string_ci,number':
-    case 'number.string_ci,string_ci,number':
-      return (keys, primaryKey) =>
-        `${JSON.stringify([(keys[0] as string | null)?.toLowerCase(), (keys[1] as string | null)?.toLowerCase(), keys[2]])}:${primaryKey}`;
-
-    case 'string.string_ci,string_ci,bigint':
-    case 'bigint.string_ci,string_ci,bigint':
-    case 'number.string_ci,string_ci,bigint':
-      return (keys, primaryKey) =>
-        `${JSON.stringify([(keys[0] as string | null)?.toLowerCase(), (keys[1] as string | null)?.toLowerCase(), (keys[2] as bigint | null)?.toString()])}:${primaryKey}`;
-
-    case 'string.string_ci,string_ci,buffer':
-    case 'bigint.string_ci,string_ci,buffer':
-    case 'number.string_ci,string_ci,buffer':
-      return (keys, primaryKey) =>
-        `${JSON.stringify([(keys[0] as string | null)?.toLowerCase(), (keys[1] as string | null)?.toLowerCase(), (keys[2] as Buffer | null)?.toString('latin1')])}:${primaryKey}`;
-
-    case 'string.string_ci,string_ci,string_ci':
-    case 'bigint.string_ci,string_ci,string_ci':
-    case 'number.string_ci,string_ci,string_ci':
-      return (keys, primaryKey) =>
-        `${JSON.stringify([(keys[0] as string | null)?.toLowerCase(), (keys[1] as string | null)?.toLowerCase(), (keys[2] as string | null)?.toLowerCase()])}:${primaryKey}`;
   }
 
   throw new Error(`Unsupported hash key types: ${types.join(',')}`);

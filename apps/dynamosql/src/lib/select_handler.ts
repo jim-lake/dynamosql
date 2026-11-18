@@ -1,15 +1,10 @@
 import { setTimeout } from 'node:timers/promises';
 
-import { COLLATIONS } from '../constants/mysql';
 import { SQLError } from '../error';
 
 import * as Expression from './expression';
 import { isBaseFrom, isDerivedFrom } from './helpers/ast_helper';
-import {
-  getExprCollation,
-  isCaseInsensitive,
-  isPadCollation,
-} from './helpers/collation';
+import { foldString, getExprCollation } from './helpers/collation';
 import { resolveReferences } from './helpers/column_ref_helper';
 import { makeEngineGroups } from './helpers/engine_groups';
 import { formGroup, formImplicitGroup, hasAggregate } from './helpers/group';
@@ -526,19 +521,7 @@ async function _evaluateReturn(
           const parts = collations.map((collation, index) => {
             const value = row.result?.[index]?.value;
             if (typeof value === 'string') {
-              let folded = isPadCollation(collation)
-                ? value.replace(/ +$/, '')
-                : value;
-              if (collation === COLLATIONS.UTF8MB4_0900_AS_CI) {
-                folded = folded.toLowerCase();
-              } else if (isCaseInsensitive(collation)) {
-                folded = folded
-                  .normalize('NFKD')
-                  .replace(/\p{M}/gu, '')
-                  .toLowerCase()
-                  .replace(/ß/g, 'ss');
-              }
-              return `s${folded}`;
+              return `s${foldString(value, collation)}`;
             }
             if (value === null || value === undefined) {
               return 'n';

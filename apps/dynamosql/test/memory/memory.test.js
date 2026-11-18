@@ -140,6 +140,16 @@ describe('Temp', function () {
     path.join(__dirname, 'memory_null_key_wide_error.sql'),
     { allowedErrors: 'SAME_CODE', skipAffected: true, checkChanged: true }
   );
+  runTests(
+    'memory_ai_ci_key.sql',
+    path.join(__dirname, 'memory_ai_ci_key.sql'),
+    { checkChanged: true }
+  );
+  runTests(
+    'memory_ai_ci_key_error.sql',
+    path.join(__dirname, 'memory_ai_ci_key_error.sql'),
+    { allowedErrors: 'SAME_CODE', skipAffected: true, checkChanged: true }
+  );
   runTests('memory_strict.sql', path.join(__dirname, 'memory_strict.sql'), {
     checkChanged: true,
   });

@@ -30,9 +30,6 @@ export function createOrderedNullableMakeKey(
         if (kinds[i] === 'buffer') {
           return (key as Buffer).toString('latin1');
         }
-        if (kinds[i] === 'string_ci') {
-          return (key as string).toLowerCase();
-        }
         return key as OrderedNullableKeyPart;
       });
       return parts.includes(null) ? [...parts, primaryKey] : parts;
@@ -53,12 +50,6 @@ export function createOrderedNullableMakeKey(
         keys[0] === null
           ? [(keys[0] as Buffer | null)?.toString('latin1') ?? null, primaryKey]
           : [(keys[0] as Buffer | null)?.toString('latin1') ?? null];
-
-    case 'string_ci':
-      return (keys, primaryKey) =>
-        keys[0] === null
-          ? [(keys[0] as string | null)?.toLowerCase() ?? null, primaryKey]
-          : [(keys[0] as string | null)?.toLowerCase() ?? null];
 
     case 'string,string':
     case 'string,number':
@@ -96,21 +87,6 @@ export function createOrderedNullableMakeKey(
               (keys[1] as Buffer | null)?.toString('latin1') ?? null,
             ];
 
-    case 'string,string_ci':
-    case 'number,string_ci':
-    case 'bigint,string_ci':
-      return (keys, primaryKey) =>
-        keys[0] === null || keys[1] === null
-          ? [
-              keys[0] as OrderedNullableKeyPart,
-              (keys[1] as string | null)?.toLowerCase() ?? null,
-              primaryKey,
-            ]
-          : [
-              keys[0] as OrderedNullableKeyPart,
-              (keys[1] as string | null)?.toLowerCase() ?? null,
-            ];
-
     case 'buffer,string':
     case 'buffer,number':
     case 'buffer,bigint':
@@ -137,60 +113,6 @@ export function createOrderedNullableMakeKey(
           : [
               (keys[0] as Buffer | null)?.toString('latin1') ?? null,
               (keys[1] as Buffer | null)?.toString('latin1') ?? null,
-            ];
-
-    case 'buffer,string_ci':
-      return (keys, primaryKey) =>
-        keys[0] === null || keys[1] === null
-          ? [
-              (keys[0] as Buffer | null)?.toString('latin1') ?? null,
-              (keys[1] as string | null)?.toLowerCase() ?? null,
-              primaryKey,
-            ]
-          : [
-              (keys[0] as Buffer | null)?.toString('latin1') ?? null,
-              (keys[1] as string | null)?.toLowerCase() ?? null,
-            ];
-
-    case 'string_ci,string':
-    case 'string_ci,number':
-    case 'string_ci,bigint':
-      return (keys, primaryKey) =>
-        keys[0] === null || keys[1] === null
-          ? [
-              (keys[0] as string | null)?.toLowerCase() ?? null,
-              keys[1] as OrderedNullableKeyPart,
-              primaryKey,
-            ]
-          : [
-              (keys[0] as string | null)?.toLowerCase() ?? null,
-              keys[1] as OrderedNullableKeyPart,
-            ];
-
-    case 'string_ci,buffer':
-      return (keys, primaryKey) =>
-        keys[0] === null || keys[1] === null
-          ? [
-              (keys[0] as string | null)?.toLowerCase() ?? null,
-              (keys[1] as Buffer | null)?.toString('latin1') ?? null,
-              primaryKey,
-            ]
-          : [
-              (keys[0] as string | null)?.toLowerCase() ?? null,
-              (keys[1] as Buffer | null)?.toString('latin1') ?? null,
-            ];
-
-    case 'string_ci,string_ci':
-      return (keys, primaryKey) =>
-        keys[0] === null || keys[1] === null
-          ? [
-              (keys[0] as string | null)?.toLowerCase() ?? null,
-              (keys[1] as string | null)?.toLowerCase() ?? null,
-              primaryKey,
-            ]
-          : [
-              (keys[0] as string | null)?.toLowerCase() ?? null,
-              (keys[1] as string | null)?.toLowerCase() ?? null,
             ];
   }
 

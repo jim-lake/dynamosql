@@ -1,0 +1,22 @@
+CREATE DATABASE IF NOT EXISTS mem_ai_ci_key_err;
+USE mem_ai_ci_key_err;
+
+CREATE TEMPORARY TABLE ai_e (id INT PRIMARY KEY, us VARCHAR(20) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci, UNIQUE KEY us_u (us));
+INSERT INTO ai_e VALUES (1, 'e');
+INSERT INTO ai_e VALUES (2, 'é');
+INSERT INTO ai_e VALUES (3, 'É');
+INSERT INTO ai_e VALUES (4, 'E');
+INSERT INTO ai_e VALUES (5, 'ß');
+INSERT INTO ai_e VALUES (6, 'ss');
+INSERT INTO ai_e VALUES (7, 'x');
+INSERT INTO ai_e VALUES (8, 'X');
+INSERT INTO ai_e VALUES (5, 'E');
+SELECT * FROM ai_e ORDER BY id;
+
+CREATE TEMPORARY TABLE ai_pe (k VARCHAR(20) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci PRIMARY KEY);
+INSERT INTO ai_pe VALUES ('a');
+INSERT INTO ai_pe VALUES ('Ä');
+INSERT INTO ai_pe VALUES ('A');
+SELECT * FROM ai_pe ORDER BY k;
+
+DROP DATABASE mem_ai_ci_key_err;

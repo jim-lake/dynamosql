@@ -2,18 +2,11 @@ import { writeFileSync } from 'fs';
 import { join } from 'path';
 import { format, resolveConfig } from 'prettier';
 
-type HashUniqueKeyType =
-  'string' | 'number' | 'bigint' | 'buffer' | 'string_ci';
+type HashUniqueKeyType = 'string' | 'number' | 'bigint' | 'buffer';
 type HashUniquePrimaryKeyType = 'string' | 'bigint' | 'number';
 type Mode = 'unique' | 'nullable' | 'nonunique';
 
-const KEY_TYPES: HashUniqueKeyType[] = [
-  'string',
-  'number',
-  'bigint',
-  'buffer',
-  'string_ci',
-];
+const KEY_TYPES: HashUniqueKeyType[] = ['string', 'number', 'bigint', 'buffer'];
 const PRIMARY_KEY_TYPES: HashUniquePrimaryKeyType[] = [
   'string',
   'bigint',
@@ -28,7 +21,6 @@ const PLAIN_NULLABLE_SINGLE: Record<HashUniqueKeyType, string> = {
   number: 'String(keys[0])',
   bigint: 'String(keys[0])',
   buffer: "(keys[0] as Buffer).toString('latin1')",
-  string_ci: '(keys[0] as string).toLowerCase()',
 };
 
 const NULL_SAFE_SINGLE: Record<HashUniqueKeyType, string> = {
@@ -36,7 +28,6 @@ const NULL_SAFE_SINGLE: Record<HashUniqueKeyType, string> = {
   number: 'keys[0]',
   bigint: 'keys[0]',
   buffer: "((keys[0] as Buffer | null)?.toString('latin1') ?? null)",
-  string_ci: '((keys[0] as string | null)?.toLowerCase() ?? null)',
 };
 
 const RETURN_TYPES: Record<Mode, string> = {
@@ -70,8 +61,6 @@ function keyExpression(
       return `(${ref} as bigint${nullMark})${access}toString()`;
     case 'buffer':
       return `(${ref} as Buffer${nullMark})${access}toString('latin1')`;
-    case 'string_ci':
-      return `(${ref} as string${nullMark})${access}toLowerCase()`;
   }
 }
 
@@ -98,15 +87,12 @@ function renderFunction(mode: Mode): string[] {
         ? 'JSON.stringify(keys)'
         : `JSON.stringify([${exprs.join(', ')}])`;
       const singleBody =
-        types[0] === 'buffer' || types[0] === 'string_ci'
+        types[0] === 'buffer'
           ? exprs[0]
           : 'keys[0] as string | number | bigint';
       const nullTest = types.map((_, i) => `keys[${i}] === null`).join(' || ');
       const isTextKey =
-        length === 1 &&
-        (types[0] === 'string' ||
-          types[0] === 'buffer' ||
-          types[0] === 'string_ci');
+        length === 1 && (types[0] === 'string' || types[0] === 'buffer');
 
       for (const primaryType of primaryTypes) {
         let statement: string;
@@ -144,18 +130,15 @@ function renderFunction(mode: Mode): string[] {
   }
   switchCases.pop();
 
-  const stringCi = nullable
-    ? '(key as string | null)?.toLowerCase()'
-    : '(key as string).toLowerCase()';
   const mapped = [
-    'keys.map((key, i) => {',
+    'keys.map((key) => {',
     '  if (Buffer.isBuffer(key)) {',
     "    return key.toString('latin1');",
     '  }',
     "  if (typeof key === 'bigint') {",
     '    return key.toString();',
     '  }',
-    `  return types[i] === 'string_ci' ? ${stringCi} : key;`,
+    '  return key;',
     '})',
   ];
   const genericBody =
@@ -188,7 +171,7 @@ function renderFunction(mode: Mode): string[] {
 }
 
 const uniqueLines = [
-  "export type HashUniqueKeyType = 'string' | 'number' | 'bigint' | 'buffer' | 'string_ci';",
+  "export type HashUniqueKeyType = 'string' | 'number' | 'bigint' | 'buffer';",
   'export type HashUniqueKeyValue = string | number | bigint | Buffer;',
   'export type HashUniqueMakeKeyResult = string | number | bigint;',
   'export type HashUniqueMakeKey = (keys: HashUniqueKeyValue[]) => HashUniqueMakeKeyResult;',

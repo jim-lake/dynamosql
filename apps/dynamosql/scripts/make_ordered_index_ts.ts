@@ -2,8 +2,7 @@ import { writeFileSync } from 'fs';
 import { join } from 'path';
 import { format, resolveConfig } from 'prettier';
 
-type OrderedUniqueKeyType =
-  'string' | 'number' | 'bigint' | 'buffer' | 'string_ci';
+type OrderedUniqueKeyType = 'string' | 'number' | 'bigint' | 'buffer';
 type Mode = 'unique' | 'nullable' | 'nonunique';
 
 const KEY_TYPES: OrderedUniqueKeyType[] = [
@@ -11,7 +10,6 @@ const KEY_TYPES: OrderedUniqueKeyType[] = [
   'number',
   'bigint',
   'buffer',
-  'string_ci',
 ];
 const HARDCODED_MAX_KEYS = 2;
 const HELPERS_DIR = join(__dirname, '..', 'src', 'lib', 'helpers');
@@ -58,10 +56,6 @@ function renderMakeKey(mode: Mode): string[] {
             return nullable
               ? `((${ref} as Buffer | null)?.toString('latin1') ?? null)`
               : `(${ref} as Buffer).toString('latin1')`;
-          case 'string_ci':
-            return nullable
-              ? `((${ref} as string | null)?.toLowerCase() ?? null)`
-              : `(${ref} as string).toLowerCase()`;
         }
       });
       const keyArray = `[${parts.join(', ')}]`;
@@ -102,9 +96,6 @@ function renderMakeKey(mode: Mode): string[] {
   const transform = [
     "        if (kinds[i] === 'buffer') {",
     "          return (key as Buffer).toString('latin1');",
-    '        }',
-    "        if (kinds[i] === 'string_ci') {",
-    '          return (key as string).toLowerCase();',
     '        }',
   ];
   const genericBody =
@@ -197,7 +188,7 @@ function renderComparator(mode: Mode): string[] {
 }
 
 const uniqueLines = [
-  "export type OrderedUniqueKeyType = 'string' | 'number' | 'bigint' | 'buffer' | 'string_ci';",
+  "export type OrderedUniqueKeyType = 'string' | 'number' | 'bigint' | 'buffer';",
   'export type OrderedUniqueKeyValue = string | number | bigint | Buffer;',
   'export type OrderedUniqueKeyPart = string | number | bigint;',
   'export type OrderedUniqueKey = OrderedUniqueKeyPart | OrderedUniqueKeyPart[];',
