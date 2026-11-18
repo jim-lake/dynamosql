@@ -4,7 +4,7 @@ import { expect } from 'chai';
 import { bytesToHex, hexToBytes } from '../src/bytes';
 import { COLLATION_NAMES, type CollationName } from '../src/collations';
 import { encodeVariable } from '../src/tuple';
-import { weightString } from '../src/weight_string';
+import { weightFramed, weightString } from '../src/weight_string';
 import { expectSameOrder, type OrderItem } from './order';
 import { ucaWeight } from '../src/uca';
 
@@ -191,30 +191,28 @@ describe('utf8mb4_0900_bin', () => {
 
 describe('framed components', () => {
   const frame = (name: CollationName, value: string, bound: number): string =>
-    bytesToHex(
-      encodeVariable(weightString(new TextEncoder().encode(value), name, bound))
-    );
+    bytesToHex(weightFramed(new TextEncoder().encode(value), name, bound));
 
-  it("'a' utf8mb4_0900_ai_ci NO PAD is 011c470000", () => {
-    expect(frame('utf8mb4_0900_ai_ci', 'a', 1)).to.equal('011C470000');
+  it("'a' utf8mb4_0900_ai_ci is 1c4701", () => {
+    expect(frame('utf8mb4_0900_ai_ci', 'a', 1)).to.equal('1C4701');
   });
 
-  it("'ab' utf8mb4_0900_ai_ci NO PAD is 011c471c600000", () => {
-    expect(frame('utf8mb4_0900_ai_ci', 'ab', 2)).to.equal('011C471C600000');
+  it("'ab' utf8mb4_0900_ai_ci is 1c471c6001", () => {
+    expect(frame('utf8mb4_0900_ai_ci', 'ab', 2)).to.equal('1C471C6001');
   });
 
-  it('empty utf8mb4_0900_ai_ci is 010000, not NULL', () => {
-    expect(frame('utf8mb4_0900_ai_ci', '', 0)).to.equal('010000');
+  it('empty utf8mb4_0900_ai_ci is 01, not empty and not NULL', () => {
+    expect(frame('utf8mb4_0900_ai_ci', '', 0)).to.equal('01');
   });
 
   it("'a' plus combining acute shares 'a' bytes under utf8mb4_0900_ai_ci", () => {
-    const withAccent = frame('utf8mb4_0900_ai_ci', 'á', 2);
+    const withAccent = frame('utf8mb4_0900_ai_ci', 'á', 2);
     expect(withAccent).to.equal(frame('utf8mb4_0900_ai_ci', 'a', 1));
-    expect(withAccent).to.equal('011C470000');
+    expect(withAccent).to.equal('1C4701');
   });
 
-  it('empty ascii_general_ci CHAR(3) pads the weight to 202020, framed 012020200000', () => {
-    expect(frame('ascii_general_ci', '', 3)).to.equal('012020200000');
+  it('empty ascii_general_ci CHAR(3) pads the weight to 202020, shifted to 212121', () => {
+    expect(frame('ascii_general_ci', '', 3)).to.equal('212121');
   });
 });
 

@@ -8,18 +8,28 @@ compare equal encode to identical bytes. Encodings cannot be decoded.
 ## API
 
 - `weightString(value, collation, maxChars?)`: key before framing.
-- `weightFramed(value, collation, maxChars?)`: `encodeVariable(weightString(...))`. This is the stored form.
+- `weightFramed(value, collation, maxChars?)`: the stored form, defined under Framing.
 
 `value` is UTF-8 bytes (ASCII bytes for `ascii_*`). `maxChars` is the declared
 `CHAR(n)` length and is read only by PAD SPACE collations.
 
 ## Framing
 
-```
-01 || escape(key) || 00 00
-```
+`weightFramed` returns the whole component, with no marker byte. A NULL component is the single byte `00`. A non-NULL string component never starts with `00` and is never empty, so it needs no `01` marker. Another component or a TX_ID may follow, so no framed key may be a proper prefix of another.
 
-`escape` replaces each `00` with `00 FF`. The empty string frames as `01 00 00`.
+| Collation                                  | Framed form              | Overhead                                    |
+| ------------------------------------------ | ------------------------ | ------------------------------------------- |
+| `utf8mb4_0900_as_cs`, `utf8mb4_0900_as_ci` | `weightString` unchanged | 0                                           |
+| `utf8mb4_0900_ai_ci`                       | `weightString \|\| 01`   | 1                                           |
+| `utf8mb4_0900_bin`                         | `escape(bytes) \|\| 01`  | 1, plus 1 per input byte `00`, `01` or `02` |
+| `ascii_bin`, `ascii_general_ci`            | each weight byte plus 1  | 0                                           |
+
+- `as_cs` and `as_ci` keys end with their own end token and every L1 unit starts with a byte `>= 02`, so no key is a proper prefix of another.
+- `ai_ci` keys can be prefixes of each other, so `01` ends them. Every unit starts with a byte `>= 02`.
+- `bin` escapes `00`, `01` and `02` as `02 x`, so the terminator `01` never appears in the payload.
+- The ASCII key is padded to `maxChars`, so its width is fixed for a column. Weights are 0 to 127, and adding 1 keeps them above `00`, so the key never starts with the NULL byte.
+
+The empty string frames as `01` for `ai_ci` and `bin`, `01 02 02 02 02` for `as_cs`, and `01 02 02` for `as_ci`.
 
 ## Collations
 
@@ -118,9 +128,9 @@ Examples (`as_cs`):
 
 - L1: 2 bytes per unit.
 - Each of levels 2 and 3: 2 bytes for the end token plus 2 bytes per non-default unit (1 byte `gap`, 1 byte unit). A count `>= 122` adds 1 to 4 bytes to its `gap`.
-- `01` separator: 1 byte. Framing: 3 bytes. Each `00` in a large `gap` payload adds 1 byte when framed.
+- `01` separator: 1 byte. Framing: 0 bytes for `as_cs` and `as_ci`.
 
-Unaccented lower case text costs about `2n + 8` bytes for `n` characters in
+Unaccented lower case text costs about `2n + 5` bytes for `n` characters in
 `as_cs`. Each upper case letter adds 2 bytes, and each precomposed accent adds 2 bytes.
 
 ## Errors

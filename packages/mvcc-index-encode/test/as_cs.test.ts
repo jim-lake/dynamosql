@@ -3,7 +3,6 @@ import { describe, it } from 'mocha';
 import { expect } from 'chai';
 import { hexToBytes } from '../src/bytes';
 import { getCollation } from '../src/collations';
-import { encodeVariable } from '../src/tuple';
 import { asCsWriteLevel } from '../src/uca';
 import { weightString, weightFramed } from '../src/weight_string';
 import { bytesToHex } from '../src/bytes';
@@ -267,19 +266,19 @@ function suite(name: Name, levels: 2 | 3): void {
     });
 
     describe('framing', () => {
-      it('matches encodeVariable of the encoding', () => {
+      it('is the encoding itself, with no marker or terminator', () => {
         for (const text of ['', 'a', 'ab', 'Áb', '一', 'á']) {
           const v = enc.encode(text);
-          expect(weightFramed(v, name)).to.deep.equal(
-            encodeVariable(weightString(v, name))
-          );
+          expect(weightFramed(v, name)).to.deep.equal(weightString(v, name));
         }
       });
 
-      it('frames the empty string distinctly from NULL', () => {
-        const framed = weightFramed(new Uint8Array(0), name);
-        expect(framed[0]).to.equal(0x01);
-        expect(framed.length).to.be.greaterThan(2);
+      it('never starts with 00 and is never empty', () => {
+        for (const text of ['', '\u0000', 'a', '一', '\u0301']) {
+          const framed = weightFramed(enc.encode(text), name);
+          expect(framed.length).to.be.greaterThan(0);
+          expect(framed[0]).to.be.greaterThan(0);
+        }
       });
 
       it('orders frames like the encodings', () => {

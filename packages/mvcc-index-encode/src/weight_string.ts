@@ -3,7 +3,6 @@ import {
   type CollationName,
   type MultiLevelCollation,
 } from './collations';
-import { frameVariable } from './tuple';
 
 let scratch = new Uint8Array(256);
 let cpScratch = new Int32Array(64);
@@ -196,16 +195,56 @@ export function weightString(
   return scratch.slice(0, n);
 }
 
+const STRING_END = 0x01;
+const BIN_ESCAPE = 0x02;
+
+function frameBytes(value: Uint8Array): Uint8Array {
+  let low = 0;
+  for (const byte of value) {
+    if (byte <= BIN_ESCAPE) {
+      low++;
+    }
+  }
+  const out = new Uint8Array(value.length + low + 1);
+  if (low === 0) {
+    out.set(value);
+  } else {
+    let o = 0;
+    for (const byte of value) {
+      if (byte <= BIN_ESCAPE) {
+        out[o++] = BIN_ESCAPE;
+      }
+      out[o++] = byte;
+    }
+  }
+  out[out.length - 1] = STRING_END;
+  return out;
+}
+
 export function weightFramed(
   value: Uint8Array,
   collation: CollationName,
   maxChars?: number
 ): Uint8Array {
-  if (getCollation(collation).kind === 'utf8-bytes') {
-    return frameVariable(value, value.length);
+  const info = getCollation(collation);
+  if (info.kind === 'utf8-bytes') {
+    return frameBytes(value);
   }
   const n = fillScratch(value, collation, maxChars);
-  return frameVariable(scratch, n);
+  if (info.kind === 'multi-level') {
+    return scratch.slice(0, n);
+  }
+  if (info.charset === 'ascii') {
+    const out = new Uint8Array(n);
+    for (let i = 0; i < n; i++) {
+      out[i] = (scratch[i] ?? 0) + 1;
+    }
+    return out;
+  }
+  const out = new Uint8Array(n + 1);
+  out.set(scratch.subarray(0, n));
+  out[n] = STRING_END;
+  return out;
 }
 
 function decodeAt(

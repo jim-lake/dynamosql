@@ -10,9 +10,10 @@ and the oracle fixtures are the source of truth for this package.
 
 ## Status
 
-Only `weightString` and the tuple framing are implemented. Other value encodings
+Only `weightString` and `weightFramed` are implemented. Other value encodings
 (integers, DECIMAL, FLOAT/DOUBLE, temporal types) and the key/index builders are
-not written yet.
+not written yet. `STRING_ENCODING.md` is the only description of the string
+key and framing formats; do not restate them here.
 
 ## Layout
 
@@ -27,7 +28,7 @@ packages/mvcc-index-encode/
 │   │   ├── collation_weights.ts  # GENERATED from MySQL. Do not edit.
 │   │   └── uca_0900_as_cs.ts     # GENERATED from MySQL. Do not edit.
 │   ├── uca.ts                # UCA table lookup: level 1 for ai_ci, levels 1-3 for as_ci/as_cs
-│   ├── tuple.ts              # encodeVariable: `01 || escape || 00 00` framing
+│   ├── tuple.ts              # encodeVariable helper
 │   └── bytes.ts              # hex and byte helpers
 ├── test/
 │   ├── order.ts              # compareBytes and expectSameOrder helpers
@@ -36,6 +37,7 @@ packages/mvcc-index-encode/
 │   ├── uca.test.ts           # UCA table lookups and implicit Han weights
 │   ├── utf8_decode.test.ts
 │   ├── weight_framed.test.ts
+│   ├── framed_concat.test.ts
 │   ├── tuple.test.ts
 │   └── fixtures/oracle.json  # GENERATED from MySQL. Do not edit.
 ├── scripts/

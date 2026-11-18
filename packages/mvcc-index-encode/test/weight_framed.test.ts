@@ -1,7 +1,6 @@
 import { describe, it } from 'mocha';
 import { expect } from 'chai';
 import { COLLATION_NAMES, type CollationName } from '../src/collations';
-import { encodeVariable } from '../src/tuple';
 import { weightString, weightFramed } from '../src/weight_string';
 
 const SAMPLES = [
@@ -37,25 +36,37 @@ function inputsFor(collation: CollationName): Uint8Array<ArrayBuffer>[] {
 
 describe('weightFramed', () => {
   for (const collation of COLLATION_NAMES) {
-    it(`matches encodeVariable(weightString) for ${collation}`, () => {
+    it(`frames ${collation} without a marker or terminator where the key is self-delimiting`, () => {
       for (const value of inputsFor(collation)) {
         const chars = new TextDecoder().decode(value).length;
         const bounds = collation.startsWith('utf8mb4')
           ? [undefined, chars]
           : [chars, chars + 3];
         for (const bound of bounds) {
-          const twoStep = encodeVariable(weightString(value, collation, bound));
-          expect(weightFramed(value, collation, bound)).to.deep.equal(twoStep);
+          const raw = weightString(value, collation, bound);
+          const framed = weightFramed(value, collation, bound);
+          if (collation === 'utf8mb4_0900_ai_ci') {
+            expect(framed).to.deep.equal(Uint8Array.of(...raw, 0x01));
+          } else if (collation.startsWith('ascii')) {
+            expect(framed).to.deep.equal(raw.map((b) => b + 1));
+          } else if (collation !== 'utf8mb4_0900_bin') {
+            expect(framed).to.deep.equal(raw);
+          }
+          expect(framed[0] ?? 0x01, collation).to.be.greaterThan(0);
         }
       }
     });
   }
 
-  it('frames the utf8mb4_0900_bin bytes directly', () => {
-    const value = new TextEncoder().encode('a\u0000é');
-    expect(weightFramed(value, 'utf8mb4_0900_bin')).to.deep.equal(
-      encodeVariable(value)
-    );
+  it('escapes bytes 00 to 02 in utf8mb4_0900_bin and ends with 01', () => {
+    const f = (...b: number[]): number[] => [
+      ...weightFramed(Uint8Array.of(...b), 'utf8mb4_0900_bin'),
+    ];
+    expect(f()).to.deep.equal([0x01]);
+    expect(f(0x61)).to.deep.equal([0x61, 0x01]);
+    expect(f(0x00)).to.deep.equal([0x02, 0x00, 0x01]);
+    expect(f(0x01, 0x02)).to.deep.equal([0x02, 0x01, 0x02, 0x02, 0x01]);
+    expect(f(0x03)).to.deep.equal([0x03, 0x01]);
   });
 
   it('throws the same RangeError as weightString for bad input', () => {
@@ -73,10 +84,13 @@ describe('weightFramed', () => {
     ).to.throw(RangeError);
   });
 
-  it('pads PAD SPACE collations to the bound with repeated space weights', () => {
+  it('pads PAD SPACE collations to the bound and shifts bytes up by one', () => {
     const value = new TextEncoder().encode('a');
-    const framed = weightFramed(value, 'ascii_general_ci', 5);
-    const expected = encodeVariable(weightString(value, 'ascii_general_ci', 5));
-    expect(framed).to.deep.equal(expected);
+    expect([...weightFramed(value, 'ascii_general_ci', 5)]).to.deep.equal([
+      0x42, 0x21, 0x21, 0x21, 0x21,
+    ]);
+    expect([...weightFramed(Uint8Array.of(0), 'ascii_bin', 2)]).to.deep.equal([
+      0x01, 0x21,
+    ]);
   });
 });
