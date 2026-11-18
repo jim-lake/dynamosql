@@ -46,7 +46,9 @@ function loadIndex(): UcaIndex {
       (pageOf[cp >>> PAGE_BITS] ?? 0) * PAGE_SIZE + (cp & (PAGE_SIZE - 1));
     offset[slot] = o;
     length[slot] = len;
-    weights.set(buf.subarray(p + 4, p + 4 + len), o);
+    for (let k = 0; k < len; k++) {
+      weights[o + k] = buf[p + 4 + k] ?? 0;
+    }
     o += len;
     p += 4 + len;
   }
