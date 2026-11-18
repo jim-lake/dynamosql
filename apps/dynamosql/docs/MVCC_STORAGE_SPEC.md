@@ -281,7 +281,7 @@ Use the table’s `dynamodb_table` value from the snapshot schema verbatim after
 | `DELETED`               | BOOL       | True for a tombstone; absent means live |
 | Column `dynamodb_name`  | N/S/B/NULL | User value; lowercase attribute name    |
 
-User attributes are lowercase; system attributes are uppercase. `column_name` is the SQL name; `dynamodb_name` is the stored name. A direct PK attribute also holds its user value; do not duplicate it.
+User attributes are lowercase; system attributes are uppercase. `column_name` is the SQL name; `dynamodb_name` is the stored name. A direct PK attribute also holds its user value. Only a single `utf8mb4_0900_bin` column may serve as a raw string PK. The storage engine rejects writes of `''` to a raw string PK because DynamoDB requires a nonempty partition key. Every other string PK collation, including `ascii_bin`, uses `DB_ROW_KEY` for the encoded key and the column attribute for the original SQL value.
 
 PRIMARY uses its single column's storage name when directly eligible. All other declared primary keys use `DB_ROW_KEY` (native B), including a single column that requires tuple encoding. Without a declared PK, `DB_ROW_ID` (native N) is generated and excluded from user columns. The two never coexist in one table. See [primary-key encoding](MVCC_INDEX_ENCODING.md#primary-partition-key).
 
@@ -305,6 +305,8 @@ Use the secondary index's `dynamodb_table` value from the snapshot schema verbat
 | `DB_ROW_KEY`                 | B          | Target partition key when the declared PK uses tuple encoding |
 
 Each secondary index has its own table. Store overlapping index/PK attributes once. Preserve identity values on index tombstones. Column renames retain these storage names.
+
+Index sort keys use only NO PAD encoding. For a declared PAD SPACE collation, index builders, writers, and readers trim trailing U+0020 from each key value before encoding, including equality probes and range endpoints. Ordered scans can differ from MySQL for suffixes that sort below its implicit space, including ASCII control characters under `ascii_bin`. See [character weights](MVCC_INDEX_ENCODING.md#character-weights).
 
 Nonunique entries append their PK after indexed values. Unique entries append their PK only if any indexed component is NULL. TX_ID follows the complete entry identity. [MVCC_INDEX_ENCODING.md](MVCC_INDEX_ENCODING.md) defines the bytes.
 
@@ -330,6 +332,8 @@ Index changes commit with row changes. Resolve entry visibility, then validate t
 | TIME      | N signed duration milliseconds              |
 | YEAR      | N calendar January 1 epoch milliseconds     |
 | SQL NULL  | Native NULL                                 |
+
+Store character and TEXT values as their SQL column values without adding collation padding. Preserve user-visible trailing spaces in row and index payload attributes. Trimming applies only when deriving PAD SPACE keys and probes.
 
 Apply SQL coercion, defaults, range checks, and precision before storage. Preserve exact numbers and fractional milliseconds. Reject unrepresentable values except for the DOUBLE fallback below. DATETIME is always stored in UTC: interpret its SQL calendar fields as UTC, never the server's local timezone. DATE/YEAR also use proleptic Gregorian fields as UTC; TIMESTAMP applies session timezone only at SQL input/output. TIME permits hours>23, with maximum magnitude 3020399000 ms. Temporal precision is `10^(3-fsp)` milliseconds.
 
