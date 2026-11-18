@@ -5,6 +5,7 @@ import { bytesToHex, hexToBytes } from '../src/bytes';
 import { COLLATION_NAMES, type CollationName } from '../src/collations';
 import { encodeVariable } from '../src/tuple';
 import { weightString } from '../src/weight_string';
+import { ucaWeight } from '../src/uca';
 
 interface StringRow {
   collation: CollationName;
@@ -17,16 +18,20 @@ interface Oracle {
   mysql_version: string;
   chars: Record<string, [number, string][]>;
   strings: StringRow[];
-  non_ascii: {
-    collation: CollationName;
-    value_hex: string;
-    weight_hex: string;
-  }[];
+  utf8: { collation: CollationName; value_hex: string; weight_hex: string }[];
 }
 
 const oracle = JSON.parse(
   readFileSync(new URL('./fixtures/oracle.json', import.meta.url), 'utf8')
 ) as Oracle;
+
+const ASCII_ONLY_COLLATIONS = COLLATION_NAMES.filter(
+  (name) => name !== 'utf8mb4_0900_ai_ci'
+);
+
+function charCount(hex: string): number {
+  return Array.from(Buffer.from(hex, 'hex').toString('utf8')).length;
+}
 
 describe('weightString against MySQL 8.4 oracle', () => {
   it('oracle was generated from MySQL 8.4', () => {
@@ -50,7 +55,7 @@ describe('weightString against MySQL 8.4 oracle', () => {
         expect(rows.length).to.be.greaterThan(0);
         for (const row of rows) {
           const value = hexToBytes(row.value_hex);
-          // NO PAD rows have no CHAR bound in the oracle; use the natural length.
+          // NO PAD rows carry no CHAR bound, so the natural length is the bound.
           const bound = row.bound ?? value.length;
           const actual = weightString(value, name, bound);
           expect(
@@ -59,18 +64,59 @@ describe('weightString against MySQL 8.4 oracle', () => {
           ).to.equal(row.weight_hex);
         }
       });
+    });
+  }
 
-      it('rejects non-ASCII input until UCA tables exist', () => {
-        expect(() => weightString(hexToBytes('C3A9'), name, 2)).to.throw(
-          RangeError
+  describe('utf8mb4_0900_ai_ci non-ASCII', () => {
+    it('matches each sampled UTF-8 string', () => {
+      const rows = oracle.utf8;
+      expect(rows.length).to.be.greaterThan(0);
+      for (const row of rows) {
+        const value = hexToBytes(row.value_hex);
+        const actual = weightString(
+          value,
+          row.collation,
+          charCount(row.value_hex)
         );
-      });
+        expect(bytesToHex(actual), `value ${row.value_hex}`).to.equal(
+          row.weight_hex
+        );
+      }
+    });
+
+    it('ucaWeight matches MySQL for sampled code points', () => {
+      expect(bytesToHex(ucaWeight(0x61))).to.equal('1C47');
+      expect(bytesToHex(ucaWeight(0xe9))).to.equal('1CAA');
+      expect(bytesToHex(ucaWeight(0x10ffff))).to.equal('FBE1FFFF');
+    });
+  });
+
+  for (const name of ASCII_ONLY_COLLATIONS) {
+    it(`${name} rejects non-ASCII input`, () => {
+      expect(() => weightString(hexToBytes('C3A9'), name, 2)).to.throw(
+        RangeError
+      );
     });
   }
 
   it('rejects values longer than the character bound', () => {
     expect(() =>
       weightString(hexToBytes('616162'), 'ascii_general_ci', 2)
+    ).to.throw(RangeError);
+  });
+
+  it('rejects values longer than the bound in code points', () => {
+    expect(() =>
+      weightString(hexToBytes('C3A9'), 'utf8mb4_0900_ai_ci', 0)
+    ).to.throw(RangeError);
+    expect(() =>
+      weightString(hexToBytes('C3A9'), 'utf8mb4_0900_ai_ci', 1)
+    ).to.not.throw();
+  });
+
+  it('rejects invalid UTF-8 under utf8mb4_0900_ai_ci', () => {
+    expect(() =>
+      weightString(hexToBytes('C3'), 'utf8mb4_0900_ai_ci', 1)
     ).to.throw(RangeError);
   });
 
@@ -99,11 +145,10 @@ describe('framed components from the spec', () => {
     expect(frame('utf8mb4_0900_ai_ci', '', 0)).to.equal('010000');
   });
 
-  it("'a' plus combining acute is rejected under utf8mb4_0900_ai_ci instead of matching 'a'", () => {
-    // The spec expects these to share bytes. Until UCA tables exist, the non-ASCII input throws.
-    expect(() =>
-      weightString(hexToBytes('61CC81'), 'utf8mb4_0900_ai_ci', 2)
-    ).to.throw(RangeError);
+  it("'a' plus combining acute shares 'a' bytes under utf8mb4_0900_ai_ci", () => {
+    const withAccent = frame('utf8mb4_0900_ai_ci', 'á', 2);
+    expect(withAccent).to.equal(frame('utf8mb4_0900_ai_ci', 'a', 1));
+    expect(withAccent).to.equal('011C470000');
   });
 
   it('empty ascii_general_ci CHAR(3) pads the weight to 202020, framed 012020200000', () => {
