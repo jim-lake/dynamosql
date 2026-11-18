@@ -1,6 +1,6 @@
-import { CHAR_WEIGHTS } from './collation_weights';
+import { CHAR_WEIGHTS } from './generated/collation_weights';
 import { hexToBytes } from './bytes';
-import { ucaWeight } from './uca';
+import { MAX_UCA_WEIGHT, ucaWriteWeight } from './uca';
 
 export const COLLATION_NAMES = [
   'ascii_bin',
@@ -22,7 +22,12 @@ interface CollationBase {
 
 export interface TableCollation extends CollationBase {
   readonly kind: 'table';
-  readonly weightOf: (codePoint: number) => Uint8Array;
+  readonly maxWeight: number;
+  readonly writeWeight: (
+    codePoint: number,
+    dst: Uint8Array,
+    at: number
+  ) => number;
 }
 
 export interface Utf8BytesCollation extends CollationBase {
@@ -42,18 +47,27 @@ const COLLATION_META: Readonly<
 
 const EMPTY = new Uint8Array(0);
 
-function buildAsciiWeightOf(name: CollationName): (cp: number) => Uint8Array {
+function buildAsciiWriter(name: CollationName): {
+  maxWeight: number;
+  writeWeight: (codePoint: number, dst: Uint8Array, at: number) => number;
+} {
   const weights: Uint8Array[] = Array.from({ length: 128 }, () => EMPTY);
   for (const [codePoint, hex] of CHAR_WEIGHTS[name] ?? []) {
     weights[codePoint] = hexToBytes(hex);
   }
-  return (codePoint) => {
-    if (codePoint >= 128) {
-      throw new RangeError(
-        `Non-ASCII code point U+${codePoint.toString(16).toUpperCase()} is not supported for ${name} yet`
-      );
-    }
-    return weights[codePoint] ?? EMPTY;
+  const maxWeight = Math.max(0, ...weights.map((w) => w.length));
+  return {
+    maxWeight,
+    writeWeight: (codePoint, dst, at) => {
+      if (codePoint >= 128) {
+        throw new RangeError(
+          `Non-ASCII code point U+${codePoint.toString(16).toUpperCase()} is not supported for ${name} yet`
+        );
+      }
+      const w = weights[codePoint] ?? EMPTY;
+      dst.set(w, at);
+      return w.length;
+    },
   };
 }
 
@@ -62,12 +76,15 @@ function buildInfo(name: CollationName): CollationInfo {
   if (name === 'utf8mb4_0900_bin') {
     return { ...meta, kind: 'utf8-bytes' };
   }
-  return {
-    ...meta,
-    kind: 'table',
-    weightOf:
-      name === 'utf8mb4_0900_ai_ci' ? ucaWeight : buildAsciiWeightOf(name),
-  };
+  if (name === 'utf8mb4_0900_ai_ci') {
+    return {
+      ...meta,
+      kind: 'table',
+      maxWeight: MAX_UCA_WEIGHT,
+      writeWeight: ucaWriteWeight,
+    };
+  }
+  return { ...meta, kind: 'table', ...buildAsciiWriter(name) };
 }
 
 const COLLATIONS: ReadonlyMap<string, CollationInfo> = new Map(

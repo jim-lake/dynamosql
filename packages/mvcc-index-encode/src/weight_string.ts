@@ -1,4 +1,5 @@
 import { getCollation, type CollationName } from './collations';
+import { frameVariable } from './tuple';
 
 let scratch = new Uint8Array(256);
 
@@ -14,17 +15,17 @@ function ensure(size: number): void {
   }
 }
 
-export function weightString(
+function fillScratch(
   value: Uint8Array,
   collation: CollationName,
-  maxChars?: number
-): Uint8Array {
+  maxChars: number | undefined
+): number {
   const info = getCollation(collation);
   if (info.kind === 'utf8-bytes') {
-    return value;
+    throw new Error('utf8-bytes collations do not use weight tables');
   }
 
-  const { weightOf, charset, pad } = info;
+  const { writeWeight, maxWeight, charset, pad } = info;
   const isAscii = charset === 'ascii';
   let n = 0;
   let chars = 0;
@@ -41,10 +42,8 @@ export function weightString(
       cp = packed & 0x1fffff;
       i += packed >>> 21;
     }
-    const w = weightOf(cp);
-    ensure(n + w.length);
-    scratch.set(w, n);
-    n += w.length;
+    ensure(n + maxWeight);
+    n += writeWeight(cp, scratch, n);
   }
 
   if (pad === 'PAD SPACE') {
@@ -56,15 +55,46 @@ export function weightString(
         `Value has ${String(chars)} characters, above bound ${String(maxChars)}`
       );
     }
-    const space = weightOf(0x20);
-    ensure(n + space.length * (maxChars - chars));
-    for (let k = chars; k < maxChars; k++) {
-      scratch.set(space, n);
-      n += space.length;
+    const padCount = maxChars - chars;
+    ensure(n + maxWeight * padCount);
+    const spaceStart = n;
+    n += writeWeight(0x20, scratch, n);
+    const spaceLen = n - spaceStart;
+    if (spaceLen === 1) {
+      scratch.fill(scratch[spaceStart] ?? 0, n, n + padCount - 1);
+      n += padCount - 1;
+    } else {
+      for (let k = 1; k < padCount; k++) {
+        scratch.copyWithin(n, spaceStart, spaceStart + spaceLen);
+        n += spaceLen;
+      }
     }
   }
+  return n;
+}
 
+export function weightString(
+  value: Uint8Array,
+  collation: CollationName,
+  maxChars?: number
+): Uint8Array {
+  if (getCollation(collation).kind === 'utf8-bytes') {
+    return value;
+  }
+  const n = fillScratch(value, collation, maxChars);
   return scratch.slice(0, n);
+}
+
+export function weightFramed(
+  value: Uint8Array,
+  collation: CollationName,
+  maxChars?: number
+): Uint8Array {
+  if (getCollation(collation).kind === 'utf8-bytes') {
+    return frameVariable(value, value.length);
+  }
+  const n = fillScratch(value, collation, maxChars);
+  return frameVariable(scratch, n);
 }
 
 function decodeAt(

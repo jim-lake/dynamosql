@@ -101,3 +101,12 @@ describe('weightString UTF-8 decoding edge cases', () => {
     ).to.throw(RangeError, 'Non-ASCII byte');
   });
 });
+
+describe('weightString buffer reuse', () => {
+  it('returns the same bytes on repeated calls that grow the scratch buffer', () => {
+    const value = new TextEncoder().encode('ab'.repeat(200));
+    const first = bytesToHex(weightString(value, UCA));
+    expect(bytesToHex(weightString(value, UCA))).to.equal(first);
+    expect(first.slice(0, 8)).to.equal('1C471C60');
+  });
+});

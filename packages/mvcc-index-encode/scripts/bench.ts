@@ -1,6 +1,5 @@
 import { COLLATION_NAMES, type CollationName } from '../src/collations';
-import { encodeVariable } from '../src/tuple';
-import { weightString } from '../src/weight_string';
+import { weightFramed, weightString } from '../src/weight_string';
 
 interface Workload {
   readonly name: string;
@@ -89,8 +88,9 @@ function run(
   const start = now();
   for (let round = 0; round < load.rounds; round++) {
     for (const value of load.strings) {
-      const weight = weightString(value, collation, load.bound);
-      bytes += framed ? encodeVariable(weight).length : weight.length;
+      bytes += framed
+        ? weightFramed(value, collation, load.bound).length
+        : weightString(value, collation, load.bound).length;
     }
   }
   const ms = now() - start;
