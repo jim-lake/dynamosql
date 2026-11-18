@@ -121,6 +121,25 @@ describe('Temp', function () {
     path.join(__dirname, 'memory_index_probe.sql'),
     { checkChanged: true, skipAffected: true }
   );
+  runTests('memory_null_key.sql', path.join(__dirname, 'memory_null_key.sql'), {
+    checkChanged: true,
+    skipAffected: true,
+  });
+  runTests(
+    'memory_null_key_error.sql',
+    path.join(__dirname, 'memory_null_key_error.sql'),
+    { allowedErrors: 'SAME_CODE', skipAffected: true, checkChanged: true }
+  );
+  runTests(
+    'memory_null_key_wide.sql',
+    path.join(__dirname, 'memory_null_key_wide.sql'),
+    { checkChanged: true, skipAffected: true }
+  );
+  runTests(
+    'memory_null_key_wide_error.sql',
+    path.join(__dirname, 'memory_null_key_wide_error.sql'),
+    { allowedErrors: 'SAME_CODE', skipAffected: true, checkChanged: true }
+  );
   runTests('memory_strict.sql', path.join(__dirname, 'memory_strict.sql'), {
     checkChanged: true,
   });

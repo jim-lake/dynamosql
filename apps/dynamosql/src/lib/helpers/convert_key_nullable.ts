@@ -29,26 +29,34 @@ export function createConvertKeyNullable(
         case 'text:string':
         case 'text:string_ci':
         case 'json:string':
-          return (value: unknown) => value as string;
+          return (value: unknown) =>
+            value === null ? null : (value as string);
         case 'bool:number':
-          return (value: unknown) => Number(value);
+          return (value: unknown) => (value === null ? null : Number(value));
         case 'long:number':
         case 'year:number':
         case 'number:number':
         case 'double:number':
-          return (value: unknown) => value as number;
+          return (value: unknown) =>
+            value === null ? null : (value as number);
         case 'longlong:bigint':
-          return (value: unknown) => BigInt(value as number | bigint);
+          return (value: unknown) =>
+            value === null ? null : BigInt(value as number | bigint);
         case 'interval:number':
-          return (value: unknown) => (value as SQLInterval).getNumber();
+          return (value: unknown) =>
+            value === null ? null : (value as SQLInterval).getNumber();
         case 'datetime:number':
-          return (value: unknown) => (value as SQLDateTime).toNumber();
+          return (value: unknown) =>
+            value === null ? null : (value as SQLDateTime).toNumber();
         case 'date:number':
-          return (value: unknown) => (value as SQLDate).toNumber();
+          return (value: unknown) =>
+            value === null ? null : (value as SQLDate).toNumber();
         case 'time:number':
-          return (value: unknown) => (value as SQLTime).toNumber();
+          return (value: unknown) =>
+            value === null ? null : (value as SQLTime).toNumber();
         case 'buffer:buffer':
-          return (value: unknown) => value as Buffer;
+          return (value: unknown) =>
+            value === null ? null : (value as Buffer);
       }
       throw new Error(`Unsupported key conversion: ${column.type}:${kinds[i]}`);
     });
@@ -66,42 +74,48 @@ export function createConvertKeyNullable(
     case 'text:string_ci':
     case 'json:string':
       return ((cells: [CellValue]) => [
-        cells[0].value as string,
+        cells[0].value === null ? null : (cells[0].value as string),
       ]) as ConvertKeyNullableFunction;
     case 'bool:number':
       return ((cells: [CellValue]) => [
-        Number(cells[0].value),
+        cells[0].value === null ? null : Number(cells[0].value),
       ]) as ConvertKeyNullableFunction;
     case 'long:number':
     case 'year:number':
     case 'number:number':
     case 'double:number':
       return ((cells: [CellValue]) => [
-        cells[0].value as number,
+        cells[0].value === null ? null : (cells[0].value as number),
       ]) as ConvertKeyNullableFunction;
     case 'longlong:bigint':
       return ((cells: [CellValue]) => [
-        BigInt(cells[0].value as number | bigint),
+        cells[0].value === null
+          ? null
+          : BigInt(cells[0].value as number | bigint),
       ]) as ConvertKeyNullableFunction;
     case 'interval:number':
       return ((cells: [CellValue]) => [
-        (cells[0].value as SQLInterval).getNumber(),
+        cells[0].value === null
+          ? null
+          : (cells[0].value as SQLInterval).getNumber(),
       ]) as ConvertKeyNullableFunction;
     case 'datetime:number':
       return ((cells: [CellValue]) => [
-        (cells[0].value as SQLDateTime).toNumber(),
+        cells[0].value === null
+          ? null
+          : (cells[0].value as SQLDateTime).toNumber(),
       ]) as ConvertKeyNullableFunction;
     case 'date:number':
       return ((cells: [CellValue]) => [
-        (cells[0].value as SQLDate).toNumber(),
+        cells[0].value === null ? null : (cells[0].value as SQLDate).toNumber(),
       ]) as ConvertKeyNullableFunction;
     case 'time:number':
       return ((cells: [CellValue]) => [
-        (cells[0].value as SQLTime).toNumber(),
+        cells[0].value === null ? null : (cells[0].value as SQLTime).toNumber(),
       ]) as ConvertKeyNullableFunction;
     case 'buffer:buffer':
       return ((cells: [CellValue]) => [
-        cells[0].value as Buffer,
+        cells[0].value === null ? null : (cells[0].value as Buffer),
       ]) as ConvertKeyNullableFunction;
     case 'null:string,null:string':
       return () => [null, null];
@@ -114,12 +128,12 @@ export function createConvertKeyNullable(
     case 'null:string,json:string':
       return ((cells: [CellValue, CellValue]) => [
         null,
-        cells[1].value as string,
+        cells[1].value === null ? null : (cells[1].value as string),
       ]) as ConvertKeyNullableFunction;
     case 'null:string,bool:number':
       return ((cells: [CellValue, CellValue]) => [
         null,
-        Number(cells[1].value),
+        cells[1].value === null ? null : Number(cells[1].value),
       ]) as ConvertKeyNullableFunction;
     case 'null:string,long:number':
     case 'null:string,year:number':
@@ -127,37 +141,43 @@ export function createConvertKeyNullable(
     case 'null:string,double:number':
       return ((cells: [CellValue, CellValue]) => [
         null,
-        cells[1].value as number,
+        cells[1].value === null ? null : (cells[1].value as number),
       ]) as ConvertKeyNullableFunction;
     case 'null:string,longlong:bigint':
       return ((cells: [CellValue, CellValue]) => [
         null,
-        BigInt(cells[1].value as number | bigint),
+        cells[1].value === null
+          ? null
+          : BigInt(cells[1].value as number | bigint),
       ]) as ConvertKeyNullableFunction;
     case 'null:string,interval:number':
       return ((cells: [CellValue, CellValue]) => [
         null,
-        (cells[1].value as SQLInterval).getNumber(),
+        cells[1].value === null
+          ? null
+          : (cells[1].value as SQLInterval).getNumber(),
       ]) as ConvertKeyNullableFunction;
     case 'null:string,datetime:number':
       return ((cells: [CellValue, CellValue]) => [
         null,
-        (cells[1].value as SQLDateTime).toNumber(),
+        cells[1].value === null
+          ? null
+          : (cells[1].value as SQLDateTime).toNumber(),
       ]) as ConvertKeyNullableFunction;
     case 'null:string,date:number':
       return ((cells: [CellValue, CellValue]) => [
         null,
-        (cells[1].value as SQLDate).toNumber(),
+        cells[1].value === null ? null : (cells[1].value as SQLDate).toNumber(),
       ]) as ConvertKeyNullableFunction;
     case 'null:string,time:number':
       return ((cells: [CellValue, CellValue]) => [
         null,
-        (cells[1].value as SQLTime).toNumber(),
+        cells[1].value === null ? null : (cells[1].value as SQLTime).toNumber(),
       ]) as ConvertKeyNullableFunction;
     case 'null:string,buffer:buffer':
       return ((cells: [CellValue, CellValue]) => [
         null,
-        cells[1].value as Buffer,
+        cells[1].value === null ? null : (cells[1].value as Buffer),
       ]) as ConvertKeyNullableFunction;
     case 'string:string,null:string':
     case 'string:string_ci,null:string':
@@ -167,7 +187,7 @@ export function createConvertKeyNullable(
     case 'text:string_ci,null:string':
     case 'json:string,null:string':
       return ((cells: [CellValue, CellValue]) => [
-        cells[0].value as string,
+        cells[0].value === null ? null : (cells[0].value as string),
         null,
       ]) as ConvertKeyNullableFunction;
     case 'string:string,string:string':
@@ -220,8 +240,8 @@ export function createConvertKeyNullable(
     case 'json:string,text:string_ci':
     case 'json:string,json:string':
       return ((cells: [CellValue, CellValue]) => [
-        cells[0].value as string,
-        cells[1].value as string,
+        cells[0].value === null ? null : (cells[0].value as string),
+        cells[1].value === null ? null : (cells[1].value as string),
       ]) as ConvertKeyNullableFunction;
     case 'string:string,bool:number':
     case 'string:string_ci,bool:number':
@@ -231,8 +251,8 @@ export function createConvertKeyNullable(
     case 'text:string_ci,bool:number':
     case 'json:string,bool:number':
       return ((cells: [CellValue, CellValue]) => [
-        cells[0].value as string,
-        Number(cells[1].value),
+        cells[0].value === null ? null : (cells[0].value as string),
+        cells[1].value === null ? null : Number(cells[1].value),
       ]) as ConvertKeyNullableFunction;
     case 'string:string,long:number':
     case 'string:string,year:number':
@@ -263,8 +283,8 @@ export function createConvertKeyNullable(
     case 'json:string,number:number':
     case 'json:string,double:number':
       return ((cells: [CellValue, CellValue]) => [
-        cells[0].value as string,
-        cells[1].value as number,
+        cells[0].value === null ? null : (cells[0].value as string),
+        cells[1].value === null ? null : (cells[1].value as number),
       ]) as ConvertKeyNullableFunction;
     case 'string:string,longlong:bigint':
     case 'string:string_ci,longlong:bigint':
@@ -274,8 +294,10 @@ export function createConvertKeyNullable(
     case 'text:string_ci,longlong:bigint':
     case 'json:string,longlong:bigint':
       return ((cells: [CellValue, CellValue]) => [
-        cells[0].value as string,
-        BigInt(cells[1].value as number | bigint),
+        cells[0].value === null ? null : (cells[0].value as string),
+        cells[1].value === null
+          ? null
+          : BigInt(cells[1].value as number | bigint),
       ]) as ConvertKeyNullableFunction;
     case 'string:string,interval:number':
     case 'string:string_ci,interval:number':
@@ -285,8 +307,10 @@ export function createConvertKeyNullable(
     case 'text:string_ci,interval:number':
     case 'json:string,interval:number':
       return ((cells: [CellValue, CellValue]) => [
-        cells[0].value as string,
-        (cells[1].value as SQLInterval).getNumber(),
+        cells[0].value === null ? null : (cells[0].value as string),
+        cells[1].value === null
+          ? null
+          : (cells[1].value as SQLInterval).getNumber(),
       ]) as ConvertKeyNullableFunction;
     case 'string:string,datetime:number':
     case 'string:string_ci,datetime:number':
@@ -296,8 +320,10 @@ export function createConvertKeyNullable(
     case 'text:string_ci,datetime:number':
     case 'json:string,datetime:number':
       return ((cells: [CellValue, CellValue]) => [
-        cells[0].value as string,
-        (cells[1].value as SQLDateTime).toNumber(),
+        cells[0].value === null ? null : (cells[0].value as string),
+        cells[1].value === null
+          ? null
+          : (cells[1].value as SQLDateTime).toNumber(),
       ]) as ConvertKeyNullableFunction;
     case 'string:string,date:number':
     case 'string:string_ci,date:number':
@@ -307,8 +333,8 @@ export function createConvertKeyNullable(
     case 'text:string_ci,date:number':
     case 'json:string,date:number':
       return ((cells: [CellValue, CellValue]) => [
-        cells[0].value as string,
-        (cells[1].value as SQLDate).toNumber(),
+        cells[0].value === null ? null : (cells[0].value as string),
+        cells[1].value === null ? null : (cells[1].value as SQLDate).toNumber(),
       ]) as ConvertKeyNullableFunction;
     case 'string:string,time:number':
     case 'string:string_ci,time:number':
@@ -318,8 +344,8 @@ export function createConvertKeyNullable(
     case 'text:string_ci,time:number':
     case 'json:string,time:number':
       return ((cells: [CellValue, CellValue]) => [
-        cells[0].value as string,
-        (cells[1].value as SQLTime).toNumber(),
+        cells[0].value === null ? null : (cells[0].value as string),
+        cells[1].value === null ? null : (cells[1].value as SQLTime).toNumber(),
       ]) as ConvertKeyNullableFunction;
     case 'string:string,buffer:buffer':
     case 'string:string_ci,buffer:buffer':
@@ -329,12 +355,12 @@ export function createConvertKeyNullable(
     case 'text:string_ci,buffer:buffer':
     case 'json:string,buffer:buffer':
       return ((cells: [CellValue, CellValue]) => [
-        cells[0].value as string,
-        cells[1].value as Buffer,
+        cells[0].value === null ? null : (cells[0].value as string),
+        cells[1].value === null ? null : (cells[1].value as Buffer),
       ]) as ConvertKeyNullableFunction;
     case 'bool:number,null:string':
       return ((cells: [CellValue, CellValue]) => [
-        Number(cells[0].value),
+        cells[0].value === null ? null : Number(cells[0].value),
         null,
       ]) as ConvertKeyNullableFunction;
     case 'bool:number,string:string':
@@ -345,58 +371,64 @@ export function createConvertKeyNullable(
     case 'bool:number,text:string_ci':
     case 'bool:number,json:string':
       return ((cells: [CellValue, CellValue]) => [
-        Number(cells[0].value),
-        cells[1].value as string,
+        cells[0].value === null ? null : Number(cells[0].value),
+        cells[1].value === null ? null : (cells[1].value as string),
       ]) as ConvertKeyNullableFunction;
     case 'bool:number,bool:number':
       return ((cells: [CellValue, CellValue]) => [
-        Number(cells[0].value),
-        Number(cells[1].value),
+        cells[0].value === null ? null : Number(cells[0].value),
+        cells[1].value === null ? null : Number(cells[1].value),
       ]) as ConvertKeyNullableFunction;
     case 'bool:number,long:number':
     case 'bool:number,year:number':
     case 'bool:number,number:number':
     case 'bool:number,double:number':
       return ((cells: [CellValue, CellValue]) => [
-        Number(cells[0].value),
-        cells[1].value as number,
+        cells[0].value === null ? null : Number(cells[0].value),
+        cells[1].value === null ? null : (cells[1].value as number),
       ]) as ConvertKeyNullableFunction;
     case 'bool:number,longlong:bigint':
       return ((cells: [CellValue, CellValue]) => [
-        Number(cells[0].value),
-        BigInt(cells[1].value as number | bigint),
+        cells[0].value === null ? null : Number(cells[0].value),
+        cells[1].value === null
+          ? null
+          : BigInt(cells[1].value as number | bigint),
       ]) as ConvertKeyNullableFunction;
     case 'bool:number,interval:number':
       return ((cells: [CellValue, CellValue]) => [
-        Number(cells[0].value),
-        (cells[1].value as SQLInterval).getNumber(),
+        cells[0].value === null ? null : Number(cells[0].value),
+        cells[1].value === null
+          ? null
+          : (cells[1].value as SQLInterval).getNumber(),
       ]) as ConvertKeyNullableFunction;
     case 'bool:number,datetime:number':
       return ((cells: [CellValue, CellValue]) => [
-        Number(cells[0].value),
-        (cells[1].value as SQLDateTime).toNumber(),
+        cells[0].value === null ? null : Number(cells[0].value),
+        cells[1].value === null
+          ? null
+          : (cells[1].value as SQLDateTime).toNumber(),
       ]) as ConvertKeyNullableFunction;
     case 'bool:number,date:number':
       return ((cells: [CellValue, CellValue]) => [
-        Number(cells[0].value),
-        (cells[1].value as SQLDate).toNumber(),
+        cells[0].value === null ? null : Number(cells[0].value),
+        cells[1].value === null ? null : (cells[1].value as SQLDate).toNumber(),
       ]) as ConvertKeyNullableFunction;
     case 'bool:number,time:number':
       return ((cells: [CellValue, CellValue]) => [
-        Number(cells[0].value),
-        (cells[1].value as SQLTime).toNumber(),
+        cells[0].value === null ? null : Number(cells[0].value),
+        cells[1].value === null ? null : (cells[1].value as SQLTime).toNumber(),
       ]) as ConvertKeyNullableFunction;
     case 'bool:number,buffer:buffer':
       return ((cells: [CellValue, CellValue]) => [
-        Number(cells[0].value),
-        cells[1].value as Buffer,
+        cells[0].value === null ? null : Number(cells[0].value),
+        cells[1].value === null ? null : (cells[1].value as Buffer),
       ]) as ConvertKeyNullableFunction;
     case 'long:number,null:string':
     case 'year:number,null:string':
     case 'number:number,null:string':
     case 'double:number,null:string':
       return ((cells: [CellValue, CellValue]) => [
-        cells[0].value as number,
+        cells[0].value === null ? null : (cells[0].value as number),
         null,
       ]) as ConvertKeyNullableFunction;
     case 'long:number,string:string':
@@ -428,16 +460,16 @@ export function createConvertKeyNullable(
     case 'double:number,text:string_ci':
     case 'double:number,json:string':
       return ((cells: [CellValue, CellValue]) => [
-        cells[0].value as number,
-        cells[1].value as string,
+        cells[0].value === null ? null : (cells[0].value as number),
+        cells[1].value === null ? null : (cells[1].value as string),
       ]) as ConvertKeyNullableFunction;
     case 'long:number,bool:number':
     case 'year:number,bool:number':
     case 'number:number,bool:number':
     case 'double:number,bool:number':
       return ((cells: [CellValue, CellValue]) => [
-        cells[0].value as number,
-        Number(cells[1].value),
+        cells[0].value === null ? null : (cells[0].value as number),
+        cells[1].value === null ? null : Number(cells[1].value),
       ]) as ConvertKeyNullableFunction;
     case 'long:number,long:number':
     case 'long:number,year:number':
@@ -456,60 +488,68 @@ export function createConvertKeyNullable(
     case 'double:number,number:number':
     case 'double:number,double:number':
       return ((cells: [CellValue, CellValue]) => [
-        cells[0].value as number,
-        cells[1].value as number,
+        cells[0].value === null ? null : (cells[0].value as number),
+        cells[1].value === null ? null : (cells[1].value as number),
       ]) as ConvertKeyNullableFunction;
     case 'long:number,longlong:bigint':
     case 'year:number,longlong:bigint':
     case 'number:number,longlong:bigint':
     case 'double:number,longlong:bigint':
       return ((cells: [CellValue, CellValue]) => [
-        cells[0].value as number,
-        BigInt(cells[1].value as number | bigint),
+        cells[0].value === null ? null : (cells[0].value as number),
+        cells[1].value === null
+          ? null
+          : BigInt(cells[1].value as number | bigint),
       ]) as ConvertKeyNullableFunction;
     case 'long:number,interval:number':
     case 'year:number,interval:number':
     case 'number:number,interval:number':
     case 'double:number,interval:number':
       return ((cells: [CellValue, CellValue]) => [
-        cells[0].value as number,
-        (cells[1].value as SQLInterval).getNumber(),
+        cells[0].value === null ? null : (cells[0].value as number),
+        cells[1].value === null
+          ? null
+          : (cells[1].value as SQLInterval).getNumber(),
       ]) as ConvertKeyNullableFunction;
     case 'long:number,datetime:number':
     case 'year:number,datetime:number':
     case 'number:number,datetime:number':
     case 'double:number,datetime:number':
       return ((cells: [CellValue, CellValue]) => [
-        cells[0].value as number,
-        (cells[1].value as SQLDateTime).toNumber(),
+        cells[0].value === null ? null : (cells[0].value as number),
+        cells[1].value === null
+          ? null
+          : (cells[1].value as SQLDateTime).toNumber(),
       ]) as ConvertKeyNullableFunction;
     case 'long:number,date:number':
     case 'year:number,date:number':
     case 'number:number,date:number':
     case 'double:number,date:number':
       return ((cells: [CellValue, CellValue]) => [
-        cells[0].value as number,
-        (cells[1].value as SQLDate).toNumber(),
+        cells[0].value === null ? null : (cells[0].value as number),
+        cells[1].value === null ? null : (cells[1].value as SQLDate).toNumber(),
       ]) as ConvertKeyNullableFunction;
     case 'long:number,time:number':
     case 'year:number,time:number':
     case 'number:number,time:number':
     case 'double:number,time:number':
       return ((cells: [CellValue, CellValue]) => [
-        cells[0].value as number,
-        (cells[1].value as SQLTime).toNumber(),
+        cells[0].value === null ? null : (cells[0].value as number),
+        cells[1].value === null ? null : (cells[1].value as SQLTime).toNumber(),
       ]) as ConvertKeyNullableFunction;
     case 'long:number,buffer:buffer':
     case 'year:number,buffer:buffer':
     case 'number:number,buffer:buffer':
     case 'double:number,buffer:buffer':
       return ((cells: [CellValue, CellValue]) => [
-        cells[0].value as number,
-        cells[1].value as Buffer,
+        cells[0].value === null ? null : (cells[0].value as number),
+        cells[1].value === null ? null : (cells[1].value as Buffer),
       ]) as ConvertKeyNullableFunction;
     case 'longlong:bigint,null:string':
       return ((cells: [CellValue, CellValue]) => [
-        BigInt(cells[0].value as number | bigint),
+        cells[0].value === null
+          ? null
+          : BigInt(cells[0].value as number | bigint),
         null,
       ]) as ConvertKeyNullableFunction;
     case 'longlong:bigint,string:string':
@@ -520,55 +560,81 @@ export function createConvertKeyNullable(
     case 'longlong:bigint,text:string_ci':
     case 'longlong:bigint,json:string':
       return ((cells: [CellValue, CellValue]) => [
-        BigInt(cells[0].value as number | bigint),
-        cells[1].value as string,
+        cells[0].value === null
+          ? null
+          : BigInt(cells[0].value as number | bigint),
+        cells[1].value === null ? null : (cells[1].value as string),
       ]) as ConvertKeyNullableFunction;
     case 'longlong:bigint,bool:number':
       return ((cells: [CellValue, CellValue]) => [
-        BigInt(cells[0].value as number | bigint),
-        Number(cells[1].value),
+        cells[0].value === null
+          ? null
+          : BigInt(cells[0].value as number | bigint),
+        cells[1].value === null ? null : Number(cells[1].value),
       ]) as ConvertKeyNullableFunction;
     case 'longlong:bigint,long:number':
     case 'longlong:bigint,year:number':
     case 'longlong:bigint,number:number':
     case 'longlong:bigint,double:number':
       return ((cells: [CellValue, CellValue]) => [
-        BigInt(cells[0].value as number | bigint),
-        cells[1].value as number,
+        cells[0].value === null
+          ? null
+          : BigInt(cells[0].value as number | bigint),
+        cells[1].value === null ? null : (cells[1].value as number),
       ]) as ConvertKeyNullableFunction;
     case 'longlong:bigint,longlong:bigint':
       return ((cells: [CellValue, CellValue]) => [
-        BigInt(cells[0].value as number | bigint),
-        BigInt(cells[1].value as number | bigint),
+        cells[0].value === null
+          ? null
+          : BigInt(cells[0].value as number | bigint),
+        cells[1].value === null
+          ? null
+          : BigInt(cells[1].value as number | bigint),
       ]) as ConvertKeyNullableFunction;
     case 'longlong:bigint,interval:number':
       return ((cells: [CellValue, CellValue]) => [
-        BigInt(cells[0].value as number | bigint),
-        (cells[1].value as SQLInterval).getNumber(),
+        cells[0].value === null
+          ? null
+          : BigInt(cells[0].value as number | bigint),
+        cells[1].value === null
+          ? null
+          : (cells[1].value as SQLInterval).getNumber(),
       ]) as ConvertKeyNullableFunction;
     case 'longlong:bigint,datetime:number':
       return ((cells: [CellValue, CellValue]) => [
-        BigInt(cells[0].value as number | bigint),
-        (cells[1].value as SQLDateTime).toNumber(),
+        cells[0].value === null
+          ? null
+          : BigInt(cells[0].value as number | bigint),
+        cells[1].value === null
+          ? null
+          : (cells[1].value as SQLDateTime).toNumber(),
       ]) as ConvertKeyNullableFunction;
     case 'longlong:bigint,date:number':
       return ((cells: [CellValue, CellValue]) => [
-        BigInt(cells[0].value as number | bigint),
-        (cells[1].value as SQLDate).toNumber(),
+        cells[0].value === null
+          ? null
+          : BigInt(cells[0].value as number | bigint),
+        cells[1].value === null ? null : (cells[1].value as SQLDate).toNumber(),
       ]) as ConvertKeyNullableFunction;
     case 'longlong:bigint,time:number':
       return ((cells: [CellValue, CellValue]) => [
-        BigInt(cells[0].value as number | bigint),
-        (cells[1].value as SQLTime).toNumber(),
+        cells[0].value === null
+          ? null
+          : BigInt(cells[0].value as number | bigint),
+        cells[1].value === null ? null : (cells[1].value as SQLTime).toNumber(),
       ]) as ConvertKeyNullableFunction;
     case 'longlong:bigint,buffer:buffer':
       return ((cells: [CellValue, CellValue]) => [
-        BigInt(cells[0].value as number | bigint),
-        cells[1].value as Buffer,
+        cells[0].value === null
+          ? null
+          : BigInt(cells[0].value as number | bigint),
+        cells[1].value === null ? null : (cells[1].value as Buffer),
       ]) as ConvertKeyNullableFunction;
     case 'interval:number,null:string':
       return ((cells: [CellValue, CellValue]) => [
-        (cells[0].value as SQLInterval).getNumber(),
+        cells[0].value === null
+          ? null
+          : (cells[0].value as SQLInterval).getNumber(),
         null,
       ]) as ConvertKeyNullableFunction;
     case 'interval:number,string:string':
@@ -579,55 +645,81 @@ export function createConvertKeyNullable(
     case 'interval:number,text:string_ci':
     case 'interval:number,json:string':
       return ((cells: [CellValue, CellValue]) => [
-        (cells[0].value as SQLInterval).getNumber(),
-        cells[1].value as string,
+        cells[0].value === null
+          ? null
+          : (cells[0].value as SQLInterval).getNumber(),
+        cells[1].value === null ? null : (cells[1].value as string),
       ]) as ConvertKeyNullableFunction;
     case 'interval:number,bool:number':
       return ((cells: [CellValue, CellValue]) => [
-        (cells[0].value as SQLInterval).getNumber(),
-        Number(cells[1].value),
+        cells[0].value === null
+          ? null
+          : (cells[0].value as SQLInterval).getNumber(),
+        cells[1].value === null ? null : Number(cells[1].value),
       ]) as ConvertKeyNullableFunction;
     case 'interval:number,long:number':
     case 'interval:number,year:number':
     case 'interval:number,number:number':
     case 'interval:number,double:number':
       return ((cells: [CellValue, CellValue]) => [
-        (cells[0].value as SQLInterval).getNumber(),
-        cells[1].value as number,
+        cells[0].value === null
+          ? null
+          : (cells[0].value as SQLInterval).getNumber(),
+        cells[1].value === null ? null : (cells[1].value as number),
       ]) as ConvertKeyNullableFunction;
     case 'interval:number,longlong:bigint':
       return ((cells: [CellValue, CellValue]) => [
-        (cells[0].value as SQLInterval).getNumber(),
-        BigInt(cells[1].value as number | bigint),
+        cells[0].value === null
+          ? null
+          : (cells[0].value as SQLInterval).getNumber(),
+        cells[1].value === null
+          ? null
+          : BigInt(cells[1].value as number | bigint),
       ]) as ConvertKeyNullableFunction;
     case 'interval:number,interval:number':
       return ((cells: [CellValue, CellValue]) => [
-        (cells[0].value as SQLInterval).getNumber(),
-        (cells[1].value as SQLInterval).getNumber(),
+        cells[0].value === null
+          ? null
+          : (cells[0].value as SQLInterval).getNumber(),
+        cells[1].value === null
+          ? null
+          : (cells[1].value as SQLInterval).getNumber(),
       ]) as ConvertKeyNullableFunction;
     case 'interval:number,datetime:number':
       return ((cells: [CellValue, CellValue]) => [
-        (cells[0].value as SQLInterval).getNumber(),
-        (cells[1].value as SQLDateTime).toNumber(),
+        cells[0].value === null
+          ? null
+          : (cells[0].value as SQLInterval).getNumber(),
+        cells[1].value === null
+          ? null
+          : (cells[1].value as SQLDateTime).toNumber(),
       ]) as ConvertKeyNullableFunction;
     case 'interval:number,date:number':
       return ((cells: [CellValue, CellValue]) => [
-        (cells[0].value as SQLInterval).getNumber(),
-        (cells[1].value as SQLDate).toNumber(),
+        cells[0].value === null
+          ? null
+          : (cells[0].value as SQLInterval).getNumber(),
+        cells[1].value === null ? null : (cells[1].value as SQLDate).toNumber(),
       ]) as ConvertKeyNullableFunction;
     case 'interval:number,time:number':
       return ((cells: [CellValue, CellValue]) => [
-        (cells[0].value as SQLInterval).getNumber(),
-        (cells[1].value as SQLTime).toNumber(),
+        cells[0].value === null
+          ? null
+          : (cells[0].value as SQLInterval).getNumber(),
+        cells[1].value === null ? null : (cells[1].value as SQLTime).toNumber(),
       ]) as ConvertKeyNullableFunction;
     case 'interval:number,buffer:buffer':
       return ((cells: [CellValue, CellValue]) => [
-        (cells[0].value as SQLInterval).getNumber(),
-        cells[1].value as Buffer,
+        cells[0].value === null
+          ? null
+          : (cells[0].value as SQLInterval).getNumber(),
+        cells[1].value === null ? null : (cells[1].value as Buffer),
       ]) as ConvertKeyNullableFunction;
     case 'datetime:number,null:string':
       return ((cells: [CellValue, CellValue]) => [
-        (cells[0].value as SQLDateTime).toNumber(),
+        cells[0].value === null
+          ? null
+          : (cells[0].value as SQLDateTime).toNumber(),
         null,
       ]) as ConvertKeyNullableFunction;
     case 'datetime:number,string:string':
@@ -638,55 +730,79 @@ export function createConvertKeyNullable(
     case 'datetime:number,text:string_ci':
     case 'datetime:number,json:string':
       return ((cells: [CellValue, CellValue]) => [
-        (cells[0].value as SQLDateTime).toNumber(),
-        cells[1].value as string,
+        cells[0].value === null
+          ? null
+          : (cells[0].value as SQLDateTime).toNumber(),
+        cells[1].value === null ? null : (cells[1].value as string),
       ]) as ConvertKeyNullableFunction;
     case 'datetime:number,bool:number':
       return ((cells: [CellValue, CellValue]) => [
-        (cells[0].value as SQLDateTime).toNumber(),
-        Number(cells[1].value),
+        cells[0].value === null
+          ? null
+          : (cells[0].value as SQLDateTime).toNumber(),
+        cells[1].value === null ? null : Number(cells[1].value),
       ]) as ConvertKeyNullableFunction;
     case 'datetime:number,long:number':
     case 'datetime:number,year:number':
     case 'datetime:number,number:number':
     case 'datetime:number,double:number':
       return ((cells: [CellValue, CellValue]) => [
-        (cells[0].value as SQLDateTime).toNumber(),
-        cells[1].value as number,
+        cells[0].value === null
+          ? null
+          : (cells[0].value as SQLDateTime).toNumber(),
+        cells[1].value === null ? null : (cells[1].value as number),
       ]) as ConvertKeyNullableFunction;
     case 'datetime:number,longlong:bigint':
       return ((cells: [CellValue, CellValue]) => [
-        (cells[0].value as SQLDateTime).toNumber(),
-        BigInt(cells[1].value as number | bigint),
+        cells[0].value === null
+          ? null
+          : (cells[0].value as SQLDateTime).toNumber(),
+        cells[1].value === null
+          ? null
+          : BigInt(cells[1].value as number | bigint),
       ]) as ConvertKeyNullableFunction;
     case 'datetime:number,interval:number':
       return ((cells: [CellValue, CellValue]) => [
-        (cells[0].value as SQLDateTime).toNumber(),
-        (cells[1].value as SQLInterval).getNumber(),
+        cells[0].value === null
+          ? null
+          : (cells[0].value as SQLDateTime).toNumber(),
+        cells[1].value === null
+          ? null
+          : (cells[1].value as SQLInterval).getNumber(),
       ]) as ConvertKeyNullableFunction;
     case 'datetime:number,datetime:number':
       return ((cells: [CellValue, CellValue]) => [
-        (cells[0].value as SQLDateTime).toNumber(),
-        (cells[1].value as SQLDateTime).toNumber(),
+        cells[0].value === null
+          ? null
+          : (cells[0].value as SQLDateTime).toNumber(),
+        cells[1].value === null
+          ? null
+          : (cells[1].value as SQLDateTime).toNumber(),
       ]) as ConvertKeyNullableFunction;
     case 'datetime:number,date:number':
       return ((cells: [CellValue, CellValue]) => [
-        (cells[0].value as SQLDateTime).toNumber(),
-        (cells[1].value as SQLDate).toNumber(),
+        cells[0].value === null
+          ? null
+          : (cells[0].value as SQLDateTime).toNumber(),
+        cells[1].value === null ? null : (cells[1].value as SQLDate).toNumber(),
       ]) as ConvertKeyNullableFunction;
     case 'datetime:number,time:number':
       return ((cells: [CellValue, CellValue]) => [
-        (cells[0].value as SQLDateTime).toNumber(),
-        (cells[1].value as SQLTime).toNumber(),
+        cells[0].value === null
+          ? null
+          : (cells[0].value as SQLDateTime).toNumber(),
+        cells[1].value === null ? null : (cells[1].value as SQLTime).toNumber(),
       ]) as ConvertKeyNullableFunction;
     case 'datetime:number,buffer:buffer':
       return ((cells: [CellValue, CellValue]) => [
-        (cells[0].value as SQLDateTime).toNumber(),
-        cells[1].value as Buffer,
+        cells[0].value === null
+          ? null
+          : (cells[0].value as SQLDateTime).toNumber(),
+        cells[1].value === null ? null : (cells[1].value as Buffer),
       ]) as ConvertKeyNullableFunction;
     case 'date:number,null:string':
       return ((cells: [CellValue, CellValue]) => [
-        (cells[0].value as SQLDate).toNumber(),
+        cells[0].value === null ? null : (cells[0].value as SQLDate).toNumber(),
         null,
       ]) as ConvertKeyNullableFunction;
     case 'date:number,string:string':
@@ -697,55 +813,61 @@ export function createConvertKeyNullable(
     case 'date:number,text:string_ci':
     case 'date:number,json:string':
       return ((cells: [CellValue, CellValue]) => [
-        (cells[0].value as SQLDate).toNumber(),
-        cells[1].value as string,
+        cells[0].value === null ? null : (cells[0].value as SQLDate).toNumber(),
+        cells[1].value === null ? null : (cells[1].value as string),
       ]) as ConvertKeyNullableFunction;
     case 'date:number,bool:number':
       return ((cells: [CellValue, CellValue]) => [
-        (cells[0].value as SQLDate).toNumber(),
-        Number(cells[1].value),
+        cells[0].value === null ? null : (cells[0].value as SQLDate).toNumber(),
+        cells[1].value === null ? null : Number(cells[1].value),
       ]) as ConvertKeyNullableFunction;
     case 'date:number,long:number':
     case 'date:number,year:number':
     case 'date:number,number:number':
     case 'date:number,double:number':
       return ((cells: [CellValue, CellValue]) => [
-        (cells[0].value as SQLDate).toNumber(),
-        cells[1].value as number,
+        cells[0].value === null ? null : (cells[0].value as SQLDate).toNumber(),
+        cells[1].value === null ? null : (cells[1].value as number),
       ]) as ConvertKeyNullableFunction;
     case 'date:number,longlong:bigint':
       return ((cells: [CellValue, CellValue]) => [
-        (cells[0].value as SQLDate).toNumber(),
-        BigInt(cells[1].value as number | bigint),
+        cells[0].value === null ? null : (cells[0].value as SQLDate).toNumber(),
+        cells[1].value === null
+          ? null
+          : BigInt(cells[1].value as number | bigint),
       ]) as ConvertKeyNullableFunction;
     case 'date:number,interval:number':
       return ((cells: [CellValue, CellValue]) => [
-        (cells[0].value as SQLDate).toNumber(),
-        (cells[1].value as SQLInterval).getNumber(),
+        cells[0].value === null ? null : (cells[0].value as SQLDate).toNumber(),
+        cells[1].value === null
+          ? null
+          : (cells[1].value as SQLInterval).getNumber(),
       ]) as ConvertKeyNullableFunction;
     case 'date:number,datetime:number':
       return ((cells: [CellValue, CellValue]) => [
-        (cells[0].value as SQLDate).toNumber(),
-        (cells[1].value as SQLDateTime).toNumber(),
+        cells[0].value === null ? null : (cells[0].value as SQLDate).toNumber(),
+        cells[1].value === null
+          ? null
+          : (cells[1].value as SQLDateTime).toNumber(),
       ]) as ConvertKeyNullableFunction;
     case 'date:number,date:number':
       return ((cells: [CellValue, CellValue]) => [
-        (cells[0].value as SQLDate).toNumber(),
-        (cells[1].value as SQLDate).toNumber(),
+        cells[0].value === null ? null : (cells[0].value as SQLDate).toNumber(),
+        cells[1].value === null ? null : (cells[1].value as SQLDate).toNumber(),
       ]) as ConvertKeyNullableFunction;
     case 'date:number,time:number':
       return ((cells: [CellValue, CellValue]) => [
-        (cells[0].value as SQLDate).toNumber(),
-        (cells[1].value as SQLTime).toNumber(),
+        cells[0].value === null ? null : (cells[0].value as SQLDate).toNumber(),
+        cells[1].value === null ? null : (cells[1].value as SQLTime).toNumber(),
       ]) as ConvertKeyNullableFunction;
     case 'date:number,buffer:buffer':
       return ((cells: [CellValue, CellValue]) => [
-        (cells[0].value as SQLDate).toNumber(),
-        cells[1].value as Buffer,
+        cells[0].value === null ? null : (cells[0].value as SQLDate).toNumber(),
+        cells[1].value === null ? null : (cells[1].value as Buffer),
       ]) as ConvertKeyNullableFunction;
     case 'time:number,null:string':
       return ((cells: [CellValue, CellValue]) => [
-        (cells[0].value as SQLTime).toNumber(),
+        cells[0].value === null ? null : (cells[0].value as SQLTime).toNumber(),
         null,
       ]) as ConvertKeyNullableFunction;
     case 'time:number,string:string':
@@ -756,55 +878,61 @@ export function createConvertKeyNullable(
     case 'time:number,text:string_ci':
     case 'time:number,json:string':
       return ((cells: [CellValue, CellValue]) => [
-        (cells[0].value as SQLTime).toNumber(),
-        cells[1].value as string,
+        cells[0].value === null ? null : (cells[0].value as SQLTime).toNumber(),
+        cells[1].value === null ? null : (cells[1].value as string),
       ]) as ConvertKeyNullableFunction;
     case 'time:number,bool:number':
       return ((cells: [CellValue, CellValue]) => [
-        (cells[0].value as SQLTime).toNumber(),
-        Number(cells[1].value),
+        cells[0].value === null ? null : (cells[0].value as SQLTime).toNumber(),
+        cells[1].value === null ? null : Number(cells[1].value),
       ]) as ConvertKeyNullableFunction;
     case 'time:number,long:number':
     case 'time:number,year:number':
     case 'time:number,number:number':
     case 'time:number,double:number':
       return ((cells: [CellValue, CellValue]) => [
-        (cells[0].value as SQLTime).toNumber(),
-        cells[1].value as number,
+        cells[0].value === null ? null : (cells[0].value as SQLTime).toNumber(),
+        cells[1].value === null ? null : (cells[1].value as number),
       ]) as ConvertKeyNullableFunction;
     case 'time:number,longlong:bigint':
       return ((cells: [CellValue, CellValue]) => [
-        (cells[0].value as SQLTime).toNumber(),
-        BigInt(cells[1].value as number | bigint),
+        cells[0].value === null ? null : (cells[0].value as SQLTime).toNumber(),
+        cells[1].value === null
+          ? null
+          : BigInt(cells[1].value as number | bigint),
       ]) as ConvertKeyNullableFunction;
     case 'time:number,interval:number':
       return ((cells: [CellValue, CellValue]) => [
-        (cells[0].value as SQLTime).toNumber(),
-        (cells[1].value as SQLInterval).getNumber(),
+        cells[0].value === null ? null : (cells[0].value as SQLTime).toNumber(),
+        cells[1].value === null
+          ? null
+          : (cells[1].value as SQLInterval).getNumber(),
       ]) as ConvertKeyNullableFunction;
     case 'time:number,datetime:number':
       return ((cells: [CellValue, CellValue]) => [
-        (cells[0].value as SQLTime).toNumber(),
-        (cells[1].value as SQLDateTime).toNumber(),
+        cells[0].value === null ? null : (cells[0].value as SQLTime).toNumber(),
+        cells[1].value === null
+          ? null
+          : (cells[1].value as SQLDateTime).toNumber(),
       ]) as ConvertKeyNullableFunction;
     case 'time:number,date:number':
       return ((cells: [CellValue, CellValue]) => [
-        (cells[0].value as SQLTime).toNumber(),
-        (cells[1].value as SQLDate).toNumber(),
+        cells[0].value === null ? null : (cells[0].value as SQLTime).toNumber(),
+        cells[1].value === null ? null : (cells[1].value as SQLDate).toNumber(),
       ]) as ConvertKeyNullableFunction;
     case 'time:number,time:number':
       return ((cells: [CellValue, CellValue]) => [
-        (cells[0].value as SQLTime).toNumber(),
-        (cells[1].value as SQLTime).toNumber(),
+        cells[0].value === null ? null : (cells[0].value as SQLTime).toNumber(),
+        cells[1].value === null ? null : (cells[1].value as SQLTime).toNumber(),
       ]) as ConvertKeyNullableFunction;
     case 'time:number,buffer:buffer':
       return ((cells: [CellValue, CellValue]) => [
-        (cells[0].value as SQLTime).toNumber(),
-        cells[1].value as Buffer,
+        cells[0].value === null ? null : (cells[0].value as SQLTime).toNumber(),
+        cells[1].value === null ? null : (cells[1].value as Buffer),
       ]) as ConvertKeyNullableFunction;
     case 'buffer:buffer,null:string':
       return ((cells: [CellValue, CellValue]) => [
-        cells[0].value as Buffer,
+        cells[0].value === null ? null : (cells[0].value as Buffer),
         null,
       ]) as ConvertKeyNullableFunction;
     case 'buffer:buffer,string:string':
@@ -815,51 +943,57 @@ export function createConvertKeyNullable(
     case 'buffer:buffer,text:string_ci':
     case 'buffer:buffer,json:string':
       return ((cells: [CellValue, CellValue]) => [
-        cells[0].value as Buffer,
-        cells[1].value as string,
+        cells[0].value === null ? null : (cells[0].value as Buffer),
+        cells[1].value === null ? null : (cells[1].value as string),
       ]) as ConvertKeyNullableFunction;
     case 'buffer:buffer,bool:number':
       return ((cells: [CellValue, CellValue]) => [
-        cells[0].value as Buffer,
-        Number(cells[1].value),
+        cells[0].value === null ? null : (cells[0].value as Buffer),
+        cells[1].value === null ? null : Number(cells[1].value),
       ]) as ConvertKeyNullableFunction;
     case 'buffer:buffer,long:number':
     case 'buffer:buffer,year:number':
     case 'buffer:buffer,number:number':
     case 'buffer:buffer,double:number':
       return ((cells: [CellValue, CellValue]) => [
-        cells[0].value as Buffer,
-        cells[1].value as number,
+        cells[0].value === null ? null : (cells[0].value as Buffer),
+        cells[1].value === null ? null : (cells[1].value as number),
       ]) as ConvertKeyNullableFunction;
     case 'buffer:buffer,longlong:bigint':
       return ((cells: [CellValue, CellValue]) => [
-        cells[0].value as Buffer,
-        BigInt(cells[1].value as number | bigint),
+        cells[0].value === null ? null : (cells[0].value as Buffer),
+        cells[1].value === null
+          ? null
+          : BigInt(cells[1].value as number | bigint),
       ]) as ConvertKeyNullableFunction;
     case 'buffer:buffer,interval:number':
       return ((cells: [CellValue, CellValue]) => [
-        cells[0].value as Buffer,
-        (cells[1].value as SQLInterval).getNumber(),
+        cells[0].value === null ? null : (cells[0].value as Buffer),
+        cells[1].value === null
+          ? null
+          : (cells[1].value as SQLInterval).getNumber(),
       ]) as ConvertKeyNullableFunction;
     case 'buffer:buffer,datetime:number':
       return ((cells: [CellValue, CellValue]) => [
-        cells[0].value as Buffer,
-        (cells[1].value as SQLDateTime).toNumber(),
+        cells[0].value === null ? null : (cells[0].value as Buffer),
+        cells[1].value === null
+          ? null
+          : (cells[1].value as SQLDateTime).toNumber(),
       ]) as ConvertKeyNullableFunction;
     case 'buffer:buffer,date:number':
       return ((cells: [CellValue, CellValue]) => [
-        cells[0].value as Buffer,
-        (cells[1].value as SQLDate).toNumber(),
+        cells[0].value === null ? null : (cells[0].value as Buffer),
+        cells[1].value === null ? null : (cells[1].value as SQLDate).toNumber(),
       ]) as ConvertKeyNullableFunction;
     case 'buffer:buffer,time:number':
       return ((cells: [CellValue, CellValue]) => [
-        cells[0].value as Buffer,
-        (cells[1].value as SQLTime).toNumber(),
+        cells[0].value === null ? null : (cells[0].value as Buffer),
+        cells[1].value === null ? null : (cells[1].value as SQLTime).toNumber(),
       ]) as ConvertKeyNullableFunction;
     case 'buffer:buffer,buffer:buffer':
       return ((cells: [CellValue, CellValue]) => [
-        cells[0].value as Buffer,
-        cells[1].value as Buffer,
+        cells[0].value === null ? null : (cells[0].value as Buffer),
+        cells[1].value === null ? null : (cells[1].value as Buffer),
       ]) as ConvertKeyNullableFunction;
   }
   throw new Error(`Unsupported key conversion: ${types.join(',')}`);

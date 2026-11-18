@@ -7,6 +7,7 @@ describe('Select', function () {
   runTests('sort_error.sql', path.join(__dirname, 'sort_error.sql'), {
     allowedErrors: 'SAME_CODE',
   });
+  runTests('distinct.sql', path.join(__dirname, 'distinct.sql'));
   runTests('group.sql', path.join(__dirname, 'group.sql'));
   runTests('limit.sql', path.join(__dirname, 'limit.sql'));
   runTests('where.sql', path.join(__dirname, 'where.sql'));

@@ -1,9 +1,15 @@
 import { setTimeout } from 'node:timers/promises';
 
+import { COLLATIONS } from '../constants/mysql';
 import { SQLError } from '../error';
 
 import * as Expression from './expression';
 import { isBaseFrom, isDerivedFrom } from './helpers/ast_helper';
+import {
+  getExprCollation,
+  isCaseInsensitive,
+  isPadCollation,
+} from './helpers/collation';
 import { resolveReferences } from './helpers/column_ref_helper';
 import { makeEngineGroups } from './helpers/engine_groups';
 import { formGroup, formImplicitGroup, hasAggregate } from './helpers/group';
@@ -13,6 +19,10 @@ import { sort } from './helpers/sort';
 import { convertNum } from './helpers/sql_conversion';
 import { applyWindows, hasWindow } from './helpers/window';
 import * as Lock from './lock';
+import { SQLDate } from './types/sql_date';
+import { SQLDateTime } from './types/sql_datetime';
+import { SQLInterval } from './types/sql_interval';
+import { SQLTime } from './types/sql_time';
 
 import type { Session } from '../session';
 import type { FieldInfo } from '../types';
@@ -494,6 +504,75 @@ async function _evaluateReturn(
 
   if (ast.type === 'select' && hasWindow(ast.columns)) {
     group_iter = applyWindows({ iter: group_iter, ast, queryColumns, state });
+  }
+
+  if (ast.type === 'select' && ast.distinct === 'DISTINCT') {
+    const collations = queryColumns.map(
+      (column) =>
+        column.result.collation ?? getExprCollation(column.expr, state)
+    );
+    const distinctInput = group_iter;
+    group_iter = (async function* () {
+      const indexes = new Set(queryColumns.keys());
+      const projected = _projectColumns({
+        iter: distinctInput,
+        queryColumns,
+        indexes,
+        state,
+      });
+      const seen = new Set<string>();
+      for await (const batch of projected) {
+        const kept = batch.filter((row) => {
+          const parts = collations.map((collation, index) => {
+            const value = row.result?.[index]?.value;
+            if (typeof value === 'string') {
+              let folded = isPadCollation(collation)
+                ? value.replace(/ +$/, '')
+                : value;
+              if (collation === COLLATIONS.UTF8MB4_0900_AS_CI) {
+                folded = folded.toLowerCase();
+              } else if (isCaseInsensitive(collation)) {
+                folded = folded
+                  .normalize('NFKD')
+                  .replace(/\p{M}/gu, '')
+                  .toLowerCase()
+                  .replace(/ß/g, 'ss');
+              }
+              return `s${folded}`;
+            }
+            if (value === null || value === undefined) {
+              return 'n';
+            }
+            if (typeof value === 'number' || typeof value === 'bigint') {
+              return `d${value}`;
+            }
+            if (Buffer.isBuffer(value)) {
+              return `b${value.toString('latin1')}`;
+            }
+            if (
+              value instanceof SQLDate ||
+              value instanceof SQLDateTime ||
+              value instanceof SQLTime
+            ) {
+              return `t${value.toNumber()}`;
+            }
+            if (value instanceof SQLInterval) {
+              return `i${value.getNumber()}`;
+            }
+            return `o${String(value)}`;
+          });
+          const key = JSON.stringify(parts);
+          if (seen.has(key)) {
+            return false;
+          }
+          seen.add(key);
+          return true;
+        });
+        if (kept.length > 0) {
+          yield kept;
+        }
+      }
+    })();
   }
 
   let resultIter: AsyncIterable<SourceRow[]> = group_iter;

@@ -18,7 +18,7 @@ Source: MySQL 8.4 Reference Manual, chapter 15 (SQL statements), chapter 11 (lan
 | `SELECT` without `FROM`                                   |    ✅     | `client_opts/multiple_statements.sql`                                       |
 | `FROM DUAL`                                               |    ❌     | `Invalid from clause`. See `MYSQL_GAPS.md`.                                 |
 | `SELECT ALL`                                              |    ❌     |                                                                             |
-| `SELECT DISTINCT`                                         |    ❌     | Silently wrong. A probe of `SELECT DISTINCT other` returned duplicate rows. |
+| `SELECT DISTINCT`                                         |    ✅     | `select/distinct.sql`                                                       |
 | `SELECT DISTINCTROW`                                      |    ❌     |                                                                             |
 | `HIGH_PRIORITY` modifier                                  |    ❌     |                                                                             |
 | `STRAIGHT_JOIN` modifier                                  |    ❌     |                                                                             |

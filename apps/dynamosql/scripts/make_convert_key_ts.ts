@@ -86,12 +86,17 @@ async function main(): Promise<void> {
       ? 'ConvertKeyNullableFunction'
       : 'ConvertKeyFunction';
 
+    const guard = (value: string, expression: string): string =>
+      nullable && expression !== 'null'
+        ? `${value} === null ? null : ${expression}`
+        : expression;
+
     const genericCases = groupCases(
       singles.map(([label, expression]): [string, string] => {
         const param = expression.includes('$v') ? '(value: unknown)' : '()';
         return [
           label,
-          `return ${param} => ${expression.replaceAll('$v', 'value')};`,
+          `return ${param} => ${guard('value', expression.replaceAll('$v', 'value'))};`,
         ];
       })
     );
@@ -101,7 +106,10 @@ async function main(): Promise<void> {
         (length) =>
           combinations(singles, length).map((combo): [string, string] => {
             const expressions = combo.map(([, expression], i) =>
-              expression.replaceAll('$v', `cells[${i}].value`)
+              guard(
+                `cells[${i}].value`,
+                expression.replaceAll('$v', `cells[${i}].value`)
+              )
             );
             const body = combo.some(([, expression]) =>
               expression.includes('$v')
