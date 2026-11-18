@@ -13,7 +13,8 @@
     "lint": "eslint src test --fix",
     "pretty": "prettier -u --write \"**/*\" --log-level warn",
     "build": "rm -rf dist && rollup -c",
-    "test": "mocha --require tsx \"test/**/*.test.ts\""
+    "test": "mocha --require tsx \"test/**/*.test.ts\"",
+    "test:bench": "tsx scripts/bench.ts"
   },
   "devDependencies": {
     "@types/node": "^24.10.0",
