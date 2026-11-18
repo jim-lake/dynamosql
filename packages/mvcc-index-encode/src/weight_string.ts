@@ -2,6 +2,9 @@ import { getCollation, type CollationName } from './collations';
 import { frameVariable } from './tuple';
 
 let scratch = new Uint8Array(256);
+let cpScratch = new Int32Array(64);
+const LEVELS_2 = [1, 2] as const;
+const LEVELS_3 = [1, 2, 3] as const;
 
 function ensure(size: number): void {
   if (size > scratch.length) {
@@ -23,6 +26,15 @@ function fillScratch(
   const info = getCollation(collation);
   if (info.kind === 'utf8-bytes') {
     throw new Error('utf8-bytes collations do not use weight tables');
+  }
+  if (info.kind === 'multi-level') {
+    return fillMultiLevel(
+      value,
+      collation,
+      info.levels,
+      info.maxLevelWeight,
+      info.writeLevel
+    );
   }
 
   const { writeWeight, maxWeight, charset, pad } = info;
@@ -68,6 +80,46 @@ function fillScratch(
         scratch.copyWithin(n, spaceStart, spaceStart + spaceLen);
         n += spaceLen;
       }
+    }
+  }
+  return n;
+}
+
+function fillMultiLevel(
+  value: Uint8Array,
+  collation: CollationName,
+  levels: 2 | 3,
+  maxLevelWeight: number,
+  writeLevel: (
+    cp: number,
+    level: 1 | 2 | 3,
+    dst: Uint8Array,
+    at: number
+  ) => number
+): number {
+  let count = 0;
+  for (let i = 0; i < value.length; count++) {
+    const packed = decodeAt(value, i, collation);
+    if (count === cpScratch.length) {
+      const grown = new Int32Array(cpScratch.length * 2);
+      grown.set(cpScratch);
+      cpScratch = grown;
+    }
+    cpScratch[count] = packed & 0x1fffff;
+    i += packed >>> 21;
+  }
+
+  let n = 0;
+  const order = levels === 2 ? LEVELS_2 : LEVELS_3;
+  for (const level of order) {
+    for (let k = 0; k < count; k++) {
+      ensure(n + maxLevelWeight);
+      n += writeLevel(cpScratch[k] ?? 0, level, scratch, n);
+    }
+    if (level !== levels) {
+      ensure(n + 2);
+      scratch[n++] = 0;
+      scratch[n++] = 0;
     }
   }
   return n;

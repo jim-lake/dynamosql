@@ -1,69 +1,66 @@
 import { zstdDecompressSync } from 'node:zlib';
-import { UCA_0900_AI_CI_BASE64 } from './generated/uca_0900_ai_ci';
+import { UCA_0900_AS_CS_BASE64 } from './generated/uca_0900_as_cs';
 
-interface UcaIndex {
+interface AsCsIndex {
   readonly pageOf: Uint16Array;
   readonly offset: Uint32Array;
-  readonly length: Uint8Array;
+  readonly len1: Uint8Array;
+  readonly len2: Uint8Array;
+  readonly len3: Uint8Array;
   readonly weights: Uint8Array;
 }
 
-const EMPTY = new Uint8Array(0);
 const PAGE_BITS = 8;
 const PAGE_SIZE = 1 << PAGE_BITS;
 const MAX_CODE_POINT = 0x10ffff;
 const PAGE_COUNT = (MAX_CODE_POINT >>> PAGE_BITS) + 1;
+export const MAX_AS_CS_LEVEL_WEIGHT = 255;
 export const MAX_UCA_WEIGHT = 255;
+const EMPTY = new Uint8Array(0);
 
-let index: UcaIndex | undefined;
+let index: AsCsIndex | undefined;
 
-function loadIndex(): UcaIndex {
-  const buf = zstdDecompressSync(Buffer.from(UCA_0900_AI_CI_BASE64, 'base64'));
-
+function loadIndex(): AsCsIndex {
+  const buf = zstdDecompressSync(Buffer.from(UCA_0900_AS_CS_BASE64, 'base64'));
   const pageOf = new Uint16Array(PAGE_COUNT);
   let pages = 0;
   let total = 0;
   for (let p = 0; p < buf.length;) {
     const cp = buf.readUIntBE(p, 3);
-    const len = buf.readUInt8(p + 3);
+    const size =
+      buf.readUInt8(p + 3) + buf.readUInt8(p + 4) + buf.readUInt8(p + 5);
     const page = cp >>> PAGE_BITS;
     if (pageOf[page] === 0) {
       pages++;
       pageOf[page] = pages;
     }
-    total += len;
-    p += 4 + len;
+    total += size;
+    p += 6 + size;
   }
 
-  const offset = new Uint32Array((pages + 1) * PAGE_SIZE);
-  const length = new Uint8Array((pages + 1) * PAGE_SIZE);
+  const slots = (pages + 1) * PAGE_SIZE;
+  const offset = new Uint32Array(slots);
+  const len1 = new Uint8Array(slots);
+  const len2 = new Uint8Array(slots);
+  const len3 = new Uint8Array(slots);
   const weights = new Uint8Array(total);
   let o = 0;
   for (let p = 0; p < buf.length;) {
     const cp = buf.readUIntBE(p, 3);
-    const len = buf.readUInt8(p + 3);
+    const a = buf.readUInt8(p + 3);
+    const b = buf.readUInt8(p + 4);
+    const c = buf.readUInt8(p + 5);
     const slot =
       (pageOf[cp >>> PAGE_BITS] ?? 0) * PAGE_SIZE + (cp & (PAGE_SIZE - 1));
     offset[slot] = o;
-    length[slot] = len;
-    for (let k = 0; k < len; k++) {
-      weights[o + k] = buf[p + 4 + k] ?? 0;
-    }
-    o += len;
-    p += 4 + len;
+    len1[slot] = a;
+    len2[slot] = b;
+    len3[slot] = c;
+    weights.set(buf.subarray(p + 6, p + 6 + a + b + c), o);
+    o += a + b + c;
+    p += 6 + a + b + c;
   }
-  return { pageOf, offset, length, weights };
-}
-
-function slotOf(codePoint: number, idx: UcaIndex): number {
-  if (codePoint < 0 || codePoint > MAX_CODE_POINT) {
-    return -1;
-  }
-  const page = idx.pageOf[codePoint >>> PAGE_BITS] ?? 0;
-  if (page === 0) {
-    return -1;
-  }
-  return page * PAGE_SIZE + (codePoint & (PAGE_SIZE - 1));
+  return { pageOf, offset, len1, len2, len3, weights };
 }
 
 function implicitHanBase(codePoint: number): number {
@@ -77,6 +74,14 @@ function implicitHanBase(codePoint: number): number {
     return 0xfb80;
   }
   return -1;
+}
+
+function slotOf(codePoint: number, idx: AsCsIndex): number {
+  if (codePoint < 0 || codePoint > MAX_CODE_POINT) {
+    return -1;
+  }
+  const page = idx.pageOf[codePoint >>> PAGE_BITS] ?? 0;
+  return page === 0 ? -1 : page * PAGE_SIZE + (codePoint & (PAGE_SIZE - 1));
 }
 
 function writeImplicitHan(
@@ -97,18 +102,6 @@ function writeImplicitHan(
   return 4;
 }
 
-export function ucaWeight(codePoint: number): Uint8Array {
-  index ??= loadIndex();
-  const slot = slotOf(codePoint, index);
-  const start = slot < 0 ? 0 : (index.offset[slot] ?? 0);
-  const len = slot < 0 ? 0 : (index.length[slot] ?? 0);
-  if (len === 0) {
-    const implicit = new Uint8Array(4);
-    return writeImplicitHan(codePoint, implicit, 0) === 4 ? implicit : EMPTY;
-  }
-  return index.weights.subarray(start, start + len);
-}
-
 interface AsciiTable {
   readonly start: Uint32Array;
   readonly length: Uint8Array;
@@ -116,17 +109,90 @@ interface AsciiTable {
 
 let asciiTable: AsciiTable | undefined;
 
-function buildAsciiTable(idx: UcaIndex): AsciiTable {
-  const start = new Uint32Array(128);
-  const length = new Uint8Array(128);
+function buildAsciiTable(idx: AsCsIndex): AsciiTable {
+  const start = new Uint32Array(128 * 3);
+  const length = new Uint8Array(128 * 3);
   for (let cp = 0; cp < 128; cp++) {
     const slot = slotOf(cp, idx);
-    if (slot >= 0) {
-      start[cp] = idx.offset[slot] ?? 0;
-      length[cp] = idx.length[slot] ?? 0;
+    if (slot < 0) {
+      continue;
     }
+    const a = idx.len1[slot] ?? 0;
+    const b = idx.len2[slot] ?? 0;
+    const base = idx.offset[slot] ?? 0;
+    start[cp * 3] = base;
+    start[cp * 3 + 1] = base + a;
+    start[cp * 3 + 2] = base + a + b;
+    length[cp * 3] = a;
+    length[cp * 3 + 1] = b;
+    length[cp * 3 + 2] = idx.len3[slot] ?? 0;
   }
   return { start, length };
+}
+
+function writeLevelFromTable(
+  codePoint: number,
+  level: 1 | 2 | 3,
+  dst: Uint8Array,
+  at: number,
+  idx: AsCsIndex
+): number {
+  const slot = slotOf(codePoint, idx);
+  const a = slot < 0 ? 0 : (idx.len1[slot] ?? 0);
+  const b = slot < 0 ? 0 : (idx.len2[slot] ?? 0);
+  const c = slot < 0 ? 0 : (idx.len3[slot] ?? 0);
+  if (a + b + c === 0) {
+    if (implicitHanBase(codePoint) < 0) {
+      return 0;
+    }
+    if (level === 1) {
+      return writeImplicitHan(codePoint, dst, at);
+    }
+    dst[at] = 0x00;
+    dst[at + 1] = level === 2 ? 0x20 : 0x02;
+    return 2;
+  }
+  const start =
+    (idx.offset[slot] ?? 0) + (level === 1 ? 0 : level === 2 ? a : a + b);
+  const len = level === 1 ? a : level === 2 ? b : c;
+  const src = idx.weights;
+  for (let k = 0; k < len; k++) {
+    dst[at + k] = src[start + k] ?? 0;
+  }
+  return len;
+}
+
+export function asCsWriteLevel(
+  codePoint: number,
+  level: 1 | 2 | 3,
+  dst: Uint8Array,
+  at: number
+): number {
+  index ??= loadIndex();
+  if (codePoint >= 0 && codePoint < 128) {
+    asciiTable ??= buildAsciiTable(index);
+    const i = codePoint * 3 + level - 1;
+    const len = asciiTable.length[i] ?? 0;
+    const start = asciiTable.start[i] ?? 0;
+    const src = index.weights;
+    for (let k = 0; k < len; k++) {
+      dst[at + k] = src[start + k] ?? 0;
+    }
+    return len;
+  }
+  return writeLevelFromTable(codePoint, level, dst, at, index);
+}
+
+export function ucaWeight(codePoint: number): Uint8Array {
+  index ??= loadIndex();
+  const slot = slotOf(codePoint, index);
+  const len = slot < 0 ? 0 : (index.len1[slot] ?? 0);
+  if (len === 0) {
+    const implicit = new Uint8Array(4);
+    return writeImplicitHan(codePoint, implicit, 0) === 4 ? implicit : EMPTY;
+  }
+  const start = index.offset[slot] ?? 0;
+  return index.weights.subarray(start, start + len);
 }
 
 export function ucaWriteWeight(
@@ -137,8 +203,8 @@ export function ucaWriteWeight(
   index ??= loadIndex();
   if (codePoint >= 0 && codePoint < 128) {
     asciiTable ??= buildAsciiTable(index);
-    const len = asciiTable.length[codePoint] ?? 0;
-    const start = asciiTable.start[codePoint] ?? 0;
+    const len = asciiTable.length[codePoint * 3] ?? 0;
+    const start = asciiTable.start[codePoint * 3] ?? 0;
     const src = index.weights;
     for (let k = 0; k < len; k++) {
       dst[at + k] = src[start + k] ?? 0;
@@ -146,7 +212,7 @@ export function ucaWriteWeight(
     return len;
   }
   const slot = slotOf(codePoint, index);
-  const len = slot < 0 ? 0 : (index.length[slot] ?? 0);
+  const len = slot < 0 ? 0 : (index.len1[slot] ?? 0);
   if (len === 0) {
     return writeImplicitHan(codePoint, dst, at);
   }

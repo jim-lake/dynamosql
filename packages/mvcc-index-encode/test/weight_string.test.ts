@@ -71,7 +71,12 @@ describe('weightString against MySQL 8.4 oracle', () => {
     it('matches each sampled UTF-8 string', () => {
       const rows = oracle.utf8;
       expect(new Set(rows.map((row) => row.collation))).to.deep.equal(
-        new Set(['utf8mb4_0900_ai_ci', 'utf8mb4_0900_bin'])
+        new Set([
+          'utf8mb4_0900_ai_ci',
+          'utf8mb4_0900_as_ci',
+          'utf8mb4_0900_as_cs',
+          'utf8mb4_0900_bin',
+        ])
       );
       expect(rows.length).to.be.greaterThan(0);
       for (const row of rows) {
@@ -173,7 +178,7 @@ describe('utf8mb4_0900_bin', () => {
   });
 });
 
-describe('framed components from the spec', () => {
+describe('framed components', () => {
   const frame = (name: CollationName, value: string, bound: number): string =>
     bytesToHex(
       encodeVariable(weightString(new TextEncoder().encode(value), name, bound))

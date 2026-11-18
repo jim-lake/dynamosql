@@ -1,12 +1,19 @@
 import { CHAR_WEIGHTS } from './generated/collation_weights';
 import { hexToBytes } from './bytes';
-import { MAX_UCA_WEIGHT, ucaWriteWeight } from './uca';
+import {
+  MAX_AS_CS_LEVEL_WEIGHT,
+  MAX_UCA_WEIGHT,
+  asCsWriteLevel,
+  ucaWriteWeight,
+} from './uca';
 
 export const COLLATION_NAMES = [
   'ascii_bin',
   'ascii_general_ci',
   'utf8mb4_0900_bin',
   'utf8mb4_0900_ai_ci',
+  'utf8mb4_0900_as_ci',
+  'utf8mb4_0900_as_cs',
 ] as const;
 
 export type CollationName = (typeof COLLATION_NAMES)[number];
@@ -30,11 +37,24 @@ export interface TableCollation extends CollationBase {
   ) => number;
 }
 
+export interface MultiLevelCollation extends CollationBase {
+  readonly kind: 'multi-level';
+  readonly levels: 2 | 3;
+  readonly maxLevelWeight: number;
+  readonly writeLevel: (
+    codePoint: number,
+    level: 1 | 2 | 3,
+    dst: Uint8Array,
+    at: number
+  ) => number;
+}
+
 export interface Utf8BytesCollation extends CollationBase {
   readonly kind: 'utf8-bytes';
 }
 
-export type CollationInfo = TableCollation | Utf8BytesCollation;
+export type CollationInfo =
+  TableCollation | MultiLevelCollation | Utf8BytesCollation;
 
 const COLLATION_META: Readonly<
   Record<CollationName, { charset: Charset; pad: PadMode }>
@@ -43,6 +63,8 @@ const COLLATION_META: Readonly<
   ascii_general_ci: { charset: 'ascii', pad: 'PAD SPACE' },
   utf8mb4_0900_bin: { charset: 'utf8mb4', pad: 'NO PAD' },
   utf8mb4_0900_ai_ci: { charset: 'utf8mb4', pad: 'NO PAD' },
+  utf8mb4_0900_as_ci: { charset: 'utf8mb4', pad: 'NO PAD' },
+  utf8mb4_0900_as_cs: { charset: 'utf8mb4', pad: 'NO PAD' },
 };
 
 const EMPTY = new Uint8Array(0);
@@ -82,6 +104,15 @@ function buildInfo(name: CollationName): CollationInfo {
       kind: 'table',
       maxWeight: MAX_UCA_WEIGHT,
       writeWeight: ucaWriteWeight,
+    };
+  }
+  if (name === 'utf8mb4_0900_as_cs' || name === 'utf8mb4_0900_as_ci') {
+    return {
+      ...meta,
+      kind: 'multi-level',
+      levels: name === 'utf8mb4_0900_as_cs' ? 3 : 2,
+      maxLevelWeight: MAX_AS_CS_LEVEL_WEIGHT,
+      writeLevel: asCsWriteLevel,
     };
   }
   return { ...meta, kind: 'table', ...buildAsciiWriter(name) };
