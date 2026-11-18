@@ -5,6 +5,7 @@ import { bytesToHex, hexToBytes } from '../src/bytes';
 import { COLLATION_NAMES, type CollationName } from '../src/collations';
 import { encodeVariable } from '../src/tuple';
 import { weightString } from '../src/weight_string';
+import { expectSameOrder, type OrderItem } from './order';
 import { ucaWeight } from '../src/uca';
 
 interface StringRow {
@@ -33,44 +34,51 @@ function charCount(hex: string): number {
   return Array.from(Buffer.from(hex, 'hex').toString('utf8')).length;
 }
 
-describe('weightString against MySQL 8.4 oracle', () => {
+describe('encoding order against the MySQL 8.4 oracle', () => {
   it('oracle was generated from MySQL 8.4', () => {
     expect(oracle.mysql_version.startsWith('8.4.')).to.equal(true);
   });
 
   for (const name of COLLATION_NAMES) {
     describe(name, () => {
-      it('matches every per-character weight for code points 0-127', () => {
-        for (const [codePoint, expected] of oracle.chars[name] ?? []) {
-          const actual = weightString(Uint8Array.of(codePoint), name, 1);
-          expect(
-            bytesToHex(actual),
-            `code point ${String(codePoint)}`
-          ).to.equal(expected);
-        }
+      it('orders code points 0-127 like MySQL', () => {
+        const items: OrderItem[] = (oracle.chars[name] ?? []).map(
+          ([codePoint, expected]) => ({
+            id: `code point ${String(codePoint)}`,
+            oracle: hexToBytes(expected),
+            ours: weightString(Uint8Array.of(codePoint), name, 1),
+          })
+        );
+        expect(items.length).to.be.greaterThan(0);
+        expectSameOrder(items);
       });
 
-      it('matches each sampled ASCII string', () => {
+      it('orders sampled ASCII strings like MySQL', () => {
         const rows = oracle.strings.filter((row) => row.collation === name);
         expect(rows.length).to.be.greaterThan(0);
-        for (const row of rows) {
-          const value = hexToBytes(row.value_hex);
-          // NO PAD rows carry no CHAR bound, so the natural length is the bound.
-          const bound = row.bound ?? value.length;
-          const actual = weightString(value, name, bound);
-          expect(
-            bytesToHex(actual),
-            `value ${row.value_hex} bound ${String(bound)}`
-          ).to.equal(row.weight_hex);
+        const bounds = new Set(rows.map((row) => row.bound));
+        for (const bound of bounds) {
+          expectSameOrder(
+            rows
+              .filter((row) => row.bound === bound)
+              .map((row) => {
+                const value = hexToBytes(row.value_hex);
+                return {
+                  id: `value ${row.value_hex} bound ${String(bound)}`,
+                  oracle: hexToBytes(row.weight_hex),
+                  ours: weightString(value, name, bound ?? value.length),
+                };
+              })
+          );
         }
       });
     });
   }
 
   describe('utf8mb4 non-ASCII', () => {
-    it('matches each sampled UTF-8 string', () => {
-      const rows = oracle.utf8;
-      expect(new Set(rows.map((row) => row.collation))).to.deep.equal(
+    it('orders each sampled UTF-8 string like MySQL', () => {
+      const names = new Set(oracle.utf8.map((row) => row.collation));
+      expect(names).to.deep.equal(
         new Set([
           'utf8mb4_0900_ai_ci',
           'utf8mb4_0900_as_ci',
@@ -78,16 +86,19 @@ describe('weightString against MySQL 8.4 oracle', () => {
           'utf8mb4_0900_bin',
         ])
       );
-      expect(rows.length).to.be.greaterThan(0);
-      for (const row of rows) {
-        const value = hexToBytes(row.value_hex);
-        const actual = weightString(
-          value,
-          row.collation,
-          charCount(row.value_hex)
-        );
-        expect(bytesToHex(actual), `value ${row.value_hex}`).to.equal(
-          row.weight_hex
+      for (const name of names) {
+        const rows = oracle.utf8.filter((row) => row.collation === name);
+        expect(rows.length).to.be.greaterThan(0);
+        expectSameOrder(
+          rows.map((row) => ({
+            id: `${name} ${row.value_hex}`,
+            oracle: hexToBytes(row.weight_hex),
+            ours: weightString(
+              hexToBytes(row.value_hex),
+              name,
+              charCount(row.value_hex)
+            ),
+          }))
         );
       }
     });

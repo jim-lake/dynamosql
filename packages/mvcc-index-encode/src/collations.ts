@@ -1,6 +1,7 @@
 import { CHAR_WEIGHTS } from './generated/collation_weights';
 import { hexToBytes } from './bytes';
 import {
+  AS_CS_LEVEL_DEFAULTS,
   MAX_AS_CS_LEVEL_WEIGHT,
   MAX_UCA_WEIGHT,
   asCsWriteLevel,
@@ -41,6 +42,7 @@ export interface MultiLevelCollation extends CollationBase {
   readonly kind: 'multi-level';
   readonly levels: 2 | 3;
   readonly maxLevelWeight: number;
+  readonly defaults: readonly [number, number];
   readonly writeLevel: (
     codePoint: number,
     level: 1 | 2 | 3,
@@ -112,6 +114,7 @@ function buildInfo(name: CollationName): CollationInfo {
       kind: 'multi-level',
       levels: name === 'utf8mb4_0900_as_cs' ? 3 : 2,
       maxLevelWeight: MAX_AS_CS_LEVEL_WEIGHT,
+      defaults: AS_CS_LEVEL_DEFAULTS,
       writeLevel: asCsWriteLevel,
     };
   }

@@ -2,7 +2,7 @@ import { describe, it } from 'mocha';
 import { expect } from 'chai';
 import { COLLATION_NAMES, type CollationName } from '../src/collations';
 import { encodeVariable } from '../src/tuple';
-import { weightFramed, weightString } from '../src/weight_string';
+import { weightString, weightFramed } from '../src/weight_string';
 
 const SAMPLES = [
   'a',

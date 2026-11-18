@@ -16,6 +16,7 @@ const MAX_CODE_POINT = 0x10ffff;
 const PAGE_COUNT = (MAX_CODE_POINT >>> PAGE_BITS) + 1;
 export const MAX_AS_CS_LEVEL_WEIGHT = 255;
 export const MAX_UCA_WEIGHT = 255;
+export const AS_CS_LEVEL_DEFAULTS = [0x0020, 0x0002] as const;
 const EMPTY = new Uint8Array(0);
 
 let index: AsCsIndex | undefined;

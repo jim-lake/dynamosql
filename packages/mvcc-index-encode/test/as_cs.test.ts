@@ -1,13 +1,13 @@
 import { readFileSync } from 'node:fs';
 import { describe, it } from 'mocha';
 import { expect } from 'chai';
-import { bytesToHex, hexToBytes } from '../src/bytes';
+import { hexToBytes } from '../src/bytes';
 import { getCollation } from '../src/collations';
 import { encodeVariable } from '../src/tuple';
 import { asCsWriteLevel } from '../src/uca';
-import { weightFramed, weightString } from '../src/weight_string';
-
-const NAME = 'utf8mb4_0900_as_cs';
+import { weightString, weightFramed } from '../src/weight_string';
+import { bytesToHex } from '../src/bytes';
+import { compareBytes, expectAscending, expectSameOrder } from './order';
 
 interface Oracle {
   utf8: { collation: string; value_hex: string; weight_hex: string }[];
@@ -18,330 +18,332 @@ const oracle = JSON.parse(
 ) as Oracle;
 
 const enc = new TextEncoder();
-const w = (text: string): string =>
-  bytesToHex(weightString(enc.encode(text), NAME));
-const wh = (hex: string): string =>
-  bytesToHex(weightString(hexToBytes(hex), NAME));
 
-describe('utf8mb4_0900_as_cs', () => {
-  it('is a NO PAD multi-level collation', () => {
-    const info = getCollation(NAME);
-    expect(info.kind).to.equal('multi-level');
-    expect(info.pad).to.equal('NO PAD');
-    expect(info.charset).to.equal('utf8mb4');
-  });
+type Name = 'utf8mb4_0900_as_cs' | 'utf8mb4_0900_as_ci';
 
-  describe('MySQL 8.4 fixtures', () => {
-    const cases: [string, string][] = [
-      ['a', '1C470000002000000002'],
-      ['A', '1C470000002000000008'],
-      ['ab', '1C471C60000000200020000000020002'],
-      ['aB', '1C471C60000000200020000000020008'],
-      ['á', '1C47000000200024000000020002'],
-      ['', '00000000'],
-    ];
-    for (const [text, hex] of cases) {
-      it(`weighs ${JSON.stringify(text)} as ${hex}`, () => {
-        expect(w(text)).to.equal(hex);
+function suite(name: Name, levels: 2 | 3): void {
+  const e = (text: string): Uint8Array => weightString(enc.encode(text), name);
+  const eh = (hex: string): Uint8Array => weightString(hexToBytes(hex), name);
+  const chain = (texts: string[]): (readonly [string, Uint8Array])[] =>
+    texts.map((t) => [JSON.stringify(t), e(t)] as const);
+  const cs = levels === 3;
+
+  describe(name, () => {
+    it('is a NO PAD multi-level collation', () => {
+      const info = getCollation(name);
+      expect(info.kind).to.equal('multi-level');
+      expect(info.pad).to.equal('NO PAD');
+      expect(info.kind === 'multi-level' && info.levels).to.equal(levels);
+    });
+
+    describe('order', () => {
+      it('sorts the empty string first', () => {
+        expectAscending(chain(['', 'a', 'aa']), '<');
+        expect(compareBytes(eh('00'), e(''))).to.equal(0);
       });
-    }
 
-    it('weighs a lone combining acute as 0000002400000002', () => {
-      expect(wh('CC81')).to.equal('0000002400000002');
-    });
+      it('compares base letters before accents', () => {
+        expectAscending(chain(['a', 'á', 'b']), '<');
+        expectAscending(chain(['áa', 'ab', 'ac']), '<');
+      });
 
-    it('weighs NUL as 00000000', () => {
-      expect(wh('00')).to.equal('00000000');
-    });
+      it('compares accents before case under as_cs', () => {
+        if (cs) {
+          expectAscending(chain(['a', 'A', 'á', 'Á']), '<');
+          expectAscending(chain(['ab', 'aB', 'Ab', 'AB', 'ac']), '<');
+        } else {
+          expectAscending(chain(['a', 'A']), '=');
+          expectAscending(chain(['á', 'Á']), '=');
+          expectAscending(chain(['a', 'á']), '<');
+        }
+      });
 
-    it('weighs U+4E00 with an implicit Han primary', () => {
-      expect(wh('E4B880')).to.equal('FB40CE000000002000000002');
-    });
-
-    it('weighs U+1F600 as 15FB0000002000000002', () => {
-      expect(wh('F09F9880')).to.equal('15FB0000002000000002');
-    });
-
-    it('weighs a space and a hyphen as in the oracle', () => {
-      expect(w('a b')).to.equal('1C4702091C6000000020002000200000000200020002');
-      expect(w('a-b')).to.equal('1C47020D1C6000000020002000200000000200020002');
-    });
-
-    it('weighs leading and trailing conjoining jamo', () => {
-      expect(wh('E1848061E18480')).to.equal(
-        '3BF51C473BF500000020002000200000000200020002'
-      );
-    });
-
-    it('weighs U+AC00 as 3BF53C73000000200020000000020002', () => {
-      expect(wh('EAB080')).to.equal('3BF53C73000000200020000000020002');
-    });
-  });
-
-  describe('levels', () => {
-    it('groups all primary weights, then secondary, then tertiary', () => {
-      const out = weightString(enc.encode('ab'), NAME);
-      expect(bytesToHex(out.subarray(0, 4))).to.equal('1C471C60');
-      expect(bytesToHex(out.subarray(4, 6))).to.equal('0000');
-      expect(bytesToHex(out.subarray(6, 10))).to.equal('00200020');
-      expect(bytesToHex(out.subarray(10, 12))).to.equal('0000');
-      expect(bytesToHex(out.subarray(12, 16))).to.equal('00020002');
-    });
-
-    it('keeps the level separators for empty input', () => {
-      expect(weightString(new Uint8Array(0), NAME).length).to.equal(4);
-    });
-
-    it('sorts case before accent only after base letters compare equal', () => {
-      expect(w('ab') < w('Ab')).to.equal(true);
-      expect(w('Ab') < w('ac')).to.equal(true);
-      expect(w('á') < w('b')).to.equal(true);
-    });
-
-    it('distinguishes accents and case', () => {
-      const values = ['a', 'A', 'á', 'Á', 'à'];
-      expect(new Set(values.map(w)).size).to.equal(values.length);
-    });
-
-    it('distinguishes combining mark order that MySQL distinguishes', () => {
-      const a = wh('61CCA1CC81');
-      const b = wh('61CC81CCA1');
-      expect(a).to.not.equal(b);
-      expect(a).to.equal('1C4700000020004000240000000200020002');
-      expect(b).to.equal('1C4700000020002400400000000200020002');
-    });
-
-    it('treats precomposed and decomposed forms as equal', () => {
-      expect(wh('C3A1')).to.equal(wh('61CC81'));
-    });
-  });
-
-  describe('against the full oracle', () => {
-    const rows = oracle.utf8.filter((row) => row.collation === NAME);
-
-    it('has a large sample', () => {
-      expect(rows.length).to.be.greaterThan(4000);
-    });
-
-    it('matches every sampled string', () => {
-      for (const row of rows) {
-        expect(wh(row.value_hex), `value ${row.value_hex}`).to.equal(
-          row.weight_hex
+      it('distinguishes combining mark order', () => {
+        expect(compareBytes(eh('61CCA1CC81'), eh('61CC81CCA1'))).to.not.equal(
+          0
         );
-      }
-    });
+      });
 
-    it('matches every ASCII sample', () => {
-      const ascii = rows.filter((row) =>
-        /^([0-7][0-9A-F])+$/i.test(row.value_hex)
-      );
-      expect(ascii.length).to.be.greaterThan(0);
-      for (const row of ascii) {
-        expect(wh(row.value_hex)).to.equal(row.weight_hex);
-      }
-    });
+      it('treats precomposed and decomposed forms as equal', () => {
+        expect(compareBytes(eh('C3A1'), eh('61CC81'))).to.equal(0);
+      });
 
-    it('matches long mixed strings', () => {
-      const long = rows.filter((row) => row.value_hex.length > 400);
-      expect(long.length).to.be.greaterThan(0);
-      for (const row of long) {
-        expect(wh(row.value_hex)).to.equal(row.weight_hex);
-      }
-    });
-  });
+      it('sorts ignorable and punctuation like MySQL', () => {
+        expect(compareBytes(e('a b'), e('ab'))).to.equal(-1);
+        expect(compareBytes(e('a-b'), e('a b'))).to.equal(1);
+        expect(compareBytes(eh('61000062'), e('ab'))).to.equal(0);
+      });
 
-  describe('input handling', () => {
-    it('ignores maxChars', () => {
-      const v = enc.encode('abc');
-      expect(bytesToHex(weightString(v, NAME))).to.equal(
-        bytesToHex(weightString(v, NAME, 1))
-      );
-      expect(bytesToHex(weightString(v, NAME))).to.equal(
-        bytesToHex(weightString(v, NAME, 100))
-      );
-    });
+      it('sorts Han and emoji by primary weight', () => {
+        expectAscending(chain(['😀', 'a', '一', '㐀']), '<');
+        expect(compareBytes(e('一'), e('二'))).to.equal(-1);
+      });
 
-    it('throws on invalid UTF-8', () => {
-      for (const hex of [
-        'C3',
-        'FF',
-        '80',
-        'C0AF',
-        'EDA080',
-        'F5808080',
-        'E280',
-      ]) {
-        expect(() => wh(hex), hex).to.throw(RangeError);
-      }
-    });
+      it('keeps a prefix before its extensions across levels', () => {
+        expectAscending(chain(['a', 'á', 'á́']), '<');
+      });
 
-    it('returns a copy that later calls do not overwrite', () => {
-      const first = weightString(enc.encode('a'), NAME);
-      const snapshot = bytesToHex(first);
-      weightString(enc.encode('zzzz'), NAME);
-      expect(bytesToHex(first)).to.equal(snapshot);
-    });
-
-    it('handles more characters than the initial scratch size', () => {
-      const text = 'a'.repeat(1000);
-      const out = weightString(enc.encode(text), NAME);
-      expect(out.length).to.equal(1000 * 2 * 3 + 4);
-      expect(bytesToHex(out.subarray(0, 4))).to.equal('1C471C47');
-    });
-
-    it('handles strings with many weightless code points', () => {
-      const text = '\u0301'.repeat(200);
-      const out = weightString(enc.encode(text), NAME);
-      expect(out.length).to.equal(200 * 4 + 4);
-    });
-  });
-
-  describe('framing', () => {
-    it('escapes every 00 byte of the weight', () => {
-      expect(bytesToHex(weightFramed(enc.encode('a'), NAME))).to.equal(
-        '011C4700FF00FF00FF2000FF00FF00FF020000'
-      );
-    });
-
-    it('matches encodeVariable of the weight', () => {
-      for (const text of ['', 'a', 'ab', 'Áb', '一', 'á']) {
-        const v = enc.encode(text);
-        expect(bytesToHex(weightFramed(v, NAME))).to.equal(
-          bytesToHex(encodeVariable(weightString(v, NAME)))
+      it('orders long runs of default weights', () => {
+        const base = 'a'.repeat(300);
+        expectAscending(
+          [
+            ['base', e(base)],
+            ['+á', e(`${base}á`)],
+            ['+b', e(`${base}b`)],
+          ],
+          '<'
         );
+        if (cs) {
+          expectAscending(
+            [
+              ['299a+A', e(`${'a'.repeat(299)}A`)],
+              ['base', e(base)],
+            ].reverse() as [string, Uint8Array][],
+            '<'
+          );
+        }
+      });
+    });
+
+    describe('gap and unit boundaries', () => {
+      const sizes = [
+        0, 1, 119, 120, 121, 122, 123, 377, 378, 379, 65657, 65658,
+      ];
+
+      it('orders a deviation by position across gap length changes', () => {
+        const total = 700;
+        const at = (p: number): readonly [string, Uint8Array] => [
+          `accent at ${String(p)}`,
+          e(`${'a'.repeat(p)}á${'a'.repeat(total - p)}`),
+        ];
+        const positions = [
+          0, 1, 119, 120, 121, 122, 377, 378, 379, 699, 700,
+        ].sort((x, y) => y - x);
+        expectAscending(positions.map(at), '<');
+      });
+
+      it('orders a run length before a trailing accent', () => {
+        expectAscending(
+          sizes.map((n) => [String(n), e(`á${'a'.repeat(n)}`)] as const),
+          '<'
+        );
+      });
+
+      it('orders every neighbouring run length of a trailing accent', () => {
+        let prev: Uint8Array | undefined;
+        for (let n = 0; n < 700; n++) {
+          const cur = e(`${'a'.repeat(n)}á`);
+          if (prev) {
+            expect(compareBytes(prev, cur), `n=${String(n)}`).to.equal(-1);
+          }
+          prev = cur;
+        }
+      });
+
+      it('orders every run length of plain text', () => {
+        let prev: Uint8Array | undefined;
+        for (let n = 0; n < 700; n++) {
+          const cur = e('a'.repeat(n));
+          if (prev) {
+            expect(compareBytes(prev, cur), `n=${String(n)}`).to.equal(-1);
+          }
+          prev = cur;
+        }
+      });
+
+      it('orders upper case position under as_cs', () => {
+        if (!cs) {
+          return;
+        }
+        for (const n of sizes.filter((x) => x > 0)) {
+          const early = e(`A${'a'.repeat(n)}`);
+          const late = e(`${'a'.repeat(n)}A`);
+          const none = e('a'.repeat(n + 1));
+          expectAscending(
+            [
+              ['none', none],
+              ['late', late],
+              ['early', early],
+            ],
+            '<'
+          );
+        }
+      });
+
+      it('keeps upper case close to lower case in size', () => {
+        if (!cs) {
+          return;
+        }
+        expect(e('A'.repeat(100)).length).to.be.lessThan(
+          e('a'.repeat(100)).length + 250
+        );
+        expect(e('A').length - e('a').length).to.be.lessThan(3);
+        expect(e('ABCDEFGH').length).to.be.lessThan(2 * 8 + 6 + 8 * 2 + 4);
+      });
+
+      it('has no 00 byte for table units', () => {
+        for (const text of ['Aá', 'ÁÀÂ', '\u0345', 'a\u0301\u0323']) {
+          expect(e(text).includes(0), text).to.equal(false);
+        }
+      });
+    });
+
+    describe('against the oracle', () => {
+      const rows = oracle.utf8.filter((row) => row.collation === name);
+
+      it('has a large sample', () => {
+        expect(rows.length).to.be.greaterThan(4000);
+      });
+
+      it('orders every sampled string like MySQL', () => {
+        expectSameOrder(
+          rows.map((row) => ({
+            id: row.value_hex,
+            oracle: hexToBytes(row.weight_hex),
+            ours: eh(row.value_hex),
+          }))
+        );
+      });
+
+      it('orders ASCII samples like MySQL', () => {
+        const ascii = rows.filter((row) =>
+          /^([0-7][0-9A-F])+$/i.test(row.value_hex)
+        );
+        expect(ascii.length).to.be.greaterThan(0);
+        expectSameOrder(
+          ascii.map((row) => ({
+            id: row.value_hex,
+            oracle: hexToBytes(row.weight_hex),
+            ours: eh(row.value_hex),
+          }))
+        );
+      });
+
+      it('orders long mixed strings like MySQL', () => {
+        const long = rows.filter((row) => row.value_hex.length > 400);
+        expect(long.length).to.be.greaterThan(0);
+        expectSameOrder(
+          long.map((row) => ({
+            id: row.value_hex,
+            oracle: hexToBytes(row.weight_hex),
+            ours: eh(row.value_hex),
+          }))
+        );
+      });
+    });
+
+    describe('input handling', () => {
+      it('ignores maxChars', () => {
+        const v = enc.encode('abc');
+        expect(weightString(v, name, 1)).to.deep.equal(weightString(v, name));
+        expect(weightString(v, name, 100)).to.deep.equal(weightString(v, name));
+      });
+
+      it('throws on invalid UTF-8', () => {
+        for (const hex of [
+          'C3',
+          'FF',
+          '80',
+          'C0AF',
+          'EDA080',
+          'F5808080',
+          'E280',
+        ]) {
+          expect(() => eh(hex), hex).to.throw(RangeError);
+        }
+      });
+
+      it('returns a copy that later calls do not overwrite', () => {
+        const first = e('a');
+        const snapshot = bytesToHex(first);
+        e('zzzz');
+        expect(bytesToHex(first)).to.equal(snapshot);
+      });
+
+      it('handles inputs larger than the initial scratch size', () => {
+        expect(e('a'.repeat(1000)).length).to.be.lessThan(2200);
+        expect(e('́'.repeat(200)).length).to.be.greaterThan(0);
+      });
+    });
+
+    describe('framing', () => {
+      it('matches encodeVariable of the encoding', () => {
+        for (const text of ['', 'a', 'ab', 'Áb', '一', 'á']) {
+          const v = enc.encode(text);
+          expect(weightFramed(v, name)).to.deep.equal(
+            encodeVariable(weightString(v, name))
+          );
+        }
+      });
+
+      it('frames the empty string distinctly from NULL', () => {
+        const framed = weightFramed(new Uint8Array(0), name);
+        expect(framed[0]).to.equal(0x01);
+        expect(framed.length).to.be.greaterThan(2);
+      });
+
+      it('orders frames like the encodings', () => {
+        const texts = ['', 'a', 'A', 'á', 'ab', 'aB', 'b', ' ', 'a b', '一'];
+        for (const x of texts) {
+          for (const y of texts) {
+            expect(
+              compareBytes(
+                weightFramed(enc.encode(x), name),
+                weightFramed(enc.encode(y), name)
+              ),
+              JSON.stringify([x, y])
+            ).to.equal(
+              compareBytes(
+                weightString(enc.encode(x), name),
+                weightString(enc.encode(y), name)
+              )
+            );
+          }
+        }
+      });
+    });
+  });
+}
+
+suite('utf8mb4_0900_as_cs', 3);
+suite('utf8mb4_0900_as_ci', 2);
+
+describe('asCsWriteLevel', () => {
+  it('keeps every level 2 and 3 unit within one byte of its default', () => {
+    const dst = new Uint8Array(32);
+    const bad: string[] = [];
+    for (let cp = 0; cp <= 0x10ffff; cp++) {
+      for (const level of [2, 3] as const) {
+        const n = asCsWriteLevel(cp, level, dst, 0);
+        const d = level === 2 ? 0x20 : 0x02;
+        for (let j = 0; j < n; j += 2) {
+          const u = ((dst[j] ?? 0) << 8) | (dst[j + 1] ?? 0);
+          if (u < d || u - d > 0xff) {
+            bad.push(`${String(cp)}/${String(level)}`);
+          }
+        }
       }
-    });
-
-    it('frames the empty string distinctly from NULL', () => {
-      expect(bytesToHex(weightFramed(new Uint8Array(0), NAME))).to.equal(
-        '0100FF00FF00FF00FF0000'
-      );
-    });
-
-    it('never produces equal frames for unequal weights', () => {
-      const texts = ['a', 'A', 'á', 'ab', 'aB', 'b', '', ' ', 'a b'];
-      const frames = texts.map((t) =>
-        bytesToHex(weightFramed(enc.encode(t), NAME))
-      );
-      expect(new Set(frames).size).to.equal(texts.length);
-    });
-  });
-
-  describe('asCsWriteLevel', () => {
-    it('writes each level of "a" at an offset without touching earlier bytes', () => {
-      const dst = new Uint8Array([0xaa, 0, 0, 0, 0]);
-      expect(asCsWriteLevel(0x61, 1, dst, 1)).to.equal(2);
-      expect(bytesToHex(dst.subarray(0, 3))).to.equal('AA1C47');
-      expect(asCsWriteLevel(0x61, 2, dst, 1)).to.equal(2);
-      expect(bytesToHex(dst.subarray(1, 3))).to.equal('0020');
-      expect(asCsWriteLevel(0x61, 3, dst, 1)).to.equal(2);
-      expect(bytesToHex(dst.subarray(1, 3))).to.equal('0002');
-      expect(dst[0]).to.equal(0xaa);
-    });
-
-    it('writes nothing for ignorable and out-of-range code points', () => {
-      const dst = new Uint8Array(8);
-      for (const level of [1, 2, 3] as const) {
-        expect(asCsWriteLevel(0x0, level, dst, 0)).to.equal(0);
-        expect(asCsWriteLevel(0x110000, level, dst, 0)).to.equal(0);
-        expect(asCsWriteLevel(-1, level, dst, 0)).to.equal(0);
-      }
-    });
-
-    it('writes implicit Han weights for every block edge', () => {
-      const edges = [0x3400, 0x4dbf, 0x4e00, 0x9fff, 0x20000, 0x2a6df];
-      for (const cp of edges) {
-        const hex = Buffer.from(String.fromCodePoint(cp)).toString('hex');
-        const dst = new Uint8Array(16);
-        const n1 = asCsWriteLevel(cp, 1, dst, 0);
-        expect(n1, `U+${cp.toString(16)} level 1`).to.equal(4);
-        const full = wh(hex);
-        expect(full.startsWith(bytesToHex(dst.subarray(0, 4)))).to.equal(true);
-        expect(full.endsWith('0000002000000002')).to.equal(true);
-      }
-    });
-  });
-});
-
-describe('utf8mb4_0900_as_ci', () => {
-  const CI = 'utf8mb4_0900_as_ci';
-  const ci = (text: string): string =>
-    bytesToHex(weightString(enc.encode(text), CI));
-  const cih = (hex: string): string =>
-    bytesToHex(weightString(hexToBytes(hex), CI));
-
-  it('is a NO PAD two-level collation', () => {
-    const info = getCollation(CI);
-    expect(info.kind).to.equal('multi-level');
-    expect(info.pad).to.equal('NO PAD');
-    expect(info.kind === 'multi-level' && info.levels).to.equal(2);
-  });
-
-  it('matches MySQL fixtures', () => {
-    expect(ci('a')).to.equal('1C4700000020');
-    expect(ci('A')).to.equal('1C4700000020');
-    expect(ci('ab')).to.equal('1C471C60000000200020');
-    expect(ci('á')).to.equal('1C47000000200024');
-    expect(ci('')).to.equal('0000');
-    expect(cih('00')).to.equal('0000');
-    expect(cih('CC81')).to.equal('00000024');
-    expect(cih('E4B880')).to.equal('FB40CE0000000020');
-    expect(cih('F09F9880')).to.equal('15FB00000020');
-    expect(cih('EAB080')).to.equal('3BF53C73000000200020');
-  });
-
-  it('matches combining mark order', () => {
-    expect(cih('61CCA1CC81')).to.equal('1C470000002000400024');
-    expect(cih('61CC81CCA1')).to.equal('1C470000002000240040');
-  });
-
-  it('folds case but keeps accents distinct', () => {
-    expect(ci('a')).to.equal(ci('A'));
-    expect(ci('ab')).to.equal(ci('AB'));
-    expect(ci('a')).to.not.equal(ci('á'));
-    expect(ci('á')).to.equal(ci('Á'));
-  });
-
-  it('is the first two levels of as_cs plus a separator', () => {
-    for (const text of ['a', 'A', 'ab', 'aB', 'á', '一', 'a b', '']) {
-      const cs = weightString(enc.encode(text), NAME);
-      const base = weightString(enc.encode(text), CI);
-      expect(bytesToHex(cs.subarray(0, base.length))).to.equal(
-        bytesToHex(base)
-      );
-      const tertiary = cs.subarray(base.length);
-      expect(bytesToHex(tertiary.subarray(0, 2))).to.equal('0000');
     }
+    expect(bad).to.deep.equal([]);
+  }).timeout(20000);
+
+  it('writes each level of "a" at an offset without touching earlier bytes', () => {
+    const dst = new Uint8Array([0xaa, 0, 0, 0, 0]);
+    expect(asCsWriteLevel(0x61, 1, dst, 1)).to.equal(2);
+    expect(bytesToHex(dst.subarray(0, 3))).to.equal('AA1C47');
+    expect(asCsWriteLevel(0x61, 2, dst, 1)).to.equal(2);
+    expect(bytesToHex(dst.subarray(1, 3))).to.equal('0020');
+    expect(asCsWriteLevel(0x61, 3, dst, 1)).to.equal(2);
+    expect(bytesToHex(dst.subarray(1, 3))).to.equal('0002');
+    expect(dst[0]).to.equal(0xaa);
   });
 
-  it('matches every sampled oracle string', () => {
-    const rows = oracle.utf8.filter((row) => row.collation === CI);
-    expect(rows.length).to.be.greaterThan(4000);
-    for (const row of rows) {
-      expect(cih(row.value_hex), `value ${row.value_hex}`).to.equal(
-        row.weight_hex
-      );
+  it('writes nothing for ignorable and out-of-range code points', () => {
+    const dst = new Uint8Array(8);
+    for (const level of [1, 2, 3] as const) {
+      expect(asCsWriteLevel(0x0, level, dst, 0)).to.equal(0);
+      expect(asCsWriteLevel(0x110000, level, dst, 0)).to.equal(0);
+      expect(asCsWriteLevel(-1, level, dst, 0)).to.equal(0);
     }
-  });
-
-  it('ignores maxChars and rejects invalid UTF-8', () => {
-    const v = enc.encode('abc');
-    expect(bytesToHex(weightString(v, CI, 1))).to.equal(
-      bytesToHex(weightString(v, CI))
-    );
-    for (const hex of ['C3', 'FF', '80', 'EDA080']) {
-      expect(() => cih(hex), hex).to.throw(RangeError);
-    }
-  });
-
-  it('frames the empty string as 0100ff00ff0000', () => {
-    expect(bytesToHex(weightFramed(new Uint8Array(0), CI))).to.equal(
-      '0100FF00FF0000'
-    );
-  });
-
-  it('handles long input', () => {
-    const out = weightString(enc.encode('a'.repeat(1000)), CI);
-    expect(out.length).to.equal(1000 * 2 * 2 + 2);
   });
 });

@@ -147,6 +147,49 @@ function mixedSamples(count, seed) {
 }
 const MIXED_HEX = mixedSamples(2000, 20260703);
 
+function denseSamples(count, seed) {
+  let s = seed >>> 0;
+  const next = () => {
+    s = (Math.imul(s, 1664525) + 1013904223) >>> 0;
+    return s >>> 8;
+  };
+  const alphabet = [
+    0x61, 0x41, 0x62, 0x42, 0xe1, 0xc1, 0xe0, 0x301, 0x323, 0x321, 0x20, 0x2d,
+    0x4e00, 0x4e8c, 0x3400, 0x1f600, 0x1c6, 0xdf, 0x00, 0x1100, 0xac00,
+  ];
+  const seen = new Set([...UTF8_HEX, ...MIXED_HEX]);
+  const samples = [];
+  const add = (cps) => {
+    const hex = Buffer.from(String.fromCodePoint(...cps), 'utf8').toString(
+      'hex'
+    );
+    if (!seen.has(hex)) {
+      seen.add(hex);
+      samples.push(hex);
+    }
+  };
+  for (const run of [239, 240, 241, 255, 256, 257, 300, 1000]) {
+    const base = Array(run).fill(0x61);
+    add(base);
+    for (const tail of [0x41, 0xe1, 0x62, 0x301]) add([...base, tail]);
+    add([0x41, ...base]);
+    add([...base.slice(1), 0x41]);
+    add([...base.slice(0, 120), 0x41, ...base.slice(120)]);
+  }
+  while (samples.length < count) {
+    const len = next() % 13;
+    const cps = [];
+    while (cps.length < len) {
+      const cp = alphabet[next() % alphabet.length];
+      const rep = next() % 8 === 0 ? 1 + (next() % 4) : 1;
+      for (let i = 0; i < rep; i++) cps.push(cp);
+    }
+    add(cps);
+  }
+  return samples;
+}
+const DENSE_HEX = denseSamples(4000, 20260704);
+
 // SQL goes through stdin: large UNION queries exceed the argv size limit (E2BIG).
 function mysql(sql) {
   return execFileSync('mysql', ['-N', '-B'], {
@@ -201,7 +244,9 @@ for (const coll of COLLATIONS) {
 
   if (coll.charset === 'utf8mb4') {
     const hexes =
-      coll.name === 'utf8mb4_0900_bin' ? UTF8_HEX : [...UTF8_HEX, ...MIXED_HEX];
+      coll.name === 'utf8mb4_0900_bin'
+        ? UTF8_HEX
+        : [...UTF8_HEX, ...MIXED_HEX, ...DENSE_HEX];
     const sql = hexes
       .map(
         (h) =>
