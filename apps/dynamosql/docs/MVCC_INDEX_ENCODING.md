@@ -44,6 +44,21 @@ TX_ID occupies the final eight bytes, after any PK suffix. P uses its component 
 
 Different rows sharing a nonunique/NULL-containing key remain distinct within one transaction. A unique non-NULL key has one final mapping or tombstone per transaction; coalesce deletion/reassignment of that key. SQL uniqueness includes snapshot visibility and own writes; final head publication validates the snapshot.
 
+## Key length limits
+
+DynamoDB bounds key sizes, and keys are never truncated or hashed to fit, so the limits are enforced at definition time.
+
+| Key                                                               | Limit (bytes) | Measured length                                                       |
+| ----------------------------------------------------------------- | ------------- | --------------------------------------------------------------------- |
+| Primary partition key (`DB_ROW_KEY` or a direct-use column value) | 2048          | The complete encoded attribute value                                  |
+| Secondary sort key (`INDEX_TX_ID`)                                | 1024          | The full `INDEX_TX_ID`: E, including any PK suffix P, plus the TX_ID. |
+
+- A definition is rejected if the maximum encoded length of any key it produces can exceed its limit. The check runs on `CREATE TABLE`, `CREATE INDEX`, and `ALTER TABLE` statements that add or change an index, a primary key, or a column used by one. Rejection is a definition error, not a write-time error.
+- The maximum length is computed from the column definitions alone, never from current values. It sums the worst-case size of every component: the 1-byte marker, the fixed value width, and for variable-width components the worst-case escaped payload plus the 2-byte terminator. Escaping counts each `00` byte as two bytes. Character components use the worst-case weight output for the column's bound under its collation, including the full padded length for PAD SPACE. Binary components use the column's maximum byte length with every byte `00`.
+- P counts toward a secondary index's limit exactly when E includes P. A nonunique index is measured as I, P, and TX_ID. A unique index with any nullable column is also measured with P, because an entry with a NULL component includes it. A unique index whose columns are all NOT NULL is measured as I and TX_ID only. An index whose measured length can exceed 1024 bytes is rejected even if I alone would fit.
+- A column type with no finite maximum encoded length, such as an unbounded TEXT or BLOB without a declared bound, cannot appear in a key and is rejected.
+- Changing a column's length, bound, or collation re-runs the check for every key containing that column.
+
 ## Tuple framing
 
 Hex bytes are written without `0x`. `||` concatenates bytes. `U_w(x)` is unsigned big-endian in exactly w bytes; `U64(x)=U_8(x)`.

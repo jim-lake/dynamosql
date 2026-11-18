@@ -143,7 +143,7 @@ for (const coll of COLLATIONS) {
     }
   }
 
-  if (coll.name === UCA_AI_CI) {
+  if (coll.charset === 'utf8mb4') {
     const sql = UTF8_HEX.map(
       (h) =>
         `SELECT '${h}', CONCAT('x', HEX(WEIGHT_STRING(_utf8mb4 X'${h}' COLLATE ${coll.name})))`

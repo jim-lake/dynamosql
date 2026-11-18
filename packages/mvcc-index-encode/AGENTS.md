@@ -41,10 +41,15 @@ packages/mvcc-index-encode/
   `utf8mb4_0900_as_ci` and `as_cs` collations are excluded because their MySQL
   output groups weights by collation level, which the per-character model in the
   spec cannot produce.
-- Non-ASCII input throws for the ASCII-only collations. `utf8mb4_0900_ai_ci` maps
+- Non-ASCII input throws for the ASCII-only collations. `utf8mb4_0900_ai_ci` throws on invalid UTF-8 and maps
   code points through the UCA table in `uca_0900_ai_ci.ts`. Code points absent from
   the table have an empty weight.
-- Never truncate a value to fit a bound. Values longer than the bound throw.
+- `utf8mb4_0900_bin` returns the input bytes as the weight, without a copy, a
+  UTF-8 check, or a length check. The caller guarantees valid UTF-8 and the
+  character bound, and must not mutate the result.
+- `maxChars` is read only for PAD SPACE collations, where it sets the padding.
+  It is required there, and a value longer than it throws. NO PAD collations
+  ignore it. Never truncate a value to fit a bound.
 - Empty PAD SPACE text pads the weight output, not the input. Empty NO PAD text
   has an empty weight.
 - Regenerate, do not hand-edit, `collation_weights.ts`, `uca_0900_ai_ci.ts`, and `oracle.json`. Run

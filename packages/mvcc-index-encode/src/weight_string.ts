@@ -4,23 +4,25 @@ import { getCollation, type Charset, type CollationName } from './collations';
 export function weightString(
   value: Uint8Array,
   collation: CollationName,
-  maxChars: number
+  maxChars?: number
 ): Uint8Array {
   const info = getCollation(collation);
-  if (!Number.isInteger(maxChars) || maxChars < 0) {
-    throw new RangeError(`Invalid character bound: ${String(maxChars)}`);
+  if (info.kind === 'utf8-bytes') {
+    return value;
   }
 
   const codePoints = decodeChars(value, info.charset, collation);
-  if (codePoints.length > maxChars) {
-    throw new RangeError(
-      `Value has ${String(codePoints.length)} characters, above bound ${String(maxChars)}`
-    );
-  }
-
   const parts = codePoints.map((cp) => info.weightOf(cp));
 
   if (info.pad === 'PAD SPACE') {
+    if (maxChars === undefined || !Number.isInteger(maxChars) || maxChars < 0) {
+      throw new RangeError(`Invalid character bound: ${String(maxChars)}`);
+    }
+    if (codePoints.length > maxChars) {
+      throw new RangeError(
+        `Value has ${String(codePoints.length)} characters, above bound ${String(maxChars)}`
+      );
+    }
     const space = info.weightOf(0x20);
     for (let i = codePoints.length; i < maxChars; i++) {
       parts.push(space);

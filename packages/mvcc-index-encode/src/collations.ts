@@ -15,11 +15,21 @@ export type PadMode = 'PAD SPACE' | 'NO PAD';
 
 export type Charset = 'ascii' | 'utf8mb4';
 
-export interface CollationInfo {
+interface CollationBase {
   readonly charset: Charset;
   readonly pad: PadMode;
+}
+
+export interface TableCollation extends CollationBase {
+  readonly kind: 'table';
   readonly weightOf: (codePoint: number) => Uint8Array;
 }
+
+export interface Utf8BytesCollation extends CollationBase {
+  readonly kind: 'utf8-bytes';
+}
+
+export type CollationInfo = TableCollation | Utf8BytesCollation;
 
 const COLLATION_META: Readonly<
   Record<CollationName, { charset: Charset; pad: PadMode }>
@@ -49,9 +59,12 @@ function buildAsciiWeightOf(name: CollationName): (cp: number) => Uint8Array {
 
 function buildInfo(name: CollationName): CollationInfo {
   const meta = COLLATION_META[name];
+  if (name === 'utf8mb4_0900_bin') {
+    return { ...meta, kind: 'utf8-bytes' };
+  }
   return {
-    charset: meta.charset,
-    pad: meta.pad,
+    ...meta,
+    kind: 'table',
     weightOf:
       name === 'utf8mb4_0900_ai_ci' ? ucaWeight : buildAsciiWeightOf(name),
   };

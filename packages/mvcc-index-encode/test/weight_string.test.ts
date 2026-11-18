@@ -26,7 +26,7 @@ const oracle = JSON.parse(
 ) as Oracle;
 
 const ASCII_ONLY_COLLATIONS = COLLATION_NAMES.filter(
-  (name) => name !== 'utf8mb4_0900_ai_ci'
+  (name) => !name.startsWith('utf8mb4')
 );
 
 function charCount(hex: string): number {
@@ -67,9 +67,12 @@ describe('weightString against MySQL 8.4 oracle', () => {
     });
   }
 
-  describe('utf8mb4_0900_ai_ci non-ASCII', () => {
+  describe('utf8mb4 non-ASCII', () => {
     it('matches each sampled UTF-8 string', () => {
       const rows = oracle.utf8;
+      expect(new Set(rows.map((row) => row.collation))).to.deep.equal(
+        new Set(['utf8mb4_0900_ai_ci', 'utf8mb4_0900_bin'])
+      );
       expect(rows.length).to.be.greaterThan(0);
       for (const row of rows) {
         const value = hexToBytes(row.value_hex);
@@ -105,12 +108,15 @@ describe('weightString against MySQL 8.4 oracle', () => {
     ).to.throw(RangeError);
   });
 
-  it('rejects values longer than the bound in code points', () => {
+  it('requires a valid bound for PAD SPACE only', () => {
+    expect(() => weightString(hexToBytes('61'), 'ascii_general_ci')).to.throw(
+      RangeError
+    );
     expect(() =>
-      weightString(hexToBytes('C3A9'), 'utf8mb4_0900_ai_ci', 0)
+      weightString(hexToBytes('61'), 'ascii_general_ci', -1)
     ).to.throw(RangeError);
     expect(() =>
-      weightString(hexToBytes('C3A9'), 'utf8mb4_0900_ai_ci', 1)
+      weightString(hexToBytes('C3A9'), 'utf8mb4_0900_ai_ci')
     ).to.not.throw();
   });
 
@@ -124,6 +130,46 @@ describe('weightString against MySQL 8.4 oracle', () => {
     expect(() =>
       weightString(hexToBytes('61'), 'latin1_swedish_ci' as CollationName, 1)
     ).to.throw(RangeError);
+  });
+});
+
+describe('utf8mb4_0900_bin', () => {
+  const bin = (hex: string, bound: number): string =>
+    bytesToHex(weightString(hexToBytes(hex), 'utf8mb4_0900_bin', bound));
+
+  it('weighs every code point as its UTF-8 bytes', () => {
+    for (const cp of [0x00, 0x7f, 0x80, 0x7ff, 0x800, 0xd7ff, 0xe000]) {
+      const hex = Buffer.from(String.fromCodePoint(cp)).toString('hex');
+      expect(bin(hex, 1)).to.equal(hex.toUpperCase());
+    }
+    for (const cp of [0xffff, 0x10000, 0x1f600, 0x10ffff]) {
+      const hex = Buffer.from(String.fromCodePoint(cp)).toString('hex');
+      expect(bin(hex, 1)).to.equal(hex.toUpperCase());
+    }
+  });
+
+  it('keeps case, accents, and combining sequences distinct', () => {
+    expect(bin('61', 1)).to.not.equal(bin('41', 1));
+    expect(bin('C3A9', 1)).to.not.equal(bin('65CC81', 2));
+  });
+
+  it('does not pad', () => {
+    expect(bin('', 5)).to.equal('');
+    expect(bin('61', 5)).to.equal('61');
+  });
+
+  it('keeps NUL bytes and a leading BOM', () => {
+    expect(bin('610062', 3)).to.equal('610062');
+    expect(bin('EFBBBF61', 2)).to.equal('EFBBBF61');
+  });
+
+  it('preserves byte order across code points of every UTF-8 length', () => {
+    const cps = [0x7f, 0x80, 0x7ff, 0x800, 0xffff, 0x10000, 0x10ffff];
+    const keys = cps.map((cp) =>
+      bin(Buffer.from(String.fromCodePoint(cp)).toString('hex'), 1)
+    );
+    const sorted = [...keys].sort();
+    expect(keys).to.deep.equal(sorted);
   });
 });
 
