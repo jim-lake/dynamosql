@@ -53,6 +53,13 @@ function isCreateIndex(ast: Create): ast is CreateIndex {
   return ast.keyword === 'index';
 }
 
+function _indexType(
+  options: readonly { type?: unknown }[] | null | undefined
+): 'btree' | 'hash' | null {
+  const type = options?.[0]?.type;
+  return type === 'btree' || type === 'hash' ? type : null;
+}
+
 export async function query(
   params: HandlerParams<Create>
 ): Promise<AffectedResult> {
@@ -102,7 +109,7 @@ async function _createIndex(
     index_name: ast.index,
     key_list,
     is_unique: ast.index_type === 'unique',
-    index_using: ast.index_using?.type ?? null,
+    indexType: ast.index_using?.type ?? null,
   });
   return { affectedRows: 0 };
 }
@@ -190,9 +197,13 @@ async function _createTable(
   const column_list: ColumnDefParam[] = [];
   const primary_key: string[] = [];
   const unique_list: UniqueDefParam[] = [];
+  const index_list: UniqueDefParam[] = [];
+  let primaryType: 'btree' | 'hash' | null = null;
 
   for (const def of ast.create_definitions ?? []) {
     if (def.resource === 'column') {
+      const literal = def.default_val?.value as
+        { type: string; value: unknown } | undefined;
       const col = {
         name: def.column.column,
         type: mysqlStringToValueType(def.definition.dataType),
@@ -206,6 +217,18 @@ async function _createTable(
           null,
         collation: makeCollation(def, collation),
         nullable: def.nullable?.value !== 'not null',
+        default:
+          literal?.type === 'bool'
+            ? Number(literal.value)
+            : literal?.type === 'number' ||
+                literal?.type === 'single_quote_string' ||
+                literal?.type === 'null'
+              ? literal.value
+              : undefined,
+        comment:
+          typeof def.comment?.value === 'string'
+            ? def.comment.value
+            : def.comment?.value.value,
       };
       if (
         column_list.some((c) => c.name.toLowerCase() === col.name.toLowerCase())
@@ -225,6 +248,7 @@ async function _createTable(
         unique_list.push({
           name,
           key_list: [{ name: col.name, type: col.type }],
+          type: null,
         });
       }
     } else if (
@@ -234,6 +258,7 @@ async function _createTable(
       for (const sub of def.definition) {
         primary_key.push(sub.column);
       }
+      primaryType = _indexType(def.index_options);
     } else if (
       def.resource === 'constraint' &&
       isUniqueConstraint(def.constraint_type)
@@ -250,7 +275,22 @@ async function _createTable(
         name: column,
         type: column_list.find((col) => col.name === column)?.type ?? 'string',
       }));
-      unique_list.push({ name, key_list });
+      const type = _indexType(
+        'index_options' in def ? def.index_options : null
+      );
+      unique_list.push({ name, key_list, type });
+    } else if (def.resource === 'index') {
+      const columns = def.definition.map((sub) => String(sub.column));
+      const key_list = columns.map((column) => ({
+        name: column,
+        type: column_list.find((col) => col.name === column)?.type ?? 'string',
+      }));
+      const name = uniqueIndexName(
+        def.index ?? null,
+        columns,
+        index_list.map((i) => i.name)
+      );
+      index_list.push({ name, key_list, type: _indexType(def.index_options) });
     }
   }
   for (const name of primary_key) {
@@ -295,7 +335,9 @@ async function _createTable(
       collation,
       column_list,
       unique_list,
+      index_list,
       primary_key,
+      primaryType,
       is_temp,
       table_engine,
     };

@@ -51,12 +51,18 @@ export async function getTableInfo(
       const keys = (index.KeySchema ?? []).map(
         (key) => key.AttributeName ?? ''
       );
-      return { name: index.IndexName ?? '', unique: false, column_list: keys };
+      return {
+        name: index.IndexName ?? '',
+        unique: false,
+        column_list: keys,
+        type: null,
+      };
     });
     return {
       table,
       collation: COLLATIONS.UTF8MB4_0900_BIN,
       primary_key,
+      primaryType: null,
       column_list,
       indexList,
       is_open: true,
@@ -64,6 +70,9 @@ export async function getTableInfo(
       tableSize: BigInt(data.Table.TableSizeBytes ?? 0),
     };
   } catch (err) {
+    if (err instanceof Error && err.message === 'resource_not_found') {
+      throw new SQLError({ err: 'table_not_found', args: [table] });
+    }
     logger.error('getTableInfo: err:', err, table);
     throw err;
   }

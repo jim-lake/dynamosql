@@ -45,6 +45,7 @@ export interface ColumnDef {
   collation?: COLLATIONS;
   nullable?: boolean;
   default?: unknown;
+  defaultValue?: CellValue;
   comment?: string;
 }
 export interface ColumnDefParam {
@@ -58,15 +59,18 @@ export interface ColumnDefParam {
   default?: unknown;
   comment?: string;
 }
+export type IndexType = 'btree' | 'hash' | null;
 export interface IndexInfo {
   name: string;
   unique: boolean;
   column_list: readonly string[];
+  type: IndexType;
 }
 export interface TableInfo {
   table: string;
   collation: COLLATIONS | null;
   primary_key: readonly string[];
+  primaryType: IndexType;
   column_list: readonly ColumnDef[];
   indexList: readonly IndexInfo[];
   is_open: boolean;
@@ -142,6 +146,8 @@ export interface CreateTableParams {
   primary_key: string[];
   column_list: ColumnDefParam[];
   unique_list: UniqueDefParam[];
+  index_list: UniqueDefParam[];
+  primaryType: IndexType;
   session: Session;
   database: string;
   is_temp?: boolean;
@@ -149,6 +155,7 @@ export interface CreateTableParams {
 export interface UniqueDefParam {
   name: string;
   key_list: KeyDef[];
+  type: IndexType;
 }
 export interface DropTableParams {
   dynamodb: DynamoDBClient;
@@ -168,7 +175,7 @@ export interface IndexParams {
   index_name: string;
   key_list: KeyDef[];
   is_unique: boolean;
-  index_using: 'btree' | 'hash' | null;
+  indexType: IndexType;
 }
 export interface DeleteIndexParams {
   dynamodb: DynamoDBClient;

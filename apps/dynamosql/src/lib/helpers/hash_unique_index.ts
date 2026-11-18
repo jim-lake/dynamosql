@@ -6,6 +6,7 @@ export type HashUniqueMakeKeyResult = string | number | bigint;
 export type HashUniqueMakeKey = (
   keys: HashUniqueKeyValue[]
 ) => HashUniqueMakeKeyResult;
+export type HashUniquePrimaryKeyType = 'string' | 'bigint' | 'number';
 
 export function createHashUniqueMakeKey(
   types: HashUniqueKeyType[]

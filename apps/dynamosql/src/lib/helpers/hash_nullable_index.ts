@@ -2,10 +2,10 @@
 import type {
   HashUniqueKeyType,
   HashUniqueKeyValue,
+  HashUniquePrimaryKeyType,
 } from './hash_unique_index';
 
 export type HashNullableKeyValue = HashUniqueKeyValue | null;
-export type HashNullablePrimaryKeyType = 'string' | 'bigint' | 'number';
 export type HashNullableMakeKey = (
   keys: HashNullableKeyValue[],
   primaryKey: string | bigint | number
@@ -13,7 +13,7 @@ export type HashNullableMakeKey = (
 
 export function createHashNullableMakeKey(
   types: HashUniqueKeyType[],
-  primaryType: HashNullablePrimaryKeyType
+  primaryType: HashUniquePrimaryKeyType
 ): HashNullableMakeKey {
   if (types.length > 3) {
     return (keys, primaryKey) => {

@@ -6,7 +6,6 @@ import { cellConvert } from '../helpers/cell_convert';
 import type { COLLATIONS } from '../../../constants/mysql';
 import type { Session } from '../../../session';
 import type { ConvertKeyFunction } from '../../helpers/convert_key';
-import type { HashNullablePrimaryKeyType } from '../../helpers/hash_nullable_index';
 import type {
   HashUniqueMakeKey,
   HashUniqueMakeKeyResult,
@@ -17,15 +16,14 @@ import type { CellValue, ColumnDef, CellRow } from '../index';
 
 export interface MemoryColumnDef extends ColumnDef {
   name_lc: string;
-  defaultValue: CellValue | undefined;
 }
 
 export const ROW_ID_NAME = 'DB_ROW_ID';
 
 export interface PrimaryKey {
   columns: string[];
+  type: 'hash' | null;
   makeKey: HashUniqueMakeKey;
-  primaryType: HashNullablePrimaryKeyType;
   convertKey: ConvertKeyFunction;
 }
 export type IndexKey =
@@ -36,6 +34,7 @@ export type IndexMap =
 export interface MemoryIndex {
   name: string;
   unique: boolean;
+  type: 'btree' | 'hash' | null;
   column_list: string[];
   keyOf: (row: CellRow, primaryKey: HashUniqueMakeKeyResult) => IndexKey;
   map: IndexMap;

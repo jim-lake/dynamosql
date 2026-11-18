@@ -1,12 +1,14 @@
 import { isCaseInsensitive } from './collation';
 
 import type { ColumnDef } from '../engine';
-import type { HashNullablePrimaryKeyType } from './hash_nullable_index';
-import type { HashUniqueKeyType } from './hash_unique_index';
+import type {
+  HashUniqueKeyType,
+  HashUniquePrimaryKeyType,
+} from './hash_unique_index';
 
 export function getPrimaryKeyType(
   keyTypes: HashUniqueKeyType[]
-): HashNullablePrimaryKeyType {
+): HashUniquePrimaryKeyType {
   const [only] = keyTypes;
   return keyTypes.length === 1 && (only === 'bigint' || only === 'number')
     ? only

@@ -16,6 +16,11 @@ describe('Temp', function () {
     { checkChanged: true }
   );
   runTests(
+    'memory_default_comment.sql',
+    path.join(__dirname, 'memory_default_comment.sql'),
+    { checkChanged: true }
+  );
+  runTests(
     'memory_truthiness.sql',
     path.join(__dirname, 'memory_truthiness.sql'),
     { checkChanged: true }

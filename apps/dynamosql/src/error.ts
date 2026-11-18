@@ -64,6 +64,10 @@ const ERROR_MAP: Record<string, ErrorMapEntry> = {
     code: 'ER_FEATURE_UNSUPPORTED',
     sqlMessage: errStr`${0} is only supported in the select list of a SELECT`,
   },
+  ER_PK_INDEX_TYPE_UNSUPPORTED: {
+    code: 'ER_FEATURE_UNSUPPORTED',
+    sqlMessage: errStr`Index type of ${0} not supported on this engine. Primary key type not supported.`,
+  },
   unsupported_type: {
     code: 'ER_NO',
     sqlMessage: errStr`Unsupported query type: ${0}`,

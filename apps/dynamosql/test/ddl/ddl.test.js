@@ -44,24 +44,31 @@ describe('DDL', function () {
     { skipAffected: true, timeout: 30000 },
     true
   );
-  runTests(
-    'show.sql',
-    path.join(__dirname, 'show.sql'),
-    { skipAffected: true, timeout: 30000 },
-    true
-  );
-  runTests(
-    'show_warnings.sql',
-    path.join(__dirname, 'show_warnings.sql'),
-    { skipAffected: true, timeout: 30000 },
-    true
-  );
-  runTests(
-    'show_error.sql',
-    path.join(__dirname, 'show_error.sql'),
-    { allowedErrors: 'SAME_CODE', skipAffected: true, timeout: 30000 },
-    true
-  );
+  runTests('show.sql', path.join(__dirname, 'show.sql'), {
+    skipAffected: true,
+    timeout: 30000,
+  });
+  runTests('show_columns.sql', path.join(__dirname, 'show_columns.sql'), {
+    skipAffected: true,
+    timeout: 30000,
+  });
+  runTests('show_index.sql', path.join(__dirname, 'show_index.sql'), {
+    skipAffected: true,
+    timeout: 30000,
+  });
+  runTests('show_create.sql', path.join(__dirname, 'show_create.sql'), {
+    skipAffected: true,
+    timeout: 30000,
+  });
+  runTests('show_warnings.sql', path.join(__dirname, 'show_warnings.sql'), {
+    skipAffected: true,
+    timeout: 30000,
+  });
+  runTests('show_error.sql', path.join(__dirname, 'show_error.sql'), {
+    allowedErrors: 'SAME_CODE',
+    skipAffected: true,
+    timeout: 30000,
+  });
   runTests(
     'error_cases.sql',
     path.join(__dirname, 'error_cases.sql'),

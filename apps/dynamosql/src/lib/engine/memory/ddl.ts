@@ -20,14 +20,18 @@ import {
   createOrderedUniqueKeyComparator,
   createOrderedUniqueMakeKey,
 } from '../../helpers/ordered_unique_index';
+import { cellConvert } from '../helpers/cell_convert';
 
 import * as Storage from './storage';
 
-import type { HashUniqueMakeKeyResult } from '../../helpers/hash_unique_index';
+import type {
+  HashUniqueMakeKeyResult,
+  HashUniquePrimaryKeyType,
+} from '../../helpers/hash_unique_index';
 import type { OrderedNullableKeyPart } from '../../helpers/ordered_nullable_index';
 import type { OrderedUniqueKey } from '../../helpers/ordered_unique_index';
 import type {
-  ColumnDefParam,
+  ColumnDef,
   CellRow,
   CellValue,
   TableInfoParams,
@@ -36,13 +40,12 @@ import type {
   CreateTableParams,
   DropTableParams,
   IndexParams,
+  IndexType,
   DeleteIndexParams,
   AddColumnParams,
-  KeyDef,
 } from '../index';
 import type {
   IndexKey,
-  IndexMap,
   MemoryColumnDef,
   MemoryIndex,
   TableData,
@@ -58,11 +61,13 @@ export async function getTableInfo(
       table,
       collation: data.collation,
       primary_key: data.primary_key.columns,
+      primaryType: data.primary_key.type,
       column_list: data.column_list,
       indexList: data.indexList.map((index) => ({
         name: index.name,
         unique: index.unique,
         column_list: index.column_list,
+        type: index.type,
       })),
       is_open: false,
       rowCount: BigInt(data.row_map.size),
@@ -97,6 +102,12 @@ export async function createTable(params: CreateTableParams): Promise<void> {
       });
     }
   }
+  if (params.primaryType === 'btree') {
+    throw new SQLError({
+      err: 'ER_PK_INDEX_TYPE_UNSUPPORTED',
+      args: ['BTREE'],
+    });
+  }
   const primary_columns =
     params.primary_key.length > 0 ? params.primary_key : [Storage.ROW_ID_NAME];
   const column_list = params.column_list.map((col) => {
@@ -105,7 +116,7 @@ export async function createTable(params: CreateTableParams): Promise<void> {
       name_lc: col.name.toLowerCase(),
       type: col.type,
       mysqlType: col.mysqlType,
-      defaultValue: Object.freeze(_getDefault(col)),
+      nullable: col.nullable,
     };
     if (col.length !== null) {
       ret.length = col.length;
@@ -116,34 +127,24 @@ export async function createTable(params: CreateTableParams): Promise<void> {
     if (col.decimals !== null) {
       ret.decimals = col.decimals;
     }
-    if (col.nullable) {
-      ret.nullable = col.nullable;
-    }
     if (col.comment) {
       ret.comment = col.comment;
     }
+    if (col.default !== undefined) {
+      ret.default = col.default;
+    }
+    ret.defaultValue = _getDefault(ret, session.timeZone);
     return ret;
   });
-  const key_column_list = primary_columns.map((name) => {
-    if (name === Storage.ROW_ID_NAME) {
-      return { name, type: 'longlong' as const, mysqlType: 'BIGINT' as const };
-    }
-    const column = column_list.find(
-      (col) => col.name_lc === name.toLowerCase()
-    );
-    if (!column) {
-      throw new SQLError({ err: 'ER_KEY_COLUMN_DOES_NOT_EXITS', args: [name] });
-    }
-    return column;
-  });
+  const key_column_list = _keyColumns(column_list, primary_columns);
   const key_types = getKeyTypes(key_column_list);
   const data: TableData = {
     table,
     column_list,
     primary_key: {
       columns: primary_columns,
+      type: params.primaryType,
       makeKey: createHashUniqueMakeKey(key_types),
-      primaryType: getPrimaryKeyType(key_types),
       convertKey: createConvertKey(key_column_list, key_types),
     },
 
@@ -151,15 +152,33 @@ export async function createTable(params: CreateTableParams): Promise<void> {
     row_map: new Map(),
     indexList: [],
   };
-  for (const unique of params.unique_list) {
-    data.indexList.push(
-      _buildIndex(data, {
-        name: unique.name,
-        key_list: unique.key_list,
-        unique: true,
-        using: null,
-      })
+  const primaryKeyType = getPrimaryKeyType(key_types);
+  const indexDefs = [
+    ...params.unique_list.map((def) => ({ ...def, unique: true })),
+    ...params.index_list.map((def) => ({ ...def, unique: false })),
+  ];
+  for (const def of indexDefs) {
+    if (data.indexList.some((index) => index.name === def.name)) {
+      throw new SQLError({ err: 'ER_DUP_KEYNAME', args: [def.name] });
+    }
+    const keyColumnList = _keyColumns(
+      column_list,
+      def.key_list.map((key) => key.name)
     );
+    const { keyOf, map } = _buildIndex(
+      keyColumnList,
+      primaryKeyType,
+      def.unique,
+      def.type
+    );
+    data.indexList.push({
+      name: def.name,
+      unique: def.unique,
+      type: def.type,
+      column_list: keyColumnList.map((col) => col.name_lc),
+      keyOf,
+      map,
+    });
   }
   if (is_temp) {
     session.saveTempTable(database, table, data);
@@ -186,17 +205,51 @@ export async function addColumn(params: AddColumnParams): Promise<void> {
   }
 }
 export async function createIndex(params: IndexParams): Promise<void> {
-  const { session, database, table, index_name, key_list } = params;
+  const { session, database, table, index_name, key_list, is_unique } = params;
   const data = Storage.getTable(database, table, session);
   if (!data) {
     throw new SQLError({ err: 'table_not_found', args: [table] });
   }
-  const index = _buildIndex(data, {
+  if (data.indexList.some((index) => index.name === index_name)) {
+    throw new SQLError({ err: 'ER_DUP_KEYNAME', args: [index_name] });
+  }
+  const primary_key_column_list = _keyColumns(
+    data.column_list,
+    data.primary_key.columns
+  );
+  const primaryKeyType = getPrimaryKeyType(
+    getKeyTypes(primary_key_column_list)
+  );
+  const keyColumnList = _keyColumns(
+    data.column_list,
+    key_list.map((key) => key.name)
+  );
+  const { keyOf, map } = _buildIndex(
+    keyColumnList,
+    primaryKeyType,
+    is_unique,
+    params.indexType
+  );
+  const index: MemoryIndex = {
     name: index_name,
-    key_list,
-    unique: params.is_unique,
-    using: params.index_using,
-  });
+    unique: is_unique,
+    type: params.indexType,
+    column_list: keyColumnList.map((col) => col.name_lc),
+    keyOf,
+    map,
+  };
+  for (const row of data.row_map.values()) {
+    const pk = Storage.primaryKeyOf(data.primary_key, row);
+    const key = index.keyOf(row, pk);
+    if (is_unique && Storage.indexFind(index.map, key) !== undefined) {
+      const row_values = index.column_list.map((col) => row[col]?.value);
+      throw new SQLError({
+        err: 'dup_primary_key_entry',
+        args: [index_name, row_values.join('-')],
+      });
+    }
+    Storage.indexAdd(index.map, key, pk);
+  }
   Storage.updateTableData(database, table, session, {
     indexList: [...data.indexList, index],
   });
@@ -213,89 +266,94 @@ export async function deleteIndex(params: DeleteIndexParams): Promise<void> {
   }
   Storage.updateTableData(database, table, session, { indexList });
 }
-function _buildIndex(
-  data: TableData,
-  def: {
-    name: string;
-    key_list: readonly KeyDef[];
-    unique: boolean;
-    using: 'btree' | 'hash' | null;
-  }
-): MemoryIndex {
-  const { name, key_list, unique, using } = def;
-  if (data.indexList.some((index) => index.name === name)) {
-    throw new SQLError({ err: 'ER_DUP_KEYNAME', args: [name] });
-  }
-  const column_list = key_list.map((key) => key.name.toLowerCase());
-  const key_column_list = column_list.map((column) => {
-    const found = data.column_list.find((col) => col.name_lc === column);
-    if (!found) {
-      throw new SQLError({
-        err: 'ER_KEY_COLUMN_DOES_NOT_EXITS',
-        args: [column],
-      });
+function _keyColumns(
+  column_list: MemoryColumnDef[],
+  names: string[]
+): MemoryColumnDef[] {
+  return names.map((name) => {
+    if (name === Storage.ROW_ID_NAME) {
+      return {
+        name,
+        name_lc: name.toLowerCase(),
+        type: 'longlong' as const,
+        mysqlType: 'BIGINT' as const,
+      };
     }
-    return found;
+    const column = column_list.find(
+      (col) => col.name_lc === name.toLowerCase()
+    );
+    if (!column) {
+      throw new SQLError({ err: 'ER_KEY_COLUMN_DOES_NOT_EXITS', args: [name] });
+    }
+    return column;
   });
-  const key_types = getKeyTypes(key_column_list);
-  const useBtree = using === 'btree' || (using === null && !unique);
-  let keyOf: MemoryIndex['keyOf'];
-  let map: IndexMap;
-  const nullable = key_column_list.some((col) => col.nullable);
+}
+function _buildIndex(
+  keyColumnList: MemoryColumnDef[],
+  primaryKeyType: HashUniquePrimaryKeyType,
+  unique: boolean,
+  type: IndexType
+): Pick<MemoryIndex, 'keyOf' | 'map'> {
+  const column_list = keyColumnList.map((col) => col.name_lc);
+  const key_types = getKeyTypes(keyColumnList);
+  const useBtree = type === 'btree' || (type === null && !unique);
+  const nullable = keyColumnList.some((col) => col.nullable);
   if (useBtree && unique && !nullable) {
     const makeKey = createOrderedUniqueMakeKey(key_types);
-    const convertKey = createConvertKey(key_column_list, key_types);
+    const convertKey = createConvertKey(keyColumnList, key_types);
     const compare = createOrderedUniqueKeyComparator(key_types);
-    keyOf = (row) => makeKey(convertKey(_cellList(row, column_list)));
-    map = new BTree<IndexKey, HashUniqueMakeKeyResult>(undefined, (a, b) =>
-      compare(a as OrderedUniqueKey, b as OrderedUniqueKey)
-    );
-  } else if (useBtree) {
+    return {
+      keyOf: (row) => makeKey(convertKey(_cellList(row, column_list))),
+      map: new BTree<IndexKey, HashUniqueMakeKeyResult>(undefined, (a, b) =>
+        compare(a as OrderedUniqueKey, b as OrderedUniqueKey)
+      ),
+    };
+  }
+  if (useBtree) {
     const makeKey = unique
       ? createOrderedNullableMakeKey(key_types)
       : createOrderedNonuniqueMakeKey(key_types);
     const compare = unique
       ? createOrderedNullableKeyComparator(key_types)
       : createOrderedNonuniqueKeyComparator(key_types);
-    const convertKey = createConvertKeyNullable(key_column_list, key_types);
-    keyOf = (row, pk) => makeKey(convertKey(_cellList(row, column_list)), pk);
-    map = new BTree<IndexKey, HashUniqueMakeKeyResult>(undefined, (a, b) =>
-      compare(a as OrderedNullableKeyPart[], b as OrderedNullableKeyPart[])
-    );
-  } else if (unique && !nullable) {
+    const convertKey = createConvertKeyNullable(keyColumnList, key_types);
+    return {
+      keyOf: (row, pk) => makeKey(convertKey(_cellList(row, column_list)), pk),
+      map: new BTree<IndexKey, HashUniqueMakeKeyResult>(undefined, (a, b) =>
+        compare(a as OrderedNullableKeyPart[], b as OrderedNullableKeyPart[])
+      ),
+    };
+  }
+  if (unique && !nullable) {
     const makeKey = createHashUniqueMakeKey(key_types);
-    const convertKey = createConvertKey(key_column_list, key_types);
-    keyOf = (row) => makeKey(convertKey(_cellList(row, column_list)));
-    map = new Map();
-  } else {
-    const makeKey = unique
-      ? createHashNullableMakeKey(key_types, data.primary_key.primaryType)
-      : createHashNonuniqueMakeKey(key_types, data.primary_key.primaryType);
-    const convertKey = createConvertKeyNullable(key_column_list, key_types);
-    keyOf = (row, pk) => makeKey(convertKey(_cellList(row, column_list)), pk);
-    map = new Map();
+    const convertKey = createConvertKey(keyColumnList, key_types);
+    return {
+      keyOf: (row) => makeKey(convertKey(_cellList(row, column_list))),
+      map: new Map(),
+    };
   }
-  const index: MemoryIndex = { name, unique, column_list, keyOf, map };
-  for (const row of data.row_map.values()) {
-    const pk = Storage.primaryKeyOf(data.primary_key, row);
-    const key = index.keyOf(row, pk);
-    if (unique && Storage.indexFind(index.map, key) !== undefined) {
-      const row_values = index.column_list.map((col) => row[col]?.value);
-      throw new SQLError({
-        err: 'dup_primary_key_entry',
-        args: [name, row_values.join('-')],
-      });
-    }
-    Storage.indexAdd(index.map, key, pk);
-  }
-  return index;
+  const makeKey = unique
+    ? createHashNullableMakeKey(key_types, primaryKeyType)
+    : createHashNonuniqueMakeKey(key_types, primaryKeyType);
+  const convertKey = createConvertKeyNullable(keyColumnList, key_types);
+  return {
+    keyOf: (row, pk) => makeKey(convertKey(_cellList(row, column_list)), pk),
+    map: new Map(),
+  };
 }
 function _cellList(row: CellRow, names: string[]): CellValue[] {
   return names.map((name) => row[name] as CellValue);
 }
-function _getDefault(column: ColumnDefParam): CellValue | undefined {
+function _getDefault(
+  column: ColumnDef,
+  timeZone: string
+): CellValue | undefined {
   if (column.default !== undefined) {
-    return { type: column.type, value: column.default };
+    return cellConvert(
+      { type: column.type, value: column.default, err: null },
+      column,
+      { strict: true, singleRow: true, ignore: false, timeZone }
+    );
   } else if (column.nullable !== false) {
     return { type: column.type, value: null };
   } else {
