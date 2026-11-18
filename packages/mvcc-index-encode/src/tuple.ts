@@ -1,3 +1,5 @@
+const BULK_COPY_MIN = 32;
+
 export function frameVariable(src: Uint8Array, n: number): Uint8Array {
   let zeros = 0;
   for (let i = 0; i < n; i++) {
@@ -7,6 +9,10 @@ export function frameVariable(src: Uint8Array, n: number): Uint8Array {
   }
   const out = new Uint8Array(n + zeros + 3);
   out[0] = 0x01;
+  if (zeros === 0 && n >= BULK_COPY_MIN) {
+    out.set(src.subarray(0, n), 1);
+    return out;
+  }
   let o = 1;
   for (let i = 0; i < n; i++) {
     const byte = src[i] ?? 0;

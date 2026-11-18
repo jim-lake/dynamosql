@@ -64,16 +64,45 @@ function slotOf(codePoint: number, idx: UcaIndex): number {
   return page * PAGE_SIZE + (codePoint & (PAGE_SIZE - 1));
 }
 
+function implicitHanBase(codePoint: number): number {
+  if (codePoint >= 0x4e00 && codePoint <= 0x9fff) {
+    return 0xfb40;
+  }
+  if (
+    (codePoint >= 0x3400 && codePoint <= 0x4dbf) ||
+    (codePoint >= 0x20000 && codePoint <= 0x2a6df)
+  ) {
+    return 0xfb80;
+  }
+  return -1;
+}
+
+function writeImplicitHan(
+  codePoint: number,
+  dst: Uint8Array,
+  at: number
+): number {
+  const base = implicitHanBase(codePoint);
+  if (base < 0) {
+    return 0;
+  }
+  const aaaa = base + (codePoint >>> 15);
+  const bbbb = (codePoint & 0x7fff) | 0x8000;
+  dst[at] = aaaa >>> 8;
+  dst[at + 1] = aaaa & 0xff;
+  dst[at + 2] = bbbb >>> 8;
+  dst[at + 3] = bbbb & 0xff;
+  return 4;
+}
+
 export function ucaWeight(codePoint: number): Uint8Array {
   index ??= loadIndex();
   const slot = slotOf(codePoint, index);
-  if (slot < 0) {
-    return EMPTY;
-  }
-  const start = index.offset[slot] ?? 0;
-  const len = index.length[slot] ?? 0;
+  const start = slot < 0 ? 0 : (index.offset[slot] ?? 0);
+  const len = slot < 0 ? 0 : (index.length[slot] ?? 0);
   if (len === 0) {
-    return EMPTY;
+    const implicit = new Uint8Array(4);
+    return writeImplicitHan(codePoint, implicit, 0) === 4 ? implicit : EMPTY;
   }
   return index.weights.subarray(start, start + len);
 }
@@ -115,11 +144,11 @@ export function ucaWriteWeight(
     return len;
   }
   const slot = slotOf(codePoint, index);
-  if (slot < 0) {
-    return 0;
+  const len = slot < 0 ? 0 : (index.length[slot] ?? 0);
+  if (len === 0) {
+    return writeImplicitHan(codePoint, dst, at);
   }
   const start = index.offset[slot] ?? 0;
-  const len = index.length[slot] ?? 0;
   const src = index.weights;
   for (let k = 0; k < len; k++) {
     dst[at + k] = src[start + k] ?? 0;

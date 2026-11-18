@@ -164,6 +164,22 @@ const scalarValues = [];
 for (let c = 0; c <= 0x10ffff; c++) {
   if (c < 0xd800 || c > 0xdfff) scalarValues.push(c);
 }
+const HAN_IMPLICIT = [
+  { lo: 0x4e00, hi: 0x9fff, base: 0xfb40 },
+  { lo: 0x3400, hi: 0x4dbf, base: 0xfb80 },
+  { lo: 0x20000, hi: 0x2a6df, base: 0xfb80 },
+];
+
+function implicitHanWeight(cp) {
+  const block = HAN_IMPLICIT.find((b) => cp >= b.lo && cp <= b.hi);
+  if (block === undefined) return null;
+  const out = Buffer.alloc(4);
+  out.writeUInt16BE(block.base + (cp >>> 15), 0);
+  out.writeUInt16BE((cp & 0x7fff) | 0x8000, 2);
+  return out;
+}
+
+let implicitHanDropped = 0;
 for (let i = 0; i < scalarValues.length; i += UCA_CHUNK) {
   const sql = scalarValues
     .slice(i, i + UCA_CHUNK)
@@ -175,7 +191,18 @@ for (let i = 0; i < scalarValues.length; i += UCA_CHUNK) {
     })
     .join('\nUNION ALL\n');
   for (const [c, h] of rowsOf(`${sql};`)) {
-    if (h !== '') ucaRows.push([Number(c), h]);
+    const cp = Number(c);
+    const implicit = implicitHanWeight(cp);
+    if (implicit !== null) {
+      if (h === '') {
+        throw new Error(`Han U+${cp.toString(16)} has an empty weight`);
+      }
+      if (Buffer.from(h, 'hex').equals(implicit)) {
+        implicitHanDropped++;
+        continue;
+      }
+    }
+    if (h !== '') ucaRows.push([cp, h]);
   }
 }
 

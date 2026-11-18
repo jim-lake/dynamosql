@@ -98,8 +98,10 @@ function run(
 }
 
 function main(): void {
-  const arg = process.argv[2];
-  const scale = Number(process.argv[3] ?? String(DEFAULT_SCALE));
+  const args = process.argv.slice(2);
+  const json = args.includes('--json');
+  const [arg, scaleArg] = args.filter((a) => a !== '--json');
+  const scale = Number(scaleArg ?? String(DEFAULT_SCALE));
   if (
     arg === undefined ||
     !(COLLATION_NAMES as readonly string[]).includes(arg) ||
@@ -107,7 +109,7 @@ function main(): void {
     scale <= 0
   ) {
     console.error(
-      `usage: npm run test:bench -- <${COLLATION_NAMES.join('|')}> [scale]`
+      `usage: npm run test:bench -- <${COLLATION_NAMES.join('|')}> [scale] [--json]`
     );
     process.exit(2);
   }
@@ -125,13 +127,28 @@ function main(): void {
     run(collation, { ...warm, rounds: 1 }, true);
   }
 
-  console.log(`collation ${collation} scale ${String(scale)}`);
+  if (!json) {
+    console.log(`collation ${collation} scale ${String(scale)}`);
+  }
   let total = 0;
+  const rows: object[] = [];
   for (const load of loads) {
     for (const framed of [false, true]) {
       const { ms, ops, bytes } = run(collation, load, framed);
       total += ms;
       const kind = framed ? 'weight+frame' : 'weight';
+      if (json) {
+        rows.push({
+          collation,
+          scale,
+          workload: load.name,
+          mode: kind,
+          seconds: ms / 1000,
+          opsPerSec: Math.round(ops / (ms / 1000)),
+          bytes,
+        });
+        continue;
+      }
       console.log(
         `${load.name.padEnd(14)} ${kind.padEnd(13)} ${(ms / 1000).toFixed(2).padStart(7)}s ${Math.round(
           ops / (ms / 1000)
@@ -140,6 +157,12 @@ function main(): void {
           .padStart(12)} ops/s ${String(bytes).padStart(14)} bytes`
       );
     }
+  }
+  if (json) {
+    console.log(
+      JSON.stringify({ collation, scale, rows, totalSeconds: total / 1000 })
+    );
+    return;
   }
   console.log(`total ${(total / 1000).toFixed(2)}s`);
 }
