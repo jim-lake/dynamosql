@@ -2,7 +2,7 @@
 
 Tables and columns from MySQL 8.4 (`8.4.11`), read from the live server's `information_schema.COLUMNS`. ✅ means DynamoSQL implements the table or column. ❌ means it does not.
 
-Only `SCHEMATA`, `TABLES`, and `COLUMNS` are implemented among the 78 MySQL 8.4 tables. Their implemented columns come from `src/lib/engine/information_schema/schema.ts`. `CATALOGS` is implemented by DynamoSQL, but MySQL 8.4 has no such table, so it is listed separately below.
+Only `CHARACTER_SETS`, `COLLATIONS`, `COLUMNS`, `SCHEMATA`, `TABLES`, and the feature tables `VIEWS`, `ROUTINES`, `EVENTS`, and the four privilege tables (which return no rows) are implemented among the 78 MySQL 8.4 tables. Their implemented columns come from `src/lib/engine/information_schema/schema.ts`. `CATALOGS` is implemented by DynamoSQL, but MySQL 8.4 has no such table, so it is listed separately below.
 
 ## Tables
 
@@ -10,17 +10,17 @@ Only `SCHEMATA`, `TABLES`, and `COLUMNS` are implemented among the 78 MySQL 8.4 
 | ------------------------------------- | --------- | -------------- | ----------------- |
 | ADMINISTRABLE_ROLE_AUTHORIZATIONS     | ❌        | 9              | 0                 |
 | APPLICABLE_ROLES                      | ❌        | 9              | 0                 |
-| CHARACTER_SETS                        | ❌        | 4              | 0                 |
+| CHARACTER_SETS                        | ✅        | 4              | 4                 |
 | CHECK_CONSTRAINTS                     | ❌        | 4              | 0                 |
-| COLLATIONS                            | ❌        | 7              | 0                 |
+| COLLATIONS                            | ✅        | 7              | 7                 |
 | COLLATION_CHARACTER_SET_APPLICABILITY | ❌        | 2              | 0                 |
 | COLUMNS                               | ✅        | 22             | 22                |
 | COLUMNS_EXTENSIONS                    | ❌        | 6              | 0                 |
-| COLUMN_PRIVILEGES                     | ❌        | 7              | 0                 |
+| COLUMN_PRIVILEGES                     | ✅        | 7              | 7                 |
 | COLUMN_STATISTICS                     | ❌        | 4              | 0                 |
 | ENABLED_ROLES                         | ❌        | 4              | 0                 |
 | ENGINES                               | ❌        | 6              | 0                 |
-| EVENTS                                | ❌        | 24             | 0                 |
+| EVENTS                                | ✅        | 24             | 24                 |
 | FILES                                 | ❌        | 38             | 0                 |
 | INNODB_BUFFER_PAGE                    | ❌        | 21             | 0                 |
 | INNODB_BUFFER_PAGE_LRU                | ❌        | 20             | 0                 |
@@ -66,10 +66,10 @@ Only `SCHEMATA`, `TABLES`, and `COLUMNS` are implemented among the 78 MySQL 8.4 
 | ROLE_COLUMN_GRANTS                    | ❌        | 10             | 0                 |
 | ROLE_ROUTINE_GRANTS                   | ❌        | 12             | 0                 |
 | ROLE_TABLE_GRANTS                     | ❌        | 9              | 0                 |
-| ROUTINES                              | ❌        | 31             | 0                 |
+| ROUTINES                              | ✅        | 31             | 31                 |
 | SCHEMATA                              | ✅        | 6              | 6                 |
 | SCHEMATA_EXTENSIONS                   | ❌        | 3              | 0                 |
-| SCHEMA_PRIVILEGES                     | ❌        | 5              | 0                 |
+| SCHEMA_PRIVILEGES                     | ✅        | 5              | 5                 |
 | STATISTICS                            | ❌        | 18             | 0                 |
 | ST_GEOMETRY_COLUMNS                   | ❌        | 7              | 0                 |
 | ST_SPATIAL_REFERENCE_SYSTEMS          | ❌        | 6              | 0                 |
@@ -79,11 +79,11 @@ Only `SCHEMATA`, `TABLES`, and `COLUMNS` are implemented among the 78 MySQL 8.4 
 | TABLES_EXTENSIONS                     | ❌        | 5              | 0                 |
 | TABLE_CONSTRAINTS                     | ❌        | 7              | 0                 |
 | TABLE_CONSTRAINTS_EXTENSIONS          | ❌        | 6              | 0                 |
-| TABLE_PRIVILEGES                      | ❌        | 6              | 0                 |
+| TABLE_PRIVILEGES                      | ✅        | 6              | 6                 |
 | TRIGGERS                              | ❌        | 22             | 0                 |
 | USER_ATTRIBUTES                       | ❌        | 3              | 0                 |
-| USER_PRIVILEGES                       | ❌        | 4              | 0                 |
-| VIEWS                                 | ❌        | 10             | 0                 |
+| USER_PRIVILEGES                       | ✅        | 4              | 4                 |
+| VIEWS                                 | ✅        | 10             | 10                 |
 | VIEW_ROUTINE_USAGE                    | ❌        | 6              | 0                 |
 | VIEW_TABLE_USAGE                      | ❌        | 6              | 0                 |
 
@@ -123,14 +123,14 @@ Only `SCHEMATA`, `TABLES`, and `COLUMNS` are implemented among the 78 MySQL 8.4 
 | IS_DEFAULT   | ❌        |
 | IS_MANDATORY | ❌        |
 
-### CHARACTER_SETS ❌
+### CHARACTER_SETS ✅
 
 | Column               | Supported |
 | -------------------- | --------- |
-| CHARACTER_SET_NAME   | ❌        |
-| DEFAULT_COLLATE_NAME | ❌        |
-| DESCRIPTION          | ❌        |
-| MAXLEN               | ❌        |
+| CHARACTER_SET_NAME   | ✅        |
+| DEFAULT_COLLATE_NAME | ✅        |
+| DESCRIPTION          | ✅        |
+| MAXLEN               | ✅        |
 
 ### CHECK_CONSTRAINTS ❌
 
@@ -141,17 +141,17 @@ Only `SCHEMATA`, `TABLES`, and `COLUMNS` are implemented among the 78 MySQL 8.4 
 | CONSTRAINT_NAME    | ❌        |
 | CHECK_CLAUSE       | ❌        |
 
-### COLLATIONS ❌
+### COLLATIONS ✅
 
 | Column             | Supported |
 | ------------------ | --------- |
-| COLLATION_NAME     | ❌        |
-| CHARACTER_SET_NAME | ❌        |
-| ID                 | ❌        |
-| IS_DEFAULT         | ❌        |
-| IS_COMPILED        | ❌        |
-| SORTLEN            | ❌        |
-| PAD_ATTRIBUTE      | ❌        |
+| COLLATION_NAME     | ✅        |
+| CHARACTER_SET_NAME | ✅        |
+| ID                 | ✅        |
+| IS_DEFAULT         | ✅        |
+| IS_COMPILED        | ✅        |
+| SORTLEN            | ✅        |
+| PAD_ATTRIBUTE      | ✅        |
 
 ### COLLATION_CHARACTER_SET_APPLICABILITY ❌
 
@@ -198,17 +198,17 @@ Only `SCHEMATA`, `TABLES`, and `COLUMNS` are implemented among the 78 MySQL 8.4 
 | ENGINE_ATTRIBUTE           | ❌        |
 | SECONDARY_ENGINE_ATTRIBUTE | ❌        |
 
-### COLUMN_PRIVILEGES ❌
+### COLUMN_PRIVILEGES ✅
 
 | Column         | Supported |
 | -------------- | --------- |
-| GRANTEE        | ❌        |
-| TABLE_CATALOG  | ❌        |
-| TABLE_SCHEMA   | ❌        |
-| TABLE_NAME     | ❌        |
-| COLUMN_NAME    | ❌        |
-| PRIVILEGE_TYPE | ❌        |
-| IS_GRANTABLE   | ❌        |
+| GRANTEE        | ✅        |
+| TABLE_CATALOG  | ✅        |
+| TABLE_SCHEMA   | ✅        |
+| TABLE_NAME     | ✅        |
+| COLUMN_NAME    | ✅        |
+| PRIVILEGE_TYPE | ✅        |
+| IS_GRANTABLE   | ✅        |
 
 ### COLUMN_STATISTICS ❌
 
@@ -239,34 +239,34 @@ Only `SCHEMATA`, `TABLES`, and `COLUMNS` are implemented among the 78 MySQL 8.4 
 | XA           | ❌        |
 | SAVEPOINTS   | ❌        |
 
-### EVENTS ❌
+### EVENTS ✅
 
 | Column               | Supported |
 | -------------------- | --------- |
-| EVENT_CATALOG        | ❌        |
-| EVENT_SCHEMA         | ❌        |
-| EVENT_NAME           | ❌        |
-| DEFINER              | ❌        |
-| TIME_ZONE            | ❌        |
-| EVENT_BODY           | ❌        |
-| EVENT_DEFINITION     | ❌        |
-| EVENT_TYPE           | ❌        |
-| EXECUTE_AT           | ❌        |
-| INTERVAL_VALUE       | ❌        |
-| INTERVAL_FIELD       | ❌        |
-| SQL_MODE             | ❌        |
-| STARTS               | ❌        |
-| ENDS                 | ❌        |
-| STATUS               | ❌        |
-| ON_COMPLETION        | ❌        |
-| CREATED              | ❌        |
-| LAST_ALTERED         | ❌        |
-| LAST_EXECUTED        | ❌        |
-| EVENT_COMMENT        | ❌        |
-| ORIGINATOR           | ❌        |
-| CHARACTER_SET_CLIENT | ❌        |
-| COLLATION_CONNECTION | ❌        |
-| DATABASE_COLLATION   | ❌        |
+| EVENT_CATALOG        | ✅        |
+| EVENT_SCHEMA         | ✅        |
+| EVENT_NAME           | ✅        |
+| DEFINER              | ✅        |
+| TIME_ZONE            | ✅        |
+| EVENT_BODY           | ✅        |
+| EVENT_DEFINITION     | ✅        |
+| EVENT_TYPE           | ✅        |
+| EXECUTE_AT           | ✅        |
+| INTERVAL_VALUE       | ✅        |
+| INTERVAL_FIELD       | ✅        |
+| SQL_MODE             | ✅        |
+| STARTS               | ✅        |
+| ENDS                 | ✅        |
+| STATUS               | ✅        |
+| ON_COMPLETION        | ✅        |
+| CREATED              | ✅        |
+| LAST_ALTERED         | ✅        |
+| LAST_EXECUTED        | ✅        |
+| EVENT_COMMENT        | ✅        |
+| ORIGINATOR           | ✅        |
+| CHARACTER_SET_CLIENT | ✅        |
+| COLLATION_CONNECTION | ✅        |
+| DATABASE_COLLATION   | ✅        |
 
 ### FILES ❌
 
@@ -931,41 +931,41 @@ Only `SCHEMATA`, `TABLES`, and `COLUMNS` are implemented among the 78 MySQL 8.4 
 | PRIVILEGE_TYPE | ❌        |
 | IS_GRANTABLE   | ❌        |
 
-### ROUTINES ❌
+### ROUTINES ✅
 
 | Column                   | Supported |
 | ------------------------ | --------- |
-| SPECIFIC_NAME            | ❌        |
-| ROUTINE_CATALOG          | ❌        |
-| ROUTINE_SCHEMA           | ❌        |
-| ROUTINE_NAME             | ❌        |
-| ROUTINE_TYPE             | ❌        |
-| DATA_TYPE                | ❌        |
-| CHARACTER_MAXIMUM_LENGTH | ❌        |
-| CHARACTER_OCTET_LENGTH   | ❌        |
-| NUMERIC_PRECISION        | ❌        |
-| NUMERIC_SCALE            | ❌        |
-| DATETIME_PRECISION       | ❌        |
-| CHARACTER_SET_NAME       | ❌        |
-| COLLATION_NAME           | ❌        |
-| DTD_IDENTIFIER           | ❌        |
-| ROUTINE_BODY             | ❌        |
-| ROUTINE_DEFINITION       | ❌        |
-| EXTERNAL_NAME            | ❌        |
-| EXTERNAL_LANGUAGE        | ❌        |
-| PARAMETER_STYLE          | ❌        |
-| IS_DETERMINISTIC         | ❌        |
-| SQL_DATA_ACCESS          | ❌        |
-| SQL_PATH                 | ❌        |
-| SECURITY_TYPE            | ❌        |
-| CREATED                  | ❌        |
-| LAST_ALTERED             | ❌        |
-| SQL_MODE                 | ❌        |
-| ROUTINE_COMMENT          | ❌        |
-| DEFINER                  | ❌        |
-| CHARACTER_SET_CLIENT     | ❌        |
-| COLLATION_CONNECTION     | ❌        |
-| DATABASE_COLLATION       | ❌        |
+| SPECIFIC_NAME            | ✅        |
+| ROUTINE_CATALOG          | ✅        |
+| ROUTINE_SCHEMA           | ✅        |
+| ROUTINE_NAME             | ✅        |
+| ROUTINE_TYPE             | ✅        |
+| DATA_TYPE                | ✅        |
+| CHARACTER_MAXIMUM_LENGTH | ✅        |
+| CHARACTER_OCTET_LENGTH   | ✅        |
+| NUMERIC_PRECISION        | ✅        |
+| NUMERIC_SCALE            | ✅        |
+| DATETIME_PRECISION       | ✅        |
+| CHARACTER_SET_NAME       | ✅        |
+| COLLATION_NAME           | ✅        |
+| DTD_IDENTIFIER           | ✅        |
+| ROUTINE_BODY             | ✅        |
+| ROUTINE_DEFINITION       | ✅        |
+| EXTERNAL_NAME            | ✅        |
+| EXTERNAL_LANGUAGE        | ✅        |
+| PARAMETER_STYLE          | ✅        |
+| IS_DETERMINISTIC         | ✅        |
+| SQL_DATA_ACCESS          | ✅        |
+| SQL_PATH                 | ✅        |
+| SECURITY_TYPE            | ✅        |
+| CREATED                  | ✅        |
+| LAST_ALTERED             | ✅        |
+| SQL_MODE                 | ✅        |
+| ROUTINE_COMMENT          | ✅        |
+| DEFINER                  | ✅        |
+| CHARACTER_SET_CLIENT     | ✅        |
+| COLLATION_CONNECTION     | ✅        |
+| DATABASE_COLLATION       | ✅        |
 
 ### SCHEMATA ✅
 
@@ -986,15 +986,15 @@ Only `SCHEMATA`, `TABLES`, and `COLUMNS` are implemented among the 78 MySQL 8.4 
 | SCHEMA_NAME  | ❌        |
 | OPTIONS      | ❌        |
 
-### SCHEMA_PRIVILEGES ❌
+### SCHEMA_PRIVILEGES ✅
 
 | Column         | Supported |
 | -------------- | --------- |
-| GRANTEE        | ❌        |
-| TABLE_CATALOG  | ❌        |
-| TABLE_SCHEMA   | ❌        |
-| PRIVILEGE_TYPE | ❌        |
-| IS_GRANTABLE   | ❌        |
+| GRANTEE        | ✅        |
+| TABLE_CATALOG  | ✅        |
+| TABLE_SCHEMA   | ✅        |
+| PRIVILEGE_TYPE | ✅        |
+| IS_GRANTABLE   | ✅        |
 
 ### STATISTICS ❌
 
@@ -1117,16 +1117,16 @@ Only `SCHEMATA`, `TABLES`, and `COLUMNS` are implemented among the 78 MySQL 8.4 
 | ENGINE_ATTRIBUTE           | ❌        |
 | SECONDARY_ENGINE_ATTRIBUTE | ❌        |
 
-### TABLE_PRIVILEGES ❌
+### TABLE_PRIVILEGES ✅
 
 | Column         | Supported |
 | -------------- | --------- |
-| GRANTEE        | ❌        |
-| TABLE_CATALOG  | ❌        |
-| TABLE_SCHEMA   | ❌        |
-| TABLE_NAME     | ❌        |
-| PRIVILEGE_TYPE | ❌        |
-| IS_GRANTABLE   | ❌        |
+| GRANTEE        | ✅        |
+| TABLE_CATALOG  | ✅        |
+| TABLE_SCHEMA   | ✅        |
+| TABLE_NAME     | ✅        |
+| PRIVILEGE_TYPE | ✅        |
+| IS_GRANTABLE   | ✅        |
 
 ### TRIGGERS ❌
 
@@ -1163,29 +1163,29 @@ Only `SCHEMATA`, `TABLES`, and `COLUMNS` are implemented among the 78 MySQL 8.4 
 | HOST      | ❌        |
 | ATTRIBUTE | ❌        |
 
-### USER_PRIVILEGES ❌
+### USER_PRIVILEGES ✅
 
 | Column         | Supported |
 | -------------- | --------- |
-| GRANTEE        | ❌        |
-| TABLE_CATALOG  | ❌        |
-| PRIVILEGE_TYPE | ❌        |
-| IS_GRANTABLE   | ❌        |
+| GRANTEE        | ✅        |
+| TABLE_CATALOG  | ✅        |
+| PRIVILEGE_TYPE | ✅        |
+| IS_GRANTABLE   | ✅        |
 
-### VIEWS ❌
+### VIEWS ✅
 
 | Column               | Supported |
 | -------------------- | --------- |
-| TABLE_CATALOG        | ❌        |
-| TABLE_SCHEMA         | ❌        |
-| TABLE_NAME           | ❌        |
-| VIEW_DEFINITION      | ❌        |
-| CHECK_OPTION         | ❌        |
-| IS_UPDATABLE         | ❌        |
-| DEFINER              | ❌        |
-| SECURITY_TYPE        | ❌        |
-| CHARACTER_SET_CLIENT | ❌        |
-| COLLATION_CONNECTION | ❌        |
+| TABLE_CATALOG        | ✅        |
+| TABLE_SCHEMA         | ✅        |
+| TABLE_NAME           | ✅        |
+| VIEW_DEFINITION      | ✅        |
+| CHECK_OPTION         | ✅        |
+| IS_UPDATABLE         | ✅        |
+| DEFINER              | ✅        |
+| SECURITY_TYPE        | ✅        |
+| CHARACTER_SET_CLIENT | ✅        |
+| COLLATION_CONNECTION | ✅        |
 
 ### VIEW_ROUTINE_USAGE ❌
 

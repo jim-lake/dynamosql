@@ -1,5 +1,18 @@
 import { deepClone } from '@/tools/clone';
 
+import {
+  CHARACTER_SETS_LIST,
+  CHARACTER_SETS_INFO,
+  COLLATIONS_LIST,
+  COLLATIONS_INFO,
+  VIEWS_INFO,
+  ROUTINES_INFO,
+  EVENTS_INFO,
+  SCHEMA_PRIVILEGES_INFO,
+  TABLE_PRIVILEGES_INFO,
+  COLUMN_PRIVILEGES_INFO,
+  USER_PRIVILEGES_INFO,
+} from '../../../constants/information_schema';
 import { COLLATIONS, CHARSETS } from '../../../constants/mysql';
 import { SQLError } from '../../../error';
 import { COLLATION_CHARSET_MAP, CHARSET_BYTE_MAP } from '../../helpers/charset';
@@ -71,6 +84,30 @@ async function _getFromTable(
       }
       return { results, tableInfo: deepClone(TABLES_INFO) };
     }
+    case 'character_sets':
+      return {
+        results: deepClone(CHARACTER_SETS_LIST),
+        tableInfo: deepClone(CHARACTER_SETS_INFO),
+      };
+    case 'collations':
+      return {
+        results: deepClone(COLLATIONS_LIST),
+        tableInfo: deepClone(COLLATIONS_INFO),
+      };
+    case 'views':
+      return { results: [], tableInfo: deepClone(VIEWS_INFO) };
+    case 'routines':
+      return { results: [], tableInfo: deepClone(ROUTINES_INFO) };
+    case 'events':
+      return { results: [], tableInfo: deepClone(EVENTS_INFO) };
+    case 'schema_privileges':
+      return { results: [], tableInfo: deepClone(SCHEMA_PRIVILEGES_INFO) };
+    case 'table_privileges':
+      return { results: [], tableInfo: deepClone(TABLE_PRIVILEGES_INFO) };
+    case 'column_privileges':
+      return { results: [], tableInfo: deepClone(COLUMN_PRIVILEGES_INFO) };
+    case 'user_privileges':
+      return { results: [], tableInfo: deepClone(USER_PRIVILEGES_INFO) };
     case 'columns': {
       const list = getDatabaseList();
       const results: Row[] = [];
