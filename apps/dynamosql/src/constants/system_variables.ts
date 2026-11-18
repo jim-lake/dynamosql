@@ -12,5 +12,7 @@ export const SYSTEM_VARIABLE_TYPES = {
   LOWER_CASE_TABLE_NAMES: 'longlong',
   DEFAULT_STORAGE_ENGINE: 'string',
   HAVE_PROFILING: 'string',
+  VERSION: 'string',
+  VERSION_COMMENT: 'string',
   TIMESTAMP: 'double',
 } as const satisfies Record<string, ValueType>;

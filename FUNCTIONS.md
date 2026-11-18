@@ -110,7 +110,7 @@ and geometry
 | CURRENT_ROLE()                  |    ❌     | Return the current active roles                                                                                                                                                   |
 | CURRENT_TIME()                  |    ✅     | Synonyms for CURTIME()                                                                                                                                                            |
 | CURRENT_TIMESTAMP()             |    ✅     | Synonyms for NOW()                                                                                                                                                                |
-| CURRENT_USER()                  |    ❌     | The authenticated user name and host name                                                                                                                                         |
+| CURRENT_USER()                  |    ✅     | `unit_misc/user_functions.test.ts` (returns os user name@localhost) |
 | CURTIME()                       |    ✅     | Return the current time                                                                                                                                                           |
 | DATABASE()                      |    ✅     | Return the default (current) database name                                                                                                                                        |
 | DATE()                          |    ✅     | Extract the date part of a date or datetime expression                                                                                                                            |
@@ -272,7 +272,7 @@ and geometry
 | SCHEMA()                        |    ✅     | Synonym for DATABASE()                                                                                                                                                            |
 | SEC_TO_TIME()                   |    ❌     | Converts seconds to 'hh:mm:ss' format                                                                                                                                             |
 | SECOND()                        |    ✅     | Return the second (0-59)                                                                                                                                                          |
-| SESSION_USER()                  |    ❌     | Synonym for USER()                                                                                                                                                                |
+| SESSION_USER()                  |    ✅     | `unit_misc/user_functions.test.ts` (returns os user name@localhost) |
 | SHA()                           |    ❌     | Calculate an SHA-1 160-bit checksum                                                                                                                                               |
 | SHA1()                          |    ❌     | Calculate an SHA-1 160-bit checksum                                                                                                                                               |
 | SHA2()                          |    ❌     | Calculate an SHA-2 checksum                                                                                                                                                       |
@@ -297,7 +297,7 @@ and geometry
 | SUBTIME()                       |    ❌     | Subtract times                                                                                                                                                                    |
 | SUM()                           |    ✅     | Return the sum                                                                                                                                                                    |
 | SYSDATE()                       |    ✅     | Return the time at which the function executes                                                                                                                                    |
-| SYSTEM_USER()                   |    ❌     | Synonym for USER()                                                                                                                                                                |
+| SYSTEM_USER()                   |    ✅     | `unit_misc/user_functions.test.ts` (returns os user name@localhost) |
 | TAN()                           |    ✅     | Return the tangent of the argument                                                                                                                                                |
 | TIME()                          |    ✅     | Extract the time portion of the expression passed                                                                                                                                 |
 | TIME_FORMAT()                   |    ❌     | Format as time                                                                                                                                                                    |
@@ -318,7 +318,7 @@ and geometry
 | UNIX_TIMESTAMP()                |    ✅     | Return a Unix timestamp                                                                                                                                                           |
 | UpdateXML()                     |    ❌     | Return replaced XML fragment                                                                                                                                                      |
 | UPPER()                         |    ✅     | Convert to uppercase                                                                                                                                                              |
-| USER()                          |    ❌     | The user name and host name provided by the client                                                                                                                                |
+| USER()                          |    ✅     | `unit_misc/user_functions.test.ts` (returns os user name@localhost) |
 | UTC_DATE()                      |    ❌     | Return the current UTC date                                                                                                                                                       |
 | UTC_TIME()                      |    ❌     | Return the current UTC time                                                                                                                                                       |
 | UTC_TIMESTAMP()                 |    ❌     | Return the current UTC date and time                                                                                                                                              |

@@ -8,3 +8,4 @@ DROP TABLE IF EXISTS test_dup_pk;
 
 -- Test SHOW TABLES with database context
 SHOW TABLES;
+SHOW TABLES FROM _dynamodb;

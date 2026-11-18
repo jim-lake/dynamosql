@@ -59,6 +59,11 @@ export async function getTableInfo(
       collation: data.collation,
       primary_key: data.primary_key.columns,
       column_list: data.column_list,
+      indexList: data.indexList.map((index) => ({
+        name: index.name,
+        unique: index.unique,
+        column_list: index.column_list,
+      })),
       is_open: false,
       rowCount: BigInt(data.row_map.size),
       tableSize: 0n,
@@ -144,10 +149,10 @@ export async function createTable(params: CreateTableParams): Promise<void> {
 
     collation: params.collation,
     row_map: new Map(),
-    index_list: [],
+    indexList: [],
   };
   for (const unique of params.unique_list) {
-    data.index_list.push(
+    data.indexList.push(
       _buildIndex(data, {
         name: unique.name,
         key_list: unique.key_list,
@@ -193,7 +198,7 @@ export async function createIndex(params: IndexParams): Promise<void> {
     using: params.index_using,
   });
   Storage.updateTableData(database, table, session, {
-    index_list: [...data.index_list, index],
+    indexList: [...data.indexList, index],
   });
 }
 export async function deleteIndex(params: DeleteIndexParams): Promise<void> {
@@ -202,13 +207,11 @@ export async function deleteIndex(params: DeleteIndexParams): Promise<void> {
   if (!data) {
     throw new SQLError({ err: 'table_not_found', args: [table] });
   }
-  const index_list = data.index_list.filter(
-    (index) => index.name !== index_name
-  );
-  if (index_list.length === data.index_list.length) {
+  const indexList = data.indexList.filter((index) => index.name !== index_name);
+  if (indexList.length === data.indexList.length) {
     throw new SQLError({ err: 'index_not_found', args: [index_name] });
   }
-  Storage.updateTableData(database, table, session, { index_list });
+  Storage.updateTableData(database, table, session, { indexList });
 }
 function _buildIndex(
   data: TableData,
@@ -220,7 +223,7 @@ function _buildIndex(
   }
 ): MemoryIndex {
   const { name, key_list, unique, using } = def;
-  if (data.index_list.some((index) => index.name === name)) {
+  if (data.indexList.some((index) => index.name === name)) {
     throw new SQLError({ err: 'ER_DUP_KEYNAME', args: [name] });
   }
   const column_list = key_list.map((key) => key.name.toLowerCase());

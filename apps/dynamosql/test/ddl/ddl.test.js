@@ -51,6 +51,18 @@ describe('DDL', function () {
     true
   );
   runTests(
+    'show_warnings.sql',
+    path.join(__dirname, 'show_warnings.sql'),
+    { skipAffected: true, timeout: 30000 },
+    true
+  );
+  runTests(
+    'show_error.sql',
+    path.join(__dirname, 'show_error.sql'),
+    { allowedErrors: 'SAME_CODE', skipAffected: true, timeout: 30000 },
+    true
+  );
+  runTests(
     'error_cases.sql',
     path.join(__dirname, 'error_cases.sql'),
     { skipAffected: true, timeout: 30000 },

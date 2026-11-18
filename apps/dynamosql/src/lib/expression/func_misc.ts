@@ -1,3 +1,5 @@
+import { userInfo } from 'node:os';
+
 import { assertArgCount, assertArgCountParse } from '../helpers/arg_count';
 import { convertNum } from '../helpers/sql_conversion';
 import { LockValueRequiredError } from '../lock';
@@ -67,7 +69,11 @@ export function user(
   _state: EvaluationState
 ): EvaluationResult {
   assertArgCountParse(expr, 0);
-  return { err: null, value: 'root@localhost', type: 'string' };
+  return {
+    err: null,
+    value: `${userInfo().username}@localhost`,
+    type: 'string',
+  };
 }
 export function version(
   expr: Function,

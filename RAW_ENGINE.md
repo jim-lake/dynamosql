@@ -72,6 +72,10 @@ Raw tables have no schema. For `JOIN ... USING (col)`, the engine decides which 
 
 If the first row of a table lacks a column that later rows have, the join can match on the wrong table.
 
+## Column metadata
+
+Raw tables store only their key attributes in DynamoDB. `SHOW COLUMNS` and `information_schema.COLUMNS` list only the key columns for a raw table. Non-key columns do not appear, and the rows for key columns do not carry MySQL's nullability, default, comment, or collation details from the table definition.
+
 ## Indexes
 
 - `UNIQUE` is not supported on DynamoDB tables. `CREATE UNIQUE INDEX`, `UNIQUE` column and table constraints, and `ALTER TABLE ... ADD UNIQUE` fail with `ER_NO`. Memory tables enforce `UNIQUE`.

@@ -1,4 +1,5 @@
 import { getExprCollation, isCaseInsensitive } from '../helpers/collation';
+import { likeToRegExp } from '../helpers/like_helper';
 import { convertBooleanValue } from '../helpers/sql_conversion';
 
 import {
@@ -162,15 +163,12 @@ function like(expr: Binary, state: EvaluationState): EvaluationResult {
     if (left.value === null || right.value === null) {
       value = null;
     } else {
-      const str = String(left.value);
-      const pattern = String(right.value)
-        .replace(/[.+^${}()|[\]\\]/g, '\\$&')
-        .replace(/%/g, '.*')
-        .replace(/_/g, '.');
       const collation = getExprCollation([expr.left, expr.right], state);
-      const flags = isCaseInsensitive(collation) ? 'i' : '';
-      const regex = new RegExp('^' + pattern + '$', flags);
-      value = regex.test(str) ? 1 : 0;
+      const regex = likeToRegExp(
+        String(right.value),
+        isCaseInsensitive(collation)
+      );
+      value = regex.test(String(left.value)) ? 1 : 0;
     }
   }
   return { err, value, name, type: 'bool' };

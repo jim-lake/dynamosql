@@ -9,6 +9,8 @@ import type { EvaluationValue } from './lib/expression';
 
 const SYSTEM_TIME_ZONE = _getSystemTimezone();
 const SERVER_UUID = randomUUID();
+export const SERVER_VERSION = '8.4.11-dynamosql';
+export const SERVER_VERSION_COMMENT = 'DynamoSQL';
 
 class GlobalSettings {
   private _collationConnection = COLLATIONS.UTF8MB4_0900_AI_CI;
@@ -56,6 +58,10 @@ class GlobalSettings {
         return { value: this.sqlMode, type };
       case 'SYSTEM_TIME_ZONE':
         return { value: this.systemTimeZone, type };
+      case 'VERSION':
+        return { value: SERVER_VERSION, type };
+      case 'VERSION_COMMENT':
+        return { value: SERVER_VERSION_COMMENT, type };
     }
     return undefined;
   }

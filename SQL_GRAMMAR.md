@@ -631,7 +631,7 @@ Subqueries are independent (no reference to the outer query) or dependent (corre
 | Feature                                                                                                                                         | Supported | Notes                                                 |
 | :---------------------------------------------------------------------------------------------------------------------------------------------- | :-------: | ----------------------------------------------------- |
 | `SHOW TABLES`                                                                                                                                   |    ✅     | `ddl/show.sql`                                        |
-| `SHOW [EXTENDED] [FULL] TABLES [{FROM \| IN} db] [LIKE 'p' \| WHERE expr]`                                                                      |    ❌     | `FROM`, `LIKE`, `WHERE`, `FULL`, `EXTENDED` untested. |
+| `SHOW [EXTENDED] [FULL] TABLES [{FROM \| IN} db] [LIKE 'p' \| WHERE expr]`                                                                      |    ✅     | `FROM` in `ddl/show.sql`. `IN`, `LIKE`, `WHERE`, `FULL`, `EXTENDED` not supported. |
 | `SHOW DATABASES` / `SHOW SCHEMAS` `[LIKE \| WHERE]`                                                                                             |    ❌     | A probe returned the database list. Not tested.       |
 | `SHOW [EXTENDED] [FULL] {COLUMNS \| FIELDS} {FROM \| IN} tbl [{FROM \| IN} db] [LIKE \| WHERE]`                                                 |    ❌     |                                                       |
 | `SHOW CREATE DATABASE / SCHEMA [IF NOT EXISTS] db`                                                                                              |    ❌     |                                                       |
@@ -639,14 +639,14 @@ Subqueries are independent (no reference to the outer query) or dependent (corre
 | `SHOW CREATE VIEW v`, `SHOW CREATE EVENT e`, `SHOW CREATE FUNCTION f`, `SHOW CREATE PROCEDURE p`, `SHOW CREATE TRIGGER t`, `SHOW CREATE USER u` |    ❌     |                                                       |
 | `SHOW [EXTENDED] {INDEX \| INDEXES \| KEYS} {FROM \| IN} tbl [{FROM \| IN} db] [WHERE expr]`                                                    |    ❌     |                                                       |
 | `SHOW [GLOBAL \| SESSION] STATUS [LIKE \| WHERE]`                                                                                               |    ❌     |                                                       |
-| `SHOW [GLOBAL \| SESSION] VARIABLES [LIKE \| WHERE]`                                                                                            |    ❌     |                                                       |
+| `SHOW [GLOBAL \| SESSION] VARIABLES [LIKE \| WHERE]`                                                                                            |    ✅     | `unit_misc/show_variables.test.ts` (LIKE only; WHERE not supported) |
 | `SHOW ENGINES`, `SHOW [STORAGE] ENGINES`, `SHOW ENGINE name STATUS`, `SHOW ENGINE INNODB MUTEX`, `SHOW ENGINE NDB STATUS`                       |    ❌     |                                                       |
 | `SHOW ERRORS [LIMIT ...]`, `SHOW COUNT(*) ERRORS`                                                                                               |    ❌     |                                                       |
-| `SHOW WARNINGS [LIMIT ...]`, `SHOW COUNT(*) WARNINGS`                                                                                           |    ❌     |                                                       |
+| `SHOW WARNINGS [LIMIT ...]`, `SHOW COUNT(*) WARNINGS`                                                                                           |    ✅     | `ddl/show_warnings.sql`. `LIMIT` and `COUNT(*)` not supported. |
 | `SHOW EVENTS [{FROM \| IN} db] [LIKE \| WHERE]`                                                                                                 |    ❌     |                                                       |
 | `SHOW FUNCTION CODE f`, `SHOW PROCEDURE CODE p`                                                                                                 |    ❌     | Debug builds only.                                    |
 | `SHOW FUNCTION STATUS [LIKE \| WHERE]`, `SHOW PROCEDURE STATUS [LIKE \| WHERE]`                                                                 |    ❌     |                                                       |
-| `SHOW GRANTS [FOR user_or_role [USING role ...]]`                                                                                               |    ❌     |                                                       |
+| `SHOW GRANTS [FOR user_or_role [USING role ...]]`                                                                                               |    ✅     | `unit_misc/show_grants.test.ts` (bare `SHOW GRANTS` only; FOR is a parser gap) |
 | `SHOW OPEN TABLES [{FROM \| IN} db] [LIKE \| WHERE]`                                                                                            |    ❌     |                                                       |
 | `SHOW PLUGINS`                                                                                                                                  |    ❌     |                                                       |
 | `SHOW PRIVILEGES`                                                                                                                               |    ❌     |                                                       |
@@ -656,11 +656,11 @@ Subqueries are independent (no reference to the outer query) or dependent (corre
 | `SHOW TRIGGERS [{FROM \| IN} db] [LIKE \| WHERE]`                                                                                               |    ❌     |                                                       |
 | `SHOW {CHARACTER SET \| CHARSET} [LIKE \| WHERE]`                                                                                               |    ❌     |                                                       |
 | `SHOW COLLATION [LIKE \| WHERE]`                                                                                                                |    ❌     |                                                       |
-| `SHOW BINARY LOG STATUS`, `SHOW MASTER STATUS` (deprecated name)                                                                                |    ❌     |                                                       |
-| `SHOW BINARY LOGS`                                                                                                                              |    ❌     |                                                       |
+| `SHOW BINARY LOG STATUS`                                                                                                                       |    ✅     | `unit_misc/show_binary_log_status.test.ts` (returns ER_NO_BINARY_LOGGING, 1381) |
+| `SHOW BINARY LOGS`, `SHOW MASTER LOGS`                                                                                                          |    ✅     | `unit_misc/show_binary_logs.test.ts` (returns ER_NO_BINARY_LOGGING, 1381) |
 | `SHOW BINLOG EVENTS [IN 'log'] [FROM pos] [LIMIT ...]`                                                                                          |    ❌     |                                                       |
 | `SHOW RELAYLOG EVENTS [IN 'log'] [FROM pos] [LIMIT ...] [FOR CHANNEL c]`                                                                        |    ❌     |                                                       |
-| `SHOW REPLICA STATUS [FOR CHANNEL c]`, `SHOW SLAVE STATUS` (deprecated name)                                                                    |    ❌     |                                                       |
+| `SHOW REPLICA STATUS` (no FOR CHANNEL)                                                                                                         |    ✅     | `unit_misc/show_replica_status.test.ts` (empty result, 60 columns) |
 | `SHOW REPLICAS`, `SHOW SLAVE HOSTS` (deprecated name)                                                                                           |    ❌     |                                                       |
 | `SHOW OPEN TABLES`, `SHOW PRIVILEGES`                                                                                                           |    ❌     |                                                       |
 | `LIKE 'pattern'` and `WHERE expr` clauses on any SHOW                                                                                           |    ❌     |                                                       |
@@ -889,7 +889,7 @@ Subqueries are independent (no reference to the outer query) or dependent (corre
 | System variable read `@@have_profiling` (returns `YES`)  |    ✅     | `expression/variables.sql`                        |
 | `SET` on read-only `@@lower_case_table_names` or `@@have_profiling` raises `ER_INCORRECT_GLOBAL_LOCAL_VAR` (1238) | ✅ | `expression/variables_error.sql` |
 | `SET @@default_storage_engine = ...`                    |    ❌     | Not implemented. MySQL accepts any known engine name, and DynamoSQL has no engine list. |
-| `@@version`, `@@version_comment`                        |    ❌     | Not defined. Values depend on the MySQL build. |
+| `@@version`, `@@version_comment`                        |    ✅     | `unit_misc/show_variables.test.ts`. Values are fixed DynamoSQL strings. |
 | System variable `@@SESSION.name`                        |    ✅     | `expression/variables.sql`                        |
 | System variable `@@GLOBAL.name`, `@@LOCAL.name`         |    ❌     |                                                   |
 | System variable `@@PERSIST.name`, `@@PERSIST_ONLY.name` |    ❌     |                                                   |

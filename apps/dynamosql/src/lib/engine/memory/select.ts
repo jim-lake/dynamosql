@@ -85,7 +85,7 @@ function _getFromTable(params: RowListParams & { from: BaseFrom }): {
     return { rows: row ? [row] : [], tableInfo };
   }
 
-  for (const index of data.index_list) {
+  for (const index of data.indexList) {
     const indexRow = index.unique
       ? _probeRow(index.column_list, cells)
       : undefined;
@@ -114,7 +114,7 @@ function _orderedMap(
   if (spec.some((item) => item.direction !== spec[0]?.direction)) {
     return undefined;
   }
-  for (const index of data.index_list) {
+  for (const index of data.indexList) {
     if (
       index.map instanceof BTree &&
       spec.length <= index.column_list.length &&

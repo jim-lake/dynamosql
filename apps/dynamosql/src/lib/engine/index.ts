@@ -58,11 +58,17 @@ export interface ColumnDefParam {
   default?: unknown;
   comment?: string;
 }
+export interface IndexInfo {
+  name: string;
+  unique: boolean;
+  column_list: readonly string[];
+}
 export interface TableInfo {
   table: string;
   collation: COLLATIONS | null;
   primary_key: readonly string[];
   column_list: readonly ColumnDef[];
+  indexList: readonly IndexInfo[];
   is_open: boolean;
   rowCount: bigint;
   tableSize: bigint;

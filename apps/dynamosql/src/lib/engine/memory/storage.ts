@@ -42,7 +42,7 @@ export interface MemoryIndex {
 }
 export interface TableState {
   row_map: Map<HashUniqueMakeKeyResult, CellRow>;
-  index_list: MemoryIndex[];
+  indexList: MemoryIndex[];
 }
 export interface TableData extends TableState {
   table: string;
@@ -128,7 +128,7 @@ export function deleteTable(database: string, table: string): void {
 export function cloneState(data: TableState): TableState {
   return {
     row_map: new Map(data.row_map),
-    index_list: data.index_list.map((index) => ({
+    indexList: data.indexList.map((index) => ({
       ...index,
       map: index.map instanceof BTree ? index.map.clone() : new Map(index.map),
     })),
@@ -196,7 +196,7 @@ export function findConflicts(
   if (state.row_map.has(pk)) {
     keys.add(pk);
   }
-  for (const index of state.index_list) {
+  for (const index of state.indexList) {
     if (!index.unique) {
       continue;
     }
@@ -214,7 +214,7 @@ export function duplicateEntryError(
 ): SQLError {
   const pk = primaryKeyOf(primary_key, row);
   if (!state.row_map.has(pk)) {
-    for (const index of state.index_list) {
+    for (const index of state.indexList) {
       if (!index.unique) {
         continue;
       }
@@ -273,7 +273,7 @@ function _setRow(
   row: CellRow
 ): void {
   state.row_map.set(key, row);
-  for (const index of state.index_list) {
+  for (const index of state.indexList) {
     indexAdd(index.map, index.keyOf(row, key), key);
   }
 }
@@ -282,7 +282,7 @@ function _unsetIndexes(
   row: CellRow,
   key: HashUniqueMakeKeyResult
 ): void {
-  for (const index of state.index_list) {
+  for (const index of state.indexList) {
     const index_key = index.keyOf(row, key);
     if (index.map instanceof BTree) {
       index.map.delete(index_key);

@@ -47,11 +47,18 @@ export async function getTableInfo(
     const primary_key = data.Table.KeySchema.map(
       (key) => key.AttributeName ?? ''
     );
+    const indexList = (data.Table.GlobalSecondaryIndexes ?? []).map((index) => {
+      const keys = (index.KeySchema ?? []).map(
+        (key) => key.AttributeName ?? ''
+      );
+      return { name: index.IndexName ?? '', unique: false, column_list: keys };
+    });
     return {
       table,
       collation: COLLATIONS.UTF8MB4_0900_BIN,
       primary_key,
       column_list,
+      indexList,
       is_open: true,
       rowCount: BigInt(data.Table.ItemCount ?? 0),
       tableSize: BigInt(data.Table.TableSizeBytes ?? 0),
