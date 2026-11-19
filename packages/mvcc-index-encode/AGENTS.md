@@ -15,39 +15,6 @@ Only `weightString` and `weightFramed` are implemented. Other value encodings
 not written yet. `STRING_ENCODING.md` is the only description of the string
 key and framing formats; do not restate them here.
 
-## Layout
-
-```
-packages/mvcc-index-encode/
-├── STRING_ENCODING.md        # Key format for every supported collation
-├── src/
-│   ├── index.ts              # Public entry; re-exports the modules below
-│   ├── weight_string.ts      # weightString: order-preserving sort key for a SQL value
-│   ├── collations.ts         # Supported collation list; per-character, multi-level, and byte kinds
-│   ├── generated/
-│   │   ├── collation_weights.ts  # GENERATED from MySQL. Do not edit.
-│   │   └── uca_0900_as_cs.ts     # GENERATED from MySQL. Do not edit.
-│   ├── uca.ts                # UCA table lookup: level 1 for ai_ci, levels 1-3 for as_ci/as_cs
-│   ├── tuple.ts              # encodeVariable helper
-│   └── bytes.ts              # hex and byte helpers
-├── test/
-│   ├── order.ts              # compareBytes and expectSameOrder helpers
-│   ├── weight_string.test.ts # ASCII, ai_ci, and bin order against the oracle
-│   ├── as_cs.test.ts         # as_cs and as_ci order
-│   ├── uca.test.ts           # UCA table lookups and implicit Han weights
-│   ├── utf8_decode.test.ts
-│   ├── weight_framed.test.ts
-│   ├── framed_concat.test.ts
-│   ├── tuple.test.ts
-│   └── fixtures/oracle.json  # GENERATED from MySQL. Do not edit.
-├── scripts/
-│   ├── dump-oracle.mjs       # Regenerates the generated files above
-│   └── rollup-plugin-inc-version.mjs
-├── rollup.config.mjs
-├── eslint.config.mjs
-└── tsconfig.json
-```
-
 ## Rules
 
 - Collations: only `ascii_bin`, `ascii_general_ci`, `utf8mb4_0900_bin`,
@@ -55,13 +22,26 @@ packages/mvcc-index-encode/
   add others without an oracle check.
 - The `as_cs` and `as_ci` collations share the table in
   `generated/uca_0900_as_cs.ts`. The dump asserts the relationship between
-  their levels. Do not reintroduce a separate table.
+  their levels.
 - Do not rely on the key matching `WEIGHT_STRING` for `as_cs` and `as_ci`.
-  Change the format only if the order tests still pass and the key does not get
-  larger for typical text.
-- Tests compare order, not bytes. Use `expectSameOrder` from `test/order.ts`.
-  Do not assert exact hex for `as_cs` or `as_ci` keys. Hand-written cases use
-  `expectAscending` chains. Compare PAD SPACE rows only within the same bound.
+  The format may change freely. There is no backward compatibility requirement,
+  and stored keys need no migration.
+- The encoding is not fixed. It may change in any collation at any time, and
+  the size curves in `TODO.md` are measurements of the current format, not
+  guarantees.
+- Tests never pin bytes, lengths, widths, cutoffs, or derived maxima, for any
+  collation. Do not add assertions that would fail when the encoding changes,
+  such as exact frame lengths, `maxBytes` values, or witness sizes. Tests assert
+  ordering and equality only. Use `expectSameOrder` from `test/order.ts`.
+  Hand-written cases use `expectAscending` chains. Compare PAD SPACE rows only
+  within the same bound.
+- Investigation and probe scripts go under `scripts/`, named for what they
+  measure or check (for example `length_model.ts`, not `test1.ts`). Keep them
+  there after use. `scripts/` is excluded from `ts:check` (tsconfig) and lint
+  (eslint config), so they are not held to the test-code rules.
+- Import direction is one way. `src/` imports only from `src/`. `test/` never
+  imports from `scripts/`. Code shared by tests and probe scripts goes in
+  `test/helpers/`, and `scripts/` may import from `test/helpers/` and `src/`.
 - The oracle samples are seeded pseudo-random in `scripts/dump-oracle.mjs`. Add
   a new sample set there when a bug shows a shape it misses.
 - Regenerate, do not hand-edit, `generated/collation_weights.ts`, `generated/uca_0900_as_cs.ts`, and `oracle.json`. Run
@@ -72,26 +52,6 @@ packages/mvcc-index-encode/
   comment only where the behavior is non-obvious, and keep it to what the reader
   needs to know.
 
-## Benchmarks
-
-Run with `npm run test:bench -- <collation> [scale]`. The bench prints one row per
-workload and mode (`weight` and `weight+frame`), plus a total.
-
-- The baseline run must take at least 10 s in total. Raise `scale` until it does.
-  At scale 0.22, `utf8mb4_0900_ai_ci` takes about 11 s, but `ascii_bin` takes about
-  3 s, so `ascii_bin` needs about scale 0.8. Runs shorter than 10 s are noise, not
-  evidence.
-- Compare against `HEAD` in a temporary worktree, not against numbers recorded in
-  an earlier session. Remove the worktree afterwards. Symlink `node_modules` into it
-  from the repo root and the package.
-- Run at least 3 times per side. Compare the median ops/s for each row, not only the
-  total. A row is a regression only if the current median is lower and the current
-  max is below the baseline min.
-- Compare every workload, including `weight` and `weight+frame` for each. A faster
-  total can hide a slower row.
-- Never compare runs at different scales.
-- Do not store benchmark results in any doc. Run the baseline and the current code fresh each time, and report the numbers in the conversation only.
-
 ## Commands
 
 Run from `packages/mvcc-index-encode/`:
@@ -100,8 +60,4 @@ Run from `packages/mvcc-index-encode/`:
 | ---------- | ------------------ |
 | Type check | `npm run ts:check` |
 | Test       | `npm test`         |
-| Build      | `npm run build`    |
 | Lint       | `npm run lint`     |
-
-`npm run build` bumps the patch version in `package.json`. `npm run pretty`
-rewrites files on disk. Run it only when the user asks.

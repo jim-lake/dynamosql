@@ -17,16 +17,16 @@ compare equal encode to identical bytes. Encodings cannot be decoded.
 
 `weightFramed` returns the whole component, with no marker byte. A NULL component is the single byte `00`. A non-NULL string component never starts with `00` and is never empty, so it needs no `01` marker. Another component or a TX_ID may follow, so no framed key may be a proper prefix of another.
 
-| Collation                                  | Framed form              | Overhead                                    |
-| ------------------------------------------ | ------------------------ | ------------------------------------------- |
-| `utf8mb4_0900_as_cs`, `utf8mb4_0900_as_ci` | `weightString` unchanged | 0                                           |
-| `utf8mb4_0900_ai_ci`                       | `weightString \|\| 01`   | 1                                           |
-| `utf8mb4_0900_bin`                         | `escape(bytes) \|\| 01`  | 1, plus 1 per input byte `00`, `01` or `02` |
-| `ascii_bin`, `ascii_general_ci`            | packed rank integer      | fixed width `w`, see ASCII                  |
+| Collation                                  | Framed form                    | Overhead                        |
+| ------------------------------------------ | ------------------------------ | ------------------------------- |
+| `utf8mb4_0900_as_cs`, `utf8mb4_0900_as_ci` | `weightString` unchanged       | 0                               |
+| `utf8mb4_0900_ai_ci`                       | `weightString \|\| 01`         | 1                               |
+| `utf8mb4_0900_bin`                         | ordered scalar codes `\|\| 01` | 1, plus 1 to 3 bytes per scalar |
+| `ascii_bin`, `ascii_general_ci`            | packed rank integer            | fixed width `w`, see ASCII      |
 
 - The `as_cs` key ends with the level 3 end byte `02`. The `as_ci` key ends with its level 2 end token. Every L1 code starts with a byte `>= 02`, and the `01` separator follows L1, so no key is a proper prefix of another.
 - `ai_ci` keys can be prefixes of each other, so `01` ends them. Every L1 code starts with a byte `>= 02`.
-- `bin` escapes `00`, `01` and `02` as `02 x`, so the terminator `01` never appears in the payload.
+- `bin` writes each scalar as one ordered code of one to three bytes. Codes start at `02`, so `01` never appears in the payload and the key is prefix-free.
 - The ASCII frame has a fixed width for a column, and its first byte is never `00`.
 
 The empty string frames as `01` for `ai_ci`, `01` for `bin`, `01 02 02` for `as_cs`, and `01 02` for `as_ci`. The empty ASCII string at bound 0 frames as `01`.
@@ -78,8 +78,12 @@ collations.
 
 ### `utf8mb4_0900_bin`
 
-The key is the input bytes. The caller guarantees valid UTF-8 and must not
-modify the result. `maxChars` is ignored.
+The key is one code per scalar value, in scalar order, followed by `01`.
+ASCII scalars U+0000..U+007F use `02`..`81`. U+0080..U+07FF use a two-byte
+code with lead `82`..`89`. All other scalars, skipping surrogates, use a
+three-byte code with lead `8A` and up. The caller guarantees valid UTF-8.
+`maxChars` is ignored. Each scalar costs at most 3 bytes, so the frame is at
+most `3n + 1` bytes and its width is 337.
 
 ### `utf8mb4_0900_ai_ci`
 
@@ -178,13 +182,13 @@ Examples:
 
 Per collation, `n` is the number of characters, and the length is the framed key.
 
-| Collation            | Worst case                                                                                                                                                | Basis                                                                                                                                        |
-| -------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
-| `ascii_*`            | `w` bytes, the smallest `w` with `K^maxChars <= 255 × 256^(w-1)`: 224 at 255 for `ascii_bin`, 213 for `ascii_general_ci`                                  | Fixed width, matching the packing bound. `maxChars` is required.                                                                             |
-| `utf8mb4_0900_bin`   | `<= 4n + 1` bytes                                                                                                                                         | Proven. A 4-byte character is never escaped. Each input byte `00`..`02` (ASCII only) costs 2 bytes, so no character costs more than 4 bytes. |
-| `utf8mb4_0900_ai_ci` | `<= 12n + 1` bytes                                                                                                                                        | Proven from the compact L1 table. The largest per-character cost is 12 bytes (U+3316 and U+337F, and others). Plus 1 for the `01` end.       |
-| `utf8mb4_0900_as_ci` | Measured: 12.07 bytes per character (U+3316 repeated 41 times, 495 bytes). No bound in tests.                                                             | Measured, not proven.                                                                                                                        |
-| `utf8mb4_0900_as_cs` | Bound enforced by tests: `24n + 3 + 4 * floor(8n / 122) + 4 * floor(8n / 218)`. Measured: 18.1 bytes per character (U+3316 repeated 41 times, 742 bytes). | Checked on per-character maxima, repeated worst-case characters, and 500 seeded mixed samples. Not a proof over arbitrary concatenation.     |
+| Collation            | Worst case                                                                                                                                                | Basis                                                                                                                                    |
+| -------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| `ascii_*`            | `w` bytes, the smallest `w` with `K^maxChars <= 255 × 256^(w-1)`: 224 at 255 for `ascii_bin`, 213 for `ascii_general_ci`                                  | Fixed width, matching the packing bound. `maxChars` is required.                                                                         |
+| `utf8mb4_0900_bin`   | `<= 3n + 1` bytes                                                                                                                                         | Proven. Each scalar costs one to three bytes, plus 1 for the `01` end. Width 337 at 1,012 bytes.                                         |
+| `utf8mb4_0900_ai_ci` | `<= 12n + 1` bytes                                                                                                                                        | Proven from the compact L1 table. The largest per-character cost is 12 bytes (U+3316 and U+337F, and others). Plus 1 for the `01` end.   |
+| `utf8mb4_0900_as_ci` | Measured: 12.07 bytes per character (U+3316 repeated 41 times, 495 bytes). No bound in tests.                                                             | Measured, not proven.                                                                                                                    |
+| `utf8mb4_0900_as_cs` | Bound enforced by tests: `24n + 3 + 4 * floor(8n / 122) + 4 * floor(8n / 218)`. Measured: 18.1 bytes per character (U+3316 repeated 41 times, 742 bytes). | Checked on per-character maxima, repeated worst-case characters, and 500 seeded mixed samples. Not a proof over arbitrary concatenation. |
 
 The largest `n` whose `as_cs` bound fits the 1012-byte tuple budget is 41
 (bound 999).

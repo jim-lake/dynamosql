@@ -51,12 +51,12 @@ export interface MultiLevelCollation extends CollationBase {
   ) => number;
 }
 
-export interface Utf8BytesCollation extends CollationBase {
-  readonly kind: 'utf8-bytes';
+export interface ScalarCodeCollation extends CollationBase {
+  readonly kind: 'scalar-code';
 }
 
 export type CollationInfo =
-  TableCollation | MultiLevelCollation | Utf8BytesCollation;
+  TableCollation | MultiLevelCollation | ScalarCodeCollation;
 
 const COLLATION_META: Readonly<
   Record<CollationName, { charset: Charset; pad: PadMode }>
@@ -98,7 +98,7 @@ function buildAsciiWriter(name: CollationName): {
 function buildInfo(name: CollationName): CollationInfo {
   const meta = COLLATION_META[name];
   if (name === 'utf8mb4_0900_bin') {
-    return { ...meta, kind: 'utf8-bytes' };
+    return { ...meta, kind: 'scalar-code' };
   }
   if (name === 'utf8mb4_0900_ai_ci') {
     return {

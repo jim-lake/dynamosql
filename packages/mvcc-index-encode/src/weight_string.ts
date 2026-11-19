@@ -26,8 +26,8 @@ function fillScratch(
   maxChars: number | undefined
 ): number {
   const info = getCollation(collation);
-  if (info.kind === 'utf8-bytes') {
-    throw new Error('utf8-bytes collations do not use weight tables');
+  if (info.kind === 'scalar-code') {
+    throw new Error('scalar-code collations do not use weight tables');
   }
   if (info.kind === 'multi-level') {
     return fillCompact(value, collation, info);
@@ -267,37 +267,57 @@ export function weightString(
   collation: CollationName,
   maxChars?: number
 ): Uint8Array {
-  if (getCollation(collation).kind === 'utf8-bytes') {
-    return value;
+  if (getCollation(collation).kind === 'scalar-code') {
+    return binaryKey(value);
   }
   const n = fillScratch(value, collation, maxChars);
   return scratch.slice(0, n);
 }
 
 const STRING_END = 0x01;
-const BIN_ESCAPE = 0x02;
+const SCALAR_BASE = 0x02;
+const TWO_BYTE_BASE = 0x82;
+const THREE_BYTE_BASE = 0x8a;
+const SURROGATE_LOW = 0xd800;
+const SURROGATE_HIGH = 0xdfff;
 
-function frameBytes(value: Uint8Array): Uint8Array {
-  let low = 0;
-  for (const byte of value) {
-    if (byte <= BIN_ESCAPE) {
-      low++;
-    }
+function writeScalarCode(cp: number, at: number): number {
+  if (cp < 0x80) {
+    scratch[at] = SCALAR_BASE + cp;
+    return 1;
   }
-  const out = new Uint8Array(value.length + low + 1);
-  if (low === 0) {
-    out.set(value);
-  } else {
-    let o = 0;
-    for (const byte of value) {
-      if (byte <= BIN_ESCAPE) {
-        out[o++] = BIN_ESCAPE;
-      }
-      out[o++] = byte;
-    }
+  if (cp < 0x800) {
+    const index = cp - 0x80;
+    scratch[at] = TWO_BYTE_BASE + (index >>> 8);
+    scratch[at + 1] = index & 0xff;
+    return 2;
   }
-  out[out.length - 1] = STRING_END;
-  return out;
+  let index = cp - 0x800;
+  if (cp > SURROGATE_HIGH) {
+    index -= SURROGATE_HIGH - SURROGATE_LOW + 1;
+  } else if (cp >= SURROGATE_LOW) {
+    throw new RangeError(`Surrogate U+${cp.toString(16)} is not a scalar`);
+  }
+  const lead = Math.floor(index / 0x10000);
+  const rest = index % 0x10000;
+  scratch[at] = THREE_BYTE_BASE + lead;
+  scratch[at + 1] = rest >>> 8;
+  scratch[at + 2] = rest & 0xff;
+  return 3;
+}
+
+function binaryKey(value: Uint8Array): Uint8Array {
+  let n = 0;
+  for (let i = 0; i < value.length;) {
+    const packed = decodeAt(value, i, 'utf8mb4_0900_bin');
+    const cp = packed & 0x1fffff;
+    i += packed >>> 21;
+    ensure(n + 3);
+    n += writeScalarCode(cp, n);
+  }
+  ensure(n + 1);
+  scratch[n] = STRING_END;
+  return scratch.slice(0, n + 1);
 }
 
 interface AsciiRanks {
@@ -397,8 +417,8 @@ export function weightFramed(
   maxChars?: number
 ): Uint8Array {
   const info = getCollation(collation);
-  if (info.kind === 'utf8-bytes') {
-    return frameBytes(value);
+  if (info.kind === 'scalar-code') {
+    return binaryKey(value);
   }
   if (info.kind === 'table' && info.charset === 'ascii') {
     return packAscii(value, collation, maxChars);
