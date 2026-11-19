@@ -100,7 +100,7 @@ JSON represents native N as exact numbers, S as strings, BOOL as booleans, and N
 }
 ```
 
-`pk` names the target partition-key attribute; index entries additionally identify INDEX_TX_ID. An empty payload is `{"overflow":false,"changes":[]}`. Read-only transactions need no record.
+`pk` names the target partition-key attribute. For index writes, record the complete physical `INDEX_TX_ID`, including its assigned change ordinal, so staging retries address the same item. An empty payload is `{"overflow":false,"changes":[]}`. Read-only transactions need no record.
 
 For a rebuild, the DDL resource intents record the same logical `table_uuid` and the physical `dynamodb_table` to create or retire.
 
@@ -296,8 +296,8 @@ Use the secondary index's `dynamodb_table` value from the snapshot schema verbat
 | Column                       | Type       | Purpose                                                       |
 | ---------------------------- | ---------- | ------------------------------------------------------------- |
 | `INDEX_PARTITION`            | S          | Partition key; always `ALL`                                   |
-| `INDEX_TX_ID`                | B          | Sort key; encoded index identity followed by TX_ID            |
-| `TX_ID`                      | N          | Creating transaction; matches encoded suffix                  |
+| `INDEX_TX_ID`                | B          | Framed index values followed by TX_ID and change ordinal      |
+| `TX_ID`                      | N          | Creating transaction, also encoded in the sort key            |
 | `DELETED`                    | BOOL       | True for a tombstone; absent means live                       |
 | Index column `dynamodb_name` | N/S/B/NULL | Indexed user value                                            |
 | PK column `dynamodb_name`    | N/S/B      | Target primary-key value                                      |
@@ -308,9 +308,9 @@ Each secondary index has its own table. Store overlapping index/PK attributes on
 
 Index sort keys use only NO PAD encoding. For a declared PAD SPACE collation, index builders, writers, and readers trim trailing U+0020 from each key value before encoding, including equality probes and range endpoints. Ordered scans can differ from MySQL for suffixes that sort below its implicit space, including ASCII control characters under `ascii_bin`. See [character weights](MVCC_INDEX_ENCODING.md#character-weights).
 
-Nonunique entries append their PK after indexed values. Unique entries append their PK only if any indexed component is NULL. TX_ID follows the complete entry identity. [MVCC_INDEX_ENCODING.md](MVCC_INDEX_ENCODING.md) defines the bytes.
+Every secondary sort key ends with the eight-byte TX_ID and a four-byte ordinal unique within that transaction and index. The declared index columns have a combined 1012-byte budget. The target PK is an item attribute and contributes to the indexed tuple only where explicitly indexed. [Secondary sort key](MVCC_INDEX_ENCODING.md#secondary-sort-key).
 
-Index changes commit with row changes. Resolve entry visibility, then validate the target row at the same snapshot. Reassigning a unique non-NULL key within one transaction produces one final mapping.
+Index changes commit with row changes. For a unique non-NULL tuple, resolve conflicts and visibility by indexed tuple. For nonunique and NULL-containing entries, resolve them by indexed tuple and target PK. Reassigning a unique non-NULL tuple within one transaction produces one final mapping. Validate live target rows at the same snapshot.
 
 ## Column values
 
@@ -392,7 +392,7 @@ F guarantees committed records strictly below F; M identifies a committed transa
 
 1. In order: read current state H, M, F; read every page of the domain's reader leases; then read every transaction with `F<=tx_id<=M`. Use strongly consistent reads and H's committed chain. New readers can acquire H or a later head in commit-chain order, never an earlier head.
 2. Before inspecting a heartbeat, verify that the transaction is absent from the current head's chain. If `last_alive<NOW()-600`, atomically set `invalidated=true` conditioned on the observed heartbeat and head being unchanged. Retry if either changed. Choose C no greater than M or any unfenced transaction ID outside H's chain in the scanned range. Delete fenced transactions' row/index records strictly below C.
-3. Retain each key's latest record below C committed in H's chain and all records at/above C. Use the leased heads to preserve the row and index versions visible to each protected snapshot, including tombstones below C.
+3. Retain the latest record below C committed in H's chain per row PK or logical index identity, and all records at/above C. Use the leased heads to preserve the row and index versions visible to each protected snapshot, including tombstones below C.
 4. After exhaustive cleanup, conditionally set `none_uncommitted_below_tx_id=C` only if `none_uncommitted_below_tx_id<C`. Partial scans are not completion proof. Overlapping workers must preserve each other's protected records.
 
 Retain transaction manifests/spills for recovery. Never reclaim an unresolved transaction still eligible to commit. Cleanup above the floor does not advance F. Committed staging retries may confirm existing contents but never recreate reclaimed records.

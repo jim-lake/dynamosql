@@ -5,7 +5,7 @@
 - Resolve index `columns` through schema `column_name` to stable `dynamodb_name`. Apply SQL column coercion and precision rules before key encoding.
 - Key equality and ascending byte order follow SQL equality and order, subject to the [PAD SPACE approximation](#character-weights). Types and component counts come from the index definition.
 - Primary keys forbid NULL. Secondary keys sort NULL before non-NULL. Only full-column ASC indexes are specified.
-- Preserve the PK-suffix rules of [hash_nonunique_index.ts](../src/lib/helpers/hash_nonunique_index.ts) and [hash_nullable_index.ts](../src/lib/helpers/hash_nullable_index.ts); replace their string serialization with the ordered encoding below.
+- Every secondary index item stores the target PK as attributes, including on tombstones. A PK column contributes to the indexed tuple only when the index explicitly includes it.
 - Persist original column values separately. Encoded keys need not recover original spelling or collation-equivalent values. Never truncate or hash a key to make it fit.
 
 ## Primary partition key
@@ -30,21 +30,13 @@ The data-table partition key is accessed only by hashed equality, so its encodin
 
 ## Secondary sort key
 
-Let I be the tuple of indexed values and P the tuple of primary-key values in PRIMARY column order. For a hidden PK, P contains its generated `DB_ROW_ID`. For a declared composite PK, P contains the declared key columns, the same values `DB_ROW_KEY` encodes. Append the full P, including columns also present in I.
+Let I be the concatenation of the framed values of the declared index columns in index order. Every secondary index uses `INDEX_PARTITION = "ALL"` and `INDEX_TX_ID = I || U64(TX_ID) || U32(change_ordinal)`.
 
-| Index case                 | Entry identity E |
-| -------------------------- | ---------------- |
-| Unique, no NULL components | I                |
-| Unique, any NULL component | I followed by P  |
-| Nonunique                  | I followed by P  |
+Within each index, the logical identity for conflict checks, coalescing, visibility, and vacuum is I for a unique entry with all components non-NULL. For a nonunique entry or an entry with any NULL component, the identity is the pair (I, target PK). Obtain the target PK from the item.
 
-`INDEX_PARTITION = "ALL"`.
+Coalesce writes to one final mapping or tombstone per logical identity per transaction. A unique non-NULL value reassigned in the same transaction has one final mapping. SQL uniqueness includes snapshot visibility and own writes, with final validation at head publication.
 
-`INDEX_TX_ID = E || U64(TX_ID)`.
-
-TX_ID occupies the final eight bytes, after any PK suffix. P uses its component encodings, not a nested encoded partition-key attribute. A unique non-NULL entry's target PK is stored in its item, not its key.
-
-Different rows sharing a nonunique/NULL-containing key remain distinct within one transaction. A unique non-NULL key has one final mapping or tombstone per transaction; coalesce deletion/reassignment of that key. SQL uniqueness includes snapshot visibility and own writes; final head publication validates the snapshot.
+After coalescing, assign a distinct unsigned 32-bit ordinal to each physical entry the transaction writes to that index, including tombstones. Ordinals start at zero and can be reused in another index or transaction. Reject a transaction that needs more than 2^32 entries in one index. Persist each assigned key in the transaction payload or spill and reuse it on retry.
 
 ## Key length limits
 
@@ -53,17 +45,17 @@ DynamoDB bounds key sizes, and keys are never truncated or hashed to fit, so the
 | Key                                                               | Limit (bytes) | Measured length                                                       |
 | ----------------------------------------------------------------- | ------------- | --------------------------------------------------------------------- |
 | Primary partition key (`DB_ROW_KEY` or a direct-use column value) | 2048          | The complete encoded attribute value                                  |
-| Secondary sort key (`INDEX_TX_ID`)                                | 1024          | The full `INDEX_TX_ID`: E, including any PK suffix P, plus the TX_ID. |
+| Secondary sort key (`INDEX_TX_ID`)                                | 1024          | The framed index tuple I plus the 12-byte suffix                      |
 
 - A definition is rejected if the maximum encoded length of any key it produces can exceed its limit. The check runs on `CREATE TABLE`, `CREATE INDEX`, and `ALTER TABLE` statements that add or change an index, a primary key, or a column used by one. Rejection is a definition error, not a write-time error.
 - The maximum length is computed from the column definitions alone, never from current values. It sums the worst-case size of every component: the 1-byte marker, the fixed value width, and for variable-width components the worst-case escaped payload plus the 2-byte terminator. Escaping counts each `00` byte as two bytes. Character components use the worst-case weight output for the column's bound under its collation, at natural length after key normalization. A permitted value can occupy the full column bound without ending in a space. Binary components use the column's maximum byte length with every byte `00`.
-- P counts toward a secondary index's limit exactly when E includes P. A nonunique index is measured as I, P, and TX_ID. A unique index with any nullable column is also measured with P, because an entry with a NULL component includes it. A unique index whose columns are all NOT NULL is measured as I and TX_ID only. An index whose measured length can exceed 1024 bytes is rejected even if I alone would fit.
+- Every secondary index reserves eight bytes for TX_ID and four for the ordinal. Reject the definition if the maximum framed length of its declared index columns exceeds 1012 bytes, regardless of uniqueness or nullability.
 - A column type with no finite maximum encoded length, such as an unbounded TEXT or BLOB without a declared bound, cannot appear in a key and is rejected.
 - Changing a column's length, bound, or collation re-runs the check for every key containing that column.
 
 ## Tuple framing
 
-Hex bytes are written without `0x`. `||` concatenates bytes. `U_w(x)` is unsigned big-endian in exactly w bytes; `U64(x)=U_8(x)`.
+Hex bytes are written without `0x`. `||` concatenates bytes. `U_w(x)` is unsigned big-endian in exactly w bytes. `U64(x)=U_8(x)` and `U32(x)=U_4(x)`.
 
 | Component                     | Bytes |
 | ----------------------------- | ----- |
@@ -130,10 +122,10 @@ An empty text value is distinct from NULL under every collation: its framed comp
 
 ## Reads and updates
 
-- Group secondary versions by E, removing the last eight bytes. Select the latest visible TX_ID before predicates or returning its target row. A selected DELETED item suppresses older mappings.
-- Validate target rows at the same snapshot. Updates tombstone the old E and write the new E; unchanged E writes only its final item.
-- An exact entry lookup uses `[E||U64(0), E||U64(M)]`, where M is the snapshot's highest committed TX_ID. Apply visibility at its head H to entries within that range. A nonunique or NULL-containing index-value lookup scans prefix I across all PK suffixes and applies visibility per E.
-- Leading-column probes use complete component encodings: Q is the concatenation of fully framed components (marker, escaped payload, and terminator for variable-width), never a raw value. `successor` operates on those framed bytes. Prefix Q covers `[Q, successor(Q))`; successor increments the last non-ff byte and drops following bytes. An all-ff prefix has no finite upper bound. Do not append TX_ID before the remaining key components. Example: an equality probe on a variable binary indexed value `61` frames to `01 61 00 00`, and the scan range is `[01 61 00 00, 01 61 00 01)`.
+- An exact lookup of I uses the inclusive range `[I||U64(0)||U32(0), I||U64(M)||U32(0xffffffff)]`, where M is the snapshot's highest committed TX_ID. Apply visibility at its head H and overlay the transaction's own writes.
+- Within each I, select the greatest visible TX_ID per logical identity. In descending key order, the first visible entry resolves that identity, including when it is a tombstone. In ascending order, retain the latest visible entry per identity until I is complete. Carry resolution state across DynamoDB pages and resume with the full physical key. Validate live target rows at the same snapshot before applying predicates or LIMIT.
+- When an update changes logical identity, tombstone the old identity and write the new mapping. An unchanged identity produces only its final item.
+- For a leading-column probe, Q is the concatenation of the complete framed components supplied by the query. Prefix Q covers `[Q, successor(Q))`. The successor increments the last non-ff byte and drops following bytes. An all-ff prefix has no finite upper bound. Append the transaction and ordinal bounds only after a complete I. For example, a variable binary indexed value `61` frames to `01 61 00 00`, giving the prefix range `[01 61 00 00, 01 61 00 01)`.
 - Re-encode predicates using the index column types and collations, including the same trailing-space trim used to build PAD SPACE entries. Incompatible SQL coercions require SQL evaluation rather than an incorrect byte range.
 
 ## Byte fixtures
@@ -162,7 +154,8 @@ An empty text value is distinct from NULL under every collation: its framed comp
 | `'ab'` CHAR utf8mb4_0900_ai_ci component          | `011c471c600000`                                       |
 | `'a'` CHAR(3) utf8mb4_general_ci component        | `0100ff410000`                                         |
 | `'a'` CHAR utf8mb4_0900_as_cs component           | `011c4700ff00ff00ff2000ff00ff00ff020000`               |
-| TX_ID 42 suffix                                   | `000000000000002a`                                     |
-| Unique unsigned key 5, TX_ID 42                   | `010000000000000005000000000000002a`                   |
-| Nonunique unsigned key 5, unsigned PK 7, TX_ID 42 | `010000000000000005010000000000000007000000000000002a` |
-| Unique NULL key, unsigned PK 7, TX_ID 42          | `00010000000000000007000000000000002a`                 |
+| TX_ID 42, change ordinal 1 suffix                 | `000000000000002a00000001`                             |
+| Unique unsigned key 5, TX_ID 42, ordinal 0        | `010000000000000005000000000000002a00000000`           |
+| Nonunique unsigned key 5, TX_ID 42, ordinal 0     | `010000000000000005000000000000002a00000000`           |
+| Same nonunique key, second row, ordinal 1, TX_ID 42 | `010000000000000005000000000000002a00000001`         |
+| Unique NULL key, TX_ID 42, ordinal 0              | `00000000000000002a00000000`                           |
