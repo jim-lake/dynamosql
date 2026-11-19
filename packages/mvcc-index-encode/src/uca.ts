@@ -15,7 +15,6 @@ const PAGE_SIZE = 1 << PAGE_BITS;
 const MAX_CODE_POINT = 0x10ffff;
 const PAGE_COUNT = (MAX_CODE_POINT >>> PAGE_BITS) + 1;
 export const MAX_AS_CS_LEVEL_WEIGHT = 255;
-export const MAX_UCA_WEIGHT = 255;
 export const AS_CS_LEVEL_DEFAULTS = [0x0020, 0x0002] as const;
 const EMPTY = new Uint8Array(0);
 
@@ -300,6 +299,34 @@ export function ucaWeight(codePoint: number): Uint8Array {
   }
   const start = index.offset[slot] ?? 0;
   return index.weights.subarray(start, start + len);
+}
+
+export const MAX_UCA_COMPACT_WEIGHT = 12;
+const compactScratch = new Uint8Array(32);
+
+export function ucaWriteCompactL1(
+  codePoint: number,
+  dst: Uint8Array,
+  at: number
+): number {
+  const len = asCsWriteLevel(codePoint, 1, compactScratch, 0);
+  const codes = asCsLevel1Codes();
+  let n = at;
+  for (let j = 0; j < len; j += 2) {
+    const unit = ((compactScratch[j] ?? 0) << 8) | (compactScratch[j + 1] ?? 0);
+    const size = codes.length[unit] ?? 0;
+    if (size === 0) {
+      throw new RangeError(`Level 1 weight ${unit.toString(16)} has no code`);
+    }
+    const code = codes.value[unit] ?? 0;
+    if (size === 1) {
+      dst[n++] = code;
+    } else {
+      dst[n++] = code >>> 8;
+      dst[n++] = code & 0xff;
+    }
+  }
+  return n - at;
 }
 
 export function ucaWriteWeight(

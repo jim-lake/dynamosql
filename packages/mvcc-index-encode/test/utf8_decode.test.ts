@@ -1,8 +1,13 @@
 import { describe, it } from 'mocha';
 import { expect } from 'chai';
 import { bytesToHex } from '../src/bytes';
-import { ucaWeight } from '../src/uca';
+import { ucaWriteCompactL1 } from '../src/uca';
 import { weightString } from '../src/weight_string';
+
+function compactL1(cp: number): Uint8Array {
+  const dst = new Uint8Array(16);
+  return dst.slice(0, ucaWriteCompactL1(cp, dst, 0));
+}
 
 const UCA = 'utf8mb4_0900_ai_ci';
 
@@ -56,7 +61,7 @@ describe('weightString UTF-8 decoding edge cases', () => {
   for (const [name, bytes, cp] of valid) {
     it(`decodes ${name} to one character`, () => {
       const got = weightString(Uint8Array.from(bytes), UCA);
-      expect(bytesToHex(got)).to.equal(bytesToHex(ucaWeight(cp)));
+      expect(bytesToHex(got)).to.equal(bytesToHex(compactL1(cp)));
     });
   }
 
@@ -65,7 +70,7 @@ describe('weightString UTF-8 decoding edge cases', () => {
     const a = weightString(new TextEncoder().encode('a'), UCA);
     const got = weightString(new Uint8Array([...bom, 0x61]), UCA);
     expect(bytesToHex(got)).to.equal(
-      bytesToHex(new Uint8Array([...ucaWeight(0xfeff), ...a]))
+      bytesToHex(new Uint8Array([...compactL1(0xfeff), ...a]))
     );
   });
 
@@ -107,6 +112,6 @@ describe('weightString buffer reuse', () => {
     const value = new TextEncoder().encode('ab'.repeat(200));
     const first = bytesToHex(weightString(value, UCA));
     expect(bytesToHex(weightString(value, UCA))).to.equal(first);
-    expect(first.slice(0, 8)).to.equal('1C471C60');
+    expect(first.slice(0, 8)).to.equal('23072314');
   });
 });

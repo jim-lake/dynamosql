@@ -6,7 +6,6 @@ import { COLLATION_NAMES, type CollationName } from '../src/collations';
 import { encodeVariable } from '../src/tuple';
 import { weightFramed, weightString } from '../src/weight_string';
 import { expectSameOrder, type OrderItem } from './order';
-import { ucaWeight } from '../src/uca';
 
 interface StringRow {
   collation: CollationName;
@@ -102,12 +101,6 @@ describe('encoding order against the MySQL 8.4 oracle', () => {
         );
       }
     });
-
-    it('ucaWeight matches MySQL for sampled code points', () => {
-      expect(bytesToHex(ucaWeight(0x61))).to.equal('1C47');
-      expect(bytesToHex(ucaWeight(0xe9))).to.equal('1CAA');
-      expect(bytesToHex(ucaWeight(0x10ffff))).to.equal('FBE1FFFF');
-    });
   });
 
   for (const name of ASCII_ONLY_COLLATIONS) {
@@ -193,12 +186,12 @@ describe('framed components', () => {
   const frame = (name: CollationName, value: string, bound: number): string =>
     bytesToHex(weightFramed(new TextEncoder().encode(value), name, bound));
 
-  it("'a' utf8mb4_0900_ai_ci is 1c4701", () => {
-    expect(frame('utf8mb4_0900_ai_ci', 'a', 1)).to.equal('1C4701');
+  it("'a' utf8mb4_0900_ai_ci is 230701", () => {
+    expect(frame('utf8mb4_0900_ai_ci', 'a', 1)).to.equal('230701');
   });
 
-  it("'ab' utf8mb4_0900_ai_ci is 1c471c6001", () => {
-    expect(frame('utf8mb4_0900_ai_ci', 'ab', 2)).to.equal('1C471C6001');
+  it("'ab' utf8mb4_0900_ai_ci is 2307231401", () => {
+    expect(frame('utf8mb4_0900_ai_ci', 'ab', 2)).to.equal('2307231401');
   });
 
   it('empty utf8mb4_0900_ai_ci is 01, not empty and not NULL', () => {
@@ -208,7 +201,7 @@ describe('framed components', () => {
   it("'a' plus combining acute shares 'a' bytes under utf8mb4_0900_ai_ci", () => {
     const withAccent = frame('utf8mb4_0900_ai_ci', 'á', 2);
     expect(withAccent).to.equal(frame('utf8mb4_0900_ai_ci', 'a', 1));
-    expect(withAccent).to.equal('1C4701');
+    expect(withAccent).to.equal('230701');
   });
 
   it('empty ascii_general_ci CHAR(3) frames as the packed padding', () => {

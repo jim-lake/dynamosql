@@ -25,7 +25,7 @@ compare equal encode to identical bytes. Encodings cannot be decoded.
 | `ascii_bin`, `ascii_general_ci`            | packed rank integer      | fixed width `w`, see ASCII                  |
 
 - The `as_cs` key ends with the level 3 end byte `02`. The `as_ci` key ends with its level 2 end token. Every L1 code starts with a byte `>= 02`, and the `01` separator follows L1, so no key is a proper prefix of another.
-- `ai_ci` keys can be prefixes of each other, so `01` ends them. Every unit starts with a byte `>= 02`.
+- `ai_ci` keys can be prefixes of each other, so `01` ends them. Every L1 code starts with a byte `>= 02`.
 - `bin` escapes `00`, `01` and `02` as `02 x`, so the terminator `01` never appears in the payload.
 - The ASCII frame has a fixed width for a column, and its first byte is never `00`.
 
@@ -38,7 +38,7 @@ The empty string frames as `01` for `ai_ci`, `01` for `bin`, `01 02 02` for `as_
 | `ascii_bin`          | PAD SPACE | `weightString`: 1 weight byte per character, padded. `weightFramed`: packed rank integer                              |
 | `ascii_general_ci`   | PAD SPACE | `weightString`: 1 weight byte per character (letters fold to upper case), padded. `weightFramed`: packed rank integer |
 | `utf8mb4_0900_bin`   | NO PAD    | input bytes, not copied                                                                                               |
-| `utf8mb4_0900_ai_ci` | NO PAD    | level 1 weights, 2 bytes each                                                                                         |
+| `utf8mb4_0900_ai_ci` | NO PAD    | compact level 1 codes (same codes as `as_ci`/`as_cs` L1)                                                              |
 | `utf8mb4_0900_as_ci` | NO PAD    | compact 2-level key                                                                                                   |
 | `utf8mb4_0900_as_cs` | NO PAD    | compact 3-level key                                                                                                   |
 
@@ -83,12 +83,12 @@ modify the result. `maxChars` is ignored.
 
 ### `utf8mb4_0900_ai_ci`
 
-Invalid UTF-8 throws. Each code point contributes its level 1 weight from the
-UCA table: one or more 2-byte units, none for ignorable code points, 4 bytes
-for implicit Han. The key is the concatenation of those weights.
+Invalid UTF-8 throws. Each code point contributes its level 1 weight as the compact L1 code
+(the same codes as `as_ci` and `as_cs`, described below). Ignorable code points
+contribute nothing. The key is the concatenation of those codes.
 
 ```
-'a'  ->  1C 47
+'a'  ->  23 07
 ```
 
 ### `utf8mb4_0900_as_ci` and `utf8mb4_0900_as_cs`
@@ -172,7 +172,7 @@ Examples:
 | `á`   | `23 07 01 FC 04 02 02` | `23 07 01 FC 04 02` |
 | `ab`  | `23 07 23 14 01 04 02` | `23 07 23 14 01 04` |
 
-`ai_ci` for `a` is `1C 47`. The `as_cs` L1 code for `a` is `23 07`.
+`ai_ci` for `a` is `23 07` plus the `01` end, framed as `23 07 01`. The `as_cs` L1 code for `a` is also `23 07`.
 
 ## Size and worst case
 
@@ -182,7 +182,7 @@ Per collation, `n` is the number of characters, and the length is the framed key
 | -------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
 | `ascii_*`            | `w` bytes, the smallest `w` with `K^maxChars <= 255 × 256^(w-1)`: 224 at 255 for `ascii_bin`, 213 for `ascii_general_ci`                                  | Fixed width, matching the packing bound. `maxChars` is required.                                                                             |
 | `utf8mb4_0900_bin`   | `<= 4n + 1` bytes                                                                                                                                         | Proven. A 4-byte character is never escaped. Each input byte `00`..`02` (ASCII only) costs 2 bytes, so no character costs more than 4 bytes. |
-| `utf8mb4_0900_ai_ci` | `<= 16n + 1` bytes                                                                                                                                        | Proven from the table. The largest character (U+337F) has 8 units, each 2 bytes.                                                             |
+| `utf8mb4_0900_ai_ci` | `<= 12n + 1` bytes                                                                                                                                        | Proven from the compact L1 table. The largest per-character cost is 12 bytes (U+3316 and U+337F, and others). Plus 1 for the `01` end.       |
 | `utf8mb4_0900_as_ci` | Measured: 12.07 bytes per character (U+3316 repeated 41 times, 495 bytes). No bound in tests.                                                             | Measured, not proven.                                                                                                                        |
 | `utf8mb4_0900_as_cs` | Bound enforced by tests: `24n + 3 + 4 * floor(8n / 122) + 4 * floor(8n / 218)`. Measured: 18.1 bytes per character (U+3316 repeated 41 times, 742 bytes). | Checked on per-character maxima, repeated worst-case characters, and 500 seeded mixed samples. Not a proof over arbitrary concatenation.     |
 

@@ -3,9 +3,9 @@ import { hexToBytes } from './bytes';
 import {
   AS_CS_LEVEL_DEFAULTS,
   MAX_AS_CS_LEVEL_WEIGHT,
-  MAX_UCA_WEIGHT,
+  MAX_UCA_COMPACT_WEIGHT,
   asCsWriteLevel,
-  ucaWriteWeight,
+  ucaWriteCompactL1,
 } from './uca';
 
 export const COLLATION_NAMES = [
@@ -104,8 +104,8 @@ function buildInfo(name: CollationName): CollationInfo {
     return {
       ...meta,
       kind: 'table',
-      maxWeight: MAX_UCA_WEIGHT,
-      writeWeight: ucaWriteWeight,
+      maxWeight: MAX_UCA_COMPACT_WEIGHT,
+      writeWeight: ucaWriteCompactL1,
     };
   }
   if (name === 'utf8mb4_0900_as_cs' || name === 'utf8mb4_0900_as_ci') {
