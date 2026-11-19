@@ -164,6 +164,8 @@ A behavior is supported only when one of these three docs states it as supported
 
 - `docs/PARSER_TODO.md` holds only parser-grammar mismatches: real MySQL 8.4 syntax that node-sql-parser's MySQL grammar rejects or misparses. Add one concise line per mismatch. Do not put parser issues in `docs/MYSQL_GAPS.md`.
 - `docs/MYSQL_GAPS.md` holds behavior gaps. A gap is a query that DynamoSQL rejects or returns differently from MySQL 8.4, when the behavior is supported under [Supported Behavior](#supported-behavior). Record the query, the MySQL result, and the DynamoSQL result.
+- BEFORE adding a MYSQL_GAPS entry, READ `../../QUERY_ERATA.md` and check that the difference is not already listed there. Errata entries are deliberate design decisions or unfixable differences (non-deterministic column choice, AVG precision, lock placement, UPPER/LOWER special-character mapping). Do not add a gap for a difference the errata covers. If the errata seems to cover it only partly, ask the user before adding the gap.
+- JavaScript and MySQL disagree on many Unicode edge cases: case mapping, multi-character expansion (`ß` vs `ss`), `localeCompare` ordering, and accent handling. Do NOT spend time chasing these. Before testing a Unicode or collation edge case, check `../../QUERY_ERATA.md`. If the case is already listed there, do not test it again. Move on to common, realistic cases. Do not write tests for these exotic edge cases.
 - Anything not supported under [Supported Behavior](#supported-behavior) is UNIMPLEMENTED or out of scope, not a gap. Do not record it in `docs/MYSQL_GAPS.md`.
 - `docs/TEST_GAPS.md` holds supported statements that match MySQL 8.4 but have no test. When you find one, add it there instead of leaving it untested.
 

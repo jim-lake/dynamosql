@@ -26,12 +26,41 @@ DynamoSQL keeps the double from the calculation and never converts it to a strin
 - `SELECT a FROM t WHERE GET_LOCK('x', 0) = 1;`: MySQL runs the query. DynamoSQL returns `ER_FEATURE_UNSUPPORTED`.
 - `SELECT id FROM t ORDER BY GET_LOCK('x', 0), id;`: MySQL runs the query. DynamoSQL returns `ER_FEATURE_UNSUPPORTED` once the sort compares rows.
 
-## Case mapping of special characters
+## Case mapping and multi-character expansions
 
-Known gap and design limitation. It will not be fixed.
+`UPPER()` and `LOWER()` are a known design limitation and will not be fixed.
 
-`UPPER()` and `LOWER()` use JavaScript's full Unicode case mapping. MySQL's utf8mb4 case mapping is one character to one character. The full mapping expands some characters into several, so the results differ:
+MySQL maps case one character to one character. JavaScript's `toUpperCase()` and `toLowerCase()` use full Unicode mappings, which can expand one character into several.
 
 - `SELECT UPPER("ß") AS u, LOWER("İ") AS w;`: MySQL returns `'ß'` and `'i'`. DynamoSQL returns `'SS'` and `'i̇'` (two code points).
+
+The entries below are not yet decided. They are listed here so tests do not pin DynamoSQL output as correct until the decision is made. A decision goes in `docs/MYSQL_GAPS.md` only if the behavior is supported and the team decides to fix it.
+
+### Collation-based comparison with multi-character weights (undecided)
+
+Under `utf8mb4_0900_ai_ci`, MySQL gives `ß` the same weight as `ss`. DynamoSQL compares one code point at a time, so it does not expand `ß`, and it compares strings with `localeCompare` in `stringCompare`, which has different results.
+
+- `SELECT POSITION('ss' IN 'ß' COLLATE utf8mb4_0900_ai_ci) AS r;` (also `LOCATE('ss', 'ß' COLLATE ...)` and `INSTR('ß' COLLATE ..., 'ss')`): MySQL returns `1`. DynamoSQL returns `0`.
+- `SELECT 'ß' COLLATE utf8mb4_0900_ai_ci = 'ss' AS r;`: MySQL and DynamoSQL both return `1`. This is listed because the `=` operator agrees, unlike the search functions above.
+- `SELECT STRCMP('ß' COLLATE utf8mb4_0900_ai_ci, 'ss') AS r;`: MySQL returns `0`. DynamoSQL returns `1`.
+- `SELECT FIELD('ß' COLLATE utf8mb4_0900_ai_ci, 'ss') AS r;`: MySQL returns `1`. DynamoSQL returns `0`.
+- `SELECT FIELD('ss', 'ß' COLLATE utf8mb4_0900_ai_ci) AS r;`: MySQL and DynamoSQL both return `0`.
+
+### Accent folding in comparison (agrees with MySQL)
+
+These results match. They are listed so the same check is not repeated.
+
+- `SELECT 'é' COLLATE utf8mb4_0900_ai_ci = 'e' AS r;`: both return `1`.
+- `SELECT 'ﬁ' COLLATE utf8mb4_0900_ai_ci = 'fi' AS r;`: both return `1`.
+- `SELECT POSITION('é' IN 'E' COLLATE utf8mb4_0900_ai_ci) AS r;`: both return `0`.
+
+### SOUNDEX on non-ASCII letters (undecided)
+
+MySQL keeps the first character when it is not an ASCII letter. DynamoSQL converts it to the ASCII letter.
+
+- `SELECT SOUNDEX('ß') AS r;`: MySQL returns `'ß000'`. DynamoSQL returns `'S000'`.
+- `SELECT SOUNDEX('ǅ') AS r;`: MySQL returns `'ǅ000'`. DynamoSQL returns `'Ǆ000'`.
+
+Whether `SOUNDEX` is a supported function must be checked in `FUNCTIONS.md` before any gap is recorded.
 
 Tests must not pin the DynamoSQL output for these characters as correct.

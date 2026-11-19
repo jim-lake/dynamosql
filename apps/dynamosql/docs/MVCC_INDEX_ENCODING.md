@@ -42,10 +42,10 @@ After coalescing, assign a distinct unsigned 32-bit ordinal to each physical ent
 
 DynamoDB bounds key sizes, and keys are never truncated or hashed to fit, so the limits are enforced at definition time.
 
-| Key                                                               | Limit (bytes) | Measured length                                                       |
-| ----------------------------------------------------------------- | ------------- | --------------------------------------------------------------------- |
-| Primary partition key (`DB_ROW_KEY` or a direct-use column value) | 2048          | The complete encoded attribute value                                  |
-| Secondary sort key (`INDEX_TX_ID`)                                | 1024          | The framed index tuple I plus the 12-byte suffix                      |
+| Key                                                               | Limit (bytes) | Measured length                                  |
+| ----------------------------------------------------------------- | ------------- | ------------------------------------------------ |
+| Primary partition key (`DB_ROW_KEY` or a direct-use column value) | 2048          | The complete encoded attribute value             |
+| Secondary sort key (`INDEX_TX_ID`)                                | 1024          | The framed index tuple I plus the 12-byte suffix |
 
 - A definition is rejected if the maximum encoded length of any key it produces can exceed its limit. The check runs on `CREATE TABLE`, `CREATE INDEX`, and `ALTER TABLE` statements that add or change an index, a primary key, or a column used by one. Rejection is a definition error, not a write-time error.
 - The maximum length is computed from the column definitions alone, never from current values. It sums the worst-case size of every component: the 1-byte marker, the fixed value width, and for variable-width components the worst-case escaped payload plus the 2-byte terminator. Escaping counts each `00` byte as two bytes. Character components use the worst-case weight output for the column's bound under its collation, at natural length after key normalization. A permitted value can occupy the full column bound without ending in a space. Binary components use the column's maximum byte length with every byte `00`.
@@ -130,32 +130,32 @@ An empty text value is distinct from NULL under every collation: its framed comp
 
 ## Byte fixtures
 
-| Input                                             | Hex                                                    |
-| ------------------------------------------------- | ------------------------------------------------------ |
-| NULL component                                    | `00`                                                   |
-| Empty binary component                            | `010000`                                               |
-| Binary `00 ff` component                          | `0100ffff0000`                                         |
-| Binary `61` component                             | `01610000`                                             |
-| Binary `61 00` component                          | `016100ff0000`                                         |
-| Signed BIGINT -1 component                        | `017fffffffffffffff`                                   |
-| Signed BIGINT 0 component                         | `018000000000000000`                                   |
-| Signed BIGINT 1 component                         | `018000000000000001`                                   |
-| Unsigned BIGINT 1 component                       | `010000000000000001`                                   |
-| DECIMAL(4,2) -1.00 component                      | `0126ab`                                               |
-| DECIMAL(4,2) 0.00 component                       | `01270f`                                               |
-| DECIMAL(4,2) 1.00 component                       | `012773`                                               |
-| DOUBLE -1 component                               | `01400fffffffffffff`                                   |
-| DOUBLE 0 component                                | `018000000000000000`                                   |
-| DOUBLE 1 component                                | `01bff0000000000000`                                   |
-| FLOAT -1 component                                | `01407fffff`                                           |
-| FLOAT 0 component                                 | `0180000000`                                           |
-| FLOAT 1 component                                 | `01bf800000`                                           |
-| `'a'` CHAR utf8mb4_0900_ai_ci component           | `011c470000`                                           |
-| `'ab'` CHAR utf8mb4_0900_ai_ci component          | `011c471c600000`                                       |
-| `'a'` CHAR(3) utf8mb4_general_ci component        | `0100ff410000`                                         |
-| `'a'` CHAR utf8mb4_0900_as_cs component           | `011c4700ff00ff00ff2000ff00ff00ff020000`               |
-| TX_ID 42, change ordinal 1 suffix                 | `000000000000002a00000001`                             |
-| Unique unsigned key 5, TX_ID 42, ordinal 0        | `010000000000000005000000000000002a00000000`           |
-| Nonunique unsigned key 5, TX_ID 42, ordinal 0     | `010000000000000005000000000000002a00000000`           |
-| Same nonunique key, second row, ordinal 1, TX_ID 42 | `010000000000000005000000000000002a00000001`         |
-| Unique NULL key, TX_ID 42, ordinal 0              | `00000000000000002a00000000`                           |
+| Input                                               | Hex                                          |
+| --------------------------------------------------- | -------------------------------------------- |
+| NULL component                                      | `00`                                         |
+| Empty binary component                              | `010000`                                     |
+| Binary `00 ff` component                            | `0100ffff0000`                               |
+| Binary `61` component                               | `01610000`                                   |
+| Binary `61 00` component                            | `016100ff0000`                               |
+| Signed BIGINT -1 component                          | `017fffffffffffffff`                         |
+| Signed BIGINT 0 component                           | `018000000000000000`                         |
+| Signed BIGINT 1 component                           | `018000000000000001`                         |
+| Unsigned BIGINT 1 component                         | `010000000000000001`                         |
+| DECIMAL(4,2) -1.00 component                        | `0126ab`                                     |
+| DECIMAL(4,2) 0.00 component                         | `01270f`                                     |
+| DECIMAL(4,2) 1.00 component                         | `012773`                                     |
+| DOUBLE -1 component                                 | `01400fffffffffffff`                         |
+| DOUBLE 0 component                                  | `018000000000000000`                         |
+| DOUBLE 1 component                                  | `01bff0000000000000`                         |
+| FLOAT -1 component                                  | `01407fffff`                                 |
+| FLOAT 0 component                                   | `0180000000`                                 |
+| FLOAT 1 component                                   | `01bf800000`                                 |
+| `'a'` CHAR utf8mb4_0900_ai_ci component             | `011c470000`                                 |
+| `'ab'` CHAR utf8mb4_0900_ai_ci component            | `011c471c600000`                             |
+| `'a'` CHAR(3) utf8mb4_general_ci component          | `0100ff410000`                               |
+| `'a'` CHAR utf8mb4_0900_as_cs component             | `011c4700ff00ff00ff2000ff00ff00ff020000`     |
+| TX_ID 42, change ordinal 1 suffix                   | `000000000000002a00000001`                   |
+| Unique unsigned key 5, TX_ID 42, ordinal 0          | `010000000000000005000000000000002a00000000` |
+| Nonunique unsigned key 5, TX_ID 42, ordinal 0       | `010000000000000005000000000000002a00000000` |
+| Same nonunique key, second row, ordinal 1, TX_ID 42 | `010000000000000005000000000000002a00000001` |
+| Unique NULL key, TX_ID 42, ordinal 0                | `00000000000000002a00000000`                 |

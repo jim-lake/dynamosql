@@ -525,6 +525,9 @@ describe('Expression', function () {
     path.join(__dirname, 'collation_function.sql'),
     { verify_field_types: true }
   );
+  runTests('position.sql', path.join(__dirname, 'position.sql'), {
+    verify_field_types: true,
+  });
   runTests('collation_error.sql', path.join(__dirname, 'collation_error.sql'), {
     allowedErrors: 'SAME_CODE',
     verify_field_types: true,

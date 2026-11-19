@@ -1,6 +1,8 @@
 import { assertArgCount, assertArgCountParse } from '../helpers/arg_count';
+import { isCaseInsensitive } from '../helpers/collation';
 import { convertNum, convertString } from '../helpers/sql_conversion';
 
+import { getExprCollation } from './collation';
 import { getValue } from './evaluate';
 
 import type { EvaluationState, EvaluationResult } from './evaluate';
@@ -435,6 +437,25 @@ export function rpad(expr: Function, state: EvaluationState): EvaluationResult {
     type: 'string',
   };
 }
+function foldChar(ch: string, caseInsensitive: boolean): string {
+  const folded = ch.toUpperCase();
+  return caseInsensitive && Array.from(folded).length === 1 ? folded : ch;
+}
+function findCodePoints(
+  haystack: string,
+  needle: string,
+  start: number,
+  caseInsensitive: boolean
+): number {
+  const hay = Array.from(haystack, (ch) => foldChar(ch, caseInsensitive));
+  const target = Array.from(needle, (ch) => foldChar(ch, caseInsensitive));
+  for (let i = start - 1; i + target.length <= hay.length; i++) {
+    if (target.every((ch, j) => ch === hay[i + j])) {
+      return i + 1;
+    }
+  }
+  return 0;
+}
 export function locate(
   expr: Function,
   state: EvaluationState
@@ -459,16 +480,19 @@ export function locate(
       decimals: str_result.decimals,
       timeZone: state.session.timeZone,
     }) ?? '';
-  const pos =
-    pos_result.value !== undefined && pos_result.value !== null
-      ? (convertNum(pos_result.value) ?? 1)
-      : 1;
+  const pos = pos_result.value === undefined ? 1 : convertNum(pos_result.value);
+  if (pos === null) {
+    return { err: null, value: null, type: 'longlong' };
+  }
   const posInt = Math.round(pos);
   if (posInt < 1) {
     return { err: null, value: 0, type: 'longlong' };
   }
-  const index = str.indexOf(substr, posInt - 1);
-  return { err: null, value: index === -1 ? 0 : index + 1, type: 'longlong' };
+  const caseInsensitive = isCaseInsensitive(
+    getExprCollation(expr.args.value[1], state)
+  );
+  const index = findCodePoints(str, substr, posInt, caseInsensitive);
+  return { err: null, value: index, type: 'longlong' };
 }
 export function instr(
   expr: Function,
@@ -483,8 +507,11 @@ export function instr(
   }
   const str = String(str_result.value);
   const substr = String(substr_result.value);
-  const index = str.indexOf(substr);
-  return { err: null, value: index === -1 ? 0 : index + 1, type: 'longlong' };
+  const caseInsensitive = isCaseInsensitive(
+    getExprCollation(expr.args.value[0], state)
+  );
+  const index = findCodePoints(str, substr, 1, caseInsensitive);
+  return { err: null, value: index, type: 'longlong' };
 }
 export function strcmp(
   expr: Function,
