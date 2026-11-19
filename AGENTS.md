@@ -62,3 +62,8 @@ Run package-specific commands from inside the package directory, as described in
 
 - The project uses npm workspaces (requires npm 7+).
 - The server package uses a custom fork of mysql2 from GitHub.
+
+## Git Safety
+
+- Never run `git checkout` or `git reset` to discard changes. To set work aside, use `git stash push` only.
+- Never pop, drop, clear, or otherwise clean up stashes. Leave every stash in place indefinitely.

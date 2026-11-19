@@ -4,7 +4,7 @@ import { COLLATIONS } from '../../constants/mysql';
 import { assertArgCount } from '../helpers/arg_count';
 import { convertNum } from '../helpers/sql_conversion';
 
-import { getExprCollation } from './collation';
+import { getExprCoercibility, getExprCollation } from './collation';
 import { getValue } from './evaluate';
 
 import type { EvaluationState, EvaluationResult } from './evaluate';
@@ -87,6 +87,15 @@ export function collation(
       ? 'binary'
       : (COLLATION_NAMES[coll] ?? COLLATIONS[coll].toLowerCase());
   return { err: null, value, type: 'string' };
+}
+
+export function coercibility(
+  expr: Function,
+  state: EvaluationState
+): EvaluationResult {
+  assertArgCount(expr, 1);
+  const value = getExprCoercibility(expr.args.value[0], state);
+  return { err: null, value, type: 'longlong' };
 }
 
 export function bit_length(

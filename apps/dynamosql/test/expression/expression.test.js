@@ -525,6 +525,11 @@ describe('Expression', function () {
     path.join(__dirname, 'collation_function.sql'),
     { verify_field_types: true }
   );
+  runTests(
+    'coercibility_function.sql',
+    path.join(__dirname, 'coercibility_function.sql'),
+    { verify_field_types: true }
+  );
   runTests('position.sql', path.join(__dirname, 'position.sql'), {
     verify_field_types: true,
   });

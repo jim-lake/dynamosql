@@ -5,6 +5,9 @@ export default tseslint.config(
   { ignores: ['dist/**', 'node_modules/**', 'scripts/**'] },
   eslint.configs.recommended,
   {
+    rules: { 'no-control-regex': 0 },
+  },
+  {
     files: ['**/*.ts'],
     extends: [
       ...tseslint.configs.recommended,

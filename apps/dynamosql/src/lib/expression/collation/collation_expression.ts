@@ -9,6 +9,22 @@ import { COERCIBILITY } from './types';
 import type { EvaluationState } from '../evaluate';
 import type { ExprArgument, ExprResult } from './types';
 
+interface Operand {
+  result: ExprResult;
+  ascii: boolean;
+}
+
+const ASCII_FUNCTIONS = new Set([
+  'uuid',
+  'version',
+  'charset',
+  'collation',
+  'hex',
+  'md5',
+  'sha1',
+  'sha2',
+]);
+
 export function getExprCollation(
   expr: ExprArgument | ExprArgument[],
   state: EvaluationState
@@ -35,39 +51,74 @@ export function _getExprCollation(
     if (expr.length === 0) {
       return [null, COERCIBILITY.IGNORABLE];
     }
-    const results = expr
-      .map((e) => _getExprCollation(e, state, strict))
-      .sort(_sortCollate);
-    let current: ExprResult | undefined = undefined;
-    for (const result of results) {
+    const operands: Operand[] = expr
+      .map((e) => ({
+        result: _getExprCollation(e, state, strict),
+        ascii:
+          !!e &&
+          'type' in e &&
+          (e.type === 'number' ||
+            ((e.type === 'single_quote_string' ||
+              e.type === 'double_quote_string') &&
+              /^[\x00-\x7f]*$/.test(String(e.value))) ||
+            (e.type === 'function' &&
+              ASCII_FUNCTIONS.has(getFunctionName(e.name).toLowerCase()))),
+      }))
+      .sort((a, b) => a.result[1] - b.result[1]);
+    let current: Operand | undefined = undefined;
+    for (const next of operands) {
       if (current === undefined) {
-        current = result;
-      } else {
-        if (current[1] === result[1]) {
-          if (current[0] !== result[0]) {
-            const implicit = current[1] !== COERCIBILITY.EXPLICIT;
-            if (strict || !implicit) {
-              throw new SQLError({
-                err: 'ER_CANT_AGGREGATE_2COLLATIONS',
-                args: [current[0], result[0]],
-              });
-            }
-            const mixed: COLLATIONS =
-              current[0] === COLLATIONS.UTF8MB4_0900_BIN ||
-              result[0] === COLLATIONS.UTF8MB4_0900_BIN
-                ? COLLATIONS.UTF8MB4_0900_BIN
-                : COLLATIONS.UTF8MB4_BIN;
-            current = [mixed, COERCIBILITY.EXPLICIT];
-          }
-        } else {
-          break;
+        current = next;
+        continue;
+      }
+      if (current.result[1] !== next.result[1]) {
+        break;
+      }
+      if (current.result[0] === next.result[0]) {
+        current = {
+          result: current.result,
+          ascii: current.ascii && next.ascii,
+        };
+        continue;
+      }
+      if (current.result[1] === COERCIBILITY.EXPLICIT) {
+        throw new SQLError({
+          err: 'ER_CANT_AGGREGATE_2COLLATIONS',
+          args: [current.result[0], next.result[0]],
+        });
+      }
+      if (current.ascii !== next.ascii) {
+        current = current.ascii ? next : current;
+        continue;
+      }
+      if (current.ascii && next.ascii) {
+        const utf8mb4: Operand | undefined = [current, next].find(
+          (op) =>
+            op.result[0] !== null &&
+            COLLATIONS[op.result[0]].startsWith('UTF8MB4')
+        );
+        if (utf8mb4) {
+          current = utf8mb4;
+          continue;
         }
       }
+      if (strict) {
+        throw new SQLError({
+          err: 'ER_CANT_AGGREGATE_2COLLATIONS',
+          args: [current.result[0], next.result[0]],
+        });
+      }
+      const mixed: COLLATIONS =
+        current.result[0] === COLLATIONS.UTF8MB4_0900_BIN ||
+        next.result[0] === COLLATIONS.UTF8MB4_0900_BIN
+          ? COLLATIONS.UTF8MB4_0900_BIN
+          : COLLATIONS.UTF8MB4_BIN;
+      current = { result: [mixed, COERCIBILITY.EXPLICIT], ascii: false };
     }
     if (current === undefined) {
       return [null, COERCIBILITY.IGNORABLE];
     }
-    return current;
+    return current.result;
   }
 
   if ('collate' in expr && expr.collate) {
@@ -150,19 +201,10 @@ export function _getExprCollation(
       }
       return [state.session.collationConnection, COERCIBILITY.STRING];
     }
+    case 'number':
     case 'unary_expr':
       return [COLLATIONS.BINARY, COERCIBILITY.NUMERIC];
     default:
       return [null, COERCIBILITY.IGNORABLE];
-  }
-}
-
-function _sortCollate(a: ExprResult, b: ExprResult) {
-  if (a[1] === b[1]) {
-    return 0;
-  } else if (a[1] < b[1]) {
-    return -1;
-  } else {
-    return 1;
   }
 }

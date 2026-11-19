@@ -29,6 +29,7 @@ export default tseslint.config(
     plugins: { local: localPlugin, 'import-x': importPlugin },
     rules: {
       'no-console': 'error',
+      'no-control-regex': 0,
       'local/no-bare-node-sql-parser': 'error',
       'func-style': ['error', 'declaration'],
       'local/local-snake-case': [
