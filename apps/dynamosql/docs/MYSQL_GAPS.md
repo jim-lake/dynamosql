@@ -18,16 +18,6 @@ Matching MySQL is not a goal for illegal statements. Parse errors (`ER_PARSE_ERR
 
 - `SELECT IS_USED_LOCK('x');` while another session holds `x`: MySQL returns that session's connection id. DynamoSQL returns the holder's session thread id, which can differ from the MySQL connection id.
 
-## Collation of GREATEST and LEAST results
-
-- `SELECT GREATEST("a", "a " COLLATE UTF8MB4_BIN) = "a" AS r;`: MySQL returns 1, because GREATEST's result takes the `utf8mb4_bin` collation of its arguments, so the outer `=` is PAD-equal. DynamoSQL returns 0, because a function call has no collation of its own in `_getExprCollation`, and the outer `=` uses the session default collation.
-
 ## DROP DATABASE IF EXISTS
 
 - `DROP DATABASE IF EXISTS missing_db;`, where `missing_db` does not exist: MySQL 8.4 returns success with a warning (1008). DynamoSQL returns `ER_BAD_DB_ERROR`. `drop_handler.ts` never reads `ast.prefix`, and `schema_manager.dropDatabase` throws `db_not_found` without a check for the flag.
-
-## Collation propagation through the expression engine
-
-Collation propagation through the expression engine is not supported. A function call has no collation of its own in `_getExprCollation`, so the collation of the input is lost.
-
-- `CREATE TEMPORARY TABLE dst_distinct.t (id INT PRIMARY KEY, s VARCHAR(20) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci); INSERT INTO dst_distinct.t VALUES (1, 'é'), (2, 'e'), (3, 'A'), (4, 'a'); SELECT DISTINCT LOWER(s) AS ls FROM dst_distinct.t ORDER BY ls;`: MySQL returns `'a'` and `'é'`, because `LOWER(s)` keeps the `ai_ci` collation and `'é'` equals `'e'`. DynamoSQL returns `'a'`, `'e'`, and `'é'`, because the DISTINCT key compares the lowered strings without the collation.

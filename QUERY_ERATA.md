@@ -25,3 +25,13 @@ DynamoSQL keeps the double from the calculation and never converts it to a strin
 
 - `SELECT a FROM t WHERE GET_LOCK('x', 0) = 1;`: MySQL runs the query. DynamoSQL returns `ER_FEATURE_UNSUPPORTED`.
 - `SELECT id FROM t ORDER BY GET_LOCK('x', 0), id;`: MySQL runs the query. DynamoSQL returns `ER_FEATURE_UNSUPPORTED` once the sort compares rows.
+
+## Case mapping of special characters
+
+Known gap and design limitation. It will not be fixed.
+
+`UPPER()` and `LOWER()` use JavaScript's full Unicode case mapping. MySQL's utf8mb4 case mapping is one character to one character. The full mapping expands some characters into several, so the results differ:
+
+- `SELECT UPPER("ß") AS u, LOWER("İ") AS w;`: MySQL returns `'ß'` and `'i'`. DynamoSQL returns `'SS'` and `'i̇'` (two code points).
+
+Tests must not pin the DynamoSQL output for these characters as correct.

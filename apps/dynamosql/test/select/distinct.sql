@@ -54,6 +54,7 @@ SELECT DISTINCT s FROM dst_distinct.dst_ai_ci WHERE id > 5 ORDER BY id;
 SELECT DISTINCT s, id FROM dst_distinct.dst_ai_ci ORDER BY id;
 SELECT DISTINCT s FROM dst_distinct.dst_ai_ci ORDER BY s DESC LIMIT 3;
 SELECT DISTINCT s FROM dst_distinct.dst_ai_ci WHERE s = 'a' ORDER BY s;
+SELECT DISTINCT LOWER(s) AS ls FROM dst_distinct.dst_ai_ci WHERE id <= 5 ORDER BY ls;
 
 
 DROP TEMPORARY TABLE IF EXISTS dst_distinct.dst_as_cs;
