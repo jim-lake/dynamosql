@@ -217,7 +217,7 @@ function buildLevel1Codes(idx: AsCsIndex): Level1Codes {
       }
     }
   }
-  const oneByte = new Set<number>([0xfb40, 0x3d6e]);
+  const oneByte = new Set<number>([0xfb40, 0x3d6e, 0xe82a, 0x1c0e]);
   for (const cp of LEVEL1_ONE_BYTE_CODE_POINTS) {
     const w = ucaWeight(cp);
     for (let k = 0; k < w.length; k += 2) {

@@ -104,10 +104,10 @@ as_ci:  L1 || 01 || level 2 tokens
 
 - **L1:** the level 1 weights of the code points in order. Each weight is a
   one-byte code or a two-byte code, not the raw 2-byte UCA unit:
-  - 24 weights have one-byte codes `03` to `F6`: `FB40` (implicit base for CJK
-    Unified Ideographs) and the level 1 weights of U+FDFA, U+FDFB, U+1F1A9,
-    U+321D and U+1F19C.
-  - Every other weight takes two bytes. The lead byte is in `02` to `FB` and
+  - 27 weights have one-byte codes `03` to `FA`: `FB40` (implicit base for CJK
+    Unified Ideographs), `3D6E`, `E82A`, `1C0E`, and the level 1 weights of
+    U+FDFA, U+FDFB, U+1F1A9, U+321D and U+1F19C.
+  - Every other weight takes two bytes. The lead byte is in `02` to `FF` and
     is shared by up to 256 weights. Lead bytes and one-byte codes come from one
     counter, so they never collide.
   - Every L1 code starts with a byte `>= 02`, so `01` sorts below any L1 continuation.
@@ -182,13 +182,13 @@ Examples:
 
 Per collation, `n` is the number of characters, and the length is the framed key.
 
-| Collation            | Worst case                                                                                                                                                | Basis                                                                                                                                    |
-| -------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
-| `ascii_*`            | `w` bytes, the smallest `w` with `K^maxChars <= 255 × 256^(w-1)`: 224 at 255 for `ascii_bin`, 213 for `ascii_general_ci`                                  | Fixed width, matching the packing bound. `maxChars` is required.                                                                         |
-| `utf8mb4_0900_bin`   | `<= 3n + 1` bytes                                                                                                                                         | Proven. Each scalar costs one to three bytes, plus 1 for the `01` end. Width 337 at 1,012 bytes.                                         |
-| `utf8mb4_0900_ai_ci` | `<= 12n + 1` bytes                                                                                                                                        | Proven from the compact L1 table. The largest per-character cost is 12 bytes (U+3316 and U+337F, and others). Plus 1 for the `01` end.   |
-| `utf8mb4_0900_as_ci` | Measured: 12.07 bytes per character (U+3316 repeated 41 times, 495 bytes). No bound in tests.                                                             | Measured, not proven.                                                                                                                    |
-| `utf8mb4_0900_as_cs` | Bound enforced by tests: `24n + 3 + 4 * floor(8n / 122) + 4 * floor(8n / 218)`. Measured: 18.1 bytes per character (U+3316 repeated 41 times, 742 bytes). | Checked on per-character maxima, repeated worst-case characters, and 500 seeded mixed samples. Not a proof over arbitrary concatenation. |
+| Collation            | Worst case                                                                                                                                                | Basis                                                                                                                                       |
+| -------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ascii_*`            | `w` bytes, the smallest `w` with `K^maxChars <= 255 × 256^(w-1)`: 224 at 255 for `ascii_bin`, 213 for `ascii_general_ci`                                  | Fixed width, matching the packing bound. `maxChars` is required.                                                                            |
+| `utf8mb4_0900_bin`   | `<= 3n + 1` bytes                                                                                                                                         | Proven. Each scalar costs one to three bytes, plus 1 for the `01` end. Width 337 at 1,012 bytes.                                            |
+| `utf8mb4_0900_ai_ci` | `<= 11n + 1` bytes                                                                                                                                        | Proven from the compact L1 table. The largest per-character cost is 11 bytes (U+337F). Plus 1 for the `01` end. Repeated U+337F attains it. |
+| `utf8mb4_0900_as_ci` | Measured: 12.07 bytes per character (U+3316 repeated 41 times, 495 bytes). No bound in tests.                                                             | Measured, not proven.                                                                                                                       |
+| `utf8mb4_0900_as_cs` | Bound enforced by tests: `24n + 3 + 4 * floor(8n / 122) + 4 * floor(8n / 218)`. Measured: 18.1 bytes per character (U+3316 repeated 41 times, 742 bytes). | Checked on per-character maxima, repeated worst-case characters, and 500 seeded mixed samples. Not a proof over arbitrary concatenation.    |
 
 The largest `n` whose `as_cs` bound fits the 1012-byte tuple budget is 41
 (bound 999).
