@@ -24,12 +24,12 @@ compare equal encode to identical bytes. Encodings cannot be decoded.
 | `utf8mb4_0900_bin`                         | `escape(bytes) \|\| 01`  | 1, plus 1 per input byte `00`, `01` or `02` |
 | `ascii_bin`, `ascii_general_ci`            | each weight byte plus 1  | 0                                           |
 
-- `as_cs` and `as_ci` keys end with their own end token and every L1 unit starts with a byte `>= 02`, so no key is a proper prefix of another.
+- The `as_cs` key ends with the level 3 end byte `02`. The `as_ci` key ends with its level 2 end token. Every L1 code starts with a byte `>= 02`, and the `01` separator follows L1, so no key is a proper prefix of another.
 - `ai_ci` keys can be prefixes of each other, so `01` ends them. Every unit starts with a byte `>= 02`.
 - `bin` escapes `00`, `01` and `02` as `02 x`, so the terminator `01` never appears in the payload.
 - The ASCII key is padded to `maxChars`, so its width is fixed for a column. Weights are 0 to 127, and adding 1 keeps them above `00`, so the key never starts with the NULL byte.
 
-The empty string frames as `01` for `ai_ci` and `bin`, `01 02 02 02 02` for `as_cs`, and `01 02 02` for `as_ci`.
+The empty string frames as `01` for `ai_ci`, `01` for `bin`, `01 02 02` for `as_cs`, and `01 02` for `as_ci`.
 
 ## Collations
 
@@ -38,7 +38,7 @@ The empty string frames as `01` for `ai_ci` and `bin`, `01 02 02 02 02` for `as_
 | `ascii_bin`          | PAD SPACE | 1 weight byte per character (the byte itself), padded            |
 | `ascii_general_ci`   | PAD SPACE | 1 weight byte per character (letters fold to upper case), padded |
 | `utf8mb4_0900_bin`   | NO PAD    | input bytes, not copied                                          |
-| `utf8mb4_0900_ai_ci` | NO PAD    | level 1 weights                                                  |
+| `utf8mb4_0900_ai_ci` | NO PAD    | level 1 weights, 2 bytes each                                    |
 | `utf8mb4_0900_as_ci` | NO PAD    | compact 2-level key                                              |
 | `utf8mb4_0900_as_cs` | NO PAD    | compact 3-level key                                              |
 
@@ -78,60 +78,106 @@ as_cs:  L1 || 01 || level 2 tokens || level 3 tokens
 as_ci:  L1 || 01 || level 2 tokens
 ```
 
-- **L1:** level 1 weights, as in `ai_ci`. Every L1 unit starts with a byte `>= 02`, so `01` sorts below any continuation.
-- **Levels 2 and 3:** the 2-byte units of all code points in order. The default unit `D` is `0020` at level 2 and `0002` at level 3. Runs of `D` are written as a count. Each unit that differs from `D` ends a run and is written in a token. Each level ends with an end token.
+- **L1:** the level 1 weights of the code points in order. Each weight is a
+  one-byte code or a two-byte code, not the raw 2-byte UCA unit:
+  - 24 weights have one-byte codes `03` to `F6`: `FB40` (implicit base for CJK
+    Unified Ideographs) and the level 1 weights of U+FDFA, U+FDFB, U+1F1A9,
+    U+321D and U+1F19C.
+  - Every other weight takes two bytes. The lead byte is in `02` to `FB` and
+    is shared by up to 256 weights. Lead bytes and one-byte codes come from one
+    counter, so they never collide.
+  - Every L1 code starts with a byte `>= 02`, so `01` sorts below any L1 continuation.
+- **Level 2:** the level 2 weights of all code points in order. The default
+  unit `D` is `0020`. Every level 2 unit is `>= D` and at most `D + F4` (the
+  largest is `0114`). Runs of `D` are counted. Each unit `u > D` is written as a
+  deviation token.
+- **Level 3:** the level 3 weights in order. The default unit `D` is `0002`.
+  The non-default units are all between `0003` and `001E`. At most 27 distinct
+  ones occur, and they are ranked 0 to 26 in ascending order. Every level 3
+  unit is `>= D`.
 
-Token, with `g` = number of `D` units before it:
+Tokens. `g` is the number of `D` units before the token:
 
-| Ends with    | Bytes                       |
-| ------------ | --------------------------- |
-| end of level | `gap(g)` `02`               |
-| unit `u < D` | `gap(g)` `03` `u` (2 bytes) |
-| unit `u > D` | `~gap(g)` `u - D` (1 byte)  |
+| Level | Token                       | Bytes                                         |
+| ----- | --------------------------- | --------------------------------------------- |
+| 2     | unit `u > D`                | `~gap(g)`, then `u - D` (1 byte)              |
+| 2     | end of level                | `gap(g)`, where `g` counts the trailing `D`s  |
+| 3     | unit with rank `r`, `g = 0` | `E5 + r` (1 byte, `E5`..`FF`)                 |
+| 3     | unit with rank `r`, `g > 0` | `ascending(g)`, then `r` (1 byte, `00`..`1A`) |
+| 3     | end of level                | `02`                                          |
 
 `~` XORs each byte with `FF`.
 
-`gap(g)`:
+`gap(g)` for level 2:
 
 | `g`        | Bytes                                            |
 | ---------- | ------------------------------------------------ |
-| 0..121     | `g + 2`                                          |
+| 0..121     | `g + 2` (`02`..`7B`)                             |
 | 122 and up | `7B + s`, then `g - 122` as `s` big-endian bytes |
 
 `s` is the smallest value in 1..4 with `g - 122 < 256^s`.
 
-The current table has no level 2 unit below `0020` and no level 3 unit below
-`0002`, so `03` is not produced. Every unit above `D` is at most `D + FF`
-(level 2 maximum `0114`, level 3 maximum `001E`), so `u - D` fits one byte and is never `00`.
-A new table must keep that bound.
+`ascending(g)` for level 3:
 
-Order at the first position where two sequences differ, each side being end,
-`< D`, `D`, or `> D`: end < `< D` < `D` < `> D`.
+| `g`        | Bytes                                                                 |
+| ---------- | --------------------------------------------------------------------- |
+| 1..217     | `228 - g` (one byte, `0B`..`E3`)                                      |
+| 218 and up | `7 - s`, then `g - 218` as `s` big-endian bytes, each XORed with `FF` |
 
-- A `gap` byte for end or `< D` is in `02..7F`. A `~gap` byte for `> D` is in `80..FD`. So end and `< D` sort below `> D` with no class byte. Within the low class, end (`02`) sorts below `03`.
-- A larger count means the deviation comes later. For end or `< D`, a later deviation sorts higher, so `gap` increases. For `> D`, a later deviation sorts lower, so `~gap` is used.
-- `gap` is prefix-free: the first byte gives the length. Equal class and count compare unit bytes.
+`s` is the smallest value in 1..4 with `g - 218 < 256^s`.
 
-Examples (`as_cs`):
+Order. At the first position where two level sequences differ, the sides are
+the end token, a deviation, or the default `D` (there is no deviation below
+`D` in the table). Ends sort first, deviations above `D` sort above `D`, and
+a deviation earlier in the level sorts above one later in the level:
 
-| Text  | Key                          |
-| ----- | ---------------------------- |
-| empty | `01 02 02 02 02`             |
-| `a`   | `1C 47 01 03 02 03 02`       |
-| `A`   | `1C 47 01 03 02 FD 06 02 02` |
-| `á`   | `1C 47 01 FC 04 02 02 04 02` |
-| `ab`  | `1C 47 1C 60 01 04 02 04 02` |
+- Level 2: `gap` bytes are `02..7F`. `~gap` bytes are `80..FD`. So the end
+  token sorts below every deviation. A larger `g` gives a smaller `~gap`, so an
+  earlier deviation sorts higher. A larger `g` gives a larger end token, so a
+  longer run before the end sorts higher.
+- Level 3: the end byte `02` sorts below every token. A zero-gap deviation
+  (`E5`..`FF`) sorts above every positive-gap deviation (`03`..`E3`). Among
+  positive gaps, a larger `g` gives a smaller `ascending` byte. Equal gaps
+  compare by rank.
 
-`as_ci` is the same without the level 3 tokens: `a` is `1C 47 01 03 02`.
+The `gap` and `ascending` forms are prefix-free because the first byte gives the length.
 
-### Size
+Examples:
 
-- L1: 2 bytes per unit.
-- Each of levels 2 and 3: 2 bytes for the end token plus 2 bytes per non-default unit (1 byte `gap`, 1 byte unit). A count `>= 122` adds 1 to 4 bytes to its `gap`.
-- `01` separator: 1 byte. Framing: 0 bytes for `as_cs` and `as_ci`.
+| Text  | `as_cs`                | `as_ci`             |
+| ----- | ---------------------- | ------------------- |
+| empty | `01 02 02`             | `01 02`             |
+| `a`   | `23 07 01 03 02`       | `23 07 01 03`       |
+| `A`   | `23 07 01 03 E9 02`    | `23 07 01 03`       |
+| `á`   | `23 07 01 FC 04 02 02` | `23 07 01 FC 04 02` |
+| `ab`  | `23 07 23 14 01 04 02` | `23 07 23 14 01 04` |
 
-Unaccented lower case text costs about `2n + 5` bytes for `n` characters in
-`as_cs`. Each upper case letter adds 2 bytes, and each precomposed accent adds 2 bytes.
+`ai_ci` for `a` is `1C 47`. The `as_cs` L1 code for `a` is `23 07`.
+
+## Size and worst case
+
+Per collation, `n` is the number of characters, and the length is the framed key.
+
+| Collation            | Worst case                                                                                                                                                | Basis                                                                                                                                        |
+| -------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ascii_*`            | exactly `maxChars` bytes                                                                                                                                  | Fixed width. `maxChars` is required.                                                                                                         |
+| `utf8mb4_0900_bin`   | `<= 4n + 1` bytes                                                                                                                                         | Proven. A 4-byte character is never escaped. Each input byte `00`..`02` (ASCII only) costs 2 bytes, so no character costs more than 4 bytes. |
+| `utf8mb4_0900_ai_ci` | `<= 16n + 1` bytes                                                                                                                                        | Proven from the table. The largest character (U+337F) has 8 units, each 2 bytes.                                                             |
+| `utf8mb4_0900_as_ci` | Measured: 12.07 bytes per character (U+3316 repeated 41 times, 495 bytes). No bound in tests.                                                             | Measured, not proven.                                                                                                                        |
+| `utf8mb4_0900_as_cs` | Bound enforced by tests: `24n + 3 + 4 * floor(8n / 122) + 4 * floor(8n / 218)`. Measured: 18.1 bytes per character (U+3316 repeated 41 times, 742 bytes). | Checked on per-character maxima, repeated worst-case characters, and 500 seeded mixed samples. Not a proof over arbitrary concatenation.     |
+
+The largest `n` whose `as_cs` bound fits the 1012-byte tuple budget is 41
+(bound 999).
+
+Typical size, for scale:
+
+- Unaccented lower case text costs `2n + 3` bytes in `as_cs` while `n <= 121`.
+  Each lower case letter costs its 2-byte L1 code, and a run of letters costs
+  one L2 end token.
+- Each level 3 deviation, such as an upper case letter, costs 1 byte when no
+  default unit precedes it since the last deviation, and 2 bytes otherwise.
+- Each level 2 deviation, such as a precomposed accent, costs 2 bytes (the
+  `~gap` and the unit).
 
 ## Errors
 

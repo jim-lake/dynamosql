@@ -27,6 +27,7 @@ const SUFFIXES = [
   [0x1c, 0x47],
   [0x80, 0, 0, 0, 0, 0, 0, 0x01],
   [0, 0, 0, 0, 0, 0, 0, 0x2a],
+  [0x1c, 0x47, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x2a],
 ].map((s) => Uint8Array.from(s));
 
 function cat(a: Uint8Array, b: Uint8Array): Uint8Array {

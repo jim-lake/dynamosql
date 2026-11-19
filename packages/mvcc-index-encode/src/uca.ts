@@ -184,6 +184,112 @@ export function asCsWriteLevel(
   return writeLevelFromTable(codePoint, level, dst, at, index);
 }
 
+export interface Level1Codes {
+  readonly length: Uint8Array;
+  readonly value: Uint16Array;
+}
+
+const LEVEL1_ONE_BYTE_CODE_POINTS = [0xfdfa, 0xfdfb, 0x1f1a9, 0x321d, 0x1f19c];
+const IMPLICIT_HAN_RANGES = [
+  [0x4e00, 0x9fff],
+  [0x3400, 0x4dbf],
+  [0x20000, 0x2a6df],
+] as const;
+
+let level1Codes: Level1Codes | undefined;
+
+function buildLevel1Codes(idx: AsCsIndex): Level1Codes {
+  const units = new Set<number>();
+  for (let slot = 0; slot < idx.len1.length; slot++) {
+    const start = idx.offset[slot] ?? 0;
+    const len = idx.len1[slot] ?? 0;
+    for (let k = 0; k < len; k += 2) {
+      units.add(
+        ((idx.weights[start + k] ?? 0) << 8) | (idx.weights[start + k + 1] ?? 0)
+      );
+    }
+  }
+  const implicit = new Uint8Array(4);
+  for (const [lo, hi] of IMPLICIT_HAN_RANGES) {
+    for (let cp = lo; cp <= hi; cp++) {
+      if (writeImplicitHan(cp, implicit, 0) === 4) {
+        units.add(((implicit[0] ?? 0) << 8) | (implicit[1] ?? 0));
+        units.add(((implicit[2] ?? 0) << 8) | (implicit[3] ?? 0));
+      }
+    }
+  }
+  const oneByte = new Set<number>([0xfb40]);
+  for (const cp of LEVEL1_ONE_BYTE_CODE_POINTS) {
+    const w = ucaWeight(cp);
+    for (let k = 0; k < w.length; k += 2) {
+      oneByte.add(((w[k] ?? 0) << 8) | (w[k + 1] ?? 0));
+    }
+  }
+
+  const length = new Uint8Array(0x10000);
+  const value = new Uint16Array(0x10000);
+  let lead = 2;
+  let current = -1;
+  let next = 256;
+  for (const unit of [...units].sort((x, y) => x - y)) {
+    if (oneByte.has(unit)) {
+      length[unit] = 1;
+      value[unit] = lead++;
+      current = -1;
+      next = 256;
+    } else {
+      if (next >= 256) {
+        current = lead++;
+        next = 0;
+      }
+      length[unit] = 2;
+      value[unit] = (current << 8) | next;
+      next++;
+    }
+  }
+  if (lead > 0x100) {
+    throw new RangeError(`Level 1 codes need ${String(lead)} leads`);
+  }
+  return { length, value };
+}
+
+export function asCsLevel1Codes(): Level1Codes {
+  index ??= loadIndex();
+  level1Codes ??= buildLevel1Codes(index);
+  return level1Codes;
+}
+
+let level3Ranks: Int16Array | undefined;
+
+function buildLevel3Ranks(idx: AsCsIndex): Int16Array {
+  const units = new Set<number>();
+  for (let slot = 0; slot < idx.len3.length; slot++) {
+    const a = idx.len1[slot] ?? 0;
+    const b = idx.len2[slot] ?? 0;
+    const c = idx.len3[slot] ?? 0;
+    const start = (idx.offset[slot] ?? 0) + a + b;
+    for (let k = 0; k < c; k += 2) {
+      units.add(
+        ((idx.weights[start + k] ?? 0) << 8) | (idx.weights[start + k + 1] ?? 0)
+      );
+    }
+  }
+  const ranks = new Int16Array(0x10000).fill(-1);
+  [...units]
+    .filter((u) => u !== AS_CS_LEVEL_DEFAULTS[1])
+    .sort((x, y) => x - y)
+    .forEach((u, rank) => {
+      ranks[u] = rank;
+    });
+  return ranks;
+}
+
+export function asCsLevel3Rank(unit: number): number {
+  index ??= loadIndex();
+  level3Ranks ??= buildLevel3Ranks(index);
+  return level3Ranks[unit] ?? -1;
+}
+
 export function ucaWeight(codePoint: number): Uint8Array {
   index ??= loadIndex();
   const slot = slotOf(codePoint, index);

@@ -3,6 +3,7 @@ import {
   type CollationName,
   type MultiLevelCollation,
 } from './collations';
+import { asCsLevel1Codes, asCsLevel3Rank } from './uca';
 
 let scratch = new Uint8Array(256);
 let cpScratch = new Int32Array(64);
@@ -97,10 +98,13 @@ function decodeAll(value: Uint8Array, collation: CollationName): number {
 
 const LEVEL_SEPARATOR = 0x01;
 const END_MARK = 0x02;
-const BELOW_MARK = 0x03;
 const DIRECT_GAPS = 0x7a;
 const ESCAPE_LEAD = DIRECT_GAPS + 1;
 const MAX_GAP_BYTES = 4;
+const LEVEL3_ZERO_GAP_BASE = 0xe5;
+const LEVEL3_MAX_RANK = 0xff - LEVEL3_ZERO_GAP_BASE;
+const LEVEL3_DIRECT_GAP_MAX = 217;
+const LEVEL3_DIRECT_GAP_BASE = 228;
 const unitScratch = new Uint8Array(256);
 
 function writeGap(gap: number, invert: boolean, at: number): number {
@@ -122,25 +126,122 @@ function writeGap(gap: number, invert: boolean, at: number): number {
   return size + 1;
 }
 
-function writeToken(
-  gap: number,
-  unit: number,
-  fallback: number,
+function writeAscendingGap(gap: number, at: number): number {
+  if (gap <= LEVEL3_DIRECT_GAP_MAX) {
+    scratch[at] = LEVEL3_DIRECT_GAP_BASE - gap;
+    return 1;
+  }
+  const rest = gap - LEVEL3_DIRECT_GAP_MAX - 1;
+  let size = 1;
+  while (size < MAX_GAP_BYTES && rest >= 2 ** (8 * size)) {
+    size++;
+  }
+  scratch[at] = 7 - size;
+  for (let k = 0; k < size; k++) {
+    const shift = 2 ** (8 * (size - 1 - k));
+    scratch[at + 1 + k] = 0xff - (Math.floor(rest / shift) & 0xff);
+  }
+  return size + 1;
+}
+
+function unitAt(buf: Uint8Array, j: number): number {
+  return ((buf[j] ?? 0) << 8) | (buf[j + 1] ?? 0);
+}
+
+function invariantError(level: number, unit: number): RangeError {
+  return new RangeError(
+    `Level ${String(level)} weight ${unit.toString(16)} is outside the encodable range`
+  );
+}
+
+function writeLevel2(
+  count: number,
+  info: MultiLevelCollation,
   at: number
 ): number {
+  const fallback = info.defaults[0];
   let n = at;
+  let gap = 0;
+  for (let k = 0; k < count; k++) {
+    const len = info.writeLevel(cpScratch[k] ?? 0, 2, unitScratch, 0);
+    for (let j = 0; j < len; j += 2) {
+      const unit = unitAt(unitScratch, j);
+      if (unit === fallback) {
+        gap++;
+        continue;
+      }
+      if (unit < fallback || unit - fallback > 0xff) {
+        throw invariantError(2, unit);
+      }
+      ensure(n + 8);
+      n += writeGap(gap, true, n);
+      scratch[n++] = unit - fallback;
+      gap = 0;
+    }
+  }
   ensure(n + 8);
-  if (unit < 0) {
-    n += writeGap(gap, false, n);
-    scratch[n++] = END_MARK;
-  } else if (unit < fallback) {
-    n += writeGap(gap, false, n);
-    scratch[n++] = BELOW_MARK;
-    scratch[n++] = unit >>> 8;
-    scratch[n++] = unit & 0xff;
-  } else {
-    n += writeGap(gap, true, n);
-    scratch[n++] = unit - fallback;
+  return n + writeGap(gap, false, n);
+}
+
+function writeLevel3(
+  count: number,
+  info: MultiLevelCollation,
+  at: number
+): number {
+  const fallback = info.defaults[1];
+  let n = at;
+  let gap = 0;
+  for (let k = 0; k < count; k++) {
+    const len = info.writeLevel(cpScratch[k] ?? 0, 3, unitScratch, 0);
+    for (let j = 0; j < len; j += 2) {
+      const unit = unitAt(unitScratch, j);
+      if (unit === fallback) {
+        gap++;
+        continue;
+      }
+      const rank = unit > fallback ? asCsLevel3Rank(unit) : -1;
+      if (rank < 0 || rank > LEVEL3_MAX_RANK) {
+        throw invariantError(3, unit);
+      }
+      ensure(n + 8);
+      if (gap === 0) {
+        scratch[n++] = LEVEL3_ZERO_GAP_BASE + rank;
+      } else {
+        n += writeAscendingGap(gap, n);
+        scratch[n++] = rank;
+      }
+      gap = 0;
+    }
+  }
+  ensure(n + 1);
+  scratch[n++] = END_MARK;
+  return n;
+}
+
+function writeLevel1(
+  count: number,
+  info: MultiLevelCollation,
+  at: number
+): number {
+  const codes = asCsLevel1Codes();
+  let n = at;
+  for (let k = 0; k < count; k++) {
+    const len = info.writeLevel(cpScratch[k] ?? 0, 1, unitScratch, 0);
+    for (let j = 0; j < len; j += 2) {
+      const unit = unitAt(unitScratch, j);
+      const size = codes.length[unit] ?? 0;
+      if (size === 0) {
+        throw invariantError(1, unit);
+      }
+      const code = codes.value[unit] ?? 0;
+      ensure(n + 2);
+      if (size === 1) {
+        scratch[n++] = code;
+      } else {
+        scratch[n++] = code >>> 8;
+        scratch[n++] = code & 0xff;
+      }
+    }
   }
   return n;
 }
@@ -151,34 +252,12 @@ function fillCompact(
   info: MultiLevelCollation
 ): number {
   const count = decodeAll(value, collation);
-  let n = 0;
-  for (let k = 0; k < count; k++) {
-    ensure(n + info.maxLevelWeight);
-    n += info.writeLevel(cpScratch[k] ?? 0, 1, scratch, n);
-  }
+  let n = writeLevel1(count, info, 0);
   ensure(n + 1);
   scratch[n++] = LEVEL_SEPARATOR;
-  for (let level = 2; level <= info.levels; level++) {
-    const fallback = info.defaults[level - 2] ?? 0;
-    let gap = 0;
-    for (let k = 0; k < count; k++) {
-      const len = info.writeLevel(
-        cpScratch[k] ?? 0,
-        level as 2 | 3,
-        unitScratch,
-        0
-      );
-      for (let j = 0; j < len; j += 2) {
-        const unit = ((unitScratch[j] ?? 0) << 8) | (unitScratch[j + 1] ?? 0);
-        if (unit === fallback) {
-          gap++;
-        } else {
-          n = writeToken(gap, unit, fallback, n);
-          gap = 0;
-        }
-      }
-    }
-    n = writeToken(gap, -1, fallback, n);
+  n = writeLevel2(count, info, n);
+  if (info.levels === 3) {
+    n = writeLevel3(count, info, n);
   }
   return n;
 }

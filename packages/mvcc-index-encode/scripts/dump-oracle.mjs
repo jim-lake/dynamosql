@@ -168,13 +168,17 @@ function denseSamples(count, seed) {
       samples.push(hex);
     }
   };
-  for (const run of [239, 240, 241, 255, 256, 257, 300, 1000]) {
+  for (const run of [
+    121, 122, 123, 217, 218, 219, 239, 240, 241, 255, 256, 257, 300, 1000,
+  ]) {
     const base = Array(run).fill(0x61);
     add(base);
     for (const tail of [0x41, 0xe1, 0x62, 0x301]) add([...base, tail]);
     add([0x41, ...base]);
     add([...base.slice(1), 0x41]);
     add([...base.slice(0, 120), 0x41, ...base.slice(120)]);
+    add([...base.slice(0, 121), 0xe1, ...base.slice(121)]);
+    add([...base.slice(0, 217), 0xe1, ...base.slice(217)]);
   }
   while (samples.length < count) {
     const len = next() % 13;
