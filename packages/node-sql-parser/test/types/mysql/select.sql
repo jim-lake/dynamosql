@@ -936,3 +936,6 @@ SELECT id, other FROM _dynamodb.foo WHERE !(other < 100) ORDER BY id;
 SELECT id, other FROM _dynamodb.foo WHERE (other > 100 OR other IS NULL) AND id != "99" ORDER BY id;
 SELECT id, other FROM _dynamodb.foo WHERE other > 100 AND (id = "111" OR id = "112") ORDER BY id;
 SELECT id, other FROM _dynamodb.foo WHERE (other > 100 AND id = "111") OR (other < 10 AND id = "4") ORDER BY id;
+SELECT POSITION('a' IN 'abc');
+SELECT POSITION(col IN s) FROM t;
+SELECT POSITION('z' IN 'abc') + 1;

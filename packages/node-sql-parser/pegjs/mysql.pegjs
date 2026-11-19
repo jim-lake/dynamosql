@@ -2168,7 +2168,16 @@ show_grant_stmt
   }
 
 show_grant_for
-  = 'FOR'i __ n:ident __ h:(KW_VAR__PRE_AT __ ident)? __ u:show_grant_for_using? {
+  = 'FOR'i __ KW_CURRENT_USER p:(__ LPAREN __ RPAREN)? __ u:show_grant_for_using? {
+    return {
+      user: null,
+      host: null,
+      current_user: true,
+      current_user_parentheses: !!p,
+      role_list: u
+    }
+  }
+  / 'FOR'i __ n:ident __ h:(KW_VAR__PRE_AT __ ident)? __ u:show_grant_for_using? {
     return {
       user: n,
       host: h && h[2],
@@ -4144,8 +4153,22 @@ trim_func_clause
     };
   }
 
+// POSITION(substr IN str). The first argument stops at additive_expr so the IN keyword
+// is not consumed as a comparison operator.
+position_func_clause
+  = 'POSITION'i __ LPAREN __ sub:additive_expr __ KW_IN __ str:expr __ RPAREN {
+    return {
+        type: 'function',
+        name: { name: [{ type: 'origin', value: 'position' }]},
+        args: { type: 'expr_list', value: [sub, str] },
+        over: null,
+        separator: ' IN ',
+        ...getLocationObject(),
+    };
+  }
+
 func_call
-  = extract_func / trim_func_clause
+  = extract_func / trim_func_clause / position_func_clause
   / 'convert'i __ LPAREN __ l:convert_args __ RPAREN {
     return {
         type: 'function',

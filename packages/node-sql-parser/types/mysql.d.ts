@@ -242,6 +242,8 @@ export interface Function {
   args?: ExprList | null;
   over?: { type: 'window'; as_window_specification: AsWindowSpec } | OnUpdateCurrentTimestamp | null;
   collate?: CollateExpr | null;
+  /** POSITION only: the keyword between the two arguments, `' IN '`. */
+  separator?: string;
   /** JSON_VALUE only: the RETURNING type. */
   returning?: ConvertDataType | null;
   /** JSON_VALUE only: the ON EMPTY behavior. */
@@ -1276,9 +1278,13 @@ export interface ShowGrants {
   type: "show";
   keyword: "grants";
   for: {
-    user: string;
+    user: string | null;
     host: string | null;
     role_list: string[] | null;
+    /** True for `FOR CURRENT_USER` / `FOR CURRENT_USER()`. `user` is null in that case. */
+    current_user?: boolean;
+    /** Whether the `CURRENT_USER` form had `()`. Only set when `current_user` is true. */
+    current_user_parentheses?: boolean;
   } | null;
   loc?: LocationRange;
 }

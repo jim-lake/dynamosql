@@ -322,24 +322,21 @@ describe('select', () => {
           {
             expr: {
               type: 'function',
-              name: { name: [{ type: 'default', value: 'position' }]},
+              name: { name: [{ type: 'origin', value: 'position' }]},
               over: null,
               args: {
                 type: 'expr_list',
                 value: [
-                  {
-                    type: 'binary_expr',
-                    operator: 'IN',
-                    left: { type: 'single_quote_string', value: ', ' },
-                    right: { type: 'single_quote_string', value: 'a, b' }
-                  }
+                  { type: 'single_quote_string', value: ', ' },
+                  { type: 'single_quote_string', value: 'a, b' }
                 ]
-              }
+              },
+              separator: ' IN '
             },
             as: null
           }
         ]);
-        expect(parser.sqlify(ast)).to.be.equal("SELECT position(', ' IN 'a, b')")
+        expect(parser.sqlify(ast)).to.be.equal("SELECT POSITION(', ' IN 'a, b')")
       });
 
       [

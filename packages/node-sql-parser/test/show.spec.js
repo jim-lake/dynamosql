@@ -50,4 +50,16 @@ describe('SHOW COMMAND', () => {
     sql = `${prefix} for u1 using 'r1'`
     expect(getParsedSql(sql)).to.be.equal(`${prefix} FOR 'u1' USING 'r1'`)
   })
+
+  it('show grants for current_user', () => {
+    const prefix = 'SHOW GRANTS'
+    let sql = `${prefix} FOR CURRENT_USER()`
+    expect(getParsedSql(sql)).to.be.equal(sql)
+    sql = `${prefix} for current_user()`
+    expect(getParsedSql(sql)).to.be.equal(`${prefix} FOR CURRENT_USER()`)
+    sql = `${prefix} FOR CURRENT_USER`
+    expect(getParsedSql(sql)).to.be.equal(sql)
+    sql = `${prefix} FOR CURRENT_USER() USING 'r1'`
+    expect(getParsedSql(sql)).to.be.equal(`${prefix} FOR CURRENT_USER() USING 'r1'`)
+  })
 })

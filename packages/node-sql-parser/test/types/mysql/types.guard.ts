@@ -791,6 +791,8 @@ export function isFunction(obj: unknown): obj is Function {
         (typeof typedObj["collate"] === "undefined" ||
             typedObj["collate"] === null ||
             isCollateExpr(typedObj["collate"]) as boolean) &&
+        (typeof typedObj["separator"] === "undefined" ||
+            typeof typedObj["separator"] === "string") &&
         (typeof typedObj["returning"] === "undefined" ||
             typedObj["returning"] === null ||
             isConvertDataType(typedObj["returning"]) as boolean) &&
@@ -4389,14 +4391,21 @@ export function isShowGrants(obj: unknown): obj is ShowGrants {
             (typedObj["for"] !== null &&
                 typeof typedObj["for"] === "object" ||
                 typeof typedObj["for"] === "function") &&
-            typeof typedObj["for"]["user"] === "string" &&
+            (typedObj["for"]["user"] === null ||
+                typeof typedObj["for"]["user"] === "string") &&
             (typedObj["for"]["host"] === null ||
                 typeof typedObj["for"]["host"] === "string") &&
             (typedObj["for"]["role_list"] === null ||
                 Array.isArray(typedObj["for"]["role_list"]) &&
                 typedObj["for"]["role_list"].every((e: any) =>
                     typeof e === "string"
-                ))) &&
+                )) &&
+            (typeof typedObj["for"]["current_user"] === "undefined" ||
+                typedObj["for"]["current_user"] === false ||
+                typedObj["for"]["current_user"] === true) &&
+            (typeof typedObj["for"]["current_user_parentheses"] === "undefined" ||
+                typedObj["for"]["current_user_parentheses"] === false ||
+                typedObj["for"]["current_user_parentheses"] === true)) &&
         (typeof typedObj["loc"] === "undefined" ||
             isLocationRange(typedObj["loc"]) as boolean)
     )

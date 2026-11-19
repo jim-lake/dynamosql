@@ -1607,6 +1607,9 @@ describe('mysql', () => {
         ['SELECT * FROM t IGNORE INDEX (i)', 'SELECT * FROM `t` IGNORE INDEX (`i`)'],
         ['CREATE TABLE t (a NCHAR(10), b NVARCHAR(20))', 'CREATE TABLE `t` (`a` NCHAR(10), `b` NVARCHAR(20))'],
         ['ALTER TABLE t ENABLE KEYS', 'ALTER TABLE `t` ENABLE KEYS'],
+        ['SELECT POSITION(\'a\' IN \'abc\')', 'SELECT POSITION(\'a\' IN \'abc\')'],
+        ['SELECT POSITION(col IN s) FROM t', 'SELECT POSITION(`col` IN `s`) FROM `t`'],
+        ['SELECT POSITION(\'z\' IN \'abc\') + 1', 'SELECT POSITION(\'z\' IN \'abc\') + 1'],
       ]
       cases.forEach(([sql, parsedSQL]) => {
         it(`should parse ${sql}`, () => {

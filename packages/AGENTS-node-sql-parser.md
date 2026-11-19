@@ -6,6 +6,14 @@ Guidance for AI agents editing this package (`node-sql-parser`, version 5.4.0).
 
 We work on the MySQL dialect only. Do not change other dialects.
 
+## Scope: this package only
+
+Testing and validation apply only to `packages/node-sql-parser/`.
+
+- Do NOT run tests, type checks, lint, or any other validation for projects outside `packages/node-sql-parser/`, including `apps/dynamosql` and `apps/server`. This holds even when a change here might affect those projects.
+- Read only the documents the user explicitly asks you to read. Do not open other AGENTS files, TODO files, or docs on your own initiative.
+- Consequences for other projects are completely out of scope. Do not investigate them or report on them.
+
 - Grammar: `pegjs/mysql.pegjs`.
 - Shared fragments: `mysql.pegjs` pulls in `pegjs/common/**/*.pegjs` with `@import`. Fourteen grammar files reference `common/`, including `mysql.pegjs`, so a change to a fragment can affect other dialects. Check with `grep -l "common/<file>" pegjs/*.pegjs` before editing one. If a fix only matters for MySQL, prefer a MySQL-specific rule in `mysql.pegjs`.
 - Types: `types/mysql.d.ts`. Do not edit other `types/*.d.ts` files.

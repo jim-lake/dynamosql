@@ -23,8 +23,8 @@ function showLikeAndWhereToSQL(showCharacterSetExpr) {
 function showGrantsForUser(showGrantsForExpr) {
   const { for: forExpr } = showGrantsForExpr
   if (!forExpr) return
-  const { user, host, role_list } = forExpr
-  let userAndHost = `'${user}'`
+  const { user, host, role_list, current_user, current_user_parentheses } = forExpr
+  let userAndHost = current_user ? `CURRENT_USER${current_user_parentheses ? '()' : ''}` : `'${user}'`
   if (host) userAndHost += `@'${host}'`
   return ['FOR', userAndHost, role_list && 'USING', role_list && role_list.map(role => `'${role}'`).join(', ')].filter(hasVal).join(' ')
 }
