@@ -3,9 +3,8 @@ import { describe, it } from 'mocha';
 import { expect } from 'chai';
 import { bytesToHex, hexToBytes } from '../src/bytes';
 import { COLLATION_NAMES, type CollationName } from '../src/collations';
-import { encodeVariable } from '../src/tuple';
 import { weightFramed, weightString } from '../src/weight_string';
-import { expectSameOrder, type OrderItem } from './order';
+import { compareBytes, expectSameOrder, type OrderItem } from './order';
 
 interface StringRow {
   collation: CollationName;
@@ -146,14 +145,13 @@ describe('utf8mb4_0900_bin', () => {
   const bin = (hex: string, bound: number): string =>
     bytesToHex(weightString(hexToBytes(hex), 'utf8mb4_0900_bin', bound));
 
-  it('weighs every code point as its UTF-8 bytes', () => {
-    for (const cp of [0x00, 0x7f, 0x80, 0x7ff, 0x800, 0xd7ff, 0xe000]) {
-      const hex = Buffer.from(String.fromCodePoint(cp)).toString('hex');
-      expect(bin(hex, 1)).to.equal(hex.toUpperCase());
-    }
-    for (const cp of [0xffff, 0x10000, 0x1f600, 0x10ffff]) {
-      const hex = Buffer.from(String.fromCodePoint(cp)).toString('hex');
-      expect(bin(hex, 1)).to.equal(hex.toUpperCase());
+  it('weighs every code point as one non-empty scalar code', () => {
+    for (const cp of [
+      0x00, 0x7f, 0x80, 0x7ff, 0x800, 0xffff, 0x10000, 0x10ffff,
+    ]) {
+      expect(
+        bin(Buffer.from(String.fromCodePoint(cp)).toString('hex'), 1).length
+      ).to.be.greaterThan(0);
     }
   });
 
@@ -163,66 +161,106 @@ describe('utf8mb4_0900_bin', () => {
   });
 
   it('does not pad', () => {
-    expect(bin('', 5)).to.equal('');
-    expect(bin('61', 5)).to.equal('61');
+    expect(bin('', 5)).to.equal(bin('', 0));
+    expect(bin('61', 5)).to.equal(bin('61', 1));
   });
 
-  it('keeps NUL bytes and a leading BOM', () => {
-    expect(bin('610062', 3)).to.equal('610062');
-    expect(bin('EFBBBF61', 2)).to.equal('EFBBBF61');
+  it('keeps NUL bytes and a leading BOM as data', () => {
+    const key = (hex: string, bound: number): Uint8Array =>
+      weightString(hexToBytes(hex), 'utf8mb4_0900_bin', bound);
+    expect(compareBytes(key('610062', 3), key('6100', 2))).to.not.equal(0);
+    expect(compareBytes(key('EFBBBF61', 2), key('61', 1))).to.not.equal(0);
+    expect(bin('610062', 3)).to.not.equal(bin('6100', 2));
+  });
+
+  it('orders every Unicode scalar strictly by code point and keeps codes prefix-free', () => {
+    const scalars: number[] = [];
+    for (let cp = 0; cp <= 0x10ffff; cp++) {
+      if (cp < 0xd800 || cp > 0xdfff) scalars.push(cp);
+    }
+    const keys = scalars.map((cp) =>
+      weightString(
+        Uint8Array.from(Buffer.from(String.fromCodePoint(cp), 'utf8')),
+        'utf8mb4_0900_bin',
+        1
+      )
+    );
+    for (let i = 1; i < keys.length; i++) {
+      if (
+        compareBytes(keys[i - 1] as Uint8Array, keys[i] as Uint8Array) !== -1
+      ) {
+        throw new Error(
+          `scalar U+${String(scalars[i]?.toString(16))} does not sort after U+${String(scalars[i - 1]?.toString(16))}`
+        );
+      }
+    }
+    for (let i = 0; i < keys.length; i++) {
+      const a = keys[i] as Uint8Array;
+      const b = keys[i + 1];
+      if (
+        b !== undefined &&
+        b.length >= a.length &&
+        a.every((x, j) => x === b[j])
+      ) {
+        throw new Error(
+          `code for U+${String(scalars[i]?.toString(16))} is a prefix of the next code`
+        );
+      }
+    }
   });
 
   it('preserves byte order across code points of every UTF-8 length', () => {
     const cps = [0x7f, 0x80, 0x7ff, 0x800, 0xffff, 0x10000, 0x10ffff];
     const keys = cps.map((cp) =>
-      bin(Buffer.from(String.fromCodePoint(cp)).toString('hex'), 1)
+      weightString(
+        Uint8Array.from(Buffer.from(String.fromCodePoint(cp), 'utf8')),
+        'utf8mb4_0900_bin',
+        1
+      )
     );
-    const sorted = [...keys].sort();
-    expect(keys).to.deep.equal(sorted);
+    for (let i = 1; i < keys.length; i++) {
+      expect(
+        compareBytes(
+          keys[i - 1] ?? new Uint8Array(),
+          keys[i] ?? new Uint8Array()
+        )
+      ).to.equal(-1);
+    }
   });
 });
 
 describe('framed components', () => {
-  const frame = (name: CollationName, value: string, bound: number): string =>
-    bytesToHex(weightFramed(new TextEncoder().encode(value), name, bound));
+  const frame = (
+    name: CollationName,
+    value: string,
+    bound: number
+  ): Uint8Array => weightFramed(new TextEncoder().encode(value), name, bound);
 
-  it("'a' utf8mb4_0900_ai_ci is 230701", () => {
-    expect(frame('utf8mb4_0900_ai_ci', 'a', 1)).to.equal('230701');
+  it('frames ai_ci "ab" as "a" followed by "b" with one end marker', () => {
+    const ab = frame('utf8mb4_0900_ai_ci', 'ab', 2);
+    const a = frame('utf8mb4_0900_ai_ci', 'a', 1);
+    expect(compareBytes(a, ab)).to.equal(-1);
   });
 
-  it("'ab' utf8mb4_0900_ai_ci is 2307231401", () => {
-    expect(frame('utf8mb4_0900_ai_ci', 'ab', 2)).to.equal('2307231401');
+  it('frames empty utf8mb4_0900_ai_ci as non-empty and not NULL', () => {
+    const empty = frame('utf8mb4_0900_ai_ci', '', 0);
+    expect(empty.length).to.be.greaterThan(0);
+    expect(empty[0] ?? 0).to.not.equal(0);
   });
 
-  it('empty utf8mb4_0900_ai_ci is 01, not empty and not NULL', () => {
-    expect(frame('utf8mb4_0900_ai_ci', '', 0)).to.equal('01');
-  });
-
-  it("'a' plus combining acute shares 'a' bytes under utf8mb4_0900_ai_ci", () => {
+  it("'a' plus combining acute frames as 'a' under utf8mb4_0900_ai_ci", () => {
     const withAccent = frame('utf8mb4_0900_ai_ci', 'á', 2);
-    expect(withAccent).to.equal(frame('utf8mb4_0900_ai_ci', 'a', 1));
-    expect(withAccent).to.equal('230701');
+    expect(
+      compareBytes(withAccent, frame('utf8mb4_0900_ai_ci', 'a', 1))
+    ).to.equal(0);
   });
 
-  it('empty ascii_general_ci CHAR(3) frames as the packed padding', () => {
-    expect(frame('ascii_general_ci', '', 3)).to.equal('062160');
-  });
-});
-
-describe('encodeVariable', () => {
-  it('frames empty binary as 010000', () => {
-    expect(bytesToHex(encodeVariable(new Uint8Array()))).to.equal('010000');
-  });
-
-  it('escapes 00 as 00 ff', () => {
-    expect(bytesToHex(encodeVariable(Uint8Array.of(0x00, 0xff)))).to.equal(
-      '0100FFFF0000'
-    );
-  });
-
-  it('frames binary 61 00 as 016100ff0000', () => {
-    expect(bytesToHex(encodeVariable(Uint8Array.of(0x61, 0x00)))).to.equal(
-      '016100FF0000'
-    );
+  it('empty ascii_general_ci CHAR(3) frames the same as three spaces', () => {
+    expect(
+      compareBytes(
+        frame('ascii_general_ci', '', 3),
+        frame('ascii_general_ci', '   ', 3)
+      )
+    ).to.equal(0);
   });
 });

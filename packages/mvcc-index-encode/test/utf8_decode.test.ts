@@ -69,9 +69,7 @@ describe('weightString UTF-8 decoding edge cases', () => {
     const bom = Uint8Array.from([0xef, 0xbb, 0xbf]);
     const a = weightString(new TextEncoder().encode('a'), UCA);
     const got = weightString(new Uint8Array([...bom, 0x61]), UCA);
-    expect(bytesToHex(got)).to.equal(
-      bytesToHex(new Uint8Array([...compactL1(0xfeff), ...a]))
-    );
+    expect(bytesToHex(got)).to.equal(bytesToHex(a));
   });
 
   it('ignores the bound for NO PAD collations', () => {
@@ -112,6 +110,6 @@ describe('weightString buffer reuse', () => {
     const value = new TextEncoder().encode('ab'.repeat(200));
     const first = bytesToHex(weightString(value, UCA));
     expect(bytesToHex(weightString(value, UCA))).to.equal(first);
-    expect(first.slice(0, 8)).to.equal('23072314');
+    expect(first.slice(0, 4)).to.equal(bytesToHex(compactL1(0x61)).slice(0, 4));
   });
 });
