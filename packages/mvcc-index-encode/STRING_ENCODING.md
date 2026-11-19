@@ -1,210 +1,39 @@
 # String encoding
 
-Keys are compared bytewise and have a size limit. For two values in a
-collation, comparing their encodings bytewise gives the same result (less,
-equal, greater) as comparing the values under that collation. Values that
-compare equal encode to identical bytes. Encodings cannot be decoded.
+**The encoding is not finalized.** This is a high-level summary. Its statements should not be taken as correct. The code in `src/` is the current best implementation and the reference. Open work and size targets are in [TODO.md](TODO.md).
+
+## Goal
+
+Comparing two encodings bytewise must give the same result as comparing the values under the collation. Values that compare equal must encode to identical bytes. Encodings are not decoded.
 
 ## API
 
 - `weightString(value, collation, maxChars?)`: key before framing.
-- `weightFramed(value, collation, maxChars?)`: the stored form, defined under Framing.
+- `weightFramed(value, collation, maxChars?)`: stored form.
 
-`value` is UTF-8 bytes (ASCII bytes for `ascii_*`). `maxChars` is the declared
-`CHAR(n)` length and is read only by PAD SPACE collations.
+`maxChars` is the declared `CHAR(n)` length. Only PAD SPACE collations read it.
 
 ## Framing
 
-`weightFramed` returns the whole component, with no marker byte. A NULL component is the single byte `00`. A non-NULL string component never starts with `00` and is never empty, so it needs no `01` marker. Another component or a TX_ID may follow, so no framed key may be a proper prefix of another.
-
-| Collation                                  | Framed form                    | Overhead                        |
-| ------------------------------------------ | ------------------------------ | ------------------------------- |
-| `utf8mb4_0900_as_cs`, `utf8mb4_0900_as_ci` | `weightString` unchanged       | 0                               |
-| `utf8mb4_0900_ai_ci`                       | `weightString \|\| 01`         | 1                               |
-| `utf8mb4_0900_bin`                         | ordered scalar codes `\|\| 01` | 1, plus 1 to 3 bytes per scalar |
-| `ascii_bin`, `ascii_general_ci`            | packed rank integer            | fixed width `w`, see ASCII      |
-
-- The `as_cs` key ends with the level 3 end byte `02`. The `as_ci` key ends with its level 2 end token. Every L1 code starts with a byte `>= 02`, and the `01` separator follows L1, so no key is a proper prefix of another.
-- `ai_ci` keys can be prefixes of each other, so `01` ends them. Every L1 code starts with a byte `>= 02`.
-- `bin` writes each scalar as one ordered code of one to three bytes. Codes start at `02`, so `01` never appears in the payload and the key is prefix-free.
-- The ASCII frame has a fixed width for a column, and its first byte is never `00`.
-
-The empty string frames as `01` for `ai_ci`, `01` for `bin`, `01 02 02` for `as_cs`, and `01 02` for `as_ci`. The empty ASCII string at bound 0 frames as `01`.
+A NULL component is `00`. A non-NULL string component never starts with `00`. Framed keys must stay correct when another component or a transaction ID follows.
 
 ## Collations
 
-| Collation            | Pad       | Key                                                                                                                   |
-| -------------------- | --------- | --------------------------------------------------------------------------------------------------------------------- |
-| `ascii_bin`          | PAD SPACE | `weightString`: 1 weight byte per character, padded. `weightFramed`: packed rank integer                              |
-| `ascii_general_ci`   | PAD SPACE | `weightString`: 1 weight byte per character (letters fold to upper case), padded. `weightFramed`: packed rank integer |
-| `utf8mb4_0900_bin`   | NO PAD    | input bytes, not copied                                                                                               |
-| `utf8mb4_0900_ai_ci` | NO PAD    | compact level 1 codes (same codes as `as_ci`/`as_cs` L1)                                                              |
-| `utf8mb4_0900_as_ci` | NO PAD    | compact 2-level key                                                                                                   |
-| `utf8mb4_0900_as_cs` | NO PAD    | compact 3-level key                                                                                                   |
+| Collation            | Pad       | Approach                                               |
+| -------------------- | --------- | ------------------------------------------------------ |
+| `ascii_bin`          | PAD SPACE | Padded ranks packed into a fixed-width integer         |
+| `ascii_general_ci`   | PAD SPACE | Same, over case-folded ranks                           |
+| `utf8mb4_0900_bin`   | NO PAD    | One ordered code per scalar, then an end byte          |
+| `utf8mb4_0900_ai_ci` | NO PAD    | Compact level 1 codes, then an end byte                |
+| `utf8mb4_0900_as_ci` | NO PAD    | Compact level 1 codes, then level 2 tokens             |
+| `utf8mb4_0900_as_cs` | NO PAD    | Compact level 1 codes, then level 2 and level 3 tokens |
 
 Other collations throw `RangeError`.
 
-### ASCII
+## Size
 
-Bytes `>= 0x80` throw. The value is padded with spaces to `maxChars`
-characters, so `a` and `a ` encode identically. `maxChars` is required. A
-longer value throws. Frames are comparable only with the same `maxChars`.
-
-`weightString` returns one weight per character, padded with the space weight
-(`20`). `weightFramed` packs the padded sequence:
-
-1. Rank the distinct MySQL weights in ascending order: 128 ranks for
-   `ascii_bin` and 102 for `ascii_general_ci`. Case folding and padding happen
-   first.
-2. Write the `n` padded ranks as a base-`K` integer `x` (`K` is the rank count),
-   most significant rank first.
-3. Take the smallest whole-byte width `w >= 1` with `K^n <= 255 × 256^(w-1)`.
-   The frame is `256^(w-1) + x` in `w` big-endian bytes. The leading byte is
-   never `00`, and every frame in a column has the same length.
-4. At bound 0 the frame is `01`.
-
-Equal values, including values that differ only by trailing spaces at the same
-bound, get equal frames. At bound 255 the frame is 224 bytes for `ascii_bin`
-and 213 bytes for `ascii_general_ci`.
-
-```
-ascii_bin         'A' maxChars 3  (weightFramed)  ->  11 50 20
-ascii_general_ci  'a' maxChars 3  (weightFramed)  ->  0B 5E 84
-ascii_bin         ''  maxChars 0  (weightFramed)  ->  01
-```
-
-The `weightString` key for `'A'` with `maxChars` 3 is `41 20 20` for both
-collations.
-
-### `utf8mb4_0900_bin`
-
-The key is one code per scalar value, in scalar order, followed by `01`.
-ASCII scalars U+0000..U+007F use `02`..`81`. U+0080..U+07FF use a two-byte
-code with lead `82`..`89`. All other scalars, skipping surrogates, use a
-three-byte code with lead `8A` and up. The caller guarantees valid UTF-8.
-`maxChars` is ignored. Each scalar costs at most 3 bytes, so the frame is at
-most `3n + 1` bytes and its width is 337.
-
-### `utf8mb4_0900_ai_ci`
-
-Invalid UTF-8 throws. Each code point contributes its level 1 weight as the compact L1 code
-(the same codes as `as_ci` and `as_cs`, described below). Ignorable code points
-contribute nothing. The key is the concatenation of those codes.
-
-```
-'a'  ->  23 07
-```
-
-### `utf8mb4_0900_as_ci` and `utf8mb4_0900_as_cs`
-
-```
-as_cs:  L1 || 01 || level 2 tokens || level 3 tokens
-as_ci:  L1 || 01 || level 2 tokens
-```
-
-- **L1:** the level 1 weights of the code points in order. Each weight is a
-  one-byte code or a two-byte code, not the raw 2-byte UCA unit:
-  - 27 weights have one-byte codes `03` to `FA`: `FB40` (implicit base for CJK
-    Unified Ideographs), `3D6E`, `E82A`, `1C0E`, and the level 1 weights of
-    U+FDFA, U+FDFB, U+1F1A9, U+321D and U+1F19C.
-  - Every other weight takes two bytes. The lead byte is in `02` to `FF` and
-    is shared by up to 256 weights. Lead bytes and one-byte codes come from one
-    counter, so they never collide.
-  - Every L1 code starts with a byte `>= 02`, so `01` sorts below any L1 continuation.
-- **Level 2:** the level 2 weights of all code points in order. The default
-  unit `D` is `0020`. Every level 2 unit is `>= D` and at most `D + F4` (the
-  largest is `0114`). Runs of `D` are counted. Each unit `u > D` is written as a
-  deviation token.
-- **Level 3:** the level 3 weights in order. The default unit `D` is `0002`.
-  The non-default units are all between `0003` and `001E`. At most 27 distinct
-  ones occur, and they are ranked 0 to 26 in ascending order. Every level 3
-  unit is `>= D`.
-
-Tokens. `g` is the number of `D` units before the token:
-
-| Level | Token                       | Bytes                                         |
-| ----- | --------------------------- | --------------------------------------------- |
-| 2     | unit `u > D`                | `~gap(g)`, then `u - D` (1 byte)              |
-| 2     | end of level                | `gap(g)`, where `g` counts the trailing `D`s  |
-| 3     | unit with rank `r`, `g = 0` | `E5 + r` (1 byte, `E5`..`FF`)                 |
-| 3     | unit with rank `r`, `g > 0` | `ascending(g)`, then `r` (1 byte, `00`..`1A`) |
-| 3     | end of level                | `02`                                          |
-
-`~` XORs each byte with `FF`.
-
-`gap(g)` for level 2:
-
-| `g`        | Bytes                                            |
-| ---------- | ------------------------------------------------ |
-| 0..121     | `g + 2` (`02`..`7B`)                             |
-| 122 and up | `7B + s`, then `g - 122` as `s` big-endian bytes |
-
-`s` is the smallest value in 1..4 with `g - 122 < 256^s`.
-
-`ascending(g)` for level 3:
-
-| `g`        | Bytes                                                                 |
-| ---------- | --------------------------------------------------------------------- |
-| 1..217     | `228 - g` (one byte, `0B`..`E3`)                                      |
-| 218 and up | `7 - s`, then `g - 218` as `s` big-endian bytes, each XORed with `FF` |
-
-`s` is the smallest value in 1..4 with `g - 218 < 256^s`.
-
-Order. At the first position where two level sequences differ, the sides are
-the end token, a deviation, or the default `D` (there is no deviation below
-`D` in the table). Ends sort first, deviations above `D` sort above `D`, and
-a deviation earlier in the level sorts above one later in the level:
-
-- Level 2: `gap` bytes are `02..7F`. `~gap` bytes are `80..FD`. So the end
-  token sorts below every deviation. A larger `g` gives a smaller `~gap`, so an
-  earlier deviation sorts higher. A larger `g` gives a larger end token, so a
-  longer run before the end sorts higher.
-- Level 3: the end byte `02` sorts below every token. A zero-gap deviation
-  (`E5`..`FF`) sorts above every positive-gap deviation (`03`..`E3`). Among
-  positive gaps, a larger `g` gives a smaller `ascending` byte. Equal gaps
-  compare by rank.
-
-The `gap` and `ascending` forms are prefix-free because the first byte gives the length.
-
-Examples:
-
-| Text  | `as_cs`                | `as_ci`             |
-| ----- | ---------------------- | ------------------- |
-| empty | `01 02 02`             | `01 02`             |
-| `a`   | `23 07 01 03 02`       | `23 07 01 03`       |
-| `A`   | `23 07 01 03 E9 02`    | `23 07 01 03`       |
-| `á`   | `23 07 01 FC 04 02 02` | `23 07 01 FC 04 02` |
-| `ab`  | `23 07 23 14 01 04 02` | `23 07 23 14 01 04` |
-
-`ai_ci` for `a` is `23 07` plus the `01` end, framed as `23 07 01`. The `as_cs` L1 code for `a` is also `23 07`.
-
-## Size and worst case
-
-Per collation, `n` is the number of characters, and the length is the framed key.
-
-| Collation            | Worst case                                                                                                                                                | Basis                                                                                                                                       |
-| -------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
-| `ascii_*`            | `w` bytes, the smallest `w` with `K^maxChars <= 255 × 256^(w-1)`: 224 at 255 for `ascii_bin`, 213 for `ascii_general_ci`                                  | Fixed width, matching the packing bound. `maxChars` is required.                                                                            |
-| `utf8mb4_0900_bin`   | `<= 3n + 1` bytes                                                                                                                                         | Proven. Each scalar costs one to three bytes, plus 1 for the `01` end. Width 337 at 1,012 bytes.                                            |
-| `utf8mb4_0900_ai_ci` | `<= 11n + 1` bytes                                                                                                                                        | Proven from the compact L1 table. The largest per-character cost is 11 bytes (U+337F). Plus 1 for the `01` end. Repeated U+337F attains it. |
-| `utf8mb4_0900_as_ci` | Measured: 12.07 bytes per character (U+3316 repeated 41 times, 495 bytes). No bound in tests.                                                             | Measured, not proven.                                                                                                                       |
-| `utf8mb4_0900_as_cs` | Bound enforced by tests: `24n + 3 + 4 * floor(8n / 122) + 4 * floor(8n / 218)`. Measured: 18.1 bytes per character (U+3316 repeated 41 times, 742 bytes). | Checked on per-character maxima, repeated worst-case characters, and 500 seeded mixed samples. Not a proof over arbitrary concatenation.    |
-
-The largest `n` whose `as_cs` bound fits the 1012-byte tuple budget is 41
-(bound 999).
-
-Typical size, for scale:
-
-- Unaccented lower case text costs `2n + 3` bytes in `as_cs` while `n <= 121`.
-  Each lower case letter costs its 2-byte L1 code, and a run of letters costs
-  one L2 end token.
-- Each level 3 deviation, such as an upper case letter, costs 1 byte when no
-  default unit precedes it since the last deviation, and 2 bytes otherwise.
-- Each level 2 deviation, such as a precomposed accent, costs 2 bytes (the
-  `~gap` and the unit).
+Worst-case lengths are not stated here. They are measured by `scripts/length_model.ts` and recorded in TODO.md.
 
 ## Errors
 
-`RangeError` for: unknown collation, missing or invalid `maxChars` on PAD
-SPACE, value longer than `maxChars`, non-ASCII input to `ascii_*`, invalid
-UTF-8 for the UCA collations.
+`RangeError` for an unknown collation, a missing or invalid `maxChars` on PAD SPACE, a value longer than `maxChars`, non-ASCII input to `ascii_*`, and invalid UTF-8 for the UCA collations.
