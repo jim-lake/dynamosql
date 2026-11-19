@@ -211,8 +211,8 @@ describe('framed components', () => {
     expect(withAccent).to.equal('1C4701');
   });
 
-  it('empty ascii_general_ci CHAR(3) pads the weight to 202020, shifted to 212121', () => {
-    expect(frame('ascii_general_ci', '', 3)).to.equal('212121');
+  it('empty ascii_general_ci CHAR(3) frames as the packed padding', () => {
+    expect(frame('ascii_general_ci', '', 3)).to.equal('062160');
   });
 });
 

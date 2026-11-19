@@ -64,7 +64,7 @@ function fillScratch(
       );
     }
     const padCount = maxChars - chars;
-    ensure(n + maxWeight * padCount);
+    ensure(n + maxWeight * (padCount + 1));
     const spaceStart = n;
     n += writeWeight(0x20, scratch, n);
     const spaceLen = n - spaceStart;
@@ -300,6 +300,97 @@ function frameBytes(value: Uint8Array): Uint8Array {
   return out;
 }
 
+interface AsciiRanks {
+  readonly base: bigint;
+  readonly rankOf: Uint8Array;
+}
+
+const asciiRankCache = new Map<CollationName, AsciiRanks>();
+
+function asciiRanks(collation: CollationName): AsciiRanks {
+  const cached = asciiRankCache.get(collation);
+  if (cached !== undefined) {
+    return cached;
+  }
+  const info = getCollation(collation);
+  if (info.kind !== 'table' || info.charset !== 'ascii') {
+    throw new RangeError(`${collation} is not an ASCII collation`);
+  }
+  const weights = Array.from({ length: 128 }, (_, cp) => {
+    const dst = new Uint8Array(8);
+    const len = info.writeWeight(cp, dst, 0);
+    return bytesKey(dst.subarray(0, len));
+  });
+  const distinct = [...new Set(weights)].sort();
+  const rankOf = new Uint8Array(128);
+  for (let cp = 0; cp < 128; cp++) {
+    rankOf[cp] = distinct.indexOf(weights[cp] as string);
+  }
+  const ranks: AsciiRanks = { base: BigInt(distinct.length), rankOf };
+  asciiRankCache.set(collation, ranks);
+  return ranks;
+}
+
+function bytesKey(bytes: Uint8Array): string {
+  return Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('');
+}
+
+function asciiWidth(base: bigint, n: number): number {
+  const need = base ** BigInt(n);
+  let w = 1;
+  let cap = 255n;
+  while (need > cap) {
+    cap *= 256n;
+    w++;
+  }
+  return w;
+}
+
+function packAscii(
+  value: Uint8Array,
+  collation: CollationName,
+  maxChars: number | undefined
+): Uint8Array {
+  const { base, rankOf } = asciiRanks(collation);
+  const bound = checkedBound(value, maxChars);
+  if (bound === 0) {
+    return Uint8Array.of(0x01);
+  }
+  const padRank = BigInt(rankOf[0x20] ?? 0);
+  let x = 0n;
+  let chars = 0;
+  for (let i = 0; i < value.length; i++, chars++) {
+    const cp = value[i] ?? 0;
+    if (cp >= 0x80) {
+      throw new RangeError(`Non-ASCII byte in ${collation} input`);
+    }
+    x = x * base + BigInt(rankOf[cp] ?? 0);
+  }
+  for (let k = chars; k < bound; k++) {
+    x = x * base + padRank;
+  }
+  const w = asciiWidth(base, bound);
+  let v = 256n ** BigInt(w - 1) + x;
+  const out = new Uint8Array(w);
+  for (let i = w - 1; i >= 0; i--) {
+    out[i] = Number(v & 0xffn);
+    v >>= 8n;
+  }
+  return out;
+}
+
+function checkedBound(value: Uint8Array, maxChars: number | undefined): number {
+  if (maxChars === undefined || !Number.isInteger(maxChars) || maxChars < 0) {
+    throw new RangeError(`Invalid character bound: ${String(maxChars)}`);
+  }
+  if (value.length > maxChars) {
+    throw new RangeError(
+      `Value has ${String(value.length)} characters, above bound ${String(maxChars)}`
+    );
+  }
+  return maxChars;
+}
+
 export function weightFramed(
   value: Uint8Array,
   collation: CollationName,
@@ -309,16 +400,12 @@ export function weightFramed(
   if (info.kind === 'utf8-bytes') {
     return frameBytes(value);
   }
+  if (info.kind === 'table' && info.charset === 'ascii') {
+    return packAscii(value, collation, maxChars);
+  }
   const n = fillScratch(value, collation, maxChars);
   if (info.kind === 'multi-level') {
     return scratch.slice(0, n);
-  }
-  if (info.charset === 'ascii') {
-    const out = new Uint8Array(n);
-    for (let i = 0; i < n; i++) {
-      out[i] = (scratch[i] ?? 0) + 1;
-    }
-    return out;
   }
   const out = new Uint8Array(n + 1);
   out.set(scratch.subarray(0, n));

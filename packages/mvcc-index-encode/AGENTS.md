@@ -53,47 +53,17 @@ packages/mvcc-index-encode/
 - Collations: only `ascii_bin`, `ascii_general_ci`, `utf8mb4_0900_bin`,
   `utf8mb4_0900_ai_ci`, `utf8mb4_0900_as_ci`, and `utf8mb4_0900_as_cs`. Do not
   add others without an oracle check.
-- `utf8mb4_0900_as_cs` and `utf8mb4_0900_as_ci` are multi-level collations
-  with 3 and 2 levels, so they cannot use the per-character `writeWeight`
-  model. Both are NO PAD and ignore `maxChars`. All three UCA collations share
-  the table in `generated/uca_0900_as_cs.ts`. The dump asserts that every
-  `ai_ci` weight equals level 1 of `as_cs` and every `as_ci` weight equals
-  levels 1 and 2. The table still holds MySQL's exact weights, and the encoder
-  derives the compact key from them.
-- The `as_cs` and `as_ci` key is: all level 1 weights (2 bytes each), `01`,
-  then one section per further level, each ending with an end token. Almost
-  every level 2 weight is `0020` and level 3 weight is `0002`, so those
-  defaults are not written. Each non-default weight is a token carrying the
-  count of defaults before it, and the section ends with an end token carrying
-  the trailing default count. Weights below the default sort before it and
-  weights above sort after it, so counts are encoded to keep that order. Do not
-  reintroduce the MySQL `00 00` level separators. `STRING_ENCODING.md` documents
-  the format. Keep it in sync with any change to the encoding.
-- `weightString` returns this key for `as_cs` and `as_ci` and MySQL's bytes for
-  the other collations. Do not rely on the key matching `WEIGHT_STRING` for
-  `as_cs` and `as_ci`. Change the format only if the order tests still pass and
-  the key does not get larger for typical text.
-- Non-ASCII input throws for the ASCII-only collations. The UCA collations
-  throw on invalid UTF-8 and map code points through the shared table. Code
-  points absent from the table have an empty weight, except implicit Han.
-- `utf8mb4_0900_bin` returns the input bytes as the weight, without a copy, a
-  UTF-8 check, or a length check. The caller guarantees valid UTF-8 and the
-  character bound, and must not mutate the result.
-- `maxChars` is read only for PAD SPACE collations, where it sets the padding.
-  It is required there, and a value longer than it throws. NO PAD collations
-  ignore it. Never truncate a value to fit a bound.
-- Empty PAD SPACE text pads the weight output, not the input. Empty NO PAD text
-  has an empty weight.
-- Tests compare order, not bytes. Use `expectSameOrder` from `test/order.ts`: it
-  sorts the oracle rows by MySQL's bytes and requires every adjacent pair to
-  compare the same under our bytes, ties included. Do not assert exact hex for
-  `as_cs` or `as_ci` keys. Hand-written cases use `expectAscending` chains.
-  Compare PAD SPACE rows only within the same bound.
-- The oracle samples are seeded pseudo-random in `scripts/dump-oracle.mjs`:
-  ASCII, UTF-8, mixed scripts, and a dense set over a small alphabet (case,
-  accents, combining marks in both orders, NUL, Han, emoji) with long runs
-  around the 239 to 257 length boundaries. Add a new sample set there when a bug
-  shows a shape it misses.
+- The `as_cs` and `as_ci` collations share the table in
+  `generated/uca_0900_as_cs.ts`. The dump asserts the relationship between
+  their levels. Do not reintroduce a separate table.
+- Do not rely on the key matching `WEIGHT_STRING` for `as_cs` and `as_ci`.
+  Change the format only if the order tests still pass and the key does not get
+  larger for typical text.
+- Tests compare order, not bytes. Use `expectSameOrder` from `test/order.ts`.
+  Do not assert exact hex for `as_cs` or `as_ci` keys. Hand-written cases use
+  `expectAscending` chains. Compare PAD SPACE rows only within the same bound.
+- The oracle samples are seeded pseudo-random in `scripts/dump-oracle.mjs`. Add
+  a new sample set there when a bug shows a shape it misses.
 - Regenerate, do not hand-edit, `generated/collation_weights.ts`, `generated/uca_0900_as_cs.ts`, and `oracle.json`. Run
   `node scripts/dump-oracle.mjs` against a local MySQL 8.4 server.
 - No comments. Do not add function or type doc comments, comments that restate

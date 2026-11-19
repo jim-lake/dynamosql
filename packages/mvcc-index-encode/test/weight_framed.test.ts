@@ -48,7 +48,15 @@ describe('weightFramed', () => {
           if (collation === 'utf8mb4_0900_ai_ci') {
             expect(framed).to.deep.equal(Uint8Array.of(...raw, 0x01));
           } else if (collation.startsWith('ascii')) {
-            expect(framed).to.deep.equal(raw.map((b) => b + 1));
+            const k = collation === 'ascii_bin' ? 128n : 102n;
+            let w = 1;
+            while (k ** BigInt(bound ?? 0) > 255n * 256n ** BigInt(w - 1)) {
+              w++;
+            }
+            expect(
+              framed.length,
+              `${collation} bound ${String(bound)}`
+            ).to.equal(bound === 0 ? 1 : w);
           } else if (collation !== 'utf8mb4_0900_bin') {
             expect(framed).to.deep.equal(raw);
           }
@@ -86,11 +94,29 @@ describe('weightFramed', () => {
 
   it('pads PAD SPACE collations to the bound and shifts bytes up by one', () => {
     const value = new TextEncoder().encode('a');
-    expect([...weightFramed(value, 'ascii_general_ci', 5)]).to.deep.equal([
-      0x42, 0x21, 0x21, 0x21, 0x21,
-    ]);
-    expect([...weightFramed(Uint8Array.of(0), 'ascii_bin', 2)]).to.deep.equal([
-      0x01, 0x21,
-    ]);
+    expect(
+      Buffer.from(weightFramed(value, 'ascii_general_ci', 5)).toString('hex')
+    ).to.equal('02a5693970');
+    expect(
+      Buffer.from(weightFramed(Uint8Array.of(0), 'ascii_bin', 2)).toString(
+        'hex'
+      )
+    ).to.equal('0120');
+  });
+
+  it('frames empty ASCII values at bound 0 as a non-empty frame', () => {
+    for (const collation of ['ascii_bin', 'ascii_general_ci'] as const) {
+      const framed = weightFramed(new Uint8Array(0), collation, 0);
+      expect(framed.length, collation).to.be.greaterThan(0);
+      expect(framed[0] ?? 0x01, collation).to.be.greaterThan(0);
+    }
+  });
+
+  it('packs a full 255-byte ASCII value at bound 255 without overflow', () => {
+    const value = new TextEncoder().encode('a'.repeat(255));
+    expect(() => weightFramed(value, 'ascii_bin', 255)).to.not.throw();
+    expect(weightFramed(value, 'ascii_bin', 255).length).to.equal(224);
+    expect(weightFramed(value, 'ascii_general_ci', 255).length).to.equal(213);
+    expect(() => weightString(value, 'ascii_bin', 255)).to.not.throw();
   });
 });

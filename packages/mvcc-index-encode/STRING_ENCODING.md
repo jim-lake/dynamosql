@@ -22,39 +22,59 @@ compare equal encode to identical bytes. Encodings cannot be decoded.
 | `utf8mb4_0900_as_cs`, `utf8mb4_0900_as_ci` | `weightString` unchanged | 0                                           |
 | `utf8mb4_0900_ai_ci`                       | `weightString \|\| 01`   | 1                                           |
 | `utf8mb4_0900_bin`                         | `escape(bytes) \|\| 01`  | 1, plus 1 per input byte `00`, `01` or `02` |
-| `ascii_bin`, `ascii_general_ci`            | each weight byte plus 1  | 0                                           |
+| `ascii_bin`, `ascii_general_ci`            | packed rank integer      | fixed width `w`, see ASCII                  |
 
 - The `as_cs` key ends with the level 3 end byte `02`. The `as_ci` key ends with its level 2 end token. Every L1 code starts with a byte `>= 02`, and the `01` separator follows L1, so no key is a proper prefix of another.
 - `ai_ci` keys can be prefixes of each other, so `01` ends them. Every unit starts with a byte `>= 02`.
 - `bin` escapes `00`, `01` and `02` as `02 x`, so the terminator `01` never appears in the payload.
-- The ASCII key is padded to `maxChars`, so its width is fixed for a column. Weights are 0 to 127, and adding 1 keeps them above `00`, so the key never starts with the NULL byte.
+- The ASCII frame has a fixed width for a column, and its first byte is never `00`.
 
-The empty string frames as `01` for `ai_ci`, `01` for `bin`, `01 02 02` for `as_cs`, and `01 02` for `as_ci`.
+The empty string frames as `01` for `ai_ci`, `01` for `bin`, `01 02 02` for `as_cs`, and `01 02` for `as_ci`. The empty ASCII string at bound 0 frames as `01`.
 
 ## Collations
 
-| Collation            | Pad       | Key                                                              |
-| -------------------- | --------- | ---------------------------------------------------------------- |
-| `ascii_bin`          | PAD SPACE | 1 weight byte per character (the byte itself), padded            |
-| `ascii_general_ci`   | PAD SPACE | 1 weight byte per character (letters fold to upper case), padded |
-| `utf8mb4_0900_bin`   | NO PAD    | input bytes, not copied                                          |
-| `utf8mb4_0900_ai_ci` | NO PAD    | level 1 weights, 2 bytes each                                    |
-| `utf8mb4_0900_as_ci` | NO PAD    | compact 2-level key                                              |
-| `utf8mb4_0900_as_cs` | NO PAD    | compact 3-level key                                              |
+| Collation            | Pad       | Key                                                                                                                   |
+| -------------------- | --------- | --------------------------------------------------------------------------------------------------------------------- |
+| `ascii_bin`          | PAD SPACE | `weightString`: 1 weight byte per character, padded. `weightFramed`: packed rank integer                              |
+| `ascii_general_ci`   | PAD SPACE | `weightString`: 1 weight byte per character (letters fold to upper case), padded. `weightFramed`: packed rank integer |
+| `utf8mb4_0900_bin`   | NO PAD    | input bytes, not copied                                                                                               |
+| `utf8mb4_0900_ai_ci` | NO PAD    | level 1 weights, 2 bytes each                                                                                         |
+| `utf8mb4_0900_as_ci` | NO PAD    | compact 2-level key                                                                                                   |
+| `utf8mb4_0900_as_cs` | NO PAD    | compact 3-level key                                                                                                   |
 
 Other collations throw `RangeError`.
 
 ### ASCII
 
-Bytes `>= 0x80` throw. The key is padded with the space weight (`20`) to
-`maxChars` characters, so `a` and `a ` encode identically. `maxChars` is
-required. A longer value throws. Keys are comparable only with the same
-`maxChars`.
+Bytes `>= 0x80` throw. The value is padded with spaces to `maxChars`
+characters, so `a` and `a ` encode identically. `maxChars` is required. A
+longer value throws. Frames are comparable only with the same `maxChars`.
+
+`weightString` returns one weight per character, padded with the space weight
+(`20`). `weightFramed` packs the padded sequence:
+
+1. Rank the distinct MySQL weights in ascending order: 128 ranks for
+   `ascii_bin` and 102 for `ascii_general_ci`. Case folding and padding happen
+   first.
+2. Write the `n` padded ranks as a base-`K` integer `x` (`K` is the rank count),
+   most significant rank first.
+3. Take the smallest whole-byte width `w >= 1` with `K^n <= 255 × 256^(w-1)`.
+   The frame is `256^(w-1) + x` in `w` big-endian bytes. The leading byte is
+   never `00`, and every frame in a column has the same length.
+4. At bound 0 the frame is `01`.
+
+Equal values, including values that differ only by trailing spaces at the same
+bound, get equal frames. At bound 255 the frame is 224 bytes for `ascii_bin`
+and 213 bytes for `ascii_general_ci`.
 
 ```
-ascii_bin         'A' maxChars 3  ->  41 20 20
-ascii_general_ci  'a' maxChars 3  ->  41 20 20
+ascii_bin         'A' maxChars 3  (weightFramed)  ->  11 50 20
+ascii_general_ci  'a' maxChars 3  (weightFramed)  ->  0B 5E 84
+ascii_bin         ''  maxChars 0  (weightFramed)  ->  01
 ```
+
+The `weightString` key for `'A'` with `maxChars` 3 is `41 20 20` for both
+collations.
 
 ### `utf8mb4_0900_bin`
 
@@ -160,7 +180,7 @@ Per collation, `n` is the number of characters, and the length is the framed key
 
 | Collation            | Worst case                                                                                                                                                | Basis                                                                                                                                        |
 | -------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
-| `ascii_*`            | exactly `maxChars` bytes                                                                                                                                  | Fixed width. `maxChars` is required.                                                                                                         |
+| `ascii_*`            | `w` bytes, the smallest `w` with `K^maxChars <= 255 × 256^(w-1)`: 224 at 255 for `ascii_bin`, 213 for `ascii_general_ci`                                  | Fixed width, matching the packing bound. `maxChars` is required.                                                                             |
 | `utf8mb4_0900_bin`   | `<= 4n + 1` bytes                                                                                                                                         | Proven. A 4-byte character is never escaped. Each input byte `00`..`02` (ASCII only) costs 2 bytes, so no character costs more than 4 bytes. |
 | `utf8mb4_0900_ai_ci` | `<= 16n + 1` bytes                                                                                                                                        | Proven from the table. The largest character (U+337F) has 8 units, each 2 bytes.                                                             |
 | `utf8mb4_0900_as_ci` | Measured: 12.07 bytes per character (U+3316 repeated 41 times, 495 bytes). No bound in tests.                                                             | Measured, not proven.                                                                                                                        |
