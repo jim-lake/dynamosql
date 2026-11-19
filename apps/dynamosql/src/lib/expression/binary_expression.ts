@@ -1,7 +1,8 @@
-import { getExprCollation, isCaseInsensitive } from '../helpers/collation';
+import { isCaseInsensitive } from '../helpers/collation';
 import { likeToRegExp } from '../helpers/like_helper';
 import { convertBooleanValue } from '../helpers/sql_conversion';
 
+import { getExprCollation } from './collation';
 import {
   equal,
   nullSafeEqual,

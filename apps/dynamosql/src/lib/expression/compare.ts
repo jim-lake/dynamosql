@@ -1,4 +1,4 @@
-import { getExprCollation, stringCompare } from '../helpers/collation';
+import { stringCompare } from '../helpers/collation';
 import {
   convertNum,
   convertDateTime,
@@ -8,6 +8,7 @@ import { SQLDate } from '../types/sql_date';
 import { SQLDateTime } from '../types/sql_datetime';
 import { SQLTime } from '../types/sql_time';
 
+import { getExprCollation } from './collation';
 import { getValue } from './evaluate';
 
 import type { EvaluationState, EvaluationResult } from './evaluate';
@@ -268,7 +269,7 @@ function _equal(
     } else if (left_val === right_val) {
       value = 1;
     } else if (typeof left_val === 'string' && typeof right_val === 'string') {
-      const collation = getExprCollation(expr, state);
+      const collation = getExprCollation([expr.left, expr.right], state);
       value = stringCompare(left_val, right_val, collation) === 0 ? 1 : 0;
     }
   }

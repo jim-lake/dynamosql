@@ -1,9 +1,10 @@
-import { getExprCollation, stringCompare } from '../helpers/collation';
+import { stringCompare } from '../helpers/collation';
 import {
   convertBooleanValue,
   convertDateTime,
 } from '../helpers/sql_conversion';
 
+import { getExprCollation } from './collation';
 import { convertCompare } from './compare';
 import { getValue } from './evaluate';
 import { unionType, unionValue } from './func_comp';

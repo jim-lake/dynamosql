@@ -1,8 +1,9 @@
 import { SQLError } from '../../error';
 import { Types } from '../../types';
 import { getValue } from '../expression';
+import { getExprCollation } from '../expression/collation';
 
-import { getExprCollation, stringCompare } from './collation';
+import { stringCompare } from './collation';
 
 import type { COLLATIONS } from '../../constants/mysql';
 import type { FieldInfo } from '../../types';

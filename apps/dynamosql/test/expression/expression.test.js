@@ -520,6 +520,11 @@ describe('Expression', function () {
   runTests('collation.sql', path.join(__dirname, 'collation.sql'), {
     verify_field_types: true,
   });
+  runTests(
+    'collation_function.sql',
+    path.join(__dirname, 'collation_function.sql'),
+    { verify_field_types: true }
+  );
   runTests('collation_error.sql', path.join(__dirname, 'collation_error.sql'), {
     allowedErrors: 'SAME_CODE',
     verify_field_types: true,

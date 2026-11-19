@@ -3,8 +3,9 @@ import { setTimeout } from 'node:timers/promises';
 import { SQLError } from '../error';
 
 import * as Expression from './expression';
+import { getExprCollation } from './expression/collation';
 import { isBaseFrom, isDerivedFrom } from './helpers/ast_helper';
-import { foldString, getExprCollation } from './helpers/collation';
+import { foldString } from './helpers/collation';
 import { resolveReferences } from './helpers/column_ref_helper';
 import { makeEngineGroups } from './helpers/engine_groups';
 import { formGroup, formImplicitGroup, hasAggregate } from './helpers/group';

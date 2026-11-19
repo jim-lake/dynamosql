@@ -2,9 +2,9 @@ import * as crypto from 'node:crypto';
 
 import { COLLATIONS } from '../../constants/mysql';
 import { assertArgCount } from '../helpers/arg_count';
-import { getExprCollation } from '../helpers/collation';
 import { convertNum } from '../helpers/sql_conversion';
 
+import { getExprCollation } from './collation';
 import { getValue } from './evaluate';
 
 import type { EvaluationState, EvaluationResult } from './evaluate';
@@ -68,6 +68,10 @@ export function charset(
   return { err: null, value, type: 'string' };
 }
 
+const COLLATION_NAMES: Partial<Record<COLLATIONS, string>> = {
+  [COLLATIONS.UTF8_GENERAL_CI]: 'utf8mb3_general_ci',
+};
+
 export function collation(
   expr: Function,
   state: EvaluationState
@@ -77,9 +81,11 @@ export function collation(
   if (arg.err) {
     return arg;
   }
-  const coll =
-    arg.type === 'string' ? getExprCollation(expr.args.value[0], state) : null;
-  const value = coll === null ? 'binary' : COLLATIONS[coll].toLowerCase();
+  const coll = getExprCollation(expr.args.value[0], state);
+  const value =
+    coll === null
+      ? 'binary'
+      : (COLLATION_NAMES[coll] ?? COLLATIONS[coll].toLowerCase());
   return { err: null, value, type: 'string' };
 }
 

@@ -3,13 +3,12 @@ import {
   COERCIBILITY,
   getExprCoercibility,
   getExprCollation,
-  isCaseInsensitive,
-  isPadCollation,
-} from '../collation';
+} from '../../expression/collation';
+import { isCaseInsensitive, isPadCollation } from '../collation';
 
 import { convertValueExpression, convertWhere } from './convert_where';
 
-import type { ExprArgument } from '../collation';
+import type { ExprArgument } from '../../expression/collation';
 import type { ConvertWhereState, ConvertResult } from './convert_where';
 import type { ExpressionValue, Binary } from 'node-sql-parser/build/mysql';
 

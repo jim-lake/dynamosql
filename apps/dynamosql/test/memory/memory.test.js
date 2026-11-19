@@ -52,6 +52,11 @@ describe('Temp', function () {
   runTests('collation.sql', path.join(__dirname, 'collation.sql'), {
     checkChanged: true,
   });
+  runTests(
+    'memory_collation_function.sql',
+    path.join(__dirname, 'memory_collation_function.sql'),
+    { checkChanged: true, verify_field_types: true }
+  );
   runTests('temp_keyless.sql', path.join(__dirname, 'temp_keyless.sql'), {
     checkChanged: true,
   });

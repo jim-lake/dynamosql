@@ -1,5 +1,5 @@
 import { assertArgCount, assertArgCountParse } from '../helpers/arg_count';
-import { getExprCollation, stringCompare } from '../helpers/collation';
+import { stringCompare } from '../helpers/collation';
 import { getDecimals } from '../helpers/decimals';
 import {
   convertNum,
@@ -9,6 +9,7 @@ import {
   convertTime,
 } from '../helpers/sql_conversion';
 
+import { getExprCollation } from './collation';
 import { getValue } from './evaluate';
 
 import type { ValueType } from '../types/value_type';
