@@ -2,7 +2,7 @@ import { describe, it } from 'mocha';
 import { expect } from 'chai';
 import { asCsWriteLevel } from '../src/uca';
 import { COLLATION_NAMES, type CollationName } from '../src/collations';
-import { weightFramed } from '../src/weight_string';
+import { weightString } from '../src/weight_string';
 import { primaryCodes, primaryLengths } from '../src/primary_bits';
 import { compareBytes } from './order';
 
@@ -36,7 +36,7 @@ function cat(...parts: Uint8Array[]): Uint8Array {
 const utf8 = (s: string): Uint8Array => new TextEncoder().encode(s);
 
 function frame(s: string, name: CollationName): Uint8Array {
-  return weightFramed(utf8(s), name);
+  return weightString(utf8(s), name);
 }
 
 describe('suffix matrix over frames', () => {

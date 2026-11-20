@@ -1,36 +1,32 @@
 # String encoding
 
-`weightString(value, collation, maxChars?)` returns an ordered key. `weightFramed` returns a component suitable for concatenation. Equal values have identical bytes within each function. A NULL component is `00`. A non-NULL frame has a nonzero first byte and ends before the next component. Both functions take a byte array. All four utf8mb4 collations decode UTF-8 and raise `RangeError` for malformed input.
+**Every collation is NO PAD.** Values are compared without padding to a declared width, including `ascii_bin` and `ascii_general_ci`. Trailing spaces are significant, and no input is padded.
 
-| Collation          | Padding   | Frame                                                   |
-| ------------------ | --------- | ------------------------------------------------------- |
-| ascii_bin          | PAD SPACE | Pack padded MySQL weight ranks as a fixed-width integer |
-| ascii_general_ci   | PAD SPACE | Pack padded case-folded ranks as a fixed-width integer  |
-| utf8mb4_0900_bin   | NO PAD    | Ordered scalar codes followed by an end byte            |
-| utf8mb4_0900_ai_ci | NO PAD    | Primary bit stream                                      |
-| utf8mb4_0900_as_ci | NO PAD    | Primary and secondary bit streams                       |
-| utf8mb4_0900_as_cs | NO PAD    | Primary, secondary and tertiary bit streams             |
+`weightString(value, collation)` returns an ordered key. Equal values have identical bytes. Its input is a byte array. All four utf8mb4 collations decode UTF-8 and raise `RangeError` for malformed input. An unsupported collation raises `Error` with the message `unsupported`.
 
-For PAD SPACE, supply a nonnegative integral declared character width and compare frames within the same width. Values exceeding the bound and non-ASCII bytes raise `RangeError`. NO PAD ignores the bound. An unsupported collation raises `RangeError`.
+| Collation          | Frame                                        |
+| ------------------ | -------------------------------------------- |
+| ascii_bin          | Ordered ASCII table weights                  |
+| ascii_general_ci   | Ordered case-folded ASCII table weights      |
+| utf8mb4_0900_bin   | Ordered scalar codes followed by an end byte |
+| utf8mb4_0900_ai_ci | Primary bit stream                           |
+| utf8mb4_0900_as_ci | Primary and secondary bit streams            |
+| utf8mb4_0900_as_cs | Primary, secondary and tertiary bit streams  |
 
 ## Worst-case frame size
 
-`M(n)` is the largest non-NULL `weightFramed` result in bytes for a value of at most `n` characters. For ASCII, `n` is the declared PAD SPACE width and every valid input at that width has the same frame length. For `utf8mb4`, count Unicode scalars. The formulas include all framing bits and final byte padding, and apply at `n = 0`.
+`M(n)` is the largest non-NULL `weightString` result in bytes for a value of at most `n` Unicode scalars. The formulas include all framing bits and final byte padding, and apply at `n = 0`.
 
 | Collation            | Exact M(n) in bytes  | Largest n in 1,012 bytes | M(n) at cutoff | M(n + 1) |
 | -------------------- | -------------------- | -----------------------: | -------------: | -------: |
-| `ascii_bin`          | W(128, n)            |                    1,156 |          1,012 |    1,013 |
-| `ascii_general_ci`   | W(102, n)            |                    1,213 |          1,012 |    1,013 |
 | `utf8mb4_0900_bin`   | 3n + 1               |                      337 |          1,012 |    1,015 |
 | `utf8mb4_0900_ai_ci` | ceil((44n + 8) / 8)  |                      183 |          1,008 |    1,013 |
 | `utf8mb4_0900_as_ci` | ceil((59n + 10) / 8) |                      137 |          1,012 |    1,019 |
 | `utf8mb4_0900_as_cs` | ceil((76n + 11) / 8) |                      106 |          1,009 |    1,018 |
 
-`W(K, n)` is the smallest positive integer `w` satisfying `Kⁿ ≤ 255 × 256^(w−1)`. The padded rank sequence has `Kⁿ` possible values. A frame of `w` bytes allows 255 choices for its nonzero first byte and 256 for each subsequent byte.
-
 ### Composite indexes
 
-The 1,012-byte budget applies to all column frames together. Add the independent column maxima, then reserve 12 more bytes for the transaction ID and ordinal. A NULL component occupies one byte. For example, an `ai_ci` column of width 183 can use 1,008 bytes. Adding an `ascii_bin` column of width 4 brings the maximum to exactly 1,012 bytes. Width 5 brings it to 1,013.
+The 1,012-byte budget applies to all column frames together. Add the independent column maxima, then reserve 12 more bytes for the transaction ID and ordinal. A NULL component occupies one byte. For example, an `ai_ci` column of width 183 can use 1,008 bytes.
 
 | Bytes available for one UCA column | Largest ai_ci width | Largest as_ci width | Largest as_cs width |
 | ---------------------------------: | ------------------: | ------------------: | ------------------: |
@@ -49,15 +45,9 @@ Start with zero bits in the initial context and negative infinity in the other f
 
 The largest payloads at widths 0 through 3 are 0, 77, 153 and 229 bits. At width 4 every context maximum equals its width-3 maximum plus 76 bits. Adding a constant to all five costs adds the same constant after the next transition, so the maximum is `76n + 1` payload bits for every positive width. The ten fixed bits give the table's byte formula. At width zero the ten fixed bits alone occupy two bytes. A concrete 106-scalar witness is U+FDFA, U+1F1A9, then 52 repetitions of the pair (U+327C, U+FDFA). Its frame occupies 1,009 bytes.
 
-## ASCII encodings
-
-`weightString` emits the MySQL table weight for each input byte, then the weight of U+0020 for every remaining character position up to the declared width. `weightFramed` assigns consecutive ranks starting at zero to the distinct weights in bytewise order. Equal weights share a rank. Pad with the rank of U+0020 and treat the resulting digits as an `n`-digit base-`K` integer `x`, most significant digit first. [ASCII weight tables](src/generated/collation_weights.ts)
-
-With `w = W(K, n)`, write `256^(w−1) + x` in exactly `w` big-endian bytes. The offset makes the first byte nonzero. At a common declared width, comparing frames compares the padded rank sequences, including ties from trailing spaces and case folding. At width zero the empty value has an empty raw key and frame `01`. [ASCII writers](src/weight_string.ts)
-
 ## Binary Unicode encoding
 
-For `utf8mb4_0900_bin`, both public functions write one code per scalar, followed by the end byte `01`. In the table, `u` is the scalar's numeric value and byte constants are hexadecimal. [Scalar writer](src/weight_string.ts)
+For `utf8mb4_0900_bin`, `weightString` writes one code per scalar, followed by the end byte `01`. In the table, `u` is the scalar's numeric value and byte constants are hexadecimal. [Scalar writer](src/weight_string.ts)
 
 | Scalar range                          | Code bytes in order                                                                                                                                  |
 | ------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -69,7 +59,7 @@ The lead byte determines the code length. Codes increase with the scalar value, 
 
 ## UCA frame layout
 
-For these three collations, `weightString` and `weightFramed` return the same bytes. Decode the UTF-8 input into Unicode scalars. For each active level, concatenate the nonzero 16-bit MySQL weight units for all scalars in input order. An expansion contributes every unit at that level. An ignorable contributes none. The lookup handles implicit Han weights as well as stored table entries. [Weight lookup](src/uca.ts)
+For these three collations, `weightString` returns the frame. Decode the UTF-8 input into Unicode scalars. For each active level, concatenate the nonzero 16-bit MySQL weight units for all scalars in input order. An expansion contributes every unit at that level. An ignorable contributes none. The lookup handles implicit Han weights as well as stored table entries. [Weight lookup](src/uca.ts)
 
 | Collation            | Fields in bit order                                  | Final comparison level |
 | -------------------- | ---------------------------------------------------- | ---------------------- |

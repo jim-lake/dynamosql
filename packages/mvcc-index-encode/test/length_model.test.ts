@@ -1,5 +1,5 @@
 import { describe, it } from 'mocha';
-import { weightFramed } from '../src/weight_string';
+import { weightString } from '../src/weight_string';
 import { expectAscending } from './order';
 
 describe('tertiary ordering across packed ranks', () => {
@@ -10,7 +10,7 @@ describe('tertiary ordering across packed ranks', () => {
         const text = prefix + suffix;
         return [
           text,
-          weightFramed(Buffer.from(text), 'utf8mb4_0900_as_cs'),
+          weightString(Buffer.from(text), 'utf8mb4_0900_as_cs'),
         ] as const;
       });
       expectAscending(chain, '<');

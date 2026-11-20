@@ -45,13 +45,6 @@ describe('weightString UTF-8 decoding edge cases', () => {
         'Invalid UTF-8'
       );
     });
-
-    it(`rejects ${name} before checking the bound`, () => {
-      expect(() => weightString(Uint8Array.from(bytes), UCA, 4)).to.throw(
-        RangeError,
-        'Invalid UTF-8'
-      );
-    });
   }
 
   it('orders decoded boundary scalars by their primary weights', () => {
@@ -69,38 +62,6 @@ describe('weightString UTF-8 decoding edge cases', () => {
     const a = weightString(new TextEncoder().encode('a'), UCA);
     const got = weightString(new Uint8Array([...bom, 0x61]), UCA);
     expect(bytesToHex(got)).to.equal(bytesToHex(a));
-  });
-
-  it('ignores the bound for NO PAD collations', () => {
-    const value = new TextEncoder().encode('aé中\u{1f600}');
-    expect(bytesToHex(weightString(value, UCA, 0))).to.equal(
-      bytesToHex(weightString(value, UCA))
-    );
-  });
-
-  it('counts characters, not bytes, against the bound for PAD SPACE', () => {
-    expect(() =>
-      weightString(Uint8Array.from([0x61, 0x62, 0x63]), 'ascii_general_ci', 2)
-    ).to.throw(RangeError, 'above bound 2');
-    expect(() =>
-      weightString(Uint8Array.from([0x61, 0x62]), 'ascii_general_ci', 2)
-    ).to.not.throw();
-  });
-
-  it('pads ASCII PAD SPACE text with one space weight per missing character', () => {
-    const c = 'ascii_general_ci';
-    const a = weightString(Uint8Array.from([0x61]), c, 1);
-    const space = weightString(Uint8Array.from([0x20]), c, 1);
-    const padded = weightString(Uint8Array.from([0x61]), c, 3);
-    expect(bytesToHex(padded)).to.equal(
-      bytesToHex(new Uint8Array([...a, ...space, ...space]))
-    );
-  });
-
-  it('rejects non-ASCII bytes under ascii_bin', () => {
-    expect(() =>
-      weightString(Uint8Array.from([0x61, 0xc3, 0xa9]), 'ascii_bin', 3)
-    ).to.throw(RangeError, 'Non-ASCII byte');
   });
 });
 

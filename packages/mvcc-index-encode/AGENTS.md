@@ -10,13 +10,15 @@ and the oracle fixtures are the source of truth for this package.
 
 ## Status
 
-Only `weightString` and `weightFramed` are implemented. Other value encodings
+Only `weightString` is implemented. Other value encodings
 (integers, DECIMAL, FLOAT/DOUBLE, temporal types) and the key/index builders are
 not written yet. `STRING_ENCODING.md` is the only description of the string
 key and framing formats; do not restate them here.
 
 ## Rules
 
+- Every collation is NO PAD, including `ascii_bin` and `ascii_general_ci`.
+  Nothing pads a value to a declared width, and trailing spaces are significant.
 - Collations: only `ascii_bin`, `ascii_general_ci`, `utf8mb4_0900_bin`,
   `utf8mb4_0900_ai_ci`, `utf8mb4_0900_as_ci`, and `utf8mb4_0900_as_cs`. Do not
   add others without an oracle check.
@@ -33,8 +35,7 @@ key and framing formats; do not restate them here.
   collation. Do not add assertions that would fail when the encoding changes,
   such as exact frame lengths, `maxBytes` values, or witness sizes. Tests assert
   ordering and equality only. Use `expectSameOrder` from `test/order.ts`.
-  Hand-written cases use `expectAscending` chains. Compare PAD SPACE rows only
-  within the same bound.
+  Hand-written cases use `expectAscending` chains.
 - Investigation and probe scripts go under `scripts/`, named for what they
   measure or check (for example `length_model.ts`, not `test1.ts`). Keep them
   there after use. `scripts/` is excluded from `ts:check` (tsconfig) and lint

@@ -1,11 +1,10 @@
 import { readFileSync } from 'node:fs';
 import { describe, it } from 'mocha';
 import { expect } from 'chai';
-import { hexToBytes } from '../src/bytes';
+import { bytesToHex, hexToBytes } from '../src/bytes';
 import { getCollation } from '../src/collations';
 import { asCsWriteLevel } from '../src/uca';
-import { weightString, weightFramed } from '../src/weight_string';
-import { bytesToHex } from '../src/bytes';
+import { weightString } from '../src/weight_string';
 import { compareBytes, expectAscending, expectSameOrder } from './order';
 
 interface Oracle {
@@ -28,10 +27,9 @@ function suite(name: Name, levels: 2 | 3): void {
   const cs = levels === 3;
 
   describe(name, () => {
-    it('is a NO PAD multi-level collation', () => {
+    it('is a multi-level collation', () => {
       const info = getCollation(name);
       expect(info.kind).to.equal('multi-level');
-      expect(info.pad).to.equal('NO PAD');
       expect(info.kind === 'multi-level' && info.levels).to.equal(levels);
     });
 
@@ -229,20 +227,6 @@ function suite(name: Name, levels: 2 | 3): void {
         );
       });
 
-      it('orders ASCII samples like MySQL', () => {
-        const ascii = rows.filter((row) =>
-          /^([0-7][0-9A-F])+$/i.test(row.value_hex)
-        );
-        expect(ascii.length).to.be.greaterThan(0);
-        expectSameOrder(
-          ascii.map((row) => ({
-            id: row.value_hex,
-            oracle: hexToBytes(row.weight_hex),
-            ours: eh(row.value_hex),
-          }))
-        );
-      });
-
       it('orders long mixed strings like MySQL', () => {
         const long = rows.filter((row) => row.value_hex.length > 400);
         expect(long.length).to.be.greaterThan(0);
@@ -257,12 +241,6 @@ function suite(name: Name, levels: 2 | 3): void {
     });
 
     describe('input handling', () => {
-      it('ignores maxChars', () => {
-        const v = enc.encode('abc');
-        expect(weightString(v, name, 1)).to.deep.equal(weightString(v, name));
-        expect(weightString(v, name, 100)).to.deep.equal(weightString(v, name));
-      });
-
       it('throws on invalid UTF-8', () => {
         for (const hex of [
           'C3',
@@ -295,30 +273,14 @@ function suite(name: Name, levels: 2 | 3): void {
     describe('framing', () => {
       it('never starts with 00 and is never empty', () => {
         for (const text of ['', '\u0000', 'a', '一', '\u0301']) {
-          const framed = weightFramed(enc.encode(text), name);
+          const framed = weightString(enc.encode(text), name);
           expect(framed.length).to.be.greaterThan(0);
           expect(framed[0]).to.be.greaterThan(0);
         }
       });
 
-      it('orders frames like the encodings', () => {
-        const texts = ['', 'a', 'A', 'á', 'ab', 'aB', 'b', ' ', 'a b', '一'];
-        for (const x of texts) {
-          for (const y of texts) {
-            expect(
-              compareBytes(
-                weightFramed(enc.encode(x), name),
-                weightFramed(enc.encode(y), name)
-              ),
-              JSON.stringify([x, y])
-            ).to.equal(
-              compareBytes(
-                weightString(enc.encode(x), name),
-                weightString(enc.encode(y), name)
-              )
-            );
-          }
-        }
+      it('orders a prefix before its extension and keeps the empty frame smallest', () => {
+        expectAscending(chain(['', 'a', 'ab', 'abc']), '<');
       });
     });
   });

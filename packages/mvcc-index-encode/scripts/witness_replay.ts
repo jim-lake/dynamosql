@@ -1,4 +1,4 @@
-import { weightFramed } from '../src/index';
+import { weightString } from '../src/index';
 import {
   computeCurve,
   scanGroups,
@@ -14,7 +14,7 @@ const enc = new TextEncoder();
 for (let k = 0; k <= max; k++) {
   const cps = curve.witnesses[k] ?? [];
   const text = String.fromCodePoint(...cps);
-  const framed = weightFramed(enc.encode(text), collation, k).length;
+  const framed = weightString(enc.encode(text), collation).length;
   const model = curve.maxBytes[k] ?? -1;
   if (framed !== model)
     throw new Error(`Replay mismatch at ${k}: ${framed} vs ${model}`);

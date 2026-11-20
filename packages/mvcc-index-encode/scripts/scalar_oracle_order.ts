@@ -1,5 +1,5 @@
 import { asCsWriteLevel } from '../src/uca';
-import { weightFramed } from '../src/weight_string';
+import { weightString } from '../src/weight_string';
 
 const variants = ['ai_ci', 'as_ci', 'as_cs'] as const;
 const count = 0x110000 - 0x800;
@@ -23,7 +23,7 @@ for (const [index, variant] of variants.entries()) {
       at += n;
     }
     const value = Buffer.from(String.fromCodePoint(cp));
-    const key = weightFramed(value, collation);
+    const key = weightString(value, collation);
     if (!key[0]) throw new Error('Frame collides with NULL');
     frames.set(key, ends[input]);
     offsets[input + 1] = at;

@@ -1,6 +1,6 @@
 import { asCsWriteLevel } from '../src/uca';
 import { primaryLengths } from '../src/primary_bits';
-import { weightFramed } from '../src/weight_string';
+import { weightString } from '../src/weight_string';
 
 const buf = new Uint8Array(64);
 let maxBits = 0;
@@ -23,7 +23,7 @@ const fixed = 1 + primaryLengths[0];
 const cutoff = Math.floor((8 * 1012 - fixed) / maxBits);
 for (let n = 0; n <= cutoff + 1; n++) {
   const value = Buffer.from(String.fromCodePoint(witness).repeat(n));
-  const bytes = weightFramed(value, 'utf8mb4_0900_ai_ci').length;
+  const bytes = weightString(value, 'utf8mb4_0900_ai_ci').length;
   if (bytes !== Math.ceil((n * maxBits + fixed) / 8))
     throw new Error('Replay at ' + n);
 }

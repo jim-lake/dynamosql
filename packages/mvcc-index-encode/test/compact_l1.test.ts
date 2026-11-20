@@ -1,7 +1,7 @@
 import { describe, it } from 'mocha';
 import { expect } from 'chai';
 import { ucaWriteCompactL1 } from '../src/uca';
-import { weightFramed, weightString } from '../src/weight_string';
+import { weightString } from '../src/weight_string';
 import { compareBytes, expectAscending } from './order';
 
 function compactL1(cp: number): Uint8Array {
@@ -43,12 +43,12 @@ describe('compact level 1 codes', () => {
     );
   });
 
-  it('frames repeated U+337F in strictly increasing order', () => {
-    const framed = [1, 2, 10, 41].map((n) =>
-      weightFramed(new TextEncoder().encode('㍿'.repeat(n)), UCA)
+  it('orders repeated U+337F in strictly increasing order', () => {
+    const keys = [1, 2, 10, 41].map((n) =>
+      weightString(new TextEncoder().encode('㍿'.repeat(n)), UCA)
     );
     expectAscending(
-      framed.map((f, i) => [String(i), f] as const),
+      keys.map((k, i) => [String(i), k] as const),
       '<'
     );
   });

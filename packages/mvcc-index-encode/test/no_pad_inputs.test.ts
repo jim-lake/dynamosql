@@ -1,10 +1,9 @@
 import { describe, it } from 'mocha';
 import { expect } from 'chai';
 import { bytesToHex } from '../src/bytes';
-import { weightFramed, weightString } from '../src/weight_string';
+import { weightString } from '../src/weight_string';
 
 const NO_PAD = [
-  'utf8mb4_0900_bin',
   'utf8mb4_0900_ai_ci',
   'utf8mb4_0900_as_ci',
   'utf8mb4_0900_as_cs',
@@ -21,30 +20,13 @@ const INVALID: [string, number[]][] = [
 
 describe('NO PAD collations reject malformed UTF-8', () => {
   for (const name of NO_PAD) {
-    if (name === 'utf8mb4_0900_bin') {
-      continue;
-    }
     for (const [label, bytes] of INVALID) {
-      it(`${name} rejects ${label} in weightString and weightFramed`, () => {
-        const value = Uint8Array.from(bytes);
-        expect(() => weightString(value, name)).to.throw(RangeError);
-        expect(() => weightFramed(value, name)).to.throw(RangeError);
+      it(`${name} rejects ${label}`, () => {
+        expect(() => weightString(Uint8Array.from(bytes), name)).to.throw(
+          RangeError
+        );
       });
     }
-  }
-});
-
-describe('NO PAD ignores maxChars', () => {
-  const value = new TextEncoder().encode('aé中\u{1f600}');
-  for (const name of NO_PAD) {
-    it(`${name} gives identical output for omitted, zero and small bounds`, () => {
-      const plain = bytesToHex(weightString(value, name));
-      const framed = bytesToHex(weightFramed(value, name));
-      for (const bound of [undefined, 0, 1, 2]) {
-        expect(bytesToHex(weightString(value, name, bound))).to.equal(plain);
-        expect(bytesToHex(weightFramed(value, name, bound))).to.equal(framed);
-      }
-    });
   }
 });
 
@@ -54,28 +36,22 @@ describe('scratch-backed results', () => {
     expect(weightString(value, 'utf8mb4_0900_bin')).to.not.equal(value);
   });
 
-  it('keeps an earlier weightFramed result intact after a larger call', () => {
-    const first = weightFramed(
+  it('keeps an earlier result intact after a larger call', () => {
+    const first = weightString(
       new TextEncoder().encode('ab'),
       'utf8mb4_0900_as_cs'
     );
     const snapshot = bytesToHex(first);
-    weightFramed(
+    weightString(
       new TextEncoder().encode('z'.repeat(900)),
       'utf8mb4_0900_as_cs'
     );
     expect(bytesToHex(first)).to.equal(snapshot);
   });
 
-  it('throws for an unsupported collation on both entry points', () => {
-    const value = Uint8Array.of(0x61);
-    expect(() => weightString(value, 'latin1_swedish_ci' as never, 1)).to.throw(
-      Error,
-      'unsupported'
-    );
-    expect(() => weightFramed(value, 'latin1_swedish_ci' as never, 1)).to.throw(
-      Error,
-      'unsupported'
-    );
+  it('throws for an unsupported collation', () => {
+    expect(() =>
+      weightString(Uint8Array.of(0x61), 'latin1_swedish_ci' as never)
+    ).to.throw(Error, 'unsupported');
   });
 });

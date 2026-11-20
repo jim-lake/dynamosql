@@ -1,12 +1,11 @@
 import { COLLATION_NAMES, type CollationName } from '../src/collations';
-import { weightFramed, weightString } from '../src/weight_string';
+import { weightString } from '../src/weight_string';
 
 interface Workload {
   readonly name: string;
   readonly asciiOnly: boolean;
   readonly rounds: number;
   readonly strings: readonly Uint8Array[];
-  readonly bound: number;
 }
 
 const COUNT = 20000;
@@ -32,17 +31,15 @@ function build(
   const next = makeRandom(SEED + name.length);
   const encoder = new TextEncoder();
   const strings: Uint8Array[] = [];
-  let bound = 0;
   for (let i = 0; i < COUNT; i++) {
     const len = minLen + (next() % (maxLen - minLen + 1));
     const cps: number[] = [];
     for (let j = 0; j < len; j++) {
       cps.push(pick(next));
     }
-    bound = Math.max(bound, len);
     strings.push(encoder.encode(String.fromCodePoint(...cps)));
   }
-  return { name, asciiOnly, rounds, strings, bound };
+  return { name, asciiOnly, rounds, strings };
 }
 
 const printable = (next: () => number): number => 0x20 + (next() % 95);
@@ -81,16 +78,13 @@ function now(): number {
 
 function run(
   collation: CollationName,
-  load: Workload,
-  framed: boolean
+  load: Workload
 ): { ms: number; ops: number; bytes: number } {
   let bytes = 0;
   const start = now();
   for (let round = 0; round < load.rounds; round++) {
     for (const value of load.strings) {
-      bytes += framed
-        ? weightFramed(value, collation, load.bound).length
-        : weightString(value, collation, load.bound).length;
+      bytes += weightString(value, collation).length;
     }
   }
   const ms = now() - start;
@@ -124,7 +118,7 @@ function main(): void {
 
   const warm = loads[0];
   if (warm !== undefined) {
-    run(collation, { ...warm, rounds: 1 }, true);
+    run(collation, { ...warm, rounds: 1 });
   }
 
   if (!json) {
@@ -133,30 +127,26 @@ function main(): void {
   let total = 0;
   const rows: object[] = [];
   for (const load of loads) {
-    for (const framed of [false, true]) {
-      const { ms, ops, bytes } = run(collation, load, framed);
-      total += ms;
-      const kind = framed ? 'weight+frame' : 'weight';
-      if (json) {
-        rows.push({
-          collation,
-          scale,
-          workload: load.name,
-          mode: kind,
-          seconds: ms / 1000,
-          opsPerSec: Math.round(ops / (ms / 1000)),
-          bytes,
-        });
-        continue;
-      }
-      console.log(
-        `${load.name.padEnd(14)} ${kind.padEnd(13)} ${(ms / 1000).toFixed(2).padStart(7)}s ${Math.round(
-          ops / (ms / 1000)
-        )
-          .toLocaleString()
-          .padStart(12)} ops/s ${String(bytes).padStart(14)} bytes`
-      );
+    const { ms, ops, bytes } = run(collation, load);
+    total += ms;
+    if (json) {
+      rows.push({
+        collation,
+        scale,
+        workload: load.name,
+        seconds: ms / 1000,
+        opsPerSec: Math.round(ops / (ms / 1000)),
+        bytes,
+      });
+      continue;
     }
+    console.log(
+      `${load.name.padEnd(14)} ${(ms / 1000).toFixed(2).padStart(7)}s ${Math.round(
+        ops / (ms / 1000)
+      )
+        .toLocaleString()
+        .padStart(12)} ops/s ${String(bytes).padStart(14)} bytes`
+    );
   }
   if (json) {
     console.log(

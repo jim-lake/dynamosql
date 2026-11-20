@@ -1,7 +1,7 @@
 import { primaryLengths } from '../src/primary_bits';
 import { readFileSync } from 'node:fs';
 import { asCsWriteLevel, ucaWriteCompactL1 } from '../src/uca';
-import { weightFramed } from '../src/weight_string';
+import { weightString } from '../src/weight_string';
 import { computeCurve, scanGroups } from '../test/helpers/length_model';
 
 const groups = scanGroups();
@@ -81,7 +81,7 @@ for (const variant of ['ai_ci', 'as_ci', 'as_cs'] as const) {
           Math.ceil((maxPrimary * i + 1 + primaryLengths[0]) / 8)
         )
       : computeCurve(variant, 180, groups).maxBytes;
-  const frame = (s: string) => weightFramed(Buffer.from(s), name).length;
+  const frame = (s: string) => weightString(Buffer.from(s), name).length;
   let pairMax = 0;
   for (const a of samples)
     for (const b of samples)

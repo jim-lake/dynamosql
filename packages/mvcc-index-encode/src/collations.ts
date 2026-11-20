@@ -17,13 +17,10 @@ export const COLLATION_NAMES = [
 
 export type CollationName = (typeof COLLATION_NAMES)[number];
 
-export type PadMode = 'PAD SPACE' | 'NO PAD';
-
 export type Charset = 'ascii' | 'utf8mb4';
 
 interface CollationBase {
   readonly charset: Charset;
-  readonly pad: PadMode;
 }
 
 export interface TableCollation extends CollationBase {
@@ -56,15 +53,13 @@ export interface ScalarCodeCollation extends CollationBase {
 export type CollationInfo =
   TableCollation | MultiLevelCollation | ScalarCodeCollation;
 
-const COLLATION_META: Readonly<
-  Record<CollationName, { charset: Charset; pad: PadMode }>
-> = {
-  ascii_bin: { charset: 'ascii', pad: 'PAD SPACE' },
-  ascii_general_ci: { charset: 'ascii', pad: 'PAD SPACE' },
-  utf8mb4_0900_bin: { charset: 'utf8mb4', pad: 'NO PAD' },
-  utf8mb4_0900_ai_ci: { charset: 'utf8mb4', pad: 'NO PAD' },
-  utf8mb4_0900_as_ci: { charset: 'utf8mb4', pad: 'NO PAD' },
-  utf8mb4_0900_as_cs: { charset: 'utf8mb4', pad: 'NO PAD' },
+const COLLATION_META: Readonly<Record<CollationName, { charset: Charset }>> = {
+  ascii_bin: { charset: 'ascii' },
+  ascii_general_ci: { charset: 'ascii' },
+  utf8mb4_0900_bin: { charset: 'utf8mb4' },
+  utf8mb4_0900_ai_ci: { charset: 'utf8mb4' },
+  utf8mb4_0900_as_ci: { charset: 'utf8mb4' },
+  utf8mb4_0900_as_cs: { charset: 'utf8mb4' },
 };
 
 const EMPTY = new Uint8Array(0);
