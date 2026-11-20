@@ -1,19 +1,5 @@
 import { zstdDecompressSync } from 'node:zlib';
 
-function hexToBytes(hex) {
-  if (hex.length % 2 !== 0 || !/^[0-9a-fA-F]*$/.test(hex)) {
-    throw new RangeError(`Invalid hex string: ${hex}`);
-  }
-  const out = new Uint8Array(hex.length / 2);
-  for (let i = 0; i < out.length; i++) {
-    out[i] = parseInt(hex.slice(i * 2, i * 2 + 2), 16);
-  }
-  return out;
-}
-function bytesToHex(bytes) {
-  return Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("").toUpperCase();
-}
-
 const CHAR_WEIGHTS = {
   "ascii_bin": [
     [0, "00"],
@@ -797,6 +783,17 @@ const CHAR_WEIGHTS = {
   ]
 };
 
+function hexToBytes(hex) {
+  if (hex.length % 2 !== 0 || !/^[0-9a-fA-F]*$/.test(hex)) {
+    throw new RangeError(`Invalid hex string: ${hex}`);
+  }
+  const out = new Uint8Array(hex.length / 2);
+  for (let i = 0; i < out.length; i++) {
+    out[i] = parseInt(hex.slice(i * 2, i * 2 + 2), 16);
+  }
+  return out;
+}
+
 const UCA_0900_AS_CS_BASE64 = [
   "KLUv/YBoIHjfAIxJABpS6BM4EHiNOuS0GF2+58zLztl82QTmOUwEAfB2HR6BtD1AlJNRKzJUSwC2EOQl5ROdQYImJEk63m6Ttgw2ARwBMwGCU7jNg2qwLYWKR9Hyyi2HkuWUV/5EyrG2/ZN5TnhYE86/U0le5VJR7zQajTJRWtKVeNGJkZ8kBRLO7csziSNhRr5FliDtECkx5FAIFUjSD86RwGZDH4iPiD2geCDtKHI80mGUow4H50+8MXrYCacgqoNPHwQDQwE/x5oezn/lDmIOWRvEGu4MaAxmv/GFu74w355eOm8Tz3xHtiBYwa6ukE6IwuEEp7myXFOcVYIQVIRQCJ9wmm9nt/IDcVuWAyvbUHXtboBWMzMYh+8WhBV005ioaGnw5pnZjFwmSEY3xrkULLYiDO879T6BOX1pJejyOusy4ypDQLY1dkBMKyzr2/VigXFhXI2tiLZRVUpRLdkAE9XS1E82hhQjlsD0ulhgKIrOCtR/iOwhAEKcfxDnzzuvH4jzEj4ChId7e7esB3abzW+qg2erutfuBrfazeAO9wV1GAVoKiFUGhoN/GdmX3ZFk43HxD6sqP6+F2z8leC9xl31VfUR3G39gWxYq7az6qAw1e7WW1jcv7L6bdVrDTzVtjv1WanHMl2/ADcqbe0PJVVNU9PTf5pyMjcx/ZKVkjnJjGQ+MhN4oy5eRB5AFvBEU3zohax40ANlufQDXAWj/4PF7Qcgxf/rWsq7/HnNe2jv86DP5/e8ns/zeJjuvJ3//PTXeTrvaXf+nJfzcR7Ov3nOd/Ntno295jdfzWt+mkfzZ2xxVVw1s5YpBHVreRkyY85VMVc8TBMYLf+y5V6yN+b17oK9uWzRWzgna8mC5UqXakXLL7O8ypVTwZotuQGfp+Z4+p1u5z+v6XQdOjX3DHf+HKlXzseRwvk3N+e7uWvzbKTpNZu1GtvW7HKp1E7zaKz4mTfzmZH3l8GS+TFTYj7MFcx/0Uaj7+Uxz9V7y2t5LFdqK+hLdBWbSres+XiKLcWOUgdxcuUOKDgoazxhnHxzIq7aTfwk/ZjYLUFT0tFkkd4kHYnUuR9ZMsJZJBPyiQx5FNKDOAJp/HHCXOijP+714OLRdyQ5dh1IOR7HlzeC3rC0UVkDk0aOGYUyGPsWxRTBMXq5CEb0RXchpwUlC0ly5IraqqInNqaYgUIRsZ84NNFZoh9CGXYSf4XiEXoijOoQTygF8YMfXvBqDdRywB9LPXz+fXZ4DhterOEzUHEM73fh+/h+76yXJwOvfGfhK3DLduI6MZ2YwoSfy8qJ48QBjEEWfSiWYxiW/2CEX3hdaLXgshhA5rFijwrPRM4UmSgmER9PQJpoUSLxsM6wkARgId8ILhF1IeQI4UC0Dap9SBMsC5wC/liNB9A/yQ5YOFRugBSP0YCZoQaGF34qLpjo8+ID74npVeVh8Szv0FgoqgBqh6cuSjdHQcwEL3NZ5CjjLiVIRpgCYQac4huiW+cDcVucAzc2trXe4EitM/iGtQu0CnqaG1oHQ555mk2W6ZGNBYpxhQ1+bXgLwfpXiARhr6GqtevpplxrCIBscTmwqPVZz7uPxf0rq99uedVru4Gneu7UZ7sUturaC3yAKMep9S37QzFVO/Wp038qO32TmZjpvHRWOiedkf6IwBtlVYvuAbeAm+geeqGgB5KaA5ij5h/ze9/7X//1oVe8zxX0yuf3UHE9AYUIqFPB7jTLAZMqirKQMQntk9B2yKIA4mFhOIIsxDIF56cH1rwXsA09V5u4grHUkReB+YbmaupZOhRX70HrbyETbxXHiBN8PlLSMYsabBeQtb36ABVb5GvaP21PKArRCvDr8nbQrn98vC/9a7OuA4Po8OejETYPeNd39ZHn4dn+4kZKTXwBqRpHFoGr4QFOPPAP8Y2jTJp+MrR4jF5LSbqojr08YR7HLloIpdQH8qfjvoRWFVblOlXih/oJR4taGraZDlSL2bFtLKO9NePoUcfftbwq9ZZiTqlSSYWDAnVCct0/AqlGHrQM9rI9GmYiZXmUDWIPW59Lkfe1Vl/i7/ldxviNHJNdtveGolGBxqm4NJylVkTGuofqNF19+HySonQMO6Zufubqowo6lxAFf6eSId5cfDpRbWIGp7qAg8OdrpUb13YjwXecZrtq//88lu1vDPC5zv6CmsOIg1VbFghX8st89KqmYGf6oTgRwUN4K6uJ5YWHMH7l72L4/axYZBnqRj79h0ZGTtszGVuI6tOFt2+pOk+gyZlAprIH17qwshtJE9bX6M7l487Oqa7pvlQBucvkTiqmnIZr4eHSYZQhOHK2AT4u3/dHdWzxP1ZFzhqp1dssEPHY1qkWh2evqRX+w1PVWJML0T4WlkZ0Zy7LqZ4TSoF3XXMFLski16pzEhLhPxkF2cCewrwh9CC7N5/55m/fkaicIbynxJ88ht7x8l2F3m7hOvEzhrUiocVBO1vOMWubVNiDUHB/DwMAkx2wBk8qWwysQlrCMPb6/xdAknvHgXKxT2Fg4NChMyvMGAhwAMbiGQHnPF1lSAkzmdEODOUk2VINwP2PlHlrAWawkB4wM4i7c6PkAzFYZ6QhbIWh/t2RZ2yQIdkQAUG/rp9jQS+m/UUkycEfxx+YXor/DxNlH3P0DunPPHjgYCi8aH3S9kpBL6Bf5JezwN25gfDwT2WFpRUA38EpaJSOgRNjWV1wwPiF4COxgcOjwExsauJRKDsaZB96o0J0wkfEkS9KcCsIZuaqrT0hzcqKShqZ6iKNDa2ENixyyRwiIhrb+HQ/+fGySAZoaiAtsEdbqAf0UAu0Mat8ctAUtcLqA3/DuPduCY2EKGpplNETeFiDvkr7gbjXxQKBr2CUZEe3Gn6HQeMI6ZyS7KmeEO7+GLnAljhEgcXw80qKe8YumSjg/3u0P6jtiTVUBVryCkAhQsYSrhHA9lDnZ00PZC1+yXYk20zxNT/uh7tsDywAVk92mvPFXqX+3PMUxaJ1ZWIpnj6wxt2f02rkvkBFtYOQvQe9XifjSFvIi6EOpB4Hug5qm4iFQir0iRkd7RTYHHzbMIgtBQIXvUcfi5CcdNxuNo6ZiPwkv8yJpNRrSMe6xHxmqwTIB4k6LOiEzJ9TeA/yKElCyXJj+BMpjwXOu+F5912AXbq8PwCEUmSa3ZsKnBydWZ5zn3ugJ6GNopGjAqQ+pTSmp4KoHImp5R3Yqh13q3essa21rsyv0LAYAAKxJbJMszO0RLVOtmq39bgLuQSTupW7MLx+vTG+gL+IwH3BicKWw5fEmMWZxprHm8icyZ3KnsufzKDNoc6iz6PQG/jR+dKk06XUptWn1qjXqdiH2YjaituN3ITdi96q36vgEOF34nHj/+SE5azmreeu6K/psOqx67Lss+207n/vtfC28bfyuPO59Lr1u/a89734vvm/+sD7wfzC/cP+xP/FAwAAAgIAJQEkAicDLQQyBToGJgcuCCsJOwopCywMKA0zDg88ED0RPhIzEyIUIxUzFjQXGBkaGz8cNB0eHyAhQCJBI0IkQyVEJkUnMCgxKSorLC1GLkcvNDBIMUkyITM0NEo1OTY1NzgvOUs6NDs8PTM+P0AlQSRCKkMiRAAEBEVMRkc0SDRJNEozS0xNNE5QM1FSUzRUVVZXM1hNWTRaWzNcNF0zXl80YE5hT2I0Y0cAA2SqZTJm3We1aHppj2oYa6psM22VbuNv/3DDA3EDcuRz5HQgdZR2wHfAeAQCAvvAg3h5eXrGe9l82H3afgI0f8eAgIGBgoKDg4SDhQSJJAOGHwOHi4i+icSKxouLjM6NjY7cj+GQAgYGAAKRuZK6k7uUvZW+lsKXxJjFmcaayJvJnMudzJ7Nn86gz6HUoqKj16Tbpdym3afeqN+p4aoAK6vcrAKtvq7Er8aw3LEgsrqzu7S9tb62wrfEuMW5xrrIu8m8y73Mvs2/zsDPwdTC1xkAA8MgxNvF3Mbdx97I38nhygLLAszOzdzO4c8fyB+5H8YAA9Ag0cXS3AAD0wrUCtXd1s/XBNjT2SDawdvB3L/dv97S39Lg4+Hj4iAF4+QK5QrmC+cL6A7pDuoV6xXsGO0Y7hzvHPDI",
   "8dTy1/PH9MX1vvYGEffl+OX51/rR+9H81v3Z/tj/2gQgWiUEICsCUAM2JAReBXQGiAcrCJEJvAriCyEZDJYkDYAlDiEdJg9/ECIRLhIyEzYUShVaFmIXbBiAGY0alhuwHMMdzB7nH+8g/CEFIg4jHSQuJTImWSdkKIMpiCqPK5QsmC2lLqkvrzAgMSAyMjM2NEo1WjZiN2w4gDmNOpY7sDzDPcw+5z/vQPxBQg5DHUQuRTJGWUdkSINJiEqPS5RMmE2lTqlPr1ACUQJSIFMCVCBVdFaIVwJYIFm8WuJbXAJdAl4CXyBgSGEgYqBjoGS0ZbRmuGe4aMJpwmq9a71sx23Hbstvy3DPcc9y03PTdNd113Y8dwJ4KnkqelV7VXxRfVF+TH9MgPiBggT3g1CEM4UjhiKHM4qEi4SMnI2OAI8AkAERkQSSOpOUQpVClmiXaJhWmVaampuanKqdqp6mn6agoqGiotWj1aTepd6m9Kf0qNypqgqrCqwUrRSuIa8hsCWxJbI+sz60X7Vftmq3arhyuXK6QrtCvHe9d757v3vA4cFiwgLDnsQgxbXGtcfZyNnJ0crRy27MIM3Hzs/h0CII0QLS0wLUKtUq1lrXWtgm2SbaJivbAtxi3WLebN8C4HnheeKAMuMC5OWA5ufnAujr6evq6+vr7KXtAu4d7wLw8QLyACzzAvRk9WT2RvdG+JT5Avo++z78Nv3+Ov86AAUAIE4FAQJVA1UEcQVxBn4HfgjBCcEK5gvmDAkNDhMPExByERK6E7oUwhXCFgQXGLMZsxqvGxzgHR6uHyC7Ibsi3SPdJPMl8yZGJ4UJqHNQb1Lok2wFyjlWJc0BU1BoWEtwncbX5z1ayTVERwz8t4oPH9qLk7gB8FivFPNBspNfxGELu8+KnPLwNp5UuXhFb7/hXtvnn369iUf22ThZe9pyntymA0+TCwp2or57SN+9I8PqbHCz+5vW5P44FSlj3XexK99DX+ero4udYpbu0LuHvimXeUDYuBAbfDMJvNez+cPke/o75pHlFO4dOPhVtnI/rF+HC0cerrN4U/FK4YYs9/fwuRGhdQ5vCF4Y5su0l+Taxn9kP8PFUS6uZDO4zH1vh/2qM0Ujz7lqb/kBMUN4xuFbiFZs5cd74x6BY+5A8eWTXrpKeEbwhPJ45RSs7561xRwA0GCIADZN0sLo95WON0ovLAdXfwSGMVxht8lsLgZlc23aGCxktq16I3pSusLRw1yWf5M3RNOTyB4KnoKgWtL3rT/Mt9me/11jFt7E/Rllzl3gdSLsT8I+r0ztkBXkq8kJJt93hL6l9IWyjXF3LMY3RuOx5V9K54tcwW/lj9nbM8uHkeJ9zbqr34NFUR9VIY34QQ0vYSTPo4SfDcdCpaoVXjTeIL2DB6pUyjxFEMB+ZDudFh5KwptroKlFqKWrhG8EX/J2D6JjYbDb+s2u9xEJxfIgX/O0n5b/czTfevRPim3pMexrhvtSYn/WzC36B6ns0ixy1gY1IcXcDpgU7N/7WlR3mfCsoBefSi3pvk1nJtoMhJxVh5QMeq3ZR88Gc65yFZDWKCRzxmhodvxx3/zWtGKo9ENRhbbJnqosGwP26AhtUcDibNGzuYKqvCls/BQwDBH11u3EXUvAOAfQRuKGQpPZV5neCkHijYX5AHB1vHCKbQxvgvDtlLYwMSjFaFVoOeohgH0lx5u2pEOwe6pDDHqg6Qw64qDWLVDyGDa6ETH9aCIDk0xbwfLE19csUuiniBtAinWflnPFPq8Qxft0U2gtAWx2AESmKNApKmYrZixoLS65LzCFMAUxIpAFMpEzkjSTNZQ2lTeWOJc5mDqZO5o8mz2cPp0/nkCfQaBCoUOiRKNFpEalR6ZIp0moSqlLqkyrTaxOrU+uUK9RsFKxU7JUs1W0VrVXV1hYWbZaA8tbzFwCYl0mXmlfzWBgYZBikWOSZJNllGaVZ5Zol2mYaplrmmybbZxunW+ecJ9xoHKhc6J0o3WkdqV3pnineah6qXuqfKt9rH6tf66Ar4GwgrGDsoSzhbSGtYcilAAFiIiJAjqKDouLjIyN+AWO+Y8cFZCQsFKxU7JUs1W0VrVXtli3WbhauVu6u1y8X77Ov2DAz8Fewl3D0MbRx8jIycnKysvLzMzNzc7Oz8/Qt9G40rnTutS71bzWvde+2L/ZwNrBBdsg3MLdw97D38TgxOHF4sbjx+TH5cjmyOfJ6Mrpy+rM6+vs7O3t7u7v7/C8IrzxwPLA89L00/X19vb39/j4+fn6+vv7/Pz9/f7+//8GBi0HLwQGA5wKnhwWAicNKAT9D/4bNR2GHR47H2ogI88h/SL+I/8kAiUDJgcnCygNKRwqHSseLCUtLC4tLzcwODFGMkczWTRaNWQ2ZTdqOGs5bjpvO5g8mT3MPs0/zkF2QoJDh0ScRaNGp0exSLdJxUrGS21McE1zTnZPelB9UYBSgVOCVINVhFaGV4dYiFmKWotbjFyNXY5ej1+FYD1hPmI/Y0BkQWVCZkNnRGhFaUZqmmsCKWwqbZJuDG+BcJhxAXIAcwR0BnUjCwAGdrd3u3jGeR96IHsOfCF9In4PfyOAEIEugi+DJoQnhTCGKIcqiDmJOoo7izyMPY0+jkCPQZBCkUiSSZNKlEuVTJZNl06YT5lQmlubXJxdnWaeaJ9soHChd6J4o3qke6V9pn6ng6iFqYiqiauKrIutja6Or5CwkrGTspSzlbSWtZ22nrefuKC5rbqou6q8q72svrK/KSO2gwACwbPCs8O0xLjFuca6x7vIvMm9yr7Lv8zHzcjOyc/B0MrRy9LU09TUAnnVtt4E/+W35sbpBQDuQ+9R8CDxIPIg8yD0IPUg9iD3IPgg+SD6Xvtp/HH9ARH+o/+1BwACxAcBegJ7AzwEPQU+Bj8HQAhBCWsK1AvVDNYN1w6HBxDXEZkS2AcT2RTZBxXbFtoX3BjdGd4a4BvhHOEd4h7jH+Qg5iHnIugj6SQHJeom6yfrKO0p7irvK/As8S3YEi7ZL9swmjGbMpwznTSeNZ82oDehOKI5ozqkO6U8pj2nPqg/qUEzQjRFM0Y0S0tMTE3fTuVP7FARURJSE1MUVBVVFlYYVzFYMllEWkVbUlxfXXJec190YH9hgGKXY5pkm2WkZqVnrmivabBqoWtTbFRtYG4zbzRwYXFVcjVzBXQGddB20XfSeMJ5w3rVe9Z8Nn1ifmN/jIAkC4EOgg+DEIQShROGFIcViBiJGoobixyMHo0ijiOPJZAmkSqSK5MslC2VLpYvlzCYH5kMmg2bHZwRnSeeKJ8poCChIaIWoxekJKUZpjKnM6g0qTWqNqs3rDitOa46rzuwPLExsrKzs7S0tbW2tre3uLi5ubq6u7u8vL29vr6/v8AHwQfCB8MHxAfFB8YHxwfIB8kHyj3LPsw/zUDOQc9C0EPRRNJF00bUR9VI1knXSthL2UzaTdtO3E/dUN5R31LgU+FU4lXjVuRX5VjmWedaJEkHJErqTOuq7KvtrO6t767wr/Gw8rHzsvRb9Vz2BRL3AsX4K/lj+/v8/P39/v7//wgi4wgi5Agi5Qgi5ggi5wgi6Agi6Qgi6ggi6wgi7Agi7Qgi7ggi7wgi8AgO8Q/yEPMR9BL1E/YU9xX4FvkX+hhqGWsa+xv8HGIdHmMfICFkIiMkZSUmZicoZykqK2gsaS1sLoguLy8wQjFDMkQzRTRGNUc2SDdJOEo5SzpMO008Tj1PPlA/P0Aj8kHzQvRD9UT2RfdG+Ef5SPpJ+0r8S/1M/k3/TgBPAVACUQNSBFMFVAZVB1YIVwlYClk0WltcXF1dXtgIX4hfYGBhYWJiY2NkZGVlZmZnZ2hoaWlqamtrbGxtbW5ub29wcHFxcnJzc3R0dXV2dnd3eHh5eXp6e3t8fH19fn5/f4CAgYGCgoODhISFhYaGh4eIiImJioqLi4yMjY2Ojo+PkJCRkZKSk5OUlJWVlpaXl5iYmZmampubnJydnZ6en5+gF6EZoiujbaR8pYamoqemqAipCapWq8SsCq0LCK4/r2ewkbHAslezdbSPtbW2GrcbuCS5WLrTu3m8hL2pvr6/v8DAwcHCwsPDxMTF",
@@ -1161,36 +1158,6 @@ function getCollation(name) {
     throw new RangeError(`Unsupported collation: ${name}`);
   }
   return info;
-}
-
-const BULK_COPY_MIN = 32;
-function frameVariable(src, n) {
-  let zeros = 0;
-  for (let i = 0; i < n; i++) {
-    if (src[i] === 0) {
-      zeros++;
-    }
-  }
-  const out = new Uint8Array(n + zeros + 3);
-  out[0] = 1;
-  if (zeros === 0 && n >= BULK_COPY_MIN) {
-    out.set(src.subarray(0, n), 1);
-    return out;
-  }
-  let o = 1;
-  for (let i = 0; i < n; i++) {
-    const byte = src[i] ?? 0;
-    if (byte === 0) {
-      out[o++] = 0;
-      out[o++] = 255;
-    } else {
-      out[o++] = byte;
-    }
-  }
-  return out;
-}
-function encodeVariable(bytes) {
-  return frameVariable(bytes, bytes.length);
 }
 
 const secondaryLengths = new Uint8Array(277);
@@ -1924,6 +1891,35 @@ for (const [first, last, prefixLength] of ranges) {
 
 let scratch = new Uint8Array(256);
 let cpScratch = new Int32Array(64);
+function weightString(value, collation, maxChars) {
+  switch (collation) {
+    case "utf8mb4_0900_bin":
+      return binaryKey(value);
+    case "ascii_bin":
+    case "ascii_general_ci":
+    case "utf8mb4_0900_ai_ci":
+    case "utf8mb4_0900_as_ci":
+    case "utf8mb4_0900_as_cs":
+      return scratch.slice(0, fillScratch(value, collation, maxChars));
+    default:
+      throw new Error("unsupported");
+  }
+}
+function weightFramed(value, collation, maxChars) {
+  switch (collation) {
+    case "utf8mb4_0900_bin":
+      return binaryKey(value);
+    case "ascii_bin":
+    case "ascii_general_ci":
+      return packAscii(value, collation, maxChars);
+    case "utf8mb4_0900_ai_ci":
+    case "utf8mb4_0900_as_ci":
+    case "utf8mb4_0900_as_cs":
+      return scratch.slice(0, fillScratch(value, collation, maxChars));
+    default:
+      throw new Error("unsupported");
+  }
+}
 function ensure(size) {
   if (size > scratch.length) {
     let next = scratch.length;
@@ -2053,7 +2049,9 @@ function writeTertiary(count, info, writer) {
     const secondary = info.writeLevel(cp, 2, secondaryScratch, 0);
     const tertiary = info.writeLevel(cp, 3, unitScratch, 0);
     if (tertiary !== secondary) {
-      throw new RangeError(`Unequal lower-level counts for U+${cp.toString(16)}`);
+      throw new RangeError(
+        `Unequal lower-level counts for U+${cp.toString(16)}`
+      );
     }
     for (let j = 0; j < tertiary; j += 2) {
       const unit = unitAt(unitScratch, j);
@@ -2079,13 +2077,6 @@ function fillCompact(value, collation, info) {
   }
   if (info.levels === 3) writeTertiary(count, info, writer);
   return writer.finish();
-}
-function weightString(value, collation, maxChars) {
-  if (getCollation(collation).kind === "scalar-code") {
-    return binaryKey(value);
-  }
-  const n = fillScratch(value, collation, maxChars);
-  return scratch.slice(0, n);
 }
 const STRING_END = 1;
 const SCALAR_BASE = 2;
@@ -2206,17 +2197,6 @@ function checkedBound(value, maxChars) {
   }
   return maxChars;
 }
-function weightFramed(value, collation, maxChars) {
-  const info = getCollation(collation);
-  if (info.kind === "scalar-code") {
-    return binaryKey(value);
-  }
-  if (info.kind === "table" && info.charset === "ascii") {
-    return packAscii(value, collation, maxChars);
-  }
-  const n = fillScratch(value, collation, maxChars);
-  return scratch.slice(0, n);
-}
 function decodeAt(value, i, collation) {
   const b0 = value[i] ?? 0;
   if (b0 < 128) {
@@ -2260,4 +2240,4 @@ function invalidUtf8(collation) {
   return new RangeError(`Invalid UTF-8 input for ${collation}`);
 }
 
-export { COLLATION_NAMES, bytesToHex, encodeVariable, hexToBytes, weightFramed, weightString };
+export { COLLATION_NAMES, weightFramed, weightString };

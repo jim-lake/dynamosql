@@ -14,6 +14,43 @@ import { primaryCodes, primaryLengths } from './primary_bits';
 let scratch = new Uint8Array(256);
 let cpScratch = new Int32Array(64);
 
+export function weightString(
+  value: Uint8Array,
+  collation: CollationName,
+  maxChars?: number
+): Uint8Array {
+  switch (collation) {
+    case 'utf8mb4_0900_bin':
+      return binaryKey(value);
+    case 'ascii_bin':
+    case 'ascii_general_ci':
+    case 'utf8mb4_0900_ai_ci':
+    case 'utf8mb4_0900_as_ci':
+    case 'utf8mb4_0900_as_cs':
+      return scratch.slice(0, fillScratch(value, collation, maxChars));
+    default:
+      throw new Error('unsupported');
+  }
+}
+export function weightFramed(
+  value: Uint8Array,
+  collation: CollationName,
+  maxChars?: number
+): Uint8Array {
+  switch (collation) {
+    case 'utf8mb4_0900_bin':
+      return binaryKey(value);
+    case 'ascii_bin':
+    case 'ascii_general_ci':
+      return packAscii(value, collation, maxChars);
+    case 'utf8mb4_0900_ai_ci':
+    case 'utf8mb4_0900_as_ci':
+    case 'utf8mb4_0900_as_cs':
+      return scratch.slice(0, fillScratch(value, collation, maxChars));
+    default:
+      throw new Error('unsupported');
+  }
+}
 function ensure(size: number): void {
   if (size > scratch.length) {
     let next = scratch.length;
@@ -202,25 +239,6 @@ function fillCompact(
   return writer.finish();
 }
 
-export function weightString(
-  value: Uint8Array,
-  collation: CollationName,
-  maxChars?: number
-): Uint8Array {
-  switch (collation) {
-    case 'utf8mb4_0900_bin':
-      return binaryKey(value);
-    case 'ascii_bin':
-    case 'ascii_general_ci':
-    case 'utf8mb4_0900_ai_ci':
-    case 'utf8mb4_0900_as_ci':
-    case 'utf8mb4_0900_as_cs':
-      return scratch.slice(0, fillScratch(value, collation, maxChars));
-    default:
-      throw new Error('unsupported');
-  }
-}
-
 const STRING_END = 0x01;
 const SCALAR_BASE = 0x02;
 const TWO_BYTE_BASE = 0x82;
@@ -356,26 +374,6 @@ function checkedBound(value: Uint8Array, maxChars: number | undefined): number {
     );
   }
   return maxChars;
-}
-
-export function weightFramed(
-  value: Uint8Array,
-  collation: CollationName,
-  maxChars?: number
-): Uint8Array {
-  switch (collation) {
-    case 'utf8mb4_0900_bin':
-      return binaryKey(value);
-    case 'ascii_bin':
-    case 'ascii_general_ci':
-      return packAscii(value, collation, maxChars);
-    case 'utf8mb4_0900_ai_ci':
-    case 'utf8mb4_0900_as_ci':
-    case 'utf8mb4_0900_as_cs':
-      return scratch.slice(0, fillScratch(value, collation, maxChars));
-    default:
-      throw new Error('unsupported');
-  }
 }
 
 function decodeAt(
