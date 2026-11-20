@@ -1,9 +1,18 @@
-import { AS_CS_LEVEL_DEFAULTS, asCsWriteLevel, ucaWriteCompactL1 } from '../src/uca';
+import {
+  AS_CS_LEVEL_DEFAULTS,
+  asCsWriteLevel,
+  ucaWriteCompactL1,
+} from '../src/uca';
 
 const DEF = AS_CS_LEVEL_DEFAULTS[0];
 const buf = new Uint8Array(64);
 
-interface Group { l1: number; tokens: [number, number][]; trailing: number; cp: number }
+interface Group {
+  l1: number;
+  tokens: [number, number][];
+  trailing: number;
+  cp: number;
+}
 const byKey = new Map<string, Group>();
 for (let cp = 0; cp <= 0x10ffff; cp++) {
   if (cp >= 0xd800 && cp <= 0xdfff) continue;
@@ -13,13 +22,17 @@ for (let cp = 0; cp <= 0x10ffff; cp++) {
   const tokens: [number, number][] = [];
   for (let k = 0; k < len; k += 2) {
     const u = ((buf[k] ?? 0) << 8) | (buf[k + 1] ?? 0);
-    if (u === DEF) { gap++; continue; }
+    if (u === DEF) {
+      gap++;
+      continue;
+    }
     tokens.push([gap, u - DEF]);
     gap = 0;
   }
   const key = JSON.stringify([tokens, gap]);
   const seen = byKey.get(key);
-  if (seen === undefined || l1 > seen.l1) byKey.set(key, { l1, tokens, trailing: gap, cp });
+  if (seen === undefined || l1 > seen.l1)
+    byKey.set(key, { l1, tokens, trailing: gap, cp });
 }
 const groups = [...byKey.values()];
 
@@ -38,7 +51,7 @@ export function curve(
   maxScalars: number,
   special: Set<string>,
   merged: Set<number>
-): { max: number[]; } {
+): { max: number[] } {
   const max: number[] = [];
   let layer = new Map<number, number>([[0, 0]]);
   const record = (m: Map<number, number>) => {
@@ -89,7 +102,9 @@ if (process.argv[2] === 'witness') {
   const n = 84;
   let layer = new Map<number, { b: number; prev?: [number, number] }[]>();
   const rowsAt: Map<number, { b: number; from: number; g: number }>[] = [];
-  let cur = new Map<number, { b: number; from: number; g: number }>([[0, { b: 0, from: -1, g: -1 }]]);
+  let cur = new Map<number, { b: number; from: number; g: number }>([
+    [0, { b: 0, from: -1, g: -1 }],
+  ]);
   rowsAt.push(cur);
   for (let k = 1; k <= n; k++) {
     const next = new Map<number, { b: number; from: number; g: number }>();
@@ -106,7 +121,8 @@ if (process.argv[2] === 'witness') {
         }
         const np = g.tokens.length === 0 ? p0 + g.trailing : g.trailing;
         const old = next.get(np);
-        if (old === undefined || old.b < b) next.set(np, { b, from: p0, g: gi });
+        if (old === undefined || old.b < b)
+          next.set(np, { b, from: p0, g: gi });
       });
     }
     rowsAt.push(next);
@@ -116,7 +132,10 @@ if (process.argv[2] === 'witness') {
   let bestV = -1;
   for (const [p, st] of cur) {
     const tot = st.b + 1 + gapLen(p, new Set());
-    if (tot > bestV) { bestV = tot; bestP = p; }
+    if (tot > bestV) {
+      bestV = tot;
+      bestP = p;
+    }
   }
   const seq: number[] = [];
   let p = bestP;
@@ -125,12 +144,24 @@ if (process.argv[2] === 'witness') {
     seq.push(groups[st.g]!.cp);
     p = st.from;
   }
-  console.log('total', bestV, 'scalars', seq.reverse().map((c) => c.toString(16).toUpperCase()).join(' '));
+  console.log(
+    'total',
+    bestV,
+    'scalars',
+    seq
+      .reverse()
+      .map((c) => c.toString(16).toUpperCase())
+      .join(' ')
+  );
   void layer;
 }
 
 if (process.argv[2] === 'effective') {
-  for (const set of [new Set(['3:23']), new Set(['3:23', '5:23']), new Set(['3:23', '5:23', '1:23'])]) {
+  for (const set of [
+    new Set(['3:23']),
+    new Set(['3:23', '5:23']),
+    new Set(['3:23', '5:23', '1:23']),
+  ]) {
     const c = curve(84, set, new Set());
     console.log([...set].join(','), 'n=56', c.max[56], 'n=84', c.max[84]);
   }
@@ -142,7 +173,9 @@ if (process.argv[2] === 'pairs') {
   console.log('n=84', c.max[84]);
   const used = new Map<string, number>();
   const n = 84;
-  let cur = new Map<number, { b: number; from: number; g: number }>([[0, { b: 0, from: -1, g: -1 }]]);
+  let cur = new Map<number, { b: number; from: number; g: number }>([
+    [0, { b: 0, from: -1, g: -1 }],
+  ]);
   const rowsAt: Map<number, { b: number; from: number; g: number }>[] = [cur];
   for (let k = 1; k <= n; k++) {
     const next = new Map<number, { b: number; from: number; g: number }>();
@@ -159,22 +192,28 @@ if (process.argv[2] === 'pairs') {
         }
         const np = g.tokens.length === 0 ? p0 + g.trailing : g.trailing;
         const old = next.get(np);
-        if (old === undefined || old.b < b) next.set(np, { b, from: p0, g: gi });
+        if (old === undefined || old.b < b)
+          next.set(np, { b, from: p0, g: gi });
       });
     }
     rowsAt.push(next);
     cur = next;
   }
-  let bestP = 0; let bestV = -1;
+  let bestP = 0;
+  let bestV = -1;
   for (const [p, st] of cur) {
     const tot = st.b + 1 + gapLen(p, new Set());
-    if (tot > bestV) { bestV = tot; bestP = p; }
+    if (tot > bestV) {
+      bestV = tot;
+      bestP = p;
+    }
   }
   let p = bestP;
   for (let k = n; k >= 1; k--) {
     const st = rowsAt[k]!.get(p)!;
     const g = groups[st.g]!;
-    for (const t of g.tokens) used.set(`${t[0]}:${t[1]}`, (used.get(`${t[0]}:${t[1]}`) ?? 0) + 1);
+    for (const t of g.tokens)
+      used.set(`${t[0]}:${t[1]}`, (used.get(`${t[0]}:${t[1]}`) ?? 0) + 1);
     p = st.from;
   }
   console.log('witness pairs', JSON.stringify([...used.entries()]));

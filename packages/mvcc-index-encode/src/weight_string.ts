@@ -3,7 +3,13 @@ import {
   type CollationName,
   type MultiLevelCollation,
 } from './collations';
-import { asCsLevel1Codes, asCsLevel3Rank } from './uca';
+import {
+  secondaryCodes,
+  secondaryLengths,
+  tertiaryContext,
+  tertiaryTree,
+} from './lower_bits';
+import { primaryCodes, primaryLengths } from './primary_bits';
 
 let scratch = new Uint8Array(256);
 let cpScratch = new Int32Array(64);
@@ -96,53 +102,30 @@ function decodeAll(value: Uint8Array, collation: CollationName): number {
   return count;
 }
 
-const LEVEL_SEPARATOR = 0x01;
-const END_MARK = 0x02;
-const DIRECT_GAPS = 0x7a;
-const ESCAPE_LEAD = DIRECT_GAPS + 1;
-const MAX_GAP_BYTES = 4;
-const LEVEL3_ZERO_GAP_BASE = 0xe5;
-const LEVEL3_MAX_RANK = 0xff - LEVEL3_ZERO_GAP_BASE;
-const LEVEL3_DIRECT_GAP_MAX = 217;
-const LEVEL3_DIRECT_GAP_BASE = 228;
+class BitWriter {
+  private at = 0;
+  private pending = 0;
+  private count = 0;
+
+  public append(code: number, length: number): void {
+    this.pending = this.pending * 2 ** length + code;
+    this.count += length;
+    while (this.count >= 8) {
+      this.count -= 8;
+      const divisor = 2 ** this.count;
+      ensure(this.at + 1);
+      scratch[this.at++] = Math.floor(this.pending / divisor);
+      this.pending %= divisor;
+    }
+  }
+
+  public finish(): number {
+    if (this.count > 0) this.append(0, 8 - this.count);
+    return this.at;
+  }
+}
 const unitScratch = new Uint8Array(256);
-
-function writeGap(gap: number, invert: boolean, at: number): number {
-  const mask = invert ? 0xff : 0x00;
-  if (gap < DIRECT_GAPS) {
-    scratch[at] = (gap + 2) ^ mask;
-    return 1;
-  }
-  let rest = gap - DIRECT_GAPS;
-  let size = 1;
-  while (size < MAX_GAP_BYTES && rest >= 2 ** (8 * size)) {
-    size++;
-  }
-  scratch[at] = (ESCAPE_LEAD + size) ^ mask;
-  for (let k = size; k > 0; k--) {
-    scratch[at + k] = (rest & 0xff) ^ mask;
-    rest = Math.floor(rest / 256);
-  }
-  return size + 1;
-}
-
-function writeAscendingGap(gap: number, at: number): number {
-  if (gap <= LEVEL3_DIRECT_GAP_MAX) {
-    scratch[at] = LEVEL3_DIRECT_GAP_BASE - gap;
-    return 1;
-  }
-  const rest = gap - LEVEL3_DIRECT_GAP_MAX - 1;
-  let size = 1;
-  while (size < MAX_GAP_BYTES && rest >= 2 ** (8 * size)) {
-    size++;
-  }
-  scratch[at] = 7 - size;
-  for (let k = 0; k < size; k++) {
-    const shift = 2 ** (8 * (size - 1 - k));
-    scratch[at + 1 + k] = 0xff - (Math.floor(rest / shift) & 0xff);
-  }
-  return size + 1;
-}
+const secondaryScratch = new Uint8Array(256);
 
 function unitAt(buf: Uint8Array, j: number): number {
   return ((buf[j] ?? 0) << 8) | (buf[j + 1] ?? 0);
@@ -154,96 +137,51 @@ function invariantError(level: number, unit: number): RangeError {
   );
 }
 
-function writeLevel2(
+function writeUnits(
   count: number,
   info: MultiLevelCollation,
-  at: number
-): number {
-  const fallback = info.defaults[0];
-  let n = at;
-  let gap = 0;
+  level: 1 | 2,
+  writer: BitWriter
+): void {
+  const lengths = level === 1 ? primaryLengths : secondaryLengths;
+  const codes = level === 1 ? primaryCodes : secondaryCodes;
   for (let k = 0; k < count; k++) {
-    const len = info.writeLevel(cpScratch[k] ?? 0, 2, unitScratch, 0);
+    const len = info.writeLevel(cpScratch[k] ?? 0, level, unitScratch, 0);
     for (let j = 0; j < len; j += 2) {
       const unit = unitAt(unitScratch, j);
-      if (unit === fallback) {
-        gap++;
-        continue;
-      }
-      if (unit < fallback || unit - fallback > 0xff) {
-        throw invariantError(2, unit);
-      }
-      ensure(n + 8);
-      n += writeGap(gap, true, n);
-      scratch[n++] = unit - fallback;
-      gap = 0;
+      const length = lengths[unit];
+      if (!length) throw invariantError(level, unit);
+      writer.append(codes[unit] ?? 0, length);
     }
   }
-  ensure(n + 8);
-  return n + writeGap(gap, false, n);
 }
 
-function writeLevel3(
+function writeTertiary(
   count: number,
   info: MultiLevelCollation,
-  at: number
-): number {
-  const fallback = info.defaults[1];
-  let n = at;
-  let gap = 0;
+  writer: BitWriter
+): void {
+  let context = 0;
   for (let k = 0; k < count; k++) {
-    const len = info.writeLevel(cpScratch[k] ?? 0, 3, unitScratch, 0);
-    for (let j = 0; j < len; j += 2) {
+    const cp = cpScratch[k] ?? 0;
+    const secondary = info.writeLevel(cp, 2, secondaryScratch, 0);
+    const tertiary = info.writeLevel(cp, 3, unitScratch, 0);
+    if (tertiary !== secondary) {
+      throw new RangeError(
+        `Unequal lower-level counts for U+${cp.toString(16)}`
+      );
+    }
+    for (let j = 0; j < tertiary; j += 2) {
       const unit = unitAt(unitScratch, j);
-      if (unit === fallback) {
-        gap++;
-        continue;
+      const tree = tertiaryTree(unitAt(secondaryScratch, j), context);
+      if (tree) {
+        const length = tree.lengths[unit] ?? 0;
+        if (!length) throw invariantError(3, unit);
+        writer.append(tree.codes[unit] ?? 0, length);
       }
-      const rank = unit > fallback ? asCsLevel3Rank(unit) : -1;
-      if (rank < 0 || rank > LEVEL3_MAX_RANK) {
-        throw invariantError(3, unit);
-      }
-      ensure(n + 8);
-      if (gap === 0) {
-        scratch[n++] = LEVEL3_ZERO_GAP_BASE + rank;
-      } else {
-        n += writeAscendingGap(gap, n);
-        scratch[n++] = rank;
-      }
-      gap = 0;
+      context = tertiaryContext(unit);
     }
   }
-  ensure(n + 1);
-  scratch[n++] = END_MARK;
-  return n;
-}
-
-function writeLevel1(
-  count: number,
-  info: MultiLevelCollation,
-  at: number
-): number {
-  const codes = asCsLevel1Codes();
-  let n = at;
-  for (let k = 0; k < count; k++) {
-    const len = info.writeLevel(cpScratch[k] ?? 0, 1, unitScratch, 0);
-    for (let j = 0; j < len; j += 2) {
-      const unit = unitAt(unitScratch, j);
-      const size = codes.length[unit] ?? 0;
-      if (size === 0) {
-        throw invariantError(1, unit);
-      }
-      const code = codes.value[unit] ?? 0;
-      ensure(n + 2);
-      if (size === 1) {
-        scratch[n++] = code;
-      } else {
-        scratch[n++] = code >>> 8;
-        scratch[n++] = code & 0xff;
-      }
-    }
-  }
-  return n;
 }
 
 function fillCompact(
@@ -252,14 +190,16 @@ function fillCompact(
   info: MultiLevelCollation
 ): number {
   const count = decodeAll(value, collation);
-  let n = writeLevel1(count, info, 0);
-  ensure(n + 1);
-  scratch[n++] = LEVEL_SEPARATOR;
-  n = writeLevel2(count, info, n);
-  if (info.levels === 3) {
-    n = writeLevel3(count, info, n);
+  const writer = new BitWriter();
+  writer.append(1, 1);
+  writeUnits(count, info, 1, writer);
+  writer.append(primaryCodes[0] ?? 0, primaryLengths[0] ?? 0);
+  if (info.levels >= 2) {
+    writeUnits(count, info, 2, writer);
+    writer.append(secondaryCodes[0] ?? 0, secondaryLengths[0] ?? 0);
   }
-  return n;
+  if (info.levels === 3) writeTertiary(count, info, writer);
+  return writer.finish();
 }
 
 export function weightString(
@@ -424,13 +364,7 @@ export function weightFramed(
     return packAscii(value, collation, maxChars);
   }
   const n = fillScratch(value, collation, maxChars);
-  if (info.kind === 'multi-level') {
-    return scratch.slice(0, n);
-  }
-  const out = new Uint8Array(n + 1);
-  out.set(scratch.subarray(0, n));
-  out[n] = STRING_END;
-  return out;
+  return scratch.slice(0, n);
 }
 
 function decodeAt(

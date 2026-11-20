@@ -1,9 +1,19 @@
 import { describe, it } from 'mocha';
-import { expect } from 'chai';
-import { scanGroups } from './helpers/length_model';
+import { weightFramed } from '../src/weight_string';
+import { expectAscending } from './order';
 
-describe('length model', () => {
-  it('finds 42 scalar groups', () => {
-    expect(scanGroups()).to.have.length(42);
+describe('tertiary ordering across packed ranks', () => {
+  it('orders case variants after each shared prefix', () => {
+    for (let length = 0; length < 16; length++) {
+      const prefix = 'A'.repeat(length);
+      const chain = ['aa', 'aA', 'Aa', 'AA'].map((suffix) => {
+        const text = prefix + suffix;
+        return [
+          text,
+          weightFramed(Buffer.from(text), 'utf8mb4_0900_as_cs'),
+        ] as const;
+      });
+      expectAscending(chain, '<');
+    }
   });
 });

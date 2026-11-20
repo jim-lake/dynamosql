@@ -1,13 +1,9 @@
 import { describe, it } from 'mocha';
 import { expect } from 'chai';
 import { bytesToHex } from '../src/bytes';
-import { ucaWriteCompactL1 } from '../src/uca';
+import { ucaWeight } from '../src/uca';
+import { expectSameOrder } from './order';
 import { weightString } from '../src/weight_string';
-
-function compactL1(cp: number): Uint8Array {
-  const dst = new Uint8Array(16);
-  return dst.slice(0, ucaWriteCompactL1(cp, dst, 0));
-}
 
 const UCA = 'utf8mb4_0900_ai_ci';
 
@@ -58,12 +54,15 @@ describe('weightString UTF-8 decoding edge cases', () => {
     });
   }
 
-  for (const [name, bytes, cp] of valid) {
-    it(`decodes ${name} to one character`, () => {
-      const got = weightString(Uint8Array.from(bytes), UCA);
-      expect(bytesToHex(got)).to.equal(bytesToHex(compactL1(cp)));
-    });
-  }
+  it('orders decoded boundary scalars by their primary weights', () => {
+    expectSameOrder(
+      valid.map(([id, bytes, cp]) => ({
+        id,
+        oracle: ucaWeight(cp),
+        ours: weightString(Uint8Array.from(bytes), UCA),
+      }))
+    );
+  });
 
   it('keeps a leading BOM as a character instead of stripping it', () => {
     const bom = Uint8Array.from([0xef, 0xbb, 0xbf]);
@@ -110,6 +109,5 @@ describe('weightString buffer reuse', () => {
     const value = new TextEncoder().encode('ab'.repeat(200));
     const first = bytesToHex(weightString(value, UCA));
     expect(bytesToHex(weightString(value, UCA))).to.equal(first);
-    expect(first.slice(0, 4)).to.equal(bytesToHex(compactL1(0x61)).slice(0, 4));
   });
 });

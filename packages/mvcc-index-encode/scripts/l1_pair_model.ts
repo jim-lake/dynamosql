@@ -7,13 +7,14 @@ for (let cp = 1; cp <= 0x10ffff; cp++) {
   const w = ucaWeight(cp);
   if (w.length === 0) continue;
   const units: number[] = [];
-  for (let k = 0; k < w.length; k += 2) units.push(((w[k] ?? 0) << 8) | (w[k + 1] ?? 0));
+  for (let k = 0; k < w.length; k += 2)
+    units.push(((w[k] ?? 0) << 8) | (w[k + 1] ?? 0));
   all.push({ cp, units });
 }
 
 function cost(units: readonly number[], pairs: ReadonlySet<string>): number {
   let c = 0;
-  for (let i = 0; i < units.length; ) {
+  for (let i = 0; i < units.length;) {
     const a = units[i] ?? 0;
     const b = units[i + 1];
     if (b !== undefined && pairs.has(`${a}:${b}`)) {
@@ -44,7 +45,8 @@ for (let step = 0; step < 40; step++) {
   const gain = new Set<string>();
   for (const s of hot) {
     if (cost(s.units, pairs) < current) continue;
-    for (let i = 0; i + 1 < s.units.length; i++) gain.add(`${String(s.units[i])}:${String(s.units[i + 1])}`);
+    for (let i = 0; i + 1 < s.units.length; i++)
+      gain.add(`${String(s.units[i])}:${String(s.units[i + 1])}`);
   }
   let best = '';
   let bestMax = current;
@@ -60,6 +62,8 @@ for (let step = 0; step < 40; step++) {
   if (best === '') break;
   pairs.add(best);
   current = bestMax;
-  console.log(`step ${String(step + 1)}: add ${best} -> hot max=${String(current)} pairs=${String(pairs.size)}`);
+  console.log(
+    `step ${String(step + 1)}: add ${best} -> hot max=${String(current)} pairs=${String(pairs.size)}`
+  );
 }
 console.log(`full repertoire with pairs: max=${String(maxOver(all, pairs))}`);

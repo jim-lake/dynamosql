@@ -1,8 +1,9 @@
 import { describe, it } from 'mocha';
 import { expect } from 'chai';
-import { asCsLevel1Codes, asCsWriteLevel } from '../src/uca';
+import { asCsWriteLevel } from '../src/uca';
 import { COLLATION_NAMES, type CollationName } from '../src/collations';
 import { weightFramed } from '../src/weight_string';
+import { primaryCodes, primaryLengths } from '../src/primary_bits';
 import { compareBytes } from './order';
 
 const UCA_NAMES = COLLATION_NAMES.filter(
@@ -173,36 +174,17 @@ describe('gap transitions', () => {
 
 describe('table scan', () => {
   it('gives every table code a unique value, with no code prefixing another', () => {
-    const codes = asCsLevel1Codes();
-    const entries: [number, Uint8Array][] = [];
-    for (let unit = 0; unit < 0x10000; unit++) {
-      const len = codes.length[unit] ?? 0;
-      if (len === 0) {
-        continue;
+    let previous = '';
+    for (let unit = 0; unit < primaryLengths.length; unit++) {
+      const length = primaryLengths[unit] ?? 0;
+      if (!length) continue;
+      const code = (primaryCodes[unit] ?? 0).toString(2).padStart(length, '0');
+      if (previous && (previous >= code || code.startsWith(previous))) {
+        throw new Error(
+          `Primary order or prefix violation at ${unit.toString(16)}`
+        );
       }
-      const v = codes.value[unit] ?? 0;
-      entries.push([
-        unit,
-        len === 1 ? Uint8Array.of(v) : Uint8Array.of(v >>> 8, v & 0xff),
-      ]);
-    }
-    expect(entries.length).to.be.greaterThan(0);
-    for (const [, bytes] of entries) {
-      expect(bytes[0]).to.be.at.least(2);
-    }
-    const sorted = [...entries].sort((x, y) => compareBytes(x[1], y[1]));
-    for (let i = 1; i < sorted.length; i++) {
-      const a = sorted[i - 1]?.[1] ?? new Uint8Array();
-      const b = sorted[i]?.[1] ?? new Uint8Array();
-      expect(
-        compareBytes(a, b),
-        `${String(sorted[i - 1]?.[0])} < ${String(sorted[i]?.[0])}`
-      ).to.equal(-1);
-      expect(
-        b.length >= a.length &&
-          Buffer.from(b.subarray(0, a.length)).equals(Buffer.from(a)),
-        'prefix'
-      ).to.equal(false);
+      previous = code;
     }
   });
 

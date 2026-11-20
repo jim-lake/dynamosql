@@ -1,16 +1,12 @@
 import { describe, it } from 'mocha';
 import { expect } from 'chai';
-import {
-  AS_CS_LEVEL_DEFAULTS,
-  asCsLevel1Codes,
-  asCsWriteLevel,
-} from '../src/uca';
-
-const MAX_L3_DEVIATIONS = 0xff - 0xe5 + 1;
+import { tertiaryContexts, tertiaryTree } from '../src/lower_bits';
+import { expectSameOrder } from './order';
+import { AS_CS_LEVEL_DEFAULTS, asCsWriteLevel } from '../src/uca';
 
 function scalars(): number[] {
   const out: number[] = [];
-  for (let cp = 1; cp <= 0x10ffff; cp++) {
+  for (let cp = 0; cp <= 0x10ffff; cp++) {
     if (cp < 0xd800 || cp > 0xdfff) {
       out.push(cp);
     }
@@ -37,40 +33,37 @@ describe('as_cs table limits', function () {
     }
   });
 
-  it('fits every level 3 deviation in one byte below the 0xFF limit', () => {
-    const buf = new Uint8Array(64);
-    const ranks = new Set<number>();
+  it('preserves the tertiary order for each tied secondary position', () => {
+    const s = new Uint8Array(64);
+    const t = new Uint8Array(64);
+    const choices = new Map<number, Set<number>>();
     for (const cp of scalars()) {
-      const len = asCsWriteLevel(cp, 3, buf, 0);
-      for (let j = 0; j < len; j += 2) {
-        const unit = ((buf[j] ?? 0) << 8) | (buf[j + 1] ?? 0);
-        if (unit !== AS_CS_LEVEL_DEFAULTS[1]) {
-          ranks.add(unit);
-        }
+      const count = asCsWriteLevel(cp, 2, s, 0);
+      const tertiary = asCsWriteLevel(cp, 3, t, 0);
+      if (count !== tertiary) expect(tertiary, String(cp)).to.equal(count);
+      for (let i = 0; i < count; i += 2) {
+        const secondary = ((s[i] ?? 0) << 8) | (s[i + 1] ?? 0);
+        const rank = ((t[i] ?? 0) << 8) | (t[i + 1] ?? 0);
+        const ranks = choices.get(secondary);
+        if (ranks) ranks.add(rank);
+        else choices.set(secondary, new Set([rank]));
       }
     }
-    expect(ranks.size).to.equal(MAX_L3_DEVIATIONS);
-  });
-
-  it('keeps one-byte and two-byte level 1 leads distinct and never 00 or 01', () => {
-    const codes = asCsLevel1Codes();
-    const oneByte = new Set<number>();
-    const leads = new Set<number>();
-    for (let unit = 0; unit < 0x10000; unit++) {
-      const size = codes.length[unit] ?? 0;
-      if (size === 1) {
-        oneByte.add(codes.value[unit] ?? 0);
-      } else if (size === 2) {
-        leads.add((codes.value[unit] ?? 0) >>> 8);
+    for (const [secondary, ranks] of choices) {
+      for (const state of tertiaryContexts.keys()) {
+        const tree = tertiaryTree(secondary, state);
+        expectSameOrder(
+          [...ranks].map((rank) => {
+            const width = tree?.lengths[rank] ?? 0;
+            const code = (tree?.codes[rank] ?? 0).toString(2);
+            return {
+              id: String(rank),
+              oracle: Uint8Array.of(rank >>> 8, rank & 255),
+              ours: Buffer.from(width ? code.padStart(width, '0') : ''),
+            };
+          })
+        );
       }
-    }
-    for (const value of [...oneByte, ...leads]) {
-      expect(value).to.be.greaterThan(0x01);
-    }
-    for (const lead of leads) {
-      expect(oneByte.has(lead), `lead ${lead.toString(16)} collides`).to.equal(
-        false
-      );
     }
   });
 });

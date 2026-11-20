@@ -36,26 +36,15 @@ function inputsFor(collation: CollationName): Uint8Array<ArrayBuffer>[] {
 
 describe('weightFramed', () => {
   for (const collation of COLLATION_NAMES) {
-    it(`frames ${collation} without a marker or terminator where the key is self-delimiting`, () => {
+    it(`frames ${collation} after NULL`, () => {
       for (const value of inputsFor(collation)) {
         const chars = new TextDecoder().decode(value).length;
         const bounds = collation.startsWith('utf8mb4')
           ? [undefined, chars]
           : [chars, chars + 3];
         for (const bound of bounds) {
-          const raw = weightString(value, collation, bound);
           const framed = weightFramed(value, collation, bound);
-          if (collation === 'utf8mb4_0900_ai_ci') {
-            expect(framed).to.deep.equal(Uint8Array.of(...raw, 0x01));
-          } else if (collation.startsWith('ascii')) {
-            expect(
-              framed.length,
-              `${collation} bound ${String(bound)}`
-            ).to.be.greaterThan(0);
-          } else if (collation !== 'utf8mb4_0900_bin') {
-            expect(framed).to.deep.equal(raw);
-          }
-          expect(framed[0] ?? 0x01, collation).to.be.greaterThan(0);
+          expect(framed[0] ?? 0, collation).to.be.greaterThan(0);
         }
       }
     });

@@ -188,7 +188,11 @@ export interface Level1Codes {
   readonly value: Uint16Array;
 }
 
-const LEVEL1_ONE_BYTE_CODE_POINTS = [0xfdfa, 0xfdfb, 0x1f1a9, 0x321d, 0x1f19c];
+const LEVEL1_ONE_BYTE_UNITS = [
+  0x0317, 0x0318, 0x1c0e, 0x1c3f, 0x1c7a, 0x1c8f, 0x1caa, 0x1d77, 0x1db9,
+  0x1ddd, 0x1e33, 0x1e71, 0x230b, 0x2325, 0x2364, 0x239c, 0x23b1, 0x23c5,
+  0x3c00, 0x3c01, 0x3c77, 0x3c7b, 0x3cd4, 0x3d6e, 0xdf0f, 0xe82a, 0xfb40,
+] as const;
 const IMPLICIT_HAN_RANGES = [
   [0x4e00, 0x9fff],
   [0x3400, 0x4dbf],
@@ -217,13 +221,7 @@ function buildLevel1Codes(idx: AsCsIndex): Level1Codes {
       }
     }
   }
-  const oneByte = new Set<number>([0xfb40, 0x3d6e, 0xe82a, 0x1c0e]);
-  for (const cp of LEVEL1_ONE_BYTE_CODE_POINTS) {
-    const w = ucaWeight(cp);
-    for (let k = 0; k < w.length; k += 2) {
-      oneByte.add(((w[k] ?? 0) << 8) | (w[k + 1] ?? 0));
-    }
-  }
+  const oneByte = new Set<number>(LEVEL1_ONE_BYTE_UNITS);
 
   const length = new Uint8Array(0x10000);
   const value = new Uint16Array(0x10000);
@@ -256,37 +254,6 @@ export function asCsLevel1Codes(): Level1Codes {
   index ??= loadIndex();
   level1Codes ??= buildLevel1Codes(index);
   return level1Codes;
-}
-
-let level3Ranks: Int16Array | undefined;
-
-function buildLevel3Ranks(idx: AsCsIndex): Int16Array {
-  const units = new Set<number>();
-  for (let slot = 0; slot < idx.len3.length; slot++) {
-    const a = idx.len1[slot] ?? 0;
-    const b = idx.len2[slot] ?? 0;
-    const c = idx.len3[slot] ?? 0;
-    const start = (idx.offset[slot] ?? 0) + a + b;
-    for (let k = 0; k < c; k += 2) {
-      units.add(
-        ((idx.weights[start + k] ?? 0) << 8) | (idx.weights[start + k + 1] ?? 0)
-      );
-    }
-  }
-  const ranks = new Int16Array(0x10000).fill(-1);
-  [...units]
-    .filter((u) => u !== AS_CS_LEVEL_DEFAULTS[1])
-    .sort((x, y) => x - y)
-    .forEach((u, rank) => {
-      ranks[u] = rank;
-    });
-  return ranks;
-}
-
-export function asCsLevel3Rank(unit: number): number {
-  index ??= loadIndex();
-  level3Ranks ??= buildLevel3Ranks(index);
-  return level3Ranks[unit] ?? -1;
 }
 
 export function ucaWeight(codePoint: number): Uint8Array {

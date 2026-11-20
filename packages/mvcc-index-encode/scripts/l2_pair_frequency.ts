@@ -15,7 +15,10 @@ for (let cp = 0; cp <= 0x10ffff; cp++) {
   const toks: string[] = [];
   for (let k = 0; k < len; k += 2) {
     const unit = ((buf[k] ?? 0) << 8) | (buf[k + 1] ?? 0);
-    if (unit === DEF) { gap++; continue; }
+    if (unit === DEF) {
+      gap++;
+      continue;
+    }
     devs++;
     deviations.add(unit);
     toks.push(`g${gap}:d${unit - DEF}`);
@@ -27,4 +30,13 @@ for (let cp = 0; cp <= 0x10ffff; cp++) {
 }
 const sorted = [...counts.entries()].sort((a, b) => b[1] - a[1]);
 const total = sorted.reduce((s, [, c]) => s + c, 0);
-console.log(JSON.stringify({ distinctPairs: sorted.length, distinctDeviations: deviations.size, scalarsWithDev, maxPerScalar, totalTokens: total, top: sorted.slice(0, 20) }));
+console.log(
+  JSON.stringify({
+    distinctPairs: sorted.length,
+    distinctDeviations: deviations.size,
+    scalarsWithDev,
+    maxPerScalar,
+    totalTokens: total,
+    top: sorted.slice(0, 20),
+  })
+);

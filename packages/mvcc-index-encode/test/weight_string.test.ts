@@ -236,7 +236,7 @@ describe('framed components', () => {
     bound: number
   ): Uint8Array => weightFramed(new TextEncoder().encode(value), name, bound);
 
-  it('frames ai_ci "ab" as "a" followed by "b" with one end marker', () => {
+  it('orders the ai_ci frame for "a" before "ab"', () => {
     const ab = frame('utf8mb4_0900_ai_ci', 'ab', 2);
     const a = frame('utf8mb4_0900_ai_ci', 'a', 1);
     expect(compareBytes(a, ab)).to.equal(-1);

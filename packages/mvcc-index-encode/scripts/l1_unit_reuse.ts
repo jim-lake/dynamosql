@@ -18,11 +18,41 @@ for (let cp = 1; cp <= 0x10ffff; cp++) {
 const byBytes = [...scalars].sort((a, b) => b.bytes - a.bytes);
 const top = byBytes.slice(0, 200);
 const unitsInTop = new Map<number, number>();
-for (const s of top) for (const u of new Set(s.units)) unitsInTop.set(u, (unitsInTop.get(u) ?? 0) + 1);
+for (const s of top)
+  for (const u of new Set(s.units))
+    unitsInTop.set(u, (unitsInTop.get(u) ?? 0) + 1);
 const hist = new Map<number, number>();
-for (const s of scalars) hist.set(s.units.length, (hist.get(s.units.length) ?? 0) + 1);
-console.log('scalars with weights', scalars.length, 'max units', scalars.reduce((m, s) => Math.max(m, s.units.length), 0));
-console.log('units per scalar histogram', [...hist.entries()].sort((a, b) => a[0] - b[0]));
-console.log('top 200 costliest scalars: max bytes', top[0]?.bytes, 'min bytes', top[top.length - 1]?.bytes);
-console.log('distinct units across top 200', unitsInTop.size, 'units appearing in >=10 of them', [...unitsInTop.values()].filter((c) => c >= 10).length);
-console.log('top 10 scalars:', top.slice(0, 10).map((s) => `U+${s.cp.toString(16)} units=${String(s.units.length)} bytes=${String(s.bytes)}`).join('\n'));
+for (const s of scalars)
+  hist.set(s.units.length, (hist.get(s.units.length) ?? 0) + 1);
+console.log(
+  'scalars with weights',
+  scalars.length,
+  'max units',
+  scalars.reduce((m, s) => Math.max(m, s.units.length), 0)
+);
+console.log(
+  'units per scalar histogram',
+  [...hist.entries()].sort((a, b) => a[0] - b[0])
+);
+console.log(
+  'top 200 costliest scalars: max bytes',
+  top[0]?.bytes,
+  'min bytes',
+  top[top.length - 1]?.bytes
+);
+console.log(
+  'distinct units across top 200',
+  unitsInTop.size,
+  'units appearing in >=10 of them',
+  [...unitsInTop.values()].filter((c) => c >= 10).length
+);
+console.log(
+  'top 10 scalars:',
+  top
+    .slice(0, 10)
+    .map(
+      (s) =>
+        `U+${s.cp.toString(16)} units=${String(s.units.length)} bytes=${String(s.bytes)}`
+    )
+    .join('\n')
+);

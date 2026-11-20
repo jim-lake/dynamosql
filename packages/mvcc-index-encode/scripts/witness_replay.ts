@@ -11,13 +11,29 @@ const collation =
   variant === 'as_ci' ? 'utf8mb4_0900_as_ci' : 'utf8mb4_0900_as_cs';
 const curve = computeCurve(variant, max, scanGroups());
 const enc = new TextEncoder();
-for (let k = 1; k <= max; k++) {
+for (let k = 0; k <= max; k++) {
   const cps = curve.witnesses[k] ?? [];
   const text = String.fromCodePoint(...cps);
   const framed = weightFramed(enc.encode(text), collation, k).length;
   const model = curve.maxBytes[k] ?? -1;
-  const mark = framed === model ? 'ok' : 'MISMATCH';
+  if (framed !== model)
+    throw new Error(`Replay mismatch at ${k}: ${framed} vs ${model}`);
+  const mark = 'ok';
   console.log(
     `${String(k)}\tmodel=${String(model)}\tframed=${String(framed)}\t${mark}`
   );
+}
+
+const budget = Number(process.argv[4] ?? 1012);
+const firstOver = curve.maxBytes.findIndex((bytes) => bytes > budget);
+if (firstOver > 0) {
+  for (const width of [firstOver - 1, firstOver]) {
+    const witness = curve.witnesses[width] ?? [];
+    console.log({
+      budget,
+      width,
+      bytes: curve.maxBytes[width],
+      witness: witness.map((cp) => cp.toString(16)).join(' '),
+    });
+  }
 }

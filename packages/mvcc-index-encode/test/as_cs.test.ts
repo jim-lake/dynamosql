@@ -128,6 +128,35 @@ function suite(name: Name, levels: 2 | 3): void {
         );
       });
 
+      it('orders accents at gap lengths around the direct and escape boundary', () => {
+        for (const gap of [
+          0, 1, 2, 3, 4, 5, 6, 118, 119, 120, 121, 122, 123, 300,
+        ]) {
+          const dev = `${'a'.repeat(gap)}á`;
+          const plain = `${'a'.repeat(gap)}a`;
+          expectAscending(
+            [
+              ['plain', e(plain)],
+              ['accent', e(dev)],
+            ],
+            '<'
+          );
+        }
+      });
+
+      it('orders an accent by position across split gap lengths', () => {
+        expectAscending(
+          [
+            ['aaá', e('aaá')],
+            ['aaaá', e('aaaá')],
+            ['aaaaá', e('aaaaá')],
+            ['aaaaaá', e('aaaaaá')],
+            ['aaaaaaá', e('aaaaaaá')],
+          ],
+          '<'
+        );
+      });
+
       it('orders every neighbouring run length of a trailing accent', () => {
         let prev: Uint8Array | undefined;
         for (let n = 0; n < 700; n++) {
@@ -180,12 +209,6 @@ function suite(name: Name, levels: 2 | 3): void {
           ],
           '<'
         );
-      });
-
-      it('has no 00 byte for table units', () => {
-        for (const text of ['Aá', 'ÁÀÂ', '\u0345', 'a\u0301\u0323']) {
-          expect(e(text).includes(0), text).to.equal(false);
-        }
       });
     });
 
@@ -270,13 +293,6 @@ function suite(name: Name, levels: 2 | 3): void {
     });
 
     describe('framing', () => {
-      it('is the encoding itself, with no marker or terminator', () => {
-        for (const text of ['', 'a', 'ab', 'Áb', '一', 'á']) {
-          const v = enc.encode(text);
-          expect(weightFramed(v, name)).to.deep.equal(weightString(v, name));
-        }
-      });
-
       it('never starts with 00 and is never empty', () => {
         for (const text of ['', '\u0000', 'a', '一', '\u0301']) {
           const framed = weightFramed(enc.encode(text), name);

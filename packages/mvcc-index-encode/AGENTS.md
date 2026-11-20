@@ -53,6 +53,12 @@ key and framing formats; do not restate them here.
   comment only where the behavior is non-obvious, and keep it to what the reader
   needs to know.
 
+## Working mode
+
+- This package is a search problem. Keep working through the open items in `TODO.md` until they are done. Do not stop to ask questions, report a summary, or wait for approval while items remain.
+- Make design choices yourself, state them in the final message, and continue. Stop only for a real external blocker, such as an unreachable MySQL 8.4 server, or an irreversible outward-facing action.
+- Record progress in `TODO.md` as you go.
+
 ## Commands
 
 Run from `packages/mvcc-index-encode/`:

@@ -1,177 +1,121 @@
+import { primaryLengths } from '../../src/primary_bits';
 import {
-  AS_CS_LEVEL_DEFAULTS,
-  asCsWriteLevel,
-  ucaWriteCompactL1,
-} from '../../src/uca';
+  secondaryLengths,
+  tertiaryContext,
+  tertiaryContexts,
+  tertiaryTree,
+} from '../../src/lower_bits';
+import { asCsWriteLevel } from '../../src/uca';
 
 export type Variant = 'as_cs' | 'as_ci';
 
-export interface ScalarGroup {
-  readonly l1: number;
-  readonly l2: readonly boolean[];
-  readonly l3: readonly boolean[];
-  readonly cp: number;
+interface Group {
+  cp: number;
+  primary: number;
+  secondaryBits: number;
+  tertiaryBits: number[];
+  end: number | undefined;
 }
 
-export interface Curve {
-  readonly maxBytes: readonly number[];
-  readonly witnesses: readonly (readonly number[])[];
-}
-
-const L2_DEFAULT = AS_CS_LEVEL_DEFAULTS[0];
-const L3_DEFAULT = AS_CS_LEVEL_DEFAULTS[1];
-
-export function gapLength(g: number): number {
-  if (g <= 121) {
-    return 1;
-  }
-  return 1 + smallestWidth(g - 122);
-}
-
-export function ascendingLength(g: number): number {
-  if (g <= 217) {
-    return 1;
-  }
-  return 1 + smallestWidth(g - 218);
-}
-
-function smallestWidth(v: number): number {
-  let s = 1;
-  while (v >= 256 ** s) {
-    s++;
-  }
-  return s;
-}
-
-function flagString(flags: readonly boolean[]): string {
-  return flags.map((d) => (d ? '1' : '0')).join('');
-}
-
-function unitsOf(buf: Uint8Array, len: number): number[] {
-  const units: number[] = [];
-  for (let k = 0; k < len; k += 2) {
-    units.push(((buf[k] ?? 0) << 8) | (buf[k + 1] ?? 0));
-  }
-  return units;
-}
-
-export function scanGroups(): ScalarGroup[] {
+export function scanGroups(): Group[] {
+  const groups = new Map<string, Group>();
+  const unique = new Map<number, number>();
   const buf = new Uint8Array(64);
-  const byKey = new Map<
-    string,
-    { l1: number; cp: number; l2: boolean[]; l3: boolean[] }
-  >();
+  const secondary = new Uint8Array(64);
+  const unitAt = (bytes: Uint8Array, i: number) =>
+    ((bytes[i] ?? 0) << 8) | (bytes[i + 1] ?? 0);
   for (let cp = 0; cp <= 0x10ffff; cp++) {
-    if (cp >= 0xd800 && cp <= 0xdfff) {
-      continue;
+    if (cp >= 0xd800 && cp <= 0xdfff) continue;
+    const length = asCsWriteLevel(cp, 1, buf, 0);
+    let primary = 0;
+    for (let i = 0; i < length; i += 2) {
+      const bits = primaryLengths[unitAt(buf, i)];
+      if (!bits) throw new Error('Missing primary code');
+      primary += bits;
     }
-    const l1 = ucaWriteCompactL1(cp, buf, 0);
-    const l2 = unitsOf(buf, asCsWriteLevel(cp, 2, buf, 0)).map(
-      (u) => u !== L2_DEFAULT
-    );
-    const l3 = unitsOf(buf, asCsWriteLevel(cp, 3, buf, 0)).map(
-      (u) => u !== L3_DEFAULT
-    );
-    const key = `${flagString(l2)}|${flagString(l3)}`;
-    const seen = byKey.get(key);
-    if (seen === undefined || l1 > seen.l1) {
-      byKey.set(key, { l1, cp, l2, l3 });
+    const size = asCsWriteLevel(cp, 2, secondary, 0);
+    if (asCsWriteLevel(cp, 3, buf, 0) !== size) {
+      throw new Error('Unequal secondary and tertiary counts');
+    }
+    let secondaryBits = 0;
+    let end: number | undefined;
+    const tertiaryBits = tertiaryContexts.map(() => 0);
+    for (let i = 0; i < size; i += 2) {
+      const s = unitAt(secondary, i);
+      const t = unitAt(buf, i);
+      const width = secondaryLengths[s];
+      if (!width) throw new Error('Missing secondary code');
+      secondaryBits += width;
+      for (let state = 0; state < tertiaryBits.length; state++) {
+        const tree = tertiaryTree(s, end ?? state);
+        const bits = tree?.lengths[t];
+        if (tree && !bits) throw new Error('Missing tertiary code');
+        if (!tree) {
+          const only = unique.get(s);
+          if (only !== undefined && only !== t)
+            throw new Error('Ambiguous omitted rank');
+          unique.set(s, t);
+        }
+        tertiaryBits[state] = (tertiaryBits[state] ?? 0) + (bits ?? 0);
+      }
+      end = tertiaryContext(t);
+    }
+    const key = [secondaryBits, end, ...tertiaryBits].join(',');
+    if (primary > (groups.get(key)?.primary ?? -1)) {
+      groups.set(key, { cp, primary, secondaryBits, tertiaryBits, end });
     }
   }
-  return [...byKey.values()];
-}
-
-interface Node {
-  readonly bytes: number;
-  readonly p2: number;
-  readonly p3: number;
-  readonly prev: string | undefined;
-  readonly cp: number;
+  return [...groups.values()];
 }
 
 export function computeCurve(
   variant: Variant,
-  maxScalars: number,
-  groups: readonly ScalarGroup[]
-): Curve {
-  const layers: Map<string, Node>[] = [
-    new Map([['0,0', { bytes: 0, p2: 0, p3: 0, prev: undefined, cp: -1 }]]),
-  ];
-  for (let k = 1; k <= maxScalars; k++) {
-    const next = new Map<string, Node>();
-    for (const [key, node] of layers[k - 1] ?? []) {
-      for (const g of groups) {
-        let bytes = node.bytes + g.l1;
-        let p2 = node.p2;
-        let p3 = variant === 'as_cs' ? node.p3 : 0;
-        for (const dev of g.l2) {
-          if (dev) {
-            bytes += gapLength(p2) + 1;
-            p2 = 0;
-          } else {
-            p2++;
-          }
-        }
-        if (variant === 'as_cs') {
-          for (const dev of g.l3) {
-            if (dev) {
-              bytes += p3 === 0 ? 1 : ascendingLength(p3) + 1;
-              p3 = 0;
-            } else {
-              p3++;
-            }
-          }
-        }
-        const nk = `${String(p2)},${String(p3)}`;
-        const cur = next.get(nk);
-        if (cur === undefined || cur.bytes < bytes) {
-          next.set(nk, { bytes, p2, p3, prev: key, cp: g.cp });
-        }
+  width: number,
+  groups: readonly Group[]
+) {
+  const states = variant === 'as_cs' ? tertiaryContexts.length : 1;
+  const indices = Array.from({ length: states }, (_, i) => i);
+  const edges = indices.map(() =>
+    indices.map(() => ({ bits: -Infinity, cp: 0 }))
+  );
+  for (const start of indices) {
+    for (const group of groups) {
+      const end = states === 1 ? 0 : (group.end ?? start);
+      const edge = edges[start]?.[end];
+      const bits =
+        group.primary +
+        group.secondaryBits +
+        (states === 1 ? 0 : (group.tertiaryBits[start] ?? 0));
+      if (edge && bits > edge.bits) {
+        edge.bits = bits;
+        edge.cp = group.cp;
       }
     }
-    layers.push(next);
   }
-
-  const maxBytes: number[] = [];
-  const witnesses: number[][] = [];
-  let best = -1;
-  let bestWitness: number[] = [];
-  for (let k = 0; k <= maxScalars; k++) {
-    const layer = layers[k] ?? new Map<string, Node>();
-    let layerBest = -1;
-    let layerKey = '';
-    for (const [key, node] of layer) {
-      const total =
-        node.bytes + 1 + gapLength(node.p2) + (variant === 'as_cs' ? 1 : 0);
-      if (total > layerBest) {
-        layerBest = total;
-        layerKey = key;
+  const fixed = 1 + (primaryLengths[0] ?? 0) + (secondaryLengths[0] ?? 0);
+  const maxBytes = [Math.ceil(fixed / 8)];
+  const witnesses: number[][] = [[]];
+  let layer = indices.map((i) => ({
+    bits: i === 0 ? 0 : -Infinity,
+    path: [] as number[],
+  }));
+  for (let n = 1; n <= width; n++) {
+    layer = indices.map((end) => {
+      let bits = -Infinity;
+      let path: number[] = [];
+      for (const start of indices) {
+        const from = layer[start];
+        const edge = edges[start]?.[end];
+        if (from && edge && from.bits + edge.bits > bits) {
+          bits = from.bits + edge.bits;
+          path = [...from.path, edge.cp];
+        }
       }
-    }
-    if (layerBest > best) {
-      best = layerBest;
-      bestWitness = replay(layers, k, layerKey);
-    }
-    maxBytes.push(best);
-    witnesses.push(bestWitness);
+      return { bits, path };
+    });
+    const best = layer.reduce((a, b) => (a.bits >= b.bits ? a : b));
+    maxBytes.push(Math.ceil((best.bits + fixed) / 8));
+    witnesses.push(best.path);
   }
   return { maxBytes, witnesses };
-}
-
-function replay(
-  layers: readonly Map<string, Node>[],
-  k: number,
-  key: string
-): number[] {
-  const cps: number[] = [];
-  let at = key;
-  for (let layer = k; layer > 0; layer--) {
-    const node = layers[layer]?.get(at);
-    if (node === undefined || node.prev === undefined) {
-      break;
-    }
-    cps.push(node.cp);
-    at = node.prev;
-  }
-  return cps.reverse();
 }

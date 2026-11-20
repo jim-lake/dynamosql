@@ -3,9 +3,7 @@ import { hexToBytes } from './bytes';
 import {
   AS_CS_LEVEL_DEFAULTS,
   MAX_AS_CS_LEVEL_WEIGHT,
-  MAX_UCA_COMPACT_WEIGHT,
   asCsWriteLevel,
-  ucaWriteCompactL1,
 } from './uca';
 
 export const COLLATION_NAMES = [
@@ -40,7 +38,7 @@ export interface TableCollation extends CollationBase {
 
 export interface MultiLevelCollation extends CollationBase {
   readonly kind: 'multi-level';
-  readonly levels: 2 | 3;
+  readonly levels: 1 | 2 | 3;
   readonly maxLevelWeight: number;
   readonly defaults: readonly [number, number];
   readonly writeLevel: (
@@ -100,19 +98,16 @@ function buildInfo(name: CollationName): CollationInfo {
   if (name === 'utf8mb4_0900_bin') {
     return { ...meta, kind: 'scalar-code' };
   }
-  if (name === 'utf8mb4_0900_ai_ci') {
-    return {
-      ...meta,
-      kind: 'table',
-      maxWeight: MAX_UCA_COMPACT_WEIGHT,
-      writeWeight: ucaWriteCompactL1,
-    };
-  }
-  if (name === 'utf8mb4_0900_as_cs' || name === 'utf8mb4_0900_as_ci') {
+  if (meta.charset === 'utf8mb4') {
     return {
       ...meta,
       kind: 'multi-level',
-      levels: name === 'utf8mb4_0900_as_cs' ? 3 : 2,
+      levels:
+        name === 'utf8mb4_0900_as_cs'
+          ? 3
+          : name === 'utf8mb4_0900_as_ci'
+            ? 2
+            : 1,
       maxLevelWeight: MAX_AS_CS_LEVEL_WEIGHT,
       defaults: AS_CS_LEVEL_DEFAULTS,
       writeLevel: asCsWriteLevel,
