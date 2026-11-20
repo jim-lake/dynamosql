@@ -82,6 +82,27 @@ SELECT DISTINCT t FROM dst_distinct.dst_dt ORDER BY t;
 SELECT DISTINCT d, t FROM dst_distinct.dst_dt ORDER BY d, t;
 
 
+SELECT DISTINCT CONCAT(comment, '!') AS c FROM _dynamodb.foo WHERE id LIKE "dis%" ORDER BY c;
+SELECT DISTINCT CONCAT_WS('-', comment, other) AS c FROM _dynamodb.foo WHERE id LIKE "dis%" ORDER BY c;
+SELECT DISTINCT LEFT(comment, 2) AS c FROM _dynamodb.foo WHERE id LIKE "dis%" ORDER BY c;
+SELECT DISTINCT RIGHT(comment, 2) AS c FROM _dynamodb.foo WHERE id LIKE "dis%" ORDER BY c;
+SELECT DISTINCT TRIM(CONCAT(' ', comment, ' ')) AS c FROM _dynamodb.foo WHERE id LIKE "dis%" ORDER BY c;
+SELECT DISTINCT REVERSE(comment) AS c FROM _dynamodb.foo WHERE id LIKE "dis%" ORDER BY c;
+SELECT DISTINCT REPLACE(comment, 'a', 'o') AS c FROM _dynamodb.foo WHERE id LIKE "dis%" ORDER BY c;
+SELECT DISTINCT SUBSTRING(comment, 2) AS c FROM _dynamodb.foo WHERE id LIKE "dis%" ORDER BY c;
+SELECT DISTINCT LPAD(comment, 6, '*') AS c FROM _dynamodb.foo WHERE id LIKE "dis%" ORDER BY c;
+SELECT DISTINCT REPEAT(comment, 2) AS c FROM _dynamodb.foo WHERE id LIKE "dis%" ORDER BY c;
+SELECT DISTINCT other, CONCAT(comment, other) AS c FROM _dynamodb.foo WHERE id LIKE "dis%" ORDER BY other, c;
+SELECT DISTINCT CONCAT(s, '') AS c FROM dst_distinct.dst_ai_ci WHERE id <= 5 ORDER BY c;
+SELECT DISTINCT LEFT(s, 1) AS c FROM dst_distinct.dst_ai_ci WHERE id <= 5 ORDER BY c;
+SELECT DISTINCT TRIM(s) AS c FROM dst_distinct.dst_ai_ci ORDER BY c;
+SELECT DISTINCT REVERSE(s) AS c FROM dst_distinct.dst_ai_ci WHERE id <= 5 ORDER BY c;
+SELECT DISTINCT REPLACE(s, 'a', 'b') AS c FROM dst_distinct.dst_ai_ci WHERE id <= 5 ORDER BY c;
+SELECT DISTINCT CONCAT_WS(',', s, 'x') AS c FROM dst_distinct.dst_ai_ci WHERE id <= 5 ORDER BY c;
+SELECT DISTINCT REPEAT(s, 2) AS c FROM dst_distinct.dst_ai_ci WHERE id <= 5 ORDER BY c;
+SELECT DISTINCT LPAD(s, 3, 'x') AS c FROM dst_distinct.dst_ai_ci WHERE id <= 5 ORDER BY c;
+SELECT DISTINCT SUBSTRING(s, 1, 1) AS c FROM dst_distinct.dst_ai_ci WHERE id <= 5 ORDER BY c;
+
 DROP TEMPORARY TABLE IF EXISTS dst_distinct.dst_ai_ci;
 DROP TEMPORARY TABLE IF EXISTS dst_distinct.dst_as_cs;
 DROP TEMPORARY TABLE IF EXISTS dst_distinct.dst_num;

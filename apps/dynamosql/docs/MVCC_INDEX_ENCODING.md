@@ -57,12 +57,12 @@ DynamoDB bounds key sizes, and keys are never truncated or hashed to fit, so the
 
 Hex bytes are written without `0x`. `||` concatenates bytes. `U_w(x)` is unsigned big-endian in exactly w bytes. `U64(x)=U_8(x)` and `U32(x)=U_4(x)`.
 
-| Component | Bytes |
-| --- | --- |
-| NULL | `00` |
-| Non-NULL fixed-width numeric or temporal value | `01` followed by the encoded value |
-| Non-NULL variable binary value | `01` followed by the escaped payload and `00 00` |
-| Non-NULL character value | The complete frame returned by `weightFramed` |
+| Component                                      | Bytes                                            |
+| ---------------------------------------------- | ------------------------------------------------ |
+| NULL                                           | `00`                                             |
+| Non-NULL fixed-width numeric or temporal value | `01` followed by the encoded value               |
+| Non-NULL variable binary value                 | `01` followed by the escaped payload and `00 00` |
+| Non-NULL character value                       | The complete frame returned by `weightFramed`    |
 
 For a variable binary payload, escape each `00` as `00 ff`. Concatenate complete components directly. The schema determines their types and widths.
 
@@ -78,8 +78,8 @@ For a variable binary payload, escape each `00` as `00 ff`. Concatenate complete
 | DOUBLE           | Ordered IEEE binary64, 8 bytes                                                          |
 | Binary           | Escaped stored bytes                                                                    |
 | BLOB             | Escaped stored bytes                                                                    |
-| Character        | Complete collation-specific string frame                                                          |
-| TEXT             | Complete collation-specific string frame                                                          |
+| Character        | Complete collation-specific string frame                                                |
+| TEXT             | Complete collation-specific string frame                                                |
 | DATE             | `U64((year*10000 + month*100 + day)*86400000000)`                                       |
 | DATETIME         | DATE integer plus time-of-day microseconds, encoded U64                                 |
 | TIMESTAMP        | `U64(epoch_microseconds+1)`; SQL zero timestamp uses `U64(0)`                           |
@@ -110,28 +110,28 @@ MySQL 8.4 defines equality and ordering. For example, `a` and `a` followed by U+
 
 ## Byte fixtures
 
-| Input                                             | Hex                                                    |
-| ------------------------------------------------- | ------------------------------------------------------ |
-| NULL component                                    | `00`                                                   |
-| Empty binary component                            | `010000`                                               |
-| Binary `00 ff` component                          | `0100ffff0000`                                         |
-| Binary `61` component                             | `01610000`                                             |
-| Binary `61 00` component                          | `016100ff0000`                                         |
-| Signed BIGINT -1 component                        | `017fffffffffffffff`                                   |
-| Signed BIGINT 0 component                         | `018000000000000000`                                   |
-| Signed BIGINT 1 component                         | `018000000000000001`                                   |
-| Unsigned BIGINT 1 component                       | `010000000000000001`                                   |
-| DECIMAL(4,2) -1.00 component                      | `0126ab`                                               |
-| DECIMAL(4,2) 0.00 component                       | `01270f`                                               |
-| DECIMAL(4,2) 1.00 component                       | `012773`                                               |
-| DOUBLE -1 component                               | `01400fffffffffffff`                                   |
-| DOUBLE 0 component                                | `018000000000000000`                                   |
-| DOUBLE 1 component                                | `01bff0000000000000`                                   |
-| FLOAT -1 component                                | `01407fffff`                                           |
-| FLOAT 0 component                                 | `0180000000`                                           |
-| FLOAT 1 component                                 | `01bf800000`                                           |
-| TX_ID 42, change ordinal 1 suffix                 | `000000000000002a00000001`                             |
-| Unique unsigned key 5, TX_ID 42, ordinal 0        | `010000000000000005000000000000002a00000000`           |
-| Nonunique unsigned key 5, TX_ID 42, ordinal 0     | `010000000000000005000000000000002a00000000`           |
-| Same nonunique key, second row, ordinal 1, TX_ID 42 | `010000000000000005000000000000002a00000001`         |
-| Unique NULL key, TX_ID 42, ordinal 0              | `00000000000000002a00000000`                           |
+| Input                                               | Hex                                          |
+| --------------------------------------------------- | -------------------------------------------- |
+| NULL component                                      | `00`                                         |
+| Empty binary component                              | `010000`                                     |
+| Binary `00 ff` component                            | `0100ffff0000`                               |
+| Binary `61` component                               | `01610000`                                   |
+| Binary `61 00` component                            | `016100ff0000`                               |
+| Signed BIGINT -1 component                          | `017fffffffffffffff`                         |
+| Signed BIGINT 0 component                           | `018000000000000000`                         |
+| Signed BIGINT 1 component                           | `018000000000000001`                         |
+| Unsigned BIGINT 1 component                         | `010000000000000001`                         |
+| DECIMAL(4,2) -1.00 component                        | `0126ab`                                     |
+| DECIMAL(4,2) 0.00 component                         | `01270f`                                     |
+| DECIMAL(4,2) 1.00 component                         | `012773`                                     |
+| DOUBLE -1 component                                 | `01400fffffffffffff`                         |
+| DOUBLE 0 component                                  | `018000000000000000`                         |
+| DOUBLE 1 component                                  | `01bff0000000000000`                         |
+| FLOAT -1 component                                  | `01407fffff`                                 |
+| FLOAT 0 component                                   | `0180000000`                                 |
+| FLOAT 1 component                                   | `01bf800000`                                 |
+| TX_ID 42, change ordinal 1 suffix                   | `000000000000002a00000001`                   |
+| Unique unsigned key 5, TX_ID 42, ordinal 0          | `010000000000000005000000000000002a00000000` |
+| Nonunique unsigned key 5, TX_ID 42, ordinal 0       | `010000000000000005000000000000002a00000000` |
+| Same nonunique key, second row, ordinal 1, TX_ID 42 | `010000000000000005000000000000002a00000001` |
+| Unique NULL key, TX_ID 42, ordinal 0                | `00000000000000002a00000000`                 |

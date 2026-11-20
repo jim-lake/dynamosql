@@ -19,6 +19,10 @@ function returnsBigint(): MysqlType {
   return 'BIGINT';
 }
 
+function returnsVarchar(): MysqlType {
+  return 'VARCHAR';
+}
+
 export const aggregateRules: Record<string, FunctionRule> = {
   count: returnsBigint,
   sum: sameAsFirstArg,
@@ -35,4 +39,14 @@ export const functionRules: Record<string, FunctionRule> = {
   row_number: returnsBigint,
   rank: returnsBigint,
   dense_rank: returnsBigint,
+  concat: returnsVarchar,
+  concat_ws: returnsVarchar,
+  left: returnsVarchar,
+  right: returnsVarchar,
+  trim: returnsVarchar,
+  reverse: returnsVarchar,
+  replace: returnsVarchar,
+  substring: returnsVarchar,
+  lpad: returnsVarchar,
+  repeat: returnsVarchar,
 };
