@@ -70,10 +70,12 @@ describe('scratch-backed results', () => {
   it('throws for an unsupported collation on both entry points', () => {
     const value = Uint8Array.of(0x61);
     expect(() => weightString(value, 'latin1_swedish_ci' as never, 1)).to.throw(
-      RangeError
+      Error,
+      'unsupported'
     );
     expect(() => weightFramed(value, 'latin1_swedish_ci' as never, 1)).to.throw(
-      RangeError
+      Error,
+      'unsupported'
     );
   });
 });

@@ -137,7 +137,7 @@ describe('encoding order against the MySQL 8.4 oracle', () => {
   it('rejects an unknown collation', () => {
     expect(() =>
       weightString(hexToBytes('61'), 'latin1_swedish_ci' as CollationName, 1)
-    ).to.throw(RangeError);
+    ).to.throw(Error, 'unsupported');
   });
 });
 

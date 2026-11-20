@@ -207,11 +207,18 @@ export function weightString(
   collation: CollationName,
   maxChars?: number
 ): Uint8Array {
-  if (getCollation(collation).kind === 'scalar-code') {
-    return binaryKey(value);
+  switch (collation) {
+    case 'utf8mb4_0900_bin':
+      return binaryKey(value);
+    case 'ascii_bin':
+    case 'ascii_general_ci':
+    case 'utf8mb4_0900_ai_ci':
+    case 'utf8mb4_0900_as_ci':
+    case 'utf8mb4_0900_as_cs':
+      return scratch.slice(0, fillScratch(value, collation, maxChars));
+    default:
+      throw new Error('unsupported');
   }
-  const n = fillScratch(value, collation, maxChars);
-  return scratch.slice(0, n);
 }
 
 const STRING_END = 0x01;
@@ -356,15 +363,19 @@ export function weightFramed(
   collation: CollationName,
   maxChars?: number
 ): Uint8Array {
-  const info = getCollation(collation);
-  if (info.kind === 'scalar-code') {
-    return binaryKey(value);
+  switch (collation) {
+    case 'utf8mb4_0900_bin':
+      return binaryKey(value);
+    case 'ascii_bin':
+    case 'ascii_general_ci':
+      return packAscii(value, collation, maxChars);
+    case 'utf8mb4_0900_ai_ci':
+    case 'utf8mb4_0900_as_ci':
+    case 'utf8mb4_0900_as_cs':
+      return scratch.slice(0, fillScratch(value, collation, maxChars));
+    default:
+      throw new Error('unsupported');
   }
-  if (info.kind === 'table' && info.charset === 'ascii') {
-    return packAscii(value, collation, maxChars);
-  }
-  const n = fillScratch(value, collation, maxChars);
-  return scratch.slice(0, n);
 }
 
 function decodeAt(

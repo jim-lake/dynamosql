@@ -17,14 +17,14 @@ For PAD SPACE, supply a nonnegative integral declared character width and compar
 
 `M(n)` is the largest non-NULL `weightFramed` result in bytes for a value of at most `n` characters. For ASCII, `n` is the declared PAD SPACE width and every valid input at that width has the same frame length. For `utf8mb4`, count Unicode scalars. The formulas include all framing bits and final byte padding, and apply at `n = 0`.
 
-| Collation | Exact M(n) in bytes | Largest n in 1,012 bytes | M(n) at cutoff | M(n + 1) |
-| --- | --- | ---: | ---: | ---: |
-| `ascii_bin` | W(128, n) | 1,156 | 1,012 | 1,013 |
-| `ascii_general_ci` | W(102, n) | 1,213 | 1,012 | 1,013 |
-| `utf8mb4_0900_bin` | 3n + 1 | 337 | 1,012 | 1,015 |
-| `utf8mb4_0900_ai_ci` | ceil((44n + 8) / 8) | 183 | 1,008 | 1,013 |
-| `utf8mb4_0900_as_ci` | ceil((59n + 10) / 8) | 137 | 1,012 | 1,019 |
-| `utf8mb4_0900_as_cs` | ceil((76n + 11) / 8) | 106 | 1,009 | 1,018 |
+| Collation            | Exact M(n) in bytes  | Largest n in 1,012 bytes | M(n) at cutoff | M(n + 1) |
+| -------------------- | -------------------- | -----------------------: | -------------: | -------: |
+| `ascii_bin`          | W(128, n)            |                    1,156 |          1,012 |    1,013 |
+| `ascii_general_ci`   | W(102, n)            |                    1,213 |          1,012 |    1,013 |
+| `utf8mb4_0900_bin`   | 3n + 1               |                      337 |          1,012 |    1,015 |
+| `utf8mb4_0900_ai_ci` | ceil((44n + 8) / 8)  |                      183 |          1,008 |    1,013 |
+| `utf8mb4_0900_as_ci` | ceil((59n + 10) / 8) |                      137 |          1,012 |    1,019 |
+| `utf8mb4_0900_as_cs` | ceil((76n + 11) / 8) |                      106 |          1,009 |    1,018 |
 
 `W(K, n)` is the smallest positive integer `w` satisfying `Kⁿ ≤ 255 × 256^(w−1)`. The padded rank sequence has `Kⁿ` possible values. A frame of `w` bytes allows 255 choices for its nonzero first byte and 256 for each subsequent byte.
 
@@ -33,11 +33,11 @@ For PAD SPACE, supply a nonnegative integral declared character width and compar
 The 1,012-byte budget applies to all column frames together. Add the independent column maxima, then reserve 12 more bytes for the transaction ID and ordinal. A NULL component occupies one byte. For example, an `ai_ci` column of width 183 can use 1,008 bytes. Adding an `ascii_bin` column of width 4 brings the maximum to exactly 1,012 bytes. Width 5 brings it to 1,013.
 
 | Bytes available for one UCA column | Largest ai_ci width | Largest as_ci width | Largest as_cs width |
-| ---: | ---: | ---: | ---: |
-| 64 | 11 | 8 | 6 |
-| 128 | 23 | 17 | 13 |
-| 256 | 46 | 34 | 26 |
-| 512 | 92 | 69 | 53 |
+| ---------------------------------: | ------------------: | ------------------: | ------------------: |
+|                                 64 |                  11 |                   8 |                   6 |
+|                                128 |                  23 |                  17 |                  13 |
+|                                256 |                  46 |                  34 |                  26 |
+|                                512 |                  92 |                  69 |                  53 |
 
 ### Why the UCA bounds are exact
 
@@ -59,10 +59,10 @@ With `w = W(K, n)`, write `256^(w−1) + x` in exactly `w` big-endian bytes. The
 
 For `utf8mb4_0900_bin`, both public functions write one code per scalar, followed by the end byte `01`. In the table, `u` is the scalar's numeric value and byte constants are hexadecimal. [Scalar writer](src/weight_string.ts)
 
-| Scalar range | Code bytes in order |
-| --- | --- |
-| U+0000–U+007F | One byte equal to `0x02 + u` |
-| U+0080–U+07FF | With `x = u − 0x80`, write `0x82 + floor(x / 256)`, then the low byte of `x` |
+| Scalar range                          | Code bytes in order                                                                                                                                  |
+| ------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
+| U+0000–U+007F                         | One byte equal to `0x02 + u`                                                                                                                         |
+| U+0080–U+07FF                         | With `x = u − 0x80`, write `0x82 + floor(x / 256)`, then the low byte of `x`                                                                         |
 | U+0800–U+10FFFF, excluding surrogates | Set `x = u − 0x800` and subtract another `0x800` when `u > 0xDFFF`. Write `0x8A + floor(x / 65536)`, then the low 16 bits of `x` in big-endian order |
 
 The lead byte determines the code length. Codes increase with the scalar value, and the end byte sorts below every lead. Repeating U+0800 attains the maximum of three bytes per scalar plus the end byte.
