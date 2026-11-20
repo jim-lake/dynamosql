@@ -4,25 +4,31 @@ import { SQLError } from '../error';
 
 import * as Expression from './expression';
 import { getExprCollation } from './expression/collation';
+import { getExprMysqlType } from './expression/mysql_type/mysql_type_expression';
 import { isBaseFrom, isDerivedFrom } from './helpers/ast_helper';
-import { foldString } from './helpers/collation';
 import { resolveReferences } from './helpers/column_ref_helper';
+import { createConvertKeyNullable } from './helpers/convert_key_nullable';
 import { makeEngineGroups } from './helpers/engine_groups';
 import { formGroup, formImplicitGroup, hasAggregate } from './helpers/group';
+import { createHashDistinctMakeKey } from './helpers/hash_distinct_index';
 import { formJoin } from './helpers/join';
+import { getKeyTypes } from './helpers/key_type_convert';
 import { expandStarColumns, calcColumns } from './helpers/query_columns';
 import { sort } from './helpers/sort';
 import { convertNum } from './helpers/sql_conversion';
 import { applyWindows, hasWindow } from './helpers/window';
 import * as Lock from './lock';
-import { SQLDate } from './types/sql_date';
-import { SQLDateTime } from './types/sql_datetime';
-import { SQLInterval } from './types/sql_interval';
-import { SQLTime } from './types/sql_time';
+import { mysqlStringToValueType } from './types/value_type';
 
 import type { Session } from '../session';
 import type { FieldInfo } from '../types';
-import type { TableInfoMap, SourceMap, CellRow, OrderBySpec } from './engine';
+import type {
+  ColumnDef,
+  TableInfoMap,
+  SourceMap,
+  CellRow,
+  OrderBySpec,
+} from './engine';
 import type {
   EvaluationResult,
   EvaluationState,
@@ -503,10 +509,24 @@ async function _evaluateReturn(
   }
 
   if (ast.type === 'select' && ast.distinct === 'DISTINCT') {
-    const collations = queryColumns.map(
-      (column) =>
-        column.result.collation ?? getExprCollation(column.expr, state)
-    );
+    const distinctColumns: ColumnDef[] = queryColumns.map((column) => {
+      const mysqlType = getExprMysqlType(column.expr, state);
+      if (!mysqlType) {
+        throw new SQLError({ err: 'ER_NOT_SUPPORTED_YET' });
+      }
+      return {
+        name: column.result.name ?? '',
+        type: mysqlStringToValueType(mysqlType),
+        mysqlType,
+        collation:
+          column.result.collation ??
+          getExprCollation(column.expr, state) ??
+          undefined,
+      };
+    });
+    const keyTypes = getKeyTypes(distinctColumns);
+    const convertKey = createConvertKeyNullable(distinctColumns, keyTypes);
+    const makeKey = createHashDistinctMakeKey(keyTypes);
     const distinctInput = group_iter;
     group_iter = (async function* () {
       const indexes = new Set(queryColumns.keys());
@@ -519,33 +539,7 @@ async function _evaluateReturn(
       const seen = new Set<string>();
       for await (const batch of projected) {
         const kept = batch.filter((row) => {
-          const parts = collations.map((collation, index) => {
-            const value = row.result?.[index]?.value;
-            if (typeof value === 'string') {
-              return `s${foldString(value, collation)}`;
-            }
-            if (value === null || value === undefined) {
-              return 'n';
-            }
-            if (typeof value === 'number' || typeof value === 'bigint') {
-              return `d${value}`;
-            }
-            if (Buffer.isBuffer(value)) {
-              return `b${value.toString('latin1')}`;
-            }
-            if (
-              value instanceof SQLDate ||
-              value instanceof SQLDateTime ||
-              value instanceof SQLTime
-            ) {
-              return `t${value.toNumber()}`;
-            }
-            if (value instanceof SQLInterval) {
-              return `i${value.getNumber()}`;
-            }
-            return `o${String(value)}`;
-          });
-          const key = JSON.stringify(parts);
+          const key = makeKey(convertKey(row.result ?? []));
           if (seen.has(key)) {
             return false;
           }

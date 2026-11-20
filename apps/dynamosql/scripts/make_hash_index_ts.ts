@@ -4,7 +4,7 @@ import { format, resolveConfig } from 'prettier';
 
 type HashUniqueKeyType = 'string' | 'number' | 'bigint' | 'buffer';
 type HashUniquePrimaryKeyType = 'string' | 'bigint' | 'number';
-type Mode = 'unique' | 'nullable' | 'nonunique';
+type Mode = 'unique' | 'nullable' | 'nonunique' | 'distinct';
 
 const KEY_TYPES: HashUniqueKeyType[] = ['string', 'number', 'bigint', 'buffer'];
 const PRIMARY_KEY_TYPES: HashUniquePrimaryKeyType[] = [
@@ -34,6 +34,7 @@ const RETURN_TYPES: Record<Mode, string> = {
   unique: 'HashUniqueMakeKey',
   nullable: 'HashNullableMakeKey',
   nonunique: 'HashNonuniqueMakeKey',
+  distinct: 'HashDistinctMakeKey',
 };
 
 function typeCombinations(length: number): HashUniqueKeyType[][] {
@@ -66,14 +67,15 @@ function keyExpression(
 
 function renderFunction(mode: Mode): string[] {
   const nullable = mode !== 'unique';
+  const hasPrimaryKey = mode === 'nullable' || mode === 'nonunique';
   const returnType = RETURN_TYPES[mode];
-  const params = nullable
+  const params = hasPrimaryKey
     ? 'types: HashUniqueKeyType[], primaryType: HashUniquePrimaryKeyType'
     : 'types: HashUniqueKeyType[]';
-  const switchSubject = nullable
+  const switchSubject = hasPrimaryKey
     ? "  switch (`${primaryType}.${types.join(',')}`) {"
     : "  switch (types.join(',')) {";
-  const primaryTypes: (HashUniquePrimaryKeyType | null)[] = nullable
+  const primaryTypes: (HashUniquePrimaryKeyType | null)[] = hasPrimaryKey
     ? PRIMARY_KEY_TYPES
     : [null];
 
@@ -97,7 +99,7 @@ function renderFunction(mode: Mode): string[] {
       for (const primaryType of primaryTypes) {
         let statement: string;
         if (primaryType === null) {
-          statement = `      return keys => ${length > 1 ? multiBody : singleBody};`;
+          statement = `      return keys => ${mode === 'unique' && length === 1 ? singleBody : multiBody};`;
         } else if (mode === 'nonunique') {
           const keyText = length > 1 ? multiBody : NULL_SAFE_SINGLE[types[0]];
           statement =
@@ -141,19 +143,18 @@ function renderFunction(mode: Mode): string[] {
     '  return key;',
     '})',
   ];
-  const genericBody =
-    mode === 'unique'
-      ? ['    return keys => JSON.stringify(', ...mapped, '    );']
-      : [
-          '    return (keys, primaryKey) => {',
-          '      const json = JSON.stringify(',
-          ...mapped,
-          '      );',
-          mode === 'nullable'
-            ? '      return keys.includes(null) ? `${json}:${primaryKey}` : json;'
-            : '      return `${json}:${primaryKey}`;',
-          '    };',
-        ];
+  const genericBody = !hasPrimaryKey
+    ? ['    return keys => JSON.stringify(', ...mapped, '    );']
+    : [
+        '    return (keys, primaryKey) => {',
+        '      const json = JSON.stringify(',
+        ...mapped,
+        '      );',
+        mode === 'nullable'
+          ? '      return keys.includes(null) ? `${json}:${primaryKey}` : json;'
+          : '      return `${json}:${primaryKey}`;',
+        '    };',
+      ];
 
   return [
     `export function create${returnType}(${params}): ${returnType} {`,
@@ -204,10 +205,19 @@ const nonuniqueLines = [
   ...renderFunction('nonunique'),
 ];
 
+const distinctLines = [
+  "import type { HashUniqueKeyType, HashUniqueKeyValue } from './hash_unique_index';",
+  '',
+  'export type HashDistinctMakeKey = (keys: (HashUniqueKeyValue | null)[]) => string;',
+  '',
+  ...renderFunction('distinct'),
+];
+
 const outputs: [string, string[]][] = [
   ['hash_unique_index.ts', uniqueLines],
   ['hash_nullable_index.ts', nullableLines],
   ['hash_nonunique_index.ts', nonuniqueLines],
+  ['hash_distinct_index.ts', distinctLines],
 ];
 async function main(): Promise<void> {
   for (const [fileName, lines] of outputs) {
