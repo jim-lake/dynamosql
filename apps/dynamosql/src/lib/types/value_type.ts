@@ -67,6 +67,8 @@ export function mysqlStringToValueType(s: string): ValueType {
       return 'long';
     case 'BIGINT':
       return 'longlong';
+    case 'YEAR':
+      return 'year';
     case 'VARCHAR':
       return 'string';
     case 'CHAR':
