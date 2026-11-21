@@ -19,6 +19,13 @@ MySQL picks a value from one row of each group for a non-aggregated column. The 
 
 DynamoSQL keeps the double from the calculation and never converts it to a string and back. The extra digits are intentional. The same applies to `AVG(v) OVER ()`.
 
+## Last bit of DOUBLE results
+
+The last bit of a DOUBLE result is not reliable across environments. The same expression can differ by one unit in the last place depending on the exact MySQL version, the Node.js version, and the CPU. Both engines compute the value with a libm or V8 routine, and those routines do not always agree in the final bit.
+
+- `SELECT SIN(-2.5) AS r;`: MySQL returns `-0.5984721441039565`. DynamoSQL returns `-0.5984721441039564` in the same environment.
+- `SELECT RADIANS(-3) AS r;`: MySQL returns `-0.05235987755982989`. DynamoSQL returns `-0.05235987755982988`.
+
 ## Lock function placement
 
 `GET_LOCK()`, `RELEASE_LOCK()`, `IS_FREE_LOCK()`, `IS_USED_LOCK()`, and `RELEASE_ALL_LOCKS()` are supported only in the select list of a SELECT. MySQL accepts them in WHERE, HAVING, and other clauses. DynamoSQL raises `ER_FEATURE_UNSUPPORTED` when it evaluates a lock call in those positions.

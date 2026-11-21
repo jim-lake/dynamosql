@@ -21,3 +21,12 @@ Matching MySQL is not a goal for illegal statements. Parse errors (`ER_PARSE_ERR
 ## DROP DATABASE IF EXISTS
 
 - `DROP DATABASE IF EXISTS missing_db;`, where `missing_db` does not exist: MySQL 8.4 returns success with a warning (1008). DynamoSQL returns `ER_BAD_DB_ERROR`. `drop_handler.ts` never reads `ast.prefix`, and `schema_manager.dropDatabase` throws `db_not_found` without a check for the flag.
+
+## ROUND on DECIMAL
+
+- `SELECT ROUND(CAST(-1.45 AS DECIMAL(10,2)), 1);`: MySQL returns `-1.5` (NEWDECIMAL). DynamoSQL returns `-1.4`, because `round` calls `value.toFixed(decimals)` on the double value of the decimal, and the double -1.45 is stored just below the tie.
+- `SELECT ROUND(dec_v) FROM t;`, where `dec_v` is `DECIMAL(10,2)`: MySQL returns NEWDECIMAL. DynamoSQL returns DOUBLE, because `round` resolves the result type through `_resolveTypeForRounding` and does not keep the DECIMAL input type.
+
+## PI display precision
+
+- `SELECT PI();`: MySQL returns `3.141593` in the text protocol, because PI has 6 decimal places. DynamoSQL returns `3.141592653589793`.

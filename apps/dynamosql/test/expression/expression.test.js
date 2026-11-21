@@ -117,6 +117,11 @@ describe('Expression', function () {
     { verify_field_types: true }
   );
   runTests(
+    'function_hex_round.sql',
+    path.join(__dirname, 'function_hex_round.sql'),
+    { verify_field_types: true }
+  );
+  runTests(
     'function_edge_cases_error.sql',
     path.join(__dirname, 'function_edge_cases_error.sql'),
     { allowedErrors: 'SAME_CODE', verify_field_types: true }

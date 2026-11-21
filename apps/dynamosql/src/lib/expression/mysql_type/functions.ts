@@ -167,6 +167,10 @@ function returnsVarchar(): MysqlType {
   return 'VARCHAR';
 }
 
+function returnsDouble(): MysqlType {
+  return 'DOUBLE';
+}
+
 export const functionRules: Record<string, FunctionRule> = {
   lower: sameAsFirstArg,
   lcase: sameAsFirstArg,
@@ -193,9 +197,28 @@ export const functionRules: Record<string, FunctionRule> = {
   floor: integerResultRule,
   ceil: integerResultRule,
   ceiling: integerResultRule,
-  sqrt: () => {
-    return 'DOUBLE';
-  },
+  sqrt: returnsDouble,
+  pow: returnsDouble,
+  power: returnsDouble,
+  exp: returnsDouble,
+  ln: returnsDouble,
+  degrees: returnsDouble,
+  sign: returnsBigint,
+  ascii: returnsBigint,
+  month: returnsBigint,
+  year: () => 'YEAR',
+  hex: returnsVarchar,
+  dayname: returnsVarchar,
+  cos: returnsDouble,
+  sin: returnsDouble,
+  tan: returnsDouble,
+  atan: returnsDouble,
+  log2: returnsDouble,
+  log10: returnsDouble,
+  pi: returnsDouble,
+  radians: returnsDouble,
+  instr: returnsBigint,
+  locate: returnsBigint,
   mod: (args, state) => {
     const families = familiesOf(args, state);
     if (!families) {

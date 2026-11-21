@@ -6,6 +6,7 @@ import { convertNum } from '../helpers/sql_conversion';
 
 import { getExprCoercibility, getExprCollation } from './collation';
 import { getValue } from './evaluate';
+import { mysqlRound } from './func_math_basic';
 
 import type { EvaluationState, EvaluationResult } from './evaluate';
 import type { Function } from 'node-sql-parser/build/mysql';
@@ -14,13 +15,14 @@ export function hex(expr: Function, state: EvaluationState): EvaluationResult {
   assertArgCount(expr, 1);
   const result = getValue(expr.args.value[0], state);
   result.name = `HEX(${result.name})`;
+  const inputType = result.type;
   result.type = 'string';
   if (!result.err && result.value !== null) {
     if (typeof result.value === 'number' || typeof result.value === 'bigint') {
       const num =
         typeof result.value === 'bigint'
           ? result.value
-          : BigInt(Math.round(result.value));
+          : BigInt(mysqlRound(result.value, inputType));
       const unsigned = num < 0n ? (1n << 64n) + num : num;
       result.value = unsigned.toString(16).toUpperCase();
     } else if (Buffer.isBuffer(result.value)) {

@@ -255,7 +255,15 @@ export function runTests(
   }
 }
 function _checkEqual(name: string, i: number, left: any, right: any) {
-  if (name === 'ignore_seconds') {
+  if (name === 'approx_double') {
+    const l = Number(left);
+    const r = Number(right);
+    expect(
+      left === right ||
+        Math.abs(l - r) <= 1e-15 * Math.max(Math.abs(l), Math.abs(r)),
+      `results[${i}].${name} approx equal: ${left} vs ${right}`
+    ).to.be.true;
+  } else if (name === 'ignore_seconds') {
     expect(
       left.length,
       `results[${i}].${name}: (${left}).length === (${right}).length`

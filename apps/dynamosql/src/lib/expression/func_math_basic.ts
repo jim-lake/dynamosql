@@ -84,12 +84,12 @@ export function round(
   if (value === null) {
     result.value = null;
   } else if (decimals === 0) {
-    result.value = _mysqlRound(value);
+    result.value = mysqlRound(value, result.type);
   } else if (decimals > 0) {
     result.value = Number(value.toFixed(decimals));
   } else {
     const factor = Math.pow(10, -decimals);
-    result.value = _mysqlRound(value / factor) * factor;
+    result.value = mysqlRound(value / factor, result.type) * factor;
   }
   if (result.type === 'bool') {
     result.type = 'longlong';
@@ -99,7 +99,14 @@ export function round(
   }
   return result;
 }
-function _mysqlRound(x: number): number {
+export function mysqlRound(x: number, type: string): number {
+  if (type === 'double') {
+    const lower = Math.floor(x);
+    if (x - lower === 0.5) {
+      return lower % 2 === 0 ? lower : lower + 1;
+    }
+    return Math.round(x);
+  }
   return x >= 0 ? Math.round(x) : -Math.round(-x);
 }
 export function mod(expr: Function, state: EvaluationState): EvaluationResult {
