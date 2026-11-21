@@ -10,11 +10,10 @@ const max = Number(process.argv[3] ?? 60);
 const collation =
   variant === 'as_ci' ? 'utf8mb4_0900_as_ci' : 'utf8mb4_0900_as_cs';
 const curve = computeCurve(variant, max, scanGroups());
-const enc = new TextEncoder();
 for (let k = 0; k <= max; k++) {
   const cps = curve.witnesses[k] ?? [];
   const text = String.fromCodePoint(...cps);
-  const framed = weightString(enc.encode(text), collation).length;
+  const framed = weightString(text, collation).length;
   const model = curve.maxBytes[k] ?? -1;
   if (framed !== model)
     throw new Error(`Replay mismatch at ${k}: ${framed} vs ${model}`);

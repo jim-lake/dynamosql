@@ -4,6 +4,7 @@ import { expect } from 'chai';
 import { bytesToHex, hexToBytes } from '../src/bytes';
 import { type CollationName } from '../src/collations';
 import { weightString } from '../src/weight_string';
+import { hexStr, byteStr } from './helpers/strings';
 import { compareBytes, expectSameOrder, type OrderItem } from './order';
 
 interface Oracle {
@@ -36,28 +37,28 @@ describe('encoding order against the MySQL 8.4 oracle', () => {
       const items: OrderItem[] = rows.map((row) => ({
         id: `${name} ${row.value_hex}`,
         oracle: hexToBytes(row.weight_hex),
-        ours: weightString(hexToBytes(row.value_hex), name),
+        ours: weightString(hexStr(row.value_hex), name),
       }));
       expectSameOrder(items);
     }
   });
 
   it('rejects invalid UTF-8 under utf8mb4_0900_ai_ci', () => {
-    expect(() => weightString(hexToBytes('C3'), 'utf8mb4_0900_ai_ci')).to.throw(
+    expect(() => weightString(hexStr('C3'), 'utf8mb4_0900_ai_ci')).to.throw(
       RangeError
     );
   });
 
   it('rejects an unknown collation', () => {
     expect(() =>
-      weightString(hexToBytes('61'), 'latin1_swedish_ci' as CollationName)
+      weightString(hexStr('61'), 'latin1_swedish_ci' as CollationName)
     ).to.throw(Error, 'unsupported');
   });
 });
 
 describe('utf8mb4_0900_bin', () => {
   const bin = (hex: string): string =>
-    bytesToHex(weightString(hexToBytes(hex), 'utf8mb4_0900_bin'));
+    bytesToHex(weightString(hexStr(hex), 'utf8mb4_0900_bin'));
 
   it('weighs every code point as one non-empty scalar code', () => {
     for (const cp of [
@@ -76,7 +77,7 @@ describe('utf8mb4_0900_bin', () => {
 
   it('keeps NUL bytes and a leading BOM as data', () => {
     const key = (hex: string): Uint8Array =>
-      weightString(hexToBytes(hex), 'utf8mb4_0900_bin');
+      weightString(hexStr(hex), 'utf8mb4_0900_bin');
     expect(compareBytes(key('610062'), key('6100'))).to.not.equal(0);
     expect(compareBytes(key('EFBBBF61'), key('61'))).to.not.equal(0);
     expect(bin('610062')).to.not.equal(bin('6100'));
@@ -89,7 +90,7 @@ describe('utf8mb4_0900_bin', () => {
     }
     const keys = scalars.map((cp) =>
       weightString(
-        Uint8Array.from(Buffer.from(String.fromCodePoint(cp), 'utf8')),
+        byteStr(Buffer.from(String.fromCodePoint(cp), 'utf8')),
         'utf8mb4_0900_bin'
       )
     );

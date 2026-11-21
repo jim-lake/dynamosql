@@ -5,6 +5,7 @@ import { bytesToHex, hexToBytes } from '../src/bytes';
 import { getCollation } from '../src/collations';
 import { asCsWriteLevel } from '../src/uca';
 import { weightString } from '../src/weight_string';
+import { hexStr, utf8Str } from './helpers/strings';
 import { compareBytes, expectAscending, expectSameOrder } from './order';
 
 interface Oracle {
@@ -15,13 +16,11 @@ const oracle = JSON.parse(
   readFileSync(new URL('./fixtures/oracle.json', import.meta.url), 'utf8')
 ) as Oracle;
 
-const enc = new TextEncoder();
-
 type Name = 'utf8mb4_0900_as_cs' | 'utf8mb4_0900_as_ci';
 
 function suite(name: Name, levels: 2 | 3): void {
-  const e = (text: string): Uint8Array => weightString(enc.encode(text), name);
-  const eh = (hex: string): Uint8Array => weightString(hexToBytes(hex), name);
+  const e = (text: string): Uint8Array => weightString(utf8Str(text), name);
+  const eh = (hex: string): Uint8Array => weightString(hexStr(hex), name);
   const chain = (texts: string[]): (readonly [string, Uint8Array])[] =>
     texts.map((t) => [JSON.stringify(t), e(t)] as const);
   const cs = levels === 3;
@@ -273,7 +272,7 @@ function suite(name: Name, levels: 2 | 3): void {
     describe('framing', () => {
       it('never starts with 00 and is never empty', () => {
         for (const text of ['', '\u0000', 'a', '一', '\u0301']) {
-          const framed = weightString(enc.encode(text), name);
+          const framed = weightString(utf8Str(text), name);
           expect(framed.length).to.be.greaterThan(0);
           expect(framed[0]).to.be.greaterThan(0);
         }

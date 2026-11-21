@@ -4,6 +4,7 @@ import { bytesToHex } from '../src/bytes';
 import { ucaWeight } from '../src/uca';
 import { expectSameOrder } from './order';
 import { weightString } from '../src/weight_string';
+import { byteStr, utf8Str } from './helpers/strings';
 
 const UCA = 'utf8mb4_0900_ai_ci';
 
@@ -40,7 +41,7 @@ const valid: [string, number[], number][] = [
 describe('weightString UTF-8 decoding edge cases', () => {
   for (const [name, bytes] of invalid) {
     it(`rejects ${name}`, () => {
-      expect(() => weightString(Uint8Array.from(bytes), UCA)).to.throw(
+      expect(() => weightString(byteStr(bytes), UCA)).to.throw(
         RangeError,
         'Invalid UTF-8'
       );
@@ -52,22 +53,22 @@ describe('weightString UTF-8 decoding edge cases', () => {
       valid.map(([id, bytes, cp]) => ({
         id,
         oracle: ucaWeight(cp),
-        ours: weightString(Uint8Array.from(bytes), UCA),
+        ours: weightString(byteStr(bytes), UCA),
       }))
     );
   });
 
   it('keeps a leading BOM as a character instead of stripping it', () => {
     const bom = Uint8Array.from([0xef, 0xbb, 0xbf]);
-    const a = weightString(new TextEncoder().encode('a'), UCA);
-    const got = weightString(new Uint8Array([...bom, 0x61]), UCA);
+    const a = weightString(utf8Str('a'), UCA);
+    const got = weightString(byteStr([...bom, 0x61]), UCA);
     expect(bytesToHex(got)).to.equal(bytesToHex(a));
   });
 });
 
 describe('weightString buffer reuse', () => {
   it('returns the same bytes on repeated calls that grow the scratch buffer', () => {
-    const value = new TextEncoder().encode('ab'.repeat(200));
+    const value = utf8Str('ab'.repeat(200));
     const first = bytesToHex(weightString(value, UCA));
     expect(bytesToHex(weightString(value, UCA))).to.equal(first);
   });

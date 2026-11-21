@@ -13,20 +13,31 @@ import { primaryCodes, primaryLengths } from './primary_bits';
 
 let scratch = new Uint8Array(256);
 let cpScratch = new Int32Array(64);
+let input = Buffer.allocUnsafeSlow(16384);
+
+function inputBytes(value: string): Uint8Array {
+  if (value.length > input.length) {
+    input = Buffer.allocUnsafeSlow(value.length);
+  }
+  input.write(value, 0, value.length, 'latin1');
+  return input.subarray(0, value.length);
+}
 
 export function weightString(
-  value: Uint8Array,
+  value: string,
   collation: CollationName
 ): Uint8Array {
   switch (collation) {
     case 'utf8mb4_0900_bin':
-      return binaryKey(value);
+      return binaryKey(inputBytes(value));
     case 'ascii_bin':
+      return Buffer.from(value, 'latin1');
     case 'ascii_general_ci':
+      return Buffer.from(value.toUpperCase(), 'latin1');
     case 'utf8mb4_0900_ai_ci':
     case 'utf8mb4_0900_as_ci':
     case 'utf8mb4_0900_as_cs':
-      return scratch.slice(0, fillScratch(value, collation));
+      return scratch.slice(0, fillScratch(inputBytes(value), collation));
     default:
       throw new Error('unsupported');
   }
@@ -197,15 +208,15 @@ const THREE_BYTE_BASE = 0x8a;
 const SURROGATE_LOW = 0xd800;
 const SURROGATE_HIGH = 0xdfff;
 
-function writeScalarCode(cp: number, at: number): number {
+function writeScalarCode(cp: number, out: Buffer, at: number): number {
   if (cp < 0x80) {
-    scratch[at] = SCALAR_BASE + cp;
+    out[at] = SCALAR_BASE + cp;
     return 1;
   }
   if (cp < 0x800) {
     const index = cp - 0x80;
-    scratch[at] = TWO_BYTE_BASE + (index >>> 8);
-    scratch[at + 1] = index & 0xff;
+    out[at] = TWO_BYTE_BASE + (index >>> 8);
+    out[at + 1] = index & 0xff;
     return 2;
   }
   let index = cp - 0x800;
@@ -216,24 +227,22 @@ function writeScalarCode(cp: number, at: number): number {
   }
   const lead = Math.floor(index / 0x10000);
   const rest = index % 0x10000;
-  scratch[at] = THREE_BYTE_BASE + lead;
-  scratch[at + 1] = rest >>> 8;
-  scratch[at + 2] = rest & 0xff;
+  out[at] = THREE_BYTE_BASE + lead;
+  out[at + 1] = rest >>> 8;
+  out[at + 2] = rest & 0xff;
   return 3;
 }
 
 function binaryKey(value: Uint8Array): Uint8Array {
+  const out = Buffer.allocUnsafe(value.length + 1);
   let n = 0;
   for (let i = 0; i < value.length;) {
     const packed = decodeAt(value, i, 'utf8mb4_0900_bin');
-    const cp = packed & 0x1fffff;
     i += packed >>> 21;
-    ensure(n + 3);
-    n += writeScalarCode(cp, n);
+    n += writeScalarCode(packed & 0x1fffff, out, n);
   }
-  ensure(n + 1);
-  scratch[n] = STRING_END;
-  return scratch.slice(0, n + 1);
+  out[n] = STRING_END;
+  return new Uint8Array(out.buffer, out.byteOffset, n + 1);
 }
 
 function decodeAt(

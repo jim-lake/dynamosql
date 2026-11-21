@@ -5,7 +5,7 @@ interface Workload {
   readonly name: string;
   readonly asciiOnly: boolean;
   readonly rounds: number;
-  readonly strings: readonly Uint8Array[];
+  readonly strings: readonly string[];
 }
 
 const COUNT = 20000;
@@ -29,15 +29,16 @@ function build(
   pick: (next: () => number) => number
 ): Workload {
   const next = makeRandom(SEED + name.length);
-  const encoder = new TextEncoder();
-  const strings: Uint8Array[] = [];
+  const strings: string[] = [];
   for (let i = 0; i < COUNT; i++) {
     const len = minLen + (next() % (maxLen - minLen + 1));
     const cps: number[] = [];
     for (let j = 0; j < len; j++) {
       cps.push(pick(next));
     }
-    strings.push(encoder.encode(String.fromCodePoint(...cps)));
+    strings.push(
+      Buffer.from(String.fromCodePoint(...cps), 'utf8').toString('latin1')
+    );
   }
   return { name, asciiOnly, rounds, strings };
 }

@@ -22,7 +22,9 @@ for (let cp = 0; cp <= 0x10ffff; cp++) {
 const fixed = 1 + primaryLengths[0];
 const cutoff = Math.floor((8 * 1012 - fixed) / maxBits);
 for (let n = 0; n <= cutoff + 1; n++) {
-  const value = Buffer.from(String.fromCodePoint(witness).repeat(n));
+  const value = Buffer.from(String.fromCodePoint(witness).repeat(n)).toString(
+    'latin1'
+  );
   const bytes = weightString(value, 'utf8mb4_0900_ai_ci').length;
   if (bytes !== Math.ceil((n * maxBits + fixed) / 8))
     throw new Error('Replay at ' + n);

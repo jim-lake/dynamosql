@@ -2,6 +2,7 @@ import { describe, it } from 'mocha';
 import { expect } from 'chai';
 import { bytesToHex } from '../src/bytes';
 import { weightString } from '../src/weight_string';
+import { byteStr, utf8Str } from './helpers/strings';
 
 const NO_PAD = [
   'utf8mb4_0900_ai_ci',
@@ -22,9 +23,7 @@ describe('NO PAD collations reject malformed UTF-8', () => {
   for (const name of NO_PAD) {
     for (const [label, bytes] of INVALID) {
       it(`${name} rejects ${label}`, () => {
-        expect(() => weightString(Uint8Array.from(bytes), name)).to.throw(
-          RangeError
-        );
+        expect(() => weightString(byteStr(bytes), name)).to.throw(RangeError);
       });
     }
   }
@@ -32,26 +31,22 @@ describe('NO PAD collations reject malformed UTF-8', () => {
 
 describe('scratch-backed results', () => {
   it('encodes the binary input as ordered scalar codes ending in 01', () => {
-    const value = Uint8Array.of(0x61, 0x00, 0x7f);
-    expect(weightString(value, 'utf8mb4_0900_bin')).to.not.equal(value);
+    expect(
+      weightString(utf8Str('a\u0000\u007f'), 'utf8mb4_0900_bin')
+    ).to.be.instanceOf(Uint8Array);
   });
 
   it('keeps an earlier result intact after a larger call', () => {
-    const first = weightString(
-      new TextEncoder().encode('ab'),
-      'utf8mb4_0900_as_cs'
-    );
+    const first = weightString(utf8Str('ab'), 'utf8mb4_0900_as_cs');
     const snapshot = bytesToHex(first);
-    weightString(
-      new TextEncoder().encode('z'.repeat(900)),
-      'utf8mb4_0900_as_cs'
-    );
+    weightString(utf8Str('z'.repeat(900)), 'utf8mb4_0900_as_cs');
     expect(bytesToHex(first)).to.equal(snapshot);
   });
 
   it('throws for an unsupported collation', () => {
-    expect(() =>
-      weightString(Uint8Array.of(0x61), 'latin1_swedish_ci' as never)
-    ).to.throw(Error, 'unsupported');
+    expect(() => weightString('a', 'latin1_swedish_ci' as never)).to.throw(
+      Error,
+      'unsupported'
+    );
   });
 });

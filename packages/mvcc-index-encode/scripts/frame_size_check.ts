@@ -81,7 +81,7 @@ for (const variant of ['ai_ci', 'as_ci', 'as_cs'] as const) {
           Math.ceil((maxPrimary * i + 1 + primaryLengths[0]) / 8)
         )
       : computeCurve(variant, 180, groups).maxBytes;
-  const frame = (s: string) => weightString(Buffer.from(s), name).length;
+  const frame = (s: string) => weightString(s, name).length;
   let pairMax = 0;
   for (const a of samples)
     for (const b of samples)
