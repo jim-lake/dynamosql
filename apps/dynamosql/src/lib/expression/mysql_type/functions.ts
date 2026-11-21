@@ -173,6 +173,21 @@ function returnsDouble(): MysqlType {
   return 'DOUBLE';
 }
 
+function returnsInt(): MysqlType {
+  return 'INT';
+}
+
+function valueSelectRule(
+  args: unknown[],
+  state: EvaluationState
+): MysqlType | null {
+  const mysqlType = coalesceRule(args, state);
+  if (mysqlType === 'CHAR') {
+    return 'VARCHAR';
+  }
+  return mysqlType === 'TINYINT' ? 'INT' : mysqlType;
+}
+
 export const functionRules: Record<string, FunctionRule> = {
   lower: sameAsFirstArg,
   lcase: sameAsFirstArg,
@@ -226,9 +241,22 @@ export const functionRules: Record<string, FunctionRule> = {
   minute: returnsBigint,
   second: returnsBigint,
   datediff: returnsBigint,
-  day: returnsBigint,
+  day: returnsInt,
   dayofweek: returnsBigint,
-  dayofyear: returnsBigint,
+  dayofyear: returnsInt,
+  dayofmonth: returnsInt,
+  microsecond: returnsBigint,
+  json_valid: returnsBigint,
+  json_depth: returnsBigint,
+  json_length: returnsBigint,
+  json_type: returnsVarchar,
+  json_unquote: returnsVarchar,
+  json_quote: returnsVarchar,
+  greatest: valueSelectRule,
+  least: valueSelectRule,
+  if: (args, state) => {
+    return valueSelectRule(args.slice(1), state);
+  },
   weekday: returnsBigint,
   last_day: () => 'DATE',
   octet_length: returnsBigint,
@@ -241,7 +269,7 @@ export const functionRules: Record<string, FunctionRule> = {
   weekofyear: returnsBigint,
   yearweek: returnsBigint,
   timestampdiff: returnsBigint,
-  isnull: returnsBigint,
+  isnull: returnsInt,
   log: returnsDouble,
   cos: returnsDouble,
   sin: returnsDouble,

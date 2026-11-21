@@ -205,6 +205,9 @@ export function unionValue(
   value: EvaluationResult['value'],
   type: ValueType
 ): EvaluationResult['value'] {
+  if (type === 'string' && typeof value !== 'string') {
+    return value === null ? null : String(value);
+  }
   return type === 'number' && typeof value === 'bigint' ? Number(value) : value;
 }
 export function unionType(list: EvaluationResult[]): UnionTypeResult {
