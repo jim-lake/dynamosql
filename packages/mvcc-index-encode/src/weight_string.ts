@@ -36,8 +36,10 @@ export function weightString(
       return Buffer.from(value.toUpperCase(), 'latin1');
     case 'utf8mb4_0900_ai_ci':
     case 'utf8mb4_0900_as_ci':
-    case 'utf8mb4_0900_as_cs':
-      return scratch.slice(0, fillScratch(inputBytes(value), collation));
+    case 'utf8mb4_0900_as_cs': {
+      const length = fillScratch(inputBytes(value), collation);
+      return scratch.slice(0, length);
+    }
     default:
       throw new Error('unsupported');
   }
