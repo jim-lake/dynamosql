@@ -157,22 +157,22 @@ export function timestampdiff(
 
       switch (unit) {
         case 'microsecond':
-          value = Math.floor(diffSeconds * 1000000);
+          value = Math.trunc(diffSeconds * 1000000);
           break;
         case 'second':
-          value = Math.floor(diffSeconds);
+          value = Math.trunc(diffSeconds);
           break;
         case 'minute':
-          value = Math.floor(diffSeconds / 60);
+          value = Math.trunc(diffSeconds / 60);
           break;
         case 'hour':
-          value = Math.floor(diffSeconds / 3600);
+          value = Math.trunc(diffSeconds / 3600);
           break;
         case 'day':
-          value = Math.floor(diffSeconds / 86400);
+          value = Math.trunc(diffSeconds / 86400);
           break;
         case 'week':
-          value = Math.floor(diffSeconds / (86400 * 7));
+          value = Math.trunc(diffSeconds / (86400 * 7));
           break;
         case 'month': {
           const startDate = start.toDate(state.session.timeZone);
@@ -188,7 +188,7 @@ export function timestampdiff(
           const months =
             (endDate.getFullYear() - startDate.getFullYear()) * 12 +
             (endDate.getMonth() - startDate.getMonth());
-          value = Math.floor(months / 3);
+          value = Math.trunc(months / 3);
           break;
         }
         case 'year': {
