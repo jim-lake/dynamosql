@@ -22,7 +22,7 @@ for (const [index, variant] of variants.entries()) {
       reference.set(unitBuffer.subarray(0, n), at);
       at += n;
     }
-    const value = Buffer.from(String.fromCodePoint(cp));
+    const value = String.fromCodePoint(cp);
     const key = weightString(value, collation);
     if (!key[0]) throw new Error('Frame collides with NULL');
     frames.set(key, ends[input]);

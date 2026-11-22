@@ -36,9 +36,7 @@ function build(
     for (let j = 0; j < len; j++) {
       cps.push(pick(next));
     }
-    strings.push(
-      Buffer.from(String.fromCodePoint(...cps), 'utf8').toString('latin1')
-    );
+    strings.push(String.fromCodePoint(...cps));
   }
   return { name, asciiOnly, rounds, strings };
 }

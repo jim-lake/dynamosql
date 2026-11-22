@@ -2,7 +2,6 @@ import { describe, it } from 'mocha';
 import { expect } from 'chai';
 import { ucaWriteCompactL1 } from '../src/uca';
 import { weightString } from '../src/weight_string';
-import { byteStr, utf8Str } from './helpers/strings';
 import { compareBytes, expectAscending } from './order';
 
 function compactL1(cp: number): Uint8Array {
@@ -45,9 +44,7 @@ describe('compact level 1 codes', () => {
   });
 
   it('orders repeated U+337F in strictly increasing order', () => {
-    const keys = [1, 2, 10, 41].map((n) =>
-      weightString(utf8Str('㍿'.repeat(n)), UCA)
-    );
+    const keys = [1, 2, 10, 41].map((n) => weightString('㍿'.repeat(n), UCA));
     expectAscending(
       keys.map((k, i) => [String(i), k] as const),
       '<'
@@ -56,7 +53,7 @@ describe('compact level 1 codes', () => {
 
   it('keeps the ai_ci key for an ignorable-only value equal to the empty key', () => {
     expect(
-      compareBytes(weightString(byteStr([0x00]), UCA), weightString('', UCA))
+      compareBytes(weightString('\u0000', UCA), weightString('', UCA))
     ).to.equal(0);
   });
 });

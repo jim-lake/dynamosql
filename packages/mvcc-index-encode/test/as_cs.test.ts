@@ -5,7 +5,7 @@ import { bytesToHex, hexToBytes } from '../src/bytes';
 import { getCollation } from '../src/collations';
 import { asCsWriteLevel } from '../src/uca';
 import { weightString } from '../src/weight_string';
-import { hexStr, utf8Str } from './helpers/strings';
+import { hexText } from './helpers/strings';
 import { compareBytes, expectAscending, expectSameOrder } from './order';
 
 interface Oracle {
@@ -19,8 +19,7 @@ const oracle = JSON.parse(
 type Name = 'utf8mb4_0900_as_cs' | 'utf8mb4_0900_as_ci';
 
 function suite(name: Name, levels: 2 | 3): void {
-  const e = (text: string): Uint8Array => weightString(utf8Str(text), name);
-  const eh = (hex: string): Uint8Array => weightString(hexStr(hex), name);
+  const e = (text: string): Uint8Array => weightString(text, name);
   const chain = (texts: string[]): (readonly [string, Uint8Array])[] =>
     texts.map((t) => [JSON.stringify(t), e(t)] as const);
   const cs = levels === 3;
@@ -35,7 +34,7 @@ function suite(name: Name, levels: 2 | 3): void {
     describe('order', () => {
       it('sorts the empty string first', () => {
         expectAscending(chain(['', 'a', 'aa']), '<');
-        expect(compareBytes(eh('00'), e(''))).to.equal(0);
+        expect(compareBytes(e('\u0000'), e(''))).to.equal(0);
       });
 
       it('compares base letters before accents', () => {
@@ -55,19 +54,19 @@ function suite(name: Name, levels: 2 | 3): void {
       });
 
       it('distinguishes combining mark order', () => {
-        expect(compareBytes(eh('61CCA1CC81'), eh('61CC81CCA1'))).to.not.equal(
-          0
-        );
+        expect(
+          compareBytes(e('a\u0301\u0323'), e('a\u0323\u0301'))
+        ).to.not.equal(0);
       });
 
       it('treats precomposed and decomposed forms as equal', () => {
-        expect(compareBytes(eh('C3A1'), eh('61CC81'))).to.equal(0);
+        expect(compareBytes(e('\u00e1'), e('a\u0301'))).to.equal(0);
       });
 
       it('sorts ignorable and punctuation like MySQL', () => {
         expect(compareBytes(e('a b'), e('ab'))).to.equal(-1);
         expect(compareBytes(e('a-b'), e('a b'))).to.equal(1);
-        expect(compareBytes(eh('61000062'), e('ab'))).to.equal(0);
+        expect(compareBytes(e('a\u0000b'), e('ab'))).to.equal(0);
       });
 
       it('sorts Han and emoji by primary weight', () => {
@@ -221,7 +220,7 @@ function suite(name: Name, levels: 2 | 3): void {
           rows.map((row) => ({
             id: row.value_hex,
             oracle: hexToBytes(row.weight_hex),
-            ours: eh(row.value_hex),
+            ours: e(hexText(row.value_hex)),
           }))
         );
       });
@@ -233,24 +232,16 @@ function suite(name: Name, levels: 2 | 3): void {
           long.map((row) => ({
             id: row.value_hex,
             oracle: hexToBytes(row.weight_hex),
-            ours: eh(row.value_hex),
+            ours: e(hexText(row.value_hex)),
           }))
         );
       });
     });
 
     describe('input handling', () => {
-      it('throws on invalid UTF-8', () => {
-        for (const hex of [
-          'C3',
-          'FF',
-          '80',
-          'C0AF',
-          'EDA080',
-          'F5808080',
-          'E280',
-        ]) {
-          expect(() => eh(hex), hex).to.throw(RangeError);
+      it('throws on unpaired surrogates', () => {
+        for (const text of ['\uD800', '\uDFFF', '\uD83Da', 'a\uDC00']) {
+          expect(() => e(text), JSON.stringify(text)).to.throw(RangeError);
         }
       });
 
@@ -272,7 +263,7 @@ function suite(name: Name, levels: 2 | 3): void {
     describe('framing', () => {
       it('never starts with 00 and is never empty', () => {
         for (const text of ['', '\u0000', 'a', '一', '\u0301']) {
-          const framed = weightString(utf8Str(text), name);
+          const framed = weightString(text, name);
           expect(framed.length).to.be.greaterThan(0);
           expect(framed[0]).to.be.greaterThan(0);
         }

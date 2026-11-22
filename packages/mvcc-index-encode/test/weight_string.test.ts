@@ -4,7 +4,7 @@ import { expect } from 'chai';
 import { bytesToHex, hexToBytes } from '../src/bytes';
 import { type CollationName } from '../src/collations';
 import { weightString } from '../src/weight_string';
-import { hexStr, byteStr } from './helpers/strings';
+import { hexText } from './helpers/strings';
 import { compareBytes, expectSameOrder, type OrderItem } from './order';
 
 interface Oracle {
@@ -37,50 +37,48 @@ describe('encoding order against the MySQL 8.4 oracle', () => {
       const items: OrderItem[] = rows.map((row) => ({
         id: `${name} ${row.value_hex}`,
         oracle: hexToBytes(row.weight_hex),
-        ours: weightString(hexStr(row.value_hex), name),
+        ours: weightString(hexText(row.value_hex), name),
       }));
       expectSameOrder(items);
     }
   });
 
-  it('rejects invalid UTF-8 under utf8mb4_0900_ai_ci', () => {
-    expect(() => weightString(hexStr('C3'), 'utf8mb4_0900_ai_ci')).to.throw(
+  it('rejects unpaired surrogates under utf8mb4_0900_ai_ci', () => {
+    expect(() => weightString('a\uD800', 'utf8mb4_0900_ai_ci')).to.throw(
       RangeError
     );
   });
 
   it('rejects an unknown collation', () => {
     expect(() =>
-      weightString(hexStr('61'), 'latin1_swedish_ci' as CollationName)
+      weightString('a', 'latin1_swedish_ci' as CollationName)
     ).to.throw(Error, 'unsupported');
   });
 });
 
 describe('utf8mb4_0900_bin', () => {
-  const bin = (hex: string): string =>
-    bytesToHex(weightString(hexStr(hex), 'utf8mb4_0900_bin'));
+  const bin = (text: string): string =>
+    bytesToHex(weightString(text, 'utf8mb4_0900_bin'));
 
   it('weighs every code point as one non-empty scalar code', () => {
     for (const cp of [
       0x00, 0x7f, 0x80, 0x7ff, 0x800, 0xffff, 0x10000, 0x10ffff,
     ]) {
-      expect(
-        bin(Buffer.from(String.fromCodePoint(cp)).toString('hex')).length
-      ).to.be.greaterThan(0);
+      expect(bin(String.fromCodePoint(cp)).length).to.be.greaterThan(0);
     }
   });
 
   it('keeps case, accents, and combining sequences distinct', () => {
-    expect(bin('61')).to.not.equal(bin('41'));
-    expect(bin('C3A9')).to.not.equal(bin('65CC81'));
+    expect(bin('a')).to.not.equal(bin('A'));
+    expect(bin('\u00e9')).to.not.equal(bin('e\u0301'));
   });
 
-  it('keeps NUL bytes and a leading BOM as data', () => {
-    const key = (hex: string): Uint8Array =>
-      weightString(hexStr(hex), 'utf8mb4_0900_bin');
-    expect(compareBytes(key('610062'), key('6100'))).to.not.equal(0);
-    expect(compareBytes(key('EFBBBF61'), key('61'))).to.not.equal(0);
-    expect(bin('610062')).to.not.equal(bin('6100'));
+  it('keeps NUL and a leading BOM as data', () => {
+    const key = (text: string): Uint8Array =>
+      weightString(text, 'utf8mb4_0900_bin');
+    expect(compareBytes(key('a\u0000b'), key('a\u0000'))).to.not.equal(0);
+    expect(compareBytes(key('\uFEFFa'), key('a'))).to.not.equal(0);
+    expect(bin('a\u0000b')).to.not.equal(bin('a\u0000'));
   });
 
   it('orders every Unicode scalar strictly by code point and keeps codes prefix-free', () => {
@@ -89,10 +87,7 @@ describe('utf8mb4_0900_bin', () => {
       if (cp < 0xd800 || cp > 0xdfff) scalars.push(cp);
     }
     const keys = scalars.map((cp) =>
-      weightString(
-        byteStr(Buffer.from(String.fromCodePoint(cp), 'utf8')),
-        'utf8mb4_0900_bin'
-      )
+      weightString(String.fromCodePoint(cp), 'utf8mb4_0900_bin')
     );
     for (let i = 1; i < keys.length; i++) {
       if (

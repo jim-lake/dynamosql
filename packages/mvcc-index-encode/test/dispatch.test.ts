@@ -4,11 +4,6 @@ import { COLLATION_NAMES, type CollationName } from '../src/collations';
 import { weightString } from '../src/weight_string';
 import { expectAscending } from './order';
 
-const bytesStr = (bytes: Iterable<number>): string =>
-  String.fromCharCode(...bytes);
-const utf8 = (text: string): string =>
-  Buffer.from(text, 'utf8').toString('latin1');
-
 interface Chain {
   relation: '<' | '=';
   values: string[];
@@ -56,27 +51,17 @@ function validFor(name: CollationName): string[] {
     : COMMON_VALID;
 }
 
-const UTF8_INVALID: [string, number[]][] = [
-  ['lone continuation', [0x80]],
-  ['0xc0 lead', [0xc0, 0x80]],
-  ['0xc1 lead', [0xc1, 0xbf]],
-  ['truncated 2-byte', [0xc3]],
-  ['bad 2-byte continuation', [0xc3, 0x28]],
-  ['overlong 3-byte', [0xe0, 0x80, 0x80]],
-  ['encoded surrogate', [0xed, 0xa0, 0x80]],
-  ['truncated 3-byte', [0xe4, 0xb8]],
-  ['overlong 4-byte', [0xf0, 0x80, 0x80, 0x80]],
-  ['above U+10FFFF', [0xf4, 0x90, 0x80, 0x80]],
-  ['lead 0xf5', [0xf5, 0x80, 0x80, 0x80]],
-  ['0xff', [0xff]],
-  ['truncated 4-byte', [0xf0, 0x9f, 0x98]],
-  ['ASCII then invalid', [0x61, 0xff]],
+const UNPAIRED_SURROGATES: [string, string][] = [
+  ['lone high surrogate', '\uD800'],
+  ['lone low surrogate', '\uDFFF'],
+  ['high surrogate then ASCII', '\uD83Da'],
+  ['ASCII then lone low surrogate', 'a\uDC00'],
 ];
 
 describe('collation argument', () => {
   for (const name of COLLATION_NAMES) {
     it(`accepts ${name}`, () => {
-      expect(() => weightString(utf8('a'), name)).to.not.throw();
+      expect(() => weightString('a', name)).to.not.throw();
     });
   }
 
@@ -100,7 +85,7 @@ describe('collation argument', () => {
     [],
   ]) {
     it(`rejects collation ${JSON.stringify(bad)}`, () => {
-      expect(() => weightString(utf8('a'), bad as never)).to.throw(
+      expect(() => weightString('a', bad as never)).to.throw(
         Error,
         'unsupported'
       );
@@ -123,10 +108,7 @@ describe('each collation orders by its own rules', () => {
         .join(` ${chain.relation} `);
       it(`${name}: ${label}`, () => {
         expectAscending(
-          chain.values.map((v) => [
-            JSON.stringify(v),
-            weightString(utf8(v), name),
-          ]),
+          chain.values.map((v) => [JSON.stringify(v), weightString(v, name)]),
           chain.relation
         );
       });
@@ -138,7 +120,7 @@ describe('value argument: valid input', () => {
   for (const name of COLLATION_NAMES) {
     for (const text of validFor(name)) {
       it(`${name} accepts ${JSON.stringify(text)}`, () => {
-        expect(() => weightString(utf8(text), name)).to.not.throw();
+        expect(() => weightString(text, name)).to.not.throw();
       });
     }
 
@@ -146,8 +128,8 @@ describe('value argument: valid input', () => {
       for (const text of validFor(name)) {
         expectAscending(
           [
-            ['first', weightString(utf8(text), name)],
-            ['second', weightString(utf8(text), name)],
+            ['first', weightString(text, name)],
+            ['second', weightString(text, name)],
           ],
           '='
         );
@@ -156,11 +138,11 @@ describe('value argument: valid input', () => {
 
     it(`${name} treats a Buffer, a plain array copy, and a subarray view alike`, () => {
       for (const text of validFor(name)) {
-        const expected = weightString(utf8(text), name);
+        const expected = weightString(text, name);
         expectAscending(
           [
             ['string', expected],
-            ['copy', weightString(utf8(text), name)],
+            ['copy', weightString(text, name)],
           ],
           '='
         );
@@ -169,12 +151,12 @@ describe('value argument: valid input', () => {
 
     it(`${name} does not modify its input`, () => {
       for (const text of validFor(name)) {
-        const before = weightString(utf8(text), name);
-        weightString(utf8(text), name);
+        const before = weightString(text, name);
+        weightString(text, name);
         expectAscending(
           [
             ['before', before],
-            ['after', weightString(utf8(text), name)],
+            ['after', weightString(text, name)],
           ],
           '='
         );
@@ -182,12 +164,12 @@ describe('value argument: valid input', () => {
     });
 
     it(`${name} returns a result later calls do not change`, () => {
-      const first = weightString(utf8('ab'), name);
+      const first = weightString('ab', name);
       const snapshot = Uint8Array.from(first);
-      weightString(utf8('z'.repeat(900)), name);
+      weightString('z'.repeat(900), name);
       weightString('', name);
       for (const other of COLLATION_NAMES) {
-        weightString(utf8('q'), other);
+        weightString('q', other);
       }
       expectAscending(
         [
@@ -199,8 +181,8 @@ describe('value argument: valid input', () => {
     });
 
     it(`${name} returns a fresh array on every call`, () => {
-      const a = weightString(utf8('ab'), name);
-      const b = weightString(utf8('ab'), name);
+      const a = weightString('ab', name);
+      const b = weightString('ab', name);
       expect(a).to.not.equal(b);
       const before = Array.from(b);
       a[0] = 0xff;
@@ -211,9 +193,9 @@ describe('value argument: valid input', () => {
 
 describe('value argument: invalid input', () => {
   for (const name of COLLATION_NAMES.filter((n) => n.startsWith('utf8mb4'))) {
-    for (const [label, bytes] of UTF8_INVALID) {
+    for (const [label, text] of UNPAIRED_SURROGATES) {
       it(`${name} rejects ${label}`, () => {
-        expect(() => weightString(bytesStr(bytes), name)).to.throw(RangeError);
+        expect(() => weightString(text, name)).to.throw(RangeError);
       });
     }
   }
@@ -222,13 +204,13 @@ describe('value argument: invalid input', () => {
     (n) => n !== 'ascii_general_ci' && n !== 'ascii_bin'
   )) {
     it(`${name} works after a call that threw`, () => {
-      const expected = weightString(utf8('abc'), name);
-      const bad = name.startsWith('utf8mb4') ? [0x61, 0xff] : [0x61, 0x80];
-      expect(() => weightString(bytesStr(bad), name)).to.throw(RangeError);
+      const expected = weightString('abc', name);
+      const bad = name.startsWith('utf8mb4') ? 'a\uDFFF' : 'a\u0080';
+      expect(() => weightString(bad, name)).to.throw(RangeError);
       expectAscending(
         [
           ['before', expected],
-          ['after', weightString(utf8('abc'), name)],
+          ['after', weightString('abc', name)],
         ],
         '='
       );

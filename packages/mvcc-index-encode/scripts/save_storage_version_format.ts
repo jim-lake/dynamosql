@@ -171,7 +171,7 @@ function randomInputs(
 }
 
 function outputBytes(input: string, collation: CollationName): number {
-  return weightString(new TextEncoder().encode(input), collation).length;
+  return weightString(input, collation).length;
 }
 
 function growToTarget(unit: string[], collation: CollationName): string {
@@ -225,7 +225,7 @@ function main(): void {
   for (const collation of COLLATION_NAMES) {
     const pairs: [string, string][] = [];
     for (const input of inputsFor(collation, worst, sampled)) {
-      const output = weightString(new TextEncoder().encode(input), collation);
+      const output = weightString(input, collation);
       maxBytes = Math.max(maxBytes, output.length);
       pairs.push([input, Buffer.from(output).toString('base64')]);
     }
