@@ -239,12 +239,6 @@ function suite(name: Name, levels: 2 | 3): void {
     });
 
     describe('input handling', () => {
-      it('throws on unpaired surrogates', () => {
-        for (const text of ['\uD800', '\uDFFF', '\uD83Da', 'a\uDC00']) {
-          expect(() => e(text), JSON.stringify(text)).to.throw(RangeError);
-        }
-      });
-
       it('returns a copy that later calls do not overwrite', () => {
         const first = e('a');
         const snapshot = bytesToHex(first);

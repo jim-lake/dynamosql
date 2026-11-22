@@ -2,7 +2,7 @@
 
 **Every collation is NO PAD.** Values are compared without padding to a declared width, including `ascii_bin` and `ascii_general_ci`. Trailing spaces are significant, and no input is padded.
 
-`weightString(value, collation)` returns an ordered key. Equal values have identical bytes. Its input is a JavaScript string, read as UTF-16 code points. The four utf8mb4 collations raise `RangeError` for an unpaired surrogate. `ascii_bin` and `ascii_general_ci` raise `RangeError` for any code unit above U+007F. An unsupported collation raises `Error` with the message `unsupported`.
+`weightString(value, collation)` returns an ordered key. Equal values have identical bytes. Its input is a JavaScript string, read as UTF-16 code points. The caller supplies valid input: ASCII for `ascii_bin` and `ascii_general_ci`, and well-formed UTF-16 (no unpaired surrogates) for the utf8mb4 collations. The function does not check or condition the input. An unsupported collation raises `Error` with the message `unsupported`.
 
 | Collation          | Frame                                        |
 | ------------------ | -------------------------------------------- |

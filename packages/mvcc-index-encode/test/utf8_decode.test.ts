@@ -7,14 +7,6 @@ import { weightString } from '../src/weight_string';
 
 const UCA = 'utf8mb4_0900_ai_ci';
 
-const unpaired: [string, string][] = [
-  ['lone high surrogate', '\uD800'],
-  ['lone low surrogate', '\uDFFF'],
-  ['high surrogate before ASCII', '\uD83Da'],
-  ['low surrogate after ASCII', 'a\uDC00'],
-  ['high surrogate at end', 'a\uDBFF'],
-];
-
 const valid: [string, string, number][] = [
   ['U+007F', '\u007f', 0x7f],
   ['U+0080', '\u0080', 0x80],
@@ -28,15 +20,6 @@ const valid: [string, string, number][] = [
 ];
 
 describe('weightString code point edge cases', () => {
-  for (const [name, text] of unpaired) {
-    it(`rejects ${name}`, () => {
-      expect(() => weightString(text, UCA)).to.throw(
-        RangeError,
-        'Unpaired surrogate'
-      );
-    });
-  }
-
   it('orders boundary scalars by their primary weights', () => {
     expectSameOrder(
       valid.map(([id, text, cp]) => ({

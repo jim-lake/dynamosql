@@ -76,11 +76,6 @@ function buildAsciiWriter(name: CollationName): {
   return {
     maxWeight,
     writeWeight: (codePoint, dst, at) => {
-      if (codePoint >= 128) {
-        throw new RangeError(
-          `Non-ASCII code point U+${codePoint.toString(16).toUpperCase()} is not supported for ${name} yet`
-        );
-      }
       const w = weights[codePoint] ?? EMPTY;
       dst.set(w, at);
       return w.length;

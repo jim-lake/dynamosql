@@ -43,12 +43,6 @@ describe('encoding order against the MySQL 8.4 oracle', () => {
     }
   });
 
-  it('rejects unpaired surrogates under utf8mb4_0900_ai_ci', () => {
-    expect(() => weightString('a\uD800', 'utf8mb4_0900_ai_ci')).to.throw(
-      RangeError
-    );
-  });
-
   it('rejects an unknown collation', () => {
     expect(() =>
       weightString('a', 'latin1_swedish_ci' as CollationName)

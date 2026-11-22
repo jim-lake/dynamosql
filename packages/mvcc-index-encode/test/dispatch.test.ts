@@ -51,13 +51,6 @@ function validFor(name: CollationName): string[] {
     : COMMON_VALID;
 }
 
-const UNPAIRED_SURROGATES: [string, string][] = [
-  ['lone high surrogate', '\uD800'],
-  ['lone low surrogate', '\uDFFF'],
-  ['high surrogate then ASCII', '\uD83Da'],
-  ['ASCII then lone low surrogate', 'a\uDC00'],
-];
-
 describe('collation argument', () => {
   for (const name of COLLATION_NAMES) {
     it(`accepts ${name}`, () => {
@@ -187,33 +180,6 @@ describe('value argument: valid input', () => {
       const before = Array.from(b);
       a[0] = 0xff;
       expect(Array.from(b)).to.deep.equal(before);
-    });
-  }
-});
-
-describe('value argument: invalid input', () => {
-  for (const name of COLLATION_NAMES.filter((n) => n.startsWith('utf8mb4'))) {
-    for (const [label, text] of UNPAIRED_SURROGATES) {
-      it(`${name} rejects ${label}`, () => {
-        expect(() => weightString(text, name)).to.throw(RangeError);
-      });
-    }
-  }
-
-  for (const name of COLLATION_NAMES.filter(
-    (n) => n !== 'ascii_general_ci' && n !== 'ascii_bin'
-  )) {
-    it(`${name} works after a call that threw`, () => {
-      const expected = weightString('abc', name);
-      const bad = name.startsWith('utf8mb4') ? 'a\uDFFF' : 'a\u0080';
-      expect(() => weightString(bad, name)).to.throw(RangeError);
-      expectAscending(
-        [
-          ['before', expected],
-          ['after', weightString('abc', name)],
-        ],
-        '='
-      );
     });
   }
 });

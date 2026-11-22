@@ -22,9 +22,9 @@ export function weightString(
     case 'utf8mb4_0900_bin':
       return binaryKey(value);
     case 'ascii_bin':
-      return Buffer.from(checkAscii(value, collation), 'ascii');
+      return Buffer.from(value, 'ascii');
     case 'ascii_general_ci':
-      return Buffer.from(checkAscii(value, collation).toUpperCase(), 'ascii');
+      return Buffer.from(value.toUpperCase(), 'ascii');
     case 'utf8mb4_0900_ai_ci':
     case 'utf8mb4_0900_as_ci':
     case 'utf8mb4_0900_as_cs': {
@@ -34,18 +34,6 @@ export function weightString(
     default:
       throw new Error('unsupported');
   }
-}
-
-function checkAscii(value: string, collation: CollationName): string {
-  for (let i = 0; i < value.length; i++) {
-    const unit = value.charCodeAt(i);
-    if (unit >= 0x80) {
-      throw new RangeError(
-        `Non-ASCII code unit U+${unit.toString(16).toUpperCase()} in ${collation} input`
-      );
-    }
-  }
-  return value;
 }
 
 function ensure(size: number): void {
@@ -76,13 +64,8 @@ function decodeString(value: string): number {
     i++;
     if (cp >= 0xd800 && cp <= 0xdbff) {
       const low = value.charCodeAt(i);
-      if (!(low >= 0xdc00 && low <= 0xdfff)) {
-        throw unpairedSurrogate(cp);
-      }
       cp = 0x10000 + ((cp - 0xd800) << 10) + (low - 0xdc00);
       i++;
-    } else if (cp >= 0xdc00 && cp <= 0xdfff) {
-      throw unpairedSurrogate(cp);
     }
     if (count === cpScratch.length) {
       const grown = new Int32Array(cpScratch.length * 2);
@@ -92,12 +75,6 @@ function decodeString(value: string): number {
     cpScratch[count++] = cp;
   }
   return count;
-}
-
-function unpairedSurrogate(unit: number): RangeError {
-  return new RangeError(
-    `Unpaired surrogate U+${unit.toString(16).toUpperCase()} is not a scalar`
-  );
 }
 
 class BitWriter {
@@ -217,8 +194,6 @@ function writeScalarCode(cp: number, out: Buffer, at: number): number {
   let index = cp - 0x800;
   if (cp > SURROGATE_HIGH) {
     index -= SURROGATE_HIGH - SURROGATE_LOW + 1;
-  } else if (cp >= SURROGATE_LOW) {
-    throw new RangeError(`Surrogate U+${cp.toString(16)} is not a scalar`);
   }
   const lead = Math.floor(index / 0x10000);
   const rest = index % 0x10000;
