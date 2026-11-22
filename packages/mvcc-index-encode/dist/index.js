@@ -1104,12 +1104,12 @@ const COLLATION_NAMES = [
   "utf8mb4_0900_as_cs"
 ];
 const COLLATION_META = {
-  ascii_bin: { charset: "ascii", pad: "PAD SPACE" },
-  ascii_general_ci: { charset: "ascii", pad: "PAD SPACE" },
-  utf8mb4_0900_bin: { charset: "utf8mb4", pad: "NO PAD" },
-  utf8mb4_0900_ai_ci: { charset: "utf8mb4", pad: "NO PAD" },
-  utf8mb4_0900_as_ci: { charset: "utf8mb4", pad: "NO PAD" },
-  utf8mb4_0900_as_cs: { charset: "utf8mb4", pad: "NO PAD" }
+  ascii_bin: { charset: "ascii" },
+  ascii_general_ci: { charset: "ascii" },
+  utf8mb4_0900_bin: { charset: "utf8mb4" },
+  utf8mb4_0900_ai_ci: { charset: "utf8mb4" },
+  utf8mb4_0900_as_ci: { charset: "utf8mb4" },
+  utf8mb4_0900_as_cs: { charset: "utf8mb4" }
 };
 const EMPTY = new Uint8Array(0);
 function buildAsciiWriter(name) {
@@ -1121,11 +1121,6 @@ function buildAsciiWriter(name) {
   return {
     maxWeight,
     writeWeight: (codePoint, dst, at) => {
-      if (codePoint >= 128) {
-        throw new RangeError(
-          `Non-ASCII code point U+${codePoint.toString(16).toUpperCase()} is not supported for ${name} yet`
-        );
-      }
       const w = weights[codePoint] ?? EMPTY;
       dst.set(w, at);
       return w.length;
@@ -1891,31 +1886,20 @@ for (const [first, last, prefixLength] of ranges) {
 
 let scratch = new Uint8Array(256);
 let cpScratch = new Int32Array(64);
-function weightString(value, collation, maxChars) {
+function weightString(value, collation) {
   switch (collation) {
     case "utf8mb4_0900_bin":
       return binaryKey(value);
     case "ascii_bin":
+      return Buffer.from(value, "ascii");
     case "ascii_general_ci":
+      return Buffer.from(value.toUpperCase(), "ascii");
     case "utf8mb4_0900_ai_ci":
     case "utf8mb4_0900_as_ci":
-    case "utf8mb4_0900_as_cs":
-      return scratch.slice(0, fillScratch(value, collation, maxChars));
-    default:
-      throw new Error("unsupported");
-  }
-}
-function weightFramed(value, collation, maxChars) {
-  switch (collation) {
-    case "utf8mb4_0900_bin":
-      return binaryKey(value);
-    case "ascii_bin":
-    case "ascii_general_ci":
-      return packAscii(value, collation, maxChars);
-    case "utf8mb4_0900_ai_ci":
-    case "utf8mb4_0900_as_ci":
-    case "utf8mb4_0900_as_cs":
-      return scratch.slice(0, fillScratch(value, collation, maxChars));
+    case "utf8mb4_0900_as_cs": {
+      const length = fillScratch(value, collation);
+      return scratch.slice(0, length);
+    }
     default:
       throw new Error("unsupported");
   }
@@ -1931,71 +1915,30 @@ function ensure(size) {
     scratch = grown;
   }
 }
-function fillScratch(value, collation, maxChars) {
+function fillScratch(value, collation) {
   const info = getCollation(collation);
-  if (info.kind === "scalar-code") {
+  if (info.kind !== "multi-level") {
     throw new Error("scalar-code collations do not use weight tables");
   }
-  if (info.kind === "multi-level") {
-    return fillCompact(value, collation, info);
-  }
-  const { writeWeight, maxWeight, charset, pad } = info;
-  const isAscii = charset === "ascii";
-  let n = 0;
-  let chars = 0;
-  for (let i = 0; i < value.length; chars++) {
-    let cp;
-    if (isAscii) {
-      cp = value[i] ?? 0;
-      if (cp >= 128) {
-        throw new RangeError(`Non-ASCII byte in ${collation} input`);
-      }
-      i++;
-    } else {
-      const packed = decodeAt(value, i, collation);
-      cp = packed & 2097151;
-      i += packed >>> 21;
-    }
-    ensure(n + maxWeight);
-    n += writeWeight(cp, scratch, n);
-  }
-  if (pad === "PAD SPACE") {
-    if (maxChars === void 0 || !Number.isInteger(maxChars) || maxChars < 0) {
-      throw new RangeError(`Invalid character bound: ${String(maxChars)}`);
-    }
-    if (chars > maxChars) {
-      throw new RangeError(
-        `Value has ${String(chars)} characters, above bound ${String(maxChars)}`
-      );
-    }
-    const padCount = maxChars - chars;
-    ensure(n + maxWeight * (padCount + 1));
-    const spaceStart = n;
-    n += writeWeight(32, scratch, n);
-    const spaceLen = n - spaceStart;
-    if (spaceLen === 1) {
-      scratch.fill(scratch[spaceStart] ?? 0, n, n + padCount - 1);
-      n += padCount - 1;
-    } else {
-      for (let k = 1; k < padCount; k++) {
-        scratch.copyWithin(n, spaceStart, spaceStart + spaceLen);
-        n += spaceLen;
-      }
-    }
-  }
-  return n;
+  return fillCompact(value, info);
 }
-function decodeAll(value, collation) {
+function decodeString(value) {
   let count = 0;
-  for (let i = 0; i < value.length; count++) {
-    const packed = decodeAt(value, i, collation);
+  let i = 0;
+  while (i < value.length) {
+    let cp = value.charCodeAt(i);
+    i++;
+    if (cp >= 55296 && cp <= 56319) {
+      const low = value.charCodeAt(i);
+      cp = 65536 + (cp - 55296 << 10) + (low - 56320);
+      i++;
+    }
     if (count === cpScratch.length) {
       const grown = new Int32Array(cpScratch.length * 2);
       grown.set(cpScratch);
       cpScratch = grown;
     }
-    cpScratch[count] = packed & 2097151;
-    i += packed >>> 21;
+    cpScratch[count++] = cp;
   }
   return count;
 }
@@ -2065,8 +2008,8 @@ function writeTertiary(count, info, writer) {
     }
   }
 }
-function fillCompact(value, collation, info) {
-  const count = decodeAll(value, collation);
+function fillCompact(value, info) {
+  const count = decodeString(value);
   const writer = new BitWriter();
   writer.append(1, 1);
   writeUnits(count, info, 1, writer);
@@ -2084,160 +2027,39 @@ const TWO_BYTE_BASE = 130;
 const THREE_BYTE_BASE = 138;
 const SURROGATE_LOW = 55296;
 const SURROGATE_HIGH = 57343;
-function writeScalarCode(cp, at) {
+function writeScalarCode(cp, out, at) {
   if (cp < 128) {
-    scratch[at] = SCALAR_BASE + cp;
+    out[at] = SCALAR_BASE + cp;
     return 1;
   }
   if (cp < 2048) {
     const index2 = cp - 128;
-    scratch[at] = TWO_BYTE_BASE + (index2 >>> 8);
-    scratch[at + 1] = index2 & 255;
+    out[at] = TWO_BYTE_BASE + (index2 >>> 8);
+    out[at + 1] = index2 & 255;
     return 2;
   }
   let index = cp - 2048;
   if (cp > SURROGATE_HIGH) {
     index -= SURROGATE_HIGH - SURROGATE_LOW + 1;
-  } else if (cp >= SURROGATE_LOW) {
-    throw new RangeError(`Surrogate U+${cp.toString(16)} is not a scalar`);
   }
   const lead = Math.floor(index / 65536);
   const rest = index % 65536;
-  scratch[at] = THREE_BYTE_BASE + lead;
-  scratch[at + 1] = rest >>> 8;
-  scratch[at + 2] = rest & 255;
+  out[at] = THREE_BYTE_BASE + lead;
+  out[at + 1] = rest >>> 8;
+  out[at + 2] = rest & 255;
   return 3;
 }
 function binaryKey(value) {
+  const count = decodeString(value);
+  const out = Buffer.allocUnsafe(count * 3 + 1);
   let n = 0;
-  for (let i = 0; i < value.length; ) {
-    const packed = decodeAt(value, i, "utf8mb4_0900_bin");
-    const cp = packed & 2097151;
-    i += packed >>> 21;
-    ensure(n + 3);
-    n += writeScalarCode(cp, n);
+  for (let k = 0; k < count; k++) {
+    n += writeScalarCode(cpScratch[k] ?? 0, out, n);
   }
-  ensure(n + 1);
-  scratch[n] = STRING_END;
-  return scratch.slice(0, n + 1);
-}
-const asciiRankCache = /* @__PURE__ */ new Map();
-function asciiRanks(collation) {
-  const cached = asciiRankCache.get(collation);
-  if (cached !== void 0) {
-    return cached;
-  }
-  const info = getCollation(collation);
-  if (info.kind !== "table" || info.charset !== "ascii") {
-    throw new RangeError(`${collation} is not an ASCII collation`);
-  }
-  const weights = Array.from({ length: 128 }, (_, cp) => {
-    const dst = new Uint8Array(8);
-    const len = info.writeWeight(cp, dst, 0);
-    return bytesKey(dst.subarray(0, len));
-  });
-  const distinct = [...new Set(weights)].sort();
-  const rankOf = new Uint8Array(128);
-  for (let cp = 0; cp < 128; cp++) {
-    rankOf[cp] = distinct.indexOf(weights[cp]);
-  }
-  const ranks = { base: BigInt(distinct.length), rankOf };
-  asciiRankCache.set(collation, ranks);
-  return ranks;
-}
-function bytesKey(bytes) {
-  return Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
-}
-function asciiWidth(base, n) {
-  const need = base ** BigInt(n);
-  let w = 1;
-  let cap = 255n;
-  while (need > cap) {
-    cap *= 256n;
-    w++;
-  }
-  return w;
-}
-function packAscii(value, collation, maxChars) {
-  const { base, rankOf } = asciiRanks(collation);
-  const bound = checkedBound(value, maxChars);
-  if (bound === 0) {
-    return Uint8Array.of(1);
-  }
-  const padRank = BigInt(rankOf[32] ?? 0);
-  let x = 0n;
-  let chars = 0;
-  for (let i = 0; i < value.length; i++, chars++) {
-    const cp = value[i] ?? 0;
-    if (cp >= 128) {
-      throw new RangeError(`Non-ASCII byte in ${collation} input`);
-    }
-    x = x * base + BigInt(rankOf[cp] ?? 0);
-  }
-  for (let k = chars; k < bound; k++) {
-    x = x * base + padRank;
-  }
-  const w = asciiWidth(base, bound);
-  let v = 256n ** BigInt(w - 1) + x;
-  const out = new Uint8Array(w);
-  for (let i = w - 1; i >= 0; i--) {
-    out[i] = Number(v & 0xffn);
-    v >>= 8n;
-  }
-  return out;
-}
-function checkedBound(value, maxChars) {
-  if (maxChars === void 0 || !Number.isInteger(maxChars) || maxChars < 0) {
-    throw new RangeError(`Invalid character bound: ${String(maxChars)}`);
-  }
-  if (value.length > maxChars) {
-    throw new RangeError(
-      `Value has ${String(value.length)} characters, above bound ${String(maxChars)}`
-    );
-  }
-  return maxChars;
-}
-function decodeAt(value, i, collation) {
-  const b0 = value[i] ?? 0;
-  if (b0 < 128) {
-    return b0 | 1 << 21;
-  }
-  let need;
-  let cp;
-  let lo = 128;
-  let hi = 191;
-  if (b0 >= 194 && b0 <= 223) {
-    need = 1;
-    cp = b0 & 31;
-  } else if (b0 >= 224 && b0 <= 239) {
-    need = 2;
-    cp = b0 & 15;
-    if (b0 === 224) lo = 160;
-    else if (b0 === 237) hi = 159;
-  } else if (b0 >= 240 && b0 <= 244) {
-    need = 3;
-    cp = b0 & 7;
-    if (b0 === 240) lo = 144;
-    else if (b0 === 244) hi = 143;
-  } else {
-    throw invalidUtf8(collation);
-  }
-  for (let k = 1; k <= need; k++) {
-    if (i + k >= value.length) {
-      throw invalidUtf8(collation);
-    }
-    const b = value[i + k] ?? 0;
-    const min = k === 1 ? lo : 128;
-    const max = k === 1 ? hi : 191;
-    if (b < min || b > max) {
-      throw invalidUtf8(collation);
-    }
-    cp = cp << 6 | b & 63;
-  }
-  return cp | need + 1 << 21;
-}
-function invalidUtf8(collation) {
-  return new RangeError(`Invalid UTF-8 input for ${collation}`);
+  out[n] = STRING_END;
+  return new Uint8Array(out.buffer, out.byteOffset, n + 1);
 }
 
-export { COLLATION_NAMES, weightFramed, weightString };
+const STORAGE_VERSION = 1;
+
+export { COLLATION_NAMES, STORAGE_VERSION, weightString };

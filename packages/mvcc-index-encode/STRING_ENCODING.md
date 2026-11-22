@@ -2,16 +2,20 @@
 
 **Every collation is NO PAD.** Values are compared without padding to a declared width, including `ascii_bin` and `ascii_general_ci`. Trailing spaces are significant, and no input is padded.
 
-`weightString(value, collation)` returns an ordered key. Equal values have identical bytes. Its input is a JavaScript string, read as UTF-16 code points. The caller supplies valid input: ASCII for `ascii_bin` and `ascii_general_ci`, and well-formed UTF-16 (no unpaired surrogates) for the utf8mb4 collations. The function does not check or condition the input. An unsupported collation raises `Error` with the message `unsupported`.
+`weightString(value: string, collation: CollationName): Uint8Array` returns a fresh ordered key. Bytewise comparison of two keys gives the collation order of their input strings. Strings that compare equal under the collation produce identical bytes.
 
-| Collation          | Frame                                        |
+The caller supplies a JavaScript string containing only ASCII characters for the ASCII collations, or well-formed UTF-16 for the utf8mb4 collations. The package exports the supported names as `COLLATION_NAMES`. An unsupported collation raises `Error` with the message `unsupported`.
+
+| Collation          | Returned key                                 |
 | ------------------ | -------------------------------------------- |
-| ascii_bin          | Ordered ASCII table weights                  |
-| ascii_general_ci   | Ordered case-folded ASCII table weights      |
+| ascii_bin          | Input ASCII bytes                            |
+| ascii_general_ci   | Uppercase ASCII bytes                        |
 | utf8mb4_0900_bin   | Ordered scalar codes followed by an end byte |
 | utf8mb4_0900_ai_ci | Primary bit stream                           |
 | utf8mb4_0900_as_ci | Primary and secondary bit streams            |
 | utf8mb4_0900_as_cs | Primary, secondary and tertiary bit streams  |
+
+Each ASCII key contains one byte per input character. The empty string produces an empty key, and a key can be a prefix of another key. The four utf8mb4 collations return self-delimiting frames.
 
 ## Worst-case frame size
 
@@ -59,7 +63,7 @@ The lead byte determines the code length. Codes increase with the scalar value, 
 
 ## UCA frame layout
 
-For these three collations, `weightString` returns the frame. Decode the UTF-8 input into Unicode scalars. For each active level, concatenate the nonzero 16-bit MySQL weight units for all scalars in input order. An expansion contributes every unit at that level. An ignorable contributes none. The lookup handles implicit Han weights as well as stored table entries. [Weight lookup](src/uca.ts)
+For these three collations, `weightString` returns the frame. Read Unicode scalars from the well-formed UTF-16 string. For each active level, concatenate the nonzero 16-bit MySQL weight units for all scalars in input order. An expansion contributes every unit at that level. An ignorable contributes none. The lookup handles implicit Han weights as well as stored table entries. [Weight lookup](src/uca.ts)
 
 | Collation            | Fields in bit order                                  | Final comparison level |
 | -------------------- | ---------------------------------------------------- | ---------------------- |

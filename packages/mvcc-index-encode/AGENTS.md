@@ -1,5 +1,12 @@
 # @dynamosql/mvcc-index-encode
 
+## Project boundary
+
+The directory containing this `AGENTS.md` is the project root. Never look at
+anything outside this directory and its descendants. Keep all searches, reads,
+references, and edits within the project. This rule includes parent directories,
+sibling packages, and paths reached through links or symlinks.
+
 Ordered byte encoding for DynamoSQL MVCC primary-key and index values. The
 encoded bytes are stored in an external system whose only comparator is
 bytewise, under a small key size limit. The requirement is order equivalence
