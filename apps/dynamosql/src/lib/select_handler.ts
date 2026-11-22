@@ -510,14 +510,16 @@ async function _evaluateReturn(
 
   if (ast.type === 'select' && ast.distinct === 'DISTINCT') {
     const distinctColumns: ColumnDef[] = queryColumns.map((column) => {
-      const mysqlType = getExprMysqlType(column.expr, state);
-      if (!mysqlType) {
+      const typeInfo = getExprMysqlType(column.expr, state);
+      if (!typeInfo) {
         throw new SQLError({ err: 'ER_NOT_SUPPORTED_YET' });
       }
       return {
         name: column.result.name ?? '',
-        type: mysqlStringToValueType(mysqlType),
-        mysqlType,
+        type: mysqlStringToValueType(typeInfo.type),
+        mysqlType: typeInfo.type,
+        length: typeInfo.length,
+        decimals: typeInfo.scale,
         collation:
           column.result.collation ??
           getExprCollation(column.expr, state) ??

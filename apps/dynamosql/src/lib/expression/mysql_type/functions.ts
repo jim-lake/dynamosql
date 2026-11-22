@@ -2,11 +2,12 @@ import { getExprMysqlType } from './mysql_type_expression';
 
 import type { MysqlType } from '../../types/value_type';
 import type { EvaluationState } from '../evaluate';
+import type { MysqlTypeInfo } from './mysql_type_expression';
 
 export type FunctionRule = (
   args: unknown[],
   state: EvaluationState
-) => MysqlType | null;
+) => MysqlTypeInfo | null;
 
 type Family =
   | 'int'
@@ -74,8 +75,8 @@ const NULLIF_RESULT: Record<Family, MysqlType> = {
 };
 
 function familyOf(expr: unknown, state: EvaluationState): Family | undefined {
-  const mysqlType = getExprMysqlType(expr, state);
-  return mysqlType ? familyByMysqlType[mysqlType] : undefined;
+  const info = getExprMysqlType(expr, state);
+  return info ? familyByMysqlType[info.type] : undefined;
 }
 
 function familiesOf(args: unknown[], state: EvaluationState): Family[] | null {
@@ -86,70 +87,82 @@ function familiesOf(args: unknown[], state: EvaluationState): Family[] | null {
 function preserveNumericRule(
   args: unknown[],
   state: EvaluationState
-): MysqlType | null {
-  const family = familyOf(args[0], state);
-  if (!family) {
+): MysqlTypeInfo | null {
+  const info = getExprMysqlType(args[0], state);
+  if (!info) {
     return null;
   }
+  const family = familyByMysqlType[info.type];
   if (family === 'decimal') {
-    return 'DECIMAL';
+    return { type: 'DECIMAL', precision: info.precision, scale: info.scale };
   }
-  return INTEGER_FAMILIES.has(family) ? 'BIGINT' : 'DOUBLE';
+  return { type: family && INTEGER_FAMILIES.has(family) ? 'BIGINT' : 'DOUBLE' };
 }
 
 function integerResultRule(
   args: unknown[],
   state: EvaluationState
-): MysqlType | null {
+): MysqlTypeInfo | null {
   const family = familyOf(args[0], state);
   if (!family) {
     return null;
   }
-  return EXACT_FAMILIES.has(family) ? 'BIGINT' : 'DOUBLE';
+  return { type: EXACT_FAMILIES.has(family) ? 'BIGINT' : 'DOUBLE' };
 }
 
 function coalesceRule(
   args: unknown[],
   state: EvaluationState
-): MysqlType | null {
+): MysqlTypeInfo | null {
   const families = familiesOf(args, state);
   if (!families || families.includes('json')) {
     return null;
   }
   if (families.includes('text')) {
-    return 'TEXT';
+    return { type: 'TEXT' };
   }
   if (families.every((f) => NUMERIC_FAMILIES.has(f))) {
     if (families.includes('double')) {
-      return 'DOUBLE';
+      return { type: 'DOUBLE' };
     }
     if (families.includes('decimal')) {
-      return 'DECIMAL';
+      return { type: 'DECIMAL' };
     }
     if (families.includes('bigint')) {
-      return 'BIGINT';
+      return { type: 'BIGINT' };
     }
     if (families.includes('int')) {
-      return 'INT';
+      return { type: 'INT' };
     }
-    return families.every((f) => f === 'year') ? 'YEAR' : 'TINYINT';
+    return { type: families.every((f) => f === 'year') ? 'YEAR' : 'TINYINT' };
   }
   if (families.every((f) => TEMPORAL_FAMILIES.has(f))) {
     if (families.every((f) => f === 'time')) {
-      return 'TIME';
+      return { type: 'TIME' };
     }
-    return families.every((f) => f === 'date') ? 'DATE' : 'DATETIME';
+    return { type: families.every((f) => f === 'date') ? 'DATE' : 'DATETIME' };
   }
   const hasVarchar = families.some((f) => f === 'varchar' || f === 'binary');
   const mixesNumericAndTemporal =
     families.some((f) => NUMERIC_FAMILIES.has(f)) &&
     families.some((f) => TEMPORAL_FAMILIES.has(f));
-  return hasVarchar || mixesNumericAndTemporal ? 'VARCHAR' : 'CHAR';
+  return { type: hasVarchar || mixesNumericAndTemporal ? 'VARCHAR' : 'CHAR' };
 }
 
 export const aggregateRules: Record<string, FunctionRule> = {
   count: returnsBigint,
-  sum: sameAsFirstArg,
+  sum: (args, state) => {
+    const family = familyOf(args[0], state);
+    if (!family) {
+      return null;
+    }
+    return {
+      type:
+        EXACT_FAMILIES.has(family) || TEMPORAL_FAMILIES.has(family)
+          ? 'DECIMAL'
+          : 'DOUBLE',
+    };
+  },
   max: sameAsFirstArg,
   min: sameAsFirstArg,
 };
@@ -157,35 +170,42 @@ export const aggregateRules: Record<string, FunctionRule> = {
 function sameAsFirstArg(
   args: unknown[],
   state: EvaluationState
-): MysqlType | null {
+): MysqlTypeInfo | null {
   return getExprMysqlType(args[0], state);
 }
 
-function returnsBigint(): MysqlType {
-  return 'BIGINT';
+function returnsBigint(): MysqlTypeInfo {
+  return { type: 'BIGINT' };
 }
 
-function returnsVarchar(): MysqlType {
-  return 'VARCHAR';
+function returnsVarchar(): MysqlTypeInfo {
+  return { type: 'VARCHAR' };
 }
 
-function returnsDouble(): MysqlType {
-  return 'DOUBLE';
+function returnsDouble(): MysqlTypeInfo {
+  return { type: 'DOUBLE' };
 }
 
-function returnsInt(): MysqlType {
-  return 'INT';
+function returnsInt(): MysqlTypeInfo {
+  return { type: 'INT' };
+}
+
+function returnsJson(): MysqlTypeInfo {
+  return { type: 'JSON' };
 }
 
 function valueSelectRule(
   args: unknown[],
   state: EvaluationState
-): MysqlType | null {
-  const mysqlType = coalesceRule(args, state);
-  if (mysqlType === 'CHAR') {
-    return 'VARCHAR';
+): MysqlTypeInfo | null {
+  const info = coalesceRule(args, state);
+  if (!info) {
+    return null;
   }
-  return mysqlType === 'TINYINT' ? 'INT' : mysqlType;
+  if (info.type === 'CHAR') {
+    return { type: 'VARCHAR' };
+  }
+  return info.type === 'TINYINT' ? { type: 'INT' } : info;
 }
 
 export const functionRules: Record<string, FunctionRule> = {
@@ -225,7 +245,7 @@ export const functionRules: Record<string, FunctionRule> = {
   ord: returnsBigint,
   month: returnsBigint,
   quarter: returnsBigint,
-  year: () => 'YEAR',
+  year: () => ({ type: 'YEAR' }),
   hex: returnsVarchar,
   oct: returnsVarchar,
   dayname: returnsVarchar,
@@ -252,18 +272,26 @@ export const functionRules: Record<string, FunctionRule> = {
   json_type: returnsVarchar,
   json_unquote: returnsVarchar,
   json_quote: returnsVarchar,
+  json_array: returnsJson,
+  json_object: returnsJson,
+  json_extract: returnsJson,
+  json_keys: returnsJson,
+  json_contains: returnsBigint,
+  json_contains_path: returnsBigint,
+  coercibility: returnsBigint,
+  collation: returnsVarchar,
   greatest: valueSelectRule,
   least: valueSelectRule,
   if: (args, state) => {
     return valueSelectRule(args.slice(1), state);
   },
   weekday: returnsBigint,
-  last_day: () => 'DATE',
+  last_day: () => ({ type: 'DATE' }),
   octet_length: returnsBigint,
   position: returnsBigint,
   mid: returnsVarchar,
   date_format: returnsVarchar,
-  from_unixtime: () => 'DATETIME',
+  from_unixtime: () => ({ type: 'DATETIME' }),
   substr: returnsVarchar,
   week: returnsBigint,
   weekofyear: returnsBigint,
@@ -291,14 +319,14 @@ export const functionRules: Record<string, FunctionRule> = {
       return null;
     }
     if (families.some((f) => f === 'double' || STRING_FAMILIES.has(f))) {
-      return 'DOUBLE';
+      return { type: 'DOUBLE' };
     }
-    return families.includes('decimal') ? 'DECIMAL' : 'BIGINT';
+    return { type: families.includes('decimal') ? 'DECIMAL' : 'BIGINT' };
   },
   ifnull: coalesceRule,
   coalesce: coalesceRule,
   nullif: (args, state) => {
     const family = familyOf(args[0], state);
-    return family ? NULLIF_RESULT[family] : null;
+    return family ? { type: NULLIF_RESULT[family] } : null;
   },
 };

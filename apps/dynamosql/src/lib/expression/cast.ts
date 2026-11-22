@@ -15,6 +15,7 @@ interface CastTarget {
   dataType: string;
   quoted?: string;
   length?: number;
+  scale?: number;
 }
 
 function datetime(expr: Cast, state: EvaluationState): EvaluationResult {
@@ -91,6 +92,10 @@ function decimal(expr: Cast, state: EvaluationState): EvaluationResult {
   const result = getValue(expr.expr, state);
   result.name = `CAST(${result.name} AS DECIMAL)`;
   result.type = 'number';
+  const target: CastTarget | undefined = Array.isArray(expr.target)
+    ? expr.target[0]
+    : expr.target;
+  result.decimals = target?.scale;
   if (
     !result.err &&
     result.value !== null &&

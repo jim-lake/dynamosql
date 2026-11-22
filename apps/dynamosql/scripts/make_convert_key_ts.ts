@@ -21,7 +21,11 @@ const CONVERSIONS: Conversion[] = [
   ['bool', 'number', 'Number($v)'],
   ['long', 'number', '$v as number'],
   ['year', 'number', '$v as number'],
-  ['number', 'number', '$v as number'],
+  [
+    'number',
+    'number',
+    '$s === null ? $v as number : Number(($v as number).toFixed($s as number))',
+  ],
   ['double', 'number', '$v as number'],
   ['longlong', 'bigint', 'BigInt($v as number | bigint)'],
   ['interval', 'number', '($v as SQLInterval).getNumber()'],
@@ -93,7 +97,7 @@ async function main(): Promise<void> {
         const param = expression.includes('$v') ? '(value: unknown)' : '()';
         return [
           label,
-          `return ${param} => ${guard('value', expression.replaceAll('$v', 'value').replaceAll('$c', 'collations[i] ?? null'))};`,
+          `return ${param} => ${guard('value', expression.replaceAll('$v', 'value').replaceAll('$c', 'collations[i] ?? null').replaceAll('$s', 'scales[i]'))};`,
         ];
       })
     );
@@ -108,6 +112,7 @@ async function main(): Promise<void> {
                 expression
                   .replaceAll('$v', `cells[${i}].value`)
                   .replaceAll('$c', `collations[${i}] ?? null`)
+                  .replaceAll('$s', `scales[${i}]`)
               )
             );
             const body = combo.some(([, expression]) =>
@@ -151,6 +156,7 @@ async function main(): Promise<void> {
       ...nonNullAssumption,
       `export function ${nullable ? 'createConvertKeyNullable' : 'createConvertKey'}(columns: ColumnDef[], types: HashUniqueKeyType[]): ${convertKeyFunction} {`,
       'const collations = columns.map((column): COLLATIONS | null => column.collation ?? null);',
+      'const scales = columns.map((column): number | null => column.decimals ?? null);',
       `if (types.length > ${HARDCODED_MAX_KEYS}) {`,
       'const kinds = types.slice();',
       'const converters = columns.map((column, i): Converter => {',

@@ -71,3 +71,9 @@ MySQL keeps the first character when it is not an ASCII letter. DynamoSQL conver
 Whether `SOUNDEX` is a supported function must be checked in `FUNCTIONS.md` before any gap is recorded.
 
 Tests must not pin the DynamoSQL output for these characters as correct.
+
+## PI() display precision
+
+MySQL shows `PI()` with 6 decimal places in the text protocol, because the result field has `decimals` 6. The value is still the full double. Other DOUBLE results print full precision. DynamoSQL treats `PI()` as a plain DOUBLE and returns the full value, so it does not reproduce the 6-place display.
+
+- `SELECT PI();`: MySQL returns `3.141593`. DynamoSQL returns `3.141592653589793`.

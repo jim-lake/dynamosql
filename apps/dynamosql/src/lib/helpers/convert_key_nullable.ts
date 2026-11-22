@@ -22,6 +22,9 @@ export function createConvertKeyNullable(
   const collations = columns.map(
     (column): COLLATIONS | null => column.collation ?? null
   );
+  const scales = columns.map(
+    (column): number | null => column.decimals ?? null
+  );
   if (types.length > 2) {
     const kinds = types.slice();
     const converters = columns.map((column, i): Converter => {
@@ -42,10 +45,16 @@ export function createConvertKeyNullable(
           return (value: unknown) => (value === null ? null : Number(value));
         case 'long:number':
         case 'year:number':
-        case 'number:number':
         case 'double:number':
           return (value: unknown) =>
             value === null ? null : (value as number);
+        case 'number:number':
+          return (value: unknown) =>
+            value === null
+              ? null
+              : scales[i] === null
+                ? (value as number)
+                : Number((value as number).toFixed(scales[i]));
         case 'longlong:bigint':
           return (value: unknown) =>
             value === null ? null : BigInt(value as number | bigint);
@@ -91,10 +100,17 @@ export function createConvertKeyNullable(
       ]) as ConvertKeyNullableFunction;
     case 'long:number':
     case 'year:number':
-    case 'number:number':
     case 'double:number':
       return ((cells: [CellValue]) => [
         cells[0].value === null ? null : (cells[0].value as number),
+      ]) as ConvertKeyNullableFunction;
+    case 'number:number':
+      return ((cells: [CellValue]) => [
+        cells[0].value === null
+          ? null
+          : scales[0] === null
+            ? (cells[0].value as number)
+            : Number((cells[0].value as number).toFixed(scales[0])),
       ]) as ConvertKeyNullableFunction;
     case 'longlong:bigint':
       return ((cells: [CellValue]) => [
@@ -149,11 +165,19 @@ export function createConvertKeyNullable(
       ]) as ConvertKeyNullableFunction;
     case 'null:string,long:number':
     case 'null:string,year:number':
-    case 'null:string,number:number':
     case 'null:string,double:number':
       return ((cells: [CellValue, CellValue]) => [
         null,
         cells[1].value === null ? null : (cells[1].value as number),
+      ]) as ConvertKeyNullableFunction;
+    case 'null:string,number:number':
+      return ((cells: [CellValue, CellValue]) => [
+        null,
+        cells[1].value === null
+          ? null
+          : scales[1] === null
+            ? (cells[1].value as number)
+            : Number((cells[1].value as number).toFixed(scales[1])),
       ]) as ConvertKeyNullableFunction;
     case 'null:string,longlong:bigint':
       return ((cells: [CellValue, CellValue]) => [
@@ -237,21 +261,31 @@ export function createConvertKeyNullable(
       ]) as ConvertKeyNullableFunction;
     case 'string:string,long:number':
     case 'string:string,year:number':
-    case 'string:string,number:number':
     case 'string:string,double:number':
     case 'char:string,long:number':
     case 'char:string,year:number':
-    case 'char:string,number:number':
     case 'char:string,double:number':
     case 'text:string,long:number':
     case 'text:string,year:number':
-    case 'text:string,number:number':
     case 'text:string,double:number':
       return ((cells: [CellValue, CellValue]) => [
         cells[0].value === null
           ? null
           : foldString(cells[0].value as string, collations[0] ?? null),
         cells[1].value === null ? null : (cells[1].value as number),
+      ]) as ConvertKeyNullableFunction;
+    case 'string:string,number:number':
+    case 'char:string,number:number':
+    case 'text:string,number:number':
+      return ((cells: [CellValue, CellValue]) => [
+        cells[0].value === null
+          ? null
+          : foldString(cells[0].value as string, collations[0] ?? null),
+        cells[1].value === null
+          ? null
+          : scales[1] === null
+            ? (cells[1].value as number)
+            : Number((cells[1].value as number).toFixed(scales[1])),
       ]) as ConvertKeyNullableFunction;
     case 'string:string,longlong:bigint':
     case 'char:string,longlong:bigint':
@@ -339,11 +373,19 @@ export function createConvertKeyNullable(
       ]) as ConvertKeyNullableFunction;
     case 'json:string,long:number':
     case 'json:string,year:number':
-    case 'json:string,number:number':
     case 'json:string,double:number':
       return ((cells: [CellValue, CellValue]) => [
         cells[0].value === null ? null : (cells[0].value as string),
         cells[1].value === null ? null : (cells[1].value as number),
+      ]) as ConvertKeyNullableFunction;
+    case 'json:string,number:number':
+      return ((cells: [CellValue, CellValue]) => [
+        cells[0].value === null ? null : (cells[0].value as string),
+        cells[1].value === null
+          ? null
+          : scales[1] === null
+            ? (cells[1].value as number)
+            : Number((cells[1].value as number).toFixed(scales[1])),
       ]) as ConvertKeyNullableFunction;
     case 'json:string,longlong:bigint':
       return ((cells: [CellValue, CellValue]) => [
@@ -407,11 +449,19 @@ export function createConvertKeyNullable(
       ]) as ConvertKeyNullableFunction;
     case 'bool:number,long:number':
     case 'bool:number,year:number':
-    case 'bool:number,number:number':
     case 'bool:number,double:number':
       return ((cells: [CellValue, CellValue]) => [
         cells[0].value === null ? null : Number(cells[0].value),
         cells[1].value === null ? null : (cells[1].value as number),
+      ]) as ConvertKeyNullableFunction;
+    case 'bool:number,number:number':
+      return ((cells: [CellValue, CellValue]) => [
+        cells[0].value === null ? null : Number(cells[0].value),
+        cells[1].value === null
+          ? null
+          : scales[1] === null
+            ? (cells[1].value as number)
+            : Number((cells[1].value as number).toFixed(scales[1])),
       ]) as ConvertKeyNullableFunction;
     case 'bool:number,longlong:bigint':
       return ((cells: [CellValue, CellValue]) => [
@@ -451,7 +501,6 @@ export function createConvertKeyNullable(
       ]) as ConvertKeyNullableFunction;
     case 'long:number,null:string':
     case 'year:number,null:string':
-    case 'number:number,null:string':
     case 'double:number,null:string':
       return ((cells: [CellValue, CellValue]) => [
         cells[0].value === null ? null : (cells[0].value as number),
@@ -463,9 +512,6 @@ export function createConvertKeyNullable(
     case 'year:number,string:string':
     case 'year:number,char:string':
     case 'year:number,text:string':
-    case 'number:number,string:string':
-    case 'number:number,char:string':
-    case 'number:number,text:string':
     case 'double:number,string:string':
     case 'double:number,char:string':
     case 'double:number,text:string':
@@ -477,7 +523,6 @@ export function createConvertKeyNullable(
       ]) as ConvertKeyNullableFunction;
     case 'long:number,json:string':
     case 'year:number,json:string':
-    case 'number:number,json:string':
     case 'double:number,json:string':
       return ((cells: [CellValue, CellValue]) => [
         cells[0].value === null ? null : (cells[0].value as number),
@@ -485,7 +530,6 @@ export function createConvertKeyNullable(
       ]) as ConvertKeyNullableFunction;
     case 'long:number,bool:number':
     case 'year:number,bool:number':
-    case 'number:number,bool:number':
     case 'double:number,bool:number':
       return ((cells: [CellValue, CellValue]) => [
         cells[0].value === null ? null : (cells[0].value as number),
@@ -493,27 +537,30 @@ export function createConvertKeyNullable(
       ]) as ConvertKeyNullableFunction;
     case 'long:number,long:number':
     case 'long:number,year:number':
-    case 'long:number,number:number':
     case 'long:number,double:number':
     case 'year:number,long:number':
     case 'year:number,year:number':
-    case 'year:number,number:number':
     case 'year:number,double:number':
-    case 'number:number,long:number':
-    case 'number:number,year:number':
-    case 'number:number,number:number':
-    case 'number:number,double:number':
     case 'double:number,long:number':
     case 'double:number,year:number':
-    case 'double:number,number:number':
     case 'double:number,double:number':
       return ((cells: [CellValue, CellValue]) => [
         cells[0].value === null ? null : (cells[0].value as number),
         cells[1].value === null ? null : (cells[1].value as number),
       ]) as ConvertKeyNullableFunction;
+    case 'long:number,number:number':
+    case 'year:number,number:number':
+    case 'double:number,number:number':
+      return ((cells: [CellValue, CellValue]) => [
+        cells[0].value === null ? null : (cells[0].value as number),
+        cells[1].value === null
+          ? null
+          : scales[1] === null
+            ? (cells[1].value as number)
+            : Number((cells[1].value as number).toFixed(scales[1])),
+      ]) as ConvertKeyNullableFunction;
     case 'long:number,longlong:bigint':
     case 'year:number,longlong:bigint':
-    case 'number:number,longlong:bigint':
     case 'double:number,longlong:bigint':
       return ((cells: [CellValue, CellValue]) => [
         cells[0].value === null ? null : (cells[0].value as number),
@@ -523,7 +570,6 @@ export function createConvertKeyNullable(
       ]) as ConvertKeyNullableFunction;
     case 'long:number,interval:number':
     case 'year:number,interval:number':
-    case 'number:number,interval:number':
     case 'double:number,interval:number':
       return ((cells: [CellValue, CellValue]) => [
         cells[0].value === null ? null : (cells[0].value as number),
@@ -533,7 +579,6 @@ export function createConvertKeyNullable(
       ]) as ConvertKeyNullableFunction;
     case 'long:number,datetime:number':
     case 'year:number,datetime:number':
-    case 'number:number,datetime:number':
     case 'double:number,datetime:number':
       return ((cells: [CellValue, CellValue]) => [
         cells[0].value === null ? null : (cells[0].value as number),
@@ -543,7 +588,6 @@ export function createConvertKeyNullable(
       ]) as ConvertKeyNullableFunction;
     case 'long:number,date:number':
     case 'year:number,date:number':
-    case 'number:number,date:number':
     case 'double:number,date:number':
       return ((cells: [CellValue, CellValue]) => [
         cells[0].value === null ? null : (cells[0].value as number),
@@ -551,7 +595,6 @@ export function createConvertKeyNullable(
       ]) as ConvertKeyNullableFunction;
     case 'long:number,time:number':
     case 'year:number,time:number':
-    case 'number:number,time:number':
     case 'double:number,time:number':
       return ((cells: [CellValue, CellValue]) => [
         cells[0].value === null ? null : (cells[0].value as number),
@@ -559,10 +602,133 @@ export function createConvertKeyNullable(
       ]) as ConvertKeyNullableFunction;
     case 'long:number,buffer:buffer':
     case 'year:number,buffer:buffer':
-    case 'number:number,buffer:buffer':
     case 'double:number,buffer:buffer':
       return ((cells: [CellValue, CellValue]) => [
         cells[0].value === null ? null : (cells[0].value as number),
+        cells[1].value === null ? null : (cells[1].value as Buffer),
+      ]) as ConvertKeyNullableFunction;
+    case 'number:number,null:string':
+      return ((cells: [CellValue, CellValue]) => [
+        cells[0].value === null
+          ? null
+          : scales[0] === null
+            ? (cells[0].value as number)
+            : Number((cells[0].value as number).toFixed(scales[0])),
+        null,
+      ]) as ConvertKeyNullableFunction;
+    case 'number:number,string:string':
+    case 'number:number,char:string':
+    case 'number:number,text:string':
+      return ((cells: [CellValue, CellValue]) => [
+        cells[0].value === null
+          ? null
+          : scales[0] === null
+            ? (cells[0].value as number)
+            : Number((cells[0].value as number).toFixed(scales[0])),
+        cells[1].value === null
+          ? null
+          : foldString(cells[1].value as string, collations[1] ?? null),
+      ]) as ConvertKeyNullableFunction;
+    case 'number:number,json:string':
+      return ((cells: [CellValue, CellValue]) => [
+        cells[0].value === null
+          ? null
+          : scales[0] === null
+            ? (cells[0].value as number)
+            : Number((cells[0].value as number).toFixed(scales[0])),
+        cells[1].value === null ? null : (cells[1].value as string),
+      ]) as ConvertKeyNullableFunction;
+    case 'number:number,bool:number':
+      return ((cells: [CellValue, CellValue]) => [
+        cells[0].value === null
+          ? null
+          : scales[0] === null
+            ? (cells[0].value as number)
+            : Number((cells[0].value as number).toFixed(scales[0])),
+        cells[1].value === null ? null : Number(cells[1].value),
+      ]) as ConvertKeyNullableFunction;
+    case 'number:number,long:number':
+    case 'number:number,year:number':
+    case 'number:number,double:number':
+      return ((cells: [CellValue, CellValue]) => [
+        cells[0].value === null
+          ? null
+          : scales[0] === null
+            ? (cells[0].value as number)
+            : Number((cells[0].value as number).toFixed(scales[0])),
+        cells[1].value === null ? null : (cells[1].value as number),
+      ]) as ConvertKeyNullableFunction;
+    case 'number:number,number:number':
+      return ((cells: [CellValue, CellValue]) => [
+        cells[0].value === null
+          ? null
+          : scales[0] === null
+            ? (cells[0].value as number)
+            : Number((cells[0].value as number).toFixed(scales[0])),
+        cells[1].value === null
+          ? null
+          : scales[1] === null
+            ? (cells[1].value as number)
+            : Number((cells[1].value as number).toFixed(scales[1])),
+      ]) as ConvertKeyNullableFunction;
+    case 'number:number,longlong:bigint':
+      return ((cells: [CellValue, CellValue]) => [
+        cells[0].value === null
+          ? null
+          : scales[0] === null
+            ? (cells[0].value as number)
+            : Number((cells[0].value as number).toFixed(scales[0])),
+        cells[1].value === null
+          ? null
+          : BigInt(cells[1].value as number | bigint),
+      ]) as ConvertKeyNullableFunction;
+    case 'number:number,interval:number':
+      return ((cells: [CellValue, CellValue]) => [
+        cells[0].value === null
+          ? null
+          : scales[0] === null
+            ? (cells[0].value as number)
+            : Number((cells[0].value as number).toFixed(scales[0])),
+        cells[1].value === null
+          ? null
+          : (cells[1].value as SQLInterval).getNumber(),
+      ]) as ConvertKeyNullableFunction;
+    case 'number:number,datetime:number':
+      return ((cells: [CellValue, CellValue]) => [
+        cells[0].value === null
+          ? null
+          : scales[0] === null
+            ? (cells[0].value as number)
+            : Number((cells[0].value as number).toFixed(scales[0])),
+        cells[1].value === null
+          ? null
+          : (cells[1].value as SQLDateTime).toNumber(),
+      ]) as ConvertKeyNullableFunction;
+    case 'number:number,date:number':
+      return ((cells: [CellValue, CellValue]) => [
+        cells[0].value === null
+          ? null
+          : scales[0] === null
+            ? (cells[0].value as number)
+            : Number((cells[0].value as number).toFixed(scales[0])),
+        cells[1].value === null ? null : (cells[1].value as SQLDate).toNumber(),
+      ]) as ConvertKeyNullableFunction;
+    case 'number:number,time:number':
+      return ((cells: [CellValue, CellValue]) => [
+        cells[0].value === null
+          ? null
+          : scales[0] === null
+            ? (cells[0].value as number)
+            : Number((cells[0].value as number).toFixed(scales[0])),
+        cells[1].value === null ? null : (cells[1].value as SQLTime).toNumber(),
+      ]) as ConvertKeyNullableFunction;
+    case 'number:number,buffer:buffer':
+      return ((cells: [CellValue, CellValue]) => [
+        cells[0].value === null
+          ? null
+          : scales[0] === null
+            ? (cells[0].value as number)
+            : Number((cells[0].value as number).toFixed(scales[0])),
         cells[1].value === null ? null : (cells[1].value as Buffer),
       ]) as ConvertKeyNullableFunction;
     case 'longlong:bigint,null:string':
@@ -599,13 +765,23 @@ export function createConvertKeyNullable(
       ]) as ConvertKeyNullableFunction;
     case 'longlong:bigint,long:number':
     case 'longlong:bigint,year:number':
-    case 'longlong:bigint,number:number':
     case 'longlong:bigint,double:number':
       return ((cells: [CellValue, CellValue]) => [
         cells[0].value === null
           ? null
           : BigInt(cells[0].value as number | bigint),
         cells[1].value === null ? null : (cells[1].value as number),
+      ]) as ConvertKeyNullableFunction;
+    case 'longlong:bigint,number:number':
+      return ((cells: [CellValue, CellValue]) => [
+        cells[0].value === null
+          ? null
+          : BigInt(cells[0].value as number | bigint),
+        cells[1].value === null
+          ? null
+          : scales[1] === null
+            ? (cells[1].value as number)
+            : Number((cells[1].value as number).toFixed(scales[1])),
       ]) as ConvertKeyNullableFunction;
     case 'longlong:bigint,longlong:bigint':
       return ((cells: [CellValue, CellValue]) => [
@@ -689,13 +865,23 @@ export function createConvertKeyNullable(
       ]) as ConvertKeyNullableFunction;
     case 'interval:number,long:number':
     case 'interval:number,year:number':
-    case 'interval:number,number:number':
     case 'interval:number,double:number':
       return ((cells: [CellValue, CellValue]) => [
         cells[0].value === null
           ? null
           : (cells[0].value as SQLInterval).getNumber(),
         cells[1].value === null ? null : (cells[1].value as number),
+      ]) as ConvertKeyNullableFunction;
+    case 'interval:number,number:number':
+      return ((cells: [CellValue, CellValue]) => [
+        cells[0].value === null
+          ? null
+          : (cells[0].value as SQLInterval).getNumber(),
+        cells[1].value === null
+          ? null
+          : scales[1] === null
+            ? (cells[1].value as number)
+            : Number((cells[1].value as number).toFixed(scales[1])),
       ]) as ConvertKeyNullableFunction;
     case 'interval:number,longlong:bigint':
       return ((cells: [CellValue, CellValue]) => [
@@ -779,13 +965,23 @@ export function createConvertKeyNullable(
       ]) as ConvertKeyNullableFunction;
     case 'datetime:number,long:number':
     case 'datetime:number,year:number':
-    case 'datetime:number,number:number':
     case 'datetime:number,double:number':
       return ((cells: [CellValue, CellValue]) => [
         cells[0].value === null
           ? null
           : (cells[0].value as SQLDateTime).toNumber(),
         cells[1].value === null ? null : (cells[1].value as number),
+      ]) as ConvertKeyNullableFunction;
+    case 'datetime:number,number:number':
+      return ((cells: [CellValue, CellValue]) => [
+        cells[0].value === null
+          ? null
+          : (cells[0].value as SQLDateTime).toNumber(),
+        cells[1].value === null
+          ? null
+          : scales[1] === null
+            ? (cells[1].value as number)
+            : Number((cells[1].value as number).toFixed(scales[1])),
       ]) as ConvertKeyNullableFunction;
     case 'datetime:number,longlong:bigint':
       return ((cells: [CellValue, CellValue]) => [
@@ -861,11 +1057,19 @@ export function createConvertKeyNullable(
       ]) as ConvertKeyNullableFunction;
     case 'date:number,long:number':
     case 'date:number,year:number':
-    case 'date:number,number:number':
     case 'date:number,double:number':
       return ((cells: [CellValue, CellValue]) => [
         cells[0].value === null ? null : (cells[0].value as SQLDate).toNumber(),
         cells[1].value === null ? null : (cells[1].value as number),
+      ]) as ConvertKeyNullableFunction;
+    case 'date:number,number:number':
+      return ((cells: [CellValue, CellValue]) => [
+        cells[0].value === null ? null : (cells[0].value as SQLDate).toNumber(),
+        cells[1].value === null
+          ? null
+          : scales[1] === null
+            ? (cells[1].value as number)
+            : Number((cells[1].value as number).toFixed(scales[1])),
       ]) as ConvertKeyNullableFunction;
     case 'date:number,longlong:bigint':
       return ((cells: [CellValue, CellValue]) => [
@@ -929,11 +1133,19 @@ export function createConvertKeyNullable(
       ]) as ConvertKeyNullableFunction;
     case 'time:number,long:number':
     case 'time:number,year:number':
-    case 'time:number,number:number':
     case 'time:number,double:number':
       return ((cells: [CellValue, CellValue]) => [
         cells[0].value === null ? null : (cells[0].value as SQLTime).toNumber(),
         cells[1].value === null ? null : (cells[1].value as number),
+      ]) as ConvertKeyNullableFunction;
+    case 'time:number,number:number':
+      return ((cells: [CellValue, CellValue]) => [
+        cells[0].value === null ? null : (cells[0].value as SQLTime).toNumber(),
+        cells[1].value === null
+          ? null
+          : scales[1] === null
+            ? (cells[1].value as number)
+            : Number((cells[1].value as number).toFixed(scales[1])),
       ]) as ConvertKeyNullableFunction;
     case 'time:number,longlong:bigint':
       return ((cells: [CellValue, CellValue]) => [
@@ -997,11 +1209,19 @@ export function createConvertKeyNullable(
       ]) as ConvertKeyNullableFunction;
     case 'buffer:buffer,long:number':
     case 'buffer:buffer,year:number':
-    case 'buffer:buffer,number:number':
     case 'buffer:buffer,double:number':
       return ((cells: [CellValue, CellValue]) => [
         cells[0].value === null ? null : (cells[0].value as Buffer),
         cells[1].value === null ? null : (cells[1].value as number),
+      ]) as ConvertKeyNullableFunction;
+    case 'buffer:buffer,number:number':
+      return ((cells: [CellValue, CellValue]) => [
+        cells[0].value === null ? null : (cells[0].value as Buffer),
+        cells[1].value === null
+          ? null
+          : scales[1] === null
+            ? (cells[1].value as number)
+            : Number((cells[1].value as number).toFixed(scales[1])),
       ]) as ConvertKeyNullableFunction;
     case 'buffer:buffer,longlong:bigint':
       return ((cells: [CellValue, CellValue]) => [
