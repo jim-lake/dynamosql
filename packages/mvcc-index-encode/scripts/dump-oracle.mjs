@@ -1,4 +1,5 @@
 import { execFileSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -12,6 +13,10 @@ const COLLATIONS = [
   'utf8mb4_0900_as_ci',
   'utf8mb4_0900_as_cs',
 ];
+const ASCII_COLLATIONS = ['ascii_bin', 'ascii_general_ci'];
+const ASCII_SCALARS = Array.from({ length: 128 }, (_, cp) =>
+  String.fromCharCode(cp)
+);
 const UCA_AI_CI = 'utf8mb4_0900_ai_ci';
 const UCA_AS_CS = 'utf8mb4_0900_as_cs';
 const UCA_AS_CI = 'utf8mb4_0900_as_ci';
@@ -200,6 +205,59 @@ function expansionSamples(seed) {
 }
 const EXPANSION_HEX = expansionSamples(20261120);
 
+function longSamples(alphabet, seed) {
+  const samples = new Set([
+    '',
+    ' ',
+    '  ',
+    '\0',
+    'a',
+    'A',
+    'a\0',
+    '\0a',
+    'a ',
+    'a  ',
+    'ab',
+    'a b',
+    'A B',
+  ]);
+  for (const prefix of ['apple', 'a'.repeat(200), 'Z'.repeat(1000)]) {
+    for (const tail of ['', '\0', ' ', '  ', 'a', 'A', 'b']) {
+      samples.add(prefix + tail);
+    }
+  }
+  let state = seed;
+  const next = () => {
+    state = (Math.imul(state, 1664525) + 1013904223) >>> 0;
+    return state >>> 8;
+  };
+  for (let i = 0; i < 128; i++) {
+    const len = i < 64 ? 8 + (next() % 56) : 64 + (next() % 936);
+    const prefix = Array.from(
+      { length: len },
+      () => alphabet[next() % alphabet.length]
+    ).join('');
+    for (const tail of ['', 'a', 'A']) samples.add(prefix + tail);
+  }
+  return samples;
+}
+
+const ASCII_SAMPLES = longSamples(ASCII_SCALARS, 20261121);
+for (const scalar of ASCII_SCALARS) ASCII_SAMPLES.add(scalar);
+const UNICODE_EDGE_SCALARS = [
+  ...'ẹ́́̈ßİ ​ ΑσЖำ각가一㐀😀𐀀\u{10ffff}￿㍿\u{fdfa}\u{fdfb}\u{327c}',
+];
+const LONG_UNICODE_SAMPLES = longSamples(
+  [...ASCII_SCALARS, ...UNICODE_EDGE_SCALARS],
+  20261122
+);
+for (const scalar of UNICODE_EDGE_SCALARS) {
+  for (const count of [40, 200]) {
+    const run = scalar.repeat(count);
+    for (const tail of ['', 'a', 'A']) LONG_UNICODE_SAMPLES.add(run + tail);
+  }
+}
+
 // SQL goes through stdin: large UNION queries exceed the argv size limit (E2BIG).
 function mysql(sql) {
   return execFileSync('mysql', ['-N', '-B'], {
@@ -216,29 +274,98 @@ function rowsOf(sql) {
     .map((line) => line.split('\t'));
 }
 
-const out = { mysql_version: mysql('SELECT VERSION()').trim(), utf8: [] };
+const out = {
+  mysql_version: mysql('SELECT VERSION()').trim(),
+  utf8: [],
+  ascii: [],
+  storage: {},
+};
+const hex = (text) => Buffer.from(text).toString('hex');
 
-for (const collation of COLLATIONS) {
-  const hexes =
-    collation === 'utf8mb4_0900_bin'
-      ? UTF8_HEX
-      : [
-          ...new Set([
-            ...UTF8_HEX,
-            ...MIXED_HEX,
-            ...DENSE_HEX,
-            ...EXPANSION_HEX,
-          ]),
-        ];
+function fetchSamples(charset, collation, hexes) {
   const sql = hexes
     .map(
       (h) =>
-        `SELECT '${h}', CONCAT('x', HEX(WEIGHT_STRING(_utf8mb4 X'${h}' COLLATE ${collation})))`
+        `SELECT '${h}', CONCAT('x', HEX(WEIGHT_STRING(_${charset} X'${h}' COLLATE ${collation})))`
     )
     .join('\nUNION ALL\n');
-  for (const [h, w] of rowsOf(`${sql};`)) {
-    out.utf8.push({ collation, value_hex: h, weight_hex: w.slice(1) });
+  return rowsOf(`${sql};`).map(([value_hex, w]) => ({
+    collation,
+    value_hex,
+    weight_hex: w.slice(1),
+  }));
+}
+
+for (const collation of COLLATIONS) {
+  const hexes = new Set(UTF8_HEX);
+  if (collation !== 'utf8mb4_0900_bin') {
+    for (const h of [...MIXED_HEX, ...DENSE_HEX, ...EXPANSION_HEX])
+      hexes.add(h);
   }
+  out.utf8.push(...fetchSamples('utf8mb4', collation, [...hexes]));
+}
+for (const collation of COLLATIONS) {
+  out.utf8.push(
+    ...fetchSamples('utf8mb4', collation, [...LONG_UNICODE_SAMPLES].map(hex))
+  );
+}
+for (const collation of ASCII_COLLATIONS) {
+  out.ascii.push(
+    ...fetchSamples('ascii', collation, [...ASCII_SAMPLES].map(hex))
+  );
+}
+
+const scalarRows = [...ASCII_COLLATIONS, ...COLLATIONS].map((collation) => {
+  const charset = collation.startsWith('ascii_') ? 'ascii' : 'utf8mb4';
+  const rows = fetchSamples(charset, collation, ASCII_SCALARS.map(hex));
+  return [
+    `  '${collation}': [`,
+    ...rows.map(
+      ({ value_hex, weight_hex }) =>
+        `    [${parseInt(value_hex, 16)}, '${weight_hex}'],`
+    ),
+    '  ],',
+  ].join('\n');
+});
+
+const storageInputs = JSON.parse(
+  fs.readFileSync(path.join(root, 'test/fixtures/storage_inputs.json'), 'utf8')
+);
+for (const collation of [...ASCII_COLLATIONS, ...COLLATIONS]) {
+  const charset = collation.startsWith('ascii_') ? 'ascii' : 'utf8mb4';
+  const inputs = storageInputs[collation];
+  const weighted = [];
+  for (let start = 0; start < inputs.length; start += 400) {
+    const batch = inputs.slice(start, start + 400).map(hex);
+    const rows = fetchSamples(charset, collation, batch);
+    if (
+      rows.length !== batch.length ||
+      rows.some((row, index) => row.value_hex !== batch[index])
+    ) {
+      throw new Error(`Unexpected storage sample rows for ${collation}`);
+    }
+    weighted.push(
+      ...rows.map(({ weight_hex }, index) => ({
+        index: start + index,
+        weight: Buffer.from(weight_hex, 'hex'),
+      }))
+    );
+  }
+  weighted.sort((a, b) => Buffer.compare(a.weight, b.weight));
+  const ranks = new Array(weighted.length);
+  let rank = 0;
+  let prev = weighted[0].weight;
+  for (const { index, weight } of weighted) {
+    if (!prev.equals(weight)) rank++;
+    ranks[index] = rank;
+    prev = weight;
+  }
+  out.storage[collation] = {
+    input_sha256: createHash('sha256')
+      .update(JSON.stringify(inputs))
+      .digest('hex'),
+    ranks,
+  };
 }
 
 const UCA_CHUNK = 4000;
@@ -363,6 +490,18 @@ const asCsChunks = packChunks(Buffer.concat(asCsParts));
 
 fs.mkdirSync(path.join(root, 'test/fixtures'), { recursive: true });
 fs.writeFileSync(
+  path.join(root, 'src/generated/collation_weights.ts'),
+  [
+    `// Generated by scripts/dump-oracle.mjs from MySQL ${out.mysql_version}. Do not edit.`,
+    '',
+    'export const CHAR_WEIGHTS: Readonly<Record<string, readonly (readonly [number, string])[]>> = {',
+    ...scalarRows,
+    '};',
+    '',
+  ].join('\n')
+);
+
+fs.writeFileSync(
   path.join(root, 'test/fixtures/oracle.json'),
   JSON.stringify(out, null, 2) + '\n'
 );
@@ -380,5 +519,5 @@ fs.writeFileSync(
 );
 
 console.log(
-  `Wrote oracle for MySQL ${out.mysql_version}: ${out.utf8.length} utf8 rows, ${asCsRows.length} utf8mb4_0900_as_cs code points (${asCsHanDropped} implicit Han dropped)`
+  `Wrote oracle for MySQL ${out.mysql_version}: ${out.ascii.length} ASCII rows, ${out.utf8.length} utf8 rows, ${asCsRows.length} utf8mb4_0900_as_cs code points (${asCsHanDropped} implicit Han dropped)`
 );

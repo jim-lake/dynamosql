@@ -37,10 +37,20 @@ key and framing formats; do not restate them here.
   and stored keys need no migration.
 - The encoding is not fixed. It may change in any collation at any time, and
   size curves are measurements of the current format, not guarantees.
-- Tests never pin bytes, lengths, widths, cutoffs, or derived maxima, for any
-  collation. Do not add assertions that would fail when the encoding changes,
-  such as exact frame lengths, `maxBytes` values, or witness sizes. Tests assert
-  ordering and equality only. Use `expectSameOrder` from `test/order.ts`.
+- `test/storage_sample.test.ts` is the sole exact-byte regression test. Its
+  saved storage sample records the value of `STORAGE_VERSION` alongside the
+  inputs and their exact encoded bytes for each collation. When the versions
+  match, the test must fail on any byte difference. For work that preserves
+  the format, keep the version and saved sample intact and fix any unexpected
+  difference in the encoder.
+- When intentionally changing the storage format, increment `STORAGE_VERSION`
+  in `src/index.ts`. Keep the existing sample at its recorded version. A
+  version mismatch skips the storage sample test on every run until a new
+  sample is explicitly saved for the current version. Tests, builds, and
+  MySQL oracle regeneration must never refresh or relabel the sample.
+- All other encoding tests assert ordering and equality only. Do not pin
+  bytes, lengths, widths, cutoffs, or derived maxima such as `maxBytes` or
+  witness sizes. Use `expectSameOrder` from `test/order.ts`.
   Hand-written cases use `expectAscending` chains.
 - Investigation and probe scripts go under `scripts/`, named for what they
   measure or check (for example `length_model.ts`, not `test1.ts`). Keep them

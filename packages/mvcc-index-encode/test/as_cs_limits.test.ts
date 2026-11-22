@@ -1,7 +1,12 @@
 import { describe, it } from 'mocha';
 import { expect } from 'chai';
-import { tertiaryContexts, tertiaryTree } from '../src/lower_bits';
-import { expectSameOrder } from './order';
+import {
+  secondaryCodes,
+  secondaryLengths,
+  tertiaryContexts,
+  tertiaryTree,
+} from '../src/lower_bits';
+import { expectAscending, expectSameOrder, type OrderItem } from './order';
 import { AS_CS_LEVEL_DEFAULTS, asCsWriteLevel } from '../src/uca';
 
 function scalars(): number[] {
@@ -12,6 +17,37 @@ function scalars(): number[] {
     }
   }
   return out;
+}
+
+function rankedCode(
+  rank: number,
+  codes: Uint16Array,
+  widths: Uint8Array,
+  id = String(rank)
+): OrderItem {
+  const code = codes[rank] ?? 0;
+  const width = widths[rank] ?? 0;
+  expect(code, `code fits for ${id}`).to.be.lessThan(2 ** width);
+  return {
+    id,
+    oracle: Uint8Array.of(rank >>> 8, rank & 255),
+    ours: Buffer.from(width === 0 ? '' : code.toString(2).padStart(width, '0')),
+  };
+}
+
+function expectPrefixFreeOrder(items: readonly OrderItem[]): void {
+  expectSameOrder(items);
+  for (let i = 1; i < items.length; i++) {
+    const a = items[i - 1] as OrderItem;
+    const b = items[i] as OrderItem;
+    expectAscending(
+      [
+        [`code for ${a.id}`, a.ours],
+        [`prefix of code for ${b.id}`, b.ours.subarray(0, a.ours.length)],
+      ],
+      '<'
+    );
+  }
 }
 
 describe('as_cs table limits', function () {
@@ -33,7 +69,7 @@ describe('as_cs table limits', function () {
     }
   });
 
-  it('preserves the tertiary order for each tied secondary position', () => {
+  it('uses ordered prefix-free codes for reachable secondary and tertiary weights', () => {
     const s = new Uint8Array(64);
     const t = new Uint8Array(64);
     const choices = new Map<number, Set<number>>();
@@ -49,20 +85,39 @@ describe('as_cs table limits', function () {
         else choices.set(secondary, new Set([rank]));
       }
     }
+    const secondaries = [0, ...choices.keys()].sort((a, b) => a - b);
+    expectPrefixFreeOrder(
+      secondaries.map((unit) =>
+        rankedCode(unit, secondaryCodes, secondaryLengths)
+      )
+    );
     for (const [secondary, ranks] of choices) {
+      const ordered = [...ranks].sort((a, b) => a - b);
       for (const state of tertiaryContexts.keys()) {
         const tree = tertiaryTree(secondary, state);
-        expectSameOrder(
-          [...ranks].map((rank) => {
-            const width = tree?.lengths[rank] ?? 0;
-            const code = (tree?.codes[rank] ?? 0).toString(2);
-            return {
-              id: String(rank),
-              oracle: Uint8Array.of(rank >>> 8, rank & 255),
-              ours: Buffer.from(width ? code.padStart(width, '0') : ''),
-            };
-          })
+        const context = `secondary ${String(secondary)} in context ${String(state)}`;
+        if (tree === undefined) {
+          expect(ranks.size, `omitted tree for ${context}`).to.equal(1);
+          continue;
+        }
+        const items = ordered.map((rank) =>
+          rankedCode(
+            rank,
+            tree.codes,
+            tree.lengths,
+            `${context}, rank ${String(rank)}`
+          )
         );
+        for (const item of items) {
+          expectAscending(
+            [
+              ['empty code', new Uint8Array()],
+              [`code for ${item.id}`, item.ours],
+            ],
+            '<'
+          );
+        }
+        expectPrefixFreeOrder(items);
       }
     }
   });

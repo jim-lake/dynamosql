@@ -2,14 +2,21 @@ import { readFileSync } from 'node:fs';
 import { describe, it } from 'mocha';
 import { expect } from 'chai';
 import { bytesToHex, hexToBytes } from '../src/bytes';
-import { type CollationName } from '../src/collations';
+import { COLLATION_NAMES, type CollationName } from '../src/collations';
 import { weightString } from '../src/weight_string';
 import { hexText } from './helpers/strings';
 import { compareBytes, expectSameOrder, type OrderItem } from './order';
 
+interface OracleRow {
+  collation: CollationName;
+  value_hex: string;
+  weight_hex: string;
+}
+
 interface Oracle {
   mysql_version: string;
-  utf8: { collation: CollationName; value_hex: string; weight_hex: string }[];
+  ascii: OracleRow[];
+  utf8: OracleRow[];
 }
 
 const oracle = JSON.parse(
@@ -21,27 +28,31 @@ describe('encoding order against the MySQL 8.4 oracle', () => {
     expect(oracle.mysql_version.startsWith('8.4.')).to.equal(true);
   });
 
-  it('orders each sampled UTF-8 string like MySQL', () => {
-    const names = new Set(oracle.utf8.map((row) => row.collation));
-    expect(names).to.deep.equal(
-      new Set([
-        'utf8mb4_0900_ai_ci',
-        'utf8mb4_0900_as_ci',
-        'utf8mb4_0900_as_cs',
-        'utf8mb4_0900_bin',
-      ])
-    );
-    for (const name of names) {
-      const rows = oracle.utf8.filter((row) => row.collation === name);
+  for (const name of COLLATION_NAMES) {
+    it(`orders each sampled string like MySQL for ${name}`, () => {
+      const samples = name.startsWith('ascii_') ? oracle.ascii : oracle.utf8;
+      const rows = samples.filter((row) => row.collation === name);
       expect(rows.length).to.be.greaterThan(0);
-      const items: OrderItem[] = rows.map((row) => ({
-        id: `${name} ${row.value_hex}`,
-        oracle: hexToBytes(row.weight_hex),
-        ours: weightString(hexText(row.value_hex), name),
-      }));
+      if (name.startsWith('ascii_')) {
+        const inputs = new Set(rows.map((row) => hexText(row.value_hex)));
+        for (let cp = 0; cp < 128; cp++) {
+          expect(
+            inputs.has(String.fromCharCode(cp)),
+            `ASCII ${String(cp)}`
+          ).to.equal(true);
+        }
+      }
+      const items: OrderItem[] = rows.map((row) => {
+        const value = hexText(row.value_hex);
+        return {
+          id: `${name} ${JSON.stringify(value)}`,
+          oracle: hexToBytes(row.weight_hex),
+          ours: weightString(value, name),
+        };
+      });
       expectSameOrder(items);
-    }
-  });
+    });
+  }
 
   it('rejects an unknown collation', () => {
     expect(() =>

@@ -1,5 +1,3 @@
-import { CHAR_WEIGHTS } from './generated/collation_weights';
-import { hexToBytes } from './bytes';
 import {
   AS_CS_LEVEL_DEFAULTS,
   MAX_AS_CS_LEVEL_WEIGHT,
@@ -23,14 +21,8 @@ interface CollationBase {
   readonly charset: Charset;
 }
 
-export interface TableCollation extends CollationBase {
-  readonly kind: 'table';
-  readonly maxWeight: number;
-  readonly writeWeight: (
-    codePoint: number,
-    dst: Uint8Array,
-    at: number
-  ) => number;
+interface AsciiCollation extends CollationBase {
+  readonly kind: 'ascii';
 }
 
 export interface MultiLevelCollation extends CollationBase {
@@ -51,7 +43,7 @@ export interface ScalarCodeCollation extends CollationBase {
 }
 
 export type CollationInfo =
-  TableCollation | MultiLevelCollation | ScalarCodeCollation;
+  AsciiCollation | MultiLevelCollation | ScalarCodeCollation;
 
 const COLLATION_META: Readonly<Record<CollationName, { charset: Charset }>> = {
   ascii_bin: { charset: 'ascii' },
@@ -61,27 +53,6 @@ const COLLATION_META: Readonly<Record<CollationName, { charset: Charset }>> = {
   utf8mb4_0900_as_ci: { charset: 'utf8mb4' },
   utf8mb4_0900_as_cs: { charset: 'utf8mb4' },
 };
-
-const EMPTY = new Uint8Array(0);
-
-function buildAsciiWriter(name: CollationName): {
-  maxWeight: number;
-  writeWeight: (codePoint: number, dst: Uint8Array, at: number) => number;
-} {
-  const weights: Uint8Array[] = Array.from({ length: 128 }, () => EMPTY);
-  for (const [codePoint, hex] of CHAR_WEIGHTS[name] ?? []) {
-    weights[codePoint] = hexToBytes(hex);
-  }
-  const maxWeight = Math.max(0, ...weights.map((w) => w.length));
-  return {
-    maxWeight,
-    writeWeight: (codePoint, dst, at) => {
-      const w = weights[codePoint] ?? EMPTY;
-      dst.set(w, at);
-      return w.length;
-    },
-  };
-}
 
 function buildInfo(name: CollationName): CollationInfo {
   const meta = COLLATION_META[name];
@@ -103,7 +74,7 @@ function buildInfo(name: CollationName): CollationInfo {
       writeLevel: asCsWriteLevel,
     };
   }
-  return { ...meta, kind: 'table', ...buildAsciiWriter(name) };
+  return { ...meta, kind: 'ascii' };
 }
 
 const COLLATIONS: ReadonlyMap<string, CollationInfo> = new Map(

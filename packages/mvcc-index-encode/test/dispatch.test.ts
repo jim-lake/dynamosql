@@ -10,6 +10,16 @@ interface Chain {
 }
 
 const SEMANTICS: Partial<Record<CollationName, Chain[]>> = {
+  ascii_bin: [
+    {
+      relation: '<',
+      values: ['', '\0', '\0a', 'A', 'a', 'a\0', 'a ', 'a  ', 'ab'],
+    },
+  ],
+  ascii_general_ci: [
+    { relation: '=', values: ['aBc', 'AbC', 'ABC'] },
+    { relation: '<', values: ['', '\0', '\0a', 'a', 'a\0', 'a ', 'a  ', 'ab'] },
+  ],
   utf8mb4_0900_bin: [
     { relation: '<', values: ['Z', 'a', 'é', '中', '\u{10000}'] },
     { relation: '<', values: ['￿', '\u{10000}'] },
