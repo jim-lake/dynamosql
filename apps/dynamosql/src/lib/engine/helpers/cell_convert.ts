@@ -82,22 +82,26 @@ export function cellConvert(
       };
     }
     case 'datetime': {
-      const decimals = column.decimals ?? 0;
+      const fsp = column.fsp ?? 0;
       return {
         type: column.type,
-        value: convertDateTime({ value, decimals, timeZone: flags.timeZone }),
+        value: convertDateTime({
+          value,
+          decimals: fsp,
+          timeZone: flags.timeZone,
+        }),
       };
     }
     case 'time': {
-      const decimals = column.decimals ?? 0;
+      const fsp = column.fsp ?? 0;
       return {
         type: column.type,
-        value: convertTime({ value, decimals, timeZone: flags.timeZone }),
+        value: convertTime({ value, decimals: fsp, timeZone: flags.timeZone }),
       };
     }
     case 'number': {
-      const precision = column.length ?? 10;
-      const scale = column.decimals ?? 0;
+      const precision = column.precision ?? 10;
+      const scale = column.scale ?? 0;
       if (
         typeof value === 'number' &&
         Math.abs(value) < 10 ** (precision - scale)

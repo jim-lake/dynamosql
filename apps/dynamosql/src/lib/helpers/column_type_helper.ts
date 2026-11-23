@@ -1,8 +1,28 @@
 import { COLLATIONS, FIELD_FLAGS } from '../../constants/mysql';
 import { Types } from '../../types';
+import { mysqlStringToValueType } from '../types/value_type';
 
 import type { FieldInfo } from '../../types';
 import type { ColumnDef } from '../engine';
+
+export function precisionFields(
+  dataType: string,
+  definition: { length?: number | null; scale?: number | null }
+): { precision: number | null; scale: number | null; fsp: number | null } {
+  const type = mysqlStringToValueType(dataType);
+  const fields = { precision: null, scale: null, fsp: null };
+  if (type === 'number') {
+    return {
+      ...fields,
+      precision: definition.length ?? null,
+      scale: definition.scale ?? 0,
+    };
+  }
+  if (type === 'datetime' || type === 'time') {
+    return { ...fields, fsp: definition.length ?? null };
+  }
+  return fields;
+}
 
 export function convertType(def: Partial<ColumnDef>): FieldInfo {
   let charsetNr = COLLATIONS.BINARY;
@@ -171,8 +191,14 @@ export function convertType(def: Partial<ColumnDef>): FieldInfo {
   if (def.nullable === false) {
     flags |= FIELD_FLAGS.NOT_NULL;
   }
-  if (def.decimals !== undefined) {
-    decimals = def.decimals;
+  if (type === Types.NEWDECIMAL && def.scale !== undefined) {
+    decimals = def.scale;
+  }
+  if (
+    def.fsp !== undefined &&
+    (type === Types.TIME || type === Types.DATETIME)
+  ) {
+    decimals = def.fsp;
   }
 
   return {

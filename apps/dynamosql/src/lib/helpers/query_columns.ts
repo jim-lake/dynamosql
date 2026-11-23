@@ -29,7 +29,9 @@ export interface QueryColumn {
     name?: string | undefined;
     orgName?: string | undefined;
     length?: number | undefined;
-    decimals?: number | undefined;
+    precision?: number | undefined;
+    scale?: number | undefined;
+    fsp?: number | undefined;
     collation?: COLLATIONS | undefined;
     nullable?: boolean | undefined;
   };
@@ -148,7 +150,9 @@ function _makeResultColumn(
     mysqlType: column.mysqlType,
     orgName: column.name,
     length: column.length,
-    decimals: column.decimals,
+    precision: column.precision,
+    scale: column.scale,
+    fsp: column.fsp,
     collation,
     nullable: column.nullable,
   };

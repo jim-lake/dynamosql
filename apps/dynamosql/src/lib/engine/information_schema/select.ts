@@ -215,14 +215,14 @@ function _columnToColumns(
     case 'TIMESTAMP':
     case 'DATETIME':
     case 'TIME':
-      datetime_precision = column.decimals ?? 0;
+      datetime_precision = column.fsp ?? 0;
       column_type += `(${datetime_precision})`;
       break;
     case 'DATE':
       break;
     case 'DECIMAL':
-      numeric_precision = column.length ?? 0;
-      numeric_scale = column.decimals ?? 0;
+      numeric_precision = column.precision ?? 0;
+      numeric_scale = column.scale ?? 0;
       column_type += `(${numeric_precision},${numeric_scale})`;
       break;
     case 'BOOLEAN':

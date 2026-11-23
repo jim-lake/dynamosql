@@ -12,6 +12,7 @@ import {
 } from './helpers/ast_helper';
 import { CHARSET_DEFAULT_COLLATION_MAP, getCharset } from './helpers/charset';
 import { makeCollation, getCollation } from './helpers/collation';
+import { precisionFields } from './helpers/column_type_helper';
 import { isUniqueConstraint, uniqueIndexName } from './helpers/unique_index';
 import * as SchemaManager from './schema_manager';
 import * as SelectHandler from './select_handler';
@@ -209,12 +210,7 @@ async function _createTable(
         type: mysqlStringToValueType(def.definition.dataType),
         mysqlType: def.definition.dataType,
         length: def.definition.length ?? null,
-        decimals:
-          def.definition.scale ??
-          (mysqlStringToValueType(def.definition.dataType) === 'number'
-            ? 0
-            : def.definition.length) ??
-          null,
+        ...precisionFields(def.definition.dataType, def.definition),
         collation: makeCollation(def, collation),
         nullable: def.nullable?.value !== 'not null',
         default:

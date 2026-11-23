@@ -196,7 +196,7 @@ export async function query(params: HandlerParams<Show>): Promise<ShowResult> {
           : convertString({
               value: col.defaultValue.value,
               decimals:
-                col.type === 'number' ? (col.decimals ?? undefined) : undefined,
+                col.type === 'number' ? (col.scale ?? undefined) : undefined,
               timeZone: session.timeZone,
             }),
         'NULL',
@@ -386,7 +386,7 @@ function _columnType(col: ColumnDef): string {
     case 'CHAR':
       return `${name}(${col.length ?? 1})`;
     case 'DECIMAL':
-      return `decimal(${col.length ?? 10},${col.decimals ?? 0})`;
+      return `decimal(${col.precision ?? 10},${col.scale ?? 0})`;
     case 'BOOLEAN':
       return 'tinyint(1)';
     case 'TIME':

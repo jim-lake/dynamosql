@@ -156,7 +156,7 @@ async function main(): Promise<void> {
       ...nonNullAssumption,
       `export function ${nullable ? 'createConvertKeyNullable' : 'createConvertKey'}(columns: ColumnDef[], types: HashUniqueKeyType[]): ${convertKeyFunction} {`,
       'const collations = columns.map((column): COLLATIONS | null => column.collation ?? null);',
-      'const scales = columns.map((column): number | null => column.decimals ?? null);',
+      'const scales = columns.map((column): number | null => column.scale ?? null);',
       `if (types.length > ${HARDCODED_MAX_KEYS}) {`,
       'const kinds = types.slice();',
       'const converters = columns.map((column, i): Converter => {',

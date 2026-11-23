@@ -124,8 +124,14 @@ export async function createTable(params: CreateTableParams): Promise<void> {
     if (col.collation !== null) {
       ret.collation = col.collation;
     }
-    if (col.decimals !== null) {
-      ret.decimals = col.decimals;
+    if (col.precision !== null) {
+      ret.precision = col.precision;
+    }
+    if (col.scale !== null) {
+      ret.scale = col.scale;
+    }
+    if (col.fsp !== null) {
+      ret.fsp = col.fsp;
     }
     if (col.comment) {
       ret.comment = col.comment;

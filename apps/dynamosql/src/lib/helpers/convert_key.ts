@@ -23,9 +23,7 @@ export function createConvertKey(
   const collations = columns.map(
     (column): COLLATIONS | null => column.collation ?? null
   );
-  const scales = columns.map(
-    (column): number | null => column.decimals ?? null
-  );
+  const scales = columns.map((column): number | null => column.scale ?? null);
   if (types.length > 2) {
     const kinds = types.slice();
     const converters = columns.map((column, i): Converter => {

@@ -291,7 +291,9 @@ async function _iterQuery(
                   type: result.type,
                   mysqlType: result.mysqlType,
                   length: result.length,
-                  decimals: result.decimals,
+                  precision: result.precision,
+                  scale: result.scale,
+                  fsp: result.fsp,
                   collation: result.collation,
                   nullable: result.nullable,
                 };
@@ -519,7 +521,8 @@ async function _evaluateReturn(
         type: mysqlStringToValueType(typeInfo.type),
         mysqlType: typeInfo.type,
         length: typeInfo.length,
-        decimals: typeInfo.scale,
+        precision: typeInfo.precision,
+        scale: typeInfo.scale,
         collation:
           column.result.collation ??
           getExprCollation(column.expr, state) ??

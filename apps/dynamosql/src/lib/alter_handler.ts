@@ -1,6 +1,7 @@
 import { SQLError } from '../error';
 
 import { makeCollation } from './helpers/collation';
+import { precisionFields } from './helpers/column_type_helper';
 import { isUniqueConstraint, uniqueIndexName } from './helpers/unique_index';
 import * as SchemaManager from './schema_manager';
 import * as TransactionManager from './transaction_manager';
@@ -59,10 +60,7 @@ async function _runAlterTable(
         type,
         mysqlType,
         length: def.definition.length ?? null,
-        decimals:
-          def.definition.scale ??
-          (type === 'number' ? 0 : def.definition.length) ??
-          null,
+        ...precisionFields(mysqlType, def.definition),
         collation: makeCollation(def, info.collation),
         nullable: def.nullable?.value !== 'not null',
       };

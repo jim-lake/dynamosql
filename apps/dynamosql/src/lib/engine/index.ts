@@ -41,7 +41,9 @@ export interface ColumnDef {
   type: ValueType;
   mysqlType: MysqlType;
   length?: number;
-  decimals?: number;
+  precision?: number;
+  scale?: number;
+  fsp?: number;
   collation?: COLLATIONS;
   nullable?: boolean;
   default?: unknown;
@@ -53,7 +55,9 @@ export interface ColumnDefParam {
   type: ValueType;
   mysqlType: MysqlType;
   length: number | null;
-  decimals: number | null;
+  precision: number | null;
+  scale: number | null;
+  fsp: number | null;
   collation: COLLATIONS | null;
   nullable?: boolean;
   default?: unknown;
