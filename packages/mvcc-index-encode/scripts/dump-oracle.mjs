@@ -60,6 +60,16 @@ function utf8Samples(count, seed) {
   return samples;
 }
 const UTF8_HEX = utf8Samples(3000, 20260702);
+const NORMALIZED_HEX = (() => {
+  const set = new Set();
+  for (const hexValue of UTF8_HEX.slice(0, 600)) {
+    const text = Buffer.from(hexValue, 'hex').toString('utf8');
+    for (const form of ['NFC', 'NFD', 'NFKC', 'NFKD']) {
+      set.add(Buffer.from(text.normalize(form)).toString('hex'));
+    }
+  }
+  return [...set];
+})();
 
 function mixedSamples(count, seed) {
   let s = seed >>> 0;
@@ -299,7 +309,12 @@ function fetchSamples(charset, collation, hexes) {
 for (const collation of COLLATIONS) {
   const hexes = new Set(UTF8_HEX);
   if (collation !== 'utf8mb4_0900_bin') {
-    for (const h of [...MIXED_HEX, ...DENSE_HEX, ...EXPANSION_HEX])
+    for (const h of [
+      ...MIXED_HEX,
+      ...DENSE_HEX,
+      ...EXPANSION_HEX,
+      ...NORMALIZED_HEX,
+    ])
       hexes.add(h);
   }
   out.utf8.push(...fetchSamples('utf8mb4', collation, [...hexes]));
@@ -430,10 +445,12 @@ function splitLevels(cp, hex) {
 
 const aiCiL1 = new Map(aiCiRows);
 const asCsRows = [];
+const asCsAll = new Map();
 const expectedAsCi = new Map();
 let asCsHanDropped = 0;
 for (const [cp, h] of fetchUca(UCA_AS_CS)) {
   const [l1, l2, l3] = splitLevels(cp, h);
+  asCsAll.set(cp, [l1, l2, l3]);
   if (l1 !== (aiCiL1.get(cp) ?? '')) {
     throw new Error(`U+${cp.toString(16)} as_cs level 1 differs from ai_ci`);
   }
@@ -488,6 +505,263 @@ for (const [cp, l1, l2, l3] of asCsRows) {
 }
 const asCsChunks = packChunks(Buffer.concat(asCsParts));
 
+const CANON_MAX = 0x10ffff;
+const CANON_COLLATIONS = { 1: UCA_AI_CI, 2: UCA_AS_CI, 3: UCA_AS_CS };
+const hex4 = (u) => u.toString(16).toUpperCase().padStart(4, '0');
+
+function unitsOf(hex) {
+  const units = [];
+  for (let i = 0; i < hex.length; i += 4) {
+    units.push(parseInt(hex.slice(i, i + 4), 16));
+  }
+  return units;
+}
+
+function utf8Length(cp) {
+  if (cp < 0x80) return 1;
+  if (cp < 0x800) return 2;
+  if (cp < 0x10000) return 3;
+  return 4;
+}
+
+function tokensOf(cp) {
+  const label = `U+${cp.toString(16)}`;
+  const [l1, l2, l3] = asCsAll.get(cp);
+  const primary = unitsOf(l1);
+  const secondary = unitsOf(l2);
+  const tertiary = unitsOf(l3);
+  if (secondary.length !== tertiary.length) {
+    throw new Error(`${label} secondary and tertiary counts differ`);
+  }
+  const tokens = [];
+  let next = 0;
+  for (let i = 0; i < secondary.length; i++) {
+    const s = secondary[i];
+    let p = 0;
+    if (s === 0x20) {
+      p = primary[next++];
+      if (p === undefined || p === 0) {
+        throw new Error(`${label} secondary space has no primary`);
+      }
+      if (p >= 0xfb00 && p < 0xfc00) {
+        const trail = primary[next++];
+        if (trail === undefined || trail < 0x8000) {
+          throw new Error(`${label} implicit primary has no trail`);
+        }
+        p = p * 0x10000 + trail;
+      }
+    }
+    tokens.push([p, s, tertiary[i]]);
+  }
+  if (next !== primary.length)
+    throw new Error(`${label} has unused primary units`);
+  return tokens;
+}
+
+function projectWeight(tokens, depth) {
+  const level1 = tokens
+    .filter(([p]) => p !== 0)
+    .map(([p]) =>
+      p > 0xffff ? hex4(Math.floor(p / 0x10000)) + hex4(p % 0x10000) : hex4(p)
+    )
+    .join('');
+  if (depth === 1) return level1;
+  const level2 = tokens.map(([, s]) => hex4(s)).join('');
+  if (depth === 2) return `${level1}0000${level2}`;
+  const level3 = tokens.map(([, , t]) => hex4(t)).join('');
+  return `${level1}0000${level2}0000${level3}`;
+}
+
+for (const [depthText, collation] of Object.entries(CANON_COLLATIONS)) {
+  for (const row of out.utf8) {
+    if (row.collation !== collation) continue;
+    const value = Buffer.from(row.value_hex, 'hex').toString('utf8');
+    const tokens = [];
+    for (const ch of value) tokens.push(...tokensOf(ch.codePointAt(0)));
+    if (projectWeight(tokens, Number(depthText)) !== row.weight_hex) {
+      throw new Error(
+        `Per-scalar projection of ${row.value_hex} differs from ${collation}`
+      );
+    }
+  }
+}
+
+function buildCanonical(depth) {
+  const ids = new Map();
+  const forward = new Array(CANON_MAX + 1);
+  const root = { terminal: -1, children: new Map() };
+  for (let cp = 0; cp <= CANON_MAX; cp++) {
+    if (cp >= 0xd800 && cp <= 0xdfff) continue;
+    const syms = [];
+    for (const [p, s, t] of tokensOf(cp)) {
+      if (depth === 1 && p === 0) continue;
+      const key =
+        depth === 1 ? `${p}` : depth === 2 ? `${p}:${s}` : `${p}:${s}:${t}`;
+      let id = ids.get(key);
+      if (id === undefined) {
+        id = ids.size;
+        ids.set(key, id);
+      }
+      syms.push(id);
+    }
+    if (syms.length === 0) continue;
+    forward[cp] = syms;
+    let node = root;
+    for (const id of syms) {
+      let child = node.children.get(id);
+      if (child === undefined) {
+        child = { terminal: -1, children: new Map() };
+        node.children.set(id, child);
+      }
+      node = child;
+    }
+    if (node.terminal < 0 || utf8Length(cp) < utf8Length(node.terminal)) {
+      node.terminal = cp;
+    }
+  }
+  for (let cp = 0; cp <= CANON_MAX; cp++) {
+    const syms = forward[cp];
+    if (syms === undefined) continue;
+    let node = root;
+    for (const id of syms) node = node.children.get(id);
+    if (node.terminal < 0 || utf8Length(node.terminal) > utf8Length(cp)) {
+      throw new Error(
+        `No dictionary spelling at or below cost for U+${cp.toString(16)}`
+      );
+    }
+  }
+  return { forward, root, symbolCount: ids.size };
+}
+
+function encodeCanonical({ forward, root }) {
+  const bytes = [];
+  const varint = (n) => {
+    let v = n;
+    while (v >= 0x80) {
+      bytes.push((v % 0x80) | 0x80);
+      v = Math.floor(v / 0x80);
+    }
+    bytes.push(v);
+  };
+  for (let cp = 0; cp <= CANON_MAX; cp++) {
+    const syms = forward[cp] ?? [];
+    varint(syms.length);
+    for (const id of syms) varint(id);
+  }
+  const order = [root];
+  for (let q = 0; q < order.length; q++) {
+    const node = order[q];
+    node.keys = [...node.children.keys()].sort((a, b) => a - b);
+    for (const k of node.keys) order.push(node.children.get(k));
+  }
+  varint(order.length);
+  for (const node of order) {
+    varint(node.terminal + 1);
+    varint(node.keys.length);
+    let prev = 0;
+    for (const k of node.keys) {
+      varint(k - prev);
+      prev = k;
+    }
+  }
+  return Buffer.from(bytes);
+}
+
+function decodeCanonical(buf) {
+  let pos = 0;
+  const varint = () => {
+    let n = 0;
+    let mul = 1;
+    let b;
+    do {
+      b = buf[pos++];
+      n += (b & 0x7f) * mul;
+      mul *= 0x80;
+    } while (b & 0x80);
+    return n;
+  };
+  const forward = new Array(CANON_MAX + 1);
+  for (let cp = 0; cp <= CANON_MAX; cp++) {
+    const count = varint();
+    if (count === 0) continue;
+    const syms = [];
+    for (let i = 0; i < count; i++) syms.push(varint());
+    forward[cp] = syms;
+  }
+  const nodeCount = varint();
+  const nodes = [];
+  for (let k = 0; k < nodeCount; k++) {
+    const terminal = varint() - 1;
+    const count = varint();
+    const keys = [];
+    let prev = 0;
+    for (let j = 0; j < count; j++) {
+      prev += varint();
+      keys.push(prev);
+    }
+    nodes.push({ terminal, keys });
+  }
+  if (pos !== buf.length)
+    throw new Error('canonical encoding has trailing bytes');
+  return { forward, nodes };
+}
+
+const canonicalBytes = {};
+for (const [depthText] of Object.entries(CANON_COLLATIONS)) {
+  const depth = Number(depthText);
+  const built = buildCanonical(depth);
+  const bytes = encodeCanonical(built);
+  const decoded = decodeCanonical(bytes);
+  for (let cp = 0; cp <= CANON_MAX; cp++) {
+    const want = built.forward[cp] ?? [];
+    const got = decoded.forward[cp] ?? [];
+    if (want.join(',') !== got.join(',')) {
+      throw new Error(
+        `Canonical forward table decode differs at U+${cp.toString(16)}`
+      );
+    }
+  }
+  const order = [built.root];
+  for (let q = 0; q < order.length; q++) {
+    for (const k of order[q].keys) order.push(order[q].children.get(k));
+  }
+  if (order.length !== decoded.nodes.length) {
+    throw new Error(
+      `Canonical trie decode has ${decoded.nodes.length} nodes, expected ${order.length}`
+    );
+  }
+  order.forEach((node, k) => {
+    const got = decoded.nodes[k];
+    if (
+      node.terminal !== got.terminal ||
+      node.keys.join(',') !== got.keys.join(',')
+    ) {
+      throw new Error(`Canonical trie decode differs at node ${k}`);
+    }
+  });
+  canonicalBytes[depth] = {
+    raw: bytes.length,
+    symbols: built.symbolCount,
+    nodes: order.length,
+    base64: packChunks(bytes),
+  };
+}
+const canonicalSource = [
+  `// Generated by scripts/dump-oracle.mjs from MySQL ${out.mysql_version} and Unicode ${process.versions.unicode}. Do not edit.`,
+  '',
+  "export const CANONICAL_MYSQL_VERSION = '" + out.mysql_version + "';",
+  "export const CANONICAL_UNICODE_VERSION = '" +
+    process.versions.unicode +
+    "';",
+  '',
+  ...Object.entries(canonicalBytes).flatMap(([depth, { base64 }]) => [
+    `export const CANONICAL_0900_DEPTH_${depth}_BASE64: string = [`,
+    ...base64,
+    "].join('');",
+    '',
+  ]),
+].join('\n');
+
 fs.mkdirSync(path.join(root, 'test/fixtures'), { recursive: true });
 fs.writeFileSync(
   path.join(root, 'src/generated/collation_weights.ts'),
@@ -520,4 +794,9 @@ fs.writeFileSync(
 
 console.log(
   `Wrote oracle for MySQL ${out.mysql_version}: ${out.ascii.length} ASCII rows, ${out.utf8.length} utf8 rows, ${asCsRows.length} utf8mb4_0900_as_cs code points (${asCsHanDropped} implicit Han dropped)`
+);
+
+fs.writeFileSync(
+  path.join(root, 'src/generated/canonical_0900.ts'),
+  canonicalSource + '\n'
 );

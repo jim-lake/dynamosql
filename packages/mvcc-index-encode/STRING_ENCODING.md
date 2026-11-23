@@ -17,6 +17,23 @@ The caller supplies a JavaScript string containing only ASCII characters for the
 
 Each ASCII key contains one byte per input character. The empty string produces an empty key, and a key can be a prefix of another key. The four utf8mb4 collations return self-delimiting frames.
 
+## Equality key
+
+`canonicalString(value: string, collation: CollationName): string` returns a primitive string whose `===` equality matches MySQL 8.4 equality under the collation. Use it directly as a `Set` element or `Map` key. For hashing, pass the string to `update(key, 'utf8')`. The result carries no order, so ordering uses `weightString`.
+
+The input domain matches `weightString`. The output is well-formed UTF-16 and is a collation-equivalent spelling of the input. Two inputs under the same collation produce equal keys exactly when their unpadded MySQL weight strings are identical. The key is opaque text. Passing a key back through `canonicalString` returns the same key.
+
+| Collation          | Returned key                                                     |
+| ------------------ | ---------------------------------------------------------------- |
+| ascii_bin          | The input                                                        |
+| ascii_general_ci   | The input uppercased                                             |
+| utf8mb4_0900_bin   | The input                                                        |
+| utf8mb4_0900_ai_ci | Shortest spelling of the primary symbols                         |
+| utf8mb4_0900_as_ci | Shortest spelling of the primary and secondary symbols           |
+| utf8mb4_0900_as_cs | Shortest spelling of the primary, secondary and tertiary symbols |
+
+The UCA spellings come from generated tables in `src/generated/canonical_0900.ts`. The shortest spelling is chosen by dynamic programming over symbol positions, with ties broken by the smaller end position and then the lower scalar value. The UTF-8 byte length of the key never exceeds the UTF-8 byte length of the input. NO PAD applies to every collation, so trailing spaces remain in the key.
+
 ## Worst-case frame size
 
 `M(n)` is the largest non-NULL `weightString` result in bytes for a value of at most `n` Unicode scalars. The formulas include all framing bits and final byte padding, and apply at `n = 0`.
