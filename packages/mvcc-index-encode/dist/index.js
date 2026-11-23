@@ -2131,6 +2131,7 @@ function utf8Length(cp) {
   return 4;
 }
 function ucaCanonical(value, depth) {
+  if (value === "") return "";
   const table = tableFor(depth);
   const symbols = [];
   for (const ch of value) {

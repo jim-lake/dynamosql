@@ -4,6 +4,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { constants, zstdCompressSync } from 'node:zlib';
+import { validateUcaRows } from './uca_rows.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -324,6 +325,43 @@ for (const collation of COLLATIONS) {
     ...fetchSamples('utf8mb4', collation, [...LONG_UNICODE_SAMPLES].map(hex))
   );
 }
+const FAMILY_WITNESSES = [
+  ['ﬃ', 'ffi'],
+  ['ạ́', 'ạ́'],
+  ['ཱི', 'ཱི'],
+];
+const FAMILY_CONTEXTS = [
+  ['', ''],
+  ['\0\0\0', ''],
+  ['', ' '],
+  ['x\0\0\0', ' '],
+];
+const familyAffixes = utf8Samples(NON_ASCII_HEX.length + 16, 20261123)
+  .slice(NON_ASCII_HEX.length)
+  .map((value) => Buffer.from(value, 'hex').toString('utf8'));
+for (let i = 0; i < familyAffixes.length; i += 2) {
+  FAMILY_CONTEXTS.push([familyAffixes[i], familyAffixes[i + 1]]);
+}
+const FAMILY_FORMS = ['NFC', 'NFD', 'NFKC', 'NFKD'];
+const FAMILY_HEX = (() => {
+  const set = new Set();
+  for (const [left, right] of FAMILY_WITNESSES) {
+    for (const side of [left, right]) {
+      for (const [prefix, suffix] of FAMILY_CONTEXTS) {
+        const text = prefix + side + suffix;
+        for (const form of [
+          text,
+          ...FAMILY_FORMS.map((f) => text.normalize(f)),
+        ])
+          set.add(hex(form));
+      }
+    }
+  }
+  return [...set];
+})();
+for (const collation of COLLATIONS) {
+  out.utf8.push(...fetchSamples('utf8mb4', collation, FAMILY_HEX));
+}
 for (const collation of ASCII_COLLATIONS) {
   out.ascii.push(
     ...fetchSamples('ascii', collation, [...ASCII_SAMPLES].map(hex))
@@ -406,8 +444,8 @@ function implicitHanWeight(cp) {
 function fetchUca(collation) {
   const rows = [];
   for (let i = 0; i < scalarValues.length; i += UCA_CHUNK) {
-    const sql = scalarValues
-      .slice(i, i + UCA_CHUNK)
+    const batch = scalarValues.slice(i, i + UCA_CHUNK);
+    const sql = batch
       .map((c) => {
         const literal = Buffer.from(String.fromCodePoint(c), 'utf8').toString(
           'hex'
@@ -415,7 +453,7 @@ function fetchUca(collation) {
         return `SELECT ${String(c)}, HEX(WEIGHT_STRING(_utf8mb4 X'${literal}' COLLATE ${collation}))`;
       })
       .join('\nUNION ALL\n');
-    for (const [c, h] of rowsOf(`${sql};`)) rows.push([Number(c), h]);
+    rows.push(...validateUcaRows(collation, batch, rowsOf(`${sql};`)));
   }
   return rows;
 }

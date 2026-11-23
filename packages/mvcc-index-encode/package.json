@@ -1,7 +1,7 @@
 {
   "name": "@dynamosql/mvcc-index-encode",
   "description": "Ordered MVCC primary-key and index encoding for DynamoSQL",
-  "version": "0.0.7",
+  "version": "0.0.9",
   "author": "github.com/jim-lake",
   "license": "MIT",
   "private": true,

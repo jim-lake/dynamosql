@@ -86,6 +86,12 @@ describe('canonicalString', () => {
     ).to.throw('unsupported');
   });
 
+  it('returns an empty key for empty input under every collation', () => {
+    for (const collation of COLLATION_NAMES) {
+      expect(canonicalString('', collation), collation).to.equal('');
+    }
+  });
+
   it('returns a primitive string for every collation', () => {
     for (const collation of COLLATION_NAMES) {
       const key = canonicalString('Ab', collation);

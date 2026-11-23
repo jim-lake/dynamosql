@@ -116,6 +116,7 @@ function utf8Length(cp: number): number {
 }
 
 function ucaCanonical(value: string, depth: Depth): string {
+  if (value === '') return '';
   const table = tableFor(depth);
   const symbols: number[] = [];
   for (const ch of value) {
