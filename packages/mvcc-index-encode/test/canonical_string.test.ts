@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { expect } from 'chai';
 import { describe, it } from 'mocha';
@@ -6,7 +7,7 @@ import {
   canonicalString,
   type CollationName,
 } from '../src/index';
-import { expectAscending, expectSameOrder, type OrderItem } from './order';
+import { expectAscending, expectSameOrder } from './order';
 
 interface OracleRow {
   collation: CollationName;
@@ -34,12 +35,6 @@ const storageInputs = JSON.parse(
   )
 ) as Record<CollationName, string[]>;
 
-const UCA_NAMES = [
-  'utf8mb4_0900_ai_ci',
-  'utf8mb4_0900_as_ci',
-  'utf8mb4_0900_as_cs',
-] as const;
-
 function labelBytes(label: number): Uint8Array {
   const out = Buffer.alloc(4);
   out.writeUInt32BE(label);
@@ -50,35 +45,34 @@ function fromHex(hex: string): string {
   return Buffer.from(hex, 'hex').toString('utf8');
 }
 
-function utf8Bytes(text: string): Uint8Array {
-  return Buffer.from(text, 'utf8');
-}
-
-function labelFirstOccurrence(keys: readonly string[]): number[] {
-  const labels = new Map<string, number>();
-  return keys.map((key) => {
-    let label = labels.get(key);
-    if (label === undefined) {
-      label = labels.size;
-      labels.set(key, label);
-    }
-    return label;
-  });
+function labelFirstOccurrence<Key>(
+  labels: Map<Key, number>,
+  key: Key
+): Uint8Array {
+  let label = labels.get(key);
+  if (label === undefined) {
+    label = labels.size;
+    labels.set(key, label);
+  }
+  return labelBytes(label);
 }
 
 function expectEqualityClasses(
   collation: CollationName,
-  values: readonly string[],
-  oracleClasses: readonly string[]
+  rows: readonly { value: string; oracleClass: string | number }[]
 ): void {
-  const keys = values.map((value) => canonicalString(value, collation));
-  const oracleLabels = labelFirstOccurrence(oracleClasses);
-  const keyLabels = labelFirstOccurrence(keys);
-  const items: OrderItem[] = values.map((value, i) => ({
-    id: `${collation} ${JSON.stringify(value)}`,
-    oracle: labelBytes(oracleLabels[i] ?? 0),
-    ours: labelBytes(keyLabels[i] ?? 0),
-  }));
+  const oracleLabels = new Map<string | number, number>();
+  const keyLabels = new Map<string, number>();
+  const items = rows.map(({ value, oracleClass }) => {
+    const id = `${collation} ${JSON.stringify(value)}`;
+    const key = canonicalString(value, collation);
+    expect(canonicalString(key, collation), id).to.equal(key);
+    return {
+      id,
+      oracle: labelFirstOccurrence(oracleLabels, oracleClass),
+      ours: labelFirstOccurrence(keyLabels, key),
+    };
+  });
   expectSameOrder(items);
 }
 
@@ -100,36 +94,41 @@ describe('canonicalString', () => {
     }
   });
 
-  for (const collation of UCA_NAMES) {
+  for (const collation of COLLATION_NAMES) {
     it(`matches MySQL equality classes for oracle samples under ${collation}`, () => {
-      const rows = oracle.utf8.filter((row) => row.collation === collation);
-      const values = rows.map((row) => fromHex(row.value_hex));
+      const corpus = collation.startsWith('ascii_')
+        ? oracle.ascii
+        : oracle.utf8;
+      const rows = corpus.filter((row) => row.collation === collation);
+      expect(rows.length).to.be.greaterThan(0);
       expectEqualityClasses(
         collation,
-        values,
-        rows.map((row) => row.weight_hex)
+        rows.map(({ value_hex, weight_hex }) => ({
+          value: fromHex(value_hex),
+          oracleClass: weight_hex,
+        }))
       );
     });
 
     it(`matches MySQL equality classes for storage samples under ${collation}`, () => {
       const values = storageInputs[collation];
       const reference = oracle.storage[collation];
+      const hash = createHash('sha256')
+        .update(JSON.stringify(values))
+        .digest('hex');
+      expect(values.length).to.be.greaterThan(0);
+      expect(reference.input_sha256).to.equal(hash);
       expect(reference.ranks).to.have.lengthOf(values.length);
+      const rankCount = new Set(reference.ranks).size;
       expectEqualityClasses(
         collation,
-        values,
-        reference.ranks.map((rank) => String(rank))
-      );
-    });
-  }
-
-  for (const collation of ['ascii_bin', 'ascii_general_ci'] as const) {
-    it(`matches MySQL equality classes for ASCII samples under ${collation}`, () => {
-      const rows = oracle.ascii.filter((row) => row.collation === collation);
-      expectEqualityClasses(
-        collation,
-        rows.map((row) => fromHex(row.value_hex)),
-        rows.map((row) => row.weight_hex)
+        values.map((value, i) => {
+          const rank = reference.ranks[i] as number;
+          const id = `${collation} rank for ${JSON.stringify(value)}`;
+          expect(Number.isInteger(rank), id).to.equal(true);
+          expect(rank, id).to.be.within(0, rankCount - 1);
+          return { value, oracleClass: rank };
+        })
       );
     });
   }
@@ -143,17 +142,23 @@ describe('canonicalString', () => {
     expect(rows).to.have.lengthOf(128);
     expectEqualityClasses(
       'ascii_general_ci',
-      rows.map((row) => fromHex(row.value_hex)),
-      rows.map((row) => row.weight_hex)
+      rows.map(({ value_hex, weight_hex }) => ({
+        value: fromHex(value_hex),
+        oracleClass: weight_hex,
+      }))
     );
   });
 
   it('keeps accent spellings distinct under utf8mb4_0900_bin', () => {
-    const composed = canonicalString('\u00e9', 'utf8mb4_0900_bin');
-    const decomposed = canonicalString('e\u0301', 'utf8mb4_0900_bin');
-    expect(composed).to.not.equal(decomposed);
-    expect(canonicalString('e', 'utf8mb4_0900_bin')).to.not.equal(composed);
-    expect(canonicalString('e', 'utf8mb4_0900_bin')).to.not.equal(decomposed);
+    const collation = 'utf8mb4_0900_bin';
+    const values = ['é', 'e\u0301', 'e'];
+    const keys = values.map((value) => canonicalString(value, collation));
+    const set = new Set(keys);
+    const map = new Map(keys.map((key, i) => [key, values[i]]));
+    expect(set.size).to.equal(values.length);
+    for (const value of values) {
+      expect(map.get(canonicalString(value, collation))).to.equal(value);
+    }
   });
 
   it('supports Set and Map lookup under utf8mb4_0900_as_cs', () => {
@@ -164,13 +169,19 @@ describe('canonicalString', () => {
     const lookup = canonicalString('e\u0301', collation);
     expect(set.has(lookup)).to.equal(true);
     expect(map.get(lookup)).to.equal('\u00e9');
-    expect(set.has(canonicalString('e', collation))).to.equal(false);
+    const plain = canonicalString('e', collation);
+    expect(set.has(plain)).to.equal(false);
+    expect(map.has(plain)).to.equal(false);
   });
 
-  it('is repeatable after an intervening call', () => {
-    const first = canonicalString('Straße', 'utf8mb4_0900_as_cs');
-    canonicalString('完全に別の文字列', 'utf8mb4_0900_as_cs');
-    expect(canonicalString('Straße', 'utf8mb4_0900_as_cs')).to.equal(first);
+  it('is repeatable after processing a long mixed-script string', () => {
+    const collation = 'utf8mb4_0900_as_cs';
+    const first = canonicalString('Straße', collation);
+    canonicalString(
+      '東京 e\u0301 ﬃ 한글 \ufdfa \u{20000}\u200d '.repeat(1024),
+      collation
+    );
+    expect(canonicalString('Straße', collation)).to.equal(first);
   });
 
   it('matches the MySQL relation for witness pairs at each strength', () => {
@@ -235,22 +246,14 @@ describe('canonicalString', () => {
       ['utf8mb4_0900_as_cs', 'A', 'a', false],
     ];
     for (const [collation, left, right, tied] of witnesses) {
-      const a = canonicalString(left, collation);
-      const b = canonicalString(right, collation);
-      if (tied) {
-        expectAscending(
-          [
-            [`${collation} ${JSON.stringify(left)}`, utf8Bytes(a)],
-            [`${collation} ${JSON.stringify(right)}`, utf8Bytes(b)],
-          ],
-          '='
-        );
-      } else {
-        expect(
-          a,
-          `${collation} ${JSON.stringify(left)} vs ${JSON.stringify(right)}`
-        ).to.not.equal(b);
-      }
+      const labels = new Map<string, number>();
+      expectAscending(
+        [left, right].map((value) => [
+          `${collation} ${JSON.stringify(value)}`,
+          labelFirstOccurrence(labels, canonicalString(value, collation)),
+        ]),
+        tied ? '=' : '<'
+      );
     }
   });
 });

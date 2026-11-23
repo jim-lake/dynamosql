@@ -19,9 +19,9 @@ Each ASCII key contains one byte per input character. The empty string produces 
 
 ## Equality key
 
-`canonicalString(value: string, collation: CollationName): string` returns a primitive string whose `===` equality matches MySQL 8.4 equality under the collation. Use it directly as a `Set` element or `Map` key. For hashing, pass the string to `update(key, 'utf8')`. The result carries no order, so ordering uses `weightString`.
+`canonicalString(value: string, collation: CollationName): string` returns a primitive string. Two keys under the same collation compare equal with `===` exactly when MySQL 8.4 returns identical unpadded `WEIGHT_STRING` bytes for their inputs. Use the key directly as a `Set` element or `Map` key. For hashing, pass the string to `update(key, 'utf8')`. For ordering, use `weightString`.
 
-The input domain matches `weightString`. The output is well-formed UTF-16 and is a collation-equivalent spelling of the input. Two inputs under the same collation produce equal keys exactly when their unpadded MySQL weight strings are identical. The key is opaque text. Passing a key back through `canonicalString` returns the same key.
+The input domain matches `weightString`. The output is well-formed UTF-16 and is a collation-equivalent spelling of the input. Preserve the key verbatim. Unicode normalization can merge keys the collation distinguishes, such as the keys for `a\u0301\u0323` and `a\u0323\u0301` under `utf8mb4_0900_as_cs`. Passing a key back through `canonicalString` under the same collation returns the same key.
 
 | Collation          | Returned key                                                     |
 | ------------------ | ---------------------------------------------------------------- |
@@ -32,7 +32,7 @@ The input domain matches `weightString`. The output is well-formed UTF-16 and is
 | utf8mb4_0900_as_ci | Shortest spelling of the primary and secondary symbols           |
 | utf8mb4_0900_as_cs | Shortest spelling of the primary, secondary and tertiary symbols |
 
-The UCA spellings come from generated tables in `src/generated/canonical_0900.ts`. The shortest spelling is chosen by dynamic programming over symbol positions, with ties broken by the smaller end position and then the lower scalar value. The UTF-8 byte length of the key never exceeds the UTF-8 byte length of the input. NO PAD applies to every collation, so trailing spaces remain in the key.
+The UCA spellings come from generated tables in `src/generated/canonical_0900.ts`. The shortest spelling is chosen by dynamic programming over symbol positions, with ties broken by the smaller end position and then the lower scalar value. The UTF-8 byte length of the key never exceeds the UTF-8 byte length of the input. NO PAD applies to every collation, so trailing spaces are significant.
 
 ## Worst-case frame size
 

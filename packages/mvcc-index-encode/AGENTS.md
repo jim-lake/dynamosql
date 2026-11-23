@@ -17,7 +17,7 @@ and the oracle fixtures are the source of truth for this package.
 
 ## Status
 
-Only `weightString` is implemented. Other value encodings
+`weightString` and `canonicalString` are implemented. Other value encodings
 (integers, DECIMAL, FLOAT/DOUBLE, temporal types) and the key/index builders are
 not written yet. `STRING_ENCODING.md` is the only description of the string
 key and framing formats; do not restate them here.
@@ -61,7 +61,7 @@ key and framing formats; do not restate them here.
   `test/helpers/`, and `scripts/` may import from `test/helpers/` and `src/`.
 - The oracle samples are seeded pseudo-random in `scripts/dump-oracle.mjs`. Add
   a new sample set there when a bug shows a shape it misses.
-- Regenerate, do not hand-edit, `generated/collation_weights.ts`, `generated/uca_0900_as_cs.ts`, and `oracle.json`. Run
+- Regenerate, do not hand-edit, `generated/collation_weights.ts`, `generated/uca_0900_as_cs.ts`, `generated/canonical_0900.ts`, and `oracle.json`. Run
   `node scripts/dump-oracle.mjs` against a local MySQL 8.4 server.
 - A MySQL 8.4 server is always available for oracle dumps and checks. Do not
   treat its absence as a blocker.

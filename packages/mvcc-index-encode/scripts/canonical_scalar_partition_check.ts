@@ -1,113 +1,81 @@
-import { execFileSync } from 'node:child_process';
-import { canonicalString, type CollationName } from '../src/index';
+import { canonicalString } from '../src/index';
+import { mysqlWeights } from './canonical_mysql_weights';
 
-const UCA: CollationName[] = [
+const UCA = [
   'utf8mb4_0900_ai_ci',
   'utf8mb4_0900_as_ci',
   'utf8mb4_0900_as_cs',
-];
+] as const;
 const BATCH = 4000;
 
-function scalars(): string[] {
-  const out: string[] = [];
-  for (let cp = 0; cp <= 0x10ffff; cp++) {
-    if (cp >= 0xd800 && cp <= 0xdfff) continue;
-    out.push(String.fromCodePoint(cp));
-  }
-  return out;
+function codePoints(text: string): string {
+  return Array.from(text, (ch) => `U+${ch.codePointAt(0)!.toString(16)}`).join(
+    ' '
+  );
 }
 
-function weights(texts: string[], collation: CollationName): string[] {
-  const sql = texts
-    .map(
-      (t, i) =>
-        `SELECT ${i}, HEX(WEIGHT_STRING(_utf8mb4 X'${Buffer.from(t, 'utf8').toString('hex')}' COLLATE ${collation}))`
-    )
-    .join(' UNION ALL ');
-  const out = execFileSync('mysql', ['-N', '-B'], {
-    input: sql + ' ORDER BY 1;',
-    encoding: 'utf8',
-    maxBuffer: 1 << 28,
-  });
-  const rows = out
-    .split('\n')
-    .filter((line) => line.length > 0)
-    .map((line) => line.split('\t')[1] ?? '');
-  if (rows.length !== texts.length)
-    throw new Error(
-      `MySQL returned ${rows.length} rows for ${texts.length} inputs`
-    );
-  return rows;
-}
-
-function labelFirstOccurrence(keys: readonly string[]): number[] {
-  const labels = new Map<string, number>();
-  return keys.map((key) => {
-    let label = labels.get(key);
-    if (label === undefined) {
-      label = labels.size;
-      labels.set(key, label);
-    }
-    return label;
-  });
-}
-
-const all = scalars();
-let failures = 0;
 for (const collation of UCA) {
-  const oracleIds: string[] = [];
-  const ours: string[] = [];
-  for (let start = 0; start < all.length; start += BATCH) {
-    const batch = all.slice(start, start + BATCH);
-    oracleIds.push(...weights(batch, collation));
-    ours.push(...batch.map((value) => canonicalString(value, collation)));
-  }
-  const oracleLabels = labelFirstOccurrence(oracleIds);
-  const keyLabels = labelFirstOccurrence(ours);
-  const oracleToKey = new Map<number, number>();
-  const keyToOracle = new Map<number, number>();
-  let splits = 0;
-  let merges = 0;
-  for (let i = 0; i < all.length; i++) {
-    const o = oracleLabels[i]!;
-    const k = keyLabels[i]!;
-    const seenK = oracleToKey.get(o);
-    if (seenK === undefined) oracleToKey.set(o, k);
-    else if (seenK !== k) {
-      splits++;
-      if (splits <= 5)
-        console.log(
-          'FALSE SPLIT',
-          collation,
-          `U+${all[i]!.codePointAt(0)!.toString(16)}`
-        );
+  const classFirst = new Map<string, string>();
+  const keyFirst = new Map<string, string>();
+  let checked = 0;
+  let changed = 0;
+  for (let start = 0; start <= 0x10ffff; start += BATCH) {
+    const inputs: string[] = [];
+    for (let cp = start; cp < start + BATCH && cp <= 0x10ffff; cp++) {
+      if (cp < 0xd800 || cp > 0xdfff) inputs.push(String.fromCodePoint(cp));
     }
-    const seenO = keyToOracle.get(k);
-    if (seenO === undefined) keyToOracle.set(k, o);
-    else if (seenO !== o) {
-      merges++;
-      if (merges <= 5)
-        console.log(
-          'FALSE MERGE',
-          collation,
-          `U+${all[i]!.codePointAt(0)!.toString(16)}`
+    const batch = `batch U+${start.toString(16)}`;
+    const expected = mysqlWeights(inputs, collation, `${batch} inputs`);
+    const keys = inputs.map((value) => canonicalString(value, collation));
+    const replacements = keys.filter((key, i) => key !== inputs[i]);
+    const replacementWeights = mysqlWeights(
+      replacements,
+      collation,
+      `${batch} keys`
+    );
+    let next = 0;
+    for (const [i, input] of inputs.entries()) {
+      const key = keys[i]!;
+      const id = expected[i]!;
+      if (
+        !key.isWellFormed() ||
+        Buffer.byteLength(key) > Buffer.byteLength(input)
+      ) {
+        throw new Error(
+          `${collation} invalid spelling ${codePoints(input)} -> ${codePoints(key)}`
         );
+      }
+      if (input !== key && replacementWeights[next++] !== id) {
+        throw new Error(
+          `${collation} spelling changes weight ${codePoints(input)} -> ${codePoints(key)}`
+        );
+      }
+      const byClass = classFirst.get(id);
+      const byKey = keyFirst.get(key);
+      if (byClass !== byKey) {
+        const oracleRepresentative =
+          byClass === undefined ? 'new' : codePoints(byClass);
+        const keyRepresentative =
+          byKey === undefined ? 'new' : codePoints(byKey);
+        throw new Error(
+          `${collation} ${codePoints(input)}: oracle class ${oracleRepresentative}, key class ${keyRepresentative}`
+        );
+      }
+      if (byClass === undefined) {
+        classFirst.set(id, input);
+        keyFirst.set(key, input);
+      }
     }
+    checked += inputs.length;
+    changed += replacements.length;
   }
-  failures += splits + merges;
   console.log(
     collation,
     'scalars',
-    all.length,
-    'oracle classes',
-    oracleToKey.size,
-    'key classes',
-    keyToOracle.size,
-    'splits',
-    splits,
-    'merges',
-    merges
+    checked,
+    'classes',
+    classFirst.size,
+    'changed spellings',
+    changed
   );
 }
-console.log(failures === 0 ? 'ok' : `${failures} failures`);
-process.exitCode = failures === 0 ? 0 : 1;

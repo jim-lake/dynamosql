@@ -6,11 +6,7 @@ import {
   CANONICAL_0900_DEPTH_3_BASE64,
 } from '../src/generated/canonical_0900';
 
-interface Tables {
-  forward: Map<number, number[]>;
-  nodeTerminal: number[];
-  edges: Map<number, number>[];
-}
+import { describe, sample, seed } from './canonical_probe_inputs';
 
 const COLLATIONS: [CollationName, string][] = [
   ['utf8mb4_0900_ai_ci', CANONICAL_0900_DEPTH_1_BASE64],
@@ -19,193 +15,212 @@ const COLLATIONS: [CollationName, string][] = [
 ];
 
 const MAX_SYMBOLS = Number(process.env.MAX_SYMBOLS ?? 24);
-const TOKENS = [
-  'é',
-  'e',
-  '́',
-  '̣',
-  'ﬃ',
-  'ffi',
-  'ff',
-  'ß',
-  'ss',
-  'ø',
-  'o',
-  'ཱི',
-  'ཱི',
-  '一',
-  '\u0000',
-  'ﷺ',
-  'A',
-  'a',
-  ' ',
-  '﻿',
-  '한',
-  '한',
-];
+const MAX_TOKENS = Number(process.env.MAX_TOKENS ?? 8);
+if (!Number.isSafeInteger(MAX_SYMBOLS) || MAX_SYMBOLS < 0) {
+  throw new Error('MAX_SYMBOLS must be a nonnegative integer');
+}
+if (!Number.isSafeInteger(MAX_TOKENS) || MAX_TOKENS < 1) {
+  throw new Error('MAX_TOKENS must be a positive integer');
+}
 
-function decode(base64: string): Tables {
-  const buf = zstdDecompressSync(Buffer.from(base64, 'base64'));
+function scanForward(
+  buffer: Buffer,
+  visit: (cp: number, symbols: number[]) => void
+) {
   let pos = 0;
-  const varint = (): number => {
+  function varint(): number {
     let n = 0;
     let mul = 1;
-    let b: number;
-    do {
-      b = buf[pos++] ?? 0;
-      n += (b & 0x7f) * mul;
+    for (;;) {
+      const byte = buffer[pos++];
+      if (byte === undefined)
+        throw new Error('incomplete canonical forward table');
+      n += (byte & 0x7f) * mul;
+      if (byte < 0x80) return n;
       mul *= 0x80;
-    } while (b & 0x80);
-    return n;
-  };
-  const forward = new Map<number, number[]>();
+    }
+  }
+
+  const row: number[] = [];
   for (let cp = 0; cp <= 0x10ffff; cp++) {
-    const count = varint();
-    if (count === 0) continue;
-    const syms: number[] = [];
-    for (let i = 0; i < count; i++) syms.push(varint());
-    forward.set(cp, syms);
+    row.length = varint();
+    for (let i = 0; i < row.length; i++) row[i] = varint();
+    visit(cp, row);
   }
-  const nodeCount = varint();
-  const nodeTerminal: number[] = [];
-  const edges: Map<number, number>[] = [];
-  for (let k = 0; k < nodeCount; k++) {
-    nodeTerminal.push(varint() - 1);
-    const count = varint();
-    const map = new Map<number, number>();
-    let prev = 0;
-    for (let j = 0; j < count; j++) {
-      prev += varint();
-      map.set(prev, 0);
-    }
-    edges.push(map);
-  }
-  let edgeIndex = 0;
-  const linked = edges.map((map) => {
-    for (const sym of map.keys()) {
-      map.set(sym, edgeIndex + 1);
-      edgeIndex++;
-    }
-    return map;
-  });
-  return { forward, nodeTerminal, edges: linked };
 }
 
 function utf8Length(cp: number): number {
   return cp < 0x80 ? 1 : cp < 0x800 ? 2 : cp < 0x10000 ? 3 : 4;
 }
 
-function symbolsOf(tables: Tables, text: string): number[] {
+function symbolsOf(forward: Map<number, number[]>, text: string): number[] {
   const out: number[] = [];
-  for (const ch of text)
-    out.push(...(tables.forward.get(ch.codePointAt(0)!) ?? []));
+  for (const ch of text) out.push(...forward.get(ch.codePointAt(0)!)!);
   return out;
 }
 
-function cheapest(tables: Tables, symbols: number[]): number {
-  const cost = new Array<number>(symbols.length + 1).fill(Infinity);
-  cost[symbols.length] = 0;
-  for (let i = symbols.length - 1; i >= 0; i--) {
-    let node = 0;
-    for (let j = i; j < symbols.length; j++) {
-      const next = tables.edges[node]!.get(symbols[j]!);
-      if (next === undefined) break;
-      node = next;
-      const cp = tables.nodeTerminal[node]!;
-      if (cp < 0) continue;
-      cost[i] = Math.min(cost[i]!, utf8Length(cp) + cost[j + 1]!);
-    }
-  }
-  return cost[0]!;
+interface Match {
+  end: number;
+  sequence: string;
 }
 
-function segmentationMinimum(tables: Tables, symbols: number[]): number {
-  const best = new Array<number>(symbols.length + 1).fill(Infinity);
-  best[symbols.length] = 0;
-  const walk = (i: number): number => {
-    if (i === symbols.length) return 0;
-    let min = Infinity;
-    let node = 0;
-    for (let j = i; j < symbols.length; j++) {
-      const next = tables.edges[node]!.get(symbols[j]!);
-      if (next === undefined) break;
-      node = next;
-      const cp = tables.nodeTerminal[node]!;
-      if (cp >= 0) {
-        const rest = walk(j + 1);
-        if (rest !== Infinity) min = Math.min(min, utf8Length(cp) + rest);
+function possibleMatches(symbols: number[]): Match[][] {
+  return symbols.map((_, start) => {
+    const matches: Match[] = [];
+    let sequence = '';
+    for (let end = start + 1; end <= symbols.length; end++) {
+      if (sequence) sequence += ',';
+      sequence += symbols[end - 1];
+      matches.push({ end, sequence });
+    }
+    return matches;
+  });
+}
+
+function enumerate(matches: Match[][], candidates: Map<string, number>) {
+  let minimum = Infinity;
+  let optimalPaths = 0;
+  let spelling = '';
+  let overlap = false;
+  const path: number[] = [];
+
+  function walk(start: number, cost: number): boolean {
+    if (start === matches.length) {
+      if (cost < minimum) {
+        minimum = cost;
+        optimalPaths = 0;
+        // Depth-first traversal visits shorter first matches before longer ones.
+        spelling = String.fromCodePoint(...path);
       }
+      if (cost === minimum) optimalPaths++;
+      return true;
     }
-    return min;
-  };
-  return walk(0);
-}
-
-function sample(count: number, seed: number): string[] {
-  let state = seed;
-  const next = (): number => {
-    state = (state * 1103515245 + 12345) & 0x7fffffff;
-    return state;
-  };
-  const out: string[] = [];
-  for (let i = 0; i < count; i++) {
-    const n = 1 + (next() % Number(process.env.MAX_TOKENS ?? 8));
-    let s = '';
-    for (let j = 0; j < n; j++) s += TOKENS[next() % TOKENS.length];
-    out.push(s);
+    let completions = 0;
+    for (const { end, sequence } of matches[start]) {
+      const cp = candidates.get(sequence);
+      if (cp === undefined) continue;
+      path.push(cp);
+      if (walk(end, cost + utf8Length(cp))) completions++;
+      path.pop();
+    }
+    if (completions > 1) overlap = true;
+    return completions > 0;
   }
-  return out;
+
+  walk(0, 0);
+  return { minimum, optimalPaths, spelling, overlap };
 }
 
+const inputs = sample(2000, MAX_TOKENS);
 let failures = 0;
-let checked = 0;
-let skipped = 0;
-const seed = Number(process.env.SEED ?? 20260523);
 for (const [collation, base64] of COLLATIONS) {
-  const tables = decode(base64);
-  for (const input of sample(2000, seed)) {
-    const symbols = symbolsOf(tables, input);
-    if (symbols.length > MAX_SYMBOLS) {
-      skipped++;
-      continue;
-    }
-    checked++;
-    const key = canonicalString(input, collation);
-    const keySymbols = symbolsOf(tables, key);
-    const produced = Buffer.byteLength(key, 'utf8');
-    const minimum = segmentationMinimum(tables, symbols);
-    const dpMinimum = cheapest(tables, symbols);
-    if (JSON.stringify(keySymbols) !== JSON.stringify(symbols)) {
+  const keys = inputs.map((input) => canonicalString(input, collation));
+  keys.forEach((key, i) => {
+    const input = inputs[i];
+    if (
+      !key.isWellFormed() ||
+      Buffer.byteLength(key) > Buffer.byteLength(input)
+    ) {
       failures++;
-      console.log(
-        'FAIL symbols',
+      console.error('FAIL key contract', {
+        seed,
         collation,
-        JSON.stringify(input),
-        JSON.stringify(key)
-      );
+        input: describe(input),
+        key: describe(key),
+        wellFormed: key.isWellFormed(),
+      });
     }
-    if (produced !== minimum || dpMinimum !== minimum) {
+  });
+  const needed = new Set<number>();
+  for (const text of [...inputs, ...keys]) {
+    for (const ch of text) needed.add(ch.codePointAt(0)!);
+  }
+  const buffer = zstdDecompressSync(Buffer.from(base64, 'base64'));
+  const forward = new Map<number, number[]>();
+  scanForward(buffer, (cp, symbols) => {
+    if (needed.has(cp)) forward.set(cp, [...symbols]);
+  });
+  const corpus = inputs.flatMap((input, i) => {
+    const symbols = symbolsOf(forward, input);
+    return symbols.length <= MAX_SYMBOLS
+      ? [{ input, key: keys[i], symbols, matches: possibleMatches(symbols) }]
+      : [];
+  });
+
+  const candidates = new Map<string, number>();
+  for (const { matches } of corpus) {
+    for (const row of matches) {
+      for (const { sequence } of row) candidates.set(sequence, -1);
+    }
+  }
+  scanForward(buffer, (cp, symbols) => {
+    if (symbols.length === 0 || (cp >= 0xd800 && cp <= 0xdfff)) return;
+    const sequence = symbols.join(',');
+    const previous = candidates.get(sequence);
+    if (
+      previous === -1 ||
+      (previous !== undefined && utf8Length(cp) < utf8Length(previous))
+    ) {
+      candidates.set(sequence, cp);
+    }
+  });
+  for (const [sequence, cp] of candidates) {
+    if (cp < 0) candidates.delete(sequence);
+  }
+
+  let overlapCount = 0;
+  let tieCount = 0;
+  const requiredWitness =
+    collation === 'utf8mb4_0900_ai_ci' ? 'ﬃ' : 'a\u0323\u0301';
+  for (const { input, key, symbols, matches } of corpus) {
+    const keySymbols = symbolsOf(forward, key);
+    const produced = Buffer.byteLength(key);
+    const { minimum, optimalPaths, spelling, overlap } = enumerate(
+      matches,
+      candidates
+    );
+    if (overlap) overlapCount++;
+    if (optimalPaths > 1) tieCount++;
+    if (input === requiredWitness && (!overlap || optimalPaths <= 1)) {
       failures++;
-      console.log(
-        'FAIL minimum',
+      console.error('FAIL overlap and tie witness', {
+        seed,
         collation,
-        JSON.stringify(input),
-        JSON.stringify(key),
+        input: describe(input),
+        overlap,
+        optimalPaths,
+      });
+    }
+    if (
+      keySymbols.join(',') !== symbols.join(',') ||
+      produced !== minimum ||
+      key !== spelling
+    ) {
+      failures++;
+      console.error('FAIL spelling', {
+        seed,
+        collation,
+        input: describe(input),
+        key: describe(key),
         produced,
         minimum,
-        dpMinimum
-      );
+        optimalPaths,
+        expected: describe(spelling),
+      });
     }
   }
+  console.log({
+    seed,
+    collation,
+    distinctChecked: corpus.length,
+    skipped: inputs.length - corpus.length,
+    keyContractChecks: keys.length,
+    overlapCount,
+    tieCount,
+    overlapAndTieWitness: corpus.some(({ input }) => input === requiredWitness)
+      ? describe(requiredWitness)
+      : undefined,
+  });
 }
-console.log(
-  'minimum checked',
-  checked,
-  'skipped',
-  skipped,
-  'failures',
-  failures,
-  'seed',
-  seed
-);
+console.log({ seed, failures });
 process.exitCode = failures === 0 ? 0 : 1;
