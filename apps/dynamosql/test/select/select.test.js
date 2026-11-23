@@ -13,6 +13,11 @@ describe('Select', function () {
     path.join(__dirname, 'distinct_function_types.sql'),
     { verify_field_types: true }
   );
+  runTests(
+    'distinct_function_json_types.sql',
+    path.join(__dirname, 'distinct_function_json_types.sql'),
+    { verify_field_types: true }
+  );
   runTests('group.sql', path.join(__dirname, 'group.sql'));
   runTests('limit.sql', path.join(__dirname, 'limit.sql'));
   runTests('where.sql', path.join(__dirname, 'where.sql'));
