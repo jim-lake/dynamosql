@@ -77,12 +77,13 @@ export class SQLTime {
     return new SQLDateTime({ time, decimals: decimals ?? this._decimals });
   }
   toNumber(): number {
-    let seconds = this._time;
+    let seconds = Math.abs(this._time);
     const hours = Math.floor(seconds / HOUR);
     seconds -= hours * HOUR;
     const minutes = Math.floor(seconds / MINUTE);
     seconds -= minutes * MINUTE;
-    return hours * 10000 + minutes * 100 + seconds;
+    const magnitude = hours * 10000 + minutes * 100 + seconds;
+    return this._time < 0 ? -magnitude : magnitude;
   }
   gt(other: SQLTime): boolean {
     return this._time > other.getTime();

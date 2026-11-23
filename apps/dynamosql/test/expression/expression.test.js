@@ -116,6 +116,9 @@ describe('Expression', function () {
     path.join(__dirname, 'function_edge_cases.sql'),
     { verify_field_types: true }
   );
+  runTests('function_abs.sql', path.join(__dirname, 'function_abs.sql'), {
+    verify_field_types: true,
+  });
   runTests(
     'function_hex_round.sql',
     path.join(__dirname, 'function_hex_round.sql'),

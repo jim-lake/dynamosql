@@ -5,7 +5,7 @@ const MONTH_MULT = 100;
 const DAY_MULT = 1;
 const HOUR_MULT = 10000;
 const MINUTE_MULT = 100;
-const DATE_TIME_MULT = 10000;
+const DATE_TIME_MULT = 1000000;
 
 export interface SQLDateTimeConstructorParams {
   time: bigint | number;

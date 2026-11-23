@@ -13,12 +13,27 @@ export function abs(expr: Function, state: EvaluationState): EvaluationResult {
   const result = getValue(expr.args.value[0], state);
   result.name = `ABS(${result.name})`;
   if (!result.err && result.value !== null) {
-    const num = convertNum(result.value);
+    const num =
+      result.type === 'buffer'
+        ? parseInt(
+            Buffer.from(result.value as Uint8Array).toString('hex') || '0',
+            16
+          )
+        : convertNum(result.value);
     result.value = num !== null ? Math.abs(num) : null;
-    if (result.type === 'string') {
-      result.type = 'double';
-    } else if (result.type === 'bool') {
-      result.type = 'longlong';
+    switch (result.type) {
+      case 'bool':
+      case 'long':
+      case 'year':
+        result.type = 'longlong';
+        break;
+      case 'string':
+      case 'buffer':
+      case 'date':
+      case 'datetime':
+      case 'time':
+        result.type = 'double';
+        break;
     }
   } else {
     result.type = 'double';
