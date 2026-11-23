@@ -88,7 +88,10 @@ function buildDense(base64: string): Dense {
   let ei = 0;
   for (let cp = 0; cp <= CP_MAX; cp++) {
     fwdStart[cp] = fwd.length;
-    while (ri < runCount && (runCp[ri] as number) + (runLen[ri] as number) <= cp) {
+    while (
+      ri < runCount &&
+      (runCp[ri] as number) + (runLen[ri] as number) <= cp
+    ) {
       ri++;
     }
     if (ri < runCount && cp >= (runCp[ri] as number)) {
@@ -97,7 +100,11 @@ function buildDense(base64: string): Dense {
     }
     while (ei < rowCount && (rowCp[ei] as number) < cp) ei++;
     if (ei < rowCount && rowCp[ei] === cp) {
-      for (let k = rowStart[ei] as number; k < (rowStart[ei + 1] as number); k++) {
+      for (
+        let k = rowStart[ei] as number;
+        k < (rowStart[ei + 1] as number);
+        k++
+      ) {
         fwd.push(rowSyms[k] as number);
       }
     }

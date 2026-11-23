@@ -29,9 +29,11 @@ key and framing formats; do not restate them here.
 - Collations: only `ascii_bin`, `ascii_general_ci`, `utf8mb4_0900_bin`,
   `utf8mb4_0900_ai_ci`, `utf8mb4_0900_as_ci`, and `utf8mb4_0900_as_cs`. Do not
   add others without an oracle check.
-- The `as_cs` and `as_ci` collations share the table in
-  `generated/uca_0900_as_cs.ts`. The dump asserts the relationship between
-  their levels.
+- For `weightString`, the three UCA collations share the weight table in
+  `src/generated/uca_0900_as_cs.ts`. The dump checks the active levels against
+  MySQL at each strength. For `canonicalString`, the per-strength tables are in
+  `src/generated/canonical_0900.ts`. Package size and retained table memory
+  take priority over warm-call throughput for this reader.
 - Do not rely on the key matching `WEIGHT_STRING` for `as_cs` and `as_ci`.
   The format may change freely. There is no backward compatibility requirement,
   and stored keys need no migration.
@@ -43,7 +45,7 @@ key and framing formats; do not restate them here.
   match, the test must fail on any byte difference. For work that preserves
   the format, keep the version and saved sample intact and fix any unexpected
   difference in the encoder.
-- When intentionally changing the storage format, increment `STORAGE_VERSION`
+- When intentionally changing the ordered-key storage format, increment `STORAGE_VERSION`
   in `src/index.ts`. Keep the existing sample at its recorded version. A
   version mismatch skips the storage sample test on every run until a new
   sample is explicitly saved for the current version. Tests, builds, and
@@ -61,8 +63,9 @@ key and framing formats; do not restate them here.
   `test/helpers/`, and `scripts/` may import from `test/helpers/` and `src/`.
 - The oracle samples are seeded pseudo-random in `scripts/dump-oracle.mjs`. Add
   a new sample set there when a bug shows a shape it misses.
-- Regenerate, do not hand-edit, `generated/collation_weights.ts`, `generated/uca_0900_as_cs.ts`, `generated/canonical_0900.ts`, and `oracle.json`. Run
-  `node scripts/dump-oracle.mjs` against a local MySQL 8.4 server.
+- Regenerate the tables in `src/generated/` and the fixture
+  `test/fixtures/oracle.json` with `node scripts/dump-oracle.mjs` against
+  local MySQL 8.4. Do not hand-edit these files.
 - A MySQL 8.4 server is always available for oracle dumps and checks. Do not
   treat its absence as a blocker.
 - No history in documents. Never tell stories, describe how the code got where it is, or record superseded values, dropped approaches, or earlier measurements. History lives only in git. Every other document states only the present.
@@ -86,3 +89,13 @@ Run from `packages/mvcc-index-encode/`:
 | Type check | `npm run ts:check` |
 | Test       | `npm test`         |
 | Lint       | `npm run lint`     |
+
+For `canonicalString` changes, the MySQL probes check every Unicode scalar and
+seeded whole-string families at all three UCA strengths. The offline
+minimum-spelling probe checks UTF-8 cost and tie breaks on short symbol streams.
+
+```sh
+node --import tsx scripts/canonical_scalar_partition_check.ts
+node --import tsx scripts/canonical_family_probe.ts
+node --import tsx scripts/canonical_minimum_probe.ts
+```

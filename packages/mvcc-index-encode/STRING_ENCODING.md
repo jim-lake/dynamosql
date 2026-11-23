@@ -32,7 +32,9 @@ The input domain matches `weightString`. The output is well-formed UTF-16 and is
 | utf8mb4_0900_as_ci | Shortest spelling of the primary and secondary symbols           |
 | utf8mb4_0900_as_cs | Shortest spelling of the primary, secondary and tertiary symbols |
 
-The UCA spellings come from generated tables in `src/generated/canonical_0900.ts`. The shortest spelling is chosen by dynamic programming over symbol positions, with ties broken by the smaller end position and then the lower scalar value. The UTF-8 byte length of the key never exceeds the UTF-8 byte length of the input. NO PAD applies to every collation, so trailing spaces are significant.
+For UCA collations, the encoder reads the input scalars in order and concatenates their comparison symbols. It chooses a spelling of that stream with the fewest UTF-8 bytes. A spelling can span input scalar boundaries, so `é` and `e\u0301` yield the same key at all three UCA strengths. On a tie, the encoder prefers the first output scalar that consumes fewer symbols, then the lower scalar value. Each nonempty scalar mapping has an output spelling at least as short as its input scalar, and ignorable scalars can be omitted. Choosing the minimum therefore keeps the key within the input's UTF-8 byte length. [Equality-key encoder](src/canonical_string.ts)
+
+The first nonempty UCA call decodes and caches the table for its strength. When a scalar maps to one symbol and that symbol occurs nowhere else in the table, the mapping works in both directions. Consecutive scalar and symbol IDs are stored as a range. Other nonempty mappings use explicit rows for forward lookup and a trie for finding output spellings. [Table generator](scripts/dump-oracle.mjs)
 
 ## Worst-case frame size
 

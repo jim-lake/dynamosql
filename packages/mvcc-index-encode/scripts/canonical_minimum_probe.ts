@@ -65,7 +65,10 @@ function scanForward(
   let ri = 0;
   let row = 0;
   for (let c = 0; c <= 0x10ffff; c++) {
-    while (ri < runs.length && (runs[ri]?.[0] ?? 0) + (runs[ri]?.[2] ?? 0) <= c) {
+    while (
+      ri < runs.length &&
+      (runs[ri]?.[0] ?? 0) + (runs[ri]?.[2] ?? 0) <= c
+    ) {
       ri++;
     }
     const current = runs[ri];

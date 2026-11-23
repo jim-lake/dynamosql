@@ -55,7 +55,10 @@ function seededStrings(seed: number, count: number): string[] {
     const len = 1 + Math.floor(rand() * 10);
     let text = '';
     for (let k = 0; k < len; k++) {
-      const [lo, hi] = ranges[Math.floor(rand() * ranges.length)] as [number, number];
+      const [lo, hi] = ranges[Math.floor(rand() * ranges.length)] as [
+        number,
+        number,
+      ];
       text += String.fromCodePoint(lo + Math.floor(rand() * (hi - lo + 1)));
     }
     out.push(text);
@@ -65,7 +68,10 @@ function seededStrings(seed: number, count: number): string[] {
 
 function corpus(collation: CollationName): string[] {
   const oracle = JSON.parse(
-    readFileSync(new URL('../test/fixtures/oracle.json', import.meta.url), 'utf8')
+    readFileSync(
+      new URL('../test/fixtures/oracle.json', import.meta.url),
+      'utf8'
+    )
   );
   const storage = JSON.parse(
     readFileSync(
@@ -77,7 +83,11 @@ function corpus(collation: CollationName): string[] {
     .filter((r) => r.collation === collation)
     .map((r) => Buffer.from(r.value_hex, 'hex').toString('utf8'));
   const fromStorage: string[] = storage[collation] ?? [];
-  return [...fromOracle, ...fromStorage, ...seededStrings(20260523, RANDOM_VALUES)];
+  return [
+    ...fromOracle,
+    ...fromStorage,
+    ...seededStrings(20260523, RANDOM_VALUES),
+  ];
 }
 
 function median(values: number[]): number {
@@ -88,7 +98,10 @@ function median(values: number[]): number {
     : ((sorted[mid - 1] as number) + (sorted[mid] as number)) / 2;
 }
 
-async function worker(entryArg: string, collation: CollationName): Promise<void> {
+async function worker(
+  entryArg: string,
+  collation: CollationName
+): Promise<void> {
   const gc = globalThis.gc;
   if (gc === undefined) throw new Error('worker requires --expose-gc');
 
@@ -170,7 +183,9 @@ function driver(entries: string[], runs: number): void {
   for (const collation of COLLATIONS) {
     const digests = new Set(
       entries.flatMap((entry) =>
-        (samples.get(`${entry} ${collation}`) ?? []).map((row) => row.outputSha256)
+        (samples.get(`${entry} ${collation}`) ?? []).map(
+          (row) => row.outputSha256
+        )
       )
     );
     if (digests.size !== 1) {
@@ -202,7 +217,8 @@ function driver(entries: string[], runs: number): void {
 const args = process.argv.slice(2);
 if (args[0] === 'worker') {
   const [, entry, collation] = args;
-  if (!entry || !collation) throw new Error('usage: worker <entry> <collation>');
+  if (!entry || !collation)
+    throw new Error('usage: worker <entry> <collation>');
   await worker(entry, collation as CollationName);
 } else {
   const [entryA, entryB, runArg = '5'] = args;

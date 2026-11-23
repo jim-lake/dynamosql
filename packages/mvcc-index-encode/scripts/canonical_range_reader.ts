@@ -291,7 +291,10 @@ function fuzzValues(reader: RangeReader, count: number): string[] {
 
 function corpora(collation: CollationName): Record<string, string[]> {
   const oracle = JSON.parse(
-    readFileSync(new URL('../test/fixtures/oracle.json', import.meta.url), 'utf8')
+    readFileSync(
+      new URL('../test/fixtures/oracle.json', import.meta.url),
+      'utf8'
+    )
   );
   const storage = JSON.parse(
     readFileSync(
@@ -304,12 +307,7 @@ function corpora(collation: CollationName): Record<string, string[]> {
     latin: ['Crème Brûlée, Straße', 'résumé', 'naïve café'],
     han: ['東京都千代田区', '中華人民共和国'],
     mixed: ['Ünïcode 東京 ﬃ ffi 가나다', 'ẹ́ ß ø ı'],
-    overlap: [
-      'Crèmé résumé­ ',
-      'a​b東́京ﬃ ',
-      'ﷺaø̈ß‍',
-      'Ab́Ab́  ',
-    ],
+    overlap: ['Crèmé résumé­ ', 'a​b東́京ﬃ ', 'ﷺaø̈ß‍', 'Ab́Ab́  '],
     expansion: ['ﷺ'.repeat(32), 'ﬃ'.repeat(40)],
     oracle: oracle.utf8
       .filter((r: { collation: string }) => r.collation === collation)
@@ -327,7 +325,9 @@ function sourceOf(collation: CollationName): string {
 }
 
 function readerFor(collation: CollationName): RangeReader {
-  return decodeCandidate(zstdDecompressSync(Buffer.from(sourceOf(collation), 'base64')));
+  return decodeCandidate(
+    zstdDecompressSync(Buffer.from(sourceOf(collation), 'base64'))
+  );
 }
 
 function verify(): void {
