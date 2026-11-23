@@ -671,118 +671,270 @@ function buildCanonical(depth) {
   return { forward, root, symbolCount: ids.size };
 }
 
-function encodeCanonical({ forward, root }) {
+function writer() {
   const bytes = [];
-  const varint = (n) => {
-    let v = n;
-    while (v >= 0x80) {
-      bytes.push((v % 0x80) | 0x80);
-      v = Math.floor(v / 0x80);
-    }
-    bytes.push(v);
+  return {
+    bytes,
+    varint(n) {
+      let v = n;
+      while (v >= 0x80) {
+        bytes.push((v % 0x80) | 0x80);
+        v = Math.floor(v / 0x80);
+      }
+      bytes.push(v);
+    },
   };
-  for (let cp = 0; cp <= CANON_MAX; cp++) {
-    const syms = forward[cp] ?? [];
-    varint(syms.length);
-    for (const id of syms) varint(id);
+}
+
+function selectRuns(forward) {
+  let maxSym = 0;
+  for (const syms of forward) {
+    if (syms) for (const s of syms) if (s > maxSym) maxSym = s;
   }
+  const occurrences = new Uint32Array(maxSym + 1);
+  for (const syms of forward) {
+    if (syms) for (const s of syms) occurrences[s]++;
+  }
+  const runs = [];
+  let last;
+  for (let cp = 0; cp <= CANON_MAX; cp++) {
+    const syms = forward[cp];
+    if (syms === undefined || syms.length !== 1) continue;
+    const sym = syms[0];
+    if (occurrences[sym] !== 1) continue;
+    if (last && cp === last.cp + last.len && sym === last.sym + last.len) {
+      last.len++;
+    } else {
+      last = { cp, sym, len: 1 };
+      runs.push(last);
+    }
+  }
+  return runs;
+}
+
+function buildRowTrie(rows) {
+  const root = { terminal: -1, children: new Map() };
+  for (const { cp, syms } of rows) {
+    let node = root;
+    for (const id of syms) {
+      let child = node.children.get(id);
+      if (child === undefined) {
+        child = { terminal: -1, children: new Map() };
+        node.children.set(id, child);
+      }
+      node = child;
+    }
+    if (node.terminal < 0 || utf8Length(cp) < utf8Length(node.terminal)) {
+      node.terminal = cp;
+    }
+  }
+  return root;
+}
+
+function serializeCandidate(runs, rows, root) {
+  const w = writer();
+  w.varint(runs.length);
+  for (const { cp, sym, len } of runs) {
+    w.varint(cp);
+    w.varint(sym);
+    w.varint(len);
+  }
+  w.varint(rows.length);
+  let prevCp = 0;
+  for (const { cp } of rows) {
+    w.varint(cp - prevCp);
+    prevCp = cp;
+  }
+  for (const { syms } of rows) w.varint(syms.length);
+  for (const { syms } of rows) for (const id of syms) w.varint(id);
   const order = [root];
   for (let q = 0; q < order.length; q++) {
     const node = order[q];
     node.keys = [...node.children.keys()].sort((a, b) => a - b);
     for (const k of node.keys) order.push(node.children.get(k));
   }
-  varint(order.length);
+  w.varint(order.length);
   for (const node of order) {
-    varint(node.terminal + 1);
-    varint(node.keys.length);
+    w.varint(node.terminal + 1);
+    w.varint(node.keys.length);
     let prev = 0;
     for (const k of node.keys) {
-      varint(k - prev);
+      w.varint(k - prev);
       prev = k;
     }
   }
-  return Buffer.from(bytes);
+  return Buffer.from(w.bytes);
 }
 
-function decodeCanonical(buf) {
+function decodeCandidate(buf) {
   let pos = 0;
   const varint = () => {
     let n = 0;
     let mul = 1;
-    let b;
-    do {
-      b = buf[pos++];
-      n += (b & 0x7f) * mul;
+    for (;;) {
+      const byte = buf[pos++];
+      if (byte === undefined) throw new Error('truncated canonical payload');
+      n += (byte & 0x7f) * mul;
+      if (byte < 0x80) return n;
       mul *= 0x80;
-    } while (b & 0x80);
-    return n;
+    }
   };
-  const forward = new Array(CANON_MAX + 1);
-  for (let cp = 0; cp <= CANON_MAX; cp++) {
-    const count = varint();
-    if (count === 0) continue;
-    const syms = [];
-    for (let i = 0; i < count; i++) syms.push(varint());
-    forward[cp] = syms;
+  const runCount = varint();
+  const runCp = new Uint32Array(runCount);
+  const runSym = new Uint32Array(runCount);
+  const runLen = new Uint32Array(runCount);
+  for (let i = 0; i < runCount; i++) {
+    runCp[i] = varint();
+    runSym[i] = varint();
+    runLen[i] = varint();
   }
+  const rowCount = varint();
+  const rowCp = new Uint32Array(rowCount);
+  let prevCp = 0;
+  for (let i = 0; i < rowCount; i++) {
+    prevCp += varint();
+    rowCp[i] = prevCp;
+  }
+  const rowStart = new Uint32Array(rowCount + 1);
+  for (let i = 0; i < rowCount; i++) rowStart[i + 1] = rowStart[i] + varint();
+  const rowSyms = new Uint32Array(rowStart[rowCount]);
+  for (let k = 0; k < rowSyms.length; k++) rowSyms[k] = varint();
   const nodeCount = varint();
-  const nodes = [];
+  const nodeTerminal = new Int32Array(nodeCount);
+  const nodeStart = new Uint32Array(nodeCount + 1);
+  const edges = [];
   for (let k = 0; k < nodeCount; k++) {
-    const terminal = varint() - 1;
+    nodeTerminal[k] = varint() - 1;
     const count = varint();
-    const keys = [];
+    nodeStart[k] = edges.length;
     let prev = 0;
     for (let j = 0; j < count; j++) {
       prev += varint();
-      keys.push(prev);
+      edges.push(prev);
     }
-    nodes.push({ terminal, keys });
   }
+  nodeStart[nodeCount] = edges.length;
   if (pos !== buf.length)
-    throw new Error('canonical encoding has trailing bytes');
-  return { forward, nodes };
+    throw new Error('trailing bytes in canonical payload');
+  return {
+    runCp,
+    runSym,
+    runLen,
+    rowCp,
+    rowStart,
+    rowSyms,
+    nodeTerminal,
+    nodeStart,
+    edgeSym: Uint32Array.from(edges),
+  };
+}
+
+function decodedChild(r, node, sym) {
+  const end = r.nodeStart[node + 1];
+  let lo = r.nodeStart[node];
+  let hi = end;
+  while (lo < hi) {
+    const mid = (lo + hi) >>> 1;
+    if (r.edgeSym[mid] < sym) lo = mid + 1;
+    else hi = mid;
+  }
+  return lo < end && r.edgeSym[lo] === sym ? lo + 1 : -1;
+}
+
+function builtTerminal(root, path) {
+  let node = root;
+  for (const sym of path) {
+    node = node.children.get(sym);
+    if (node === undefined) return -1;
+  }
+  return node.terminal;
+}
+
+function verifyCanonical(built, decoded) {
+  const rows = new Array(CANON_MAX + 1);
+  const runSymToCp = new Map();
+  for (let i = 0; i < decoded.runCp.length; i++) {
+    for (let k = 0; k < decoded.runLen[i]; k++) {
+      const cp = decoded.runCp[i] + k;
+      if (rows[cp] !== undefined)
+        throw new Error(`duplicate row at U+${cp.toString(16)}`);
+      rows[cp] = [decoded.runSym[i] + k];
+      runSymToCp.set(decoded.runSym[i] + k, cp);
+    }
+  }
+  for (let i = 0; i < decoded.rowCp.length; i++) {
+    const cp = decoded.rowCp[i];
+    if (rows[cp] !== undefined)
+      throw new Error(`duplicate row at U+${cp.toString(16)}`);
+    rows[cp] = Array.from(
+      decoded.rowSyms.subarray(decoded.rowStart[i], decoded.rowStart[i + 1])
+    );
+  }
+  for (let cp = 0; cp <= CANON_MAX; cp++) {
+    const want = (built.forward[cp] ?? []).join(',');
+    const got = (rows[cp] ?? []).join(',');
+    if (want !== got) {
+      throw new Error(`Canonical forward row differs at U+${cp.toString(16)}`);
+    }
+  }
+
+  const lookup = (path) => {
+    if (path.length === 1 && runSymToCp.has(path[0])) {
+      return runSymToCp.get(path[0]);
+    }
+    let node = 0;
+    for (const sym of path) {
+      node = decodedChild(decoded, node, sym);
+      if (node < 0) return -1;
+    }
+    return decoded.nodeTerminal[node];
+  };
+  const builtStack = [[built.root, []]];
+  while (builtStack.length > 0) {
+    const [node, path] = builtStack.pop();
+    if (node.terminal >= 0 && lookup(path) !== node.terminal) {
+      throw new Error(
+        `Canonical reverse terminal differs at path ${path.join(',')}`
+      );
+    }
+    for (const [sym, child] of node.children) {
+      builtStack.push([child, [...path, sym]]);
+    }
+  }
+  const decodedStack = [[0, []]];
+  while (decodedStack.length > 0) {
+    const [node, path] = decodedStack.pop();
+    const cp = decoded.nodeTerminal[node];
+    if (cp >= 0 && builtTerminal(built.root, path) !== cp) {
+      throw new Error(
+        `Canonical decoded terminal differs at path ${path.join(',')}`
+      );
+    }
+    for (
+      let e = decoded.nodeStart[node];
+      e < decoded.nodeStart[node + 1];
+      e++
+    ) {
+      decodedStack.push([e + 1, [...path, decoded.edgeSym[e]]]);
+    }
+  }
 }
 
 const canonicalBytes = {};
 for (const [depthText] of Object.entries(CANON_COLLATIONS)) {
   const depth = Number(depthText);
   const built = buildCanonical(depth);
-  const bytes = encodeCanonical(built);
-  const decoded = decodeCanonical(bytes);
+  const runs = selectRuns(built.forward);
+  const inRun = new Uint8Array(CANON_MAX + 1);
+  for (const { cp, len } of runs) inRun.fill(1, cp, cp + len);
+  const rows = [];
   for (let cp = 0; cp <= CANON_MAX; cp++) {
-    const want = built.forward[cp] ?? [];
-    const got = decoded.forward[cp] ?? [];
-    if (want.join(',') !== got.join(',')) {
-      throw new Error(
-        `Canonical forward table decode differs at U+${cp.toString(16)}`
-      );
-    }
+    const syms = built.forward[cp];
+    if (inRun[cp] === 0 && syms !== undefined) rows.push({ cp, syms });
   }
-  const order = [built.root];
-  for (let q = 0; q < order.length; q++) {
-    for (const k of order[q].keys) order.push(order[q].children.get(k));
-  }
-  if (order.length !== decoded.nodes.length) {
-    throw new Error(
-      `Canonical trie decode has ${decoded.nodes.length} nodes, expected ${order.length}`
-    );
-  }
-  order.forEach((node, k) => {
-    const got = decoded.nodes[k];
-    if (
-      node.terminal !== got.terminal ||
-      node.keys.join(',') !== got.keys.join(',')
-    ) {
-      throw new Error(`Canonical trie decode differs at node ${k}`);
-    }
-  });
-  canonicalBytes[depth] = {
-    raw: bytes.length,
-    symbols: built.symbolCount,
-    nodes: order.length,
-    base64: packChunks(bytes),
-  };
+  const bytes = serializeCandidate(runs, rows, buildRowTrie(rows));
+  verifyCanonical(built, decodeCandidate(bytes));
+  canonicalBytes[depth] = { base64: packChunks(bytes) };
 }
 const canonicalSource = [
   `// Generated by scripts/dump-oracle.mjs from MySQL ${out.mysql_version} and Unicode ${process.versions.unicode}. Do not edit.`,

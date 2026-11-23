@@ -33,19 +33,49 @@ function scanForward(
     let mul = 1;
     for (;;) {
       const byte = buffer[pos++];
-      if (byte === undefined)
-        throw new Error('incomplete canonical forward table');
+      if (byte === undefined) throw new Error('incomplete canonical payload');
       n += (byte & 0x7f) * mul;
       if (byte < 0x80) return n;
       mul *= 0x80;
     }
   }
 
-  const row: number[] = [];
-  for (let cp = 0; cp <= 0x10ffff; cp++) {
-    row.length = varint();
-    for (let i = 0; i < row.length; i++) row[i] = varint();
-    visit(cp, row);
+  const runCount = varint();
+  const runs: [number, number, number][] = [];
+  for (let i = 0; i < runCount; i++) {
+    runs.push([varint(), varint(), varint()]);
+  }
+  const rowCount = varint();
+  const rowCp: number[] = [];
+  let cp = 0;
+  for (let i = 0; i < rowCount; i++) {
+    cp += varint();
+    rowCp.push(cp);
+  }
+  const rowLen: number[] = [];
+  for (let i = 0; i < rowCount; i++) rowLen.push(varint());
+  const rowSyms: number[][] = rowLen.map((n) => {
+    const syms: number[] = [];
+    for (let k = 0; k < n; k++) syms.push(varint());
+    return syms;
+  });
+
+  const single: number[] = [0];
+  const none: number[] = [];
+  let ri = 0;
+  let row = 0;
+  for (let c = 0; c <= 0x10ffff; c++) {
+    while (ri < runs.length && (runs[ri]?.[0] ?? 0) + (runs[ri]?.[2] ?? 0) <= c) {
+      ri++;
+    }
+    const current = runs[ri];
+    if (current !== undefined && c >= current[0]) {
+      single[0] = (current[1] ?? 0) + (c - current[0]);
+      visit(c, single);
+      continue;
+    }
+    while (row < rowCp.length && (rowCp[row] ?? 0) < c) row++;
+    visit(c, rowCp[row] === c ? (rowSyms[row] ?? none) : none);
   }
 }
 

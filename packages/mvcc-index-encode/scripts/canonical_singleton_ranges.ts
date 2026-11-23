@@ -88,18 +88,6 @@ function utf8Length(cp: number): number {
   return 4;
 }
 
-function readForward(r: Reader): Forward {
-  const start = new Uint32Array(CP_MAX + 2);
-  const syms: number[] = [];
-  for (let cp = 0; cp <= CP_MAX; cp++) {
-    start[cp] = syms.length;
-    const count = r.varint();
-    for (let i = 0; i < count; i++) syms.push(r.varint());
-  }
-  start[CP_MAX + 1] = syms.length;
-  return { start, syms: Uint32Array.from(syms) };
-}
-
 function readTrie(r: Reader): Trie {
   const count = r.varint();
   const terminal: number[] = [];
@@ -120,12 +108,38 @@ function readTrie(r: Reader): Trie {
   return { terminal, keys, children };
 }
 
-function decodeOriginal(buf: Buffer): { forward: Forward; trie: Trie } {
-  const r = new Reader(buf);
-  const forward = readForward(r);
-  const trie = readTrie(r);
-  if (!r.atEnd()) throw new Error('trailing bytes in canonical payload');
-  return { forward, trie };
+function decodeReference(
+  buf: Buffer,
+  collation: string
+): { forward: Forward; trie: Trie } {
+  const shipped = readCandidate(buf);
+  const trie = denseTrie(shipped.forward);
+  const mismatches = countReverseMismatches(trie, shipped.trie, shipped.runs);
+  if (mismatches !== 0) {
+    throw new Error(
+      `${collation}: ${mismatches} mismatched reverse terminals in the shipped table`
+    );
+  }
+  return { forward: shipped.forward, trie };
+}
+
+function denseTrie(f: Forward): Trie {
+  const order: TrieNode[] = [
+    buildTrie(explicitRows(f, new Uint8Array(CP_MAX + 1))),
+  ];
+  const terminal: number[] = [];
+  const keys: number[][] = [];
+  const children: number[][] = [];
+  for (let q = 0; q < order.length; q++) {
+    const node = order[q] as TrieNode;
+    const ks = [...node.children.keys()].sort((a, b) => a - b);
+    terminal.push(node.terminal);
+    keys.push(ks);
+    children.push(
+      ks.map((k) => order.push(node.children.get(k) as TrieNode) - 1)
+    );
+  }
+  return { terminal, keys, children };
 }
 
 function rowOf(f: Forward, cp: number): number[] {
@@ -361,7 +375,7 @@ let failures = 0;
 for (const [collation, base64] of STRENGTHS) {
   const currentCompressed = Buffer.from(base64, 'base64');
   const currentRaw = zstdDecompressSync(currentCompressed);
-  const orig = decodeOriginal(currentRaw);
+  const orig = decodeReference(currentRaw, collation);
 
   const runs = selectRuns(orig.forward);
   const inRun = new Uint8Array(CP_MAX + 1);

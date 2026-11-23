@@ -9,14 +9,19 @@ import {
 type Depth = 1 | 2 | 3;
 
 interface Table {
-  readonly fwdStart: Uint32Array;
-  readonly fwdSym: Uint32Array;
+  readonly runCp: Uint32Array;
+  readonly runSym: Uint32Array;
+  readonly runLen: Uint32Array;
+  readonly runSymSorted: Uint32Array;
+  readonly runOrder: Uint32Array;
+  readonly rowCp: Uint32Array;
+  readonly rowStart: Uint32Array;
+  readonly rowSyms: Uint32Array;
   readonly nodeTerminal: Int32Array;
   readonly nodeStart: Uint32Array;
   readonly edgeSym: Uint32Array;
 }
 
-const MAX_CODE_POINT = 0x10ffff;
 const NO_TERMINAL = -1;
 const sources: Readonly<Record<Depth, string>> = {
   1: CANONICAL_0900_DEPTH_1_BASE64,
@@ -44,23 +49,39 @@ function decode(base64: string): Table {
   const varint = (): number => {
     let n = 0;
     let mul = 1;
-    let b: number;
-    do {
-      b = buf[pos++] ?? 0;
-      n += (b & 0x7f) * mul;
+    for (;;) {
+      const byte = buf[pos++] ?? 0;
+      n += (byte & 0x7f) * mul;
+      if (byte < 0x80) return n;
       mul *= 0x80;
-    } while (b & 0x80);
-    return n;
+    }
   };
 
-  const fwdStart = new Uint32Array(MAX_CODE_POINT + 2);
-  const fwd: number[] = [];
-  for (let cp = 0; cp <= MAX_CODE_POINT; cp++) {
-    fwdStart[cp] = fwd.length;
-    const count = varint();
-    for (let i = 0; i < count; i++) fwd.push(varint());
+  const runCount = varint();
+  const runCp = new Uint32Array(runCount);
+  const runSym = new Uint32Array(runCount);
+  const runLen = new Uint32Array(runCount);
+  for (let i = 0; i < runCount; i++) {
+    runCp[i] = varint();
+    runSym[i] = varint();
+    runLen[i] = varint();
   }
-  fwdStart[MAX_CODE_POINT + 1] = fwd.length;
+  const order = Array.from({ length: runCount }, (_, i) => i).sort(
+    (a, b) => (runSym[a] ?? 0) - (runSym[b] ?? 0)
+  );
+
+  const rowCount = varint();
+  const rowCp = new Uint32Array(rowCount);
+  let prevCp = 0;
+  for (let i = 0; i < rowCount; i++) {
+    prevCp += varint();
+    rowCp[i] = prevCp;
+  }
+  const rowStart = new Uint32Array(rowCount + 1);
+  for (let i = 0; i < rowCount; i++)
+    rowStart[i + 1] = (rowStart[i] ?? 0) + varint();
+  const rowSyms = new Uint32Array(rowStart[rowCount] ?? 0);
+  for (let k = 0; k < rowSyms.length; k++) rowSyms[k] = varint();
 
   const nodeCount = varint();
   const nodeTerminal = new Int32Array(nodeCount);
@@ -79,8 +100,14 @@ function decode(base64: string): Table {
   nodeStart[nodeCount] = edges.length;
 
   return {
-    fwdStart,
-    fwdSym: Uint32Array.from(fwd),
+    runCp,
+    runSym,
+    runLen,
+    runSymSorted: Uint32Array.from(order, (i) => runSym[i] ?? 0),
+    runOrder: Uint32Array.from(order),
+    rowCp,
+    rowStart,
+    rowSyms,
     nodeTerminal,
     nodeStart,
     edgeSym: Uint32Array.from(edges),
@@ -94,6 +121,36 @@ function tableFor(depth: Depth): Table {
     tables[depth] = table;
   }
   return table;
+}
+
+function findLast(sorted: Uint32Array, x: number): number {
+  let lo = 0;
+  let hi = sorted.length;
+  while (lo < hi) {
+    const mid = (lo + hi) >>> 1;
+    if ((sorted[mid] ?? 0) <= x) lo = mid + 1;
+    else hi = mid;
+  }
+  return lo - 1;
+}
+
+function runForCp(table: Table, cp: number): number {
+  const i = findLast(table.runCp, cp);
+  if (i >= 0 && cp < (table.runCp[i] ?? 0) + (table.runLen[i] ?? 0)) return i;
+  return -1;
+}
+
+function runForSym(table: Table, sym: number): number {
+  const i = findLast(table.runSymSorted, sym);
+  if (i < 0) return -1;
+  const run = table.runOrder[i] ?? 0;
+  if (sym < (table.runSym[run] ?? 0) + (table.runLen[run] ?? 0)) return run;
+  return -1;
+}
+
+function rowForCp(table: Table, cp: number): number {
+  const i = findLast(table.rowCp, cp);
+  return i >= 0 && table.rowCp[i] === cp ? i : -1;
 }
 
 function childOf(table: Table, node: number, symbol: number): number {
@@ -121,9 +178,17 @@ function ucaCanonical(value: string, depth: Depth): string {
   const symbols: number[] = [];
   for (const ch of value) {
     const cp = ch.codePointAt(0) ?? 0;
-    const end = table.fwdStart[cp + 1] ?? 0;
-    for (let k = table.fwdStart[cp] ?? 0; k < end; k++) {
-      symbols.push(table.fwdSym[k] ?? 0);
+    const run = runForCp(table, cp);
+    if (run >= 0) {
+      symbols.push((table.runSym[run] ?? 0) + cp - (table.runCp[run] ?? 0));
+      continue;
+    }
+    const row = rowForCp(table, cp);
+    if (row >= 0) {
+      const end = table.rowStart[row + 1] ?? 0;
+      for (let k = table.rowStart[row] ?? 0; k < end; k++) {
+        symbols.push(table.rowSyms[k] ?? 0);
+      }
     }
   }
   const count = symbols.length;
@@ -133,19 +198,34 @@ function ucaCanonical(value: string, depth: Depth): string {
   const choiceCp = new Int32Array(count);
   const choiceEnd = new Int32Array(count);
   cost[count] = 0;
+  const relax = (i: number, cp: number, end: number): void => {
+    const total = utf8Length(cp) + (cost[end] ?? Infinity);
+    if (total < (cost[i] ?? Infinity)) {
+      cost[i] = total;
+      choiceCp[i] = cp;
+      choiceEnd[i] = end;
+    }
+  };
   for (let i = count - 1; i >= 0; i--) {
     let node = 0;
     for (let j = i; j < count; j++) {
-      node = childOf(table, node, symbols[j] ?? 0);
+      const symbol = symbols[j] ?? 0;
+      if (j === i) {
+        const run = runForSym(table, symbol);
+        if (run >= 0) {
+          relax(
+            i,
+            (table.runCp[run] ?? 0) + symbol - (table.runSym[run] ?? 0),
+            j + 1
+          );
+          break;
+        }
+      }
+      node = childOf(table, node, symbol);
       if (node < 0) break;
       const cp = table.nodeTerminal[node] ?? NO_TERMINAL;
       if (cp === NO_TERMINAL) continue;
-      const total = utf8Length(cp) + (cost[j + 1] ?? Infinity);
-      if (total < (cost[i] ?? Infinity)) {
-        cost[i] = total;
-        choiceCp[i] = cp;
-        choiceEnd[i] = j + 1;
-      }
+      relax(i, cp, j + 1);
     }
   }
 
