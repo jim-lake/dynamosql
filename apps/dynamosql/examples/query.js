@@ -1,5 +1,5 @@
 const path = require('node:path');
-const dynamosql = require('..');
+const dynamosql = require('../dist/callbacks.js');
 
 const sql = process.argv.slice(2).join(' ');
 if (!sql) {

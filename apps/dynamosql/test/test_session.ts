@@ -2,7 +2,7 @@ export {};
 process.env.TZ = 'UTC';
 
 const path = require('node:path');
-const dynamosql = require('../src');
+const dynamosql = require('../src/callbacks');
 const { Types } = require('../src/types');
 const { COLLATIONS, FIELD_FLAGS } = require('../src/constants/mysql');
 const { testNamespace } = require('./test_namespace');

@@ -1,7 +1,7 @@
 const { expect } = require('chai');
 const fs = require('node:fs');
 const path = require('node:path');
-const mysql = require('mysql');
+const mysql = require('mysql2');
 const Session = require('../../src/session');
 const { testNamespace } = require('../test_namespace');
 

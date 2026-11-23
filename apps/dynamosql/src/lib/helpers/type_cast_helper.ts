@@ -21,6 +21,19 @@ export function typeCast(
   } else {
     switch (column.type) {
       case Types.NEWDECIMAL:
+      case Types.DECIMAL:
+        if (options?.decimalNumbers) {
+          return _toNumber(value);
+        } else if (
+          typeof value === 'number' &&
+          Number.isInteger(column.decimals) &&
+          column.decimals >= 0 &&
+          column.decimals <= 30
+        ) {
+          return value.toFixed(column.decimals);
+        } else {
+          return String(value);
+        }
       case Types.TINY:
       case Types.SHORT:
       case Types.LONG:
@@ -29,7 +42,6 @@ export function typeCast(
       case Types.INT24:
       case Types.YEAR:
       case Types.BIT:
-      case Types.DECIMAL:
         return _toNumber(value);
       case Types.LONGLONG:
         switch (options?.bigNumType ?? 'number') {
@@ -90,14 +102,25 @@ export function typeCast(
         }
         break;
       case Types.JSON:
-        if (value instanceof SQLJson) {
-          return value.toString();
+        if (options?.jsonStrings) {
+          if (value instanceof SQLJson) {
+            return value.toString();
+          } else if (typeof value === 'object') {
+            return JSON.stringify(value);
+          } else {
+            return String(value);
+          }
+        } else if (value instanceof SQLJson) {
+          return value.node;
         } else if (typeof value === 'object') {
-          return JSON.stringify(value);
+          return value;
         } else {
-          return String(value);
+          try {
+            return JSON.parse(String(value)) as unknown;
+          } catch {
+            return String(value);
+          }
         }
-        break;
       case Types.TINY_BLOB:
       case Types.MEDIUM_BLOB:
       case Types.LONG_BLOB:

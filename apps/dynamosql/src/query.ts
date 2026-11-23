@@ -3,6 +3,7 @@ import { EventEmitter } from 'node:events';
 import { logger } from '@dynamosql/shared';
 import { Parser } from 'node-sql-parser/build/mysql';
 
+import { SERVER_STATUS } from './constants/mysql';
 import { SQLError } from './error';
 import * as AlterHandler from './lib/alter_handler';
 import * as CreateHandler from './lib/create_handler';
@@ -19,19 +20,25 @@ import { Types } from './types';
 
 import type { AffectedResult, ChangedResult } from './lib/handler_types';
 import type { Session, QueryParams } from './session';
-import type { FieldInfo, OkPacket, TypeCast, QueryListResult } from './types';
+import type {
+  FieldInfo,
+  QueryListResult,
+  ResultSetHeader,
+  TypeCast,
+} from './types';
 import type { AST, Use } from 'node-sql-parser/build/mysql';
 import type { Readable, ReadableOptions } from 'node:stream';
 
 const g_parser = new Parser();
 
-const DEFAULT_RESULT: OkPacket = {
+const DEFAULT_RESULT: ResultSetHeader = {
   fieldCount: 0,
   affectedRows: 0,
   insertId: 0,
-  message: '',
+  info: '',
+  serverStatus: SERVER_STATUS.SERVER_STATUS_AUTOCOMMIT,
+  warningStatus: 0,
   changedRows: 0,
-  protocol41: true,
 };
 
 export interface QueryConstructorParams extends QueryParams {
@@ -40,7 +47,7 @@ export interface QueryConstructorParams extends QueryParams {
 
 type SingleQueryResult =
   | {
-      result: AffectedResult | ChangedResult | OkPacket;
+      result: AffectedResult | ChangedResult | ResultSetHeader;
       resultIter?: null;
       columns: undefined;
     }
@@ -280,7 +287,18 @@ export class Query extends EventEmitter {
           ...other,
           type: Types[type],
           length: column.length,
-          string: () => (value === null ? null : String(value)),
+          string: () => {
+            if (value === null) {
+              return null;
+            } else if (
+              column.type === Types.JSON &&
+              typeof value === 'object'
+            ) {
+              return JSON.stringify(value);
+            } else {
+              return String(value);
+            }
+          },
           buffer: () => (value === null ? null : Buffer.from(String(value))),
         },
         () =>

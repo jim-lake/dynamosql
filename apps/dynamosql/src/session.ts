@@ -1,7 +1,7 @@
 import { hostname } from 'node:os';
 
 import { logger } from '@dynamosql/shared';
-import * as SqlString from 'sqlstring';
+import * as SqlString from 'sql-escaper';
 
 import { COLLATIONS } from './constants/mysql';
 import { SYSTEM_VARIABLE_TYPES } from './constants/system_variables';
@@ -21,7 +21,8 @@ import type { Transaction } from './lib/transaction_manager';
 import type {
   TypeCast,
   PoolConnection,
-  MysqlError,
+  QueryError,
+  QueryListResult,
   QueryOptions,
   QueryCallback,
   Query as MysqlQuery,
@@ -31,6 +32,8 @@ let g_threadId = 1;
 
 export interface TypeCastOptions {
   dateStrings?: boolean;
+  decimalNumbers?: boolean;
+  jsonStrings?: boolean;
   bigNumType: 'bigint' | 'string' | 'number|string' | 'number';
 }
 
@@ -40,6 +43,8 @@ export interface SessionConfig extends DynamoDBWithCacheConstructorParams {
   resultObjects?: boolean | undefined;
   typeCast?: TypeCast | undefined;
   dateStrings?: boolean | ('TIMESTAMP' | 'DATETIME' | 'DATE')[] | undefined;
+  decimalNumbers?: boolean | undefined;
+  jsonStrings?: boolean | undefined;
   supportBigNumbers?: boolean | undefined;
   bigNumberStrings?: boolean | undefined;
   bigintNative?: boolean | undefined;
@@ -58,7 +63,7 @@ export interface QueryParams extends QueryOptions {
 export class Session extends SQLMode implements PoolConnection {
   public readonly config: SessionConfig;
   public readonly state: string = 'connected';
-  public readonly threadId: number | null = g_threadId++;
+  public readonly threadId: number = g_threadId++;
   public readonly lockOwner: string;
   public readonly heldLocks = new Map<string, HeldLease>();
 
@@ -119,6 +124,12 @@ export class Session extends SQLMode implements PoolConnection {
 
     if (params?.dateStrings) {
       this.typeCastOptions.dateStrings = true;
+    }
+    if (params?.decimalNumbers) {
+      this.typeCastOptions.decimalNumbers = true;
+    }
+    if (params?.jsonStrings) {
+      this.typeCastOptions.jsonStrings = true;
     }
     if (params?.bigintNative) {
       this.typeCastOptions.bigNumType = 'bigint';
@@ -275,25 +286,42 @@ export class Session extends SQLMode implements PoolConnection {
     values?: unknown,
     done?: QueryCallback
   ): MysqlQuery {
+    if (typeof values === 'function') {
+      done = values as QueryCallback;
+      values = undefined;
+    }
     if (this._isReleased) {
       done?.(new SQLError('released'));
       return undefined as unknown as MysqlQuery;
     }
+    const query = this._createQuery(params, values, Boolean(done));
+    void this._run(query, done);
+    return query;
+  }
+  async runQuery(
+    params: string | QueryParams,
+    values?: unknown
+  ): Promise<QueryListResult> {
+    if (this._isReleased) {
+      throw new SQLError('released');
+    }
+    return this._createQuery(params, values, true).run();
+  }
+  private _createQuery(
+    params: string | QueryParams,
+    values: unknown,
+    collectResults: boolean
+  ): Query {
     const opts: QueryParams =
       typeof params === 'string' ? { sql: params } : { ...params };
-    if (typeof values === 'function') {
-      done = values as QueryCallback;
-    } else if (values !== undefined) {
+    if (values !== undefined) {
       opts.values = values;
     }
-
+    opts.collectResults ??= collectResults;
     if (opts.values !== undefined) {
       opts.sql = SqlString.format(opts.sql, opts.values);
     }
-    opts.collectResults ??= Boolean(done);
-    const query = new Query({ ...opts, session: this });
-    void this._run(query, done);
-    return query;
+    return new Query({ ...opts, session: this });
   }
   public readonly createQuery = this.query.bind(this);
   public readonly escape = SqlString.escape;
@@ -305,7 +333,7 @@ export class Session extends SQLMode implements PoolConnection {
       const [results, fields] = await query.run();
       done?.(null, results, fields);
     } catch (e) {
-      done?.(e as MysqlError);
+      done?.(e as QueryError);
     }
   }
   public startStatement() {

@@ -1,6 +1,6 @@
 import { logger } from '@dynamosql/shared';
 import { expect } from 'chai';
-import type { FieldInfo } from '../../src';
+import type { FieldInfo } from '../../src/callbacks';
 import { addUnitTest } from '../unit_helper';
 
 function queryAsync(target: any): (...args: any[]) => Promise<any> {
@@ -165,9 +165,11 @@ describe('Unit tests for query interface', () => {
     try {
       await new Promise<void>((resolve, reject) => {
         const q = conn.query('SET @foo = 1', []);
-        q.on('fields', (data: FieldInfo[]) => {
+        q.on('fields', (data: FieldInfo[] | undefined) => {
           logger.trace('fields:', data);
-          fields.push(data);
+          if (data !== undefined) {
+            fields.push(data);
+          }
         });
         q.on('result', (result) => {
           logger.trace('result:', result);

@@ -4,7 +4,10 @@ import type { SQLError } from './error';
 import type { EventEmitter } from 'node:events';
 import type { Readable, ReadableOptions } from 'node:stream';
 
-export type MysqlError = SQLError;
+export type QueryError = SQLError;
+
+/** @deprecated Use QueryError. */
+export type MysqlError = QueryError;
 
 export enum Types {
   DECIMAL = 0x00, // aka DECIMAL (http://dev.mysql.com/doc/refman/5.0/en/precision-math-decimal-changes.html)
@@ -51,7 +54,7 @@ export interface UntypedFieldInfo {
   flags: number;
   decimals: number;
   default?: string | undefined;
-  zeroFill: boolean;
+  zerofill: boolean;
   protocol41: boolean;
 }
 export interface FieldInfo extends UntypedFieldInfo {
@@ -77,7 +80,7 @@ export interface QueryOptions {
   typeCast?: TypeCast | undefined;
 }
 export type QueryCallback = (
-  err: MysqlError | null,
+  err: QueryError | null,
   results?: any,
   fields?: FieldInfo[] | FieldInfo[][]
 ) => void;
@@ -95,7 +98,7 @@ export interface Query {
 
   on(ev: string, callback: (...args: any[]) => void): Query;
   on(ev: 'result', callback: (row: any, index: number) => void): Query;
-  on(ev: 'error', callback: (err: MysqlError) => void): Query;
+  on(ev: 'error', callback: (err: QueryError) => void): Query;
   on(
     ev: 'fields',
     callback: (fields: FieldInfo[], index: number) => void
@@ -130,17 +133,21 @@ export interface Connection extends EscapeFunctions, EventEmitter {
   threadId: number | null;
   createQuery: QueryFunction;
   query: QueryFunction;
-  end(callback?: (err?: MysqlError) => void): void;
-  end(options: any, callback: (err?: MysqlError) => void): void;
+  end(callback?: (err?: QueryError) => void): void;
+  end(options: any, callback: (err?: QueryError) => void): void;
   destroy(): void;
 }
-export interface OkPacket {
-  fieldCount: number;
+export interface ResultSetHeader {
   affectedRows: number;
+  fieldCount: number;
+  info: string;
   insertId: number;
-  serverStatus?: number | undefined;
-  warningCount?: number | undefined;
-  message: string;
+  serverStatus: number;
+  warningStatus: number;
   changedRows: number;
-  protocol41: boolean;
 }
+
+export type DmlOkPacket = ResultSetHeader;
+
+/** @deprecated Use ResultSetHeader. */
+export type OkPacket = ResultSetHeader;

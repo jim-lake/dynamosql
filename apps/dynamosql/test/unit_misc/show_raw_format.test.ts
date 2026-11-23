@@ -1,5 +1,5 @@
 import { assert } from 'chai';
-import * as DynamoSQL from '../../src';
+import * as DynamoSQL from '../../src/callbacks';
 import { testNamespace } from '../test_namespace';
 
 const TABLE = 'show_raw_format_probe';

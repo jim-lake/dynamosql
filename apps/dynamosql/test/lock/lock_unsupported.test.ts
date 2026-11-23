@@ -1,5 +1,5 @@
 import { assert } from 'chai';
-import * as DynamoSQL from '../../src';
+import * as DynamoSQL from '../../src/callbacks';
 import { testNamespace } from '../test_namespace';
 
 function runQuery(conn: DynamoSQL.Connection, sql: string): Promise<void> {

@@ -1,5 +1,5 @@
 import { assert } from 'chai';
-import * as DynamoSQL from '../../src';
+import * as DynamoSQL from '../../src/callbacks';
 import type { PoolConnection } from '../../src/types';
 import type { Session } from '../../src/session';
 import { LOCK_TABLE } from '../../src/lib/lock';

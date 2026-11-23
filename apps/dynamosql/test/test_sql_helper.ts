@@ -2,7 +2,7 @@ process.env.TZ = 'UTC';
 
 import { assert, expect } from 'chai';
 import fs from 'node:fs';
-import * as mysql from 'mysql';
+import * as mysql from 'mysql2';
 import { createSession } from '../src/session';
 import { testNamespace } from './test_namespace';
 import { Types } from '../src/types';
@@ -19,7 +19,7 @@ interface TestExtra {
   session?: Record<string, unknown>;
   timeout?: number;
   allowedErrors?: string;
-  nestTables?: boolean;
+  nestTables?: boolean | string;
   verify_field_types?: boolean;
   skipAffected?: boolean;
   checkChanged?: boolean;
@@ -61,6 +61,7 @@ export function runTests(
       password: process.env.DB_PASSWORD ?? '',
       //database: config.db.database,
       dateStrings: true,
+      decimalNumbers: true,
       charset: 'utf8mb4',
     },
     extra?.mysql
@@ -72,6 +73,7 @@ export function runTests(
       region: process.env.AWS_REGION,
       resultObjects: false,
       dateStrings: true,
+      decimalNumbers: true,
     },
     extra?.session
   );
@@ -130,9 +132,9 @@ export function runTests(
       const mysql_result: QueryOutcome = {};
       const ddb_result: QueryOutcome = {};
 
-      const opts: { sql: string; nestTables?: boolean } = { sql };
-      if (extra?.nestTables) {
-        opts.nestTables = true;
+      const opts: { sql: string; nestTables?: boolean | string } = { sql };
+      if (extra?.nestTables !== undefined) {
+        opts.nestTables = extra.nestTables;
       }
 
       await Promise.all([
@@ -192,20 +194,25 @@ export function runTests(
           if (Array.isArray(result)) {
             ddb_fields.forEach((column, j) => {
               const name = column.name;
-              const left = String(result[j]);
-              const right = String(mysql_result.results[i][name]);
-              _checkEqual(name, i, left, right);
+              _checkCell(
+                name,
+                i,
+                column.type,
+                result[j],
+                mysql_result.results[i][name]
+              );
             });
           } else {
             ddb_fields.forEach((column) => {
               const { table, name } = column;
-              const left = opts.nestTables
-                ? result[table]?.[name]
-                : result[name];
-              const right = opts.nestTables
-                ? mysql_result.results[i]?.[table]?.[name]
-                : mysql_result.results[i][name];
-              _checkEqual(name, i, left, right);
+              const left = _nestedCell(result, table, name, opts.nestTables);
+              const right = _nestedCell(
+                mysql_result.results[i],
+                table,
+                name,
+                opts.nestTables
+              );
+              _checkCell(name, i, column.type, left, right);
             });
           }
         });
@@ -246,12 +253,52 @@ export function runTests(
           ).to.equal(mysql_result.results?.affectedRows);
         }
         if (extra?.checkChanged) {
+          // mysql2 reads changedRows only from a 'Changed:' info field. A multi-row ODKU info line has 'Duplicates:' instead, which node-mysql parsed as changedRows.
+          const ok_packet = mysql_result.results;
+          const m = /Duplicates:\s*(\d+)/.exec(ok_packet?.info ?? '');
+          const expected =
+            m === null || /Changed:/i.test(ok_packet.info)
+              ? ok_packet?.changedRows
+              : parseInt(m[1] ?? '', 10);
           expect(ddb_result.results?.changedRows, 'changedRows equal').to.equal(
-            mysql_result.results?.changedRows
+            expected
           );
         }
       }
     });
+  }
+}
+function _nestedCell(
+  row: any,
+  table: string,
+  name: string,
+  nestTables?: boolean | string
+): any {
+  if (typeof nestTables === 'string') {
+    return row[`${table}${nestTables}${name}`];
+  } else if (nestTables) {
+    return row[table]?.[name];
+  } else {
+    return row[name];
+  }
+}
+function _checkCell(
+  name: string,
+  i: number,
+  type: Types,
+  left: any,
+  right: any
+) {
+  if (type === Types.JSON && name !== 'json_unsorted_array') {
+    expect(left, `results[${i}].${name} parsed JSON deep equal`).to.deep.equal(
+      right
+    );
+  } else if (type === Types.JSON) {
+    _checkEqual(name, i, JSON.stringify(left), JSON.stringify(right));
+  } else if (left instanceof Date || Buffer.isBuffer(left)) {
+    _checkEqual(name, i, left, right);
+  } else {
+    _checkEqual(name, i, String(left), String(right));
   }
 }
 function _checkEqual(name: string, i: number, left: any, right: any) {

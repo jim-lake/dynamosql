@@ -1,11 +1,11 @@
-import * as mysql from 'mysql';
+import * as mysql from 'mysql2';
 
 import { createSession } from '../../src/session';
 
 import { elapsedMs } from './metrics';
 import { testNamespace } from '../test_namespace';
 
-import type { OkPacket } from '../../src/types';
+import type { ResultSetHeader } from '../../src/types';
 
 export interface Target {
   readonly name: string;
@@ -37,7 +37,7 @@ async function makeDynamosqlMemory(): Promise<Target> {
           if (err) {
             reject(err);
           } else {
-            resolve({ affectedRows: (result as OkPacket).affectedRows });
+            resolve({ affectedRows: (result as ResultSetHeader).affectedRows });
           }
         });
       }),
@@ -85,11 +85,11 @@ async function makeMysqlMemory(): Promise<Target> {
     measuresServerMemory: false,
     exec: (sql) =>
       new Promise((resolve, reject) => {
-        conn.query(sql, (err, result: OkPacket) => {
+        conn.query(sql, (err, result) => {
           if (err) {
             reject(err);
           } else {
-            resolve({ affectedRows: result.affectedRows });
+            resolve({ affectedRows: (result as ResultSetHeader).affectedRows });
           }
         });
       }),

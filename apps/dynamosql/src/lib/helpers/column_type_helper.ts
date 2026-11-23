@@ -213,7 +213,7 @@ export function convertType(def: Partial<ColumnDef>): FieldInfo {
     type,
     flags,
     decimals,
-    zeroFill: false,
+    zerofill: false,
     protocol41: true,
   };
 }

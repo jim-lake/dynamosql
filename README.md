@@ -166,7 +166,7 @@ results of this engine with results against MySQL. This removes
 the necessity of developing a specification and all the possible
 bikeshedding involved.
 
-## Why node-mysql?
+## Why mysql2?
 
 See above.
 
@@ -193,6 +193,10 @@ When creating a session, the following options are available.
 - `dateStrings`: Force date types (TIMESTAMP, DATETIME, DATE) to be returned
   as strings rather than inflated into JavaScript Date objects.
   Can be `true`/`false`. (Default: `false`)
+- `decimalNumbers`: Return DECIMAL and NEWDECIMAL columns as JavaScript numbers
+  instead of strings. (Default: `false`, so DECIMAL values are strings)
+- `jsonStrings`: Return JSON columns as JSON text strings instead of parsed
+  values. (Default: `false`, so JSON values are parsed)
 - `multipleStatements`: Allow multiple mysql statements per query. Be careful
   with this, it could increase the scope of SQL injection attacks. (Default: `false`)
 
@@ -249,7 +253,7 @@ Pools accept the same options as sessions.
 ## Performing queries
 
 The most basic way to perform a query is to call the `.query()` method on an object
-(like a `Session`, `Pool`). This is compatible with node-mysql.
+(like a `Session`, `Pool`). The default export is compatible with `mysql2/promise`. The callback API (compatible with `mysql2`) is available from `@dynamosql/dynamosql/callbacks`.
 
 The simplest form of `.query()` is `.query(sqlString, callback)`, where a SQL string
 is the first argument and the second is a callback:

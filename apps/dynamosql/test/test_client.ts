@@ -1,7 +1,7 @@
 export {};
 process.env.TZ = 'UTC';
 
-const mysql = require('mysql');
+const mysql = require('mysql2');
 const { Types } = require('../src/types');
 const { COLLATIONS, FIELD_FLAGS } = require('../src/constants/mysql');
 

@@ -7,7 +7,8 @@ Core query engine for DynamoSQL. It parses MySQL-compatible SQL and executes it 
 ```
 apps/dynamosql/
 ├── src/
-│   ├── index.ts              # Public entry point (exports createConnection, createPool, escape, etc.)
+│   ├── index.ts              # Public entry point, mysql2/promise-compatible API (default export)
+│   ├── callbacks.ts          # Callback (node-mysql style) API, built on index.ts
 │   ├── session.ts, pool.ts   # Connection/session handling
 │   ├── types.ts, error.ts    # Public types and SQLError
 │   ├── constants/            # MySQL constants and system variables
@@ -139,13 +140,12 @@ Production:
 
 - `@aws-sdk/client-dynamodb` (AWS SDK v3 DynamoDB client)
 - `node-sql-parser` (SQL parsing)
-- `sqlstring` (string escaping)
+- `sql-escaper` (string escaping, same package mysql2 uses)
 
 Development:
 
 - `@dynamosql/lint` (shared lint config), `prettier`
-- `mysql` and `@types/mysql` (MySQL client for comparison tests)
-- `@types/sqlstring`
+- `mysql2` (reference MySQL client for comparison tests)
 - Test tooling (`mocha`, `tsx`, `dotenv`) comes from the workspace root.
 
 ## Supported Behavior

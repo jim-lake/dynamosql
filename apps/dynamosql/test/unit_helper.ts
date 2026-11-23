@@ -1,5 +1,5 @@
-import * as mysql from 'mysql';
-import * as DynamoSQL from '../src';
+import * as mysql from 'mysql2';
+import * as DynamoSQL from '../src/callbacks';
 import { testNamespace } from './test_namespace';
 
 const dbConfig = {
@@ -28,13 +28,26 @@ export function addUnitTest(
       password: dbConfig.password,
       multipleStatements: true,
       dateStrings: true,
+      decimalNumbers: true,
     };
-    await testFunction(mysql as unknown as typeof DynamoSQL, mysql_opts);
+    // mysql2 emits an unhandled 'error' when a connection is destroyed mid-handshake, which node-mysql swallowed.
+    const referenceClient = {
+      ...mysql,
+      createConnection(opts: mysql.ConnectionOptions) {
+        const conn = mysql.createConnection(opts);
+        conn.on('error', () => {});
+        return conn;
+      },
+    } as unknown as typeof DynamoSQL;
+    await testFunction(referenceClient, mysql_opts);
   });
   it(`${name} => dynamosql`, async function () {
     if (slow && !process.env.TEST_RUN_SLOW) {
       return this.skip();
     }
-    await testFunction(DynamoSQL, { namespace: testNamespace() });
+    await testFunction(DynamoSQL, {
+      namespace: testNamespace(),
+      decimalNumbers: true,
+    });
   });
 }
