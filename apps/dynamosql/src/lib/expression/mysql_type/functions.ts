@@ -209,10 +209,13 @@ function valueSelectRule(
 }
 
 export const functionRules: Record<string, FunctionRule> = {
-  lower: sameAsFirstArg,
-  lcase: sameAsFirstArg,
-  upper: sameAsFirstArg,
-  ucase: sameAsFirstArg,
+  lower: returnsVarchar,
+  lcase: returnsVarchar,
+  upper: returnsVarchar,
+  ucase: returnsVarchar,
+  date: () => ({ type: 'DATE' }),
+  time: () => ({ type: 'TIME' }),
+  unix_timestamp: returnsBigint,
   length: returnsBigint,
   char_length: returnsBigint,
   character_length: returnsBigint,

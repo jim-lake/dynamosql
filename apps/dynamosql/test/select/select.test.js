@@ -8,6 +8,11 @@ describe('Select', function () {
     allowedErrors: 'SAME_CODE',
   });
   runTests('distinct.sql', path.join(__dirname, 'distinct.sql'));
+  runTests(
+    'distinct_function_types.sql',
+    path.join(__dirname, 'distinct_function_types.sql'),
+    { verify_field_types: true }
+  );
   runTests('group.sql', path.join(__dirname, 'group.sql'));
   runTests('limit.sql', path.join(__dirname, 'limit.sql'));
   runTests('where.sql', path.join(__dirname, 'where.sql'));
