@@ -31,7 +31,7 @@ export function convertType(def: Partial<ColumnDef>): FieldInfo {
   let flags = 0;
   let decimals = 0;
   if (def.mysqlType) {
-    switch (String(def.mysqlType)) {
+    switch (def.mysqlType) {
       case 'INT':
       case 'INTEGER':
         type = Types.LONG;
@@ -55,8 +55,6 @@ export function convertType(def: Partial<ColumnDef>): FieldInfo {
         flags |= FIELD_FLAGS.BINARY;
         break;
       case 'DOUBLE':
-      case 'DOUBLE PRECISION':
-      case 'REAL':
         type = Types.DOUBLE;
         length = 22;
         decimals = 31;
@@ -97,11 +95,9 @@ export function convertType(def: Partial<ColumnDef>): FieldInfo {
         break;
       case 'DECIMAL':
       case 'NUMERIC':
-      case 'DEC':
         type = Types.NEWDECIMAL;
         flags |= FIELD_FLAGS.BINARY;
         break;
-      case 'BOOL':
       case 'BOOLEAN':
         type = Types.TINY;
         length = 1;
