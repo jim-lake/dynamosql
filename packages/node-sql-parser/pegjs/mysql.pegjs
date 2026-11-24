@@ -4684,8 +4684,70 @@ mem_chain
     return s;
   }
 
+mysql_character_n_type
+  = KW_CHARACTER __ LPAREN __ l:[0-9]+ __ RPAREN {
+    return { dataType: 'CHAR', length: parseInt(l.join(''), 10), parentheses: true }
+  }
+
+mysql_national_type
+  = 'NATIONAL'i !ident_part __ t:(KW_CHAR / KW_CHARACTER / KW_VARCHAR) __ LPAREN __ l:[0-9]+ __ RPAREN {
+    return { dataType: t === 'VARCHAR' ? 'VARCHAR' : 'CHAR', length: parseInt(l.join(''), 10), parentheses: true }
+  }
+
+mysql_middleint_type
+  = 'MIDDLEINT'i !ident_part __ LPAREN __ l:[0-9]+ __ RPAREN __ s:numeric_type_suffix? {
+    return { dataType: 'MEDIUMINT', length: parseInt(l.join(''), 10), scale: null, parentheses: true, suffix: s }
+  }
+  / 'MIDDLEINT'i !ident_part __ s:numeric_type_suffix? __ {
+    return { dataType: 'MEDIUMINT', suffix: s }
+  }
+
+mysql_int_alias_type
+  = t:mysql_int_alias __ LPAREN __ l:[0-9]+ __ RPAREN __ s:numeric_type_suffix? {
+    return { dataType: t, length: parseInt(l.join(''), 10), scale: null, parentheses: true, suffix: s }
+  }
+  / t:mysql_int_alias __ s:numeric_type_suffix? __ {
+    return { dataType: t, suffix: s }
+  }
+
+mysql_int_alias
+  = k:('INT1'i / 'INT2'i / 'INT3'i / 'INT8'i) !ident_part {
+    return { INT1: 'TINYINT', INT2: 'SMALLINT', INT3: 'MEDIUMINT', INT8: 'BIGINT' }[k.toUpperCase()]
+  }
+
+mysql_float8_type
+  = 'FLOAT8'i !ident_part __ LPAREN __ l:[0-9]+ __ r:(COMMA __ [0-9]+)? __ RPAREN __ s:numeric_type_suffix? {
+    return { dataType: 'DOUBLE', length: parseInt(l.join(''), 10), scale: r && parseInt(r[2].join(''), 10), parentheses: true, suffix: s }
+  }
+  / 'FLOAT8'i !ident_part __ s:numeric_type_suffix? __ {
+    return { dataType: 'DOUBLE', suffix: s }
+  }
+
+mysql_fixed_type
+  = 'FIXED'i !ident_part __ LPAREN __ l:[0-9]+ __ r:(COMMA __ [0-9]+)? __ RPAREN __ s:numeric_type_suffix? {
+    return { dataType: 'DECIMAL', length: parseInt(l.join(''), 10), scale: r && parseInt(r[2].join(''), 10), parentheses: true, suffix: s }
+  }
+  / 'FIXED'i !ident_part __ s:numeric_type_suffix? __ {
+    return { dataType: 'DECIMAL', suffix: s }
+  }
+
+mysql_long_type
+  = 'LONG'i !ident_part __ 'VARCHAR'i !ident_part {
+    return { dataType: 'MEDIUMTEXT' }
+  }
+  / 'LONG'i !ident_part {
+    return { dataType: 'MEDIUMTEXT' }
+  }
+
 data_type
-  = character_string_type
+  = mysql_national_type
+  / mysql_long_type
+  / mysql_middleint_type
+  / mysql_int_alias_type
+  / mysql_float8_type
+  / mysql_fixed_type
+  / mysql_character_n_type
+  / character_string_type
   / numeric_type
   / mysql_datetime_suffix_type
   / datetime_type

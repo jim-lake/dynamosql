@@ -629,6 +629,9 @@ export function isCast(obj: unknown): obj is Cast {
                 typeof e === "function") &&
             (e["dataType"] === "CHAR" ||
                 e["dataType"] === "VARCHAR" ||
+                e["dataType"] === "NCHAR" ||
+                e["dataType"] === "NVARCHAR" ||
+                e["dataType"] === "CHARACTER VARYING" ||
                 e["dataType"] === "BINARY" ||
                 e["dataType"] === "VARBINARY" ||
                 e["dataType"] === "TINYTEXT" ||
@@ -645,9 +648,13 @@ export function isCast(obj: unknown): obj is Cast {
                 e["dataType"] === "INT" ||
                 e["dataType"] === "INTEGER" ||
                 e["dataType"] === "BIGINT" ||
+                e["dataType"] === "SERIAL" ||
                 e["dataType"] === "FLOAT" ||
+                e["dataType"] === "REAL" ||
                 e["dataType"] === "DOUBLE" ||
+                e["dataType"] === "DOUBLE PRECISION" ||
                 e["dataType"] === "DECIMAL" ||
+                e["dataType"] === "DEC" ||
                 e["dataType"] === "NUMERIC" ||
                 e["dataType"] === "BIT" ||
                 e["dataType"] === "DATE" ||
@@ -656,6 +663,7 @@ export function isCast(obj: unknown): obj is Cast {
                 e["dataType"] === "TIMESTAMP" ||
                 e["dataType"] === "YEAR" ||
                 e["dataType"] === "BOOLEAN" ||
+                e["dataType"] === "BOOL" ||
                 e["dataType"] === "JSON" ||
                 e["dataType"] === "ENUM" ||
                 e["dataType"] === "SET" ||
@@ -2659,6 +2667,9 @@ export function isMysqlType(obj: unknown): obj is MysqlType {
     return (
         (typedObj === "CHAR" ||
             typedObj === "VARCHAR" ||
+            typedObj === "NCHAR" ||
+            typedObj === "NVARCHAR" ||
+            typedObj === "CHARACTER VARYING" ||
             typedObj === "BINARY" ||
             typedObj === "VARBINARY" ||
             typedObj === "TINYTEXT" ||
@@ -2675,9 +2686,13 @@ export function isMysqlType(obj: unknown): obj is MysqlType {
             typedObj === "INT" ||
             typedObj === "INTEGER" ||
             typedObj === "BIGINT" ||
+            typedObj === "SERIAL" ||
             typedObj === "FLOAT" ||
+            typedObj === "REAL" ||
             typedObj === "DOUBLE" ||
+            typedObj === "DOUBLE PRECISION" ||
             typedObj === "DECIMAL" ||
+            typedObj === "DEC" ||
             typedObj === "NUMERIC" ||
             typedObj === "BIT" ||
             typedObj === "DATE" ||
@@ -2686,6 +2701,7 @@ export function isMysqlType(obj: unknown): obj is MysqlType {
             typedObj === "TIMESTAMP" ||
             typedObj === "YEAR" ||
             typedObj === "BOOLEAN" ||
+            typedObj === "BOOL" ||
             typedObj === "JSON" ||
             typedObj === "ENUM" ||
             typedObj === "SET" ||
@@ -2710,6 +2726,9 @@ export function isConvertDataType(obj: unknown): obj is ConvertDataType {
         typedObj["type"] === "datatype" &&
         (typedObj["dataType"] === "CHAR" ||
             typedObj["dataType"] === "VARCHAR" ||
+            typedObj["dataType"] === "NCHAR" ||
+            typedObj["dataType"] === "NVARCHAR" ||
+            typedObj["dataType"] === "CHARACTER VARYING" ||
             typedObj["dataType"] === "BINARY" ||
             typedObj["dataType"] === "VARBINARY" ||
             typedObj["dataType"] === "TINYTEXT" ||
@@ -2726,9 +2745,13 @@ export function isConvertDataType(obj: unknown): obj is ConvertDataType {
             typedObj["dataType"] === "INT" ||
             typedObj["dataType"] === "INTEGER" ||
             typedObj["dataType"] === "BIGINT" ||
+            typedObj["dataType"] === "SERIAL" ||
             typedObj["dataType"] === "FLOAT" ||
+            typedObj["dataType"] === "REAL" ||
             typedObj["dataType"] === "DOUBLE" ||
+            typedObj["dataType"] === "DOUBLE PRECISION" ||
             typedObj["dataType"] === "DECIMAL" ||
+            typedObj["dataType"] === "DEC" ||
             typedObj["dataType"] === "NUMERIC" ||
             typedObj["dataType"] === "BIT" ||
             typedObj["dataType"] === "DATE" ||
@@ -2737,6 +2760,7 @@ export function isConvertDataType(obj: unknown): obj is ConvertDataType {
             typedObj["dataType"] === "TIMESTAMP" ||
             typedObj["dataType"] === "YEAR" ||
             typedObj["dataType"] === "BOOLEAN" ||
+            typedObj["dataType"] === "BOOL" ||
             typedObj["dataType"] === "JSON" ||
             typedObj["dataType"] === "ENUM" ||
             typedObj["dataType"] === "SET" ||

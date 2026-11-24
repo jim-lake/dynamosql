@@ -718,15 +718,15 @@ export type CollateExpr = {
 };
 
 export type MysqlType =
-  | "CHAR" | "VARCHAR"
+  | "CHAR" | "VARCHAR" | "NCHAR" | "NVARCHAR" | "CHARACTER VARYING"
   | "BINARY" | "VARBINARY"
   | "TINYTEXT" | "TEXT" | "MEDIUMTEXT" | "LONGTEXT"
   | "TINYBLOB" | "BLOB" | "MEDIUMBLOB" | "LONGBLOB"
-  | "TINYINT" | "SMALLINT" | "MEDIUMINT" | "INT" | "INTEGER" | "BIGINT"
-  | "FLOAT" | "DOUBLE" | "DECIMAL" | "NUMERIC"
+  | "TINYINT" | "SMALLINT" | "MEDIUMINT" | "INT" | "INTEGER" | "BIGINT" | "SERIAL"
+  | "FLOAT" | "REAL" | "DOUBLE" | "DOUBLE PRECISION" | "DECIMAL" | "DEC" | "NUMERIC"
   | "BIT"
   | "DATE" | "TIME" | "DATETIME" | "TIMESTAMP" | "YEAR"
-  | "BOOLEAN"
+  | "BOOLEAN" | "BOOL"
   | "JSON"
   | "ENUM" | "SET"
   | "GEOMETRY" | "POINT" | "LINESTRING" | "POLYGON"

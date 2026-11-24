@@ -1618,6 +1618,96 @@ describe('mysql', () => {
       })
     })
 
+    describe('datatype union members', () => {
+      const cases = [
+        ['REAL', 'CREATE TABLE t (a REAL)'],
+        ['DOUBLE PRECISION', 'CREATE TABLE t (a DOUBLE PRECISION)'],
+        ['DEC', 'CREATE TABLE t (a DEC(5,2))'],
+        ['BOOL', 'CREATE TABLE t (a BOOL)'],
+        ['SERIAL', 'CREATE TABLE t (a SERIAL)'],
+        ['NCHAR', 'CREATE TABLE t (a NCHAR(3))'],
+        ['NVARCHAR', 'CREATE TABLE t (a NVARCHAR(5))'],
+        ['CHARACTER VARYING', 'CREATE TABLE t (a CHARACTER VARYING(10))'],
+      ]
+      it('CHARACTER(n) is CHAR', () => {
+        const ast = parser.astify('CREATE TABLE t (a CHARACTER(3))', { database: 'mysql' })
+        const def = ast.create_definitions[0].definition
+        expect(def.dataType).to.equal('CHAR')
+        expect(def.length).to.equal(3)
+        expect(def.parentheses).to.equal(true)
+        expect(getParsedSql('CREATE TABLE t (a CHARACTER(3))')).to.equal('CREATE TABLE `t` (`a` CHAR(3))')
+      })
+      it('NATIONAL CHAR and NATIONAL VARCHAR are CHAR and VARCHAR', () => {
+        const ast = parser.astify('CREATE TABLE t (a NATIONAL CHAR(3), b NATIONAL VARCHAR(5))', { database: 'mysql' })
+        const [a, b] = ast.create_definitions.map(c => c.definition)
+        expect(a.dataType).to.equal('CHAR')
+        expect(a.length).to.equal(3)
+        expect(a.parentheses).to.equal(true)
+        expect(b.dataType).to.equal('VARCHAR')
+        expect(b.length).to.equal(5)
+        expect(b.parentheses).to.equal(true)
+        expect(getParsedSql('CREATE TABLE t (a NATIONAL CHAR(3), b NATIONAL VARCHAR(5))')).to.equal(
+          'CREATE TABLE `t` (`a` CHAR(3), `b` VARCHAR(5))'
+        )
+      })
+      it('FIXED(p,s) is DECIMAL', () => {
+        const ast = parser.astify('CREATE TABLE t (a FIXED(5,2), b FIXED, c FIXED(5,2) UNSIGNED)', { database: 'mysql' })
+        const types = ast.create_definitions.map(c => c.definition.dataType)
+        expect(types).to.deep.equal(['DECIMAL', 'DECIMAL', 'DECIMAL'])
+        const def = ast.create_definitions[0].definition
+        expect(def.length).to.equal(5)
+        expect(def.scale).to.equal(2)
+        expect(def.parentheses).to.equal(true)
+        expect(ast.create_definitions[2].definition.suffix).to.deep.equal(['UNSIGNED'])
+        expect(getParsedSql('CREATE TABLE t (a FIXED(5,2))')).to.equal('CREATE TABLE `t` (`a` DECIMAL(5, 2))')
+        expect(getParsedSql('CREATE TABLE t (a FIXED)')).to.equal('CREATE TABLE `t` (`a` DECIMAL)')
+      })
+      it('INT1/INT2/INT3/INT8 map to MySQL integer types', () => {
+        const ast = parser.astify('CREATE TABLE t (a INT1, b INT2, c INT3, d INT8, e INT1(4), f INT8 UNSIGNED)', { database: 'mysql' })
+        const types = ast.create_definitions.map(c => c.definition.dataType)
+        expect(types).to.deep.equal(['TINYINT', 'SMALLINT', 'MEDIUMINT', 'BIGINT', 'TINYINT', 'BIGINT'])
+        expect(ast.create_definitions[4].definition.length).to.equal(4)
+        expect(ast.create_definitions[5].definition.suffix).to.deep.equal(['UNSIGNED'])
+        expect(getParsedSql('CREATE TABLE t (a INT1, b INT2, c INT3, d INT8, e INT1(4), f INT8 UNSIGNED)')).to.equal(
+          'CREATE TABLE `t` (`a` TINYINT, `b` SMALLINT, `c` MEDIUMINT, `d` BIGINT, `e` TINYINT(4), `f` BIGINT UNSIGNED)'
+        )
+      })
+      it('FLOAT8 maps to DOUBLE', () => {
+        const ast = parser.astify('CREATE TABLE t (a FLOAT8, b FLOAT8(10), c FLOAT8 UNSIGNED)', { database: 'mysql' })
+        const types = ast.create_definitions.map(c => c.definition.dataType)
+        expect(types).to.deep.equal(['DOUBLE', 'DOUBLE', 'DOUBLE'])
+        expect(ast.create_definitions[1].definition.length).to.equal(10)
+        expect(ast.create_definitions[2].definition.suffix).to.deep.equal(['UNSIGNED'])
+        expect(getParsedSql('CREATE TABLE t (a FLOAT8, b FLOAT8(10), c FLOAT8 UNSIGNED)')).to.equal(
+          'CREATE TABLE `t` (`a` DOUBLE, `b` DOUBLE(10), `c` DOUBLE UNSIGNED)'
+        )
+      })
+      it('MIDDLEINT is MEDIUMINT', () => {
+        const ast = parser.astify('CREATE TABLE t (a MIDDLEINT, b MIDDLEINT(5), c MIDDLEINT UNSIGNED, d MEDIUMINT(5))', { database: 'mysql' })
+        const types = ast.create_definitions.map(c => c.definition.dataType)
+        expect(types).to.deep.equal(['MEDIUMINT', 'MEDIUMINT', 'MEDIUMINT', 'MEDIUMINT'])
+        expect(ast.create_definitions[1].definition.length).to.equal(5)
+        expect(ast.create_definitions[2].definition.suffix).to.deep.equal(['UNSIGNED'])
+        expect(getParsedSql('CREATE TABLE t (a MIDDLEINT)')).to.equal('CREATE TABLE `t` (`a` MEDIUMINT)')
+        expect(getParsedSql('CREATE TABLE t (a middleint)')).to.equal('CREATE TABLE `t` (`a` MEDIUMINT)')
+      })
+      it('LONG and LONG VARCHAR are MEDIUMTEXT', () => {
+        const sql = 'CREATE TABLE t (a LONG, b LONG VARCHAR, c long varchar CHARACTER SET utf8mb4, d LONGTEXT)'
+        const ast = parser.astify(sql, { database: 'mysql' })
+        const types = ast.create_definitions.map(c => c.definition.dataType)
+        expect(types).to.deep.equal(['MEDIUMTEXT', 'MEDIUMTEXT', 'MEDIUMTEXT', 'LONGTEXT'])
+        expect(getParsedSql(sql)).to.equal(
+          'CREATE TABLE `t` (`a` MEDIUMTEXT, `b` MEDIUMTEXT, `c` MEDIUMTEXT CHARACTER SET utf8mb4, `d` LONGTEXT)'
+        )
+      })
+      cases.forEach(([dataType, sql]) => {
+        it(`should return dataType ${dataType} for ${sql}`, () => {
+          const ast = parser.astify(sql, { database: 'mysql' })
+          expect(ast.create_definitions[0].definition.dataType).to.equal(dataType)
+        })
+      })
+    })
+
   })
 
 })
