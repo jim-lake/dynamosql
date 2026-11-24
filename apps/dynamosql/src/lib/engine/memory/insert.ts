@@ -69,7 +69,10 @@ export async function insertRowList(
       if (!old_row) {
         continue;
       }
-      const same = _rowEqual(old_row, cellRow);
+      const unique_count =
+        (primary_key.columns[0] === ROW_ID_NAME ? 0 : 1) +
+        state.indexList.filter((index) => index.unique).length;
+      const same = unique_count === 1 && _rowEqual(old_row, cellRow);
       for (const key of conflicts.slice(1)) {
         Storage.removeRow(state, key);
       }

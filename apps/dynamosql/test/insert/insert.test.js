@@ -33,7 +33,9 @@ describe('Insert', function () {
     path.join(__dirname, 'on_duplicate_key_raw.sql'),
     { checkChanged: true, skipAffected: true }
   );
-  runTests('no_column_list.sql', path.join(__dirname, 'no_column_list.sql'));
+  runTests('no_column_list.sql', path.join(__dirname, 'no_column_list.sql'), {
+    checkChanged: true,
+  });
   runTests(
     'no_column_list_error.sql',
     path.join(__dirname, 'no_column_list_error.sql'),
@@ -46,14 +48,17 @@ describe('Insert', function () {
   );
   runTests(
     'division_by_zero_ignore.sql',
-    path.join(__dirname, 'division_by_zero_ignore.sql')
+    path.join(__dirname, 'division_by_zero_ignore.sql'),
+    { checkChanged: true }
   );
   runTests(
     'division_by_zero_raw.sql',
     path.join(__dirname, 'division_by_zero_raw.sql'),
     { allowedErrors: 'SAME_CODE', skipAffected: true, checkChanged: true }
   );
-  runTests('syntax.sql', path.join(__dirname, 'syntax.sql'));
+  runTests('syntax.sql', path.join(__dirname, 'syntax.sql'), {
+    checkChanged: true,
+  });
   runTests('pad_insert_raw.sql', path.join(__dirname, 'pad_insert_raw.sql'), {
     checkChanged: true,
     skipAffected: true,

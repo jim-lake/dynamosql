@@ -2,12 +2,22 @@ const { runTests } = require('../test_sql_helper');
 const path = require('node:path');
 
 describe('Temp', function () {
+  runTests(
+    'memory_affected_rows_variants.sql',
+    path.join(__dirname, 'memory_affected_rows_variants.sql'),
+    { checkChanged: true }
+  );
+  runTests(
+    'memory_affected_rows.sql',
+    path.join(__dirname, 'memory_affected_rows.sql'),
+    { checkChanged: true }
+  );
   runTests('temp.sql', path.join(__dirname, 'temp.sql'), {
     checkChanged: true,
   });
   runTests('temp_error.sql', path.join(__dirname, 'temp_error.sql'), {
     allowedErrors: 'SAME_CODE',
-    skipAffected: true,
+
     checkChanged: true,
   });
   runTests(
@@ -44,7 +54,7 @@ describe('Temp', function () {
     path.join(__dirname, 'memory_json_arrow_error.sql'),
     {
       allowedErrors: 'SAME_CODE',
-      skipAffected: true,
+
       checkChanged: true,
       verify_field_types: true,
     }
@@ -63,7 +73,7 @@ describe('Temp', function () {
   runTests(
     'temp_keyless_error.sql',
     path.join(__dirname, 'temp_keyless_error.sql'),
-    { allowedErrors: 'SAME_CODE', skipAffected: true, checkChanged: true }
+    { allowedErrors: 'SAME_CODE', checkChanged: true }
   );
   runTests('memory_intstr.sql', path.join(__dirname, 'memory_intstr.sql'), {
     checkChanged: true,
@@ -76,7 +86,7 @@ describe('Temp', function () {
   runTests(
     'memory_key_normalize_error.sql',
     path.join(__dirname, 'memory_key_normalize_error.sql'),
-    { allowedErrors: 'SAME_CODE', skipAffected: true, checkChanged: true }
+    { allowedErrors: 'SAME_CODE', checkChanged: true }
   );
   runTests('memory_unique.sql', path.join(__dirname, 'memory_unique.sql'), {
     checkChanged: true,
@@ -84,66 +94,65 @@ describe('Temp', function () {
   runTests(
     'memory_unique_error.sql',
     path.join(__dirname, 'memory_unique_error.sql'),
-    { allowedErrors: 'SAME_CODE', skipAffected: true, checkChanged: true }
+    { allowedErrors: 'SAME_CODE', checkChanged: true }
   );
   runTests(
     'memory_unique_key.sql',
     path.join(__dirname, 'memory_unique_key.sql'),
-    { skipAffected: true, checkChanged: true }
+    { checkChanged: true }
   );
   runTests(
     'memory_unique_key_error.sql',
     path.join(__dirname, 'memory_unique_key_error.sql'),
-    { allowedErrors: 'SAME_CODE', skipAffected: true, checkChanged: true }
+    { allowedErrors: 'SAME_CODE', checkChanged: true }
   );
   runTests(
     'memory_btree_index.sql',
     path.join(__dirname, 'memory_btree_index.sql'),
-    { checkChanged: true, skipAffected: true }
+    { checkChanged: true }
   );
   runTests(
     'memory_btree_index_error.sql',
     path.join(__dirname, 'memory_btree_index_error.sql'),
-    { allowedErrors: 'SAME_CODE', skipAffected: true, checkChanged: true }
+    { allowedErrors: 'SAME_CODE', checkChanged: true }
   );
   runTests(
     'memory_btree_order.sql',
     path.join(__dirname, 'memory_btree_order.sql'),
-    { checkChanged: true, skipAffected: true }
+    { checkChanged: true }
   );
   runTests(
     'memory_index_kinds.sql',
     path.join(__dirname, 'memory_index_kinds.sql'),
-    { checkChanged: true, skipAffected: true }
+    { checkChanged: true }
   );
   runTests(
     'memory_index_kinds_error.sql',
     path.join(__dirname, 'memory_index_kinds_error.sql'),
-    { allowedErrors: 'SAME_CODE', skipAffected: true, checkChanged: true }
+    { allowedErrors: 'SAME_CODE', checkChanged: true }
   );
   runTests(
     'memory_index_probe.sql',
     path.join(__dirname, 'memory_index_probe.sql'),
-    { checkChanged: true, skipAffected: true }
+    { checkChanged: true }
   );
   runTests('memory_null_key.sql', path.join(__dirname, 'memory_null_key.sql'), {
     checkChanged: true,
-    skipAffected: true,
   });
   runTests(
     'memory_null_key_error.sql',
     path.join(__dirname, 'memory_null_key_error.sql'),
-    { allowedErrors: 'SAME_CODE', skipAffected: true, checkChanged: true }
+    { allowedErrors: 'SAME_CODE', checkChanged: true }
   );
   runTests(
     'memory_null_key_wide.sql',
     path.join(__dirname, 'memory_null_key_wide.sql'),
-    { checkChanged: true, skipAffected: true }
+    { checkChanged: true }
   );
   runTests(
     'memory_null_key_wide_error.sql',
     path.join(__dirname, 'memory_null_key_wide_error.sql'),
-    { allowedErrors: 'SAME_CODE', skipAffected: true, checkChanged: true }
+    { allowedErrors: 'SAME_CODE', checkChanged: true }
   );
   runTests(
     'memory_ai_ci_key.sql',
@@ -153,7 +162,7 @@ describe('Temp', function () {
   runTests(
     'memory_ai_ci_key_error.sql',
     path.join(__dirname, 'memory_ai_ci_key_error.sql'),
-    { allowedErrors: 'SAME_CODE', skipAffected: true, checkChanged: true }
+    { allowedErrors: 'SAME_CODE', checkChanged: true }
   );
   runTests('memory_strict.sql', path.join(__dirname, 'memory_strict.sql'), {
     checkChanged: true,
@@ -161,17 +170,17 @@ describe('Temp', function () {
   runTests(
     'memory_strict_error.sql',
     path.join(__dirname, 'memory_strict_error.sql'),
-    { allowedErrors: 'SAME_CODE', skipAffected: true, checkChanged: true }
+    { allowedErrors: 'SAME_CODE', checkChanged: true }
   );
   runTests(
     'memory_null_matrix_error.sql',
     path.join(__dirname, 'memory_null_matrix_error.sql'),
-    { allowedErrors: 'SAME_CODE', skipAffected: true, checkChanged: true }
+    { allowedErrors: 'SAME_CODE', checkChanged: true }
   );
   runTests(
     'memory_misuse_error.sql',
     path.join(__dirname, 'memory_misuse_error.sql'),
-    { allowedErrors: 'SAME_CODE', skipAffected: true, checkChanged: true }
+    { allowedErrors: 'SAME_CODE', checkChanged: true }
   );
   for (const name of [
     'memory_convert_int.sql',
@@ -204,7 +213,7 @@ describe('Temp', function () {
   ]) {
     runTests(name, path.join(__dirname, name), {
       allowedErrors: 'SAME_CODE',
-      skipAffected: true,
+
       checkChanged: true,
     });
   }
@@ -225,7 +234,7 @@ describe('Temp', function () {
   ]) {
     runTests(name, path.join(__dirname, name), {
       allowedErrors: 'SAME_CODE',
-      skipAffected: true,
+
       checkChanged: true,
     });
   }
