@@ -38,23 +38,29 @@ interface DeleteRowChange extends ChangeTarget {
     previous_row_tx_id?: number;
 }
 type RowChange = InsertRowChange | UpdateRowChange | DeleteRowChange;
-/** Index entries also identify their encoded index identity plus TX_ID. */
-interface IndexChangeTarget extends ChangeTarget {
+/** Index changes identify their item by the index layout's sort or partition key. */
+interface OrderedIndexTarget {
     index_tx_id: Base64Value;
+    index_key?: never;
 }
-interface InsertIndexChange extends IndexChangeTarget {
+interface HashIndexTarget {
+    index_key: string | Base64Value;
+    index_tx_id?: never;
+}
+type IndexChangeTarget = OrderedIndexTarget | HashIndexTarget;
+interface InsertIndexChange extends ChangeTarget {
     kind: 'insert';
     values: ColumnValues;
 }
-interface UpdateIndexChange extends IndexChangeTarget {
+interface UpdateIndexChange extends ChangeTarget {
     kind: 'update';
     values: ColumnValues;
 }
 /** Index deletes keep their identity attributes but carry no values. */
-interface DeleteIndexChange extends IndexChangeTarget {
+interface DeleteIndexChange extends ChangeTarget {
     kind: 'delete';
 }
-type IndexChange = InsertIndexChange | UpdateIndexChange | DeleteIndexChange;
+type IndexChange = (InsertIndexChange | UpdateIndexChange | DeleteIndexChange) & IndexChangeTarget;
 type DmlChange = RowChange | IndexChange;
 interface CreateTableIntent {
     kind: 'create_table';
@@ -116,10 +122,11 @@ interface PrimaryIndexDef {
     columns: string[];
     dynamodb_name: string;
 }
-/** A secondary index, stored in its own table. */
+/** A secondary index, stored in its own table. `index_type` selects the key layout. */
 interface SecondaryIndexDef {
     index_name: string;
     index_uuid: string;
+    index_type: 'BTREE' | 'HASH';
     unique: boolean;
     columns: string[];
     dynamodb_table: string;
@@ -241,15 +248,15 @@ interface HiddenRowIdKey {
     DB_ROW_ID: NumberAttr;
     DB_ROW_KEY?: never;
 }
-interface TupleRowKey {
-    DB_ROW_KEY: BinaryAttr;
+interface HashKeyRowKey {
+    DB_ROW_KEY: StringAttr | BinaryAttr;
     DB_ROW_ID?: never;
 }
 interface DirectRowKey {
     DB_ROW_ID?: never;
     DB_ROW_KEY?: never;
 }
-type RowKeyAttrs = HiddenRowIdKey | TupleRowKey | DirectRowKey;
+type RowKeyAttrs = HiddenRowIdKey | HashKeyRowKey | DirectRowKey;
 type RowItem = Record<string, RowAttr> & RowKeyAttrs & {
     TX_ID: NumberAttr;
     /** True for a tombstone. Absent on live rows. */
@@ -264,14 +271,19 @@ type RowTombstoneItem = Record<string, KeyAttr | NumberAttr | BoolAttr> & RowKey
     TX_ID: NumberAttr;
     DELETED: BoolAttr;
 };
-/** Attributes that can appear on an index entry. */
-type IndexAttr = KeyAttr | ColumnAttr | BoolAttr;
-type IndexItem = Record<string, IndexAttr> & RowKeyAttrs & {
+type OrderedIndexItem = Record<string, RowAttr> & RowKeyAttrs & {
     INDEX_PARTITION: StringAttr;
     INDEX_TX_ID: BinaryAttr;
     TX_ID: NumberAttr;
     /** True for a tombstone. Absent on live entries. */
     DELETED?: BoolAttr;
 };
+type HashIndexItem = Record<string, RowAttr> & RowKeyAttrs & {
+    INDEX_KEY?: StringAttr | BinaryAttr;
+    TX_ID: NumberAttr;
+    /** True for a tombstone. Absent on live entries. */
+    DELETED?: BoolAttr;
+};
+type IndexItem = OrderedIndexItem | HashIndexItem;
 
-export type { Base64Value, BinaryAttr, BoolAttr, ChangeTarget, ColumnAttr, ColumnDef, ColumnDefault, ColumnValue, ColumnValues, CreateTableIntent, DatabaseDef, DdlChange, DdlTransactionPayload, DeleteIndexChange, DeleteRowChange, DirectRowKey, DmlChange, DmlTransactionPayload, HiddenRowIdKey, IndexAttr, IndexChange, IndexChangeTarget, IndexDef, IndexItem, InsertIndexChange, InsertRowChange, KeyAttr, LiteralDefault, LiveRowItem, MvccAutoIncrementItem, MvccReaderLeaseItem, MvccSchemaItem, MvccSpillItem, MvccStateItem, MvccTransactionItem, MysqlType, NoDefault, NullAttr, NumberAttr, PrimaryIndexDef, PrimaryKey, PrimaryKeyValue, RetireTableIntent, RowAttr, RowChange, RowItem, RowKeyAttrs, RowTombstoneItem, SchemaCatalog, SecondaryIndexDef, SpillPayload, StringAttr, TableDef, TransactionPayload, TupleRowKey, UpdateIndexChange, UpdateRowChange };
+export type { Base64Value, BinaryAttr, BoolAttr, ChangeTarget, ColumnAttr, ColumnDef, ColumnDefault, ColumnValue, ColumnValues, CreateTableIntent, DatabaseDef, DdlChange, DdlTransactionPayload, DeleteIndexChange, DeleteRowChange, DirectRowKey, DmlChange, DmlTransactionPayload, HashIndexItem, HashIndexTarget, HashKeyRowKey, HiddenRowIdKey, IndexChange, IndexChangeTarget, IndexDef, IndexItem, InsertIndexChange, InsertRowChange, KeyAttr, LiteralDefault, LiveRowItem, MvccAutoIncrementItem, MvccReaderLeaseItem, MvccSchemaItem, MvccSpillItem, MvccStateItem, MvccTransactionItem, MysqlType, NoDefault, NullAttr, NumberAttr, OrderedIndexItem, OrderedIndexTarget, PrimaryIndexDef, PrimaryKey, PrimaryKeyValue, RetireTableIntent, RowAttr, RowChange, RowItem, RowKeyAttrs, RowTombstoneItem, SchemaCatalog, SecondaryIndexDef, SpillPayload, StringAttr, TableDef, TransactionPayload, UpdateIndexChange, UpdateRowChange };

@@ -66,10 +66,11 @@ export interface PrimaryIndexDef {
   dynamodb_name: string;
 }
 
-/** A secondary index, stored in its own table. */
+/** A secondary index, stored in its own table. `index_type` selects the key layout. */
 export interface SecondaryIndexDef {
   index_name: string;
   index_uuid: string;
+  index_type: 'BTREE' | 'HASH';
   unique: boolean;
   columns: string[];
   dynamodb_table: string;

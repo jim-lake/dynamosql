@@ -26,28 +26,40 @@ export interface DeleteRowChange extends ChangeTarget {
 
 export type RowChange = InsertRowChange | UpdateRowChange | DeleteRowChange;
 
-/** Index entries also identify their encoded index identity plus TX_ID. */
-export interface IndexChangeTarget extends ChangeTarget {
+/** Index changes identify their item by the index layout's sort or partition key. */
+export interface OrderedIndexTarget {
   index_tx_id: Base64Value;
+  index_key?: never;
 }
 
-export interface InsertIndexChange extends IndexChangeTarget {
+export interface HashIndexTarget {
+  index_key: string | Base64Value;
+  index_tx_id?: never;
+}
+
+export type IndexChangeTarget = OrderedIndexTarget | HashIndexTarget;
+
+export interface InsertIndexChange extends ChangeTarget {
   kind: 'insert';
   values: ColumnValues;
 }
 
-export interface UpdateIndexChange extends IndexChangeTarget {
+export interface UpdateIndexChange extends ChangeTarget {
   kind: 'update';
   values: ColumnValues;
 }
 
 /** Index deletes keep their identity attributes but carry no values. */
-export interface DeleteIndexChange extends IndexChangeTarget {
+export interface DeleteIndexChange extends ChangeTarget {
   kind: 'delete';
 }
 
-export type IndexChange =
-  InsertIndexChange | UpdateIndexChange | DeleteIndexChange;
+export type IndexChange = (
+  | InsertIndexChange
+  | UpdateIndexChange
+  | DeleteIndexChange
+) &
+  IndexChangeTarget;
 
 export type DmlChange = RowChange | IndexChange;
 
