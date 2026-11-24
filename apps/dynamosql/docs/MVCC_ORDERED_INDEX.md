@@ -1,38 +1,26 @@
-# MVCC primary-key and index encoding
+# MVCC ordered index encoding
+
+This document controls ORDERED indexes (`index_type` `BTREE`): secondary index tables whose sort keys are byte-ordered, and the optional ordered PRIMARY index. [MVCC_HASH_INDEX.md](MVCC_HASH_INDEX.md) defines HASH indexes and the data-table partition key.
+
+Character values are encoded with `weightString` from `@dynamosql/mvcc-index-encode`. [String format and supported collations](../../../packages/mvcc-index-encode/STRING_ENCODING.md) defines its output and size bounds.
 
 ## Identity
 
 - Resolve index `columns` through schema `column_name` to stable `dynamodb_name`. Apply SQL column coercion and precision rules before key encoding.
-- Key equality and ascending byte order follow SQL equality and order, under the [declared character bound and collation](#character-weights). Types and component counts come from the index definition.
+- Key equality and ascending byte order follow the SQL equality and order of each column's type. Character columns follow `weightString` under the column's [collation](#character-weights), which is always NO PAD. Types and component counts come from the index definition.
 - Primary keys forbid NULL. Secondary keys sort NULL before non-NULL. Only full-column ASC indexes are specified.
-- Every secondary index item stores the target PK as attributes, including on tombstones. A PK column contributes to the indexed tuple only when the index explicitly includes it.
+- Every secondary index item stores the target PK as attributes, including on tombstones. The PK is never part of the sort key. The sort key is only I, TX_ID and the change ordinal.
 - Persist original column values separately. Encoded keys need not recover original spelling or collation-equivalent values. Never truncate or hash a key to make it fit.
 
-## Primary partition key
+## Ordered PRIMARY index
 
-The PRIMARY index's `dynamodb_name` selects the data-table partition-key attribute.
-
-| Primary definition         | Attribute                | Value                                        |
-| -------------------------- | ------------------------ | -------------------------------------------- |
-| One directly usable column | Column's `dynamodb_name` | Its native N, S, or B value                  |
-| Other declared PK          | `DB_ROW_KEY`             | Binary tuple of declared PK values, native B |
-| No declared PK             | `DB_ROW_ID`              | Generated positive signed BIGINT, native N   |
-
-Each physical generation uses the representation selected by its PRIMARY definition for every row.
-
-Direct use requires native equality to match SQL equality. Choose the representation from the column definition, never per row. Numeric columns whose entire permitted range uses N may use their stored value; fixed nonempty binary columns may use B. Variable binary columns permitting empty values use the binary tuple representation.
-
-Raw string bytes in a primary key or index have the implicit NO PAD collation `utf8mb4_0900_bin` (UTF-8 byte order). A single string PK may use native S only under `utf8mb4_0900_bin`. When native S is used, reject a write whose PK is the empty string after SQL coercion. DynamoDB requires at least one byte in a partition key. A framed string component can represent the empty string. Every other string PK collation uses a binary tuple in `DB_ROW_KEY`. For PAD SPACE character columns, pass the declared width to the string frame encoder on writes and lookups. The separate column attribute preserves the SQL value, including user-visible trailing spaces.
-
-A DOUBLE PK permitting both N and B storage uses the binary tuple representation for every key; its partition-key type cannot vary per row. Composite PKs always use binary tuples, including those containing buffers. `DB_ROW_KEY` for a declared PK is its encoding, not an allocated surrogate. The data-table sort key remains numeric `TX_ID`.
-
-The data-table partition key is accessed only by hashed equality, so its encoding is for identity, not range order, and `DB_ROW_KEY` need not be byte-order-preserving. A PRIMARY key MAY, but is not required to, have a separate ordered index table to support range scans and ordering on the primary key. Whether and when to provide one is left to the implementation.
+The data-table partition key uses the [hash key encoding](MVCC_HASH_INDEX.md#primary-partition-key) and supports only equality. A PRIMARY key MAY, but is not required to, have a separate ordered index table to support range scans and ordering on the primary key. It uses the secondary sort key layout below with the PK columns as the indexed columns. Whether and when to provide one is left to the implementation.
 
 ## Secondary sort key
 
 Let I be the concatenation of the framed values of the declared index columns in index order. Every secondary index uses `INDEX_PARTITION = "ALL"` and `INDEX_TX_ID = I || U64(TX_ID) || U32(change_ordinal)`.
 
-Within each index, the logical identity for conflict checks, coalescing, visibility, and vacuum is I for a unique entry with all components non-NULL. For a nonunique entry or an entry with any NULL component, the identity is the pair (I, target PK). Obtain the target PK from the item.
+Within each index, the logical identity for conflict checks, coalescing, visibility, and vacuum is I for a unique entry with all components non-NULL. For a nonunique entry or an entry with any NULL component, the identity is the pair (I, target PK). The target PK is not in the sort key. Read it from the item's PK attributes, which the item stores as row data.
 
 Coalesce writes to one final mapping or tombstone per logical identity per transaction. A unique non-NULL value reassigned in the same transaction has one final mapping. SQL uniqueness includes snapshot visibility and own writes, with final validation at head publication.
 
@@ -44,11 +32,10 @@ DynamoDB bounds key sizes, and keys are never truncated or hashed to fit, so the
 
 | Key                                                               | Limit (bytes) | Measured length                                  |
 | ----------------------------------------------------------------- | ------------- | ------------------------------------------------ |
-| Primary partition key (`DB_ROW_KEY` or a direct-use column value) | 2048          | The complete encoded attribute value             |
 | Secondary sort key (`INDEX_TX_ID`)                                | 1024          | The framed index tuple I plus the 12-byte suffix |
 
-- A definition is rejected if the maximum encoded length of any key it produces can exceed its limit. The check runs on `CREATE TABLE`, `CREATE INDEX`, and `ALTER TABLE` statements that add or change an index, a primary key, or a column used by one. Rejection is a definition error, not a write-time error.
-- Sum the maximum framed lengths from the column definitions. Character columns use the string encoder’s maximum for the declared width and collation. Fixed-width components include their marker. For variable binary columns, charge the marker, two bytes per possible input byte and the two-byte terminator. [String encoder bounds](../../../packages/mvcc-index-encode/TODO.md)
+- A definition is rejected if the maximum encoded length of any key it produces can exceed its limit. The check runs on `CREATE TABLE`, `CREATE INDEX`, and `ALTER TABLE` statements that add or change an ordered index or a column used by one. Rejection is a definition error, not a write-time error.
+- Sum the maximum framed lengths from the column definitions. Fixed-width components include their marker. For variable binary columns, charge the marker, two bytes per possible input byte and the two-byte terminator. For a `utf8mb4` collation column of declared width n characters, charge M(n) from the [worst-case frame size](../../../packages/mvcc-index-encode/STRING_ENCODING.md#worst-case-frame-size) table. For an ASCII collation column, charge the marker, two bytes per character and the two-byte terminator, which is 2n + 3.
 - Every secondary index reserves eight bytes for TX_ID and four for the ordinal. Reject the definition if the maximum framed length of its declared index columns exceeds 1012 bytes, regardless of uniqueness or nullability.
 - A column type with no finite maximum encoded length, such as an unbounded TEXT or BLOB without a declared bound, cannot appear in a key and is rejected.
 - Changing a column's length, bound, or collation re-runs the check for every key containing that column.
@@ -62,9 +49,10 @@ Hex bytes are written without `0x`. `||` concatenates bytes. `U_w(x)` is unsigne
 | NULL                                           | `00`                                             |
 | Non-NULL fixed-width numeric or temporal value | `01` followed by the encoded value               |
 | Non-NULL variable binary value                 | `01` followed by the escaped payload and `00 00` |
-| Non-NULL character value                       | The complete frame returned by `weightFramed`    |
+| Non-NULL `utf8mb4` character value             | The complete frame returned by `weightString`    |
+| Non-NULL ASCII-collation character value       | `01` followed by the escaped key and `00 00`     |
 
-For a variable binary payload, escape each `00` as `00 ff`. Concatenate complete components directly. The schema determines their types and widths.
+For a variable binary payload or an ASCII-collation `weightString` key, escape each `00` as `00 ff`. ASCII keys are not self-delimiting, so the terminator is required. Concatenate complete components directly. The schema determines their types and widths.
 
 ## Value bytes
 
@@ -78,8 +66,8 @@ For a variable binary payload, escape each `00` as `00 ff`. Concatenate complete
 | DOUBLE           | Ordered IEEE binary64, 8 bytes                                                          |
 | Binary           | Escaped stored bytes                                                                    |
 | BLOB             | Escaped stored bytes                                                                    |
-| Character        | Complete collation-specific string frame                                                |
-| TEXT             | Complete collation-specific string frame                                                |
+| Character        | `weightString` frame; ASCII collations use tuple framing of the escaped key              |
+| TEXT             | Same as Character                                                                       |
 | DATE             | `U64((year*10000 + month*100 + day)*86400000000)`                                       |
 | DATETIME         | DATE integer plus time-of-day microseconds, encoded U64                                 |
 | TIMESTAMP        | `U64(epoch_microseconds+1)`; SQL zero timestamp uses `U64(0)`                           |
@@ -96,9 +84,11 @@ JSON, spatial, ENUM, SET, prefix, expression, and descending key encodings are u
 
 ### Character weights
 
-Use `weightFramed(value, collation, maxChars)` for character columns in tuples, index entries, lookups and range endpoints. For PAD SPACE ASCII collations, pass the declared width and preserve the input for padding by the encoder. For NO PAD collations, trailing spaces participate in comparison. Every non-NULL string frame starts above the NULL marker, including the empty string.
+Use `weightString(value, collation)` for character columns in tuples, index entries, lookups and range endpoints. Every collation is NO PAD: nothing pads a value to a declared width, and trailing spaces participate in comparison. The declared width only feeds the [key length check](#key-length-limits). Every non-NULL `utf8mb4` frame starts above the NULL marker, including the empty string. Reject unsupported collations.
 
-MySQL 8.4 defines equality and ordering. For example, `a` and `a` followed by U+0301 have identical frames under `utf8mb4_0900_ai_ci`. The encoder handles whole-string collation levels before framing. Use its output directly as one component. Reject unsupported collations. [String format and supported collations](../../../packages/mvcc-index-encode/STRING_ENCODING.md)
+Two keys compare as their input strings compare under the collation, and strings that compare equal produce identical bytes. For example, `a` and `a` followed by U+0301 have identical frames under `utf8mb4_0900_ai_ci`.
+
+MySQL treats `ascii_bin` and `ascii_general_ci` as PAD SPACE. Ordered indexes do not: `a` and `a` followed by a space are distinct keys, including for unique checks, probes and range endpoints. Evaluate predicates on such columns in SQL where trailing spaces could change the result.
 
 ## Reads and updates
 
@@ -106,7 +96,7 @@ MySQL 8.4 defines equality and ordering. For example, `a` and `a` followed by U+
 - Within each I, select the greatest visible TX_ID per logical identity. In descending key order, the first visible entry resolves that identity, including when it is a tombstone. In ascending order, retain the latest visible entry per identity until I is complete. Carry resolution state across DynamoDB pages and resume with the full physical key. Validate live target rows at the same snapshot before applying predicates or LIMIT.
 - When an update changes logical identity, tombstone the old identity and write the new mapping. An unchanged identity produces only its final item.
 - For a leading-column probe, Q is the concatenation of the complete framed components supplied by the query. Prefix Q covers `[Q, successor(Q))`. The successor increments the last non-ff byte and drops following bytes. An all-ff prefix has no finite upper bound. Append the transaction and ordinal bounds only after a complete I. For example, a variable binary indexed value `61` frames to `01 61 00 00`, giving the prefix range `[01 61 00 00, 01 61 00 01)`.
-- Re-encode predicates using the index column types and collations, including the declared width used to build PAD SPACE entries. Incompatible SQL coercions require SQL evaluation rather than an incorrect byte range.
+- Re-encode predicates using the index column types and collations. Incompatible SQL coercions require SQL evaluation rather than an incorrect byte range.
 
 ## Byte fixtures
 
@@ -116,6 +106,10 @@ MySQL 8.4 defines equality and ordering. For example, `a` and `a` followed by U+
 | Empty binary component                              | `010000`                                     |
 | Binary `00 ff` component                            | `0100ffff0000`                               |
 | Binary `61` component                               | `01610000`                                   |
+| `ascii_bin` empty string component                  | `010000`                                     |
+| `ascii_bin` `a` component                           | `01610000`                                   |
+| `ascii_bin` `a` followed by `00` component          | `016100ff0000`                               |
+| `ascii_general_ci` `a` component                    | `01410000`                                   |
 | Binary `61 00` component                            | `016100ff0000`                               |
 | Signed BIGINT -1 component                          | `017fffffffffffffff`                         |
 | Signed BIGINT 0 component                           | `018000000000000000`                         |

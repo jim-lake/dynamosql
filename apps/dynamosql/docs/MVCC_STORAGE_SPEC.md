@@ -59,7 +59,7 @@ Each change records the written `pk` and `kind` (`insert`, `update`, or `delete`
 
 `previous_row_tx_id` is optional when the writer already knows the prior row's TX_ID, such as read-modify-write. It is not expected for unconditional updates or INSERTs over tombstones. Never read a prior row just to populate it; its absence changes neither visibility nor commit validation.
 
-JSON represents native N as exact numbers, S as strings, BOOL as booleans, and NULL as null. Every B value uses `{"base64":"..."}` with padded base64, including binary keys, BLOBs, binary DOUBLEs, compressed SQL JSON, and INDEX_TX_ID. Decode the wrapper to bytes before writing. Empty B uses `{"base64":""}`; it differs from null.
+JSON represents native N as exact numbers, S as strings, BOOL as booleans, and NULL as null. Every B value uses `{"base64":"..."}` with padded base64, including binary keys, BLOBs, binary DOUBLEs, compressed SQL JSON, INDEX_TX_ID, and B-typed INDEX_KEY. Decode the wrapper to bytes before writing. Empty B uses `{"base64":""}`; it differs from null.
 
 `payload_zstd`, decoded (insert, read-modify-write update, delete, unconditional update):
 
@@ -100,7 +100,7 @@ JSON represents native N as exact numbers, S as strings, BOOL as booleans, and N
 }
 ```
 
-`pk` names the target partition-key attribute. For index writes, record the complete physical `INDEX_TX_ID`, including its assigned change ordinal, so staging retries address the same item. An empty payload is `{"overflow":false,"changes":[]}`. Read-only transactions need no record.
+`pk` names the target partition-key attribute. For ordered index writes, record the complete physical `INDEX_TX_ID`, including its assigned change ordinal, so staging retries address the same item. For hash index writes, record `INDEX_KEY`. An empty payload is `{"overflow":false,"changes":[]}`. Read-only transactions need no record.
 
 For a rebuild, the DDL resource intents record the same logical `table_uuid` and the physical `dynamodb_table` to create or retire.
 
@@ -177,7 +177,7 @@ Schemas are immutable and retained. Query the domain's highest `schema_id` desce
 - Resolve databases by name within the snapshot catalog. Assign a fresh `table_uuid` on CREATE TABLE and preserve it across renames and preserving rebuilds. Store each physical generation’s name in `dynamodb_table`. A UUID suffix is conventional. Never republish a retired generation.
 - Columns have `column_name` and stable lowercase `dynamodb_name`; no numeric column IDs. New columns use a unique storage name, adding `_2`, `_3`, etc. as needed; do not reuse names within a physical generation. Rename changes `column_name` and index references, not stored attribute names. Column order defines SELECT */implicit INSERT order.
 - Use normalized MySQL types, defaults, precision, charset, and collation. Irrelevant parameters are null. Fold ASCII A–Z for identifier lookup; preserve display names. Exclude temporary tables and built-in databases.
-- Every key is in `indexes`: `index_name`, `unique`, and `columns` (SQL column names). PRIMARY is unique; its `dynamodb_name` selects the data partition-key attribute. With no declared PK, PRIMARY has `columns=["DB_ROW_ID"]`. Secondary indexes have `index_uuid` and `dynamodb_table`. Index encodings and direct-PK eligibility are defined in [MVCC_INDEX_ENCODING.md](MVCC_INDEX_ENCODING.md).
+- Every key is in `indexes`: `index_name`, `unique`, and `columns` (SQL column names). PRIMARY is unique; its `dynamodb_name` selects the data partition-key attribute. With no declared PK, PRIMARY has `columns=["DB_ROW_ID"]`. Secondary indexes have `index_uuid`, `dynamodb_table`, and `index_type`, which is `BTREE` for an ordered index or `HASH` for a hash index. [MVCC_HASH_INDEX.md](MVCC_HASH_INDEX.md) controls the PRIMARY partition-key encoding and HASH index encodings. [MVCC_ORDERED_INDEX.md](MVCC_ORDERED_INDEX.md) controls BTREE index encodings.
 - Indexes use full columns and ASC order. PK columns are non-nullable. Physical key changes create new generations. Renames preserve physical names.
 
 `payload_zstd`, decoded:
@@ -257,6 +257,7 @@ Schemas are immutable and retained. Query the domain's highest `schema_id` desce
             {
               "index_name": "name_unique",
               "index_uuid": "00000000-0000-4000-8000-000000000009",
+              "index_type": "BTREE",
               "unique": true,
               "columns": ["name"],
               "dynamodb_table": "orders_name_unique_00000000-0000-4000-8000-000000000009"
@@ -281,9 +282,11 @@ Use the table’s `dynamodb_table` value from the snapshot schema verbatim after
 | `DELETED`               | BOOL       | True for a tombstone; absent means live |
 | Column `dynamodb_name`  | N/S/B/NULL | User value; lowercase attribute name    |
 
-User attributes are lowercase; system attributes are uppercase. `column_name` is the SQL name; `dynamodb_name` is the stored name. A direct PK attribute also holds its user value. Only a single `utf8mb4_0900_bin` column may serve as a raw string PK. The storage engine rejects writes of `''` to a raw string PK because DynamoDB requires a nonempty partition key. Every other string PK collation, including `ascii_bin`, uses `DB_ROW_KEY` for the encoded key and the column attribute for the original SQL value.
+User attributes are lowercase; system attributes are uppercase. `column_name` is the SQL name; `dynamodb_name` is the stored name. A direct PK attribute also holds its user value.
 
-PRIMARY uses its single column's storage name when directly eligible. All other declared primary keys use `DB_ROW_KEY` (native B), including a single column that requires tuple encoding. Without a declared PK, `DB_ROW_ID` (native N) is generated and excluded from user columns. The two never coexist in one table. See [primary-key encoding](MVCC_INDEX_ENCODING.md#primary-partition-key).
+DynamoDB rejects an empty S or B partition key. A primary key whose partition-key value would be empty is illegal: reject the write. This applies to a direct string or binary PK holding `''` and to a `DB_ROW_KEY` that would be empty.
+
+The partition key uses the hash key encoding from [MVCC_HASH_INDEX.md](MVCC_HASH_INDEX.md#primary-partition-key). PRIMARY uses its single column's storage name when the hash key equals the column's stored value. All other declared primary keys use `DB_ROW_KEY`, which holds the hash key, and the column attributes hold the original SQL values. Without a declared PK, `DB_ROW_ID` (native N) is generated and excluded from user columns. The two never coexist in one table.
 
 Live rows contain every user column. Tombstones contain only key attributes and DELETED. PK updates tombstone the old key and write the new row. Coalesce repeated writes; failed statements never enter the transaction overlay.
 
@@ -291,26 +294,40 @@ Point reads Query the partition key with `TX_ID<=M`, descending, until the first
 
 ## `P_${index.dynamodb_table}`
 
-Use the secondary index's `dynamodb_table` value from the snapshot schema verbatim after the `P_` prefix.
+Use the secondary index's `dynamodb_table` value from the snapshot schema verbatim after the `P_` prefix. Each secondary index has its own table, and its `index_type` selects the key layout. Every index table has these attributes:
 
 | Column                       | Type       | Purpose                                                       |
 | ---------------------------- | ---------- | ------------------------------------------------------------- |
-| `INDEX_PARTITION`            | S          | Partition key; always `ALL`                                   |
-| `INDEX_TX_ID`                | B          | Framed index values followed by TX_ID and change ordinal      |
-| `TX_ID`                      | N          | Creating transaction, also encoded in the sort key            |
+| `TX_ID`                      | N          | Creating transaction                                          |
 | `DELETED`                    | BOOL       | True for a tombstone; absent means live                       |
 | Index column `dynamodb_name` | N/S/B/NULL | Indexed user value                                            |
 | PK column `dynamodb_name`    | N/S/B      | Target primary-key value                                      |
 | `DB_ROW_ID`                  | N          | Target generated partition key, for a hidden PK               |
-| `DB_ROW_KEY`                 | B          | Target partition key when the declared PK uses tuple encoding |
+| `DB_ROW_KEY`                 | S/B        | Target partition key when the declared PK is not direct       |
 
-Each secondary index has its own table. Store overlapping index/PK attributes once. Preserve identity values on index tombstones. Column renames retain these storage names.
+Store overlapping index/PK attributes once. Preserve identity values on index tombstones. Column renames retain these storage names. The target PK is an item attribute and never part of the key, except where a hash key appends it for a NULL component. Index changes commit with row changes. Validate live target rows at the same snapshot.
 
-Index sort keys use only NO PAD encoding. For a declared PAD SPACE collation, index builders, writers, and readers trim trailing U+0020 from each key value before encoding, including equality probes and range endpoints. Ordered scans can differ from MySQL for suffixes that sort below its implicit space, including ASCII control characters under `ascii_bin`. See [character weights](MVCC_INDEX_ENCODING.md#character-weights).
+For a unique non-NULL tuple, resolve conflicts and visibility by indexed tuple. For nonunique and NULL-containing entries, resolve them by indexed tuple and target PK, read from the item's PK attributes, not from the key. Reassigning a unique non-NULL tuple within one transaction produces one final mapping.
 
-Every secondary sort key ends with the eight-byte TX_ID and a four-byte ordinal unique within that transaction and index. The declared index columns have a combined 1012-byte budget. The target PK is an item attribute and contributes to the indexed tuple only where explicitly indexed. [Secondary sort key](MVCC_INDEX_ENCODING.md#secondary-sort-key).
+### Ordered indexes (`BTREE`)
 
-Index changes commit with row changes. For a unique non-NULL tuple, resolve conflicts and visibility by indexed tuple. For nonunique and NULL-containing entries, resolve them by indexed tuple and target PK. Reassigning a unique non-NULL tuple within one transaction produces one final mapping. Validate live target rows at the same snapshot.
+| Key                | Type | Value                                                    |
+| ------------------ | ---- | -------------------------------------------------------- |
+| `INDEX_PARTITION`  | S    | Partition key; always `ALL`                              |
+| `INDEX_TX_ID`      | B    | Sort key; framed index values, TX_ID and change ordinal  |
+
+[MVCC_ORDERED_INDEX.md](MVCC_ORDERED_INDEX.md) defines `INDEX_TX_ID`. Its sort keys use `weightString`, and every collation is NO PAD. Trailing spaces are significant in keys, including under `ascii_bin` and `ascii_general_ci`, which MySQL treats as PAD SPACE. See [character weights](MVCC_ORDERED_INDEX.md#character-weights).
+
+Every ordered sort key ends with the eight-byte TX_ID and a four-byte ordinal unique within that transaction and index. The declared index columns have a combined 1012-byte budget. [Secondary sort key](MVCC_ORDERED_INDEX.md#secondary-sort-key).
+
+### Hash indexes (`HASH`)
+
+| Key         | Type  | Value                                             |
+| ----------- | ----- | ------------------------------------------------- |
+| `INDEX_KEY` | S/B   | Partition key; derived hash key of the indexed values, or the indexed column's own attribute for a direct key |
+| `TX_ID`     | N     | Sort key; creating transaction                    |
+
+[MVCC_HASH_INDEX.md](MVCC_HASH_INDEX.md) defines the key. A direct key uses the indexed column's `dynamodb_name` as the partition key and stores the value once. Character values use `canonicalString`, and every collation is NO PAD. A hash index supports only equality lookups. A row whose hash index key would be an empty S or B is not saved in that index. Lookups, unique checks and other uses of the index may not work correctly for such rows.
 
 ## Column values
 
@@ -333,13 +350,13 @@ Index changes commit with row changes. For a unique non-NULL tuple, resolve conf
 | YEAR      | N calendar January 1 epoch milliseconds     |
 | SQL NULL  | Native NULL                                 |
 
-Store character and TEXT values as their SQL column values without adding collation padding. Preserve user-visible trailing spaces in row and index payload attributes. Trimming applies only when deriving PAD SPACE keys and probes.
+Store character and TEXT values as their SQL column values without adding collation padding. Preserve user-visible trailing spaces in row and index payload attributes. Key derivation never trims or pads.
 
 Apply SQL coercion, defaults, range checks, and precision before storage. Preserve exact numbers and fractional milliseconds. Reject unrepresentable values except for the DOUBLE fallback below. DATETIME is always stored in UTC: interpret its SQL calendar fields as UTC, never the server's local timezone. DATE/YEAR also use proleptic Gregorian fields as UTC; TIMESTAMP applies session timezone only at SQL input/output. TIME permits hours>23, with maximum magnitude 3020399000 ms. Temporal precision is `10^(3-fsp)` milliseconds.
 
 DOUBLE uses B if and only if its finite binary64 value is outside the [native N range](https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/HowItWorks.NamingRulesDataTypes.html). This includes nonzero underflow and overflow magnitudes; zero uses N. In-range values must use N with a decimal representation preserving binary64. NaN and infinities are invalid.
 
-The B value is exactly the eight order-preserving IEEE binary64 bytes from [index value encoding](MVCC_INDEX_ENCODING.md#value-bytes), without a tuple marker or terminator. Writers select N/B for each value; readers inspect the returned DynamoDB attribute type for every value, never infer it for the whole column. To decode B: if its high bit is 0, complement all bits; otherwise flip the high bit. Interpret the restored bits as IEEE binary64.
+The B value is exactly the eight order-preserving IEEE binary64 bytes from [index value encoding](MVCC_ORDERED_INDEX.md#value-bytes), without a tuple marker or terminator. Writers select N/B for each value; readers inspect the returned DynamoDB attribute type for every value, never infer it for the whole column. To decode B: if its high bit is 0, complement all bits; otherwise flip the high bit. Interpret the restored bits as IEEE binary64.
 
 PartiQL predicates must cover both native types: use numeric bounds for N and encoded binary bounds for B. Handle out-of-N-range bounds without constructing invalid N parameters. Binary bounds are passed as B parameters; mixed N/B values must not be compared as one native numeric type. Resolve MVCC visibility before mutable-value filtering.
 

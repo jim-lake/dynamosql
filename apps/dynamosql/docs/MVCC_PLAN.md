@@ -1,6 +1,6 @@
 # MVCC implementation plan
 
-Storage behavior: [MVCC_STORAGE_SPEC.md](MVCC_STORAGE_SPEC.md). Key encodings: [MVCC_INDEX_ENCODING.md](MVCC_INDEX_ENCODING.md).
+Storage behavior: [MVCC_STORAGE_SPEC.md](MVCC_STORAGE_SPEC.md). Ordered index encodings: [MVCC_ORDERED_INDEX.md](MVCC_ORDERED_INDEX.md).
 
 1. Register `mvcc` and implement the engine interface using existing SQL conversion/comparison helpers.
 2. Add transaction context and statement rollback. Keep read snapshots alive through iterator completion/cancellation and explicit transaction lifetime.
