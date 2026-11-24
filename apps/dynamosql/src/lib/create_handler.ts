@@ -5,6 +5,8 @@ import { trackFirstSeen } from '@/tools/util';
 import { COLLATIONS } from '../constants/mysql';
 import { SQLError } from '../error';
 
+import { getExprCollation } from './expression/collation/collation_expression';
+import { getExprMysqlType } from './expression/mysql_type/mysql_type_expression';
 import {
   getDatabaseName,
   getDatabaseFromTable,
@@ -16,22 +18,27 @@ import { precisionFields } from './helpers/column_type_helper';
 import { isUniqueConstraint, uniqueIndexName } from './helpers/unique_index';
 import * as SchemaManager from './schema_manager';
 import * as SelectHandler from './select_handler';
-import { mysqlStringToValueType } from './types/value_type';
+import * as TransactionManager from './transaction_manager';
+import {
+  mysqlStringToValueType,
+  valueTypeToMysqlType,
+} from './types/value_type';
 
 import type { CHARSETS } from '../constants/mysql';
-import type { FieldInfo } from '../types';
 import type {
   ColumnDefParam,
   EvaluationResultRow,
   UniqueDefParam,
 } from './engine';
 import type { EvaluationResult } from './expression';
+import type { EvaluationState } from './expression/evaluate';
 import type { HandlerParams, AffectedResult } from './handler_types';
 import type {
   Create,
   CreateTable,
   CreateDatabase,
   ColumnRef,
+  Binary,
 } from 'node-sql-parser/build/mysql';
 
 type CreateIndex = Create & {
@@ -74,6 +81,35 @@ export async function query(
   } else {
     logger.error('unsupported create:', ast.keyword);
     throw new SQLError('unsupported');
+  }
+}
+function _exprNullable(expr: unknown, state: EvaluationState): boolean {
+  if (typeof expr !== 'object' || expr === null || !('type' in expr)) {
+    return true;
+  }
+  switch (expr.type) {
+    case 'number':
+    case 'single_quote_string':
+    case 'double_quote_string':
+    case 'bool':
+      return false;
+    case 'column_ref': {
+      const ref = state.columnRefMap?.get(expr as ColumnRef);
+      const info = ref?.from ? state.tableInfoMap?.get(ref.from) : undefined;
+      const name = String((expr as ColumnRef).column).toLowerCase();
+      const column = info?.columns.find((col) => col.name_lc === name);
+      return column?.nullable !== false;
+    }
+    case 'binary_expr': {
+      const { operator, left, right } = expr as Binary;
+      return (
+        !['+', '-', '*'].includes(operator) ||
+        _exprNullable(left, state) ||
+        _exprNullable(right, state)
+      );
+    }
+    default:
+      return true;
   }
 }
 async function _createIndex(
@@ -285,27 +321,93 @@ async function _createTable(
       index_list.push({ name, key_list, type: _indexType(def.index_options) });
     }
   }
-  for (const name of primary_key) {
-    if (column_list.find((col) => col.name === name)?.mysqlType === 'JSON') {
-      throw new SQLError({ err: 'ER_JSON_USED_AS_KEY', args: [name] });
-    }
-  }
-
   let list: EvaluationResultRow[] | undefined;
-  if (ast.as && ast.query_expr) {
+  if (ast.query_expr) {
     const opts = { ast: ast.query_expr, session, dynamodb };
-    const { rows, columns } = await SelectHandler.internalQuery(opts);
+    const { rows, columns, queryColumns, state } =
+      await SelectHandler.internalQuery(opts);
 
-    const track = new Map();
+    const defined = column_list.splice(0);
+    const row_keys = columns.map((field, i) => {
+      const name_lc = field.name.toLowerCase();
+      if (column_list.some((col) => col.name.toLowerCase() === name_lc)) {
+        throw new SQLError({ err: 'ER_DUP_FIELDNAME', args: [field.name] });
+      }
+      const existing = defined.find(
+        (col) => col.name.toLowerCase() === name_lc
+      );
+      if (existing) {
+        column_list.push(existing);
+        return existing.name;
+      }
+      const result = queryColumns[i]?.result ?? {};
+      const expr = queryColumns[i]?.expr;
+      const typeInfo =
+        result.mysqlType === undefined ? getExprMysqlType(expr, state) : null;
+      const mysqlType =
+        result.mysqlType ??
+        typeInfo?.type ??
+        (result.type ? valueTypeToMysqlType(result.type) : 'VARCHAR');
+      const type = mysqlStringToValueType(mysqlType);
+      const is_text = type === 'string' || type === 'char';
+      const strings = rows
+        .map((row) => row[i]?.value)
+        .filter((v) => v !== null && v !== undefined)
+        .map(String);
+      let length = result.length ?? typeInfo?.length ?? null;
+      let precision = result.precision ?? typeInfo?.precision ?? null;
+      let scale = result.scale ?? typeInfo?.scale ?? null;
+      if (length === null && is_text) {
+        length = Math.max(1, ...strings.map((v) => v.length));
+      } else if (precision === null && type === 'number') {
+        const parts = strings.map((v) => v.replace('-', '').split('.'));
+        scale ??= Math.max(0, ...parts.map((p) => p[1]?.length ?? 0));
+        const int_digits = Math.max(1, ...parts.map((p) => p[0]?.length ?? 0));
+        precision = int_digits + scale;
+      }
+      const expr_collation =
+        is_text && expr ? getExprCollation(expr, state) : null;
+      const nullable = expr ? _exprNullable(expr, state) : true;
+      column_list.push({
+        name: field.name,
+        type,
+        mysqlType,
+        length,
+        precision,
+        scale,
+        fsp: result.fsp ?? null,
+        collation: is_text
+          ? (result.collation ?? expr_collation ?? collation)
+          : null,
+        nullable,
+        default:
+          result.default ??
+          (nullable || (expr && 'type' in expr && expr.type === 'column_ref')
+            ? undefined
+            : is_text
+              ? ''
+              : ['long', 'longlong', 'number', 'double'].includes(type)
+                ? 0
+                : undefined),
+        comment: result.comment,
+      });
+      return field.name;
+    });
+    column_list.unshift(...defined.filter((col) => !column_list.includes(col)));
+
     list = rows.map((row: EvaluationResult[]) => {
       const obj: EvaluationResultRow = {};
-      columns.forEach((column: FieldInfo, i: number) => {
+      row_keys.forEach((name, i) => {
         const value = row[i];
         if (value !== undefined) {
-          obj[column.name] = value;
+          obj[name] = value;
         }
       });
-      if (!duplicate_mode) {
+      return obj;
+    });
+    if (database.toLowerCase() === '_dynamodb' && !is_temp && !duplicate_mode) {
+      const track = new Map();
+      for (const obj of list) {
         const keys = primary_key.map((name) => obj[name]?.value);
         if (!trackFirstSeen(track, keys)) {
           throw new SQLError({
@@ -314,8 +416,17 @@ async function _createTable(
           });
         }
       }
-      return obj;
-    });
+    }
+  }
+
+  for (const name of primary_key) {
+    const key_column = column_list.find((col) => col.name === name);
+    if (key_column) {
+      key_column.nullable = false;
+    }
+    if (key_column?.mysqlType === 'JSON') {
+      throw new SQLError({ err: 'ER_JSON_USED_AS_KEY', args: [name] });
+    }
   }
 
   try {
@@ -353,8 +464,17 @@ async function _createTable(
       table,
       list,
       duplicate_mode,
+      is_ignore: duplicate_mode === 'ignore',
     };
-    return await engine.insertRowList(insertOpts);
+    try {
+      return await TransactionManager.run(
+        async () => await engine.insertRowList(insertOpts),
+        params
+      );
+    } catch (err) {
+      await SchemaManager.dropTable({ dynamodb, session, database, table });
+      throw err;
+    }
   }
   return { affectedRows: 0 };
 }

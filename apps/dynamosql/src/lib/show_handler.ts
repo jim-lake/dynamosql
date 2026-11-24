@@ -1,11 +1,12 @@
 import { userInfo } from 'node:os';
 
-import { COLLATIONS } from '../constants/mysql';
+import { COLLATIONS, FIELD_FLAGS } from '../constants/mysql';
 import { ALL_PRIVILEGES, CLASSIC_PRIVILEGES } from '../constants/privileges';
 import { REPLICA_STATUS_COLUMNS } from '../constants/replica_status';
 import { SYSTEM_VARIABLE_TYPES } from '../constants/system_variables';
 import { SQLError } from '../error';
 import GlobalSettings from '../global_settings';
+import { Types } from '../types';
 
 import {
   CHARSET_DEFAULT_COLLATION_MAP,
@@ -186,9 +187,13 @@ export async function query(params: HandlerParams<Show>): Promise<ShowResult> {
           }
         }
       }
-      const row: (string | null)[] = [
-        col.name,
-        _columnType(col),
+      const row: (string | null)[] = [col.name, _columnType(col)];
+      if (detail.full) {
+        const collation =
+          col.collation === undefined ? null : COLLATIONS[col.collation];
+        row.push(collation?.toLowerCase() ?? null);
+      }
+      row.push(
         nullable.has(col.name) ? 'YES' : 'NO',
         key,
         col.defaultValue === undefined || col.defaultValue.value === null
@@ -199,24 +204,37 @@ export async function query(params: HandlerParams<Show>): Promise<ShowResult> {
                 col.type === 'number' ? (col.scale ?? undefined) : undefined,
               timeZone: session.timeZone,
             }),
-        'NULL',
-      ];
+        'NULL'
+      );
       if (detail.full) {
-        const collation =
-          col.collation === undefined ? null : COLLATIONS[col.collation];
-        row.push(
-          collation?.toLowerCase() ?? null,
-          'select,insert,update,references',
-          col.comment ?? ''
-        );
+        row.push('select,insert,update,references', col.comment ?? '');
       }
       return row;
     });
-    const names = ['Field', 'Type', 'Null', 'Key', 'Default', 'Extra'];
+    const columns: FieldInfo[] = [
+      _showField('Field', Types.VAR_STRING, 256, FIELD_FLAGS.NOT_NULL),
+      _showField(
+        'Type',
+        Types.BLOB,
+        786420,
+        FIELD_FLAGS.NOT_NULL | FIELD_FLAGS.BLOB
+      ),
+    ];
     if (detail.full) {
-      names.push('Collation', 'Privileges', 'Comment');
+      columns.push(_showField('Collation', Types.VAR_STRING, 128, 0));
     }
-    const columns = names.map((name) => _stringColumn(name));
+    columns.push(
+      _showField('Null', Types.VAR_STRING, 12, FIELD_FLAGS.NOT_NULL),
+      _showField('Key', Types.VAR_STRING, 12, FIELD_FLAGS.NOT_NULL),
+      _showField('Default', Types.BLOB, 786420, FIELD_FLAGS.BLOB),
+      _showField('Extra', Types.VAR_STRING, 160, FIELD_FLAGS.NOT_NULL)
+    );
+    if (detail.full) {
+      columns.push(
+        _showField('Privileges', Types.VAR_STRING, 320, FIELD_FLAGS.NOT_NULL),
+        _showField('Comment', Types.VAR_STRING, 4096, FIELD_FLAGS.NOT_NULL)
+      );
+    }
     return { rows, columns };
   } else if (detail.keyword === 'index' || detail.keyword === 'indexes') {
     const target = detail.from?.[0];
@@ -358,6 +376,29 @@ function _stringColumn(name: string): FieldInfo {
     name,
     orgName: name,
   });
+}
+
+function _showField(
+  name: string,
+  type: Types,
+  length: number,
+  flags: number
+): FieldInfo {
+  return {
+    catalog: 'def',
+    db: '',
+    table: '',
+    orgTable: '',
+    name,
+    orgName: name,
+    charsetNr: COLLATIONS.UTF8MB4_GENERAL_CI,
+    length,
+    type,
+    flags,
+    decimals: 0,
+    zerofill: false,
+    protocol41: true,
+  };
 }
 
 async function _tableInfo(

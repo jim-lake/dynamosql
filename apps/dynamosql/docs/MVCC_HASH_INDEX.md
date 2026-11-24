@@ -37,10 +37,10 @@ Each component has one byte form that depends only on its value and its column d
 
 Let `n = x*10^s`, the exact scaled integer. DECIMAL normalized bytes depend on the value:
 
-| Value                          | Normalized bytes                                  |
-| ------------------------------ | ------------------------------------------------- |
-| `-(2^53-1) <= n <= 2^53-1`     | `n` as IEEE binary64, little-endian, 8 bytes      |
-| Otherwise                      | `LE_32(n)`, 256-bit two's complement, 32 bytes    |
+| Value                      | Normalized bytes                               |
+| -------------------------- | ---------------------------------------------- |
+| `-(2^53-1) <= n <= 2^53-1` | `n` as IEEE binary64, little-endian, 8 bytes   |
+| Otherwise                  | `LE_32(n)`, 256-bit two's complement, 32 bytes |
 
 A binary64 represents every integer in that range exactly. DECIMAL precision is at most 65 digits, so every `n` fits in 256 bits. The length prefix in [hashed keys](#hashed-keys) separates the two widths. Zero is positive zero.
 
@@ -48,24 +48,24 @@ A binary64 represents every integer in that range exactly. DECIMAL precision is 
 
 The representation is chosen from the index definition, never per row. A given index always produces one attribute type. Each NOT NULL single-column index takes the first row that applies.
 
-| Index definition                                                                                   | Key                                                   |
-| -------------------------------------------------------------------------------------------------- | ----------------------------------------------------- |
-| One NOT NULL direct column whose maximum stored length is at most 2048 bytes                       | The column's stored N, S or B value, unchanged        |
-| One NOT NULL DOUBLE column                                                                         | B, the 8 normalized bytes                             |
-| One NOT NULL FLOAT column                                                                          | B, the 4 normalized bytes                             |
-| One NOT NULL character column, other collation, maximum normalized length at most 16 bytes         | S, `canonicalString(value, collation)`                |
-| Anything else, including every composite index and every index with a nullable column             | B, the [hashed key](#hashed-keys)                     |
+| Index definition                                                                           | Key                                            |
+| ------------------------------------------------------------------------------------------ | ---------------------------------------------- |
+| One NOT NULL direct column whose maximum stored length is at most 2048 bytes               | The column's stored N, S or B value, unchanged |
+| One NOT NULL DOUBLE column                                                                 | B, the 8 normalized bytes                      |
+| One NOT NULL FLOAT column                                                                  | B, the 4 normalized bytes                      |
+| One NOT NULL character column, other collation, maximum normalized length at most 16 bytes | S, `canonicalString(value, collation)`         |
+| Anything else, including every composite index and every index with a nullable column      | B, the [hashed key](#hashed-keys)              |
 
 A direct column is one whose stored value already is its hash key, so the key never duplicates the value:
 
-| Direct column type                                  | Stored value | Maximum stored length                 |
-| --------------------------------------------------- | ------------ | ------------------------------------- |
-| Integer                                             | N            | Fits                                  |
-| DECIMAL(p,s) with `p <= 38`                         | N            | Fits                                  |
-| Temporal                                            | N            | Fits                                  |
-| Binary, BLOB                                        | B            | Declared length in bytes              |
-| Character, TEXT under `utf8mb4_0900_bin`            | S            | Four bytes per declared character     |
-| Character, TEXT under `ascii_bin`                   | S            | One byte per declared character       |
+| Direct column type                       | Stored value | Maximum stored length             |
+| ---------------------------------------- | ------------ | --------------------------------- |
+| Integer                                  | N            | Fits                              |
+| DECIMAL(p,s) with `p <= 38`              | N            | Fits                              |
+| Temporal                                 | N            | Fits                              |
+| Binary, BLOB                             | B            | Declared length in bytes          |
+| Character, TEXT under `utf8mb4_0900_bin` | S            | Four bytes per declared character |
+| Character, TEXT under `ascii_bin`        | S            | One byte per declared character   |
 
 - A direct key is the column's own attribute. The item stores the value once, under the column's `dynamodb_name`.
 - 2048 bytes is DynamoDB's partition-key limit. A direct column whose maximum stored length exceeds it, or has no declared bound, is hashed.
@@ -92,12 +92,12 @@ The PRIMARY definition is encoded as a hash key. PK columns forbid NULL, so the 
 
 The hashed key is `SHA-256` of the concatenated component frames in index order, applied once, 32 bytes.
 
-| Component                                    | Frame                                           |
-| -------------------------------------------- | ----------------------------------------------- |
-| Fixed-width value                            | Its normalized bytes                            |
-| Variable-width value                         | `LE_4(byte length)` followed by its normalized bytes |
-| NULL, in a column that permits NULL          | `00`                                            |
-| Non-NULL value, in a column that permits NULL | `01` followed by its frame as above            |
+| Component                                     | Frame                                                |
+| --------------------------------------------- | ---------------------------------------------------- |
+| Fixed-width value                             | Its normalized bytes                                 |
+| Variable-width value                          | `LE_4(byte length)` followed by its normalized bytes |
+| NULL, in a column that permits NULL           | `00`                                                 |
+| Non-NULL value, in a column that permits NULL | `01` followed by its frame as above                  |
 
 - The schema fixes each component's type and nullability, and every variable-width value carries its length, so distinct component lists never produce the same input bytes.
 - When any component of a row's key is NULL, append the row's PK frames after the index components, so NULL-containing rows never share a key. The PK frames are the declared PK components in PK order, framed as above, or `LE_8(DB_ROW_ID)` for a hidden PK. When no component is NULL, append nothing.
@@ -108,26 +108,26 @@ The hash index table's partition key is the indexed column's own attribute for a
 
 ## Byte fixtures
 
-| Input                                           | Key                                                                                                              |
-| ----------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
-| NOT NULL INT 1, single column                   | N `1`                                                                                                            |
-| NOT NULL DECIMAL(5,2) 1.50, single column       | N `1.5`                                                                                                          |
-| BIGINT -1 normalized bytes                      | `ffffffffffffffff`                                                                                               |
-| DATE 2000-01-01 normalized bytes                | `000080f5598d6b42`, binary64 946684800000                                                                        |
-| TIME -00:00:01.5 normalized bytes               | `00000000007097c0`, binary64 -1500                                                                               |
-| YEAR 2024 normalized bytes                      | `0000401f25cc7842`, binary64 1704067200000                                                                       |
-| Zero DATE normalized bytes                      | `0080faca73f93fc3`, binary64 -9000000000000000                                                                   |
-| DECIMAL(5,2) 1.50 normalized bytes              | `0000000000c06240`, binary64 150                                                                                 |
-| DECIMAL(65,0) 2^53 normalized bytes             | `0000000000002000000000000000000000000000000000000000000000000000`                                               |
-| NOT NULL DOUBLE 1, single column                | B `000000000000f03f`                                                                                             |
-| NOT NULL DOUBLE -1, single column               | B `000000000000f0bf`                                                                                             |
-| NOT NULL DOUBLE -0, single column               | B `0000000000000000`                                                                                             |
-| `utf8mb4_0900_bin` `abc` in NOT NULL VARCHAR(4) | S `abc`, direct                                                                                                        |
-| `ascii_bin` 17 `a` in NOT NULL VARCHAR(17)      | S `aaaaaaaaaaaaaaaaa`, direct                                                                                    |
-| `ascii_general_ci` 17 `a` in NOT NULL VARCHAR(17) | B `SHA-256(11000000 41×17)` = `b664e05a93365551f927d89d91c9e2bacecf16b8e44bc8d06dcaa8dd35f39f32` |
-| (`ab`, `c`), composite NOT NULL VARCHARs        | B `SHA-256(02000000 6162 01000000 63)` = `60014a36d7b05b0730e42a8b96faa1ffb4bd28469aea4000191179f01561ddb7`      |
-| (`a`, `bc`), composite NOT NULL VARCHARs        | B `SHA-256(01000000 61 02000000 6263)` = `47ea6f805c5b663e33012cd34184e1398ad81a0dcea50071346f05d26692e843`      |
-| (INT 1, INT 2), composite NOT NULL              | B `SHA-256(01000000 02000000)` = `34fb5c825de7ca4aea6e712f19d439c1da0c92c37b423936c5f618545ca4fa1f`              |
-| Nullable INT 1, single column                   | B `SHA-256(01 01000000)` = `b3844634762d8e075473fc1cd774d0f251c6512e27e67e43e7b9ae69efff56f3`                    |
-| Nullable INT NULL, BIGINT PK 10                 | B `SHA-256(00 0a00000000000000)` = `82451e648f5a389de8890552888439415478ffa3d3595a17639e69f2b839486a`            |
-| Nullable VARCHAR `ab`, single column            | B `SHA-256(01 02000000 6162)` = `50689cfad79bcb0617484629f2d4ea14e2547e22aef83bebda6bdf51e7b963d8`               |
+| Input                                             | Key                                                                                                         |
+| ------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
+| NOT NULL INT 1, single column                     | N `1`                                                                                                       |
+| NOT NULL DECIMAL(5,2) 1.50, single column         | N `1.5`                                                                                                     |
+| BIGINT -1 normalized bytes                        | `ffffffffffffffff`                                                                                          |
+| DATE 2000-01-01 normalized bytes                  | `000080f5598d6b42`, binary64 946684800000                                                                   |
+| TIME -00:00:01.5 normalized bytes                 | `00000000007097c0`, binary64 -1500                                                                          |
+| YEAR 2024 normalized bytes                        | `0000401f25cc7842`, binary64 1704067200000                                                                  |
+| Zero DATE normalized bytes                        | `0080faca73f93fc3`, binary64 -9000000000000000                                                              |
+| DECIMAL(5,2) 1.50 normalized bytes                | `0000000000c06240`, binary64 150                                                                            |
+| DECIMAL(65,0) 2^53 normalized bytes               | `0000000000002000000000000000000000000000000000000000000000000000`                                          |
+| NOT NULL DOUBLE 1, single column                  | B `000000000000f03f`                                                                                        |
+| NOT NULL DOUBLE -1, single column                 | B `000000000000f0bf`                                                                                        |
+| NOT NULL DOUBLE -0, single column                 | B `0000000000000000`                                                                                        |
+| `utf8mb4_0900_bin` `abc` in NOT NULL VARCHAR(4)   | S `abc`, direct                                                                                             |
+| `ascii_bin` 17 `a` in NOT NULL VARCHAR(17)        | S `aaaaaaaaaaaaaaaaa`, direct                                                                               |
+| `ascii_general_ci` 17 `a` in NOT NULL VARCHAR(17) | B `SHA-256(11000000 41×17)` = `b664e05a93365551f927d89d91c9e2bacecf16b8e44bc8d06dcaa8dd35f39f32`            |
+| (`ab`, `c`), composite NOT NULL VARCHARs          | B `SHA-256(02000000 6162 01000000 63)` = `60014a36d7b05b0730e42a8b96faa1ffb4bd28469aea4000191179f01561ddb7` |
+| (`a`, `bc`), composite NOT NULL VARCHARs          | B `SHA-256(01000000 61 02000000 6263)` = `47ea6f805c5b663e33012cd34184e1398ad81a0dcea50071346f05d26692e843` |
+| (INT 1, INT 2), composite NOT NULL                | B `SHA-256(01000000 02000000)` = `34fb5c825de7ca4aea6e712f19d439c1da0c92c37b423936c5f618545ca4fa1f`         |
+| Nullable INT 1, single column                     | B `SHA-256(01 01000000)` = `b3844634762d8e075473fc1cd774d0f251c6512e27e67e43e7b9ae69efff56f3`               |
+| Nullable INT NULL, BIGINT PK 10                   | B `SHA-256(00 0a00000000000000)` = `82451e648f5a389de8890552888439415478ffa3d3595a17639e69f2b839486a`       |
+| Nullable VARCHAR `ab`, single column              | B `SHA-256(01 02000000 6162)` = `50689cfad79bcb0617484629f2d4ea14e2547e22aef83bebda6bdf51e7b963d8`          |

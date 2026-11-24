@@ -296,14 +296,14 @@ Point reads Query the partition key with `TX_ID<=M`, descending, until the first
 
 Use the secondary index's `dynamodb_table` value from the snapshot schema verbatim after the `P_` prefix. Each secondary index has its own table, and its `index_type` selects the key layout. Every index table has these attributes:
 
-| Column                       | Type       | Purpose                                                       |
-| ---------------------------- | ---------- | ------------------------------------------------------------- |
-| `TX_ID`                      | N          | Creating transaction                                          |
-| `DELETED`                    | BOOL       | True for a tombstone; absent means live                       |
-| Index column `dynamodb_name` | N/S/B/NULL | Indexed user value                                            |
-| PK column `dynamodb_name`    | N/S/B      | Target primary-key value                                      |
-| `DB_ROW_ID`                  | N          | Target generated partition key, for a hidden PK               |
-| `DB_ROW_KEY`                 | S/B        | Target partition key when the declared PK is not direct       |
+| Column                       | Type       | Purpose                                                 |
+| ---------------------------- | ---------- | ------------------------------------------------------- |
+| `TX_ID`                      | N          | Creating transaction                                    |
+| `DELETED`                    | BOOL       | True for a tombstone; absent means live                 |
+| Index column `dynamodb_name` | N/S/B/NULL | Indexed user value                                      |
+| PK column `dynamodb_name`    | N/S/B      | Target primary-key value                                |
+| `DB_ROW_ID`                  | N          | Target generated partition key, for a hidden PK         |
+| `DB_ROW_KEY`                 | S/B        | Target partition key when the declared PK is not direct |
 
 Store overlapping index/PK attributes once. Preserve identity values on index tombstones. Column renames retain these storage names. The target PK is an item attribute and never part of the key, except where a hash key appends it for a NULL component. Index changes commit with row changes. Validate live target rows at the same snapshot.
 
@@ -311,10 +311,10 @@ For a unique non-NULL tuple, resolve conflicts and visibility by indexed tuple. 
 
 ### Ordered indexes (`BTREE`)
 
-| Key                | Type | Value                                                    |
-| ------------------ | ---- | -------------------------------------------------------- |
-| `INDEX_PARTITION`  | S    | Partition key; always `ALL`                              |
-| `INDEX_TX_ID`      | B    | Sort key; framed index values, TX_ID and change ordinal  |
+| Key               | Type | Value                                                   |
+| ----------------- | ---- | ------------------------------------------------------- |
+| `INDEX_PARTITION` | S    | Partition key; always `ALL`                             |
+| `INDEX_TX_ID`     | B    | Sort key; framed index values, TX_ID and change ordinal |
 
 [MVCC_ORDERED_INDEX.md](MVCC_ORDERED_INDEX.md) defines `INDEX_TX_ID`. Its sort keys use `weightString`, and every collation is NO PAD. Trailing spaces are significant in keys, including under `ascii_bin` and `ascii_general_ci`, which MySQL treats as PAD SPACE. See [character weights](MVCC_ORDERED_INDEX.md#character-weights).
 
@@ -322,10 +322,10 @@ Every ordered sort key ends with the eight-byte TX_ID and a four-byte ordinal un
 
 ### Hash indexes (`HASH`)
 
-| Key         | Type  | Value                                             |
-| ----------- | ----- | ------------------------------------------------- |
-| `INDEX_KEY` | S/B   | Partition key; derived hash key of the indexed values, or the indexed column's own attribute for a direct key |
-| `TX_ID`     | N     | Sort key; creating transaction                    |
+| Key         | Type | Value                                                                                                         |
+| ----------- | ---- | ------------------------------------------------------------------------------------------------------------- |
+| `INDEX_KEY` | S/B  | Partition key; derived hash key of the indexed values, or the indexed column's own attribute for a direct key |
+| `TX_ID`     | N    | Sort key; creating transaction                                                                                |
 
 [MVCC_HASH_INDEX.md](MVCC_HASH_INDEX.md) defines the key. A direct key uses the indexed column's `dynamodb_name` as the partition key and stores the value once. Character values use `canonicalString`, and every collation is NO PAD. A hash index supports only equality lookups. A row whose hash index key would be an empty S or B is not saved in that index. Lookups, unique checks and other uses of the index may not work correctly for such rows.
 

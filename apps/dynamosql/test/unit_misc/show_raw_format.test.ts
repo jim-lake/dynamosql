@@ -69,11 +69,11 @@ describe('SHOW on raw (_dynamodb) tables', () => {
       [
         'Field',
         'Type',
+        'Collation',
         'Null',
         'Key',
         'Default',
         'Extra',
-        'Collation',
         'Privileges',
         'Comment',
       ]

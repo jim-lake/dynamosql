@@ -26,9 +26,3 @@ Matching MySQL is not a goal for illegal statements. Parse errors (`ER_PARSE_ERR
 
 - `SELECT ROUND(CAST(-1.45 AS DECIMAL(10,2)), 1);`: MySQL returns `-1.5` (NEWDECIMAL). DynamoSQL returns `-1.4`, because `round` calls `value.toFixed(decimals)` on the double value of the decimal, and the double -1.45 is stored just below the tie.
 - `SELECT ROUND(dec_v) FROM t;`, where `dec_v` is `DECIMAL(10,2)`: MySQL returns NEWDECIMAL. DynamoSQL returns DOUBLE, because `round` resolves the result type through `_resolveTypeForRounding` and does not keep the DECIMAL input type.
-
-## CREATE TEMPORARY TABLE ... SELECT
-
-- `CREATE TEMPORARY TABLE ct (id INT PRIMARY KEY) AS SELECT 1 AS id UNION SELECT 2;` then `SELECT * FROM ct;`: MySQL returns `affectedRows` 2 and 2 rows. DynamoSQL returns `affectedRows` 1 and 0 rows. The CTAS rows are not kept in the memory table.
-- The same statement without `AS` (`CREATE TEMPORARY TABLE ct (id INT PRIMARY KEY) SELECT ...`) behaves the same way.
-- `CREATE TEMPORARY TABLE ct SELECT 1 AS id;` (no column definitions, no key): MySQL succeeds with `affectedRows` 1. DynamoSQL returns `ER_BAD_FIELD_ERROR`.

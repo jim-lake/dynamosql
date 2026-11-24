@@ -45,11 +45,29 @@ export function getExprMysqlType(
   switch (expr.type) {
     case 'column_ref':
       return _columnRefMysqlType(expr as ColumnRef, state);
-    case 'number':
-      return { type: 'DECIMAL' };
+    case 'number': {
+      const text = 'value' in expr ? String(expr.value) : '';
+      const [int_part = '', frac = ''] = text.replace('-', '').split('.');
+      if (text.includes('.')) {
+        return {
+          type: 'DECIMAL',
+          precision: Math.max(1, int_part.length) + frac.length,
+          scale: frac.length,
+        };
+      }
+      return {
+        type: int_part.length > 9 ? 'BIGINT' : 'INT',
+        precision: int_part.length,
+        scale: 0,
+      };
+    }
     case 'single_quote_string':
     case 'double_quote_string':
-      return { type: 'VARCHAR' };
+      return {
+        type: 'VARCHAR',
+        length:
+          'value' in expr ? Array.from(String(expr.value)).length : undefined,
+      };
     case 'binary_expr':
       return _binaryMysqlType(expr as Binary, state);
     case 'unary_expr':
@@ -85,14 +103,33 @@ function _binaryMysqlType(
     return { type: 'BIGINT' };
   }
   const types = [left.type, right.type];
+  const scale = _arithmeticScale(op, left, right);
   if (types.some((t) => STRING_TYPES.has(t)) || types.includes('DOUBLE')) {
-    return { type: 'DOUBLE', scale: _arithmeticScale(op, left, right) };
+    return { type: 'DOUBLE', scale };
+  }
+  if (types.includes('DECIMAL') && op !== '/') {
+    const lp = left.precision ?? INTEGER_PRECISION[left.type];
+    const rp = right.precision ?? INTEGER_PRECISION[right.type];
+    const ls = left.scale ?? 0;
+    const rs = right.scale ?? 0;
+    const precision =
+      lp === undefined || rp === undefined
+        ? undefined
+        : op === '*'
+          ? lp + rp
+          : Math.max(lp - ls, rp - rs) + Math.max(ls, rs) + 1;
+    return { type: 'DECIMAL', precision, scale };
   }
   if (types.includes('DECIMAL')) {
-    return { type: 'DECIMAL', scale: _arithmeticScale(op, left, right) };
+    return { type: 'DECIMAL', scale };
   }
   return { type: 'BIGINT' };
 }
+
+const INTEGER_PRECISION: Partial<Record<MysqlType, number>> = {
+  INT: 11,
+  BIGINT: 20,
+};
 
 function _arithmeticScale(
   op: string,
@@ -122,7 +159,12 @@ function _columnRefMysqlType(
   const column = info?.columns.find((c) =>
     info.isCaseSensitive ? c.name === columnName : c.name_lc === columnName
   );
-  return { type: column?.mysqlType ?? 'JSON' };
+  return {
+    type: column?.mysqlType ?? 'JSON',
+    length: column?.length,
+    precision: column?.precision,
+    scale: column?.scale ?? (column?.mysqlType === 'INT' ? 0 : undefined),
+  };
 }
 
 function _castMysqlType(expr: Cast): MysqlTypeInfo | null {

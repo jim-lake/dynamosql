@@ -111,11 +111,13 @@ export interface InternalQueryResult {
   columns: FieldInfo[];
   queryColumns: QueryColumn[];
   row_list: SourceRowResult[] | SourceRowResultGroup[];
+  state: EvaluationState;
 }
 export async function internalQuery(
   params: InternalQueryParams
 ): Promise<InternalQueryResult> {
-  const { resultIter, queryColumns, columnRefMap } = await _iterQuery(params);
+  const { resultIter, queryColumns, columnRefMap, state } =
+    await _iterQuery(params);
 
   let row_list: SourceRowResult[] = [];
   for await (const batch of resultIter) {
@@ -127,7 +129,7 @@ export async function internalQuery(
   }
   const columns = calcColumns(queryColumns, columnRefMap);
   const rows = row_list.map((row) => row.result);
-  return { rows, columns, queryColumns, row_list };
+  return { rows, columns, queryColumns, row_list, state };
 }
 type PlainNode = Record<string, unknown>;
 function _isPlainNode(value: unknown): value is PlainNode {
@@ -176,6 +178,7 @@ interface IterQueryResults {
   resultIter: AsyncIterableIterator<SourceRowResult[]>;
   queryColumns: QueryColumn[];
   columnRefMap: Map<ColumnRef, ColumnRefInfo>;
+  state: EvaluationState;
 }
 async function _iterQuery(
   params: InternalQueryParams
@@ -594,7 +597,7 @@ async function _evaluateReturn(
   }
 
   const finalIter = _makeResults({ iter: resultIter, queryColumns, state });
-  return { resultIter: finalIter, queryColumns, columnRefMap };
+  return { resultIter: finalIter, queryColumns, columnRefMap, state };
 }
 
 async function* _listToItetator(list: SourceRow[]): AsyncIterable<SourceRow[]> {

@@ -31,14 +31,45 @@ export function convertType(def: Partial<ColumnDef>): FieldInfo {
   let flags = 0;
   let decimals = 0;
   if (def.mysqlType) {
-    switch (def.mysqlType) {
+    switch (String(def.mysqlType)) {
       case 'INT':
+      case 'INTEGER':
         type = Types.LONG;
+        length = 11;
         flags |= FIELD_FLAGS.BINARY;
+        break;
+      case 'TINYINT':
+        type = Types.TINY;
+        length = 4;
+        break;
+      case 'SMALLINT':
+        type = Types.SHORT;
+        length = 6;
+        break;
+      case 'MEDIUMINT':
+        type = Types.INT24;
+        length = 9;
         break;
       case 'BIGINT':
         type = Types.LONGLONG;
         flags |= FIELD_FLAGS.BINARY;
+        break;
+      case 'DOUBLE':
+      case 'DOUBLE PRECISION':
+      case 'REAL':
+        type = Types.DOUBLE;
+        length = 22;
+        decimals = 31;
+        break;
+      case 'FLOAT':
+        type = Types.FLOAT;
+        length = 12;
+        decimals = 31;
+        break;
+      case 'YEAR':
+        type = Types.YEAR;
+        length = 4;
+        flags |= FIELD_FLAGS.UNSIGNED | FIELD_FLAGS.ZEROFILL;
         break;
       case 'VARCHAR':
         type = Types.VAR_STRING;
@@ -65,12 +96,15 @@ export function convertType(def: Partial<ColumnDef>): FieldInfo {
         flags |= FIELD_FLAGS.BINARY;
         break;
       case 'DECIMAL':
+      case 'NUMERIC':
+      case 'DEC':
         type = Types.NEWDECIMAL;
         flags |= FIELD_FLAGS.BINARY;
         break;
+      case 'BOOL':
       case 'BOOLEAN':
         type = Types.TINY;
-        flags |= FIELD_FLAGS.BINARY;
+        length = 1;
         break;
       case 'TEXT':
       case 'TINYTEXT':

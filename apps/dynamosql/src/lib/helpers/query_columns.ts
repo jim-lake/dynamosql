@@ -34,6 +34,8 @@ export interface QueryColumn {
     fsp?: number | undefined;
     collation?: COLLATIONS | undefined;
     nullable?: boolean | undefined;
+    default?: unknown;
+    comment?: string | undefined;
   };
   db?: string;
 }
@@ -155,5 +157,7 @@ function _makeResultColumn(
     fsp: column.fsp,
     collation,
     nullable: column.nullable,
+    default: column.default,
+    comment: column.comment,
   };
 }

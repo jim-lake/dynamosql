@@ -30,9 +30,9 @@ After coalescing, assign a distinct unsigned 32-bit ordinal to each physical ent
 
 DynamoDB bounds key sizes, and keys are never truncated or hashed to fit, so the limits are enforced at definition time.
 
-| Key                                                               | Limit (bytes) | Measured length                                  |
-| ----------------------------------------------------------------- | ------------- | ------------------------------------------------ |
-| Secondary sort key (`INDEX_TX_ID`)                                | 1024          | The framed index tuple I plus the 12-byte suffix |
+| Key                                | Limit (bytes) | Measured length                                  |
+| ---------------------------------- | ------------- | ------------------------------------------------ |
+| Secondary sort key (`INDEX_TX_ID`) | 1024          | The framed index tuple I plus the 12-byte suffix |
 
 - A definition is rejected if the maximum encoded length of any key it produces can exceed its limit. The check runs on `CREATE TABLE`, `CREATE INDEX`, and `ALTER TABLE` statements that add or change an ordered index or a column used by one. Rejection is a definition error, not a write-time error.
 - Sum the maximum framed lengths from the column definitions. Fixed-width components include their marker. For variable binary columns, charge the marker, two bytes per possible input byte and the two-byte terminator. For a `utf8mb4` collation column of declared width n characters, charge M(n) from the [worst-case frame size](../../../packages/mvcc-index-encode/STRING_ENCODING.md#worst-case-frame-size) table. For an ASCII collation column, charge the marker, two bytes per character and the two-byte terminator, which is 2n + 3.
@@ -66,7 +66,7 @@ For a variable binary payload or an ASCII-collation `weightString` key, escape e
 | DOUBLE           | Ordered IEEE binary64, 8 bytes                                                          |
 | Binary           | Escaped stored bytes                                                                    |
 | BLOB             | Escaped stored bytes                                                                    |
-| Character        | `weightString` frame; ASCII collations use tuple framing of the escaped key              |
+| Character        | `weightString` frame; ASCII collations use tuple framing of the escaped key             |
 | TEXT             | Same as Character                                                                       |
 | DATE             | `U64((year*10000 + month*100 + day)*86400000000)`                                       |
 | DATETIME         | DATE integer plus time-of-day microseconds, encoded U64                                 |

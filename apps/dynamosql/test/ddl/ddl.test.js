@@ -46,6 +46,7 @@ describe('DDL', function () {
   runTests('show.sql', path.join(__dirname, 'show.sql'), { timeout: 30000 });
   runTests('show_columns.sql', path.join(__dirname, 'show_columns.sql'), {
     timeout: 30000,
+    verify_field_types: true,
   });
   runTests('show_index.sql', path.join(__dirname, 'show_index.sql'), {
     timeout: 30000,

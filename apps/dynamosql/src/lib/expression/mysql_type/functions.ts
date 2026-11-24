@@ -208,11 +208,18 @@ function valueSelectRule(
   return info.type === 'TINYINT' ? { type: 'INT' } : info;
 }
 
+function sameLengthVarchar(
+  args: unknown[],
+  state: EvaluationState
+): MysqlTypeInfo {
+  return { type: 'VARCHAR', length: getExprMysqlType(args[0], state)?.length };
+}
+
 export const functionRules: Record<string, FunctionRule> = {
-  lower: returnsVarchar,
-  lcase: returnsVarchar,
-  upper: returnsVarchar,
-  ucase: returnsVarchar,
+  lower: sameLengthVarchar,
+  lcase: sameLengthVarchar,
+  upper: sameLengthVarchar,
+  ucase: sameLengthVarchar,
   date: () => ({ type: 'DATE' }),
   time: () => ({ type: 'TIME' }),
   unix_timestamp: returnsBigint,
@@ -222,7 +229,14 @@ export const functionRules: Record<string, FunctionRule> = {
   row_number: returnsBigint,
   rank: returnsBigint,
   dense_rank: returnsBigint,
-  concat: returnsVarchar,
+  concat: (args, state) => {
+    const lengths = args.map((arg) => getExprMysqlType(arg, state)?.length);
+    const known = lengths.every((len): len is number => len !== undefined);
+    return {
+      type: 'VARCHAR',
+      length: known ? lengths.reduce((sum, len) => sum + len, 0) : undefined,
+    };
+  },
   concat_ws: returnsVarchar,
   left: returnsVarchar,
   right: returnsVarchar,

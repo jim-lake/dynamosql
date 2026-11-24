@@ -28,7 +28,12 @@ describe('Temp', function () {
   runTests(
     'memory_default_comment.sql',
     path.join(__dirname, 'memory_default_comment.sql'),
-    { checkChanged: true }
+    { checkChanged: true, verify_field_types: true }
+  );
+  runTests(
+    'memory_field_types.sql',
+    path.join(__dirname, 'memory_field_types.sql'),
+    { checkChanged: true, verify_field_types: true }
   );
   runTests(
     'memory_truthiness.sql',
@@ -66,6 +71,15 @@ describe('Temp', function () {
     'memory_collation_function.sql',
     path.join(__dirname, 'memory_collation_function.sql'),
     { checkChanged: true, verify_field_types: true }
+  );
+  runTests('memory_ctas.sql', path.join(__dirname, 'memory_ctas.sql'), {
+    checkChanged: true,
+    verify_field_types: true,
+  });
+  runTests(
+    'memory_ctas_error.sql',
+    path.join(__dirname, 'memory_ctas_error.sql'),
+    { allowedErrors: 'SAME_CODE', checkChanged: true }
   );
   runTests('temp_keyless.sql', path.join(__dirname, 'temp_keyless.sql'), {
     checkChanged: true,
