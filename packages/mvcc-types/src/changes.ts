@@ -55,9 +55,7 @@ export interface DeleteIndexChange extends ChangeTarget {
 }
 
 export type IndexChange = (
-  | InsertIndexChange
-  | UpdateIndexChange
-  | DeleteIndexChange
+  InsertIndexChange | UpdateIndexChange | DeleteIndexChange
 ) &
   IndexChangeTarget;
 
