@@ -10,13 +10,10 @@ type Depth = 1 | 2 | 3;
 
 interface Table {
   readonly runCp: Uint32Array;
-  readonly runSym: Uint32Array;
   readonly runLen: Uint32Array;
-  readonly runSymSorted: Uint32Array;
-  readonly runOrder: Uint32Array;
   readonly rowCp: Uint32Array;
   readonly rowStart: Uint32Array;
-  readonly rowSyms: Uint32Array;
+  readonly rowEdges: Uint32Array;
   readonly nodeTerminal: Int32Array;
   readonly nodeStart: Uint32Array;
   readonly edgeSym: Uint32Array;
@@ -59,16 +56,12 @@ function decode(base64: string): Table {
 
   const runCount = varint();
   const runCp = new Uint32Array(runCount);
-  const runSym = new Uint32Array(runCount);
   const runLen = new Uint32Array(runCount);
   for (let i = 0; i < runCount; i++) {
     runCp[i] = varint();
-    runSym[i] = varint();
+    varint();
     runLen[i] = varint();
   }
-  const order = Array.from({ length: runCount }, (_, i) => i).sort(
-    (a, b) => (runSym[a] ?? 0) - (runSym[b] ?? 0)
-  );
 
   const rowCount = varint();
   const rowCp = new Uint32Array(rowCount);
@@ -80,13 +73,14 @@ function decode(base64: string): Table {
   const rowStart = new Uint32Array(rowCount + 1);
   for (let i = 0; i < rowCount; i++)
     rowStart[i + 1] = (rowStart[i] ?? 0) + varint();
-  const rowSyms = new Uint32Array(rowStart[rowCount] ?? 0);
-  for (let k = 0; k < rowSyms.length; k++) rowSyms[k] = varint();
+  const rowEdges = new Uint32Array(rowStart[rowCount] ?? 0);
+  for (let k = 0; k < rowEdges.length; k++) rowEdges[k] = varint();
 
   const nodeCount = varint();
   const nodeTerminal = new Int32Array(nodeCount);
   const nodeStart = new Uint32Array(nodeCount + 1);
   const edges: number[] = [];
+  const firstEdge = new Map<number, number>();
   for (let k = 0; k < nodeCount; k++) {
     nodeTerminal[k] = varint() - 1;
     const count = varint();
@@ -94,20 +88,25 @@ function decode(base64: string): Table {
     let prev = 0;
     for (let j = 0; j < count; j++) {
       prev += varint();
+      if (!firstEdge.has(prev)) firstEdge.set(prev, edges.length);
       edges.push(prev);
     }
   }
   nodeStart[nodeCount] = edges.length;
+  // A symbol's first edge is at the root whenever it can start a spelling.
+  for (let i = 0; i < rowEdges.length; i++) {
+    const edge = firstEdge.get(rowEdges[i] ?? 0);
+    if (edge === undefined)
+      throw new Error('canonical symbol has no trie edge');
+    rowEdges[i] = edge;
+  }
 
   return {
     runCp,
-    runSym,
     runLen,
-    runSymSorted: Uint32Array.from(order, (i) => runSym[i] ?? 0),
-    runOrder: Uint32Array.from(order),
     rowCp,
     rowStart,
-    rowSyms,
+    rowEdges,
     nodeTerminal,
     nodeStart,
     edgeSym: Uint32Array.from(edges),
@@ -134,18 +133,9 @@ function findLast(sorted: Uint32Array, x: number): number {
   return lo - 1;
 }
 
-function runForCp(table: Table, cp: number): number {
+function isSingleton(table: Table, cp: number): boolean {
   const i = findLast(table.runCp, cp);
-  if (i >= 0 && cp < (table.runCp[i] ?? 0) + (table.runLen[i] ?? 0)) return i;
-  return -1;
-}
-
-function runForSym(table: Table, sym: number): number {
-  const i = findLast(table.runSymSorted, sym);
-  if (i < 0) return -1;
-  const run = table.runOrder[i] ?? 0;
-  if (sym < (table.runSym[run] ?? 0) + (table.runLen[run] ?? 0)) return run;
-  return -1;
+  return i >= 0 && cp < (table.runCp[i] ?? 0) + (table.runLen[i] ?? 0);
 }
 
 function rowForCp(table: Table, cp: number): number {
@@ -176,18 +166,19 @@ function ucaCanonical(value: string, depth: Depth): string {
   if (value === '') return '';
   const table = tableFor(depth);
   const symbols: number[] = [];
-  for (const ch of value) {
-    const cp = ch.codePointAt(0) ?? 0;
-    const run = runForCp(table, cp);
-    if (run >= 0) {
-      symbols.push((table.runSym[run] ?? 0) + cp - (table.runCp[run] ?? 0));
+  for (let i = 0; i < value.length;) {
+    const cp = value.codePointAt(i) ?? 0;
+    i += cp > 0xffff ? 2 : 1;
+    if (isSingleton(table, cp)) {
+      // A singleton spells only itself and cannot participate in a longer match.
+      symbols.push(~cp);
       continue;
     }
     const row = rowForCp(table, cp);
     if (row >= 0) {
       const end = table.rowStart[row + 1] ?? 0;
       for (let k = table.rowStart[row] ?? 0; k < end; k++) {
-        symbols.push(table.rowSyms[k] ?? 0);
+        symbols.push(table.rowEdges[k] ?? 0);
       }
     }
   }
@@ -198,34 +189,34 @@ function ucaCanonical(value: string, depth: Depth): string {
   const choiceCp = new Int32Array(count);
   const choiceEnd = new Int32Array(count);
   cost[count] = 0;
-  const relax = (i: number, cp: number, end: number): void => {
-    const total = utf8Length(cp) + (cost[end] ?? Infinity);
-    if (total < (cost[i] ?? Infinity)) {
-      cost[i] = total;
-      choiceCp[i] = cp;
-      choiceEnd[i] = end;
-    }
-  };
+  const rootEnd = table.nodeStart[1] ?? 0;
   for (let i = count - 1; i >= 0; i--) {
-    let node = 0;
-    for (let j = i; j < count; j++) {
-      const symbol = symbols[j] ?? 0;
-      if (j === i) {
-        const run = runForSym(table, symbol);
-        if (run >= 0) {
-          relax(
-            i,
-            (table.runCp[run] ?? 0) + symbol - (table.runSym[run] ?? 0),
-            j + 1
-          );
-          break;
+    const edge = symbols[i] ?? 0;
+    if (edge < 0) {
+      const cp = ~edge;
+      cost[i] = utf8Length(cp) + (cost[i + 1] ?? Infinity);
+      choiceCp[i] = cp;
+      choiceEnd[i] = i + 1;
+      continue;
+    }
+    if (edge >= rootEnd) continue;
+    let node = edge + 1;
+    let end = i + 1;
+    for (;;) {
+      const cp = table.nodeTerminal[node] ?? NO_TERMINAL;
+      if (cp !== NO_TERMINAL) {
+        const total = utf8Length(cp) + (cost[end] ?? Infinity);
+        if (total < (cost[i] ?? Infinity)) {
+          cost[i] = total;
+          choiceCp[i] = cp;
+          choiceEnd[i] = end;
         }
       }
-      node = childOf(table, node, symbol);
+      const nextEdge = symbols[end] ?? -1;
+      if (nextEdge < 0) break;
+      node = childOf(table, node, table.edgeSym[nextEdge] ?? 0);
       if (node < 0) break;
-      const cp = table.nodeTerminal[node] ?? NO_TERMINAL;
-      if (cp === NO_TERMINAL) continue;
-      relax(i, cp, j + 1);
+      end++;
     }
   }
 

@@ -83,14 +83,13 @@ class BitWriter {
   private count = 0;
 
   public append(code: number, length: number): void {
-    this.pending = this.pending * 2 ** length + code;
+    // At most seven pending bits and a 25-bit code fit in one word.
+    this.pending = (this.pending << length) | code;
     this.count += length;
     while (this.count >= 8) {
       this.count -= 8;
-      const divisor = 2 ** this.count;
       ensure(this.at + 1);
-      scratch[this.at++] = Math.floor(this.pending / divisor);
-      this.pending %= divisor;
+      scratch[this.at++] = this.pending >>> this.count;
     }
   }
 
