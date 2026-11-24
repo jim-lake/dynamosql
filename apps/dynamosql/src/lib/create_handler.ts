@@ -434,7 +434,10 @@ async function _createTable(
     });
     for (const name of primary_key) {
       if (!column_list.some((col) => col.name === name)) {
-        throw new SQLError({ err: 'ER_KEY_COLUMN_DOES_NOT_EXITS', args: [name] });
+        throw new SQLError({
+          err: 'ER_KEY_COLUMN_DOES_NOT_EXITS',
+          args: [name],
+        });
       }
     }
     if (is_raw) {

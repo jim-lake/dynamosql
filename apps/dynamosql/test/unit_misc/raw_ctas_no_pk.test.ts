@@ -23,32 +23,32 @@ async function runQuery(
 }
 
 describe('raw CREATE TABLE without a primary key', () => {
-    let conn: ReturnType<typeof DynamoSQL.createConnection>;
+  let conn: ReturnType<typeof DynamoSQL.createConnection>;
 
-    before(() => {
-      conn = DynamoSQL.createConnection({ namespace: testNamespace() });
-    });
+  before(() => {
+    conn = DynamoSQL.createConnection({ namespace: testNamespace() });
+  });
 
-    after(async () => {
-      try {
-        await runQuery(conn, `DROP TABLE IF EXISTS _dynamodb.${TABLE}`);
-      } finally {
-        conn.destroy();
-      }
-    });
-
-    for (const sql of NO_PK_LIST) {
-      it(`${sql} fails with ER_REQUIRES_PRIMARY_KEY and creates nothing`, async () => {
-        let code: unknown = null;
-        try {
-          await runQuery(conn, sql);
-        } catch (err) {
-          code = (err as { code?: unknown }).code;
-        }
-        assert.equal(code, 'ER_REQUIRES_PRIMARY_KEY');
-        const rows = await runQuery(conn, 'SHOW TABLES FROM _dynamodb');
-        const names = rows.flatMap((row) => Object.values(row).map(String));
-        assert.notInclude(names, TABLE);
-      });
+  after(async () => {
+    try {
+      await runQuery(conn, `DROP TABLE IF EXISTS _dynamodb.${TABLE}`);
+    } finally {
+      conn.destroy();
     }
+  });
+
+  for (const sql of NO_PK_LIST) {
+    it(`${sql} fails with ER_REQUIRES_PRIMARY_KEY and creates nothing`, async () => {
+      let code: unknown = null;
+      try {
+        await runQuery(conn, sql);
+      } catch (err) {
+        code = (err as { code?: unknown }).code;
+      }
+      assert.equal(code, 'ER_REQUIRES_PRIMARY_KEY');
+      const rows = await runQuery(conn, 'SHOW TABLES FROM _dynamodb');
+      const names = rows.flatMap((row) => Object.values(row).map(String));
+      assert.notInclude(names, TABLE);
+    });
+  }
 });

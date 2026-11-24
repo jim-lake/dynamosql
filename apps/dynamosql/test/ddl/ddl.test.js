@@ -25,11 +25,10 @@ describe('DDL', function () {
     { timeout: 30000 },
     true
   );
-  runTests(
-    'ctas_error.sql',
-    path.join(__dirname, 'ctas_error.sql'),
-    { allowedErrors: 'SAME_CODE', timeout: 30000 }
-  );
+  runTests('ctas_error.sql', path.join(__dirname, 'ctas_error.sql'), {
+    allowedErrors: 'SAME_CODE',
+    timeout: 30000,
+  });
   runTests(
     'alter.sql',
     path.join(__dirname, 'alter.sql'),
