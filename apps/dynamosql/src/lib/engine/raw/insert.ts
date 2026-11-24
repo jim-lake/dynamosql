@@ -23,7 +23,7 @@ import {
 import type {
   EvaluationResultRow,
   InsertParams,
-  ChangedResult,
+  AffectedResult,
 } from '../index';
 import type { DescribeTableCommandOutput } from '@aws-sdk/client-dynamodb';
 import type {
@@ -40,9 +40,9 @@ interface SingleCallSet {
 
 export async function insertRowList(
   params: InsertParams
-): Promise<ChangedResult> {
+): Promise<AffectedResult> {
   if (params.list.length === 0) {
-    return { affectedRows: 0, changedRows: 0 };
+    return { affectedRows: 0 };
   } else if (params.duplicate_mode === 'update' && params.on_duplicate_update) {
     const { dynamodb, session, database, table, list } = params;
     const set = params.on_duplicate_update;
@@ -59,8 +59,6 @@ export async function insertRowList(
     }
     const from = { db: database, table, as: null } as unknown as BaseFrom;
     const columnRefMap = buildSetReferences(set, from);
-    let affectedRows = 0;
-    let changedRows = 0;
 
     const plans = list.map((row) => {
       const insert_row = lowerKeys(row);
@@ -102,6 +100,7 @@ export async function insertRowList(
     });
 
     if (plans.every((plan) => plan.every((item) => item !== undefined))) {
+      let affectedRows = 0;
       for (let i = 0; i < list.length; i++) {
         const row = list[i] ?? {};
         const plan = plans[i] ?? [];
@@ -163,9 +162,8 @@ export async function insertRowList(
               !isSameCell(toCell(old[findKey(old, item.column)]), item.set)
         );
         affectedRows += changed ? 2 : 1;
-        changedRows += 1;
       }
-      return { affectedRows, changedRows };
+      return { affectedRows };
     }
 
     const keys = list.map((row) =>
@@ -222,9 +220,7 @@ export async function insertRowList(
       );
     }
     const updated = list.length - missing_rows.length;
-    affectedRows = updated * 2 + missing_rows.length;
-    changedRows = updated;
-    return { affectedRows, changedRows };
+    return { affectedRows: updated * 2 + missing_rows.length };
   } else if (params.duplicate_mode) {
     return _insertIgnoreReplace(params);
   } else {
@@ -250,7 +246,7 @@ function hasExistingRef(node: unknown): boolean {
 
 async function _insertIgnoreReplace(
   params: InsertParams
-): Promise<ChangedResult> {
+): Promise<AffectedResult> {
   const { dynamodb, duplicate_mode, table } = params;
   let list = params.list;
   let affectedRows: number;
@@ -346,7 +342,7 @@ async function _insertIgnoreReplace(
     await dynamodb.putItems(opts);
     affectedRows = list.length;
   }
-  return { affectedRows, changedRows: 0 };
+  return { affectedRows };
 }
 
 interface CancellationReason {
@@ -367,7 +363,7 @@ function hasCancellationReasons(
   );
 }
 
-async function _insertNoIgnore(params: InsertParams): Promise<ChangedResult> {
+async function _insertNoIgnore(params: InsertParams): Promise<AffectedResult> {
   const { dynamodb, table, list } = params;
   const sql_list = list.map(
     (item) =>
@@ -376,7 +372,7 @@ async function _insertNoIgnore(params: InsertParams): Promise<ChangedResult> {
 
   try {
     await dynamodb.transactionQL(sql_list);
-    return { affectedRows: list.length, changedRows: 0 };
+    return { affectedRows: list.length };
   } catch (err: unknown) {
     if (err instanceof Error) {
       if (

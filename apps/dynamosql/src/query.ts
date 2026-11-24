@@ -194,8 +194,10 @@ export class Query extends EventEmitter {
           columns: undefined,
         };
       case 'drop':
-        await DropHandler.query({ ...params, ast });
-        return { result: DEFAULT_RESULT, columns: undefined };
+        return {
+          result: await DropHandler.query({ ...params, ast }),
+          columns: undefined,
+        };
       case 'insert':
       case 'replace':
         return {

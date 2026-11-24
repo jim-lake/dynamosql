@@ -37,12 +37,10 @@ describe('Select', function () {
   runTests('having.sql', path.join(__dirname, 'having.sql'));
   runTests('having_error.sql', path.join(__dirname, 'having_error.sql'), {
     allowedErrors: 'SAME_CODE',
-    skipAffected: true,
   });
   runTests('subquery.sql', path.join(__dirname, 'subquery.sql'));
   runTests('subquery_error.sql', path.join(__dirname, 'subquery_error.sql'), {
     allowedErrors: 'SAME_CODE',
-    skipAffected: true,
   });
   runTests('derived_table.sql', path.join(__dirname, 'derived_table.sql'));
   runTests(
@@ -57,12 +55,11 @@ describe('Select', function () {
   runTests(
     'derived_table_error.sql',
     path.join(__dirname, 'derived_table_error.sql'),
-    { allowedErrors: 'SAME_CODE', skipAffected: true },
+    { allowedErrors: 'SAME_CODE' },
     path.join(__dirname, 'advanced.sql')
   );
   runTests('advanced_error.sql', path.join(__dirname, 'advanced_error.sql'), {
     allowedErrors: 'SAME_CODE',
-    skipAffected: true,
   });
   runTests('aggregate.sql', path.join(__dirname, 'aggregate.sql'));
   runTests('window.sql', path.join(__dirname, 'window.sql'));
@@ -70,7 +67,6 @@ describe('Select', function () {
   runTests('window_lead.sql', path.join(__dirname, 'window_lead.sql'));
   runTests('window_error.sql', path.join(__dirname, 'window_error.sql'), {
     allowedErrors: 'SAME_CODE',
-    skipAffected: true,
   });
   runTests('cast.sql', path.join(__dirname, 'cast.sql'));
   runTests('functions.sql', path.join(__dirname, 'functions.sql'));

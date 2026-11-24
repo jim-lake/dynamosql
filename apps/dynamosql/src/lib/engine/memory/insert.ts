@@ -9,7 +9,7 @@ import type { CellConvertFlags } from '../helpers/cell_convert';
 import type {
   EvaluationResultRow,
   InsertParams,
-  ChangedResult,
+  AffectedResult,
   CellRow,
 } from '../index';
 import type { MemoryColumnDef } from './storage';
@@ -18,7 +18,7 @@ let g_last_row_id = 0;
 
 export async function insertRowList(
   params: InsertParams
-): Promise<ChangedResult> {
+): Promise<AffectedResult> {
   const {
     session,
     database,
@@ -32,7 +32,7 @@ export async function insertRowList(
   const data = Storage.getTable(database, table, session);
 
   if (list.length === 0) {
-    return { affectedRows: 0, changedRows: 0 };
+    return { affectedRows: 0 };
   }
 
   if (!data) {
@@ -42,7 +42,6 @@ export async function insertRowList(
   const primary_key = data.primary_key;
   const state = Storage.cloneState(data);
   let affectedRows = 0;
-  let duplicateRows = 0;
 
   for (const row of list) {
     for (const name of Object.keys(row)) {
@@ -112,7 +111,6 @@ export async function insertRowList(
       }
       Storage.replaceRow(state, target, new_row, primary_key);
       affectedRows += changed ? 2 : 1;
-      duplicateRows++;
     } else if (duplicate_mode === 'ignore') {
       continue;
     } else {
@@ -121,7 +119,7 @@ export async function insertRowList(
   }
 
   Storage.txSaveData(database, table, session, state);
-  return { affectedRows, changedRows: duplicateRows };
+  return { affectedRows };
 }
 function _transformRow(
   row: EvaluationResultRow,

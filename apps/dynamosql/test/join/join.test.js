@@ -26,7 +26,6 @@ describe('Join', function () {
       session: { resultObjects: true },
       nestTables: true,
       allowedErrors: 'SAME_CODE',
-      skipAffected: true,
     }
   );
   runTests('syntax.sql', path.join(__dirname, 'syntax.sql'));

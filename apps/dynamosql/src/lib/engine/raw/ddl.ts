@@ -15,6 +15,7 @@ import type {
   IndexParams,
   DeleteIndexParams,
   AddColumnParams,
+  AffectedResult,
 } from '../index';
 
 const TYPE_MAP = { S: 'string', N: 'number', B: 'buffer' } as const;
@@ -141,7 +142,9 @@ export async function dropTable(params: DropTableParams): Promise<void> {
 
 export async function addColumn(_params: AddColumnParams): Promise<void> {}
 
-export async function createIndex(params: IndexParams): Promise<void> {
+export async function createIndex(
+  params: IndexParams
+): Promise<AffectedResult> {
   const { dynamodb, table, index_name } = params;
   if (params.is_unique) {
     throw new SQLError({ err: 'unsupported' });
@@ -153,6 +156,7 @@ export async function createIndex(params: IndexParams): Promise<void> {
   try {
     await dynamodb.createIndex(opts);
     await _waitForTable({ dynamodb, table, index_name });
+    return { affectedRows: 0 };
   } catch (err: unknown) {
     if (err instanceof Error) {
       if (
@@ -167,12 +171,15 @@ export async function createIndex(params: IndexParams): Promise<void> {
   }
 }
 
-export async function deleteIndex(params: DeleteIndexParams): Promise<void> {
+export async function deleteIndex(
+  params: DeleteIndexParams
+): Promise<AffectedResult> {
   const { dynamodb, table, index_name } = params;
 
   try {
     await dynamodb.deleteIndex({ table, index_name });
     await _waitForTable({ dynamodb, table, index_name });
+    return { affectedRows: 0 };
   } catch (err: unknown) {
     if (err instanceof Error && err.message === 'resource_not_found') {
       throw new Error('index_not_found', { cause: err });

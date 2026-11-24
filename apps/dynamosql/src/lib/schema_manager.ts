@@ -136,7 +136,9 @@ interface DropDatabaseParams {
   database: string;
   dynamodb: DynamoDBClient;
 }
-export async function dropDatabase(params: DropDatabaseParams): Promise<void> {
+export async function dropDatabase(
+  params: DropDatabaseParams
+): Promise<number> {
   const { session, database } = params;
   const database_lc = database.toLowerCase();
   if (BUILT_IN[database_lc]) {
@@ -147,6 +149,7 @@ export async function dropDatabase(params: DropDatabaseParams): Promise<void> {
       throw new SQLError({ err: 'db_not_found', args: [database] });
     }
     session.deleteTempTablesForDatabase(database_lc);
+    const table_count = schema.tables.size;
     for (const [table_lc, entry] of schema.tables) {
       const engine = getEngine(database_lc, table_lc, session);
       try {
@@ -158,6 +161,7 @@ export async function dropDatabase(params: DropDatabaseParams): Promise<void> {
       }
     }
     g_schemaMap.delete(database_lc);
+    return table_count;
   }
 }
 export interface CreateTableParams extends EngineCreateTableParams {

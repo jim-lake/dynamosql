@@ -43,6 +43,7 @@ import type {
   IndexType,
   DeleteIndexParams,
   AddColumnParams,
+  AffectedResult,
 } from '../index';
 import type {
   IndexKey,
@@ -210,7 +211,9 @@ export async function addColumn(params: AddColumnParams): Promise<void> {
     });
   }
 }
-export async function createIndex(params: IndexParams): Promise<void> {
+export async function createIndex(
+  params: IndexParams
+): Promise<AffectedResult> {
   const { session, database, table, index_name, key_list, is_unique } = params;
   const data = Storage.getTable(database, table, session);
   if (!data) {
@@ -259,8 +262,11 @@ export async function createIndex(params: IndexParams): Promise<void> {
   Storage.updateTableData(database, table, session, {
     indexList: [...data.indexList, index],
   });
+  return { affectedRows: data.row_map.size };
 }
-export async function deleteIndex(params: DeleteIndexParams): Promise<void> {
+export async function deleteIndex(
+  params: DeleteIndexParams
+): Promise<AffectedResult> {
   const { session, database, table, index_name } = params;
   const data = Storage.getTable(database, table, session);
   if (!data) {
@@ -271,6 +277,7 @@ export async function deleteIndex(params: DeleteIndexParams): Promise<void> {
     throw new SQLError({ err: 'index_not_found', args: [index_name] });
   }
   Storage.updateTableData(database, table, session, { indexList });
+  return { affectedRows: data.row_map.size };
 }
 function _keyColumns(
   column_list: MemoryColumnDef[],

@@ -72,6 +72,11 @@ describe('Promise API', function () {
       expect(header.insertId).to.be.a('number');
       expect(header.fieldCount).to.equal(0);
       expect(header.info).to.be.a('string');
+      const [update] = await conn.query(
+        'UPDATE promise_api_dml SET v = 2 WHERE id IN (1, 2)'
+      );
+      expect(update.affectedRows).to.equal(2);
+      expect(update.changedRows).to.equal(1);
     } finally {
       conn.destroy();
     }

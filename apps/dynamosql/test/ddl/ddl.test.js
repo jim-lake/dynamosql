@@ -3,99 +3,85 @@ const path = require('node:path');
 
 describe('DDL', function () {
   runTests('transactions.sql', path.join(__dirname, 'transactions.sql'), {
-    skipAffected: true,
     timeout: 30000,
   });
 
   runTests(
     'create.sql',
     path.join(__dirname, 'create.sql'),
-    { skipAffected: true, timeout: 30000 },
+    { timeout: 30000 },
     true
   );
 
   runTests(
     'ctas.sql',
     path.join(__dirname, 'ctas.sql'),
-    { skipAffected: true, timeout: 30000 },
+    { timeout: 30000 },
     true
   );
   runTests(
     'alter.sql',
     path.join(__dirname, 'alter.sql'),
-    { skipAffected: true, timeout: 30000 },
+    { timeout: 30000 },
     true
   );
   runTests(
     'create_variations.sql',
     path.join(__dirname, 'create_variations.sql'),
-    { skipAffected: true, timeout: 30000 },
+    { timeout: 30000 },
     true
   );
   runTests(
     'create_variations_error.sql',
     path.join(__dirname, 'create_variations_error.sql'),
-    { allowedErrors: 'SAME_CODE', skipAffected: true, timeout: 30000 },
+    { allowedErrors: 'SAME_CODE', timeout: 30000 },
     true
   );
   runTests(
     'drop.sql',
     path.join(__dirname, 'drop.sql'),
-    { skipAffected: true, timeout: 30000 },
+    { timeout: 30000 },
     true
   );
-  runTests('show.sql', path.join(__dirname, 'show.sql'), {
-    skipAffected: true,
-    timeout: 30000,
-  });
+  runTests('show.sql', path.join(__dirname, 'show.sql'), { timeout: 30000 });
   runTests('show_columns.sql', path.join(__dirname, 'show_columns.sql'), {
-    skipAffected: true,
     timeout: 30000,
   });
   runTests('show_index.sql', path.join(__dirname, 'show_index.sql'), {
-    skipAffected: true,
     timeout: 30000,
   });
   runTests('show_create.sql', path.join(__dirname, 'show_create.sql'), {
-    skipAffected: true,
     timeout: 30000,
   });
   runTests('show_warnings.sql', path.join(__dirname, 'show_warnings.sql'), {
-    skipAffected: true,
     timeout: 30000,
   });
   runTests('show_error.sql', path.join(__dirname, 'show_error.sql'), {
     allowedErrors: 'SAME_CODE',
-    skipAffected: true,
     timeout: 30000,
   });
   runTests(
     'error_cases.sql',
     path.join(__dirname, 'error_cases.sql'),
-    { skipAffected: true, timeout: 30000 },
+    { timeout: 30000 },
     true
   );
   runTests(
     'error_cases_error.sql',
     path.join(__dirname, 'error_cases_error.sql'),
-    { allowedErrors: 'SAME_CODE', skipAffected: true, timeout: 30000 },
+    { allowedErrors: 'SAME_CODE', timeout: 30000 },
     true
   );
   runTests(
     'create_temporary.sql',
-    path.join(__dirname, 'create_temporary.sql'),
-    { skipAffected: true }
+    path.join(__dirname, 'create_temporary.sql')
   );
   runTests('create_types.sql', path.join(__dirname, 'create_types.sql'), {
-    skipAffected: true,
     verify_field_types: true,
   });
-  runTests('drop_multi.sql', path.join(__dirname, 'drop_multi.sql'), {
-    skipAffected: true,
-  });
+  runTests('drop_multi.sql', path.join(__dirname, 'drop_multi.sql'));
   runTests(
     'transaction_modes.sql',
-    path.join(__dirname, 'transaction_modes.sql'),
-    { skipAffected: true }
+    path.join(__dirname, 'transaction_modes.sql')
   );
 });

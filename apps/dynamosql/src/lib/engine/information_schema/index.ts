@@ -19,13 +19,13 @@ export async function dropTable() {
     args: ['user', 'information_schema'],
   });
 }
-export async function createIndex() {
+export async function createIndex(): Promise<AffectedResult> {
   throw new SQLError({
     code: 'ER_DBACCESS_DENIED_ERROR',
     args: ['user', 'information_schema'],
   });
 }
-export async function deleteIndex() {
+export async function deleteIndex(): Promise<AffectedResult> {
   throw new SQLError({
     code: 'ER_DBACCESS_DENIED_ERROR',
     args: ['user', 'information_schema'],
@@ -61,7 +61,7 @@ export async function multipleUpdate(): Promise<ChangedResult> {
     args: ['user', 'information_schema'],
   });
 }
-export async function insertRowList(): Promise<ChangedResult> {
+export async function insertRowList(): Promise<AffectedResult> {
   throw new SQLError({
     code: 'ER_DBACCESS_DENIED_ERROR',
     args: ['user', 'information_schema'],

@@ -257,8 +257,8 @@ export interface Engine {
   getTableList(params: TableListParams): Promise<string[]>;
   createTable(params: CreateTableParams): Promise<void>;
   dropTable(params: DropTableParams): Promise<void>;
-  createIndex(params: IndexParams): Promise<void>;
-  deleteIndex(params: DeleteIndexParams): Promise<void>;
+  createIndex(params: IndexParams): Promise<AffectedResult>;
+  deleteIndex(params: DeleteIndexParams): Promise<AffectedResult>;
   addColumn(params: AddColumnParams): Promise<void>;
   getTableInfo(params: TableInfoParams): Promise<TableInfo>;
   getRowList(params: RowListParams): Promise<RowListResult>;
@@ -266,7 +266,7 @@ export interface Engine {
   multipleDelete(params: MultiDeleteParams): Promise<AffectedResult>;
   singleUpdate(params: UpdateParams): Promise<ChangedResult>;
   multipleUpdate(params: MultiUpdateParams): Promise<ChangedResult>;
-  insertRowList(params: InsertParams): Promise<ChangedResult>;
+  insertRowList(params: InsertParams): Promise<AffectedResult>;
 }
 
 const NullEngine: Engine = {

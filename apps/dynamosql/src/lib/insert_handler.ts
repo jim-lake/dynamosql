@@ -21,11 +21,7 @@ import type {
   EngineValue,
   EvaluationResultRow,
 } from './engine';
-import type {
-  HandlerParams,
-  AffectedResult,
-  ChangedResult,
-} from './handler_types';
+import type { HandlerParams, AffectedResult } from './handler_types';
 import type { ColumnRefInfo } from './helpers/column_ref_helper';
 import type {
   BaseFrom,
@@ -211,7 +207,7 @@ async function _runInsert(
       single_row: is_single_row,
     };
     try {
-      let result: ChangedResult;
+      let result: AffectedResult;
       try {
         result = await engine.insertRowList(opts);
       } catch (err: unknown) {
@@ -298,7 +294,6 @@ async function _runInsert(
         }
 
         let affectedRows = 0;
-        let changedRows = 0;
         for (const row of list) {
           const entry = state.get(_keyOf(row, primary_key));
           if (!entry) {
@@ -327,7 +322,6 @@ async function _runInsert(
             entry.cur[attr] = value;
           }
           affectedRows += changed ? 2 : 1;
-          changedRows += 1;
         }
 
         const update_list = [...state.values()]
@@ -365,11 +359,9 @@ async function _runInsert(
             single_row: is_single_row,
           });
         }
-        result = { affectedRows, changedRows };
+        result = { affectedRows };
       }
-      // The driver reads changedRows from MySQL's row-count info, which MySQL sends for multi-row VALUES and INSERT ... SELECT.
-      const has_row_info = list.length > 1 || ast.values?.type === 'select';
-      return has_row_info ? result : { affectedRows: result.affectedRows };
+      return result;
     } catch (err: unknown) {
       if (!isErrorWithDetails(err)) {
         throw err;

@@ -253,15 +253,8 @@ export function runTests(
           ).to.equal(mysql_result.results?.affectedRows);
         }
         if (extra?.checkChanged) {
-          // mysql2 reads changedRows only from a 'Changed:' info field. A multi-row ODKU info line has 'Duplicates:' instead, which node-mysql parsed as changedRows.
-          const ok_packet = mysql_result.results;
-          const m = /Duplicates:\s*(\d+)/.exec(ok_packet?.info ?? '');
-          const expected =
-            m === null || /Changed:/i.test(ok_packet.info)
-              ? ok_packet?.changedRows
-              : parseInt(m[1] ?? '', 10);
           expect(ddb_result.results?.changedRows, 'changedRows equal').to.equal(
-            expected
+            mysql_result.results?.changedRows
           );
         }
       }

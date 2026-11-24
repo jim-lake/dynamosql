@@ -2,6 +2,14 @@
 
 The raw engine stores data in DynamoDB. This page lists where its behavior differs from MySQL 8.4. Behavior not listed here matches MySQL.
 
+## REPLACE affectedRows
+
+`REPLACE` counts 1 for each row written. MySQL counts 2 for each row that replaces an existing, different row. The raw engine writes the rows with `TransactWriteItems`, which cannot return the replaced items, so it cannot tell which rows existed.
+
+## UPDATE changedRows
+
+Raw UPDATE `changedRows` does not match MySQL. The raw engine can count rows whose values did not change. MySQL counts only rows whose values changed.
+
 ## INSERT ... ON DUPLICATE KEY UPDATE
 
 ### affectedRows
@@ -13,12 +21,6 @@ Counts match MySQL when the statement's SET values are plain values (`c = VALUES
 | New row                 | 1         | 1                        |
 | Existing row, changed   | 2         | 2                        |
 | Existing row, unchanged | 1         | 2                        |
-
-### changedRows
-
-The raw engine reports `changedRows` the same way MySQL does. A multi-row `VALUES` list or `INSERT ... SELECT` reports the number of rows that hit an existing key. A single-row `VALUES` or `INSERT ... SET` reports 0.
-
-In the exception case above, `changedRows` counts every row that hit an existing key, including rows whose values did not change.
 
 ### Atomicity
 

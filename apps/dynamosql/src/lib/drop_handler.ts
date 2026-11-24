@@ -4,17 +4,23 @@ import { SQLError } from '../error';
 
 import * as SchemaManager from './schema_manager';
 
-import type { HandlerParams } from './handler_types';
+import type { HandlerParams, AffectedResult } from './handler_types';
 import type { Drop } from 'node-sql-parser/build/mysql';
 
-export async function query(params: HandlerParams<Drop>): Promise<void> {
+export async function query(
+  params: HandlerParams<Drop>
+): Promise<AffectedResult> {
   const { ast, session, dynamodb } = params;
 
   if (ast.keyword === 'database' || ast.keyword === 'schema') {
     const dbAst = ast;
     const dbName = String(dbAst.name);
-    await SchemaManager.dropDatabase({ ...params, database: dbName });
-    return;
+    return {
+      affectedRows: await SchemaManager.dropDatabase({
+        ...params,
+        database: dbName,
+      }),
+    };
   } else if (ast.keyword === 'table') {
     const tableAst = ast;
     if (!Array.isArray(tableAst.name)) {
@@ -43,12 +49,13 @@ export async function query(params: HandlerParams<Drop>): Promise<void> {
         err.message === 'resource_not_found' &&
         ast.prefix === 'if exists'
       ) {
-        return;
+        return { affectedRows: 0 };
       } else if (err instanceof Error && err.message === 'resource_not_found') {
         throw new SQLError({ err: 'ER_BAD_TABLE_ERROR', args: [table] });
       }
       throw err;
     }
+    return { affectedRows: 0 };
   } else if (ast.keyword === 'index') {
     const indexAst = ast;
     const database = indexAst.table.db ?? session.getCurrentDatabase();
@@ -58,13 +65,11 @@ export async function query(params: HandlerParams<Drop>): Promise<void> {
     const table = indexAst.table.table;
     const index_name = String(indexAst.name.column);
     try {
-      await SchemaManager.getEngine(database, table, session).deleteIndex({
-        dynamodb,
-        session,
+      return await SchemaManager.getEngine(
         database,
         table,
-        index_name,
-      });
+        session
+      ).deleteIndex({ dynamodb, session, database, table, index_name });
     } catch (err) {
       if (err instanceof Error && err.message === 'index_not_found') {
         throw new SQLError({

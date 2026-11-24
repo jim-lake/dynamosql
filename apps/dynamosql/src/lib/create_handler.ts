@@ -102,7 +102,7 @@ async function _createIndex(
       type: info.column_list.find((col) => col.name === name)?.type ?? 'string',
     };
   });
-  await engine.createIndex({
+  return await engine.createIndex({
     dynamodb,
     session,
     database,
@@ -112,7 +112,6 @@ async function _createIndex(
     is_unique: ast.index_type === 'unique',
     indexType: ast.index_using?.type ?? null,
   });
-  return { affectedRows: 0 };
 }
 async function _createDatabase(
   params: HandlerParams<CreateDatabase>
@@ -143,13 +142,10 @@ async function _createDatabase(
   }
   collation ??= COLLATIONS.UTF8MB4_0900_AI_CI;
   const success = SchemaManager.createDatabase({ database, collation });
-  if (success) {
-    return { affectedRows: 1 };
-  } else if (ast.if_not_exists) {
-    return { affectedRows: 0 };
-  } else {
+  if (!success && !ast.if_not_exists) {
     throw new SQLError({ err: 'ER_DB_CREATE_EXISTS' });
   }
+  return { affectedRows: 1 };
 }
 async function _createTable(
   params: HandlerParams<CreateTable>
