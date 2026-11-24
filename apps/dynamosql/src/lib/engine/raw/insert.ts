@@ -43,10 +43,23 @@ export async function insertRowList(
 ): Promise<AffectedResult> {
   if (params.list.length === 0) {
     return { affectedRows: 0 };
-  } else if (params.duplicate_mode === 'update' && params.on_duplicate_update) {
+  }
+  const table_info = await params.dynamodb.getTableCached(params.table);
+  const key_names = (table_info.Table?.KeySchema ?? []).map((k) =>
+    (k.AttributeName ?? '').toLowerCase()
+  );
+  const has_null_key = params.list.some((row) =>
+    Object.entries(row).some(
+      ([name, cell]) =>
+        cell.value === null && key_names.includes(name.toLowerCase())
+    )
+  );
+  if (has_null_key) {
+    throw new SQLError('ER_BAD_NULL_ERROR');
+  }
+  if (params.duplicate_mode === 'update' && params.on_duplicate_update) {
     const { dynamodb, session, database, table, list } = params;
     const set = params.on_duplicate_update;
-    const table_info = await dynamodb.getTableCached(table);
     const key_list = (table_info.Table?.KeySchema ?? []).map(
       (key) => key.AttributeName ?? ''
     );

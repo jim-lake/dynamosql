@@ -147,6 +147,10 @@ const ERROR_MAP: Record<string, ErrorMapEntry> = {
     code: 'ER_KEY_COLUMN_DOES_NOT_EXITS',
     sqlMessage: errStr`Key column '${0}' doesn't exist in table`,
   },
+  ER_REQUIRES_PRIMARY_KEY: {
+    code: 'ER_REQUIRES_PRIMARY_KEY',
+    sqlMessage: 'This table type requires a primary key',
+  },
   ER_DUP_KEYNAME: {
     code: 'ER_DUP_KEYNAME',
     sqlMessage: errStr`Duplicate key name '${0}'`,

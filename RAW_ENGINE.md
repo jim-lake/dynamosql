@@ -2,6 +2,10 @@
 
 The raw engine stores data in DynamoDB. This page lists where its behavior differs from MySQL 8.4. Behavior not listed here matches MySQL.
 
+## Primary key required
+
+`CREATE TABLE` in `_dynamodb`, including `CREATE TABLE ... AS SELECT`, fails with `ER_REQUIRES_PRIMARY_KEY` when no primary key is defined. MySQL allows keyless tables. A CTAS does not infer a primary key from the select list.
+
 ## REPLACE affectedRows
 
 `REPLACE` counts 1 for each row written. MySQL counts 2 for each row that replaces an existing, different row. The raw engine writes the rows with `TransactWriteItems`, which cannot return the replaced items, so it cannot tell which rows existed.

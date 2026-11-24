@@ -90,10 +90,13 @@ export async function getTableList(params: TableListParams): Promise<string[]> {
 }
 export async function createTable(params: CreateTableParams): Promise<void> {
   const { dynamodb, table, ...other } = params;
+  if (params.primary_key.length === 0) {
+    throw new SQLError('ER_REQUIRES_PRIMARY_KEY');
+  }
   const primary_key = params.primary_key.map((name) => {
     const column = params.column_list.find((c) => c.name === name);
     if (!column) {
-      throw new SQLError('bad_primary_key');
+      throw new SQLError({ err: 'ER_KEY_COLUMN_DOES_NOT_EXITS', args: [name] });
     }
     return { name: column.name, type: _valueToDynamoKeyType(column.type) };
   });

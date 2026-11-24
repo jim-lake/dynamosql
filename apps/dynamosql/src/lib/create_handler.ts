@@ -5,6 +5,7 @@ import { trackFirstSeen } from '@/tools/util';
 import { COLLATIONS } from '../constants/mysql';
 import { SQLError } from '../error';
 
+import { cellConvert } from './engine/helpers/cell_convert';
 import { getExprCollation } from './expression/collation/collation_expression';
 import { getExprMysqlType } from './expression/mysql_type/mysql_type_expression';
 import {
@@ -321,6 +322,10 @@ async function _createTable(
       index_list.push({ name, key_list, type: _indexType(def.index_options) });
     }
   }
+  const is_raw = database.toLowerCase() === '_dynamodb' && !is_temp;
+  if (is_raw && primary_key.length === 0) {
+    throw new SQLError('ER_REQUIRES_PRIMARY_KEY');
+  }
   let list: EvaluationResultRow[] | undefined;
   if (ast.query_expr) {
     const opts = { ast: ast.query_expr, session, dynamodb };
@@ -328,6 +333,7 @@ async function _createTable(
       await SelectHandler.internalQuery(opts);
 
     const defined = column_list.splice(0);
+    const row_columns: (ColumnDefParam | undefined)[] = [];
     const row_keys = columns.map((field, i) => {
       const name_lc = field.name.toLowerCase();
       if (column_list.some((col) => col.name.toLowerCase() === name_lc)) {
@@ -338,6 +344,7 @@ async function _createTable(
       );
       if (existing) {
         column_list.push(existing);
+        row_columns[i] = existing;
         return existing.name;
       }
       const result = queryColumns[i]?.result ?? {};
@@ -399,16 +406,47 @@ async function _createTable(
       const obj: EvaluationResultRow = {};
       row_keys.forEach((name, i) => {
         const value = row[i];
-        if (value !== undefined) {
+        const column = row_columns[i];
+        if (value !== undefined && is_raw && column) {
+          const converted = cellConvert(
+            value,
+            {
+              ...column,
+              length: column.length ?? undefined,
+              precision: column.precision ?? undefined,
+              scale: column.scale ?? undefined,
+              fsp: column.fsp ?? undefined,
+              collation: column.collation ?? undefined,
+            },
+            {
+              strict: session.strictMode,
+              singleRow: false,
+              ignore: duplicate_mode === 'ignore',
+              timeZone: session.timeZone,
+            }
+          );
+          obj[name] = { ...converted, err: null };
+        } else if (value !== undefined) {
           obj[name] = value;
         }
       });
       return obj;
     });
-    if (database.toLowerCase() === '_dynamodb' && !is_temp && !duplicate_mode) {
+    for (const name of primary_key) {
+      if (!column_list.some((col) => col.name === name)) {
+        throw new SQLError({ err: 'ER_KEY_COLUMN_DOES_NOT_EXITS', args: [name] });
+      }
+    }
+    if (is_raw) {
       const track = new Map();
       for (const obj of list) {
         const keys = primary_key.map((name) => obj[name]?.value);
+        if (keys.some((key) => key === null || key === undefined)) {
+          throw new SQLError('ER_BAD_NULL_ERROR');
+        }
+        if (duplicate_mode) {
+          continue;
+        }
         if (!trackFirstSeen(track, keys)) {
           throw new SQLError({
             err: 'dup_primary_key_entry',
