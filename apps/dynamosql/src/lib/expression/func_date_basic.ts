@@ -1,12 +1,15 @@
 import { assertArgCount, assertArgCountParse } from '../helpers/arg_count';
-import { getFunctionName } from '../helpers/ast_helper';
+import { getFunctionName, dependsOnRow } from '../helpers/ast_helper';
+import { getDecimals } from '../helpers/decimals';
 import {
   convertNum,
   convertDateTime,
   convertDate,
+  roundDecimalText,
 } from '../helpers/sql_conversion';
 import { SQLDate } from '../types/sql_date';
 import { SQLDateTime, createSQLDateTime } from '../types/sql_datetime';
+import { SQLJson } from '../types/sql_json';
 
 import { getValue } from './evaluate';
 
@@ -117,17 +120,38 @@ export function unix_timestamp(
     if (val.value === null) {
       result.value = null;
     } else {
-      const dt = convertDateTime({
-        value: val.value,
-        timeZone: state.session.timeZone,
-      });
-      if (dt === null) {
-        result.value = 0;
-        if (typeof val.value === 'string') {
-          result.type = 'number';
+      const timeZone = state.session.timeZone;
+      const dt = convertDateTime({ value: val.value, timeZone });
+      let decimals: number | undefined;
+      if (val.value instanceof SQLDateTime) {
+        decimals =
+          val.value.getDecimals() > 0 ? val.value.getDecimals() : undefined;
+      } else if (dependsOnRow(expr.args.value[0])) {
+        decimals = 6;
+      } else if (
+        typeof val.value === 'string' ||
+        val.value instanceof SQLJson
+      ) {
+        const text = String(
+          val.value instanceof SQLJson ? val.value.node : val.value
+        );
+        const fraction = /\.(\d+)/.exec(text);
+        if (fraction?.[1]) {
+          decimals = fraction[1].length;
+        } else if (!dt) {
+          decimals = 6;
         }
+      } else if (val.type === 'double') {
+        decimals = 6;
+      } else if (val.type === 'number') {
+        decimals = getDecimals(val);
+      }
+      if (decimals === undefined) {
+        result.value = dt ? dt.getTime() : 0;
       } else {
-        result.value = dt.getTime();
+        result.type = 'number';
+        result.decimals = decimals;
+        result.value = dt ? roundDecimalText(dt.toUTCTime(), decimals) : 0;
       }
     }
   }

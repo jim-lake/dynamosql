@@ -1,0 +1,15 @@
+CREATE DATABASE IF NOT EXISTS fn_space_repeat;
+CREATE TEMPORARY TABLE fn_space_repeat.probe_space_repeat (id INT PRIMARY KEY, n INT, doc JSON);
+INSERT INTO fn_space_repeat.probe_space_repeat VALUES (1, 3, CAST('2' AS JSON)), (2, 0, CAST('0' AS JSON));
+SELECT SPACE(3) AS s, REPEAT('a', 3) AS r;
+SELECT SPACE(16383) AS s, REPEAT('é', 16383) AS r;
+SELECT SPACE(16384) AS s;
+SELECT REPEAT('é', 16384) AS r;
+SELECT REPEAT('a', -1) AS r;
+SELECT SPACE(NULL) AS s, REPEAT(NULL, 3) AS r;
+SELECT SPACE(n) AS s, REPEAT('a', n) AS r FROM fn_space_repeat.probe_space_repeat ORDER BY id;
+SELECT SPACE(doc) AS s, REPEAT('a', doc) AS r FROM fn_space_repeat.probe_space_repeat ORDER BY id;
+SELECT REPEAT('a', NULL) AS r FROM fn_space_repeat.probe_space_repeat WHERE id = 1;
+SET @cnt = 2;
+SELECT SPACE(@cnt) AS s, REPEAT('a', @cnt) AS r;
+DROP TEMPORARY TABLE fn_space_repeat.probe_space_repeat;

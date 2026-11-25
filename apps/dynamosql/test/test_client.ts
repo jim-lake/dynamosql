@@ -5,6 +5,8 @@ const mysql = require('mysql2');
 const { Types } = require('../src/types');
 const { COLLATIONS, FIELD_FLAGS } = require('../src/constants/mysql');
 
+const decimalStrings = process.argv.includes('--decimal-strings');
+process.argv = process.argv.filter((arg) => arg !== '--decimal-strings');
 const sql = process.argv.pop()!;
 const arg_len = process.argv.length;
 console.log('Arg_len:', arg_len);
@@ -32,6 +34,7 @@ const conn = mysql.createConnection({
   charset: 'utf8mb4',
   multipleStatements: true,
   dateStrings: true,
+  decimalNumbers: !decimalStrings,
   typeCast(field: any, next: () => any) {
     if (field.type === 'LONGLONG') {
       const val = field.string();

@@ -7,7 +7,9 @@ const { Types } = require('../src/types');
 const { COLLATIONS, FIELD_FLAGS } = require('../src/constants/mysql');
 const { testNamespace } = require('./test_namespace');
 
-const sql = process.argv.slice(2).join(' ');
+const args = process.argv.slice(2);
+const decimalStrings = args.includes('--decimal-strings');
+const sql = args.filter((arg) => arg !== '--decimal-strings').join(' ');
 if (!sql) {
   console.log('usage:', path.basename(process.argv[1]), '<sql>');
   process.exit(-1);
@@ -18,6 +20,7 @@ const opts = {
   namespace: testNamespace(),
   multipleStatements: true,
   dateStrings: true,
+  decimalNumbers: !decimalStrings,
   resultObjects: true,
   charset: 'utf8mb4',
   typeCast(field: any, next: () => any) {

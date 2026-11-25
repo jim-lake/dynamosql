@@ -26,7 +26,7 @@ function minus(expr: Unary, state: EvaluationState): EvaluationResult {
     } else {
       const num = convertNum(result.value);
       result.value = num !== null ? -num : null;
-      if (result.type === 'string') {
+      if (result.type === 'string' || result.type === 'json') {
         result.type = 'double';
       }
     }

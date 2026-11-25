@@ -6,6 +6,7 @@ import { toBigInt } from '@/tools/safe_convert';
 import GlobalSettings from '../../global_settings';
 import { getFunctionName } from '../helpers/ast_helper';
 import { getDecimalsForString } from '../helpers/decimals';
+import { mysqlStringToValueType } from '../types/value_type';
 
 import {
   methods as AggregateFunctions,
@@ -468,6 +469,18 @@ export function getValue(
       const decode = _decodeCell(cell);
       result.type = decode.type;
       result.value = decode.value;
+      const info = from ? tableInfoMap?.get(from) : undefined;
+      const lookup_name = info?.isCaseSensitive
+        ? col_name
+        : col_name.toLowerCase();
+      const column = info?.columns.find((c) =>
+        info.isCaseSensitive
+          ? c.name === lookup_name
+          : c.name_lc === lookup_name
+      );
+      if (decode.type === 'null' && column?.mysqlType) {
+        result.type = mysqlStringToValueType(column.mysqlType);
+      }
     } else {
       result.err = 'no_row_list';
       result.value = col_name;

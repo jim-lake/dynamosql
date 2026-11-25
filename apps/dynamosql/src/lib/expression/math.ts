@@ -1,7 +1,9 @@
+import { getDecimals } from '../helpers/decimals';
 import {
   convertNum,
   convertBigInt,
   convertDateTimeOrDate,
+  roundDecimalText,
 } from '../helpers/sql_conversion';
 import { SQLDate } from '../types/sql_date';
 import { SQLDateTime } from '../types/sql_datetime';
@@ -66,7 +68,13 @@ export function mul(expr: Binary, state: EvaluationState): EvaluationResult {
     right_num !== undefined
   ) {
     // @ts-expect-error TS2365 ignore bigint/number the code is correct
-    value = left_num * right_num;
+    const product = left_num * right_num;
+    if (result.type === 'number') {
+      const decimals = getDecimals(result.left) + getDecimals(result.right);
+      value = roundDecimalText(Number(product), decimals);
+    } else {
+      value = product;
+    }
   }
   return { err, value, name, type: result.type };
 }
@@ -160,7 +168,9 @@ export function modHelper(
       left.type === 'string' ||
       right.type === 'string' ||
       left.type === 'text' ||
-      right.type === 'text'
+      right.type === 'text' ||
+      left.type === 'json' ||
+      right.type === 'json'
     ) {
       type = 'double';
     } else if (left.type === 'number' || right.type === 'number') {
@@ -177,7 +187,9 @@ interface NumBothSidesResult extends EvaluationResult {
   left_num?: bigint | number | undefined;
   right_num?: bigint | number | undefined;
   interval?: SQLInterval;
-  datetime?: SQLDateTime | SQLDate | SQLTime | null;
+  datetime?: SQLDateTime | SQLTime | SQLDate | null;
+  left: EvaluationResult;
+  right: EvaluationResult;
 }
 function _numBothSides(
   expr: Binary,
@@ -280,7 +292,18 @@ function _numBothSides(
       }
     }
   }
-  return { err, name, value, left_num, right_num, interval, datetime, type };
+  return {
+    err,
+    name,
+    value,
+    left_num,
+    right_num,
+    interval,
+    datetime,
+    type,
+    left,
+    right,
+  };
 }
 function _unionNumberType(
   raw_type1: ValueType,
@@ -296,7 +319,9 @@ function _unionNumberType(
     type1 === 'string' ||
     type2 === 'string' ||
     type1 === 'text' ||
-    type2 === 'text'
+    type2 === 'text' ||
+    type1 === 'json' ||
+    type2 === 'json'
   ) {
     return 'double';
   } else if (type1 === type2) {

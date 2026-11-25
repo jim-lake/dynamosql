@@ -82,7 +82,7 @@ export function round(
   if (arg2 && arg2.err) {
     return arg2;
   }
-  if (result.value === null) {
+  if (result.value === null && result.type === 'null') {
     result.type = 'double';
   }
   if (result.value instanceof SQLJson) {
@@ -114,7 +114,11 @@ export function round(
     const factor = Math.pow(10, -decimals);
     result.value = mysqlRound(value / factor, result.type) * factor;
   }
-  if (result.type === 'bool') {
+  if (
+    result.type === 'bool' ||
+    result.type === 'long' ||
+    result.type === 'year'
+  ) {
     result.type = 'longlong';
   }
   if (result.type === 'string') {
@@ -135,16 +139,18 @@ export function mod(expr: Function, state: EvaluationState): EvaluationResult {
   return modHelper(arg1, arg2, `MOD(${arg1.name}, ${arg2.name})`);
 }
 function _resolveTypeForRounding(result: EvaluationResult): ValueType {
-  if (
-    result.value === null ||
-    result.type === 'string' ||
-    result.type === 'json'
-  ) {
+  if (result.type === 'string' || result.type === 'json') {
     return 'double';
   } else if (result.type === 'number') {
     return 'longlong';
-  } else if (result.type === 'bool') {
+  } else if (
+    result.type === 'bool' ||
+    result.type === 'long' ||
+    result.type === 'year'
+  ) {
     return 'longlong';
+  } else if (result.type === 'null') {
+    return 'double';
   }
   return result.type;
 }
@@ -162,6 +168,9 @@ export function pow(expr: Function, state: EvaluationState): EvaluationResult {
     const num1 = convertNum(arg1.value);
     const num2 = convertNum(arg2.value);
     value = num1 !== null && num2 !== null ? Math.pow(num1, num2) : null;
+    if (value === Infinity || value === -Infinity) {
+      return { err: 'ER_DATA_OUT_OF_RANGE', name, value: null, type: 'double' };
+    }
   }
   return { err, name, value, type: 'double' };
 }
@@ -226,6 +235,10 @@ export function exp(expr: Function, state: EvaluationState): EvaluationResult {
   if (!result.err && result.value !== null) {
     const num = convertNum(result.value);
     result.value = num !== null ? Math.exp(num) : null;
+    if (result.value === Infinity) {
+      result.err = 'ER_DATA_OUT_OF_RANGE';
+      result.value = null;
+    }
   }
   return result;
 }

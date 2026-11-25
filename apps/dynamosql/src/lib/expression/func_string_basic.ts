@@ -1,4 +1,5 @@
 import { assertArgCount, assertArgCountParse } from '../helpers/arg_count';
+import { dependsOnRow } from '../helpers/ast_helper';
 import { isCaseInsensitive } from '../helpers/collation';
 import { convertNum, convertString } from '../helpers/sql_conversion';
 
@@ -183,23 +184,23 @@ export function repeat(
   let type: EvaluationResult['type'];
   const name = `REPEAT(${arg1.name}, ${arg2.name})`;
 
+  const rowDependent = dependsOnRow(expr.args.value[1]);
   if (!err && arg2.value === null) {
     value = null;
     type = 'text';
   } else if (!err && arg1.value === null) {
     value = null;
-    type = 'string';
+    type = rowDependent ? 'text' : 'string';
   } else if (!err) {
     const count = convertNum(arg2.value);
     const str = String(arg1.value);
     const rounded = count === null ? 0 : Math.round(count);
     value = rounded > 0 ? str.repeat(rounded) : '';
-    // MySQL types results over 65535 bytes (or a negative count) as BLOB.
-    let max_bytes = 3 * str.length * Math.max(rounded, 0);
-    if (rounded < 0 && str.length > 0) {
-      max_bytes = Infinity;
-    }
-    type = max_bytes > 65535 ? 'text' : 'string';
+    // MySQL reserves 4 bytes per character and types a negative count on a non-empty string as BLOB.
+    const max_bytes = 4 * Array.from(str).length * Math.max(rounded, 0);
+    const negative_count = rounded < 0 && str.length > 0;
+    type =
+      rowDependent || negative_count || max_bytes > 65535 ? 'text' : 'string';
   } else {
     type = 'text';
   }
@@ -322,12 +323,14 @@ export function space(
   assertArgCount(expr, 1);
   const result = getValue(expr.args.value[0], state);
   result.name = `SPACE(${result.name})`;
-  result.type = 'string';
+  const rowDependent = dependsOnRow(expr.args.value[0]);
+  let rounded = 0;
   if (!result.err && result.value !== null) {
     const count = convertNum(result.value);
-    result.value =
-      count !== null && count > 0 ? ' '.repeat(Math.round(count)) : '';
+    rounded = count !== null && count > 0 ? Math.round(count) : 0;
+    result.value = ' '.repeat(rounded);
   }
+  result.type = rowDependent || 4 * rounded > 65535 ? 'text' : 'string';
   return result;
 }
 export function concat_ws(

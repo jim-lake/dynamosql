@@ -1,0 +1,5 @@
+SELECT EXP(2020) AS result;
+SELECT EXP(710) AS result;
+SELECT POW(10, 400) AS result;
+SELECT POWER(10, 400) AS result;
+SELECT POW(-10, 401) AS result;

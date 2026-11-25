@@ -95,3 +95,12 @@ export function walkColumnRefs(
     });
   }
 }
+export function dependsOnRow(node: unknown): boolean {
+  if (typeof node !== 'object' || node === null) {
+    return false;
+  }
+  if ('type' in node && (node.type === 'column_ref' || node.type === 'var')) {
+    return true;
+  }
+  return Object.values(node).some(dependsOnRow);
+}

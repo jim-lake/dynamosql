@@ -87,8 +87,14 @@ function signed(expr: Cast, state: EvaluationState): EvaluationResult {
 }
 function char(expr: Cast, state: EvaluationState): EvaluationResult {
   const result = getValue(expr.expr, state);
+  const target: CastTarget | undefined = Array.isArray(expr.target)
+    ? expr.target[0]
+    : expr.target;
+  const isBlob =
+    target?.length === undefined &&
+    (result.type === 'json' || result.type === 'text');
   result.name = `CAST(${result.name} AS CHAR)`;
-  result.type = 'string';
+  result.type = isBlob ? 'text' : 'string';
   if (
     !result.err &&
     result.value !== null &&

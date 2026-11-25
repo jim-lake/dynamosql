@@ -35,6 +35,26 @@ describe('Expression', function () {
     allowedErrors: 'SAME_CODE',
     verify_field_types: true,
   });
+  runTests(
+    'math_overflow_error.sql',
+    path.join(__dirname, 'math_overflow_error.sql'),
+    { allowedErrors: 'SAME_CODE', verify_field_types: true }
+  );
+  runTests(
+    'function_space_repeat_types.sql',
+    path.join(__dirname, 'function_space_repeat_types.sql'),
+    { verify_field_types: true }
+  );
+  runTests(
+    'json_arithmetic_types.sql',
+    path.join(__dirname, 'json_arithmetic_types.sql'),
+    { verify_field_types: true }
+  );
+  runTests(
+    'unix_timestamp_types.sql',
+    path.join(__dirname, 'unix_timestamp_types.sql'),
+    { verify_field_types: true }
+  );
   runTests('cast.sql', path.join(__dirname, 'cast.sql'), {
     verify_field_types: true,
   });
@@ -219,6 +239,11 @@ describe('Expression', function () {
     'function_json_array_error.sql',
     path.join(__dirname, 'function_json_array_error.sql'),
     { allowedErrors: 'SAME_CODE', verify_field_types: true }
+  );
+  runTests(
+    'json_number_type.sql',
+    path.join(__dirname, 'json_number_type.sql'),
+    { verify_field_types: true }
   );
   runTests(
     'function_json_extract.sql',
@@ -566,4 +591,12 @@ describe('Expression', function () {
     path.join(__dirname, 'null_and_text_arithmetic.sql'),
     { verify_field_types: true }
   );
+  runTests(
+    'decimal_multiply.sql',
+    path.join(__dirname, 'decimal_multiply.sql'),
+    { verify_field_types: true }
+  );
+  runTests('round_decimal.sql', path.join(__dirname, 'round_decimal.sql'), {
+    verify_field_types: true,
+  });
 });
