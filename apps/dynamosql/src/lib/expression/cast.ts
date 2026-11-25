@@ -69,20 +69,58 @@ function time(expr: Cast, state: EvaluationState): EvaluationResult {
   }
   return result;
 }
-function signed(expr: Cast, state: EvaluationState): EvaluationResult {
+function _toSignedBigInt(
+  expr: Cast,
+  state: EvaluationState,
+  is_unsigned: boolean
+): EvaluationResult {
   const result = getValue(expr.expr, state);
-  result.name = `CAST(${result.name} AS SIGNED)`;
   const input_type = result.type;
+  const int_min = -9223372036854775808n;
+  const int_max = 9223372036854775807n;
+  const uint_max = 18446744073709551615n;
   result.type = 'longlong';
   if (!result.err && result.value !== null) {
-    if (typeof result.value !== 'number' || input_type === 'string') {
-      result.value = convertBigInt(
+    if (typeof result.value === 'number' && input_type !== 'string') {
+      if (input_type === 'double' && result.value < -9223372036854775808) {
+        result.err = 'ER_DATA_OUT_OF_RANGE';
+        result.value = null;
+      } else {
+        const exact = BigInt(mysqlRound(result.value, input_type));
+        const top =
+          input_type === 'double' || !is_unsigned ? int_max : uint_max;
+        result.value = exact < int_min ? int_min : exact > top ? top : exact;
+      }
+    } else {
+      const exact = convertBigInt(
         typeof result.value === 'string' ? result.value.trim() : result.value
       );
-    } else {
-      result.value = BigInt(mysqlRound(result.value, input_type));
+      const over = input_type === 'string' || is_unsigned ? uint_max : int_max;
+      result.value =
+        exact === null
+          ? null
+          : exact < int_min
+            ? int_min
+            : exact > uint_max
+              ? over
+              : exact;
     }
   }
+  if (typeof result.value === 'bigint') {
+    result.value = is_unsigned
+      ? BigInt.asUintN(64, result.value)
+      : BigInt.asIntN(64, result.value);
+  }
+  return result;
+}
+function signed(expr: Cast, state: EvaluationState): EvaluationResult {
+  const result = _toSignedBigInt(expr, state, false);
+  result.name = `CAST(${result.name} AS SIGNED)`;
+  return result;
+}
+function unsigned(expr: Cast, state: EvaluationState): EvaluationResult {
+  const result = _toSignedBigInt(expr, state, true);
+  result.name = `CAST(${result.name} AS UNSIGNED)`;
   return result;
 }
 function char(expr: Cast, state: EvaluationState): EvaluationResult {
@@ -157,4 +195,4 @@ function json(expr: Cast, state: EvaluationState): EvaluationResult {
 export const methods: Record<
   string,
   undefined | ((expr: Cast, state: EvaluationState) => EvaluationResult)
-> = { datetime, date, time, signed, char, decimal, double, json };
+> = { datetime, date, time, signed, unsigned, char, decimal, double, json };

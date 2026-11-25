@@ -646,7 +646,7 @@ Subqueries are independent (no reference to the outer query) or dependent (corre
 | `SHOW EVENTS [{FROM \| IN} db] [LIKE \| WHERE]`                                                                                                 |    ❌     |                                                       |
 | `SHOW FUNCTION CODE f`, `SHOW PROCEDURE CODE p`                                                                                                 |    ❌     | Debug builds only.                                    |
 | `SHOW FUNCTION STATUS [LIKE \| WHERE]`, `SHOW PROCEDURE STATUS [LIKE \| WHERE]`                                                                 |    ❌     |                                                       |
-| `SHOW GRANTS [FOR user_or_role [USING role ...]]`                                                                                               |    ✅     | `unit_misc/show_grants.test.ts` (bare `SHOW GRANTS` only; FOR is a parser gap) |
+| `SHOW GRANTS [FOR user_or_role [USING role ...]]`                                                                                               |    ✅     | `unit_misc/show_grants.test.ts` (bare `SHOW GRANTS` and `FOR CURRENT_USER()`; a named user in `FOR` is ignored, see `docs/MYSQL_GAPS.md`) |
 | `SHOW OPEN TABLES [{FROM \| IN} db] [LIKE \| WHERE]`                                                                                            |    ❌     |                                                       |
 | `SHOW PLUGINS`                                                                                                                                  |    ❌     |                                                       |
 | `SHOW PRIVILEGES`                                                                                                                               |    ❌     |                                                       |
@@ -944,7 +944,7 @@ Operator semantics and function behavior are in `FUNCTIONS.md`. The rows below c
 | `CASE WHEN condition THEN ... [ELSE ...] END` (searched)                                                           |    ✅     | `expression/case.sql`                       |
 | `CAST(expr AS CHAR)`                                                                                               |    ✅     | `select/cast.sql`                           |
 | `CAST(expr AS SIGNED [INTEGER])`                                                                                   |    ✅     | `select/cast.sql`                           |
-| `CAST(expr AS UNSIGNED [INTEGER])`                                                                                 |    ❌     |                                             |
+| `CAST(expr AS UNSIGNED [INTEGER])`                                                                                 |    ✅     | `expression/cast.sql`, `expression/cast_edge_cases.sql`                                              |
 | `CAST(expr AS DECIMAL[(M[,D])])`                                                                                   |    ✅     | `select/cast.sql`                           |
 | `CAST(expr AS DOUBLE)`                                                                                             |    ✅     | `expression/function_least.sql`             |
 | `CAST(expr AS FLOAT[(p)])`, `CAST(expr AS REAL)`                                                                   |    ❌     |                                             |

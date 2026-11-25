@@ -16,3 +16,7 @@ Matching MySQL is not a goal for illegal statements. Parse errors (`ER_PARSE_ERR
 ## DROP DATABASE IF EXISTS
 
 - `DROP DATABASE IF EXISTS missing_db;`, where `missing_db` does not exist: MySQL 8.4 returns success with a warning (1008). DynamoSQL returns `ER_BAD_DB_ERROR`. `drop_handler.ts` never reads `ast.prefix`, and `schema_manager.dropDatabase` throws `db_not_found` without a check for the flag.
+
+## SHOW GRANTS FOR
+
+- `SHOW GRANTS FOR 'nobody'@'%';`, where that account does not exist: MySQL returns `ER_NONEXISTING_GRANT`. DynamoSQL ignores the `FOR` target and returns the grants of the connected user.

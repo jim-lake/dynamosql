@@ -5,3 +5,6 @@ SELECT CAST('[1,]' AS JSON) AS json_value;
 SELECT CAST('1 2' AS JSON) AS json_value;
 SELECT CAST('NaN' AS JSON) AS json_value;
 SELECT CAST("{'a':1}" AS JSON) AS json_value;
+SELECT CAST(-1e30 AS SIGNED) AS signed_double_below_min_error;
+SELECT CAST(-1.5e19 AS SIGNED) AS signed_double_below_min_error_2;
+SELECT CAST(-1e30 AS UNSIGNED) AS unsigned_double_below_min_error;

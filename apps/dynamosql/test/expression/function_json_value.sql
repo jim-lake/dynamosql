@@ -22,3 +22,12 @@ SELECT JSON_VALUE(CAST('{"a":"x"}' AS JSON), '$.a') AS result;
 SELECT JSON_VALUE(JSON_ARRAY(1, 2), '$[0]') AS result;
 SELECT JSON_VALUE(NULL, '$.a') AS result;
 SELECT JSON_VALUE('not json', '$.a') AS result;
+
+-- JSON_VALUE with RETURNING type spellings
+SELECT JSON_VALUE('{"i":5}', '$.i' RETURNING SIGNED INTEGER) AS result;
+SELECT JSON_VALUE('{"i":-5}', '$.i' RETURNING SIGNED INTEGER) AS result;
+SELECT JSON_VALUE('{"i":5}', '$.i' RETURNING UNSIGNED INTEGER) AS result;
+SELECT JSON_VALUE('{"i":5}', '$.i' RETURNING UNSIGNED) AS result;
+SELECT JSON_VALUE('{"s":"abc"}', '$.s' RETURNING CHAR(3) CHARACTER SET utf8mb4) AS result;
+SELECT JSON_VALUE('{"s":"ab"}', '$.s' RETURNING CHAR(3) CHARACTER SET utf8mb4) AS result;
+SELECT JSON_VALUE('{"s":"abcdef"}', '$.s' RETURNING CHAR(3) CHARACTER SET utf8mb4) AS result;
