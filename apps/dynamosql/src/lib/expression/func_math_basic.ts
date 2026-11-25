@@ -85,7 +85,7 @@ export function round(
   if (result.value === null && result.type === 'null') {
     result.type = 'double';
   }
-  if (result.value instanceof SQLJson) {
+  if (result.value instanceof SQLJson || result.type === 'json') {
     result.type = 'double';
   }
   let value = convertNum(result.value);

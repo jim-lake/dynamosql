@@ -147,9 +147,6 @@ export function _getExprCollation(
         if (col.collation) {
           return [col.collation, COERCIBILITY.COLUMN_TYPE];
         }
-        if (col.mysqlType === 'JSON') {
-          return [COLLATIONS.UTF8MB4_BIN, COERCIBILITY.COLUMN_TYPE];
-        }
         return [COLLATIONS.BINARY, COERCIBILITY.NUMERIC];
       } else if (ref_info?.column?.expr) {
         return _getExprCollation(ref_info.column.expr, state);

@@ -70,6 +70,11 @@ describe('Temp', function () {
     { checkChanged: true, verify_field_types: true }
   );
   runTests(
+    'memory_json_group_join.sql',
+    path.join(__dirname, 'memory_json_group_join.sql'),
+    { checkChanged: true, verify_field_types: true }
+  );
+  runTests(
     'memory_json_ordering.sql',
     path.join(__dirname, 'memory_json_ordering.sql'),
     { checkChanged: true, verify_field_types: true }
@@ -103,6 +108,16 @@ describe('Temp', function () {
       checkChanged: true,
       verify_field_types: true,
     }
+  );
+  runTests(
+    'memory_json_scalar_string.sql',
+    path.join(__dirname, 'memory_json_scalar_string.sql'),
+    { checkChanged: true }
+  );
+  runTests(
+    'memory_json_scalar_sql.sql',
+    path.join(__dirname, 'memory_json_scalar_sql.sql'),
+    { checkChanged: true, verify_field_types: true }
   );
   runTests('collation.sql', path.join(__dirname, 'collation.sql'), {
     checkChanged: true,

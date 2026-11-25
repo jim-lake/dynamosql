@@ -205,7 +205,7 @@ export function unionValue(
   value: EvaluationResult['value'],
   type: ValueType
 ): EvaluationResult['value'] {
-  if (type === 'string' && typeof value !== 'string') {
+  if ((type === 'string' || type === 'text') && typeof value !== 'string') {
     return value === null ? null : String(value);
   }
   return type === 'number' && typeof value === 'bigint' ? Number(value) : value;
@@ -253,7 +253,7 @@ export function unionType(list: EvaluationResult[]): UnionTypeResult {
   } else {
     compare_type = 'string';
   }
-  let type = compare_type;
+  let type: ValueType = compare_type;
   if (type === 'datetime' || type === 'date') {
     if (
       types.some(
@@ -267,6 +267,12 @@ export function unionType(list: EvaluationResult[]): UnionTypeResult {
       compare_type = 'string';
       type = 'string';
     }
+  }
+  if (
+    types.includes('json') &&
+    types.some((t) => t !== 'json' && t !== 'null')
+  ) {
+    type = 'text';
   }
   return { compare_type, type };
 }

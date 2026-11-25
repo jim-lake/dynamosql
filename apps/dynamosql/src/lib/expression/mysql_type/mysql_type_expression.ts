@@ -99,6 +99,12 @@ function _binaryMysqlType(
     return null;
   }
   const op = expr.operator.toUpperCase();
+  if (op === '->') {
+    return { type: 'JSON' };
+  }
+  if (op === '->>') {
+    return { type: 'LONGTEXT' };
+  }
   if (op !== '+' && op !== '-' && op !== '*' && op !== '/') {
     return { type: 'BIGINT' };
   }

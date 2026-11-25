@@ -20,3 +20,11 @@ Matching MySQL is not a goal for illegal statements. Parse errors (`ER_PARSE_ERR
 ## SHOW GRANTS FOR
 
 - `SHOW GRANTS FOR 'nobody'@'%';`, where that account does not exist: MySQL returns `ER_NONEXISTING_GRANT`. DynamoSQL ignores the `FOR` target and returns the grants of the connected user.
+
+## String function result type on TEXT and JSON
+
+- `SELECT UPPER(t), TRIM(t), CONCAT(t, 'x'), CONCAT_WS('-', t, 'x') FROM tt;`, where `t` is a `TEXT` or `JSON` column: MySQL returns `BLOB` field metadata. DynamoSQL returns `VAR_STRING`. The values match. `upper`, `lower`, and `trim` in `func_string_basic.ts` always set `type = 'string'`, and `concat` only returns `text` when an argument's runtime type is `text`.
+
+## JSON column coercibility
+
+- `SELECT COERCIBILITY(j), COLLATION(CONCAT(j, s)) FROM cj;`, where `j` is `JSON` and `s` is `VARCHAR`: MySQL returns `2` and `utf8mb4_bin`. DynamoSQL returns `5` and `utf8mb4_0900_ai_ci`. A JSON column without a collation falls through to `[BINARY, NUMERIC]` in the `column_ref` branch of `_getExprCollation`. `COLLATION(j)` and `j LIKE s` match MySQL.
