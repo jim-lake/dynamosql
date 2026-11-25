@@ -40,4 +40,3 @@ SELECT id, DATEDIFF(doc, '2020-01-01') AS v FROM jd ORDER BY id;
 SELECT SUM(doc) AS s, AVG(doc) AS a FROM jsum;
 SELECT COUNT(*) AS c FROM jg GROUP BY doc ORDER BY c;
 
-SELECT id, ROUND(doc) AS v FROM jr ORDER BY id;

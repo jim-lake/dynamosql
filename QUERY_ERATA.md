@@ -90,6 +90,22 @@ MySQL does not define a sort order for JSON arrays and objects. Its `ORDER BY` a
 
 - `SELECT id FROM t ORDER BY doc, id;`, where `doc` holds `[1,2]`, `[2]`, and `[]` in rows 1 to 3: MySQL returns ids 3, 2, 1. DynamoSQL returns ids 3, 1, 2.
 
+## Rounding DOUBLE ties
+
+DynamoSQL rounds DOUBLE values with JavaScript's `Math.round`, which sends a value exactly halfway between two integers toward positive infinity. MySQL has no specified rounding rule for DOUBLE values. It uses the C library's rounding, so the result for a tie depends on the platform; most C libraries round a tie to the nearest even integer. Rounding of DECIMAL values matches MySQL: ties round away from zero.
+
+This affects `ROUND()`, `CAST(... AS SIGNED)`, `HEX()`, and any other conversion of a DOUBLE to an integer.
+
+- `SELECT CAST(2.5e0 AS SIGNED) AS a;`: MySQL returns `2` on a typical Linux build. DynamoSQL returns `3`.
+- `SELECT ROUND(-1.5e0) AS a;`: MySQL returns `-2` on a typical Linux build. DynamoSQL returns `-1`.
+- `SELECT ROUND(2.5) AS a;` (DECIMAL): both return `3`.
+
+## Nested CAST to DOUBLE then SIGNED
+
+MySQL truncates when a `CAST(... AS DOUBLE)` result is cast directly to an integer type, but it rounds every other DOUBLE value. DynamoSQL rounds all DOUBLE values.
+
+- `SELECT CAST(CAST(3.7 AS DOUBLE) AS SIGNED) AS a;`: MySQL returns `3`. DynamoSQL returns `4`, the same as MySQL's result for `CAST(3.7e0 AS SIGNED)` and `CAST(CAST(3.7 AS DOUBLE) + 0 AS SIGNED)`.
+
 ## PI() display precision
 
 MySQL shows `PI()` with 6 decimal places in the text protocol, because the result field has `decimals` 6. The value is still the full double. Other DOUBLE results print full precision. DynamoSQL treats `PI()` as a plain DOUBLE and returns the full value, so it does not reproduce the 6-place display.

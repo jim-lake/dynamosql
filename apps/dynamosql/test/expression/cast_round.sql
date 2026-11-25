@@ -1,0 +1,49 @@
+-- CAST AS DECIMAL rounds half away from zero to the target scale
+SELECT CAST(42.222 AS DECIMAL(10,2)) AS result;
+SELECT CAST(42.225 AS DECIMAL(10,2)) AS result;
+SELECT CAST(-42.225 AS DECIMAL(10,2)) AS result;
+SELECT CAST(0.5 AS DECIMAL) AS result;
+SELECT CAST(-0.5 AS DECIMAL) AS result;
+SELECT CAST(1.5 AS DECIMAL) AS result;
+SELECT CAST(-1.5 AS DECIMAL) AS result;
+SELECT CAST(42.5 AS DECIMAL) AS result;
+SELECT CAST(-0.4 AS DECIMAL) AS result;
+SELECT CAST(12345.67 AS DECIMAL(7)) AS result;
+SELECT CAST(1e-7 AS DECIMAL(10,8)) AS result;
+SELECT CAST(9.5 AS DECIMAL(1,0)) AS result;
+SELECT CAST(42 AS DECIMAL(10,2)) AS result;
+SELECT CAST(1=1 AS DECIMAL(5,2)) AS result;
+SELECT CAST(NULL AS DECIMAL(10,2)) AS result;
+
+-- CAST AS DECIMAL clamps to the largest value the column can hold
+SELECT CAST(123456 AS DECIMAL(5,2)) AS result;
+SELECT CAST(-123456.7 AS DECIMAL(5,2)) AS result;
+
+-- CAST AS DECIMAL reads strings by their leading numeric prefix
+SELECT CAST('42.225' AS DECIMAL(10,2)) AS result;
+SELECT CAST(' 1.5 ' AS DECIMAL(10,1)) AS result;
+SELECT CAST('3.5e2' AS DECIMAL(10,2)) AS result;
+SELECT CAST('-0.4' AS DECIMAL(10,2)) AS result;
+SELECT CAST('12abc' AS DECIMAL(10,2)) AS result;
+SELECT CAST('abc' AS DECIMAL(10,2)) AS result;
+SELECT CAST('' AS DECIMAL(10,2)) AS result;
+SELECT CAST('Infinity' AS DECIMAL(10,2)) AS result;
+
+-- CAST AS DECIMAL reads JSON numbers and numeric strings
+SELECT CAST(JSON_EXTRACT('{"a":42.225}', '$.a') AS DECIMAL(10,2)) AS result;
+SELECT CAST(JSON_EXTRACT('{"a":"42.225"}', '$.a') AS DECIMAL(10,2)) AS result;
+
+-- CAST AS SIGNED rounds decimal and double numbers half away from zero
+SELECT CAST(3.75 AS SIGNED) AS result;
+SELECT CAST(-3.75 AS SIGNED) AS result;
+SELECT CAST(2.5 AS SIGNED) AS result;
+SELECT CAST(-2.5 AS SIGNED) AS result;
+SELECT CAST(3.5e0 AS SIGNED) AS result;
+SELECT CAST(-2.5e0 AS SIGNED) AS result;
+SELECT CAST(3.7e0 AS SIGNED) AS result;
+
+-- CAST AS SIGNED truncates strings
+SELECT CAST('3.75' AS SIGNED) AS result;
+SELECT CAST('-3.75' AS SIGNED) AS result;
+SELECT CAST('3.5e2' AS SIGNED) AS result;
+SELECT CAST(' 7 ' AS SIGNED) AS result;

@@ -55,6 +55,25 @@ export function convertNum(value: unknown): number | null {
   }
   return null;
 }
+export function roundDecimalText(value: number, scale: number): number {
+  if (value === 0 || !Number.isFinite(value)) {
+    return value;
+  }
+  const [mantissa = '', exponentText = '0'] = Math.abs(value)
+    .toExponential()
+    .split('e');
+  const digits = mantissa.replace('.', '');
+  const keep = Number(exponentText) + 1 + scale;
+  if (keep < 0) {
+    return 0;
+  }
+  let units = BigInt(digits.padEnd(keep, '0').slice(0, keep) || '0');
+  if (keep < digits.length && digits.charAt(keep) >= '5') {
+    units += 1n;
+  }
+  const sign = value < 0 ? '-' : '';
+  return Number(`${sign}${units}e-${scale}`);
+}
 export function convertBigInt(value: unknown): bigint | null {
   if (value === null || value === undefined) {
     return null;

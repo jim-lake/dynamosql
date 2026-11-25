@@ -9,6 +9,10 @@ Matching MySQL is not a goal for illegal statements. Parse errors (`ER_PARSE_ERR
 - `SELECT extra FROM t JOIN (SELECT id, extra FROM u) s ON s.id = t.id;`, where `extra` exists only in the derived table: MySQL returns the values of `s.extra`. DynamoSQL returns `ER_BAD_FIELD_ERROR`. An unqualified column resolves through the first FROM item (`firstFrom` in `_resolveObject`), and derived tables are not searched.
 - `SELECT s.ID FROM (SELECT id FROM t) s;` with a mismatched alias case, such as `S.NAME` for alias `s`: MySQL returns `ER_BAD_FIELD_ERROR`. DynamoSQL returns `ER_NO_SUCH_TABLE`, because table and alias lookup both fail with the table error. This is an error case for an invalid statement, so it is kept as reference only.
 
+## DECIMAL arithmetic
+
+- `SELECT CAST(42.225 AS DECIMAL(10,2)) * 10 AS r;`: MySQL returns `422.30` (exact NEWDECIMAL product). DynamoSQL returns `422.29999999999995`, because the product is computed in doubles.
+
 ## DECIMAL scale in string functions
 
 - `SELECT CONCAT(CAST(1.50 AS DECIMAL(5,2)), '') AS r;`: MySQL returns `'1.50'`. DynamoSQL returns `'1.5'`, because `concat` appends `String(result.value)` (`func_string_basic.ts:53`), which drops the decimal scale.
@@ -24,17 +28,11 @@ Matching MySQL is not a goal for illegal statements. Parse errors (`ER_PARSE_ERR
 
 ## ROUND on DECIMAL
 
-- `SELECT ROUND(CAST(-1.45 AS DECIMAL(10,2)), 1);`: MySQL returns `-1.5` (NEWDECIMAL). DynamoSQL returns `-1.4`, because `round` calls `value.toFixed(decimals)` on the double value of the decimal, and the double -1.45 is stored just below the tie.
 - `SELECT ROUND(dec_v) FROM t;`, where `dec_v` is `DECIMAL(10,2)`: MySQL returns NEWDECIMAL. DynamoSQL returns DOUBLE, because `round` resolves the result type through `_resolveTypeForRounding` and does not keep the DECIMAL input type.
-
-## CAST to integer and decimal
-
-- `SELECT CAST(3.75 AS SIGNED) AS a;`: MySQL returns `4`. DynamoSQL returns `3`, because `cast.ts` converts with `convertBigInt`, which truncates with `Math.floor`.
-- `SELECT CAST(42 AS DECIMAL(10,2)) AS b;`: MySQL returns `'42.00'`. DynamoSQL returns `'42'`, because the decimal scale is not applied to an integer input.
 
 ## JSON DOUBLE numbers in stored values
 
-- `CREATE TEMPORARY TABLE t (id INT PRIMARY KEY, doc JSON); INSERT INTO t VALUES (1, '1e3'); SELECT JSON_TYPE(doc), CAST(doc AS CHAR) FROM t;`: MySQL returns `DOUBLE` and `'1000.0'`. DynamoSQL returns `INTEGER` and `'1000'`, because `JSON.parse` turns `1e3` into the JavaScript number 1000 and loses the DOUBLE type. The same literal in an expression (`JSON_TYPE('1e3')`) returns `DOUBLE` on both engines.
+- `CREATE TEMPORARY TABLE t (id INT PRIMARY KEY, doc JSON); INSERT INTO t VALUES (1, '1e3'); SELECT JSON_TYPE(doc) FROM t;`: MySQL returns `DOUBLE`. DynamoSQL returns `INTEGER`, because `JSON.parse` turns `1e3` into the JavaScript number 1000 and loses the DOUBLE type. The same literal in an expression (`JSON_TYPE('1e3')`) returns `DOUBLE` on both engines.
 - `SELECT id, CAST(doc AS CHAR) AS doc_text FROM js;`, where `js` is a JSON column: MySQL reports the column type as BLOB. DynamoSQL reports VAR_STRING.
 
 ## JSON scalar arithmetic and comparison
@@ -51,7 +49,7 @@ Matching MySQL is not a goal for illegal statements. Parse errors (`ER_PARSE_ERR
 
 ## UNIX_TIMESTAMP on a JSON string
 
-- `SELECT id, UNIX_TIMESTAMP(doc) AS v FROM jd;`, where `jd.doc` holds the JSON string `"2020-01-02"`: MySQL returns `1577923200.000000` as a DECIMAL(17,6) string. DynamoSQL returns the BIGINT `1577923200`. A non-date JSON string returns `0.000000` on MySQL and `0` on DynamoSQL.
+- `SELECT id, UNIX_TIMESTAMP(doc) AS v FROM jd;`, where `jd.doc` holds the JSON string `"2020-01-02"`: MySQL reports the result type as NEWDECIMAL. DynamoSQL reports LONGLONG. The values match. The same happens with a VARCHAR argument, so the difference is not specific to JSON.
 
 ## EXP overflow
 

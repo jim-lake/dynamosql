@@ -4,10 +4,12 @@ import {
   convertTime,
   convertBigInt,
   convertNum,
+  roundDecimalText,
 } from '../helpers/sql_conversion';
 import { SQLJson } from '../types/sql_json';
 
 import { getValue } from './evaluate';
+import { mysqlRound } from './func_math_basic';
 
 import type { EvaluationState, EvaluationResult } from './evaluate';
 import type { Cast } from 'node-sql-parser/build/mysql';
@@ -70,9 +72,16 @@ function time(expr: Cast, state: EvaluationState): EvaluationResult {
 function signed(expr: Cast, state: EvaluationState): EvaluationResult {
   const result = getValue(expr.expr, state);
   result.name = `CAST(${result.name} AS SIGNED)`;
+  const input_type = result.type;
   result.type = 'longlong';
   if (!result.err && result.value !== null) {
-    result.value = convertBigInt(result.value);
+    if (typeof result.value !== 'number' || input_type === 'string') {
+      result.value = convertBigInt(
+        typeof result.value === 'string' ? result.value.trim() : result.value
+      );
+    } else {
+      result.value = BigInt(mysqlRound(result.value, input_type));
+    }
   }
   return result;
 }
@@ -97,15 +106,13 @@ function decimal(expr: Cast, state: EvaluationState): EvaluationResult {
     ? expr.target[0]
     : expr.target;
   result.decimals = target?.scale;
-  if (
-    !result.err &&
-    result.value !== null &&
-    typeof result.value !== 'number'
-  ) {
-    result.value =
-      result.value instanceof SQLJson
-        ? convertNum(result.value)
-        : Number(result.value);
+  if (!result.err && result.value !== null) {
+    const scale = target?.scale ?? 0;
+    const limit =
+      Math.pow(10, (target?.length ?? 10) - scale) - Math.pow(10, -scale);
+    const num = convertNum(result.value) ?? 0;
+    const rounded = roundDecimalText(Number.isFinite(num) ? num : 0, scale);
+    result.value = Math.min(Math.max(rounded, -limit), limit);
   }
   return result;
 }

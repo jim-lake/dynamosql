@@ -1,5 +1,5 @@
 import { assertArgCount, assertArgCountParse } from '../helpers/arg_count';
-import { convertNum } from '../helpers/sql_conversion';
+import { convertNum, roundDecimalText } from '../helpers/sql_conversion';
 import { SQLJson } from '../types/sql_json';
 
 import { getValue } from './evaluate';
@@ -105,8 +105,11 @@ export function round(
     result.value = null;
   } else if (decimals === 0) {
     result.value = mysqlRound(value, result.type);
+  } else if (decimals > 0 && result.type === 'double') {
+    const factor = Math.pow(10, decimals);
+    result.value = Math.round(value * factor) / factor;
   } else if (decimals > 0) {
-    result.value = Number(value.toFixed(decimals));
+    result.value = roundDecimalText(value, decimals);
   } else {
     const factor = Math.pow(10, -decimals);
     result.value = mysqlRound(value / factor, result.type) * factor;
@@ -121,10 +124,6 @@ export function round(
 }
 export function mysqlRound(x: number, type: string): number {
   if (type === 'double') {
-    const lower = Math.floor(x);
-    if (x - lower === 0.5) {
-      return lower % 2 === 0 ? lower : lower + 1;
-    }
     return Math.round(x);
   }
   return x >= 0 ? Math.round(x) : -Math.round(-x);

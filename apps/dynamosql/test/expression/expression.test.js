@@ -45,6 +45,14 @@ describe('Expression', function () {
   runTests('cast_edge_cases.sql', path.join(__dirname, 'cast_edge_cases.sql'), {
     verify_field_types: true,
   });
+  runTests('cast_round.sql', path.join(__dirname, 'cast_round.sql'), {
+    verify_field_types: true,
+  });
+  runTests(
+    'cast_round_error.sql',
+    path.join(__dirname, 'cast_round_error.sql'),
+    { allowedErrors: 'SAME_CODE', verify_field_types: true }
+  );
   runTests('datetime.sql', path.join(__dirname, 'datetime.sql'), {
     verify_field_types: true,
   });
