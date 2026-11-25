@@ -123,6 +123,16 @@ describe('Temp', function () {
     checkChanged: true,
   });
   runTests(
+    'memory_json_collation.sql',
+    path.join(__dirname, 'memory_json_collation.sql'),
+    { checkChanged: true, verify_field_types: true }
+  );
+  runTests(
+    'memory_json_collation_error.sql',
+    path.join(__dirname, 'memory_json_collation_error.sql'),
+    { allowedErrors: 'SAME_CODE' }
+  );
+  runTests(
     'memory_collation_function.sql',
     path.join(__dirname, 'memory_collation_function.sql'),
     { checkChanged: true, verify_field_types: true }

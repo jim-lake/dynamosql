@@ -1,7 +1,10 @@
 import { SQLError } from '../../error';
 import { getValue } from '../expression';
 import { isAggregateNode } from '../expression/aggregate_functions';
+import { getExprCollation } from '../expression/collation';
 import { SQLJson } from '../types/sql_json';
+
+import { foldString } from './collation';
 
 import type { EvaluationState } from '../expression';
 import type { SourceRow, SourceRowGroup } from '../handler_types';
@@ -87,6 +90,7 @@ export async function* formGroup(
     }
   }
   const count = group_exprs.length;
+  const collations = group_exprs.map((group) => getExprCollation(group, state));
 
   const group_map: Record<string, unknown[] | Record<string, unknown>> = {};
   for (const row of row_list) {
@@ -101,7 +105,11 @@ export async function* formGroup(
     for (let i = 0; i < count; i++) {
       const keyValue = key_list[i];
       const key =
-        keyValue instanceof SQLJson ? `json:${keyValue}` : String(keyValue);
+        keyValue instanceof SQLJson
+          ? `json:${keyValue}`
+          : typeof keyValue === 'string'
+            ? foldString(keyValue, collations[i] ?? null)
+            : String(keyValue);
       const isLast = i + 1 === count;
       obj[key] ??= isLast ? [] : {};
 

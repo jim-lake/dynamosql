@@ -24,6 +24,9 @@ function constant(
   return () => [collation, coercibility];
 }
 
+const jsonColumn = constant(COLLATIONS.UTF8MB4_BIN, COERCIBILITY.COLUMN_TYPE);
+const jsonString = constant(COLLATIONS.UTF8MB4_BIN, COERCIBILITY.STRING);
+
 function connectionCollation(
   _args: ExprArgument[],
   state: EvaluationState
@@ -197,8 +200,35 @@ export const functionRules: Record<string, FunctionRule | undefined> = {
   uuid: constant(COLLATIONS.UTF8_GENERAL_CI, COERCIBILITY.STRING),
   version: constant(COLLATIONS.UTF8_GENERAL_CI, COERCIBILITY.SYSTEM),
   charset: constant(COLLATIONS.UTF8_GENERAL_CI, COERCIBILITY.STRING),
-  json_unquote: constant(COLLATIONS.UTF8MB4_BIN, COERCIBILITY.STRING),
-  json_extract: constant(COLLATIONS.UTF8MB4_BIN, COERCIBILITY.COLUMN_TYPE),
+  json_array: jsonColumn,
+  json_object: jsonColumn,
+  json_extract: jsonColumn,
+  json_keys: jsonColumn,
+  json_set: jsonColumn,
+  json_insert: jsonColumn,
+  json_replace: jsonColumn,
+  json_remove: jsonColumn,
+  json_array_append: jsonColumn,
+  json_array_insert: jsonColumn,
+  json_merge: jsonColumn,
+  json_merge_patch: jsonColumn,
+  json_merge_preserve: jsonColumn,
+  json_search: jsonColumn,
+  json_schema_validation_report: jsonColumn,
+  json_unquote: jsonString,
+  json_quote: jsonString,
+  json_type: jsonString,
+  json_pretty: jsonString,
+  json_value: constant(COLLATIONS.UTF8MB4_0900_BIN, COERCIBILITY.STRING),
+  json_contains: numeric,
+  json_contains_path: numeric,
+  json_depth: numeric,
+  json_length: numeric,
+  json_overlaps: numeric,
+  json_schema_valid: numeric,
+  json_storage_free: numeric,
+  json_storage_size: numeric,
+  json_valid: numeric,
 };
 
 export const aggregateRules: Record<string, FunctionRule | undefined> = {

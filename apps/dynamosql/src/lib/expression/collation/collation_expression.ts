@@ -39,6 +39,11 @@ export function getExprCoercibility(
   return _getExprCollation(expr, state)[1];
 }
 
+const UTF8MB4_BIN_COLLATIONS = new Set<COLLATIONS | null>([
+  COLLATIONS.UTF8MB4_BIN,
+  COLLATIONS.UTF8MB4_0900_BIN,
+]);
+
 export function _getExprCollation(
   expr: ExprArgument | ExprArgument[],
   state: EvaluationState,
@@ -91,6 +96,19 @@ export function _getExprCollation(
         current = current.ascii ? next : current;
         continue;
       }
+      const cur_coll: COLLATIONS | null = current.result[0];
+      const next_coll: COLLATIONS | null = next.result[0];
+      if (
+        cur_coll !== null &&
+        next_coll !== null &&
+        COLLATIONS[cur_coll].startsWith('UTF8MB4') &&
+        COLLATIONS[next_coll].startsWith('UTF8MB4') &&
+        UTF8MB4_BIN_COLLATIONS.has(cur_coll) !==
+          UTF8MB4_BIN_COLLATIONS.has(next_coll)
+      ) {
+        current = UTF8MB4_BIN_COLLATIONS.has(cur_coll) ? current : next;
+        continue;
+      }
       if (current.ascii && next.ascii) {
         const utf8mb4: Operand | undefined = [current, next].find(
           (op) =>
@@ -109,14 +127,24 @@ export function _getExprCollation(
         });
       }
       const mixed: COLLATIONS =
-        current.result[0] === COLLATIONS.UTF8MB4_0900_BIN ||
-        next.result[0] === COLLATIONS.UTF8MB4_0900_BIN
-          ? COLLATIONS.UTF8MB4_0900_BIN
+        current.result[0] !== null &&
+        UTF8MB4_BIN_COLLATIONS.has(current.result[0])
+          ? current.result[0]
           : COLLATIONS.UTF8MB4_BIN;
-      current = { result: [mixed, COERCIBILITY.EXPLICIT], ascii: false };
+      current = { result: [mixed, COERCIBILITY.NO_COLLATION], ascii: false };
     }
     if (current === undefined) {
       return [null, COERCIBILITY.IGNORABLE];
+    }
+    if (
+      strict &&
+      operands.length > 1 &&
+      current.result[1] === COERCIBILITY.NO_COLLATION
+    ) {
+      throw new SQLError({
+        err: 'ER_CANT_AGGREGATE_2COLLATIONS',
+        args: [current.result[0], operands[1]?.result[0] ?? null],
+      });
     }
     return current.result;
   }
@@ -147,6 +175,9 @@ export function _getExprCollation(
         if (col.collation) {
           return [col.collation, COERCIBILITY.COLUMN_TYPE];
         }
+        if (col.mysqlType === 'JSON') {
+          return [COLLATIONS.UTF8MB4_BIN, COERCIBILITY.COLUMN_TYPE];
+        }
         return [COLLATIONS.BINARY, COERCIBILITY.NUMERIC];
       } else if (ref_info?.column?.expr) {
         return _getExprCollation(ref_info.column.expr, state);
@@ -154,6 +185,12 @@ export function _getExprCollation(
       return [null, COERCIBILITY.IGNORABLE];
     }
     case 'binary_expr':
+      if (expr.operator === '->') {
+        return [COLLATIONS.UTF8MB4_BIN, COERCIBILITY.COLUMN_TYPE];
+      }
+      if (expr.operator === '->>') {
+        return [COLLATIONS.UTF8MB4_BIN, COERCIBILITY.STRING];
+      }
       return [COLLATIONS.BINARY, COERCIBILITY.NUMERIC];
     case 'function': {
       const rule = functionRules[getFunctionName(expr.name).toLowerCase()];

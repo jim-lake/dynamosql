@@ -283,6 +283,12 @@ function _equal(
       right,
       state.session.timeZone
     );
+    const collation =
+      (typeof left_val === 'string' && typeof right_val === 'string') ||
+      left.type === 'json' ||
+      right.type === 'json'
+        ? getExprCollation([expr.left, expr.right], state)
+        : null;
     if (nullSafe && (left.value === null || right.value === null)) {
       value = left.value === right.value ? 1 : 0;
     } else if (left_val === null) {
@@ -290,7 +296,6 @@ function _equal(
     } else if (left_val === right_val) {
       value = 1;
     } else if (typeof left_val === 'string' && typeof right_val === 'string') {
-      const collation = getExprCollation([expr.left, expr.right], state);
       value = stringCompare(left_val, right_val, collation) === 0 ? 1 : 0;
     }
   }

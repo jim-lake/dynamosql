@@ -1,0 +1,86 @@
+CREATE DATABASE IF NOT EXISTS mem_json_coll;
+USE mem_json_coll;
+CREATE TEMPORARY TABLE jcl (id INT PRIMARY KEY, j JSON, j2 JSON, ai VARCHAR(5) COLLATE utf8mb4_0900_ai_ci, cs VARCHAR(5) COLLATE utf8mb4_0900_as_cs, bn VARCHAR(5) COLLATE utf8mb4_0900_bin);
+INSERT INTO jcl (id, j, j2, ai, cs, bn) VALUES (1, '"a"', '"a"', 'a', 'b', 'c'), (2, '{"y":"P"}', '1', 'P', 'p', 'P'), (3, '1', NULL, 'b', 'a', 'd');
+
+SELECT id, COLLATION(j) AS c, COERCIBILITY(j) AS k FROM jcl ORDER BY id;
+SELECT COLLATION(j -> '$') AS c, COERCIBILITY(j -> '$') AS k FROM jcl WHERE id = 1;
+SELECT COLLATION(j ->> '$') AS c, COERCIBILITY(j ->> '$') AS k FROM jcl WHERE id = 1;
+SELECT COLLATION(JSON_EXTRACT(j, '$')) AS c, COERCIBILITY(JSON_EXTRACT(j, '$')) AS k FROM jcl WHERE id = 1;
+SELECT COLLATION(JSON_UNQUOTE(j)) AS c, COERCIBILITY(JSON_UNQUOTE(j)) AS k FROM jcl WHERE id = 1;
+SELECT COLLATION(MAX(j)) AS c, COERCIBILITY(MAX(j)) AS k FROM jcl;
+SELECT COLLATION(JSON_OBJECT('a', 1)) AS c, COERCIBILITY(JSON_OBJECT('a', 1)) AS k;
+SELECT COLLATION(JSON_ARRAY(1)) AS c, COERCIBILITY(JSON_ARRAY(1)) AS k;
+SELECT COLLATION(JSON_SET('{}', '$.a', 1)) AS c, COERCIBILITY(JSON_SET('{}', '$.a', 1)) AS k;
+SELECT COLLATION(JSON_KEYS('{"a":1}')) AS c, COERCIBILITY(JSON_KEYS('{"a":1}')) AS k;
+SELECT COLLATION(JSON_QUOTE('a')) AS c, COERCIBILITY(JSON_QUOTE('a')) AS k;
+SELECT COLLATION(JSON_TYPE('1')) AS c, COERCIBILITY(JSON_TYPE('1')) AS k;
+SELECT COLLATION(CAST('1' AS JSON)) AS c, COERCIBILITY(CAST('1' AS JSON)) AS k;
+
+SELECT COLLATION(CONCAT(j, ai)) AS c, COERCIBILITY(CONCAT(j, ai)) AS k FROM jcl WHERE id = 1;
+SELECT COLLATION(CONCAT(ai, j)) AS c FROM jcl WHERE id = 1;
+SELECT COLLATION(CONCAT(j, cs)) AS c FROM jcl WHERE id = 1;
+SELECT COLLATION(CONCAT(j, 'x')) AS c, COERCIBILITY(CONCAT(j, 'x')) AS k FROM jcl WHERE id = 1;
+SELECT COLLATION(CONCAT(j, j2)) AS c, COERCIBILITY(CONCAT(j, j2)) AS k FROM jcl WHERE id = 1;
+SELECT COLLATION(CONCAT(j, bn)) AS c, COERCIBILITY(CONCAT(j, bn)) AS k FROM jcl WHERE id = 1;
+SELECT COLLATION(CONCAT(bn, j)) AS c, COERCIBILITY(CONCAT(bn, j)) AS k FROM jcl WHERE id = 1;
+SELECT COLLATION(CONCAT(j -> '$', ai)) AS c FROM jcl WHERE id = 1;
+SELECT COLLATION(CONCAT(j ->> '$', 'x')) AS c, COERCIBILITY(CONCAT(j ->> '$', 'x')) AS k FROM jcl WHERE id = 1;
+SELECT COLLATION(CONCAT(j, 'x' COLLATE utf8mb4_0900_ai_ci)) AS c FROM jcl WHERE id = 1;
+SELECT COLLATION(IFNULL(j, ai)) AS c FROM jcl WHERE id = 1;
+SELECT COLLATION(COALESCE(j, ai)) AS c FROM jcl WHERE id = 1;
+SELECT COLLATION(CASE WHEN id = 1 THEN j ELSE ai END) AS c FROM jcl WHERE id = 1;
+
+SELECT id, j LIKE ai AS a, ai LIKE j AS b, j = ai AS c, j = cs AS d FROM jcl ORDER BY id;
+SELECT id, j ->> '$' = 'A' AS a, j ->> '$' LIKE 'A' AS b, j ->> '$' IN ('A') AS c FROM jcl WHERE id = 1;
+SELECT id, j ->> '$.y' = 'p' AS a, j ->> '$.y' = ai AS b, j ->> '$.y' = cs AS c FROM jcl WHERE id = 2;
+SELECT id, j IN (ai, 'a') AS a FROM jcl ORDER BY id;
+SELECT id FROM jcl WHERE j LIKE '"%' ORDER BY id;
+SELECT id FROM jcl WHERE ai = j ORDER BY id;
+SELECT id FROM jcl ORDER BY CONCAT(j, ai), id;
+
+SELECT COLLATION(CONCAT(ai, bn)) AS c, COERCIBILITY(CONCAT(ai, bn)) AS k FROM jcl WHERE id = 1;
+SELECT COLLATION(CONCAT(cs, bn)) AS c FROM jcl WHERE id = 1;
+SELECT COLLATION(CONCAT(ai, cs)) AS c, COERCIBILITY(CONCAT(ai, cs)) AS k FROM jcl WHERE id = 1;
+SELECT COLLATION(CONCAT(cs, ai)) AS c FROM jcl WHERE id = 1;
+SELECT COLLATION(CONCAT(ai, cs, bn)) AS c FROM jcl WHERE id = 1;
+SELECT id, ai = bn AS a, ai LIKE bn AS b, cs = bn AS c FROM jcl ORDER BY id;
+SELECT id, CONCAT(ai, cs) AS v, LENGTH(CONCAT(ai, cs)) AS l FROM jcl ORDER BY id;
+SELECT id, CONCAT(ai, cs) = 'ab' COLLATE utf8mb4_0900_bin AS a FROM jcl ORDER BY id;
+
+SELECT COLLATION(JSON_VALUE(j, '$')) AS c, COERCIBILITY(JSON_VALUE(j, '$')) AS k FROM jcl WHERE id = 1;
+SELECT COLLATION(JSON_VALUE(j, '$' RETURNING CHAR)) AS c, COERCIBILITY(JSON_VALUE(j, '$' RETURNING CHAR)) AS k FROM jcl WHERE id = 1;
+SELECT COLLATION(JSON_PRETTY(j)) AS c, COERCIBILITY(JSON_PRETTY(j)) AS k FROM jcl WHERE id = 1;
+SELECT COLLATION(JSON_SEARCH(j, 'one', 'a')) AS c, COERCIBILITY(JSON_SEARCH(j, 'one', 'a')) AS k FROM jcl WHERE id = 1;
+SELECT COLLATION(JSON_ARRAY_INSERT('[1]', '$[0]', 2)) AS c, COERCIBILITY(JSON_MERGE_PATCH('{}', '{}')) AS k;
+SELECT COLLATION(JSON_REMOVE('[1]', '$[0]')) AS c, COERCIBILITY(JSON_MERGE_PRESERVE('[1]', '[2]')) AS k;
+SELECT COLLATION(JSON_CONTAINS(j, '1')) AS c, COERCIBILITY(JSON_CONTAINS(j, '1')) AS k FROM jcl WHERE id = 1;
+SELECT COERCIBILITY(JSON_CONTAINS_PATH(j, 'one', '$')) AS a, COERCIBILITY(JSON_DEPTH(j)) AS b, COERCIBILITY(JSON_LENGTH(j)) AS c, COERCIBILITY(JSON_OVERLAPS(j, j)) AS d FROM jcl WHERE id = 1;
+SELECT COERCIBILITY(JSON_VALID(j)) AS a, COERCIBILITY(JSON_STORAGE_SIZE(j)) AS b, COERCIBILITY(JSON_STORAGE_FREE(j)) AS c, COERCIBILITY(JSON_SCHEMA_VALID('{}', j)) AS d FROM jcl WHERE id = 1;
+SELECT COLLATION(CONCAT(JSON_VALUE(j, '$'), ai)) AS c FROM jcl WHERE id = 1;
+
+CREATE TEMPORARY TABLE jpad (id INT PRIMARY KEY, j JSON, ai VARCHAR(10) COLLATE utf8mb4_0900_ai_ci, bn VARCHAR(10) COLLATE utf8mb4_0900_bin);
+INSERT INTO jpad (id, j, ai, bn) VALUES (1, '{"s":"abc  "}', 'abc', 'abc'), (2, '{"s":"abc"}', 'abc  ', 'abc  '), (3, '"abc  "', 'abc', 'abc');
+SELECT id, j ->> '$.s' = 'abc' AS a, j ->> '$.s' = 'abc  ' AS b, j ->> '$.s' > 'abc' AS c FROM jpad WHERE id <= 2 ORDER BY id;
+SELECT id, j ->> '$.s' = ai AS a, j ->> '$.s' = bn AS b FROM jpad WHERE id <= 2 ORDER BY id;
+SELECT id, JSON_UNQUOTE(j -> '$.s') = 'abc' AS a, j ->> '$.s' IN ('abc') AS b, j ->> '$.s' LIKE 'abc' AS c FROM jpad WHERE id <= 2 ORDER BY id;
+SELECT id, j -> '$.s' = 'abc' AS a, j -> '$.s' = 'abc  ' AS b FROM jpad WHERE id <= 2 ORDER BY id;
+SELECT id, j = 'abc' AS a, j = 'abc  ' AS b, j = ai AS c FROM jpad WHERE id = 3;
+SELECT id, CONCAT(j ->> '$.s', '') = 'abc' AS a, CONCAT(j ->> '$.s', ai) = 'abc  abc' AS b FROM jpad WHERE id = 1;
+SELECT id, JSON_VALUE(j, '$.s') = 'abc' AS a, JSON_VALUE(j, '$.s') = ai AS b, JSON_VALUE(j, '$.s') = bn AS c FROM jpad WHERE id <= 2 ORDER BY id;
+SELECT id FROM jpad WHERE j ->> '$.s' = 'abc' ORDER BY id;
+SELECT j ->> '$.s' AS s, COUNT(*) AS c FROM jpad WHERE id <= 2 GROUP BY j ->> '$.s' ORDER BY c;
+SELECT COUNT(*) AS c FROM jpad GROUP BY JSON_UNQUOTE(j -> '$.s') ORDER BY c;
+SELECT COUNT(*) AS c FROM jpad WHERE id <= 2 GROUP BY JSON_VALUE(j, '$.s') ORDER BY c;
+
+CREATE TEMPORARY TABLE gcol (id INT PRIMARY KEY, ai VARCHAR(10) COLLATE utf8mb4_0900_ai_ci, cs VARCHAR(10) COLLATE utf8mb4_0900_as_cs, bn VARCHAR(10) COLLATE utf8mb4_0900_bin, j JSON);
+INSERT INTO gcol (id, ai, cs, bn, j) VALUES (1, 'a', 'a', 'a', '{"s":"abc"}'), (2, 'A', 'A', 'A', '{"s":"abc  "}'), (3, 'a ', 'a ', 'a ', '{"s":"ABC"}'), (4, 'b', 'b', 'b', '{"s":"abc"}');
+SELECT COUNT(*) AS c FROM gcol GROUP BY ai ORDER BY c;
+SELECT COUNT(*) AS c FROM gcol GROUP BY cs ORDER BY c;
+SELECT COUNT(*) AS c FROM gcol GROUP BY bn ORDER BY c;
+SELECT COUNT(*) AS c FROM gcol GROUP BY ai, cs ORDER BY c;
+SELECT COUNT(*) AS c FROM gcol GROUP BY CONCAT(ai, '') ORDER BY c;
+SELECT COUNT(*) AS c FROM gcol GROUP BY UPPER(cs) ORDER BY c;
+SELECT COUNT(*) AS c FROM gcol GROUP BY j ->> '$.s' ORDER BY c;
+SELECT COUNT(*) AS c FROM gcol GROUP BY j ->> '$.s' COLLATE utf8mb4_0900_ai_ci ORDER BY c;
+SELECT COUNT(*) AS c FROM gcol GROUP BY ai HAVING COUNT(*) > 1 ORDER BY c;

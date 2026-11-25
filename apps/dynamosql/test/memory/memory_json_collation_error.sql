@@ -1,0 +1,12 @@
+CREATE DATABASE IF NOT EXISTS mem_json_coll_err;
+USE mem_json_coll_err;
+CREATE TEMPORARY TABLE jce (id INT PRIMARY KEY, j JSON, ai VARCHAR(5) COLLATE utf8mb4_0900_ai_ci, cs VARCHAR(5) COLLATE utf8mb4_0900_as_cs, bn VARCHAR(5) COLLATE utf8mb4_0900_bin);
+INSERT INTO jce (id, j, ai, cs, bn) VALUES (1, '"a"', 'a', 'b', 'c');
+SELECT j = bn AS r FROM jce;
+SELECT j LIKE bn AS r FROM jce;
+SELECT ai = cs AS r FROM jce;
+SELECT ai < cs AS r FROM jce;
+SELECT CONCAT(ai, cs) = 'ab' AS r FROM jce;
+SELECT CONCAT(ai, cs) LIKE 'a%' AS r FROM jce;
+SELECT CONCAT(j, bn) = 'x' AS r FROM jce;
+SELECT JSON_VALUE(j, '$') = j ->> '$' AS r FROM jce;

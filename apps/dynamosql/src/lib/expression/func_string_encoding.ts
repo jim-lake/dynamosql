@@ -7,6 +7,7 @@ import { convertNum } from '../helpers/sql_conversion';
 import { getExprCoercibility, getExprCollation } from './collation';
 import { getValue } from './evaluate';
 import { mysqlRound } from './func_math_basic';
+import { getExprMysqlType } from './mysql_type/mysql_type_expression';
 
 import type { EvaluationState, EvaluationResult } from './evaluate';
 import type { Function } from 'node-sql-parser/build/mysql';
@@ -83,9 +84,15 @@ export function collation(
   if (arg.err) {
     return arg;
   }
-  const coll = getExprCollation(expr.args.value[0], state);
+  const arg_expr = expr.args.value[0];
+  const isJsonColumn =
+    arg_expr !== undefined &&
+    'type' in arg_expr &&
+    arg_expr.type === 'column_ref' &&
+    getExprMysqlType(arg_expr, state)?.type === 'JSON';
+  const coll = getExprCollation(arg_expr, state);
   const value =
-    coll === null
+    coll === null || isJsonColumn
       ? 'binary'
       : (COLLATION_NAMES[coll] ?? COLLATIONS[coll].toLowerCase());
   return { err: null, value, type: 'string' };
