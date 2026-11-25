@@ -1,6 +1,6 @@
 import { isCaseInsensitive } from '../helpers/collation';
 import { likeToRegExp } from '../helpers/like_helper';
-import { convertBooleanValue } from '../helpers/sql_conversion';
+import { convertTruthValue } from '../helpers/sql_conversion';
 
 import { getExprCollation } from './collation';
 import {
@@ -40,11 +40,11 @@ function and(expr: Binary, state: EvaluationState): EvaluationResult {
   let name = left.name + ' AND ';
   let value: number | null = 0;
   if (!err) {
-    value = convertBooleanValue(left.value);
+    value = convertTruthValue(left.value);
     if (value !== 0) {
       const right = getValue(expr.right, state);
       err = right.err;
-      const rightBool = convertBooleanValue(right.value);
+      const rightBool = convertTruthValue(right.value);
       if (value === null || rightBool === null) {
         value = rightBool === 0 || value === 0 ? 0 : null;
       } else {
@@ -61,11 +61,11 @@ function or(expr: Binary, state: EvaluationState): EvaluationResult {
   let name = left.name + ' OR ';
   let value: number | null = 1;
   if (!err) {
-    value = convertBooleanValue(left.value);
+    value = convertTruthValue(left.value);
     if (!value) {
       const right = getValue(expr.right, state);
       err = right.err;
-      const result = convertBooleanValue(right.value);
+      const result = convertTruthValue(right.value);
       if (result) {
         value = 1;
       } else if (value !== null) {
@@ -83,8 +83,8 @@ function xor(expr: Binary, state: EvaluationState): EvaluationResult {
   const name = left.name + ' XOR ' + right.name;
   let value: number | null = 1;
   if (!err) {
-    const right_bool = convertBooleanValue(right.value);
-    const left_bool = convertBooleanValue(left.value);
+    const right_bool = convertTruthValue(right.value);
+    const left_bool = convertTruthValue(left.value);
     if (right_bool === null || left_bool === null) {
       value = null;
     } else {
@@ -141,11 +141,11 @@ function _is(
       result.value = right === result.value ? 1 : 0;
     } else if (right === true) {
       // IS TRUE: check if left side is truthy (non-zero, non-null)
-      const leftBool = convertBooleanValue(result.value);
+      const leftBool = convertTruthValue(result.value);
       result.value = leftBool === 1 ? 1 : 0;
     } else if (right === false) {
       // IS FALSE: check if left side is falsy (zero, but not null)
-      const leftBool = convertBooleanValue(result.value);
+      const leftBool = convertTruthValue(result.value);
       result.value = leftBool === 0 ? 1 : 0;
     } else {
       result.value = 0;

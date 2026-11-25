@@ -2,6 +2,7 @@ import { SQLError } from '../../error';
 import { Types } from '../../types';
 import { getValue } from '../expression';
 import { getExprCollation } from '../expression/collation';
+import { jsonCompare } from '../expression/compare';
 import { SQLJson } from '../types/sql_json';
 
 import { stringCompare } from './collation';
@@ -150,14 +151,7 @@ function _asc(
       return -1;
     }
   } else if (a instanceof SQLJson && b instanceof SQLJson) {
-    const rank_a = _jsonRank(a.node);
-    const rank_b = _jsonRank(b.node);
-    if (rank_a !== rank_b) {
-      return rank_a - rank_b;
-    }
-    return rank_a === 1
-      ? (a.node as number) - (b.node as number)
-      : stringCompare(String(a), String(b), collation);
+    return jsonCompare(a.node, b.node);
   } else if (
     (typeof column === 'object' && column.type === Types.NEWDECIMAL) ||
     column === 'number'
@@ -168,14 +162,6 @@ function _asc(
     const s_b = String(b);
     return stringCompare(s_a, s_b, collation);
   }
-}
-function _jsonRank(node: unknown): number {
-  if (node === null) {
-    return 0;
-  } else if (typeof node === 'number') {
-    return 1;
-  }
-  return 2;
 }
 function _desc(
   a: unknown,

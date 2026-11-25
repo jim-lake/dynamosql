@@ -1,6 +1,6 @@
 import { SQLError } from '../../../error';
 import { evaluateDuplicateUpdate } from '../../helpers/duplicate_update';
-import { cellConvert } from '../helpers/cell_convert';
+import { cellConvert, cellValueEqual } from '../helpers/cell_convert';
 
 import * as Storage from './storage';
 import { ROW_ID_NAME } from './storage';
@@ -105,7 +105,7 @@ export async function insertRowList(
           timeZone: session.timeZone,
         });
         new_row[name] = stored;
-        if (old_row[name]?.value !== stored.value) {
+        if (!cellValueEqual(old_row[name], stored)) {
           changed = true;
         }
       }
@@ -133,7 +133,6 @@ function _transformRow(
   for (const column of column_list) {
     const cell = row[column.name_lc];
     if (cell !== undefined) {
-      _checkJsonText(column, cell.value);
       result[column.name_lc] = cellConvert(cell, column, flags);
     } else if (column.defaultValue === undefined) {
       throw new SQLError({
@@ -146,19 +145,9 @@ function _transformRow(
   }
   return result;
 }
-function _checkJsonText(column: MemoryColumnDef, value: unknown) {
-  if (column.type !== 'json' || typeof value !== 'string') {
-    return;
-  }
-  try {
-    JSON.parse(value);
-  } catch {
-    throw new SQLError({ err: 'ER_INVALID_JSON_TEXT' });
-  }
-}
 function _rowEqual(a: CellRow, b: CellRow): boolean {
   const keys_a = Object.keys(a);
   return keys_a.every((key) => {
-    return a[key]?.value === b[key]?.value;
+    return cellValueEqual(a[key], b[key]);
   });
 }

@@ -1,7 +1,9 @@
 import { getFunctionName } from '../helpers/ast_helper';
 import { convertNum } from '../helpers/sql_conversion';
+import { SQLJson } from '../types/sql_json';
 
 import { aggregateName } from './aggregate_name';
+import { compareJsonOperands } from './compare';
 import { getValue } from './evaluate';
 import { json_arrayagg, json_objectagg } from './func_json_agg';
 
@@ -74,7 +76,11 @@ function sum(expr: AggrFunc, state: EvaluationState): EvaluationResult {
       err = result.err;
       break;
     }
-    if (result.type === 'null' || result.type === 'string') {
+    if (
+      result.type === 'null' ||
+      result.type === 'string' ||
+      result.value instanceof SQLJson
+    ) {
       type = 'double';
     }
     const num = convertNum(result.value);
@@ -123,7 +129,7 @@ function avg(expr: AggrFunc, state: EvaluationState): EvaluationResult {
       err = result.err;
       break;
     } else if (result.value !== null) {
-      if (result.type === 'string') {
+      if (result.type === 'string' || result.value instanceof SQLJson) {
         hasString = true;
       }
       const num = convertNum(result.value);
@@ -150,7 +156,19 @@ function min(expr: AggrFunc, state: EvaluationState): EvaluationResult {
       err = result.err;
       break;
     } else if (result.value !== null && result.value !== undefined) {
-      if (value === null || value === undefined || result.value < value) {
+      const is_json =
+        value instanceof SQLJson || result.value instanceof SQLJson;
+      const is_less =
+        value === null || value === undefined
+          ? true
+          : is_json
+            ? compareJsonOperands(
+                result,
+                { type, value },
+                state.session.timeZone
+              ) < 0
+            : result.value < value;
+      if (is_less) {
         value = result.value;
         type = result.type;
       }
@@ -171,7 +189,19 @@ function max(expr: AggrFunc, state: EvaluationState): EvaluationResult {
       err = result.err;
       break;
     } else if (result.value !== null && result.value !== undefined) {
-      if (value === null || value === undefined || result.value > value) {
+      const is_json =
+        value instanceof SQLJson || result.value instanceof SQLJson;
+      const is_greater =
+        value === null || value === undefined
+          ? true
+          : is_json
+            ? compareJsonOperands(
+                result,
+                { type, value },
+                state.session.timeZone
+              ) > 0
+            : result.value > value;
+      if (is_greater) {
         value = result.value;
         type = result.type;
       }

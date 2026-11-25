@@ -1,6 +1,7 @@
 import { SQLError } from '../../error';
 import { getValue } from '../expression';
 import { isAggregateNode } from '../expression/aggregate_functions';
+import { SQLJson } from '../types/sql_json';
 
 import type { EvaluationState } from '../expression';
 import type { SourceRow, SourceRowGroup } from '../handler_types';
@@ -98,7 +99,9 @@ export async function* formGroup(
     });
     let obj: Record<string, unknown[] | Record<string, unknown>> = group_map;
     for (let i = 0; i < count; i++) {
-      const key = String(key_list[i]);
+      const keyValue = key_list[i];
+      const key =
+        keyValue instanceof SQLJson ? `json:${keyValue}` : String(keyValue);
       const isLast = i + 1 === count;
       obj[key] ??= isLast ? [] : {};
 

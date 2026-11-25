@@ -1,5 +1,6 @@
 import { assertArgCount, assertArgCountParse } from '../helpers/arg_count';
 import { convertNum } from '../helpers/sql_conversion';
+import { SQLJson } from '../types/sql_json';
 
 import { getValue } from './evaluate';
 import { modHelper } from './math';
@@ -28,6 +29,7 @@ export function abs(expr: Function, state: EvaluationState): EvaluationResult {
         result.type = 'longlong';
         break;
       case 'string':
+      case 'json':
       case 'buffer':
       case 'date':
       case 'datetime':
@@ -83,6 +85,9 @@ export function round(
   if (result.value === null) {
     result.type = 'double';
   }
+  if (result.value instanceof SQLJson) {
+    result.type = 'double';
+  }
   let value = convertNum(result.value);
   let decimals = 0;
   result.name = arg2
@@ -131,7 +136,11 @@ export function mod(expr: Function, state: EvaluationState): EvaluationResult {
   return modHelper(arg1, arg2, `MOD(${arg1.name}, ${arg2.name})`);
 }
 function _resolveTypeForRounding(result: EvaluationResult): ValueType {
-  if (result.value === null || result.type === 'string') {
+  if (
+    result.value === null ||
+    result.type === 'string' ||
+    result.type === 'json'
+  ) {
     return 'double';
   } else if (result.type === 'number') {
     return 'longlong';

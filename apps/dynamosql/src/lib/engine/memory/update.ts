@@ -1,7 +1,7 @@
 import { logger } from '@dynamosql/shared';
 
 import { SQLError, NoSingleOperationError } from '../../../error';
-import { cellConvert } from '../helpers/cell_convert';
+import { cellConvert, cellValueEqual } from '../helpers/cell_convert';
 
 import * as Storage from './storage';
 
@@ -68,7 +68,7 @@ export async function multipleUpdate(
             ignore: !!ignore,
             timeZone: session.timeZone,
           });
-          if (old_row[set.column]?.value !== new_row[set.column]?.value) {
+          if (!cellValueEqual(old_row[set.column], new_row[set.column])) {
             changed = true;
           }
         }

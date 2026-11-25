@@ -5,7 +5,7 @@ import { SQLError } from '../../error';
 import { getValue } from '../expression';
 
 import { getSourceName } from './ast_helper';
-import { convertNum } from './sql_conversion';
+import { convertTruthValue } from './sql_conversion';
 
 import type { Row, SourceMap } from '../engine';
 import type { EvaluationState } from '../expression';
@@ -50,7 +50,7 @@ export async function* formJoin(
           if (result.err) {
             throw new SQLError(result.err);
           }
-          return Boolean(convertNum(result.value));
+          return Boolean(convertTruthValue(result.value));
         });
       }
 

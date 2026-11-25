@@ -4,4 +4,5 @@ Mismatches between node-sql-parser (MySQL grammar) and MySQL 8.4. Each form was 
 
 ## Open
 
-No open items.
+- `JSON_VALUE(doc, '$.s' RETURNING CHAR(3) CHARACTER SET utf8mb4)`: node-sql-parser rejects `CHARACTER SET` after the `CHAR(n)` returning type with a parse error. MySQL 8.4 accepts it.
+- `JSON_VALUE(doc, '$.i' RETURNING SIGNED INTEGER)`: node-sql-parser returns the dataType `SIGNED INTEGER`, not `SIGNED`. The same applies to `UNSIGNED INTEGER`. MySQL 8.4 treats both as the plain SIGNED and UNSIGNED types.

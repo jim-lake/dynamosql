@@ -50,6 +50,46 @@ describe('Temp', function () {
     { allowedErrors: 'SAME_CODE', checkChanged: true, verify_field_types: true }
   );
   runTests(
+    'memory_json_scalar.sql',
+    path.join(__dirname, 'memory_json_scalar.sql'),
+    { checkChanged: true, verify_field_types: true }
+  );
+  runTests(
+    'memory_json_scalar_error.sql',
+    path.join(__dirname, 'memory_json_scalar_error.sql'),
+    { allowedErrors: 'SAME_CODE', checkChanged: true, verify_field_types: true }
+  );
+  runTests(
+    'memory_json_mutate.sql',
+    path.join(__dirname, 'memory_json_mutate.sql'),
+    { checkChanged: true, verify_field_types: true }
+  );
+  runTests(
+    'memory_json_compare.sql',
+    path.join(__dirname, 'memory_json_compare.sql'),
+    { checkChanged: true, verify_field_types: true }
+  );
+  runTests(
+    'memory_json_ordering.sql',
+    path.join(__dirname, 'memory_json_ordering.sql'),
+    { checkChanged: true, verify_field_types: true }
+  );
+  runTests(
+    'memory_json_numeric.sql',
+    path.join(__dirname, 'memory_json_numeric.sql'),
+    { checkChanged: true, verify_field_types: true }
+  );
+  runTests(
+    'memory_json_returning.sql',
+    path.join(__dirname, 'memory_json_returning.sql'),
+    { checkChanged: true, verify_field_types: true }
+  );
+  runTests(
+    'memory_json_functions.sql',
+    path.join(__dirname, 'memory_json_functions.sql'),
+    { checkChanged: true, verify_field_types: true }
+  );
+  runTests(
     'memory_json_arrow.sql',
     path.join(__dirname, 'memory_json_arrow.sql'),
     { checkChanged: true, verify_field_types: true }

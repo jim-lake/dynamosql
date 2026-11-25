@@ -2,6 +2,11 @@ import { isDeepStrictEqual } from 'node:util';
 
 import { SQLError } from '../../error';
 import { assertArgCount } from '../helpers/arg_count';
+import {
+  convertDate,
+  convertDateTime,
+  convertTime,
+} from '../helpers/sql_conversion';
 import { SQLJson } from '../types/sql_json';
 
 import { getValue } from './evaluate';
@@ -16,6 +21,7 @@ import {
   _unquote,
 } from './func_json_common';
 
+import type { ValueType } from '../types/value_type';
 import type { EvaluationState, EvaluationResult } from './evaluate';
 import type { Binary, Function } from 'node-sql-parser/build/mysql';
 
@@ -245,8 +251,9 @@ export function json_value(
   if (path.err) {
     return path;
   }
+  const returning = (expr as ReturningFunction).returning;
   if (doc.value === null || path.value === null) {
-    return { err: null, value: null, type: 'string' };
+    return { err: null, value: null, type: _returningFieldType(returning) };
   }
 
   const segment_list = _parsePath(String(path.value));
@@ -260,16 +267,197 @@ export function json_value(
   try {
     root = SQLJson.parseText(doc, 'json_value', 1);
   } catch {
-    return { err: null, value: null, type: 'string' };
+    return { err: null, value: null, type: _returningFieldType(returning) };
   }
   const node = _lookup(root, segment_list);
   if (node === NOT_FOUND || node === null) {
-    return { err: null, value: null, type: 'string' };
+    return { err: null, value: null, type: _returningFieldType(returning) };
   }
   const text = typeof node === 'object' ? JSON.stringify(node) : String(node);
-  return { err: null, value: text, type: 'string' };
+  if (!returning) {
+    return { err: null, value: text, type: 'string' };
+  }
+  const type = returning.dataType.toUpperCase();
+  let value: unknown = null;
+  if (type === 'SIGNED' || type === 'UNSIGNED') {
+    const is_unsigned = type === 'UNSIGNED';
+    let int: bigint | null = null;
+    if (typeof node === 'boolean') {
+      int = node ? 1n : 0n;
+    } else if (typeof node === 'number') {
+      const floor = Math.floor(node);
+      const is_tie = node - floor === 0.5;
+      const rounded =
+        is_tie && floor % 2 !== 0
+          ? floor + 1
+          : is_tie
+            ? floor
+            : Math.round(node);
+      int = BigInt(rounded);
+    } else if (typeof node === 'string' && /^-?\d+$/.test(node)) {
+      int = BigInt(node);
+    }
+    const max = is_unsigned ? 18446744073709551615n : 9223372036854775807n;
+    const min = is_unsigned ? 0n : -9223372036854775808n;
+    value = int !== null && int >= min && int <= max ? int : null;
+  } else if (type === 'DECIMAL') {
+    const num = _toNumber(node, NUMERIC_TEXT);
+    const precision = returning.length ?? 10;
+    const scale = returning.scale ?? 0;
+    if (num !== null && Math.trunc(Math.abs(num)) < 10 ** (precision - scale)) {
+      const rounded = Math.round(Math.abs(num) * 10 ** scale) / 10 ** scale;
+      const sign = num < 0 && rounded !== 0 ? '-' : '';
+      value = sign + rounded.toFixed(scale);
+    }
+  } else if (type === 'DOUBLE' || type === 'REAL' || type === 'FLOAT') {
+    value = node === '' ? 0 : _toNumber(node, DOUBLE_TEXT);
+  } else if (type === 'YEAR') {
+    const num = _toNumber(node, YEAR_TEXT);
+    const year = num === null ? null : Math.round(num);
+    const is_year =
+      year !== null && (year === 0 || (year >= 1901 && year <= 2155));
+    value = is_year ? year : null;
+  } else if (type === 'CHAR') {
+    const max_length = returning.length ?? Infinity;
+    value = Array.from(text).length <= max_length ? text : null;
+  } else if (type === 'JSON') {
+    value = new SQLJson(node);
+  } else if (type === 'DATE') {
+    value = convertDate({ value: text, timeZone: state.session.timeZone });
+  } else if (type === 'DATETIME') {
+    const decimals = returning.length ?? 0;
+    value = convertDateTime({
+      value: text,
+      decimals,
+      timeZone: state.session.timeZone,
+    });
+  } else if (type === 'TIME') {
+    value = convertTime({ value: text, decimals: returning.length ?? 0 });
+  } else {
+    throw new SQLError({ err: 'ER_NOT_SUPPORTED_YET' });
+  }
+  return { err: null, value, type: _returningFieldType(returning) };
 }
 
+interface ReturningType {
+  dataType: string;
+  length?: number;
+  scale?: number;
+}
+type ReturningFunction = Function & { returning?: ReturningType };
+
+function _returningFieldType(returning: ReturningType | undefined): ValueType {
+  const type = returning?.dataType.toUpperCase();
+  if (type === 'SIGNED' || type === 'UNSIGNED') {
+    return 'longlong';
+  }
+  if (type === 'DECIMAL') {
+    return 'number';
+  }
+  if (type === 'DOUBLE' || type === 'REAL' || type === 'FLOAT') {
+    return 'double';
+  }
+  if (type === 'YEAR') {
+    return 'year';
+  }
+  if (type === 'CHAR') {
+    return returning?.length === undefined ? 'text' : 'string';
+  }
+  if (type === 'JSON') {
+    return 'json';
+  }
+  if (type === 'DATE') {
+    return 'date';
+  }
+  if (type === 'DATETIME') {
+    return 'datetime';
+  }
+  if (type === 'TIME') {
+    return 'time';
+  }
+  return 'string';
+}
+
+const NUMERIC_TEXT = /^\s*[-+]?(\d+\.?\d*|\.\d+)([eE][-+]?\d+)?\s*$/;
+const DOUBLE_TEXT = /^[-+]?(\d+\.?\d*|\.\d+)([eE][-+]?\d+)?$/;
+const YEAR_TEXT = /^\d+$/;
+
+function _toNumber(node: unknown, text_pattern: RegExp): number | null {
+  if (typeof node === 'boolean') {
+    return node ? 1 : 0;
+  }
+  if (typeof node === 'number') {
+    return node;
+  }
+  if (typeof node === 'string' && text_pattern.test(node)) {
+    return Number(node);
+  }
+  return null;
+}
+
+function _returningValue(
+  node: unknown,
+  returning: ReturningType,
+  timeZone: string
+): EvaluationResult {
+  const type = returning.dataType.toUpperCase();
+  const text = typeof node === 'object' ? JSON.stringify(node) : String(node);
+  let value: unknown = null;
+  if (type === 'SIGNED' || type === 'UNSIGNED') {
+    const is_unsigned = type === 'UNSIGNED';
+    let int: bigint | null = null;
+    if (typeof node === 'boolean') {
+      int = node ? 1n : 0n;
+    } else if (typeof node === 'number') {
+      const floor = Math.floor(node);
+      const is_tie = node - floor === 0.5;
+      const rounded =
+        is_tie && floor % 2 !== 0
+          ? floor + 1
+          : is_tie
+            ? floor
+            : Math.round(node);
+      int = BigInt(rounded);
+    } else if (typeof node === 'string' && /^-?\d+$/.test(node)) {
+      int = BigInt(node);
+    }
+    const max = is_unsigned ? 18446744073709551615n : 9223372036854775807n;
+    const min = is_unsigned ? 0n : -9223372036854775808n;
+    value = int !== null && int >= min && int <= max ? int : null;
+  } else if (type === 'DECIMAL') {
+    const num = _toNumber(node, NUMERIC_TEXT);
+    const precision = returning.length ?? 10;
+    const scale = returning.scale ?? 0;
+    if (num !== null && Math.trunc(Math.abs(num)) < 10 ** (precision - scale)) {
+      const rounded = Math.round(Math.abs(num) * 10 ** scale) / 10 ** scale;
+      const sign = num < 0 && rounded !== 0 ? '-' : '';
+      value = sign + rounded.toFixed(scale);
+    }
+  } else if (type === 'DOUBLE' || type === 'REAL' || type === 'FLOAT') {
+    value = node === '' ? 0 : _toNumber(node, DOUBLE_TEXT);
+  } else if (type === 'YEAR') {
+    const num = _toNumber(node, YEAR_TEXT);
+    const year = num === null ? null : Math.round(num);
+    const is_year =
+      year !== null && (year === 0 || (year >= 1901 && year <= 2155));
+    value = is_year ? year : null;
+  } else if (type === 'CHAR') {
+    const max_length = returning.length ?? Infinity;
+    value = Array.from(text).length <= max_length ? text : null;
+  } else if (type === 'JSON') {
+    value = new SQLJson(node);
+  } else if (type === 'DATE') {
+    value = convertDate({ value: text, timeZone });
+  } else if (type === 'DATETIME') {
+    const decimals = returning.length ?? 0;
+    value = convertDateTime({ value: text, decimals, timeZone });
+  } else if (type === 'TIME') {
+    value = convertTime({ value: text, decimals: returning.length ?? 0 });
+  } else {
+    throw new SQLError({ err: 'ER_NOT_SUPPORTED_YET' });
+  }
+  return { err: null, value, type: _returningFieldType(returning) };
+}
 function _contains(target: unknown, candidate: unknown): boolean {
   if (Array.isArray(candidate)) {
     return (

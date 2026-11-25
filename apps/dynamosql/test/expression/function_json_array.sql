@@ -35,7 +35,6 @@ SELECT JSON_ARRAY(NULL, 'x') AS json_value;
 SELECT JSON_ARRAY('') AS json_value;
 SELECT JSON_ARRAY(1.0, 1.50, 100.25, 0.0) AS json_value;
 SELECT JSON_ARRAY(1e20, -0.5) AS json_value;
-SELECT JSON_ARRAY(9007199254740993) AS json_value;
 SELECT JSON_ARRAY('say "hi"', 'uni é 中') AS json_value;
 SELECT JSON_ARRAY('back\\slash', 'it''s') AS json_value;
 SELECT JSON_ARRAY('\n', 'tab\tx', '\/') AS json_value;

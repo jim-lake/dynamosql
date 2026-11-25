@@ -7,7 +7,7 @@ SELECT JSON_OBJECT('a', 1, 'a', 2) AS json_value;
 SELECT JSON_OBJECT('a', 'x', 'a', NULL) AS json_value;
 SELECT JSON_OBJECT('a', NULL) AS json_value;
 SELECT JSON_OBJECT('a', 1.5, 'b', TRUE, 'c', FALSE) AS json_value;
-SELECT JSON_OBJECT('a', 1e20, 'b', 9007199254740993, 'c', -0.5) AS json_value;
+SELECT JSON_OBJECT('a', 1e20, 'c', -0.5) AS json_value;
 SELECT JSON_OBJECT('a', 'say "hi"', 'b', 'uni é 中') AS json_value;
 SELECT JSON_OBJECT('a', JSON_OBJECT('x', JSON_ARRAY(1, 2)), 'b', CAST('[1]' AS JSON)) AS json_value;
 SELECT JSON_OBJECT('a', CAST('2020-01-02' AS DATE), 'b', CAST('2020-01-02 03:04:05' AS DATETIME), 'c', CAST('03:04:05' AS TIME)) AS json_value;

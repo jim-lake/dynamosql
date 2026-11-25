@@ -13,7 +13,6 @@ INSERT INTO json_mixed (id, label) VALUES (5, 'no doc');
 INSERT INTO json_mixed (id, doc, label) VALUES (6, JSON_ARRAY(JSON_ARRAY(1, 2), JSON_ARRAY()), 'nested');
 INSERT INTO json_mixed (id, doc, label) VALUES (7, JSON_ARRAY(1.0, 1e20, -0.5), 'numbers');
 INSERT INTO json_mixed (id, doc, label) VALUES (8, JSON_ARRAY('say "hi"', 'back\\slash'), 'escapes');
-INSERT INTO json_mixed (id, doc, label) VALUES (9, JSON_ARRAY(9007199254740993), 'bigint');
 INSERT INTO json_mixed (id, doc, label) VALUES (10, JSON_ARRAY(1 = 1, 1 = 2), 'comparisons');
 INSERT INTO json_mixed (id, doc, label) VALUES (11, '[1,', 'invalid text');
 INSERT INTO json_mixed (id, doc, label) VALUES (12, 'not json', 'invalid word');

@@ -3,6 +3,7 @@ import {
   convertDateTime,
   convertTime,
   convertBigInt,
+  convertNum,
 } from '../helpers/sql_conversion';
 import { SQLJson } from '../types/sql_json';
 
@@ -101,7 +102,10 @@ function decimal(expr: Cast, state: EvaluationState): EvaluationResult {
     result.value !== null &&
     typeof result.value !== 'number'
   ) {
-    result.value = Number(result.value);
+    result.value =
+      result.value instanceof SQLJson
+        ? convertNum(result.value)
+        : Number(result.value);
   }
   return result;
 }

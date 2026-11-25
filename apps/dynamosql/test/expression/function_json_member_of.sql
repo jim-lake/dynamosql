@@ -19,7 +19,6 @@ SELECT 1.5 MEMBER OF('[1.5]') AS json_value;
 SELECT 1 MEMBER OF('[true]') AS json_value;
 SELECT TRUE MEMBER OF('[1]') AS json_value;
 SELECT TRUE MEMBER OF('[true]') AS json_value;
-SELECT 1 MEMBER OF('[18446744073709551615]') AS json_value;
 SELECT '2024-01-01' MEMBER OF('["2024-01-01"]') AS json_value;
 SELECT 1 MEMBER OF('{"a":1}') AS json_value;
 SELECT '{"a":1}' MEMBER OF('[{"a":1}]') AS json_value;

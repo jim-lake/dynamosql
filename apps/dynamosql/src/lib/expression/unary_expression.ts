@@ -1,4 +1,4 @@
-import { convertNum } from '../helpers/sql_conversion';
+import { convertNum, convertTruthValue } from '../helpers/sql_conversion';
 
 import { getValue } from './evaluate';
 
@@ -13,7 +13,7 @@ function not(expr: Unary, state: EvaluationState): EvaluationResult {
   result.name = 'NOT ' + result.name;
   result.type = 'bool';
   if (!result.err && result.value !== null) {
-    result.value = convertNum(result.value) ? 0 : 1;
+    result.value = convertTruthValue(result.value) ? 0 : 1;
   }
   return result;
 }

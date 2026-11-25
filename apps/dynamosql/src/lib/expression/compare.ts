@@ -6,6 +6,7 @@ import {
 } from '../helpers/sql_conversion';
 import { SQLDate } from '../types/sql_date';
 import { SQLDateTime } from '../types/sql_datetime';
+import { SQLJson } from '../types/sql_json';
 import { SQLTime } from '../types/sql_time';
 
 import { getExprCollation } from './collation';
@@ -148,12 +149,16 @@ export function convertCompare(
   right: EvaluationResult,
   timeZone: string
 ): [number, number] | [string, string] | [null, null] {
-  let left_val = left.value;
-  let right_val = right.value;
-
-  if (left_val === null || right_val === null) {
+  if (left.value === null || right.value === null) {
     return [null, null];
   }
+  if (left.value instanceof SQLJson || right.value instanceof SQLJson) {
+    const sign = compareJsonOperands(left, right, timeZone);
+    return [Math.sign(sign), 0];
+  }
+
+  let left_val = left.value;
+  let right_val = right.value;
 
   if (left_val === right_val) {
     if (typeof left_val === 'number' && typeof right_val === 'number') {
@@ -244,6 +249,22 @@ export function convertCompare(
   }
 
   return [left_str, right_str];
+}
+function _toJsonNode(
+  result: Pick<EvaluationResult, 'type' | 'value'>,
+  timeZone: string
+): JsonNode {
+  const { type, value } = result;
+  if (value instanceof SQLJson) {
+    return value.node;
+  } else if (type === 'bool') {
+    return Boolean(value);
+  } else if (typeof value === 'number' || typeof value === 'bigint') {
+    return Number(value);
+  } else if (value instanceof SQLDateTime) {
+    return value.toString({ timeZone });
+  }
+  return String(value);
 }
 function _equal(
   expr: Binary,
@@ -347,6 +368,73 @@ function _gte(
 function _needsTimeRounding(value: string, decimals: number): boolean {
   const fraction = /^[\d:]+\.(\d+)$/.exec(value)?.[1] ?? '';
   return fraction.length > decimals;
+}
+type JsonNode = unknown;
+type JsonObject = Record<string, JsonNode>;
+export function compareJsonOperands(
+  left: Pick<EvaluationResult, 'type' | 'value'>,
+  right: Pick<EvaluationResult, 'type' | 'value'>,
+  timeZone: string
+): number {
+  return jsonCompare(_toJsonNode(left, timeZone), _toJsonNode(right, timeZone));
+}
+function _jsonRank(node: JsonNode): number {
+  if (node === null) {
+    return 0;
+  } else if (typeof node === 'number') {
+    return 1;
+  } else if (typeof node === 'string') {
+    return 2;
+  } else if (Array.isArray(node)) {
+    return 4;
+  } else if (typeof node === 'boolean') {
+    return 5;
+  }
+  return 3;
+}
+export function jsonCompare(a: JsonNode, b: JsonNode): number {
+  const rank_a = _jsonRank(a);
+  const rank_b = _jsonRank(b);
+  if (rank_a !== rank_b) {
+    return rank_a - rank_b;
+  }
+  if (typeof a === 'number' && typeof b === 'number') {
+    return a - b;
+  } else if (typeof a === 'string' && typeof b === 'string') {
+    return _utf8Compare(a, b);
+  } else if (typeof a === 'boolean' && typeof b === 'boolean') {
+    return Number(a) - Number(b);
+  } else if (Array.isArray(a) && Array.isArray(b)) {
+    for (let i = 0; i < Math.min(a.length, b.length); i++) {
+      const cmp = jsonCompare(a[i], b[i]);
+      if (cmp !== 0) {
+        return cmp;
+      }
+    }
+    return a.length - b.length;
+  } else if (rank_a === 3) {
+    const obj_a = a as JsonObject;
+    const obj_b = b as JsonObject;
+    const keys_a = Object.keys(obj_a).sort(_utf8Compare);
+    const keys_b = Object.keys(obj_b).sort(_utf8Compare);
+    for (let i = 0; i < Math.min(keys_a.length, keys_b.length); i++) {
+      const key_a = keys_a[i] ?? '';
+      const key_b = keys_b[i] ?? '';
+      const key_cmp = _utf8Compare(key_a, key_b);
+      if (key_cmp !== 0) {
+        return key_cmp;
+      }
+      const val_cmp = jsonCompare(obj_a[key_a], obj_b[key_b]);
+      if (val_cmp !== 0) {
+        return val_cmp;
+      }
+    }
+    return keys_a.length - keys_b.length;
+  }
+  return 0;
+}
+function _utf8Compare(a: string, b: string): number {
+  return a === b ? 0 : Buffer.compare(Buffer.from(a), Buffer.from(b));
 }
 function _isDateLike(value: unknown): value is SQLDate | SQLDateTime {
   return value instanceof SQLDate || value instanceof SQLDateTime;

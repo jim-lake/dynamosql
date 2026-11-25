@@ -2,6 +2,7 @@ import { toBigInt } from '@/tools/safe_convert';
 
 import { SQLDate } from '../types/sql_date';
 import { SQLDateTime } from '../types/sql_datetime';
+import { SQLJson } from '../types/sql_json';
 import { createSQLTime, SQLTime } from '../types/sql_time';
 
 const MINUTE = 60;
@@ -49,6 +50,8 @@ export function convertNum(value: unknown): number | null {
     return isNaN(ret) ? 0 : ret;
   } else if (_isToNumber(value)) {
     return value.toNumber();
+  } else if (value instanceof SQLJson) {
+    return convertNum(_jsonNodeToScalar(value.node));
   }
   return null;
 }
@@ -64,6 +67,8 @@ export function convertBigInt(value: unknown): bigint | null {
   } else if (typeof value === 'string') {
     const s = value.match(/-?\d*/)?.[0] ?? '';
     return toBigInt(s) ?? 0n;
+  } else if (value instanceof SQLJson) {
+    return convertBigInt(_jsonNodeToScalar(value.node));
   }
   return null;
 }
@@ -75,6 +80,12 @@ export function convertBooleanValue(value: unknown): number | null {
   } else {
     return convertNum(value) ? 1 : 0;
   }
+}
+export function convertTruthValue(value: unknown): number | null {
+  if (value instanceof SQLJson) {
+    return typeof value.node === 'number' ? (value.node ? 1 : 0) : 1;
+  }
+  return convertBooleanValue(value);
 }
 
 const SEP = `[-^\\][!@#$%&*()_+={}\\|/\\\\<>,.:;"']+`;
@@ -102,7 +113,8 @@ export interface ConvertDateTimeParams {
 export function convertDateTimeOrDate(
   params: ConvertDateTimeParams
 ): SQLDateTime | SQLDate | null {
-  const { value, decimals, timeZone } = params;
+  const { decimals, timeZone } = params;
+  const value = _unwrapJsonScalar(params.value);
   if (value === null) {
     return null;
   } else if (value instanceof SQLDateTime) {
@@ -135,7 +147,8 @@ export function convertDateTimeOrDate(
   return null;
 }
 export function convertDateTime(params: ConvertDateTimeParams) {
-  const { value, decimals, timeZone } = params;
+  const { decimals, timeZone } = params;
+  const value = _unwrapJsonScalar(params.value);
   if (value === null) {
     return null;
   } else if (value instanceof SQLDateTime) {
@@ -165,7 +178,8 @@ export interface ConvertDateParams {
   timeZone: string;
 }
 export function convertDate(params: ConvertDateParams): SQLDate | null {
-  const { value, timeZone } = params;
+  const { timeZone } = params;
+  const value = _unwrapJsonScalar(params.value);
   if (value === null) {
     return null;
   } else if (value instanceof SQLDate) {
@@ -201,7 +215,7 @@ export interface ConvertTimeParams {
   timeZone?: string;
 }
 export function convertTime(params: ConvertTimeParams): SQLTime | null {
-  const { value } = params;
+  const value = _unwrapJsonScalar(params.value);
   let { decimals } = params;
   if (value instanceof SQLTime) {
     if (decimals === undefined || value.getDecimals() === decimals) {
@@ -426,4 +440,21 @@ function _isToNumber(value: unknown): value is ToNumber {
     'toNumber' in value &&
     typeof value.toNumber === 'function'
   );
+}
+function _unwrapJsonScalar(value: unknown): unknown {
+  if (
+    value instanceof SQLJson &&
+    (typeof value.node === 'string' || typeof value.node === 'number')
+  ) {
+    return value.node;
+  }
+  return value;
+}
+function _jsonNodeToScalar(node: unknown): unknown {
+  if (typeof node === 'boolean') {
+    return node ? 1 : 0;
+  } else if (node === null || typeof node === 'object') {
+    return 0;
+  }
+  return node;
 }

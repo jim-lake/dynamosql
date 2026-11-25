@@ -72,6 +72,13 @@ Whether `SOUNDEX` is a supported function must be checked in `FUNCTIONS.md` befo
 
 Tests must not pin the DynamoSQL output for these characters as correct.
 
+## JSON integers outside the safe range (won't fix)
+
+DynamoSQL holds JSON numbers as JavaScript doubles. Integers beyond ±2^53 − 1 (`Number.MAX_SAFE_INTEGER`) lose precision when JSON text is parsed. MySQL keeps them exactly. Tests must not use these values in JSON.
+
+- `INSERT INTO t (doc) VALUES ('9007199254740993'); SELECT CAST(doc AS CHAR) FROM t;`: MySQL returns `'9007199254740993'`. DynamoSQL returns `'9007199254740992'`.
+- `SELECT JSON_VALUE('{"x":18446744073709551615}', '$.x' RETURNING UNSIGNED) AS v;`: MySQL returns `18446744073709551615`. DynamoSQL returns `NULL`.
+
 ## PI() display precision
 
 MySQL shows `PI()` with 6 decimal places in the text protocol, because the result field has `decimals` 6. The value is still the full double. Other DOUBLE results print full precision. DynamoSQL treats `PI()` as a plain DOUBLE and returns the full value, so it does not reproduce the 6-place display.

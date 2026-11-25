@@ -4,6 +4,7 @@ import {
   convertDateTime,
   convertTime,
 } from '../../helpers/sql_conversion';
+import { SQLJson } from '../../types/sql_json';
 
 import type { EvaluationResult } from '../../expression';
 import type { CellValue, ColumnDef } from '../index';
@@ -37,6 +38,16 @@ const OVERFLOW_DIGITS = 80;
 const OVERFLOW = 10n ** BigInt(OVERFLOW_DIGITS);
 const NUMERIC_PREFIX = /^\s*([+-]?)(\d*)(?:\.(\d*))?(?:[eE]([+-]?\d+))?/;
 
+export function cellValueEqual(
+  a: { value?: unknown } | undefined,
+  b: { value?: unknown } | undefined
+): boolean {
+  if (a?.value instanceof SQLJson && b?.value instanceof SQLJson) {
+    return a.value.toString() === b.value.toString();
+  }
+  return a?.value === b?.value;
+}
+
 export function cellConvert(
   result: EvaluationResult,
   column: ColumnDef,
@@ -46,7 +57,12 @@ export function cellConvert(
   const strict = flags.strict && !flags.ignore;
   if (value === null && !column.nullable) {
     if (flags.ignore || (!flags.strict && !flags.singleRow)) {
-      value = column.type === 'string' || column.type === 'char' ? '' : 0;
+      value =
+        column.type === 'string' || column.type === 'char'
+          ? ''
+          : column.type === 'json'
+            ? 'null'
+            : 0;
     } else {
       throw new SQLError({ err: 'ER_BAD_NULL_ERROR' });
     }
@@ -178,6 +194,20 @@ export function cellConvert(
         type: column.type,
         value: column.type === 'char' ? text.trimEnd() : text,
       };
+    }
+    case 'json': {
+      if (value instanceof SQLJson) {
+        return { type: column.type, value };
+      }
+      if (typeof value !== 'string' && !Buffer.isBuffer(value)) {
+        throw new SQLError({ err: 'ER_INVALID_JSON_TEXT' });
+      }
+      try {
+        const text = Buffer.isBuffer(value) ? value.toString('utf8') : value;
+        return { type: column.type, value: new SQLJson(JSON.parse(text)) };
+      } catch {
+        throw new SQLError({ err: 'ER_INVALID_JSON_TEXT' });
+      }
     }
     default:
       return { type: result.type, value };
