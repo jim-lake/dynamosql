@@ -41,13 +41,6 @@ Matching MySQL is not a goal for illegal statements. Parse errors (`ER_PARSE_ERR
 
 - `SELECT id, doc + 0 AS v FROM t;`, where the JSON column `doc` holds the JSON number `42` in one row and the JSON number `-2.5` in another, with `JSON_EXTRACT(doc, '$') + 0` written the same way: MySQL reports the result type as NEWDECIMAL. DynamoSQL reports DOUBLE. The values match.
 - `SELECT id, SPACE(doc) AS v FROM t;`, where `doc` holds the JSON number `42`: MySQL reports the result type as BLOB. DynamoSQL reports VAR_STRING. The values match.
-- `SELECT id FROM t WHERE doc BETWEEN 1 AND 10;`, where row 8 holds the JSON `true`: MySQL returns row 8, because `true` compares as 1. DynamoSQL does not return row 8.
-- `SELECT (CAST('null' AS JSON) BETWEEN 0 AND 1) AS a;`: MySQL returns 1. DynamoSQL returns 0. BETWEEN with a JSON operand does not follow the `>=` and `<=` rules.
-
-## JSON array and object ordering
-
-- `SELECT id FROM t ORDER BY doc, id;`, where `doc` holds `[1,2]` in row 1, `[2]` in row 2, and `[]` in row 3: MySQL returns ids 3, 2, 1. DynamoSQL returns ids 3, 1, 2, because it compares arrays element by element. `SELECT CAST(MAX(doc) AS CHAR) FROM t;` over the same rows returns `'[2]'` on both engines, so the two engines disagree only on ORDER BY.
-- `SELECT id FROM t ORDER BY doc DESC, id;`, where `doc` holds `{"a":1}` in row 1, `{"a":2}` in row 2, `{"b":0}` in row 3, `{}` in row 4, and SQL NULL in row 5: MySQL returns ids 1, 2, 3, 4, 5. DynamoSQL returns ids 3, 2, 1, 4, 5. The ASC order (`ORDER BY doc, id`) returns ids 5, 4, 1, 2, 3 on both engines, so MySQL's DESC is not the reverse of its own ASC order for these objects.
 
 ## DATETIME in JSON_VALUE RETURNING
 
@@ -55,10 +48,6 @@ Matching MySQL is not a goal for illegal statements. Parse errors (`ER_PARSE_ERR
 - `SELECT JSON_VALUE('{"d":"2024-03-05T10:20:30"}', '$.d' RETURNING DATETIME) AS v;`: MySQL returns NULL. DynamoSQL returns a DATETIME value, because `convertDateTime` accepts the `T` separator.
 - `SELECT JSON_VALUE('{"d":"2024-02-30 10:20:30"}', '$.d' RETURNING DATETIME) AS v;`: MySQL returns NULL for the invalid day. DynamoSQL returns `'2024-03-01 10:20:30'`, because `convertDateTime` rolls the date over.
 - `SELECT JSON_VALUE('{"d":"2024-03-05 10:20:30.5"}', '$.d' RETURNING DATETIME(0)) AS v;`: MySQL returns `'2024-03-05 10:20:30'`. DynamoSQL returns `'2024-03-05 10:20:31'`, because `convertDateTime` rounds the fraction up.
-
-## JSON operand in simple CASE
-
-- `SELECT id, CASE doc WHEN 0 THEN 'zero' ELSE 'other' END AS v FROM t;`, where row 1 holds the JSON `null` and row 2 holds the JSON `0`: MySQL returns `'zero'` for both rows. DynamoSQL returns `'other'` for JSON `null`, because simple CASE uses the `=` rules and JSON `null` does not equal 0. The JSON `0.5` returns `'other'` on both engines.
 
 ## UNIX_TIMESTAMP on a JSON string
 

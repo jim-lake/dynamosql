@@ -79,6 +79,17 @@ DynamoSQL holds JSON numbers as JavaScript doubles. Integers beyond ±2^53 − 1
 - `INSERT INTO t (doc) VALUES ('9007199254740993'); SELECT CAST(doc AS CHAR) FROM t;`: MySQL returns `'9007199254740993'`. DynamoSQL returns `'9007199254740992'`.
 - `SELECT JSON_VALUE('{"x":18446744073709551615}', '$.x' RETURNING UNSIGNED) AS v;`: MySQL returns `18446744073709551615`. DynamoSQL returns `NULL`.
 
+## JSON comparison and ordering
+
+DynamoSQL compares JSON values with one rule set, the JSON comparison rules in the MySQL manual, in every context: comparison operators, `IN`, `BETWEEN` (as `>= AND <=`), simple `CASE` (as `=`), `ORDER BY`, `MIN`, and `MAX`. MySQL applies numeric conversion to JSON operands in `BETWEEN` and simple `CASE`, so those two constructs can disagree with its own `>=`, `<=`, and `=`.
+
+- `SELECT CAST('true' AS JSON) BETWEEN 1 AND 10 AS a;`: MySQL returns `1`. DynamoSQL returns `0`, the same as `CAST('true' AS JSON) >= 1 AND CAST('true' AS JSON) <= 10`.
+- `SELECT CASE CAST('null' AS JSON) WHEN 0 THEN 'zero' ELSE 'other' END AS a;`: MySQL returns `'zero'`. DynamoSQL returns `'other'`, the same as `CAST('null' AS JSON) = 0`.
+
+MySQL does not define a sort order for JSON arrays and objects. Its `ORDER BY` and `MIN`/`MAX` can disagree with each other, and its descending order is not always the reverse of its ascending order. DynamoSQL orders arrays element by element, then by length, and orders objects by their sorted keys and values.
+
+- `SELECT id FROM t ORDER BY doc, id;`, where `doc` holds `[1,2]`, `[2]`, and `[]` in rows 1 to 3: MySQL returns ids 3, 2, 1. DynamoSQL returns ids 3, 1, 2.
+
 ## PI() display precision
 
 MySQL shows `PI()` with 6 decimal places in the text protocol, because the result field has `decimals` 6. The value is still the full double. Other DOUBLE results print full precision. DynamoSQL treats `PI()` as a plain DOUBLE and returns the full value, so it does not reproduce the 6-place display.
