@@ -29,7 +29,7 @@ export interface MysqlTypeInfo {
   scale?: number;
 }
 
-interface CastTarget {
+export interface CastTarget {
   dataType: string;
   length?: number;
   scale?: number;
@@ -70,14 +70,18 @@ export function getExprMysqlType(
       };
     case 'binary_expr':
       return _binaryMysqlType(expr as Binary, state);
-    case 'unary_expr':
-      return { type: 'BIGINT' };
+    case 'unary_expr': {
+      const operator = 'operator' in expr ? String(expr.operator) : '';
+      return {
+        type: operator === 'NOT' || operator === '!' ? 'INT' : 'BIGINT',
+      };
+    }
     case 'cast':
       return _castMysqlType(expr as Cast);
     case 'function': {
-      const fn = expr as FunctionExpr;
+      const fn = expr as FunctionExpr & { returning?: CastTarget };
       const rule = functionRules[getFunctionName(fn.name).toLowerCase()];
-      return rule ? rule(fn.args?.value ?? [], state) : null;
+      return rule ? rule(fn.args?.value ?? [], state, fn.returning) : null;
     }
     case 'aggr_func': {
       const aggr = expr as AggrFunc;
@@ -93,17 +97,26 @@ function _binaryMysqlType(
   expr: Binary,
   state: EvaluationState
 ): MysqlTypeInfo | null {
-  const left = getExprMysqlType(expr.left, state);
-  const right = getExprMysqlType(expr.right, state);
-  if (!left || !right) {
-    return null;
-  }
   const op = expr.operator.toUpperCase();
   if (op === '->') {
     return { type: 'JSON' };
   }
   if (op === '->>') {
     return { type: 'LONGTEXT' };
+  }
+  if (BOOLEAN_OPERATORS.has(op)) {
+    return { type: 'INT' };
+  }
+  if (op === 'IS') {
+    return {
+      type:
+        'type' in expr.right && expr.right.type === 'bool' ? 'INT' : 'BIGINT',
+    };
+  }
+  const left = getExprMysqlType(expr.left, state);
+  const right = getExprMysqlType(expr.right, state);
+  if (!left || !right) {
+    return null;
   }
   if (op !== '+' && op !== '-' && op !== '*' && op !== '/') {
     return { type: 'BIGINT' };
@@ -131,6 +144,30 @@ function _binaryMysqlType(
   }
   return { type: 'BIGINT' };
 }
+
+const BOOLEAN_OPERATORS = new Set([
+  '=',
+  '<>',
+  '!=',
+  '<',
+  '<=',
+  '>',
+  '>=',
+  '<=>',
+  'LIKE',
+  'NOT LIKE',
+  'IN',
+  'NOT IN',
+  'BETWEEN',
+  'NOT BETWEEN',
+  'AND',
+  'OR',
+  'XOR',
+  '&&',
+  '||',
+  'IS NOT',
+  'MEMBER OF',
+]);
 
 const INTEGER_PRECISION: Partial<Record<MysqlType, number>> = {
   INT: 11,
@@ -174,7 +211,12 @@ function _columnRefMysqlType(
 }
 
 function _castMysqlType(expr: Cast): MysqlTypeInfo | null {
-  const target = expr.target[0] as CastTarget | undefined;
+  return targetMysqlType(expr.target[0]);
+}
+
+export function targetMysqlType(
+  target: CastTarget | undefined
+): MysqlTypeInfo | null {
   const dataType = target?.dataType.toUpperCase();
   switch (dataType) {
     case 'CHAR':
@@ -192,6 +234,10 @@ function _castMysqlType(expr: Cast): MysqlTypeInfo | null {
         precision: target?.length,
         scale: target?.scale,
       };
+    case 'DOUBLE':
+    case 'FLOAT':
+    case 'REAL':
+      return { type: 'DOUBLE' };
     case 'DATE':
       return { type: 'DATE' };
     case 'DATETIME':

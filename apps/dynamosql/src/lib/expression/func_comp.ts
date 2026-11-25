@@ -270,9 +270,17 @@ export function unionType(list: EvaluationResult[]): UnionTypeResult {
   }
   if (
     types.includes('json') &&
+    types.every((t) => t === 'json' || t === 'null')
+  ) {
+    compare_type = 'json';
+    type = 'json';
+  }
+  if (
+    types.includes('json') &&
     types.some((t) => t !== 'json' && t !== 'null')
   ) {
     type = 'text';
+    compare_type = 'string';
   }
   return { compare_type, type };
 }
@@ -416,8 +424,8 @@ export function _compare(
   }
   return {
     err: null,
-    value,
-    type,
+    value: unionValue(value, type === 'json' ? 'string' : type),
+    type: type === 'json' ? 'string' : type,
     name: `${functionName}(${names.join(', ')})`,
     decimals,
   };

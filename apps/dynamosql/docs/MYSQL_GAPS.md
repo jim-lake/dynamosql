@@ -28,3 +28,11 @@ Matching MySQL is not a goal for illegal statements. Parse errors (`ER_PARSE_ERR
 ## MIN and MAX field type on integer columns
 
 - `SELECT MIN(id) AS m FROM g;`, where `id` is `INT`: MySQL returns `LONG` field metadata. DynamoSQL returns `VAR_STRING`. The values match.
+
+## GREATEST and LEAST field type on JSON columns with DISTINCT
+
+- `SELECT DISTINCT GREATEST(j, j) AS json_value FROM tt;`, where `j` is a `JSON` column: MySQL returns `LONGTEXT` field metadata. DynamoSQL returns `VAR_STRING`. The values match. Without DISTINCT, MySQL returns `VARCHAR` for the same expression.
+
+## Boolean-valued JSON function field type with DISTINCT on a table column
+
+- `SELECT DISTINCT JSON_OVERLAPS(j, '{"a":1}') AS result FROM tt;`, `JSON_SCHEMA_VALID('{"type":"object"}', j)`, `JSON_STORAGE_SIZE(j) = JSON_STORAGE_SIZE('{"a":1}')` and `1 MEMBER OF(j)`, where `j` is a `JSON` column: MySQL returns `LONG` field metadata. DynamoSQL returns `LONGLONG`. The values match. With literal arguments MySQL returns `LONGLONG` and DynamoSQL matches.

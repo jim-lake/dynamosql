@@ -3,6 +3,16 @@ import { convertBooleanValue, convertString } from '../helpers/sql_conversion';
 
 import type { EvaluationResult } from '../expression/evaluate';
 
+function sortObjectKeys(_key: string, child: unknown): unknown {
+  if (child === null || typeof child !== 'object' || Array.isArray(child)) {
+    return child;
+  }
+  const keys = Object.keys(child).sort();
+  return Object.fromEntries(
+    keys.map((key) => [key, (child as Record<string, unknown>)[key]])
+  );
+}
+
 export class SQLJson {
   readonly node: unknown;
   constructor(node: unknown) {
@@ -45,6 +55,19 @@ export class SQLJson {
       }
       default:
         return String(value);
+    }
+  }
+  static canonicalKey(value: unknown): string {
+    if (value instanceof SQLJson) {
+      return JSON.stringify(value.node, sortObjectKeys);
+    }
+    const text = Buffer.isBuffer(value)
+      ? value.toString('utf8')
+      : String(value);
+    try {
+      return JSON.stringify(JSON.parse(text), sortObjectKeys);
+    } catch {
+      return text;
     }
   }
   static parseText(

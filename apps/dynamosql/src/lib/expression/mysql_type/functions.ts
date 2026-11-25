@@ -1,12 +1,13 @@
-import { getExprMysqlType } from './mysql_type_expression';
+import { getExprMysqlType, targetMysqlType } from './mysql_type_expression';
 
 import type { MysqlType } from '../../types/value_type';
 import type { EvaluationState } from '../evaluate';
-import type { MysqlTypeInfo } from './mysql_type_expression';
+import type { CastTarget, MysqlTypeInfo } from './mysql_type_expression';
 
 export type FunctionRule = (
   args: unknown[],
-  state: EvaluationState
+  state: EvaluationState,
+  returning?: CastTarget
 ) => MysqlTypeInfo | null;
 
 type Family =
@@ -114,9 +115,15 @@ function coalesceRule(
   args: unknown[],
   state: EvaluationState
 ): MysqlTypeInfo | null {
-  const families = familiesOf(args, state);
-  if (!families || families.includes('json')) {
+  const families = familiesOf(
+    args.filter((arg) => (arg as { type?: string }).type !== 'null'),
+    state
+  );
+  if (!families || families.length === 0) {
     return null;
+  }
+  if (families.includes('json')) {
+    return { type: families.every((f) => f === 'json') ? 'JSON' : 'TEXT' };
   }
   if (families.includes('text')) {
     return { type: 'TEXT' };
@@ -165,6 +172,8 @@ export const aggregateRules: Record<string, FunctionRule> = {
   },
   max: sameAsFirstArg,
   min: sameAsFirstArg,
+  json_arrayagg: returnsJson,
+  json_objectagg: returnsJson,
 };
 
 function sameAsFirstArg(
@@ -206,6 +215,14 @@ function valueSelectRule(
     return { type: 'VARCHAR' };
   }
   return info.type === 'TINYINT' ? { type: 'INT' } : info;
+}
+
+function greatestLeastRule(
+  args: unknown[],
+  state: EvaluationState
+): MysqlTypeInfo | null {
+  const info = valueSelectRule(args, state);
+  return info?.type === 'JSON' ? { type: 'VARCHAR' } : info;
 }
 
 function sameLengthVarchar(
@@ -306,10 +323,18 @@ export const functionRules: Record<string, FunctionRule> = {
   json_merge_preserve: returnsJson,
   json_pretty: returnsJson,
   json_schema_validation_report: returnsJson,
+  json_search: returnsJson,
+  json_overlaps: returnsInt,
+  json_schema_valid: returnsInt,
+  json_storage_size: returnsBigint,
+  json_storage_free: returnsBigint,
+  json_value: (args, state, returning) => {
+    return returning ? targetMysqlType(returning) : returnsVarchar();
+  },
   coercibility: returnsBigint,
   collation: returnsVarchar,
-  greatest: valueSelectRule,
-  least: valueSelectRule,
+  greatest: greatestLeastRule,
+  least: greatestLeastRule,
   if: (args, state) => {
     return valueSelectRule(args.slice(1), state);
   },
