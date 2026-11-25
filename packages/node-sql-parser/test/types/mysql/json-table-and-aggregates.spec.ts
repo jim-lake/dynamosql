@@ -27,7 +27,7 @@ test('JSON_VALUE RETURNING type', () => {
 test('JSON_VALUE RETURNING SIGNED INTEGER and UNSIGNED INTEGER', () => {
   const signed = parseColumnExpr(`SELECT JSON_VALUE('1', '$' RETURNING SIGNED INTEGER) AS v`);
   assertType(isFunction, signed);
-  assert.strictEqual(signed.returning.dataType, 'SIGNED INTEGER');
+  assert.strictEqual(signed.returning.dataType, 'SIGNED');
   const unsigned = parseColumnExpr(`SELECT JSON_VALUE('1', '$' RETURNING UNSIGNED) AS v`);
   assertType(isFunction, unsigned);
   assert.strictEqual(unsigned.returning.dataType, 'UNSIGNED');
@@ -85,6 +85,21 @@ test('JSON_VALUE sqlify keeps RETURNING and ON clauses', () => {
   const sql = `SELECT JSON_VALUE('{"a":1}', '$.a' RETURNING CHAR(10) DEFAULT 'x' ON EMPTY NULL ON ERROR) AS v FROM t`;
   const out = parser.sqlify(parser.astify(sql));
   assert.ok(out.includes(`RETURNING CHAR(10) DEFAULT 'x' ON EMPTY NULL ON ERROR`), out);
+  assertType(isSelect, parser.astify(out));
+});
+
+test('JSON_VALUE RETURNING CHAR with CHARACTER SET', () => {
+  const expr = parseColumnExpr(`SELECT JSON_VALUE(doc, '$.s' RETURNING CHAR(3) CHARACTER SET utf8mb4) AS v`);
+  assertType(isFunction, expr);
+  assert.strictEqual(expr.returning.dataType, 'CHAR');
+  assert.strictEqual(expr.returning.length, 3);
+  assert.strictEqual(expr.returning.charset, 'utf8mb4');
+});
+
+test('JSON_VALUE RETURNING CHAR with CHARACTER SET sqlify round-trips', () => {
+  const sql = `SELECT JSON_VALUE(doc, '$.s' RETURNING CHAR(3) CHARACTER SET utf8mb4 NULL ON EMPTY NULL ON ERROR) AS v FROM t`;
+  const out = parser.sqlify(parser.astify(sql));
+  assert.ok(out.includes(`RETURNING CHAR(3) CHARACTER SET utf8mb4 NULL ON EMPTY NULL ON ERROR`), out);
   assertType(isSelect, parser.astify(out));
 });
 

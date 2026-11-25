@@ -4221,8 +4221,11 @@ json_value_func
   }
 
 json_returning
-  = 'RETURNING'i !ident_part __ s:signedness t:(__ KW_INTEGER)? {
-    return { type: 'datatype', dataType: s + (t ? ' INTEGER' : '') };
+  = 'RETURNING'i !ident_part __ s:signedness (__ KW_INTEGER)? {
+    return { type: 'datatype', dataType: s };
+  }
+  / 'RETURNING'i !ident_part __ d:character_string_type __ create_option_character_set_kw __ cs:ident_without_kw_type {
+    return { type: 'datatype', ...d, charset: cs.value };
   }
   / 'RETURNING'i !ident_part __ d:data_type {
     return { type: 'datatype', ...d };

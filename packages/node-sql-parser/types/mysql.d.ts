@@ -740,6 +740,7 @@ export type ConvertDataType = {
   parentheses?: true;
   scale?: number | null;
   suffix?: ("UNSIGNED" | "ZEROFILL" | "SIGNED")[] | null;
+  charset?: string;
 };
 
 export type DataType = {

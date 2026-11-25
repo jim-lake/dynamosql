@@ -293,11 +293,12 @@ function onPartitionsToSQL(expr) {
 }
 
 function dataTypeToSQL(expr) {
-  const { schema, dataType, length, parentheses, scale, suffix } = expr
+  const { schema, dataType, length, parentheses, scale, suffix, charset } = expr
   let str = ''
   if (length != null) str = scale ? `${length}, ${scale}` : length
   if (parentheses) str = `(${str})`
   if (suffix && suffix.length) str += ` ${suffix.join(' ')}`
+  if (charset) str += ` CHARACTER SET ${charset}`
   const prefix = schema ? `${schema}.` : ''
   return `${prefix}${dataType}${str}`
 }

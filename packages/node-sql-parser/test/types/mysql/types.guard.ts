@@ -2792,7 +2792,9 @@ export function isConvertDataType(obj: unknown): obj is ConvertDataType {
             (e === "SIGNED" ||
                 e === "UNSIGNED" ||
                 e === "ZEROFILL")
-            ))
+            )) &&
+        (typeof typedObj["charset"] === "undefined" ||
+            typeof typedObj["charset"] === "string")
     )
 }
 

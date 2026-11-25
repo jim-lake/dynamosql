@@ -172,6 +172,10 @@ describe('AST', () => {
                     'SELECT CAST(col as unsigned integer) FROM t',
                     'SELECT CAST(`col` AS UNSIGNED INTEGER) FROM `t`'
                 ],
+                'unsigned casts': [
+                    'SELECT CAST(col AS UNSIGNED) FROM t',
+                    'SELECT CAST(`col` AS UNSIGNED) FROM `t`'
+                ],
                 'int casts': [
                     'SELECT CAST(col as int64) FROM t',
                     'SELECT CAST(`col` AS INT64) FROM `t`'
