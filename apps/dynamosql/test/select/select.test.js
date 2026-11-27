@@ -8,6 +8,13 @@ describe('Select', function () {
     allowedErrors: 'SAME_CODE',
   });
   runTests('distinct.sql', path.join(__dirname, 'distinct.sql'));
+  runTests('union.sql', path.join(__dirname, 'union.sql'), {
+    verify_field_types: true,
+  });
+  runTests('union_error.sql', path.join(__dirname, 'union_error.sql'), {
+    allowedErrors: 'SAME_CODE',
+  });
+  runTests('union_raw.sql', path.join(__dirname, 'union_raw.sql'));
   runTests(
     'distinct_function_types.sql',
     path.join(__dirname, 'distinct_function_types.sql'),

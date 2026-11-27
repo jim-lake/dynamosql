@@ -143,6 +143,10 @@ const ERROR_MAP: Record<string, ErrorMapEntry> = {
     code: 'ER_DUP_FIELDNAME',
     sqlMessage: errStr`Duplicate column name '${0}'`,
   },
+  ER_WRONG_NUMBER_OF_COLUMNS_IN_SELECT: {
+    code: 'ER_WRONG_NUMBER_OF_COLUMNS_IN_SELECT',
+    sqlMessage: 'The used SELECT statements have a different number of columns',
+  },
   ER_KEY_COLUMN_DOES_NOT_EXITS: {
     code: 'ER_KEY_COLUMN_DOES_NOT_EXITS',
     sqlMessage: errStr`Key column '${0}' doesn't exist in table`,

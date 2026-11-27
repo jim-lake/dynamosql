@@ -197,12 +197,12 @@ Source: MySQL 8.4 Reference Manual, chapter 15 (SQL statements), chapter 11 (lan
 
 | Feature                                                                   | Supported | Notes                                                                             |
 | :------------------------------------------------------------------------ | :-------: | --------------------------------------------------------------------------------- |
-| `UNION [DISTINCT]`                                                        |    ❌     | Silently wrong. A probe of `SELECT 1 UNION SELECT 2` returned only the first row. |
-| `UNION ALL`                                                               |    ❌     |                                                                                   |
+| `UNION [DISTINCT]`                                                        |    ✅     | `select/union.sql`. Outer `ORDER BY` and `LIMIT` apply to the whole union. |
+| `UNION ALL`                                                               |    ✅     | `select/union.sql`                                                                |
 | `INTERSECT [ALL \| DISTINCT]`                                             |    ❌     |                                                                                   |
 | `EXCEPT [ALL \| DISTINCT]`                                                |    ❌     |                                                                                   |
-| Parenthesized query term `( query_expression [ORDER BY] [LIMIT] [INTO] )` |    ❌     |                                                                                   |
-| `ORDER BY` or `LIMIT` after a set operator                                |    ❌     |                                                                                   |
+| Parenthesized query term `( query_expression [ORDER BY] [LIMIT] [INTO] )` |    ✅     | `select/union.sql`. `INTO` is not supported. A nested parenthesized union fails to parse, see `PARSER_TODO.md`. |
+| `ORDER BY` or `LIMIT` after a set operator                                |    ✅     | `select/union.sql`. `ORDER BY` takes result column names or positions. |
 
 ### Common table expressions
 

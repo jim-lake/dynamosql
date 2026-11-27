@@ -261,6 +261,14 @@ describe('Temp', function () {
     path.join(__dirname, 'memory_misuse_error.sql'),
     { allowedErrors: 'SAME_CODE', checkChanged: true }
   );
+  runTests('memory_union.sql', path.join(__dirname, 'memory_union.sql'), {
+    checkChanged: true,
+  });
+  runTests(
+    'memory_union_error.sql',
+    path.join(__dirname, 'memory_union_error.sql'),
+    { allowedErrors: 'SAME_CODE', checkChanged: true }
+  );
   for (const name of [
     'memory_convert_int.sql',
     'memory_convert_int_nonstrict.sql',

@@ -36,3 +36,7 @@ Matching MySQL is not a goal for illegal statements. Parse errors (`ER_PARSE_ERR
 ## Boolean-valued JSON function field type with DISTINCT on a table column
 
 - `SELECT DISTINCT JSON_OVERLAPS(j, '{"a":1}') AS result FROM tt;`, `JSON_SCHEMA_VALID('{"type":"object"}', j)`, `JSON_STORAGE_SIZE(j) = JSON_STORAGE_SIZE('{"a":1}')` and `1 MEMBER OF(j)`, where `j` is a `JSON` column: MySQL returns `LONG` field metadata. DynamoSQL returns `LONGLONG`. The values match. With literal arguments MySQL returns `LONGLONG` and DynamoSQL matches.
+
+## Column name of a bare NULL literal
+
+- `SELECT NULL;`: MySQL names the column `NULL`. DynamoSQL names it `null`. The value matches. The same naming applies to the first branch of `SELECT NULL UNION SELECT NULL;`.

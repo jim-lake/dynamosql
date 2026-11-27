@@ -48,6 +48,9 @@ export function getExprMysqlType(
     case 'number': {
       const text = 'value' in expr ? String(expr.value) : '';
       const [int_part = '', frac = ''] = text.replace('-', '').split('.');
+      if (/e/i.test(text)) {
+        return { type: 'DOUBLE' };
+      }
       if (text.includes('.')) {
         return {
           type: 'DECIMAL',

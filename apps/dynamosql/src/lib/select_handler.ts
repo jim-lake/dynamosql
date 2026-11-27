@@ -4,6 +4,7 @@ import { SQLError } from '../error';
 
 import * as Expression from './expression';
 import { getExprCollation } from './expression/collation';
+import { unionType, unionValue } from './expression/func_comp';
 import { getExprMysqlType } from './expression/mysql_type/mysql_type_expression';
 import { isBaseFrom, isDerivedFrom } from './helpers/ast_helper';
 import { resolveReferences } from './helpers/column_ref_helper';
@@ -18,7 +19,10 @@ import { sort } from './helpers/sort';
 import { convertNum } from './helpers/sql_conversion';
 import { applyWindows, hasWindow } from './helpers/window';
 import * as Lock from './lock';
-import { mysqlStringToValueType } from './types/value_type';
+import {
+  mysqlStringToValueType,
+  valueTypeToMysqlType,
+} from './types/value_type';
 
 import type { Session } from '../session';
 import type { FieldInfo } from '../types';
@@ -52,6 +56,7 @@ import type {
   From,
   Join,
   Limit,
+  OrderBy,
   ExpressionValue,
   ExtractFunc,
   FulltextSearch,
@@ -184,6 +189,9 @@ async function _iterQuery(
   params: InternalQueryParams
 ): Promise<IterQueryResults> {
   const { ast, session, dynamodb } = params;
+  if (ast.type === 'select' && ast._next) {
+    return _iterUnion({ ...params, ast });
+  }
   const subqueryValues: SubqueryValues = new Map();
   await _collectScalarSubqueries(ast.where, params, subqueryValues);
   if (ast.type === 'select') {
@@ -514,51 +522,20 @@ async function _evaluateReturn(
   }
 
   if (ast.type === 'select' && ast.distinct === 'DISTINCT') {
-    const distinctColumns: ColumnDef[] = queryColumns.map((column) => {
-      const typeInfo = getExprMysqlType(column.expr, state);
-      if (!typeInfo) {
-        throw new SQLError({ err: 'ER_NOT_SUPPORTED_YET' });
-      }
-      return {
-        name: column.result.name ?? '',
-        type: mysqlStringToValueType(typeInfo.type),
-        mysqlType: typeInfo.type,
-        length: typeInfo.length,
-        precision: typeInfo.precision,
-        scale: typeInfo.scale,
-        collation:
-          column.result.collation ??
-          getExprCollation(column.expr, state) ??
-          undefined,
-      };
-    });
+    const distinctColumns = _columnDefs(queryColumns, state);
     const keyTypes = getKeyTypes(distinctColumns);
     const convertKey = createConvertKeyNullable(distinctColumns, keyTypes);
     const makeKey = createHashDistinctMakeKey(keyTypes);
-    const distinctInput = group_iter;
-    group_iter = (async function* () {
-      const indexes = new Set(queryColumns.keys());
-      const projected = _projectColumns({
-        iter: distinctInput,
-        queryColumns,
-        indexes,
-        state,
-      });
-      const seen = new Set<string>();
-      for await (const batch of projected) {
-        const kept = batch.filter((row) => {
-          const key = makeKey(convertKey(row.result ?? []));
-          if (seen.has(key)) {
-            return false;
-          }
-          seen.add(key);
-          return true;
-        });
-        if (kept.length > 0) {
-          yield kept;
-        }
-      }
-    })();
+    const indexes = new Set(queryColumns.keys());
+    const projected = _projectColumns({
+      iter: group_iter,
+      queryColumns,
+      indexes,
+      state,
+    });
+    group_iter = _dedupRows(projected, (row) =>
+      makeKey(convertKey(row.result ?? []))
+    );
   }
 
   let resultIter: AsyncIterable<SourceRow[]> = group_iter;
@@ -600,6 +577,253 @@ async function _evaluateReturn(
   return { resultIter: finalIter, queryColumns, columnRefMap, state };
 }
 
+const RUNTIME_UNION_TYPE: Partial<Record<ValueType, ValueType>> = {
+  long: 'longlong',
+  char: 'string',
+};
+async function _iterUnion(
+  params: InternalQueryParams & { ast: Select }
+): Promise<IterQueryResults> {
+  const { ast } = params;
+  const branches: Select[] = [];
+  const setOps: string[] = [];
+  for (let node: Select | undefined = ast; node; node = node._next) {
+    branches.push(node);
+    if (node._next) {
+      setOps.push(node.set_op ?? 'union');
+    }
+  }
+  const isParenthesized = ast.parentheses_symbol === true;
+  const last = branches.length - 1;
+  const lastBranch = branches[last];
+  const orderby = isParenthesized ? ast._orderby : lastBranch?.orderby;
+  const limit = isParenthesized ? ast._limit : lastBranch?.limit;
+
+  const results: IterQueryResults[] = [];
+  for (const [index, branch] of branches.entries()) {
+    const ownsOuterClauses = index === last && !isParenthesized;
+    const branchAst: Select = {
+      ...branch,
+      _next: undefined,
+      set_op: undefined,
+      _orderby: undefined,
+      _limit: undefined,
+      orderby: ownsOuterClauses ? null : branch.orderby,
+      limit: ownsOuterClauses ? null : branch.limit,
+    };
+    results.push(await _iterQuery({ ...params, ast: branchAst }));
+  }
+  const [first, ...others] = results;
+  if (!first) {
+    throw new SQLError('ER_WRONG_NUMBER_OF_COLUMNS_IN_SELECT');
+  }
+  for (const other of others) {
+    if (other.queryColumns.length !== first.queryColumns.length) {
+      throw new SQLError('ER_WRONG_NUMBER_OF_COLUMNS_IN_SELECT');
+    }
+  }
+
+  const unionColumns: ColumnDef[] = first.queryColumns.map((column, index) => {
+    const defs = results.flatMap((result) => {
+      const branchColumn = result.queryColumns[index];
+      const isNull =
+        !branchColumn ||
+        ('type' in branchColumn.expr && branchColumn.expr.type === 'null');
+      return isNull ? [] : _columnDefs([branchColumn], result.state);
+    });
+    const scales = defs.map((def) => def.scale ?? 0);
+    return {
+      name: column.result.name ?? '',
+      type: unionType(
+        defs.map((def) => ({
+          type: RUNTIME_UNION_TYPE[def.type] ?? def.type,
+          value: null,
+          err: null,
+        }))
+      ).type,
+      mysqlType: defs[0]?.mysqlType ?? 'VARCHAR',
+      scale: defs.some((def) => def.scale !== undefined)
+        ? Math.max(...scales)
+        : undefined,
+      collation: defs.find((def) => def.collation)?.collation,
+    };
+  });
+  const keyTypes = getKeyTypes(unionColumns);
+  const convertKey = createConvertKeyNullable(unionColumns, keyTypes);
+  const makeKey = createHashDistinctMakeKey(keyTypes);
+
+  const branchIters = results.map((result) =>
+    (async function* () {
+      for await (const batch of result.resultIter) {
+        for (const row of batch) {
+          for (const [index, cell] of row.result.entries()) {
+            const type = unionColumns[index]?.type;
+            if (
+              type &&
+              type !== 'null' &&
+              type !== 'json' &&
+              cell.type !== type
+            ) {
+              row.result[index] = {
+                ...cell,
+                type,
+                value: unionValue(cell.value, type),
+              };
+            }
+          }
+        }
+        yield batch;
+      }
+    })()
+  );
+  let dedupCount = 0;
+  for (const [index, op] of setOps.entries()) {
+    if (op === 'union' || op === 'union distinct') {
+      dedupCount = index + 2;
+    }
+  }
+  async function* concatIters(
+    iters: AsyncIterable<SourceRow[]>[]
+  ): AsyncIterable<SourceRow[]> {
+    for (const iter of iters) {
+      yield* iter;
+    }
+  }
+  let resultIter: AsyncIterable<SourceRow[]> = concatIters(
+    branchIters.slice(0, dedupCount)
+  );
+  if (dedupCount > 1) {
+    resultIter = _dedupRows(resultIter, (row) =>
+      makeKey(convertKey(row.result ?? []))
+    );
+  }
+  resultIter = concatIters([resultIter, ...branchIters.slice(dedupCount)]);
+  if (orderby) {
+    const positional = orderby.map((order): OrderBy => {
+      const { expr } = order;
+      if (
+        'type' in expr &&
+        expr.type === 'number' &&
+        typeof expr.value === 'number' &&
+        (expr.value < 1 || expr.value > first.queryColumns.length)
+      ) {
+        throw new SQLError({
+          err: 'column_not_found',
+          args: [`${expr.value}' in 'order clause`],
+        });
+      }
+      if (!_isColumnRef(expr) || typeof expr.column !== 'string') {
+        return order;
+      }
+      const name = expr.column.toLowerCase();
+      const index = first.queryColumns.findIndex((column) => {
+        const columnName =
+          column.as ??
+          column.result.name ??
+          (_isColumnRef(column.expr) ? column.expr.column : undefined);
+        return (
+          typeof columnName === 'string' && columnName.toLowerCase() === name
+        );
+      });
+      if (index < 0) {
+        throw new SQLError({
+          err: 'column_not_found',
+          args: [`${expr.column}' in 'order clause`],
+        });
+      }
+      return { ...order, expr: { type: 'number', value: index + 1 } };
+    });
+    resultIter = sort({
+      iter: resultIter,
+      orderby: positional,
+      queryColumns: first.queryColumns,
+      state: first.state,
+    });
+  }
+  if (limit) {
+    resultIter = _makeLimit(resultIter, limit);
+  }
+  const outIter = (async function* () {
+    for await (const batch of resultIter) {
+      for (const [index, column] of first.queryColumns.entries()) {
+        const type = unionColumns[index]?.type ?? 'null';
+        if (type === 'json') {
+          for (const row of batch) {
+            column.result.type = _unionType(
+              column.result.type,
+              row.result?.[index]?.type
+            );
+          }
+        } else {
+          column.result.type = type === 'null' ? 'string' : type;
+          const declared = column.result.mysqlType;
+          const declaredType = declared
+            ? mysqlStringToValueType(declared)
+            : undefined;
+          if (
+            declaredType &&
+            (RUNTIME_UNION_TYPE[declaredType] ?? declaredType) !==
+              column.result.type
+          ) {
+            column.result.mysqlType = valueTypeToMysqlType(column.result.type);
+          }
+        }
+        if (batch.some((row) => row.result?.[index]?.value === null)) {
+          column.result.nullable = true;
+        }
+      }
+      yield batch as SourceRowResult[];
+    }
+  })();
+  return {
+    resultIter: outIter,
+    queryColumns: first.queryColumns,
+    columnRefMap: first.columnRefMap,
+    state: first.state,
+  };
+}
+function _columnDefs(
+  queryColumns: QueryColumn[],
+  state: EvaluationState
+): ColumnDef[] {
+  return queryColumns.map((column) => {
+    const typeInfo = getExprMysqlType(column.expr, state);
+    if (!typeInfo) {
+      throw new SQLError({ err: 'ER_NOT_SUPPORTED_YET' });
+    }
+    return {
+      name: column.result.name ?? '',
+      type: mysqlStringToValueType(typeInfo.type),
+      mysqlType: typeInfo.type,
+      length: typeInfo.length,
+      precision: typeInfo.precision,
+      scale: typeInfo.scale,
+      collation:
+        column.result.collation ??
+        getExprCollation(column.expr, state) ??
+        undefined,
+    };
+  });
+}
+async function* _dedupRows<T extends SourceRow>(
+  iter: AsyncIterable<T[]>,
+  makeKey: (row: T) => string
+): AsyncIterableIterator<T[]> {
+  const seen = new Set<string>();
+  for await (const batch of iter) {
+    const kept = batch.filter((row) => {
+      const key = makeKey(row);
+      if (seen.has(key)) {
+        return false;
+      }
+      seen.add(key);
+      return true;
+    });
+    if (kept.length > 0) {
+      yield kept;
+    }
+  }
+}
 async function* _listToItetator(list: SourceRow[]): AsyncIterable<SourceRow[]> {
   yield list;
 }
