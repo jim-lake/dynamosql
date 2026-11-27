@@ -1,6 +1,10 @@
 import type {
   AST,
+  ColumnRef,
   CreateTable,
+  ExpressionValue,
+  ExtractFunc,
+  FulltextSearch,
   FunctionName,
   BaseFrom,
   From,
@@ -10,6 +14,12 @@ import type {
 
 export function isBaseFrom(from: From): from is BaseFrom {
   return 'table' in from && typeof from.table === 'string';
+}
+
+export function isColumnRef(
+  expr: ExpressionValue | ExtractFunc | FulltextSearch
+): expr is ColumnRef {
+  return 'type' in expr && expr.type === 'column_ref';
 }
 
 export function isDerivedFrom(

@@ -1,46 +1,38 @@
-import { setTimeout } from 'node:timers/promises';
-
 import { SQLError } from '../error';
 
 import * as Expression from './expression';
-import { getExprCollation } from './expression/collation';
-import { unionType, unionValue } from './expression/func_comp';
-import { getExprMysqlType } from './expression/mysql_type/mysql_type_expression';
-import { isBaseFrom, isDerivedFrom } from './helpers/ast_helper';
 import { resolveReferences } from './helpers/column_ref_helper';
 import { createConvertKeyNullable } from './helpers/convert_key_nullable';
-import { makeEngineGroups } from './helpers/engine_groups';
+import { loadFromSources } from './helpers/from_sources';
 import { formGroup, formImplicitGroup, hasAggregate } from './helpers/group';
 import { createHashDistinctMakeKey } from './helpers/hash_distinct_index';
 import { formJoin } from './helpers/join';
 import { getKeyTypes } from './helpers/key_type_convert';
 import { expandStarColumns, calcColumns } from './helpers/query_columns';
+import {
+  columnDefs,
+  dedupRows,
+  makeLimit,
+  mergeResultType,
+  projectColumns,
+  referencedResultIndexes,
+} from './helpers/row_pipeline';
 import { sort } from './helpers/sort';
 import { convertNum } from './helpers/sql_conversion';
+import { iterUnion } from './helpers/union';
 import { applyWindows, hasWindow } from './helpers/window';
-import * as Lock from './lock';
-import {
-  mysqlStringToValueType,
-  valueTypeToMysqlType,
-} from './types/value_type';
 
 import type { Session } from '../session';
 import type { FieldInfo } from '../types';
-import type {
-  ColumnDef,
-  TableInfoMap,
-  SourceMap,
-  CellRow,
-  OrderBySpec,
-} from './engine';
+import type { ColumnDef, OrderBySpec, SourceMap, TableInfoMap } from './engine';
 import type {
   EvaluationResult,
   EvaluationState,
   SubqueryValues,
 } from './expression';
 import type {
-  HandlerParams,
   DynamoDBClient,
+  HandlerParams,
   SourceRow,
   SourceRowResult,
   SourceRowResultGroup,
@@ -48,25 +40,8 @@ import type {
 import type { ColumnRefInfo } from './helpers/column_ref_helper';
 import type { QueryColumn } from './helpers/query_columns';
 import type { SelectModifyAST } from './helpers/select_modify';
-import type { ValueType } from './types/value_type';
-import type {
-  AST,
-  Select,
-  ColumnRef,
-  From,
-  Join,
-  Limit,
-  OrderBy,
-  ExpressionValue,
-  ExtractFunc,
-  FulltextSearch,
-} from 'node-sql-parser/build/mysql';
+import type { AST, ColumnRef, From, Select } from 'node-sql-parser/build/mysql';
 
-function _isColumnRef(
-  expr: ExpressionValue | ExtractFunc | FulltextSearch
-): expr is ColumnRef {
-  return 'type' in expr && expr.type === 'column_ref';
-}
 function _isSelect(ast: AST): ast is Select {
   return ast.type === 'select';
 }
@@ -179,7 +154,7 @@ async function _collectScalarSubqueries(
   }
 }
 
-interface IterQueryResults {
+export interface IterQueryResults {
   resultIter: AsyncIterableIterator<SourceRowResult[]>;
   queryColumns: QueryColumn[];
   columnRefMap: Map<ColumnRef, ColumnRefInfo>;
@@ -190,7 +165,7 @@ async function _iterQuery(
 ): Promise<IterQueryResults> {
   const { ast, session, dynamodb } = params;
   if (ast.type === 'select' && ast._next) {
-    return _iterUnion({ ...params, ast });
+    return iterUnion({ ...params, ast }, _iterQuery);
   }
   const subqueryValues: SubqueryValues = new Map();
   await _collectScalarSubqueries(ast.where, params, subqueryValues);
@@ -208,200 +183,16 @@ async function _iterQuery(
     requestAll = requestInfo.requestAll;
     columnRefMap = requestInfo.columnRefMap;
   }
-  const from = ast.type === 'update' ? ast.table : ast.from;
-  const sourceMap: SourceMap = new Map();
-  let iterOrder: OrderBySpec | undefined;
-  const tableInfoMap: TableInfoMap = new Map();
-  if (Array.isArray(from) && from[0]) {
-    if (!from.every((item) => isBaseFrom(item) || isDerivedFrom(item))) {
-      throw new SQLError('Invalid from clause');
-    }
-    const list = from
-      .filter(isBaseFrom)
-      .map((item) => ({ database: item.db, table: item.table, item }));
-    const groups = makeEngineGroups(session, list);
-
-    const orderBy = new Map<From, OrderBySpec>();
-    const first = from[0];
-    if (
-      ast.type === 'select' &&
-      ast.orderby &&
-      from.length === 1 &&
-      isBaseFrom(first) &&
-      !ast.groupby &&
-      !ast.having &&
-      !hasAggregate(ast) &&
-      !hasWindow(ast.columns)
-    ) {
-      const spec: OrderBySpec = [];
-      const requestable = ast.orderby.every((order) => {
-        const expr = order.expr;
-        if (!_isColumnRef(expr)) {
-          return false;
-        }
-        const resultIndex = columnRefMap.get(expr)?.resultIndex;
-        const selected =
-          resultIndex === undefined
-            ? undefined
-            : ast.columns[resultIndex]?.expr;
-        const base = resultIndex === undefined ? expr : selected;
-        if (
-          !base ||
-          !('type' in base) ||
-          base.type !== 'column_ref' ||
-          columnRefMap.get(base)?.from !== first ||
-          typeof base.column !== 'string'
-        ) {
-          return false;
-        }
-        spec.push({
-          column: base.column,
-          direction: order.type === 'DESC' ? 'DESC' : 'ASC',
-        });
-        return true;
-      });
-      if (requestable) {
-        orderBy.set(first, spec);
-      }
-    }
-
-    const tasks = groups.map(async (group) => {
-      const opts = {
-        session,
-        dynamodb,
-        list: group.list.map((f) => f.item),
-        where: ast.where,
-        requestSets,
-        requestAll,
-        columnRefMap,
-        subqueryValues,
-        orderBy,
-      };
-      const result = await group.engine.getRowList(opts);
-      for (const order of result.orderMap.values()) {
-        iterOrder = order;
-      }
-      for (const [f, item] of result.sourceMap) {
-        sourceMap.set(f, item);
-      }
-      for (const [f, item] of result.tableInfoMap) {
-        tableInfoMap.set(f, item);
-      }
-    });
-    for (const item of from.filter(isDerivedFrom)) {
-      tasks.push(
-        _iterQuery({ ast: item.expr.ast, session, dynamodb }).then(
-          ({ resultIter, queryColumns, columnRefMap: innerColumnRefMap }) => {
-            const specs = calcColumns(queryColumns, innerColumnRefMap).map(
-              (column, index) => {
-                const result: QueryColumn['result'] =
-                  queryColumns[index]?.result ?? {};
-                return {
-                  name: column.name,
-                  name_lc: column.name.toLowerCase(),
-                  type: result.type,
-                  mysqlType: result.mysqlType,
-                  length: result.length,
-                  precision: result.precision,
-                  scale: result.scale,
-                  fsp: result.fsp,
-                  collation: result.collation,
-                  nullable: result.nullable,
-                };
-              }
-            );
-            const duplicate = specs.find(
-              (spec, index) =>
-                specs.findIndex((other) => other.name_lc === spec.name_lc) !==
-                index
-            );
-            if (duplicate) {
-              throw new SQLError({
-                code: 'ER_DUP_FIELDNAME',
-                sqlMessage: `Duplicate column name '${duplicate.name}'`,
-              });
-            }
-            sourceMap.set(
-              item,
-              (async function* () {
-                for await (const batch of resultIter) {
-                  yield batch.map((row) => {
-                    const cells: CellRow = {};
-                    row.result.forEach((cell, index) => {
-                      const spec = specs[index];
-                      if (spec) {
-                        cells[spec.name_lc] = {
-                          type: cell.type,
-                          value: cell.value,
-                        };
-                      }
-                    });
-                    return cells;
-                  });
-                }
-              })()
-            );
-            tableInfoMap.set(item, {
-              isCaseSensitive: false,
-              is_open: true,
-              columns: specs,
-            });
-          }
-        )
-      );
-    }
-    await Promise.all(tasks);
-    from.forEach((item, index) => {
-      const joined = item as Join;
-      if (index === 0 || !String(joined.join).includes('NATURAL')) {
-        return;
-      }
-      const lefts = from.slice(0, index);
-      const leftNames = new Set(
-        lefts.flatMap(
-          (left) => tableInfoMap.get(left)?.columns.map((c) => c.name) ?? []
-        )
-      );
-      const rightNames = new Set(
-        tableInfoMap.get(joined)?.columns.map((c) => c.name)
-      );
-      const columns = [...leftNames].filter((name) => rightNames.has(name));
-      if (columns.length === 0) {
-        return;
-      }
-      joined.using = columns;
-    });
-    from.forEach((item, index) => {
-      const joined = item as Join;
-      if (index === 0 || !('using' in joined) || !Array.isArray(joined.using)) {
-        return;
-      }
-      const leftInfos = from
-        .slice(0, index)
-        .map((left) => tableInfoMap.get(left));
-      const rightInfo = tableInfoMap.get(joined);
-      const closed = [rightInfo, ...leftInfos].every(
-        (info) => info?.is_open === false
-      );
-      if (!closed) {
-        return;
-      }
-      const leftNames = new Set(
-        leftInfos.flatMap(
-          (info) => info?.columns.map((c) => c.name.toLowerCase()) ?? []
-        )
-      );
-      const rightNames = new Set(
-        rightInfo?.columns.map((c) => c.name.toLowerCase())
-      );
-      for (const column of joined.using) {
-        const name_lc = column.toLowerCase();
-        if (!leftNames.has(name_lc) || !rightNames.has(name_lc)) {
-          throw new SQLError({ err: 'column_not_found', args: [column] });
-        }
-      }
-    });
-  }
+  const { sourceMap, tableInfoMap, iterOrder } = await loadFromSources({
+    ast,
+    session,
+    dynamodb,
+    requestSets,
+    requestAll,
+    columnRefMap,
+    subqueryValues,
+    runQuery: _iterQuery,
+  });
   return _evaluateReturn({
     ...params,
     sourceMap,
@@ -490,7 +281,9 @@ async function _evaluateReturn(
   const rowIter =
     from && Array.isArray(from)
       ? formJoin({ sourceMap, from, where, state })
-      : _listToItetator([{ source: new Map(), result: null, group: null }]);
+      : (async function* () {
+          yield [{ source: new Map(), result: null, group: null }];
+        })();
 
   let group_iter: AsyncIterable<SourceRow[]>;
 
@@ -503,18 +296,32 @@ async function _evaluateReturn(
   }
 
   if (having) {
-    const indexes = _referencedResultIndexes(
+    const indexes = referencedResultIndexes(
       having,
       state.columnRefMap,
       new Set()
     );
-    group_iter = _projectColumns({
+    const projected = projectColumns({
       iter: group_iter,
       queryColumns,
       indexes,
       state,
     });
-    group_iter = _filterHaving({ iter: group_iter, having, state });
+    group_iter = (async function* () {
+      for await (const batch of projected) {
+        const kept: SourceRow[] = [];
+        for (const row of batch) {
+          const having_result = Expression.getValue(having, { ...state, row });
+          if (having_result.err) {
+            throw new SQLError(having_result.err);
+          }
+          if (convertNum(having_result.value)) {
+            kept.push(row);
+          }
+        }
+        yield kept;
+      }
+    })();
   }
 
   if (ast.type === 'select' && hasWindow(ast.columns)) {
@@ -522,25 +329,25 @@ async function _evaluateReturn(
   }
 
   if (ast.type === 'select' && ast.distinct === 'DISTINCT') {
-    const distinctColumns = _columnDefs(queryColumns, state);
+    const distinctColumns: ColumnDef[] = columnDefs(queryColumns, state);
     const keyTypes = getKeyTypes(distinctColumns);
     const convertKey = createConvertKeyNullable(distinctColumns, keyTypes);
     const makeKey = createHashDistinctMakeKey(keyTypes);
     const indexes = new Set(queryColumns.keys());
-    const projected = _projectColumns({
+    const projected = projectColumns({
       iter: group_iter,
       queryColumns,
       indexes,
       state,
     });
-    group_iter = _dedupRows(projected, (row) =>
+    group_iter = dedupRows(projected, (row) =>
       makeKey(convertKey(row.result ?? []))
     );
   }
 
   let resultIter: AsyncIterable<SourceRow[]> = group_iter;
   if (ast.orderby) {
-    const indexes = _referencedResultIndexes(
+    const indexes = referencedResultIndexes(
       ast.orderby,
       state.columnRefMap,
       new Set()
@@ -555,7 +362,7 @@ async function _evaluateReturn(
         indexes.add(expr.value - 1);
       }
     }
-    resultIter = _projectColumns({
+    resultIter = projectColumns({
       iter: resultIter,
       queryColumns,
       indexes,
@@ -570,446 +377,37 @@ async function _evaluateReturn(
     });
   }
   if (ast.limit) {
-    resultIter = _makeLimit(resultIter, ast.limit);
+    resultIter = makeLimit(resultIter, ast.limit);
   }
 
-  const finalIter = _makeResults({ iter: resultIter, queryColumns, state });
-  return { resultIter: finalIter, queryColumns, columnRefMap, state };
-}
-
-const RUNTIME_UNION_TYPE: Partial<Record<ValueType, ValueType>> = {
-  long: 'longlong',
-  char: 'string',
-};
-async function _iterUnion(
-  params: InternalQueryParams & { ast: Select }
-): Promise<IterQueryResults> {
-  const { ast } = params;
-  const branches: Select[] = [];
-  const setOps: string[] = [];
-  for (let node: Select | undefined = ast; node; node = node._next) {
-    branches.push(node);
-    if (node._next) {
-      setOps.push(node.set_op ?? 'union');
-    }
-  }
-  const isParenthesized = ast.parentheses_symbol === true;
-  const last = branches.length - 1;
-  const lastBranch = branches[last];
-  const orderby = isParenthesized ? ast._orderby : lastBranch?.orderby;
-  const limit = isParenthesized ? ast._limit : lastBranch?.limit;
-
-  const results: IterQueryResults[] = [];
-  for (const [index, branch] of branches.entries()) {
-    const ownsOuterClauses = index === last && !isParenthesized;
-    const branchAst: Select = {
-      ...branch,
-      _next: undefined,
-      set_op: undefined,
-      _orderby: undefined,
-      _limit: undefined,
-      orderby: ownsOuterClauses ? null : branch.orderby,
-      limit: ownsOuterClauses ? null : branch.limit,
-    };
-    results.push(await _iterQuery({ ...params, ast: branchAst }));
-  }
-  const [first, ...others] = results;
-  if (!first) {
-    throw new SQLError('ER_WRONG_NUMBER_OF_COLUMNS_IN_SELECT');
-  }
-  for (const other of others) {
-    if (other.queryColumns.length !== first.queryColumns.length) {
-      throw new SQLError('ER_WRONG_NUMBER_OF_COLUMNS_IN_SELECT');
-    }
-  }
-
-  const unionColumns: ColumnDef[] = first.queryColumns.map((column, index) => {
-    const defs = results.flatMap((result) => {
-      const branchColumn = result.queryColumns[index];
-      const isNull =
-        !branchColumn ||
-        ('type' in branchColumn.expr && branchColumn.expr.type === 'null');
-      return isNull ? [] : _columnDefs([branchColumn], result.state);
-    });
-    const scales = defs.map((def) => def.scale ?? 0);
-    return {
-      name: column.result.name ?? '',
-      type: unionType(
-        defs.map((def) => ({
-          type: RUNTIME_UNION_TYPE[def.type] ?? def.type,
-          value: null,
-          err: null,
-        }))
-      ).type,
-      mysqlType: defs[0]?.mysqlType ?? 'VARCHAR',
-      scale: defs.some((def) => def.scale !== undefined)
-        ? Math.max(...scales)
-        : undefined,
-      collation: defs.find((def) => def.collation)?.collation,
-    };
-  });
-  const keyTypes = getKeyTypes(unionColumns);
-  const convertKey = createConvertKeyNullable(unionColumns, keyTypes);
-  const makeKey = createHashDistinctMakeKey(keyTypes);
-
-  const branchIters = results.map((result) =>
-    (async function* () {
-      for await (const batch of result.resultIter) {
-        for (const row of batch) {
-          for (const [index, cell] of row.result.entries()) {
-            const type = unionColumns[index]?.type;
-            if (
-              type &&
-              type !== 'null' &&
-              type !== 'json' &&
-              cell.type !== type
-            ) {
-              row.result[index] = {
-                ...cell,
-                type,
-                value: unionValue(cell.value, type),
-              };
-            }
-          }
-        }
-        yield batch;
-      }
-    })()
-  );
-  let dedupCount = 0;
-  for (const [index, op] of setOps.entries()) {
-    if (op === 'union' || op === 'union distinct') {
-      dedupCount = index + 2;
-    }
-  }
-  async function* concatIters(
-    iters: AsyncIterable<SourceRow[]>[]
-  ): AsyncIterable<SourceRow[]> {
-    for (const iter of iters) {
-      yield* iter;
-    }
-  }
-  let resultIter: AsyncIterable<SourceRow[]> = concatIters(
-    branchIters.slice(0, dedupCount)
-  );
-  if (dedupCount > 1) {
-    resultIter = _dedupRows(resultIter, (row) =>
-      makeKey(convertKey(row.result ?? []))
-    );
-  }
-  resultIter = concatIters([resultIter, ...branchIters.slice(dedupCount)]);
-  if (orderby) {
-    const positional = orderby.map((order): OrderBy => {
-      const { expr } = order;
-      if (
-        'type' in expr &&
-        expr.type === 'number' &&
-        typeof expr.value === 'number' &&
-        (expr.value < 1 || expr.value > first.queryColumns.length)
-      ) {
-        throw new SQLError({
-          err: 'column_not_found',
-          args: [`${expr.value}' in 'order clause`],
-        });
-      }
-      if (!_isColumnRef(expr) || typeof expr.column !== 'string') {
-        return order;
-      }
-      const name = expr.column.toLowerCase();
-      const index = first.queryColumns.findIndex((column) => {
-        const columnName =
-          column.as ??
-          column.result.name ??
-          (_isColumnRef(column.expr) ? column.expr.column : undefined);
-        return (
-          typeof columnName === 'string' && columnName.toLowerCase() === name
-        );
-      });
-      if (index < 0) {
-        throw new SQLError({
-          err: 'column_not_found',
-          args: [`${expr.column}' in 'order clause`],
-        });
-      }
-      return { ...order, expr: { type: 'number', value: index + 1 } };
-    });
-    resultIter = sort({
+  const finalIter = (async function* () {
+    const projected = projectColumns({
       iter: resultIter,
-      orderby: positional,
-      queryColumns: first.queryColumns,
-      state: first.state,
+      queryColumns,
+      indexes: new Set(queryColumns.keys()),
+      state,
     });
-  }
-  if (limit) {
-    resultIter = _makeLimit(resultIter, limit);
-  }
-  const outIter = (async function* () {
-    for await (const batch of resultIter) {
-      for (const [index, column] of first.queryColumns.entries()) {
-        const type = unionColumns[index]?.type ?? 'null';
-        if (type === 'json') {
-          for (const row of batch) {
-            column.result.type = _unionType(
+    for await (const batch of projected) {
+      for (const row of batch) {
+        for (const [index, column] of queryColumns.entries()) {
+          const result = row.result?.[index];
+          if (!result) {
+            continue;
+          }
+          if (result.type !== column.result.type) {
+            column.result.type = mergeResultType(
               column.result.type,
-              row.result?.[index]?.type
+              result.type
             );
           }
-        } else {
-          column.result.type = type === 'null' ? 'string' : type;
-          const declared = column.result.mysqlType;
-          const declaredType = declared
-            ? mysqlStringToValueType(declared)
-            : undefined;
-          if (
-            declaredType &&
-            (RUNTIME_UNION_TYPE[declaredType] ?? declaredType) !==
-              column.result.type
-          ) {
-            column.result.mysqlType = valueTypeToMysqlType(column.result.type);
+          column.result.name ??= result.name;
+          if (result.value === null) {
+            column.result.nullable = true;
           }
-        }
-        if (batch.some((row) => row.result?.[index]?.value === null)) {
-          column.result.nullable = true;
         }
       }
       yield batch as SourceRowResult[];
     }
   })();
-  return {
-    resultIter: outIter,
-    queryColumns: first.queryColumns,
-    columnRefMap: first.columnRefMap,
-    state: first.state,
-  };
-}
-function _columnDefs(
-  queryColumns: QueryColumn[],
-  state: EvaluationState
-): ColumnDef[] {
-  return queryColumns.map((column) => {
-    const typeInfo = getExprMysqlType(column.expr, state);
-    if (!typeInfo) {
-      throw new SQLError({ err: 'ER_NOT_SUPPORTED_YET' });
-    }
-    return {
-      name: column.result.name ?? '',
-      type: mysqlStringToValueType(typeInfo.type),
-      mysqlType: typeInfo.type,
-      length: typeInfo.length,
-      precision: typeInfo.precision,
-      scale: typeInfo.scale,
-      collation:
-        column.result.collation ??
-        getExprCollation(column.expr, state) ??
-        undefined,
-    };
-  });
-}
-async function* _dedupRows<T extends SourceRow>(
-  iter: AsyncIterable<T[]>,
-  makeKey: (row: T) => string
-): AsyncIterableIterator<T[]> {
-  const seen = new Set<string>();
-  for await (const batch of iter) {
-    const kept = batch.filter((row) => {
-      const key = makeKey(row);
-      if (seen.has(key)) {
-        return false;
-      }
-      seen.add(key);
-      return true;
-    });
-    if (kept.length > 0) {
-      yield kept;
-    }
-  }
-}
-async function* _listToItetator(list: SourceRow[]): AsyncIterable<SourceRow[]> {
-  yield list;
-}
-function _referencedResultIndexes(
-  node: unknown,
-  columnRefMap: EvaluationState['columnRefMap'],
-  found: Set<number>
-): Set<number> {
-  if (typeof node !== 'object' || node === null) {
-    return found;
-  }
-  if (Array.isArray(node)) {
-    for (const child of node) {
-      _referencedResultIndexes(child, columnRefMap, found);
-    }
-    return found;
-  }
-  const index = columnRefMap?.get(node as ColumnRef)?.resultIndex;
-  if (index !== undefined && index >= 0) {
-    found.add(index);
-  }
-  if ('type' in node && node.type === 'select') {
-    return found;
-  }
-  for (const child of Object.values(node)) {
-    _referencedResultIndexes(child, columnRefMap, found);
-  }
-  return found;
-}
-interface ProjectColumnsParams {
-  iter: AsyncIterable<SourceRow[]>;
-  queryColumns: QueryColumn[];
-  indexes: Set<number>;
-  state: EvaluationState;
-}
-async function* _projectColumns(
-  params: ProjectColumnsParams
-): AsyncIterable<SourceRow[]> {
-  const { iter, queryColumns, indexes, state } = params;
-  for await (const batch of iter) {
-    for (const row of batch) {
-      const output_row: EvaluationResult[] = row.result ?? [];
-      for (const index of indexes) {
-        const column = queryColumns[index];
-        if (!column || output_row[index]) {
-          continue;
-        }
-        const rowState = { ...state, row };
-        let result: EvaluationResult;
-        for (;;) {
-          try {
-            result = Expression.getValue(column.expr, rowState);
-            break;
-          } catch (err) {
-            if (!(err instanceof Lock.LockValueRequiredError)) {
-              throw err;
-            }
-            const { lock } = err;
-            const value = await Lock.runLockFunction(state.session, lock);
-            rowState.lockValues ??= new Map();
-            rowState.lockValues.set(lock.node, value);
-          }
-        }
-        if (result.err) {
-          throw new SQLError(result.err);
-        }
-        output_row[index] = result;
-        if (result.sleep_ms) {
-          await setTimeout(result.sleep_ms);
-        }
-      }
-      row.result = output_row;
-    }
-    yield batch;
-  }
-}
-interface FilterHavingParams {
-  iter: AsyncIterable<SourceRow[]>;
-  having: NonNullable<Select['having']>;
-  state: EvaluationState;
-}
-async function* _filterHaving(
-  params: FilterHavingParams
-): AsyncIterable<SourceRow[]> {
-  const { iter, having, state } = params;
-  for await (const batch of iter) {
-    const kept: SourceRow[] = [];
-    for (const row of batch) {
-      const having_result = Expression.getValue(having, { ...state, row });
-      if (having_result.err) {
-        throw new SQLError(having_result.err);
-      }
-      if (convertNum(having_result.value)) {
-        kept.push(row);
-      }
-    }
-    yield kept;
-  }
-}
-interface MakeResultsParams {
-  iter: AsyncIterable<SourceRow[]>;
-  queryColumns: QueryColumn[];
-  state: EvaluationState;
-}
-async function* _makeResults(
-  params: MakeResultsParams
-): AsyncIterableIterator<SourceRowResult[]> {
-  const { iter, queryColumns, state } = params;
-  const indexes = new Set(queryColumns.keys());
-  const projected = _projectColumns({ iter, queryColumns, indexes, state });
-  for await (const batch of projected) {
-    for (const row of batch) {
-      for (const [index, column] of queryColumns.entries()) {
-        const result = row.result?.[index];
-        if (!result) {
-          continue;
-        }
-        if (result.type !== column.result.type) {
-          column.result.type = _unionType(column.result.type, result.type);
-        }
-        column.result.name ??= result.name;
-        if (result.value === null) {
-          column.result.nullable = true;
-        }
-      }
-    }
-    yield batch as SourceRowResult[];
-  }
-}
-async function* _makeLimit(
-  iter: AsyncIterable<SourceRow[]>,
-  limit: Limit
-): AsyncIterableIterator<SourceRow[]> {
-  let skip_count = 0;
-  let send_count: number;
-  if (limit.seperator === 'offset') {
-    const offsetValue = limit.value[1];
-    const limitValue = limit.value[0];
-    skip_count = offsetValue ? offsetValue.value : 0;
-    send_count = limitValue ? limitValue.value : 0;
-  } else if (limit.value.length > 1) {
-    const offsetValue = limit.value[0];
-    const limitValue = limit.value[1];
-    skip_count = offsetValue ? offsetValue.value : 0;
-    send_count = limitValue ? limitValue.value : 0;
-  } else {
-    const limitValue = limit.value[0];
-    send_count = limitValue ? limitValue.value : 0;
-  }
-  for await (const batch of iter) {
-    if (skip_count >= batch.length) {
-      skip_count -= batch.length;
-    } else {
-      if (skip_count > 0) {
-        batch.splice(0, skip_count);
-        skip_count = 0;
-      }
-      if (send_count >= batch.length) {
-        send_count -= batch.length;
-      } else {
-        batch.length = send_count;
-        send_count = 0;
-      }
-      yield batch;
-      if (send_count === 0) {
-        break;
-      }
-    }
-  }
-}
-function _unionType(
-  old_type: ValueType | undefined,
-  new_type: ValueType | undefined
-): ValueType {
-  let ret = new_type ?? 'string';
-  if (!old_type || old_type === 'null') {
-    // noop
-  } else if (new_type === 'null') {
-    ret = old_type;
-  } else if (
-    (new_type === 'double' && old_type === 'number') ||
-    (new_type === 'number' && old_type === 'double')
-  ) {
-    ret = 'double';
-  } else if (new_type !== old_type) {
-    ret = 'string';
-  }
-  return ret;
+  return { resultIter: finalIter, queryColumns, columnRefMap, state };
 }
