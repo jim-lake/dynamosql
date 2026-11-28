@@ -1,8 +1,8 @@
 -- Setup test data
-INSERT INTO _dynamodb.foo SET id = "agg1", other = 100, comment = "test";
-INSERT INTO _dynamodb.foo SET id = "agg2", other = 200, comment = "test";
-INSERT INTO _dynamodb.foo SET id = "agg3", other = 300, comment = "test";
-INSERT INTO _dynamodb.foo SET id = "agg4", other = 150, comment = "other";
+INSERT INTO _dynamodb.foo SET id = "agg1", other = '100', comment = '"test"';
+INSERT INTO _dynamodb.foo SET id = "agg2", other = '200', comment = '"test"';
+INSERT INTO _dynamodb.foo SET id = "agg3", other = '300', comment = '"test"';
+INSERT INTO _dynamodb.foo SET id = "agg4", other = '150', comment = '"other"';
 
 -- Test AVG
 SELECT AVG(other) AS result FROM _dynamodb.foo WHERE id LIKE "agg%";

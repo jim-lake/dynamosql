@@ -40,3 +40,19 @@ Matching MySQL is not a goal for illegal statements. Parse errors (`ER_PARSE_ERR
 ## Column name of a bare NULL literal
 
 - `SELECT NULL;`: MySQL names the column `NULL`. DynamoSQL names it `null`. The value matches. The same naming applies to the first branch of `SELECT NULL UNION SELECT NULL;`.
+
+## COLLATE on a JSON column
+
+- `SELECT id, comment COLLATE UTF8MB4_BIN AS comment FROM _dynamodb.foo ORDER BY 2,1;`, where `comment` is a `JSON` column: MySQL returns the JSON text with its quotes, for example `"111 comment"`. DynamoSQL returns the unquoted string, for example `111 comment`. `ORDER BY comment COLLATE UTF8MB4_0900_AI_CI, id` also orders rows differently, because MySQL sorts the quoted JSON text.
+
+## LAG and LEAD with a non-JSON default on a JSON column
+
+- `SELECT id, LAG(other, 0, -1) OVER (ORDER BY other) AS l FROM _dynamodb.foo WHERE id LIKE 'rl%' ORDER BY id;`, where `other` is a `JSON` column: MySQL returns the window values as strings, for example `'111'`. DynamoSQL returns numbers for the same values, for example `111`. The same applies to `LEAD`.
+
+## CAST of a JSON string into a DOUBLE column in CREATE TABLE AS SELECT
+
+- `CREATE TABLE _dynamodb.ctas_err (g DOUBLE PRIMARY KEY) AS SELECT comment AS g FROM _dynamodb.foo WHERE id = '111';`, where `comment` is a `JSON` column holding a string: MySQL returns `ER_INVALID_JSON_VALUE_FOR_CAST` (3156). DynamoSQL returns `WARN_DATA_TRUNCATED` (1265).
+
+## typeCast false on a JSON column
+
+- `SELECT * FROM _dynamodb.foo ORDER BY id DESC;` with the client option `typeCast: false`: MySQL returns JSON columns as `Buffer` values. DynamoSQL returns `SQLJson` values, so `comment` differs in type. The values match when the client applies the default cast.

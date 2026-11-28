@@ -121,7 +121,7 @@ SELECT COUNT(id) AS c FROM having_mem.t HAVING c = 7;
 SELECT id, amount FROM having_mem.t HAVING having_mem.t.amount > 60 ORDER BY id;
 
 -- HAVING on DynamoDB tables
-INSERT IGNORE INTO _dynamodb.foo (id, other, comment) VALUES ("hav1", 100, "having a"), ("hav2", 100, "having a"), ("hav3", 200, "having b"), ("hav4", 300, "having c"), ("hav5", 300, "having c"), ("hav6", 300, "having c");
+INSERT IGNORE INTO _dynamodb.foo (id, other, comment) VALUES ("hav1", '100', '"having a"'), ("hav2", '100', '"having a"'), ("hav3", '200', '"having b"'), ("hav4", '300', '"having c"'), ("hav5", '300', '"having c"'), ("hav6", '300', '"having c"');
 SELECT other, COUNT(*) AS cnt FROM _dynamodb.foo WHERE id LIKE "hav%" GROUP BY other HAVING COUNT(*) > 1 ORDER BY other;
 SELECT comment, COUNT(*) AS cnt FROM _dynamodb.foo WHERE id LIKE "hav%" GROUP BY comment HAVING cnt = 1 ORDER BY comment;
 SELECT comment, SUM(other) AS total FROM _dynamodb.foo WHERE id LIKE "hav%" GROUP BY comment HAVING total > 300 ORDER BY comment;

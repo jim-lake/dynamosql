@@ -13,6 +13,8 @@ import {
   convertWhere,
 } from '../../helpers/convert_partiql/convert_where';
 
+import { toJsonNative } from './insert';
+
 import type {
   MultiUpdateParams,
   UpdateParams,
@@ -32,6 +34,13 @@ export async function singleUpdate(
   }
   const value_list = set.map((object) => {
     const { value } = object;
+    if (
+      'type' in value &&
+      (value.type === 'single_quote_string' ||
+        value.type === 'double_quote_string')
+    ) {
+      return escapeValue(toJsonNative(value.value));
+    }
     let ret: string | number | boolean | null | undefined;
     const result = convertValueExpression(value, {
       session,
@@ -100,7 +109,8 @@ export async function multipleUpdate(
       key: item.key as unknown as string[],
       set_list: item.set_list.map((set) => ({
         column: set.column,
-        value: (set.value as CellValue).value as AttributeValue | null | string,
+        value: toJsonNative((set.value as CellValue).value) as
+          AttributeValue | null | string,
       })),
     }));
 

@@ -1,0 +1,11 @@
+DROP TABLE IF EXISTS _dynamodb.json_update_raw;
+CREATE TABLE _dynamodb.json_update_raw (id VARCHAR(768) PRIMARY KEY, v JSON, s JSON);
+INSERT INTO _dynamodb.json_update_raw SET id = 'a', v = 2, s = '"start"';
+INSERT INTO _dynamodb.json_update_raw SET id = 'b', v = 10, s = '"other"';
+UPDATE _dynamodb.json_update_raw SET v = v + 1 WHERE id = 'a';
+UPDATE _dynamodb.json_update_raw SET s = 'string' WHERE id = 'a';
+UPDATE _dynamodb.json_update_raw SET v = 'string' WHERE id = 'b';
+SELECT v = 3 AS assert_true FROM _dynamodb.json_update_raw WHERE id = 'a';
+SELECT s = 'string' AS assert_true, JSON_TYPE(s) = 'STRING' AS assert_type FROM _dynamodb.json_update_raw WHERE id = 'a';
+SELECT v = 'string' AS assert_true FROM _dynamodb.json_update_raw WHERE id = 'b';
+DROP TABLE _dynamodb.json_update_raw;

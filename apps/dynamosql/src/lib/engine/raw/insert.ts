@@ -19,6 +19,7 @@ import {
   toAttribute,
   toCell,
 } from '../../helpers/duplicate_update';
+import { SQLJson } from '../../types/sql_json';
 
 import type {
   EvaluationResultRow,
@@ -86,7 +87,10 @@ export async function insertRowList(
             throw new SQLError(value.err);
           }
           return isSameCell(inserted, value)
-            ? { column: item.column, set: value }
+            ? {
+                column: item.column,
+                set: { ...value, value: toJsonNative(value.value) },
+              }
             : undefined;
         }
         const expr = item.value as Binary;
@@ -150,7 +154,11 @@ export async function insertRowList(
           const value = `:v${index}`;
           index++;
           attr_names[attr_name] = name;
-          attr_values[value] = toAttribute(orNull(row[name]));
+          const cell = orNull(row[name]);
+          attr_values[value] = toAttribute({
+            ...cell,
+            value: toJsonNative(cell.value),
+          });
           sets.push(`${attr_name} = if_not_exists(${attr_name}, ${value})`);
         }
         const clauses = [
@@ -189,7 +197,15 @@ export async function insertRowList(
     }
     const update_sql = list.map((row) => {
       const sets = set.map((item) => {
-        const result = convertValueExpression(item.value, {
+        const expr = item.value;
+        if (
+          'type' in expr &&
+          (expr.type === 'single_quote_string' ||
+            expr.type === 'double_quote_string')
+        ) {
+          return `${escapeIdentifier(item.column)} = ${escapeValue(toJsonNative(expr.value))}`;
+        }
+        const result = convertValueExpression(expr, {
           session,
           from,
           columnRefMap,
@@ -228,16 +244,16 @@ export async function insertRowList(
       await dynamodb.batchQL(
         missing_rows.map(
           (row) =>
-            `INSERT INTO ${escapeIdentifier(table)} VALUE ${_escapeItem(row)}`
+            `INSERT INTO ${escapeIdentifier(table)} VALUE ${_escapeItem(row, key_names)}`
         )
       );
     }
     const updated = list.length - missing_rows.length;
     return { affectedRows: updated * 2 + missing_rows.length };
   } else if (params.duplicate_mode) {
-    return _insertIgnoreReplace(params);
+    return _insertIgnoreReplace(params, key_names);
   } else {
-    return _insertNoIgnore(params);
+    return _insertNoIgnore(params, key_names);
   }
 }
 
@@ -258,7 +274,8 @@ function hasExistingRef(node: unknown): boolean {
 }
 
 async function _insertIgnoreReplace(
-  params: InsertParams
+  params: InsertParams,
+  key_names: string[]
 ): Promise<AffectedResult> {
   const { dynamodb, duplicate_mode, table } = params;
   let list = params.list;
@@ -307,7 +324,7 @@ async function _insertIgnoreReplace(
     affectedRows = list.length;
     const sql_list = list.map(
       (item) =>
-        `INSERT INTO ${escapeIdentifier(table)} VALUE ${_escapeItem(item)}`
+        `INSERT INTO ${escapeIdentifier(table)} VALUE ${_escapeItem(item, key_names)}`
     );
 
     try {
@@ -350,7 +367,7 @@ async function _insertIgnoreReplace(
       }
     }
   } else {
-    const nativeList = list.map(_fixupItem);
+    const nativeList = list.map((row) => _fixupItem(row, key_names));
     const opts = { table, list: nativeList };
     await dynamodb.putItems(opts);
     affectedRows = list.length;
@@ -376,11 +393,14 @@ function hasCancellationReasons(
   );
 }
 
-async function _insertNoIgnore(params: InsertParams): Promise<AffectedResult> {
+async function _insertNoIgnore(
+  params: InsertParams,
+  key_names: string[]
+): Promise<AffectedResult> {
   const { dynamodb, table, list } = params;
   const sql_list = list.map(
     (item) =>
-      `INSERT INTO ${escapeIdentifier(table)} VALUE ${_escapeItem(item)}`
+      `INSERT INTO ${escapeIdentifier(table)} VALUE ${_escapeItem(item, key_names)}`
   );
 
   try {
@@ -403,7 +423,7 @@ async function _insertNoIgnore(params: InsertParams): Promise<AffectedResult> {
             if (item) {
               throw new SQLError({
                 err: 'dup_table_insert',
-                args: [table, _fixupItem(item)],
+                args: [table, _fixupItem(item, key_names)],
               });
             }
           } else if (reason?.Code !== 'None') {
@@ -435,21 +455,58 @@ async function _insertNoIgnore(params: InsertParams): Promise<AffectedResult> {
   }
 }
 
-function _fixupItem(row: EvaluationResultRow): NativeType {
+export function toJsonNative(value: unknown): unknown {
+  const node: unknown = value instanceof SQLJson ? value.node : value;
+  if (
+    typeof node === 'object' &&
+    node !== null &&
+    'type' in node &&
+    node.type === 'Buffer' &&
+    'data' in node &&
+    Array.isArray(node.data)
+  ) {
+    return Buffer.from(node.data);
+  }
+  if (typeof node !== 'string') {
+    return node;
+  }
+  if (/^-?\d+(\.\d+)?([eE][+-]?\d+)?$/.test(node)) {
+    return Number(node);
+  }
+  if (!/^["[{]/.test(node)) {
+    return node;
+  }
+  try {
+    return JSON.parse(node);
+  } catch {
+    return node;
+  }
+}
+
+function _fixupItem(row: EvaluationResultRow, key_names: string[]): NativeType {
   const result: Record<string, NativeType> = {};
   for (const key in row) {
     const cell = row[key];
     if (cell !== undefined) {
-      result[key] = cell.value as NativeType;
+      result[key] = (
+        key_names.includes(key.toLowerCase())
+          ? cell.value
+          : toJsonNative(cell.value)
+      ) as NativeType;
     }
   }
   return result;
 }
 
-function _escapeItem(item: EvaluationResultRow): string {
+function _escapeItem(item: EvaluationResultRow, key_names: string[]): string {
   let s = '{ ';
   s += Object.keys(item)
-    .map((key) => `'${key}': ${escapeValue(item[key]?.value)}`)
+    .map((key) => {
+      const value = key_names.includes(key.toLowerCase())
+        ? item[key]?.value
+        : toJsonNative(item[key]?.value);
+      return `'${key}': ${escapeValue(value)}`;
+    })
     .join(', ');
   s += ' }';
   return s;

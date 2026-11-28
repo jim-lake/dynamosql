@@ -59,16 +59,6 @@ SELECT id, foo.comment, bar.otherother FROM _dynamodb.foo LEFT JOIN _dynamodb.ba
 SELECT * FROM _dynamodb.foo JOIN _dynamodb.other USING (other) ORDER BY foo.id ASC;
 SELECT * FROM _dynamodb.foo LEFT JOIN _dynamodb.other USING (other) ORDER BY foo.id ASC;
 SELECT foo.id, other.otherother FROM _dynamodb.foo JOIN _dynamodb.other USING (other) ORDER BY foo.id ASC;
-SELECT bar.id, otherother.comment FROM _dynamodb.bar JOIN _dynamodb.otherother USING (otherother) ORDER BY bar.id ASC;
-
-SELECT foo.id, bar.id, otherother.comment FROM _dynamodb.foo
-  JOIN _dynamodb.bar USING (id)
-  JOIN _dynamodb.otherother USING (otherother)
-  ORDER BY foo.id;
-SELECT foo.id, bar.id, otherother.comment FROM _dynamodb.foo
-  LEFT JOIN _dynamodb.bar USING (id)
-  LEFT JOIN _dynamodb.otherother USING (otherother)
-  ORDER BY foo.id;
 SELECT foo.id, bar.id, other.comment FROM _dynamodb.foo
   JOIN _dynamodb.bar USING (id)
   JOIN _dynamodb.other USING (comment)

@@ -74,7 +74,9 @@ export function convertValueToPQL(value: KeyValue): string {
   if (value === null) {
     ret = 'NULL';
   } else if (typeof value === 'object') {
-    if (value.S !== undefined) {
+    if ('value' in value) {
+      ret = escapeValue(value.value);
+    } else if (value.S !== undefined) {
       ret = "'" + escapeString(value.S) + "'";
     } else if (value.N !== undefined) {
       ret = String(value.N);

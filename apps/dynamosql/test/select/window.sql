@@ -1,9 +1,9 @@
 -- Setup test data
 DELETE FROM _dynamodb.foo WHERE id LIKE "win%";
-INSERT INTO _dynamodb.foo SET id = "win1", other = 100, comment = "test";
-INSERT INTO _dynamodb.foo SET id = "win2", other = 200, comment = "test";
-INSERT INTO _dynamodb.foo SET id = "win3", other = 300, comment = "test";
-INSERT INTO _dynamodb.foo SET id = "win4", other = 150, comment = "other";
+INSERT INTO _dynamodb.foo SET id = "win1", other = '100', comment = '"test"';
+INSERT INTO _dynamodb.foo SET id = "win2", other = '200', comment = '"test"';
+INSERT INTO _dynamodb.foo SET id = "win3", other = '300', comment = '"test"';
+INSERT INTO _dynamodb.foo SET id = "win4", other = '150', comment = '"other"';
 
 -- Test SUM OVER () on every row
 SELECT id, SUM(other) OVER () AS s FROM _dynamodb.foo WHERE id LIKE "win%" ORDER BY id;
@@ -47,7 +47,7 @@ SELECT id, MAX(other) OVER () AS mx FROM _dynamodb.foo WHERE id LIKE "win%" ORDE
 SELECT id, MIN(comment) OVER () AS mn, MAX(comment) OVER () AS mx FROM _dynamodb.foo WHERE id LIKE "win%" ORDER BY id;
 
 -- Test NULL handling for SUM OVER ()
-INSERT INTO _dynamodb.foo SET id = "win5", other = null, comment = "nullish";
+INSERT INTO _dynamodb.foo SET id = "win5", other = null, comment = '"nullish"';
 SELECT id, SUM(other) OVER () AS s FROM _dynamodb.foo WHERE id LIKE "win%" ORDER BY id;
 SELECT id, COUNT(other) OVER () AS n FROM _dynamodb.foo WHERE id LIKE "win%" ORDER BY id;
 SELECT id, COUNT(*) OVER () AS n FROM _dynamodb.foo WHERE id LIKE "win%" ORDER BY id;

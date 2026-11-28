@@ -18,11 +18,11 @@ SELECT s.id, u.label FROM (SELECT id, a FROM der_order.t ORDER BY a DESC LIMIT 3
 SELECT s.id, u.label FROM (SELECT id FROM der_order.t ORDER BY a LIMIT 3) s LEFT JOIN der_order.u u ON u.id = s.id ORDER BY s.id;
 
 DELETE FROM _dynamodb.foo WHERE id LIKE "dl%";
-INSERT INTO _dynamodb.foo SET id = "dl1", other = 10, comment = "p";
-INSERT INTO _dynamodb.foo SET id = "dl2", other = 20, comment = "p";
-INSERT INTO _dynamodb.foo SET id = "dl3", other = 30, comment = "q";
-INSERT INTO _dynamodb.foo SET id = "dl4", other = 40, comment = "q";
-INSERT INTO _dynamodb.foo SET id = "dl5", other = 50, comment = "q";
+INSERT INTO _dynamodb.foo SET id = "dl1", other = '10', comment = '"p"';
+INSERT INTO _dynamodb.foo SET id = "dl2", other = '20', comment = '"p"';
+INSERT INTO _dynamodb.foo SET id = "dl3", other = '30', comment = '"q"';
+INSERT INTO _dynamodb.foo SET id = "dl4", other = '40', comment = '"q"';
+INSERT INTO _dynamodb.foo SET id = "dl5", other = '50', comment = '"q"';
 
 SELECT s.id, s.other FROM (SELECT id, other FROM _dynamodb.foo WHERE id LIKE "dl%" ORDER BY other DESC LIMIT 3) s ORDER BY s.id;
 SELECT s.id FROM (SELECT id, other FROM _dynamodb.foo WHERE id LIKE "dl%" ORDER BY other LIMIT 2 OFFSET 1) s ORDER BY s.id;

@@ -4,9 +4,9 @@ import { testNamespace } from '../test_namespace';
 
 const TABLE = 'raw_ctas_no_pk_probe';
 const NO_PK_LIST = [
-  `CREATE TABLE _dynamodb.${TABLE} (id INT)`,
+  `CREATE TABLE _dynamodb.${TABLE} (id JSON)`,
   `CREATE TABLE _dynamodb.${TABLE} AS SELECT 1 AS id`,
-  `CREATE TABLE _dynamodb.${TABLE} (id INT) AS SELECT 1 AS id`,
+  `CREATE TABLE _dynamodb.${TABLE} (id JSON) AS SELECT 1 AS id`,
 ];
 
 async function runQuery(

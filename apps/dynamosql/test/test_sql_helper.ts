@@ -32,9 +32,9 @@ interface QueryOutcome {
 }
 
 const SECONDS_REGEX = /:[0-9]{2}(\.[0-9]*)?$/g;
-const SQL_MODE =
+export const SQL_MODE =
   'STRICT_TRANS_TABLES,STRICT_ALL_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,TRADITIONAL,NO_ENGINE_SUBSTITUTION';
-const CONNECTION_COLLATION = 'utf8mb4_0900_ai_ci';
+export const CONNECTION_COLLATION = 'utf8mb4_0900_ai_ci';
 
 process.on('uncaughtException', (err) => {
   console.error('Caught uncaught exception:', err);
@@ -67,23 +67,9 @@ export function runTests(
     extra?.mysql
   );
 
-  const session_opts = Object.assign(
-    {
-      namespace: testNamespace(),
-      region: process.env.AWS_REGION,
-      resultObjects: false,
-      dateStrings: true,
-      decimalNumbers: true,
-    },
-    extra?.session
-  );
+  const session_opts = sessionOptions(extra?.session);
 
-  const data = fs.readFileSync(file_path, 'utf8');
-  const sql_list = data
-    .replace(/--.*$/gm, '\n')
-    .split(';')
-    .map((s) => s.trim())
-    .filter((s) => s.length > 0);
+  const sql_list = readSqlStatements(file_path);
 
   let mysql_conn: mysql.Connection;
   let ddb_session: ReturnType<typeof createSession>;
@@ -260,6 +246,26 @@ export function runTests(
       }
     });
   }
+}
+export function sessionOptions(overrides?: Record<string, unknown>) {
+  return Object.assign(
+    {
+      namespace: testNamespace(),
+      region: process.env.AWS_REGION,
+      resultObjects: false,
+      dateStrings: true,
+      decimalNumbers: true,
+    },
+    overrides
+  );
+}
+export function readSqlStatements(file_path: string): string[] {
+  const data = fs.readFileSync(file_path, 'utf8');
+  return data
+    .replace(/--.*$/gm, '\n')
+    .split(';')
+    .map((s) => s.trim())
+    .filter((s) => s.length > 0);
 }
 function _nestedCell(
   row: any,

@@ -1,5 +1,5 @@
 -- Test DROP TABLE IF EXISTS on existing table
-CREATE TABLE _dynamodb.drop_test (id INT PRIMARY KEY);
+CREATE TABLE _dynamodb.drop_test (id DOUBLE PRIMARY KEY);
 INSERT INTO _dynamodb.drop_test (id) VALUES (1);
 SELECT * FROM _dynamodb.drop_test ORDER BY id;
 DROP TABLE IF EXISTS _dynamodb.drop_test;

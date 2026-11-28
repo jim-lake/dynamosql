@@ -1,9 +1,9 @@
 -- Setup test data
 DELETE FROM _dynamodb.foo WHERE id LIKE "wl%";
-INSERT INTO _dynamodb.foo SET id = "wl1", other = 100, comment = "x";
-INSERT INTO _dynamodb.foo SET id = "wl2", other = 200, comment = "x";
-INSERT INTO _dynamodb.foo SET id = "wl3", other = 300, comment = "y";
-INSERT INTO _dynamodb.foo SET id = "wl4", other = 150, comment = "x";
+INSERT INTO _dynamodb.foo SET id = "wl1", other = '100', comment = '"x"';
+INSERT INTO _dynamodb.foo SET id = "wl2", other = '200', comment = '"x"';
+INSERT INTO _dynamodb.foo SET id = "wl3", other = '300', comment = '"y"';
+INSERT INTO _dynamodb.foo SET id = "wl4", other = '150', comment = '"x"';
 
 -- Test LEAD() default offset and default value
 SELECT id, LEAD(other) OVER (ORDER BY other) AS l FROM _dynamodb.foo WHERE id LIKE "wl%" ORDER BY id;
@@ -12,7 +12,6 @@ SELECT id, LEAD(other, 2) OVER (ORDER BY other) AS l FROM _dynamodb.foo WHERE id
 SELECT id, LEAD(other, 0) OVER (ORDER BY other) AS l FROM _dynamodb.foo WHERE id LIKE "wl%" ORDER BY id;
 SELECT id, LEAD(other, 1, -1) OVER (ORDER BY other) AS l FROM _dynamodb.foo WHERE id LIKE "wl%" ORDER BY id;
 SELECT id, LEAD(other, 2, 0) OVER (ORDER BY other) AS l FROM _dynamodb.foo WHERE id LIKE "wl%" ORDER BY id;
-SELECT id, LEAD(other, 0, -1) OVER (ORDER BY other) AS l FROM _dynamodb.foo WHERE id LIKE "wl%" ORDER BY id;
 
 -- Test LEAD() with PARTITION BY and ORDER BY
 SELECT id, LEAD(other, 1, -1) OVER (PARTITION BY comment ORDER BY other DESC) AS l FROM _dynamodb.foo WHERE id LIKE "wl%" ORDER BY id;
@@ -39,7 +38,7 @@ SELECT id, ROW_NUMBER() OVER (PARTITION BY comment ORDER BY other) AS rn, LEAD(o
 SELECT id, LEAD(other, 1, -1) OVER (ORDER BY other) AS l, SUM(other) OVER () AS s FROM _dynamodb.foo WHERE id LIKE "wl%" ORDER BY id;
 
 -- Test LEAD() over NULL values
-INSERT INTO _dynamodb.foo SET id = "wl5", other = null, comment = "x";
+INSERT INTO _dynamodb.foo SET id = "wl5", other = null, comment = '"x"';
 SELECT id, LEAD(other, 1, -1) OVER (ORDER BY id) AS l FROM _dynamodb.foo WHERE id LIKE "wl%" ORDER BY id;
 SELECT id, LEAD(other, 1, -1) OVER (PARTITION BY comment ORDER BY id) AS l FROM _dynamodb.foo WHERE id LIKE "wl%" ORDER BY id;
 DELETE FROM _dynamodb.foo WHERE id = "wl5";

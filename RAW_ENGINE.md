@@ -74,13 +74,41 @@ The raw engine supports only `utf8mb4_0900_bin` for string columns. PAD collatio
 
 ## JOIN USING on sparse tables
 
-Raw tables have no schema. For `JOIN ... USING (col)`, the engine decides which table owns `col` from the first row of each table, in FROM order. The first table whose first row has `col` owns it. If no earlier table's first row has `col`, the engine uses the previous table in FROM order.
+Key columns are always present, so the engine knows them. Non-key columns have no schema. For `JOIN ... USING (col)` on a non-key column, the engine decides which table owns `col` from the first row of each table, in FROM order. The first table whose first row has `col` owns it. If no earlier table's first row has `col`, the engine uses the previous table in FROM order.
 
-If the first row of a table lacks a column that later rows have, the join can match on the wrong table.
+If the first row of a table lacks a non-key column that later rows have, the join can match on the wrong table.
 
 ## Column metadata
 
-Raw tables store only their key attributes in DynamoDB. `SHOW COLUMNS` and `information_schema.COLUMNS` list only the key columns for a raw table. Non-key columns do not appear, and the rows for key columns do not carry MySQL's nullability, default, comment, or collation details from the table definition.
+DynamoDB declares only the key attributes of a table, so only key columns have a declared type. `SHOW COLUMNS` and `information_schema.COLUMNS` list only the key columns, with these types. GSI key columns use the same mapping, from the index definition.
+
+| DynamoDB type | Partition key   | Sort key        |
+| ------------- | --------------- | --------------- |
+| N             | DOUBLE          | DOUBLE          |
+| S             | VARCHAR(2048)   | VARCHAR(1024)   |
+| B             | VARBINARY(2048) | VARBINARY(1024) |
+
+Key rows do not carry MySQL's nullability, default, or comment from the table definition.
+
+Non-key columns are not declared or listed anywhere. They do not appear in `SHOW COLUMNS` or `information_schema.COLUMNS`. A non-key type in `CREATE TABLE` is ignored. See [JSON](#json) for how non-key values are stored.
+
+## JSON
+
+Non-key columns hold JSON by convention. The engine reads each non-key attribute as a MySQL JSON value:
+
+| DynamoDB type | JSON value                                  |
+| ------------- | ------------------------------------------- |
+| N             | bare number                                 |
+| S             | bare string                                 |
+| B             | `{"type":"Buffer","data":[1,2,3,4]}`        |
+| BOOL          | bare boolean                                |
+| NULL          | `null`                                      |
+
+Other DynamoDB types (lists and sets) are out of scope and not supported.
+
+- JSON numbers are JavaScript doubles. Integers beyond ±(2^53 − 1) lose precision. See `QUERY_ERATA.md`, JSON integers outside the safe range.
+- A JSON object shaped `{"type":"Buffer","data":[...]}` cannot be told apart from a binary value.
+- Function-based JSON updates (`JSON_SET`, `JSON_ARRAY_APPEND`, and similar) read the row, compute the new document, and write it back with no condition check. See Atomicity under INSERT ... ON DUPLICATE KEY UPDATE.
 
 ## Indexes
 

@@ -1,0 +1,15 @@
+DROP TABLE IF EXISTS _dynamodb.raw_json_types;
+CREATE TABLE _dynamodb.raw_json_types (id VARCHAR(768) PRIMARY KEY, n JSON, s JSON, b JSON, t JSON, o JSON);
+INSERT INTO _dynamodb.raw_json_types (id, n, s, b, t, o) VALUES ('r1', 3, '"hello"', NULL, TRUE, '{"a": 1, "b": "x"}');
+INSERT INTO _dynamodb.raw_json_types (id, n, s, b, t) VALUES ('r2', NULL, NULL, NULL, NULL);
+SELECT id, n = 3 AS assert_n, s = 'hello' AS assert_s FROM _dynamodb.raw_json_types WHERE id = 'r1';
+SELECT id, JSON_TYPE(n) = 'INTEGER' AS assert_n, JSON_TYPE(s) = 'STRING' AS assert_s FROM _dynamodb.raw_json_types WHERE id = 'r1';
+SELECT id, o->'$.a' = 1 AS assert_arrow, o->>'$.b' = 'x' AS assert_arrow_text FROM _dynamodb.raw_json_types WHERE id = 'r1';
+SELECT id, n IS NULL AS assert_null_n, s IS NULL AS assert_null_s FROM _dynamodb.raw_json_types WHERE id = 'r2';
+SELECT id, JSON_TYPE(n) IS NULL AS assert_json_null FROM _dynamodb.raw_json_types WHERE id = 'r2';
+SELECT id, CAST(n AS JSON) = 3 AS assert_cast FROM _dynamodb.raw_json_types WHERE id = 'r1';
+SELECT SUM(n) = 3 AS assert_sum FROM _dynamodb.raw_json_types;
+SELECT id FROM _dynamodb.raw_json_types ORDER BY id DESC LIMIT 1;
+UPDATE _dynamodb.raw_json_types SET n = n + 1 WHERE id = 'r1';
+SELECT id, n = 4 AS assert_update FROM _dynamodb.raw_json_types WHERE id = 'r1';
+DROP TABLE _dynamodb.raw_json_types;

@@ -187,6 +187,9 @@ Only `CHARACTER_SETS`, `COLLATIONS`, `COLUMNS`, `SCHEMATA`, `TABLES`, and the fe
 | GENERATION_EXPRESSION    | ✅        |
 | SRS_ID                   | ✅        |
 
+Caveat for raw engine tables (`_dynamodb`): `DATA_TYPE` and `COLUMN_TYPE` for key columns reflect the DynamoDB key type. An `N` key is `double` (`DOUBLE`). An `S` key is `varchar` (`VARCHAR(2048)` partition, `VARCHAR(1024)` sort). A `B` key is `varbinary` (`VARBINARY(2048)` partition, `VARBINARY(1024)` sort). GSI key columns use the same mapping. Non-key columns are not listed, because DynamoDB does not declare them. See `RAW_ENGINE.md`, Column metadata.
+
+
 ### COLUMNS_EXTENSIONS ❌
 
 | Column                     | Supported |

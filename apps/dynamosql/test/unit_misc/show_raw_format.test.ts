@@ -29,7 +29,7 @@ describe('SHOW on raw (_dynamodb) tables', () => {
     await runQuery(conn, `DROP TABLE IF EXISTS _dynamodb.${TABLE}`);
     await runQuery(
       conn,
-      `CREATE TABLE _dynamodb.${TABLE} (id INT PRIMARY KEY, name VARCHAR(20), amount DECIMAL(10,2), flag BOOLEAN)`
+      `CREATE TABLE _dynamodb.${TABLE} (id DOUBLE PRIMARY KEY, name JSON, amount JSON, flag JSON)`
     );
   });
 

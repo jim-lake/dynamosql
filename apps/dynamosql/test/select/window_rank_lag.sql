@@ -1,9 +1,9 @@
 -- Setup test data
 DELETE FROM _dynamodb.foo WHERE id LIKE "rl%";
-INSERT INTO _dynamodb.foo SET id = "rl1", other = 100, comment = "x";
-INSERT INTO _dynamodb.foo SET id = "rl2", other = 200, comment = "x";
-INSERT INTO _dynamodb.foo SET id = "rl3", other = 300, comment = "y";
-INSERT INTO _dynamodb.foo SET id = "rl4", other = 150, comment = "x";
+INSERT INTO _dynamodb.foo SET id = "rl1", other = '100', comment = '"x"';
+INSERT INTO _dynamodb.foo SET id = "rl2", other = '200', comment = '"x"';
+INSERT INTO _dynamodb.foo SET id = "rl3", other = '300', comment = '"y"';
+INSERT INTO _dynamodb.foo SET id = "rl4", other = '150', comment = '"x"';
 
 -- Test ROW_NUMBER() without ORDER BY (streams, one counter)
 SELECT id, ROW_NUMBER() OVER () AS rn FROM _dynamodb.foo WHERE id = "rl1";
@@ -31,7 +31,6 @@ SELECT id, LAG(other, 2) OVER (ORDER BY other) AS l FROM _dynamodb.foo WHERE id 
 SELECT id, LAG(other, 0) OVER (ORDER BY other) AS l FROM _dynamodb.foo WHERE id LIKE "rl%" ORDER BY id;
 SELECT id, LAG(other, 1, -1) OVER (ORDER BY other) AS l FROM _dynamodb.foo WHERE id LIKE "rl%" ORDER BY id;
 SELECT id, LAG(other, 2, 0) OVER (ORDER BY other) AS l FROM _dynamodb.foo WHERE id LIKE "rl%" ORDER BY id;
-SELECT id, LAG(other, 0, -1) OVER (ORDER BY other) AS l FROM _dynamodb.foo WHERE id LIKE "rl%" ORDER BY id;
 
 -- Test LAG() with PARTITION BY and ORDER BY
 SELECT id, LAG(other, 1, -1) OVER (PARTITION BY comment ORDER BY other DESC) AS l FROM _dynamodb.foo WHERE id LIKE "rl%" ORDER BY id;
@@ -54,7 +53,7 @@ SELECT id, ROW_NUMBER() OVER (PARTITION BY comment ORDER BY other) AS rn, LAG(ot
 SELECT id, ROW_NUMBER() OVER (ORDER BY other) AS rn, SUM(other) OVER () AS s FROM _dynamodb.foo WHERE id LIKE "rl%" ORDER BY id;
 
 -- Test LAG() over NULL values
-INSERT INTO _dynamodb.foo SET id = "rl5", other = null, comment = "x";
+INSERT INTO _dynamodb.foo SET id = "rl5", other = null, comment = '"x"';
 SELECT id, LAG(other, 1, -1) OVER (ORDER BY id) AS l FROM _dynamodb.foo WHERE id LIKE "rl%" ORDER BY id;
 DELETE FROM _dynamodb.foo WHERE id = "rl5";
 

@@ -1,10 +1,10 @@
 -- Setup test data
 INSERT IGNORE INTO _dynamodb.foo (id, other, comment) VALUES
-  ("del1", 100, "delete test 1"),
-  ("del2", 200, "delete test 2"),
-  ("del3", 300, "delete test 3"),
-  ("del4", NULL, "delete test 4"),
-  ("del5", 500, NULL);
+  ("del1", '100', '"delete test 1"'),
+  ("del2", '200', '"delete test 2"'),
+  ("del3", '300', '"delete test 3"'),
+  ("del4", NULL, '"delete test 4"'),
+  ("del5", '500', NULL);
 
 SELECT id, other, comment FROM _dynamodb.foo WHERE id LIKE "del%" ORDER BY id;
 

@@ -1,11 +1,14 @@
 import { logger } from '@dynamosql/shared';
 
 import type { ItemRecord } from '@/tools/dynamodb';
-import { escapeIdentifier } from '@/tools/dynamodb_helper';
+import { escapeIdentifier, valueToNative } from '@/tools/dynamodb_helper';
 
 import { COLLATIONS } from '../../../constants/mysql';
 import { SQLError } from '../../../error';
 import { convertWhere } from '../../helpers/convert_partiql/convert_where';
+import { SQLJson } from '../../types/sql_json';
+
+import { getKeyColumns } from './ddl';
 
 import type {
   FromJoin,
@@ -13,6 +16,8 @@ import type {
   RowListResult,
   QueryTableInfo,
   QueryColumnInfo,
+  Row,
+  ColumnDef,
 } from '..';
 
 const RAW_COLLATION = COLLATIONS.UTF8MB4_0900_BIN;
@@ -31,7 +36,7 @@ export async function getRowList(
   return { sourceMap, tableInfoMap, orderMap: new Map() };
 }
 interface InteralGetResult {
-  resultIter: AsyncIterable<ItemRecord[]>;
+  resultIter: AsyncIterable<Row[]>;
   tableInfo: QueryTableInfo;
 }
 async function _getFromTable(
@@ -75,6 +80,9 @@ async function _getFromTable(
 
   try {
     const iter = dynamodb.queryQLIter({ sql });
+    const key_columns = getKeyColumns(
+      (await dynamodb.getTableCached(table)).Table ?? {}
+    );
     let columns: QueryColumnInfo[] = [];
     let first_values: ItemRecord[] | undefined;
     if (isRequestAll) {
@@ -103,13 +111,13 @@ async function _getFromTable(
         collation: RAW_COLLATION,
       }));
     }
-    async function* _makeIter(): AsyncIterable<ItemRecord[]> {
+    async function* _makeIter(): AsyncIterable<Row[]> {
       try {
         if (first_values !== undefined) {
-          yield first_values;
+          yield _toRows(first_values, key_columns);
         }
         for await (const batch of iter) {
-          yield batch;
+          yield _toRows(batch, key_columns);
         }
       } catch (err: unknown) {
         throw _fixErr(err, table, sql);
@@ -122,6 +130,30 @@ async function _getFromTable(
   } catch (err: unknown) {
     throw _fixErr(err, table, sql);
   }
+}
+function _toRows(items: ItemRecord[], key_columns: ColumnDef[]): Row[] {
+  return items.map((item) => {
+    const row: Row = {};
+    for (const [name, attr] of Object.entries(item)) {
+      const key_column = key_columns.find((column) => column.name === name);
+      if (key_column && attr.N !== undefined) {
+        row[name] = { type: 'double', value: Number(attr.N) };
+      } else if (key_column && attr.B !== undefined) {
+        row[name] = { type: 'buffer', value: Buffer.from(attr.B) };
+      } else if (key_column) {
+        row[name] = { type: 'string', value: attr.S };
+      } else if (attr.NULL) {
+        row[name] = { type: 'null', value: null };
+      } else {
+        const node =
+          attr.B !== undefined
+            ? Buffer.from(attr.B).toJSON()
+            : valueToNative(attr);
+        row[name] = { type: 'json', value: new SQLJson(node) };
+      }
+    }
+    return row;
+  });
 }
 function _fixErr(err: unknown, table: string, sql: string) {
   if (err instanceof Error && err.message === 'resource_not_found') {

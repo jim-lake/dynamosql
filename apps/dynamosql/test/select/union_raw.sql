@@ -1,13 +1,13 @@
-INSERT INTO _dynamodb.foo SET id = "un1", other = 10, comment = "alpha";
-INSERT INTO _dynamodb.foo SET id = "un2", other = 10, comment = "alpha";
-INSERT INTO _dynamodb.foo SET id = "un3", other = 20, comment = "beta";
-INSERT INTO _dynamodb.foo SET id = "un4", other = 20, comment = "Beta";
-INSERT INTO _dynamodb.foo SET id = "un5", other = null, comment = "nullish";
-INSERT INTO _dynamodb.foo SET id = "un6", other = null, comment = "nullish";
-INSERT INTO _dynamodb.foo SET id = "un7", other = 30, comment = null;
-INSERT INTO _dynamodb.foo SET id = "un8", other = 40, comment = "alpha ";
-INSERT INTO _dynamodb.bar SET id = "un1", other = "10", otherother = "alpha";
-INSERT INTO _dynamodb.bar SET id = "un2", other = "20", otherother = "beta";
+INSERT INTO _dynamodb.foo SET id = "un1", other = '10', comment = '"alpha"';
+INSERT INTO _dynamodb.foo SET id = "un2", other = '10', comment = '"alpha"';
+INSERT INTO _dynamodb.foo SET id = "un3", other = '20', comment = '"beta"';
+INSERT INTO _dynamodb.foo SET id = "un4", other = '20', comment = '"Beta"';
+INSERT INTO _dynamodb.foo SET id = "un5", other = null, comment = '"nullish"';
+INSERT INTO _dynamodb.foo SET id = "un6", other = null, comment = '"nullish"';
+INSERT INTO _dynamodb.foo SET id = "un7", other = '30', comment = null;
+INSERT INTO _dynamodb.foo SET id = "un8", other = '40', comment = '"alpha "';
+INSERT INTO _dynamodb.bar SET id = "un1", other = '"10"', otherother = '"alpha"';
+INSERT INTO _dynamodb.bar SET id = "un2", other = '"20"', otherother = '"beta"';
 INSERT INTO _dynamodb.bar SET id = "un3", other = null, otherother = null;
 
 SELECT other FROM _dynamodb.foo WHERE id LIKE "un%" AND id <= "un3" UNION SELECT other FROM _dynamodb.foo WHERE id LIKE "un%" AND id >= "un2" ORDER BY other;

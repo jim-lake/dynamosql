@@ -1,11 +1,11 @@
 CREATE DATABASE IF NOT EXISTS dst_distinct;
-INSERT INTO _dynamodb.foo SET id = "dis1", other = 10, comment = "alpha";
-INSERT INTO _dynamodb.foo SET id = "dis2", other = 10, comment = "alpha";
-INSERT INTO _dynamodb.foo SET id = "dis3", other = 20, comment = "beta";
-INSERT INTO _dynamodb.foo SET id = "dis4", other = 20, comment = "Beta";
-INSERT INTO _dynamodb.foo SET id = "dis5", other = null, comment = "nullish";
-INSERT INTO _dynamodb.foo SET id = "dis6", other = null, comment = "nullish";
-INSERT INTO _dynamodb.foo SET id = "dis7", other = 30, comment = null;
+INSERT INTO _dynamodb.foo SET id = "dis1", other = '10', comment = '"alpha"';
+INSERT INTO _dynamodb.foo SET id = "dis2", other = '10', comment = '"alpha"';
+INSERT INTO _dynamodb.foo SET id = "dis3", other = '20', comment = '"beta"';
+INSERT INTO _dynamodb.foo SET id = "dis4", other = '20', comment = '"Beta"';
+INSERT INTO _dynamodb.foo SET id = "dis5", other = null, comment = '"nullish"';
+INSERT INTO _dynamodb.foo SET id = "dis6", other = null, comment = '"nullish"';
+INSERT INTO _dynamodb.foo SET id = "dis7", other = '30', comment = null;
 
 SELECT DISTINCT other FROM _dynamodb.foo WHERE id LIKE "dis%" ORDER BY other;
 SELECT DISTINCT comment FROM _dynamodb.foo WHERE id LIKE "dis%" ORDER BY comment;

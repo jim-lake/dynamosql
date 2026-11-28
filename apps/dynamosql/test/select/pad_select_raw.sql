@@ -1,5 +1,5 @@
 DELETE FROM _dynamodb.foo WHERE id LIKE "pad_sel_%";
-INSERT INTO _dynamodb.foo (id, other, comment) VALUES ("pad_sel_abc", 1, "abc"), ("pad_sel_abc  ", 2, "abc two spaces"), ("pad_sel_abd", 3, "abd");
+INSERT INTO _dynamodb.foo (id, other, comment) VALUES ("pad_sel_abc", '1', '"abc"'), ("pad_sel_abc  ", '2', '"abc two spaces"'), ("pad_sel_abd", '3', '"abd"');
 SELECT id, other FROM _dynamodb.foo WHERE id = "pad_sel_abc" ORDER BY id;
 SELECT id, other FROM _dynamodb.foo WHERE id = "pad_sel_abc  " ORDER BY id;
 SELECT id, other FROM _dynamodb.foo WHERE id = "pad_sel_abc " ORDER BY id;

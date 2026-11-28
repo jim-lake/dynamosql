@@ -32,11 +32,11 @@ SELECT a.id FROM (SELECT id FROM der_stream.big WHERE id < 1200) a LEFT JOIN (SE
 SELECT s.id FROM (SELECT id FROM der_stream.big WHERE id < 1500) s JOIN der_stream.digits d ON d.d = s.id WHERE s.id < 10 ORDER BY s.id;
 
 DELETE FROM _dynamodb.foo WHERE id LIKE "ds%";
-INSERT INTO _dynamodb.foo SET id = "ds1", other = 10, comment = "p";
-INSERT INTO _dynamodb.foo SET id = "ds2", other = 20, comment = "p";
-INSERT INTO _dynamodb.foo SET id = "ds3", other = 30, comment = "q";
-INSERT INTO _dynamodb.foo SET id = "ds4", other = 40, comment = "q";
-INSERT INTO _dynamodb.foo SET id = "ds5", other = 50, comment = "q";
+INSERT INTO _dynamodb.foo SET id = "ds1", other = '10', comment = '"p"';
+INSERT INTO _dynamodb.foo SET id = "ds2", other = '20', comment = '"p"';
+INSERT INTO _dynamodb.foo SET id = "ds3", other = '30', comment = '"q"';
+INSERT INTO _dynamodb.foo SET id = "ds4", other = '40', comment = '"q"';
+INSERT INTO _dynamodb.foo SET id = "ds5", other = '50', comment = '"q"';
 
 SELECT s.id, s.other FROM (SELECT id, other FROM _dynamodb.foo WHERE id LIKE "ds%") s ORDER BY s.id LIMIT 2;
 SELECT s.id, s.other FROM (SELECT id, other FROM _dynamodb.foo WHERE id LIKE "ds%") s ORDER BY s.other DESC LIMIT 1;

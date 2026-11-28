@@ -16,15 +16,64 @@ import type {
   DeleteIndexParams,
   AddColumnParams,
   AffectedResult,
+  ColumnDef,
 } from '../index';
+import type { TableDescription } from '@aws-sdk/client-dynamodb';
 
-const TYPE_MAP = { S: 'string', N: 'number', B: 'buffer' } as const;
-const MYSQL_TYPE_MAP = { S: 'VARCHAR', N: 'DECIMAL', B: 'BLOB' } as const;
+type KeyRole = 'HASH' | 'RANGE';
+const KEY_COLUMN_TYPE = {
+  HASH: {
+    N: { type: 'double', mysqlType: 'DOUBLE', length: undefined },
+    S: { type: 'string', mysqlType: 'VARCHAR', length: 2048 },
+    B: { type: 'buffer', mysqlType: 'VARBINARY', length: 2048 },
+  },
+  RANGE: {
+    N: { type: 'double', mysqlType: 'DOUBLE', length: undefined },
+    S: { type: 'string', mysqlType: 'VARCHAR', length: 1024 },
+    B: { type: 'buffer', mysqlType: 'VARBINARY', length: 1024 },
+  },
+} as const;
 const COLLATION_MAP = {
   S: COLLATIONS.UTF8MB4_0900_BIN,
   N: undefined,
   B: undefined,
 } as const;
+
+export function getKeyColumns(table: TableDescription): ColumnDef[] {
+  const key_roles = new Map<string, KeyRole>();
+  const index_keys = (table.GlobalSecondaryIndexes ?? []).flatMap(
+    (index) => index.KeySchema ?? []
+  );
+  for (const key of [...index_keys, ...(table.KeySchema ?? [])]) {
+    const role =
+      key.KeyType === 'HASH' || key.KeyType === 'RANGE'
+        ? key.KeyType
+        : undefined;
+    if (key.AttributeName && role) {
+      key_roles.set(key.AttributeName, role);
+    }
+  }
+
+  return (table.AttributeDefinitions ?? []).flatMap((def) => {
+    if (!def.AttributeName || !def.AttributeType) {
+      throw new Error('bad_data');
+    }
+    const role = key_roles.get(def.AttributeName);
+    if (!role) {
+      return [];
+    }
+    const key_type = KEY_COLUMN_TYPE[role][def.AttributeType];
+    return [
+      {
+        name: def.AttributeName,
+        type: key_type.type,
+        mysqlType: key_type.mysqlType,
+        length: key_type.length,
+        collation: COLLATION_MAP[def.AttributeType],
+      },
+    ];
+  });
+}
 
 export async function getTableInfo(
   params: TableInfoParams
@@ -36,15 +85,7 @@ export async function getTableInfo(
       throw new Error('bad_data');
     }
 
-    const column_list = data.Table.AttributeDefinitions.map((def) => {
-      if (!def.AttributeName || !def.AttributeType) {
-        throw new Error('bad_data');
-      }
-      const type = TYPE_MAP[def.AttributeType];
-      const mysqlType = MYSQL_TYPE_MAP[def.AttributeType];
-      const collation = COLLATION_MAP[def.AttributeType];
-      return { name: def.AttributeName, type, mysqlType, collation };
-    });
+    const column_list = getKeyColumns(data.Table);
     const primary_key = data.Table.KeySchema.map(
       (key) => key.AttributeName ?? ''
     );

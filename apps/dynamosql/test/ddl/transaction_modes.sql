@@ -1,8 +1,8 @@
 BEGIN WORK;
-UPDATE _dynamodb.foo SET comment = "begin work" WHERE id = "4";
+UPDATE _dynamodb.foo SET comment = '"begin work"' WHERE id = "4";
 COMMIT;
 SELECT id, comment FROM _dynamodb.foo WHERE id = "4";
-UPDATE _dynamodb.foo SET comment = "4 comment" WHERE id = "4";
+UPDATE _dynamodb.foo SET comment = '"4 comment"' WHERE id = "4";
 
 CREATE DATABASE IF NOT EXISTS mem_gap_tx;
 USE mem_gap_tx;
